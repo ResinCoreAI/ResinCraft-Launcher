@@ -1,0 +1,31 @@
+// Strings for this area of the UI (see ../index.tsx for the format).
+export default {
+  'library.title': 'Library',
+  'library.subtitle': 'All your Minecraft setups in one place.',
+  'library.importModpack': 'Import modpack',
+  'library.newInstance': 'New instance',
+  'library.imported': 'Imported {name}',
+  'library.empty.title': 'No instances yet',
+  'library.empty.body': 'Create a fresh instance or install a ready-made modpack to get started.',
+  'library.empty.create': 'Create one',
+  'library.empty.browse': 'Browse modpacks',
+  'library.search': 'Search instances…',
+  'library.sort.label': 'Sort',
+  'library.sort.recent': 'Recently played',
+  'library.sort.name': 'Name',
+  'library.sort.version': 'Game version',
+  'library.sort.playtime': 'Play time',
+  'library.noMatch.title': 'Nothing matches',
+  'library.noMatch.body': 'Try a different search.',
+  'library.card.running': 'Running',
+  'library.card.preparing': 'Preparing…',
+  'library.card.preparingProgress': 'Preparing {percent}%',
+  'library.card.settings': 'Settings',
+  'library.card.duplicate': 'Duplicate',
+  'library.card.duplicated': 'Duplicated {name}',
+  'library.delete.title': 'Delete {name}?',
+  'library.delete.body':
+    'The instance, including its worlds, mods and settings, will be moved to your Recycle Bin. You can restore it from there if you change your mind.',
+  'library.delete.confirm': 'Move to Recycle Bin',
+  'library.delete.done': 'Deleted {name}'
+}

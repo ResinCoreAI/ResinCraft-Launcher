@@ -40,23 +40,30 @@ The launcher **is not publicly downloadable yet**. Say "Not released yet" plainl
 
 ### Logo (SVG, use as-is)
 
-A hexagon (a block seen at an angle) with a purple-to-cyan frame and a green-to-cyan drop of resin inside. **The logo is the only place on the site where a colour gradient is allowed.**
+A purple resin drop holding a green Minecraft-style block. The block's dark right face carries a pixel "R" whose leg ends in a small drop. All flat colours, no gradients. Use it as-is; don't redraw it, recolour it, or add effects. The file is also in the launcher repo at `resources/logo.svg`.
+
+Colours used in the mark: drop `#8b46ff`, block top `#4aff86`, block left `#1bc866`, block right `#3a178c`, pixels `#4aff86`. These sit alongside the UI tokens below; they're for the logo only.
 
 ```svg
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="resin-frame" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#b26bff"/>
-      <stop offset="1" stop-color="#22d3ee"/>
-    </linearGradient>
-    <linearGradient id="resin-drop" x1="0" y1="0" x2="0.6" y2="1">
-      <stop offset="0" stop-color="#39ff88"/>
-      <stop offset="1" stop-color="#22d3ee"/>
-    </linearGradient>
-  </defs>
-  <path d="M32 4 56 18v28L32 60 8 46V18z" fill="#120c1f" stroke="url(#resin-frame)" stroke-width="3.5" stroke-linejoin="round"/>
-  <path d="M32 15c7 9 11 15 11 21a11 11 0 0 1-22 0c0-6 4-12 11-21z" fill="url(#resin-drop)"/>
-  <path d="M26.5 37.5a5.5 5.5 0 0 0 5.5 5.5" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="140 30 744 970">
+  <path fill="#8b46ff" d="M512 48C490 150 400 252 268 402C206 472 168 548 168 632A344 344 0 0 0 856 632C856 548 818 472 756 402C624 252 534 150 512 48Z"/>
+  <path fill="#4aff86" d="M299 500L520 372L741 500L520 628Z"/>
+  <path fill="#1bc866" d="M284 525L506 653L506 907L284 780Z"/>
+  <path fill="#3a178c" d="M534 653L755 525L755 780L534 907Z"/>
+  <g fill="#4aff86">
+    <path d="M550 650L585 630L585 668L550 688Z"/>
+    <path d="M550 698L585 678L585 716L550 736Z"/>
+    <path d="M550 746L585 726L585 764L550 784Z"/>
+    <path d="M550 794L585 774L585 812L550 832Z"/>
+    <path d="M550 842L585 822L585 860L550 880Z"/>
+    <path d="M593 626L628 606L628 644L593 664Z"/>
+    <path d="M636 601L671 581L671 619L636 639Z"/>
+    <path d="M678 625L713 605L713 643L678 663Z"/>
+    <path d="M593 722L628 702L628 740L593 760Z"/>
+    <path d="M636 697L671 677L671 715L636 735Z"/>
+    <path d="M636 745L671 725L671 763L636 783Z"/>
+    <path d="M679 776C679 765 689 758 701 757C712 757 713 769 708 781C702 793 691 801 684 799C680 797 679 790 679 776Z"/>
+  </g>
 </svg>
 ```
 
@@ -80,7 +87,7 @@ Brand colours are **neon purple, cyan and neon green** on a purple-tinted near-b
 
 **How to make it feel neon without looking generated:**
 - **Colour lives on small things.** Thin 1–2px lines, text links, a 6px status dot, the cyan monospace code, a single underline under one word in the hero. Large areas stay `--paper`.
-- **No glows.** No `box-shadow` halos, no `text-shadow` glows, no blurred colour blobs. A neon sign's colour comes from the tube, not the fog. The single exception is a faint glow on the logo mark in the header (`filter: drop-shadow(0 0 6px` with purple at about 35% alpha`)`).
+- **No glows.** No `box-shadow` halos, no `text-shadow` glows, no blurred colour blobs. A neon sign's colour comes from the tube, not the fog. No exceptions, not even on the logo.
 - **Solid fills only.** The primary button is solid `--purple` with `--on-accent` text. It is not a gradient, and it doesn't glow on hover. On hover it gets slightly lighter, or moves down 1px on press.
 - **One colour per surface.** A single component never mixes purple and cyan. Cyan means "data", green means "status", purple means "you can click this".
 
@@ -262,8 +269,8 @@ No Minecraft, Mojang or Microsoft logos, fonts, artwork or official screenshots.
 ## 11. Before you finish: checklist
 
 **Not-AI checks (all must pass):**
-- [ ] No gradient anywhere except inside the logo SVG.
-- [ ] No glow, blur, glass, orb or blob effects (except the faint glow on the header logo).
+- [ ] No gradients anywhere (the logo is flat too).
+- [ ] No glow, blur, glass, orb or blob effects.
 - [ ] No icon-card grid; features are told through screenshots and plain lists.
 - [ ] No eyebrow labels, except the numbered sign-in steps.
 - [ ] Header is the minimal three-link version; footer is a statement plus one line.

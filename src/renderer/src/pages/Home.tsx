@@ -3,34 +3,36 @@ import { InstanceCard } from './Library'
 import { InstanceTile, Logo, PlayButton } from '../components/ui'
 import { useStore } from '../store'
 import { describe, greeting, playtime, timeAgo } from '../util'
+import { t } from '../i18n'
 
 export default function Home() {
   const { instances, activeAccount, go, setNewInstanceOpen } = useStore()
   const featured = instances.find((i) => i.lastPlayed) ?? instances[0]
   const total = instances.reduce((s, i) => s + i.playtime, 0)
+  const versionCount = new Set(instances.map((i) => i.mcVersion)).size
 
   if (!activeAccount || !instances.length) {
     const steps = [
       {
         done: !!activeAccount,
-        title: 'Sign in',
-        text: 'Use the Microsoft account that owns Minecraft.',
+        title: t('home.step.signIn.title'),
+        text: t('home.step.signIn.text'),
         action: () => go({ page: 'accounts' }),
-        cta: 'Sign in'
+        cta: t('home.step.signIn.cta')
       },
       {
         done: instances.length > 0,
-        title: 'Create an instance',
-        text: 'Pick a version and, if you like, Fabric or Quilt for mods.',
+        title: t('home.step.create.title'),
+        text: t('home.step.create.text'),
         action: () => setNewInstanceOpen(true),
-        cta: 'Create'
+        cta: t('home.step.create.cta')
       },
       {
         done: false,
-        title: 'Add mods & play',
-        text: 'Browse thousands of mods, packs and shaders from Modrinth.',
+        title: t('home.step.explore.title'),
+        text: t('home.step.explore.text'),
         action: () => go({ page: 'discover' }),
-        cta: 'Explore'
+        cta: t('home.step.explore.cta')
       }
     ]
     return (
@@ -38,10 +40,9 @@ export default function Home() {
         <div className="welcome" style={{ marginTop: 12 }}>
           <div className="intro">
             <Logo className="logo" />
-            <h1>Welcome to ResinCraft</h1>
+            <h1>{t('home.welcome.title')}</h1>
             <p className="muted" style={{ fontSize: 15, maxWidth: 440 }}>
-              A clean, friendly home for all your Minecraft setups. Keep separate instances for every modpack, version and world, and launch any of them in one
-              click.
+              {t('home.welcome.body')}
             </p>
           </div>
           <div className="steps">
@@ -70,10 +71,8 @@ export default function Home() {
     <div className="page">
       <div className="page-head" style={{ marginBottom: 16 }}>
         <div>
-          <h1>
-            {greeting()}, {activeAccount.username}
-          </h1>
-          <p>Ready when you are.</p>
+          <h1>{t('home.greeting', { greeting: greeting(), name: activeAccount.username })}</h1>
+          <p>{t('home.ready')}</p>
         </div>
       </div>
 
@@ -81,7 +80,7 @@ export default function Home() {
         <section className="hero">
           <InstanceTile inst={featured} className="hero-art" />
           <div>
-            <div className="eyebrow">{featured.lastPlayed ? 'Continue playing' : 'Start playing'}</div>
+            <div className="eyebrow">{featured.lastPlayed ? t('home.hero.continue') : t('home.hero.start')}</div>
             <h1>{featured.name}</h1>
             <div className="meta">
               <span>
@@ -91,13 +90,13 @@ export default function Home() {
                 <Timer /> {playtime(featured.playtime)}
               </span>
               <span>
-                <Clock /> {featured.lastPlayed ? `Played ${timeAgo(featured.lastPlayed).toLowerCase()}` : 'Not played yet'}
+                <Clock /> {featured.lastPlayed ? t('home.hero.played', { when: timeAgo(featured.lastPlayed, true) }) : t('home.hero.notPlayed')}
               </span>
             </div>
             <div className="row">
               <PlayButton inst={featured} size="lg" />
               <button className="btn lg" onClick={() => go({ page: 'instance', id: featured.id })}>
-                Manage
+                {t('home.hero.manage')}
               </button>
             </div>
           </div>
@@ -107,21 +106,21 @@ export default function Home() {
       <div className="stats" style={{ marginTop: 16 }}>
         <div className="stat">
           <b>{instances.length}</b>
-          <span>Instances</span>
+          <span>{t('home.stats.instances', { count: instances.length })}</span>
         </div>
         <div className="stat">
           <b>{playtime(total)}</b>
-          <span>Total play time</span>
+          <span>{t('home.stats.playtime')}</span>
         </div>
         <div className="stat">
-          <b>{new Set(instances.map((i) => i.mcVersion)).size}</b>
-          <span>Minecraft versions</span>
+          <b>{versionCount}</b>
+          <span>{t('home.stats.versions', { count: versionCount })}</span>
         </div>
         <button className="stat" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => go({ page: 'discover' })}>
           <b style={{ color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles size={20} /> Discover
+            <Sparkles size={20} /> {t('home.stats.discover')}
           </b>
-          <span>Find mods, packs & shaders</span>
+          <span>{t('home.stats.discoverHint')}</span>
         </button>
       </div>
 
@@ -135,9 +134,9 @@ function InstanceRow() {
   return (
     <>
       <h2 className="section">
-        <Layers size={18} /> Your instances
+        <Layers size={18} /> {t('home.instances.title')}
         <button className="link" onClick={() => go({ page: 'library' })}>
-          View all
+          {t('home.instances.viewAll')}
         </button>
       </h2>
       <div className="grid">
@@ -148,14 +147,14 @@ function InstanceRow() {
           <span className="plus">
             <Plus />
           </span>
-          New instance
+          {t('home.instances.new')}
         </button>
         {instances.length === 0 && (
           <button className="icard new" onClick={() => go({ page: 'discover', kind: 'modpack' })}>
             <span className="plus">
               <Compass />
             </span>
-            Install a modpack
+            {t('home.instances.installModpack')}
           </button>
         )}
       </div>

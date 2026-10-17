@@ -4,3 +4,6 @@ dist/
 *.log
 .dev-data/
 *.tsbuildinfo
+
+# Private build-time keys (see keys.example.env)
+keys.local.env

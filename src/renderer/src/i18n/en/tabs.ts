@@ -1,0 +1,88 @@
+// Strings for this area of the UI (see ../index.tsx for the format).
+export default {
+  // Notes tab
+  'notes.hint': 'Anything worth remembering: coordinates, to-dos, which mods need configuring. Saved to notes.md in the instance folder.',
+  'notes.saving': 'Saving…',
+  // note for translators: status shown while the notes have unsaved changes
+  'notes.editing': 'Editing',
+  'notes.saved': 'Saved',
+  'notes.saveFailed': "Couldn't save notes: {error}",
+  'notes.placeholder': 'Notes for {name}…',
+  'notes.label': 'Instance notes',
+
+  // Screenshots tab
+  'screenshots.count': {
+    one: '{count} screenshot · press F2 in game to take one',
+    other: '{count} screenshots · press F2 in game to take one'
+  },
+  'screenshots.hint': 'Press F2 in game to take a screenshot.',
+  'screenshots.openFolder': 'Open screenshots folder',
+  'screenshots.empty.title': 'No screenshots yet',
+  'screenshots.empty.body': 'Press F2 while playing and your screenshots land here.',
+  'screenshots.copyImage': 'Copy image',
+  'screenshots.showInFolder': 'Show in folder',
+  'screenshots.copied': 'Screenshot copied to clipboard',
+  'screenshots.delete.title': 'Delete screenshot?',
+  'screenshots.delete.body': '<file>{name}</file> will be moved to your Recycle Bin.',
+  'screenshots.viewer.previous': 'Previous (←)',
+  'screenshots.viewer.next': 'Next (→)',
+  'screenshots.viewer.close': 'Close (Esc)',
+  // note for translators: position of the open screenshot in the list, e.g. "3 of 12"
+  'screenshots.viewer.position': '{index} of {total}',
+
+  // Servers tab
+  'servers.hint': 'The multiplayer server list for this instance, same as in game.',
+  'servers.add': 'Add server',
+  'servers.empty.title': 'No servers yet',
+  'servers.empty.body': "Servers you add here appear in the game's Multiplayer screen.",
+  'servers.moveUp': 'Move up',
+  'servers.moveDown': 'Move down',
+  'servers.packs.on': 'Resource packs on',
+  'servers.packs.off': 'Resource packs off',
+  'servers.saveFailed': "Couldn't save the server list: {error}",
+  'servers.remove.title': 'Remove {name}?',
+  'servers.remove.body': "It will be removed from this instance's server list.",
+  'servers.offline': 'Offline',
+  'servers.latency': '{ms} ms',
+  // note for translators: players online / player limit, e.g. "12 / 100"
+  'servers.players': '{online} / {max}',
+  'servers.edit.title': 'Edit server',
+  'servers.edit.name': 'Server name',
+  'servers.edit.address': 'Server address',
+  'servers.edit.addressPlaceholder': 'play.example.com or 192.168.1.20:25565',
+  'servers.edit.packs': 'Server resource packs',
+  // note for translators: resource pack option, ask each time the server offers one
+  'servers.edit.packs.prompt': 'Prompt',
+
+  // Worlds tab
+  'worlds.mode.survival': 'Survival',
+  'worlds.mode.creative': 'Creative',
+  'worlds.mode.adventure': 'Adventure',
+  'worlds.mode.spectator': 'Spectator',
+  'worlds.hardcore': 'Hardcore',
+  'worlds.cheats': 'Cheats',
+  'worlds.search': 'Search worlds…',
+  'worlds.openBackups': 'Open backups folder',
+  'worlds.openSaves': 'Open saves folder',
+  'worlds.closeGameFirst': 'Close the game first',
+  'worlds.import': 'Import world',
+  'worlds.import.hint': 'Import a world from a .zip file',
+  'worlds.imported': 'Imported {name}',
+  'worlds.running': 'The game is running. Close it before renaming, deleting or importing worlds; backups made now may miss the last few seconds of play.',
+  'worlds.empty.title': 'No worlds yet',
+  'worlds.empty.action': 'Import a world',
+  'worlds.empty.body': 'Create one in game and it shows up here, or import a world from a .zip file.',
+  'worlds.noMatch': 'No worlds match “{query}”.',
+  'worlds.backup': 'Back up',
+  'worlds.backup.hint': 'Zip this world into the backups folder',
+  'worlds.backup.done': 'Backed up {name} to the backups folder',
+  'worlds.copySeed': 'Copy seed',
+  'worlds.seedCopied': 'Seed {seed} copied',
+  'worlds.renamed': 'Renamed to {name}',
+  'worlds.delete.title': 'Delete {name}?',
+  'worlds.delete.body': 'The world folder <folder>saves/{folder}</folder> ({size}) will be moved to your Recycle Bin. You can restore it from there.',
+  'worlds.delete.confirm': 'Delete world',
+  'worlds.rename.title': 'Rename world',
+  'worlds.rename.subtitle': 'Changes the name shown in game. The folder name stays the same.',
+  'worlds.rename.label': 'World name'
+}

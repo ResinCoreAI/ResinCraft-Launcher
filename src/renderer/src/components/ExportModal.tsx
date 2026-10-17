@@ -4,10 +4,11 @@ import type { ExportEntry, ExportResult, Instance, PackFormat } from '@shared/ty
 import { api } from '../api'
 import { useStore } from '../store'
 import { Modal, Segmented } from './ui'
+import { rich, t } from '../i18n'
 
 /** Exports an instance as a Modrinth .mrpack or CurseForge .zip. */
 export default function ExportModal({ inst, onClose }: { inst: Instance; onClose: () => void }) {
-  const { activeAccount, settings, toast } = useStore()
+  const { activeAccount, settings, toast, info } = useStore()
   const [format, setFormat] = useState<PackFormat>('mrpack')
   const [name, setName] = useState(inst.modpack?.name ?? inst.name)
   const [version, setVersion] = useState('1.0.0')
@@ -52,41 +53,41 @@ export default function ExportModal({ inst, onClose }: { inst: Instance; onClose
     }
   }
 
+  const site = format === 'mrpack' ? 'Modrinth' : 'CurseForge'
+
   if (result)
     return (
       <Modal
-        title="Modpack exported"
+        title={t('export.doneTitle')}
         subtitle={result.path}
         onClose={onClose}
         footer={
           <>
             <button className="btn" onClick={() => void api.app.showItem(result.path)}>
-              <FolderOpen /> Show in folder
+              <FolderOpen /> {t('export.showInFolder')}
             </button>
             <button className="btn primary" onClick={onClose}>
-              Done
+              {t('common.done')}
             </button>
           </>
         }
       >
         <ul className="export-summary">
           <li>
-            <Check /> <b>{result.linked}</b> {result.linked === 1 ? 'file is' : 'files are'} linked to {format === 'mrpack' ? 'Modrinth' : 'CurseForge'} and
-            download when someone installs the pack.
+            <Check /> {rich('export.linked', { b: (s) => <b>{s}</b> }, { count: result.linked, site })}
           </li>
           {result.bundled.length > 0 && (
             <li>
-              <Info /> <b>{result.bundled.length}</b> {result.bundled.length === 1 ? 'file was' : 'files were'} copied into the pack because{' '}
-              {result.bundled.length === 1 ? "it isn't" : "they aren't"} on {format === 'mrpack' ? 'Modrinth' : 'CurseForge'}:
+              <Info /> {rich('export.bundled', { b: (s) => <b>{s}</b> }, { count: result.bundled.length, site })}
               <div className="mono hint" style={{ marginTop: 4 }}>
                 {result.bundled.join(', ')}
               </div>
-              <div className="hint">Check those authors allow redistribution before you share the pack publicly.</div>
+              <div className="hint">{t('export.bundledHint')}</div>
             </li>
           )}
           {result.skippedDisabled > 0 && (
             <li>
-              <Info /> {result.skippedDisabled} disabled {result.skippedDisabled === 1 ? 'mod was' : 'mods were'} left out.
+              <Info /> {t('export.skippedDisabled', { count: result.skippedDisabled })}
             </li>
           )}
         </ul>
@@ -95,23 +96,23 @@ export default function ExportModal({ inst, onClose }: { inst: Instance; onClose
 
   return (
     <Modal
-      title={`Export ${inst.name}`}
-      subtitle="Share this instance as a modpack file anyone can import."
+      title={t('export.title', { name: inst.name })}
+      subtitle={t('export.subtitle')}
       onClose={onClose}
       wide
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={busy || !entries} onClick={run}>
-            {busy ? <Loader2 className="spin" /> : <PackageOpen />} Export…
+            {busy ? <Loader2 className="spin" /> : <PackageOpen />} {t('export.run')}
           </button>
         </>
       }
     >
       <div className="field">
-        <label>Format</label>
+        <label>{t('export.format')}</label>
         <Segmented
           value={format}
           onChange={setFormat}
@@ -121,43 +122,39 @@ export default function ExportModal({ inst, onClose }: { inst: Instance; onClose
           ]}
         />
         <span className="hint">
-          {format === 'mrpack'
-            ? 'Works in ResinCraft, Prism, the Modrinth App and most other launchers.'
-            : settings?.curseforgeKey
-              ? 'Works in the CurseForge app, ResinCraft and Prism.'
-              : 'Without a CurseForge API key, mods can’t be matched to CurseForge, so they’ll be copied into the pack instead.'}
+          {format === 'mrpack' ? t('export.mrpackHint') : info?.curseforge ? t('export.curseforgeHint') : t('export.curseforgeOffline')}
         </span>
       </div>
 
       <div className="export-grid">
         <div className="field">
-          <label htmlFor="ex-name">Pack name</label>
+          <label htmlFor="ex-name">{t('export.packName')}</label>
           <input id="ex-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="field">
-          <label htmlFor="ex-ver">Version</label>
+          <label htmlFor="ex-ver">{t('export.version')}</label>
           <input id="ex-ver" className="input mono" value={version} onChange={(e) => setVersion(e.target.value)} />
         </div>
         {format === 'curseforge' ? (
           <div className="field">
-            <label htmlFor="ex-author">Author</label>
+            <label htmlFor="ex-author">{t('export.author')}</label>
             <input id="ex-author" className="input" value={author} onChange={(e) => setAuthor(e.target.value)} />
           </div>
         ) : (
           <div className="field">
-            <label htmlFor="ex-sum">Summary</label>
-            <input id="ex-sum" className="input" value={summary} placeholder="Optional" onChange={(e) => setSummary(e.target.value)} />
+            <label htmlFor="ex-sum">{t('export.summary')}</label>
+            <input id="ex-sum" className="input" value={summary} placeholder={t('export.optional')} onChange={(e) => setSummary(e.target.value)} />
           </div>
         )}
       </div>
 
       <div className="field">
-        <label>Also include</label>
-        <span className="hint">Mods, resource packs and shaders are always included. Pick which other files and folders to ship.</span>
+        <label>{t('export.alsoInclude')}</label>
+        <span className="hint">{t('export.alsoIncludeHint')}</span>
         {!entries ? (
           <Loader2 className="spin" />
         ) : entries.length === 0 ? (
-          <span className="hint">Nothing else in this instance yet.</span>
+          <span className="hint">{t('export.nothingElse')}</span>
         ) : (
           <div className="include-list">
             {entries.map((e) => (
@@ -165,8 +162,8 @@ export default function ExportModal({ inst, onClose }: { inst: Instance; onClose
                 <input type="checkbox" checked={include.has(e.name)} onChange={() => toggle(e.name)} />
                 {e.isDir ? <Folder size={15} /> : <FileText size={15} />}
                 <span className="grow ellipsis">{e.name}</span>
-                {e.name === 'saves' && <span className="hint">your worlds, can be large</span>}
-                {e.name === 'options.txt' && <span className="hint">your keybinds & video settings</span>}
+                {e.name === 'saves' && <span className="hint">{t('export.savesHint')}</span>}
+                {e.name === 'options.txt' && <span className="hint">{t('export.optionsHint')}</span>}
               </label>
             ))}
           </div>

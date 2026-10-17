@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Loader2, Pencil, Plus, RefreshCw, Server, Signa
 import type { Instance, ServerEntry, ServerStatus } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
+import { t } from '../i18n'
 import { ConfirmModal, Empty, Modal } from './ui'
 import '../instance-tabs.css'
 
@@ -24,7 +25,7 @@ export default function ServersTab({ inst }: { inst: Instance }) {
       setServers(next)
       saving.current = saving.current.then(() =>
         api.servers.save(inst.id, next).catch((e) => {
-          toast(`Couldn't save the server list: ${(e as Error).message}`, 'error')
+          toast(t('servers.saveFailed', { error: (e as Error).message }), 'error')
         })
       )
       return saving.current
@@ -94,12 +95,12 @@ export default function ServersTab({ inst }: { inst: Instance }) {
   return (
     <>
       <div className="toolbar">
-        <span className="hint grow">The multiplayer server list for this instance, same as in game.</span>
+        <span className="hint grow">{t('servers.hint')}</span>
         <button className="btn" disabled={!visible.length} onClick={() => void pingAll(current.current)}>
-          <RefreshCw /> Refresh
+          <RefreshCw /> {t('common.refresh')}
         </button>
         <button className="btn primary" onClick={() => setEditing({ index: null, entry: { name: 'Minecraft Server', ip: '' } })}>
-          <Plus /> Add server
+          <Plus /> {t('servers.add')}
         </button>
       </div>
 
@@ -111,14 +112,14 @@ export default function ServersTab({ inst }: { inst: Instance }) {
       ) : visible.length === 0 ? (
         <Empty
           icon={<Server />}
-          title="No servers yet"
+          title={t('servers.empty.title')}
           action={
             <button className="btn primary" onClick={() => setEditing({ index: null, entry: { name: 'Minecraft Server', ip: '' } })}>
-              <Plus /> Add server
+              <Plus /> {t('servers.add')}
             </button>
           }
         >
-          Servers you add here appear in the game's Multiplayer screen.
+          {t('servers.empty.body')}
         </Empty>
       ) : (
         <div className="list">
@@ -128,10 +129,10 @@ export default function ServersTab({ inst }: { inst: Instance }) {
             return (
               <div key={`${index}-${s.ip}`} className="list-row">
                 <div className="it-reorder">
-                  <button className="btn ghost sm" title="Move up" disabled={pos === 0} onClick={() => move(pos, -1)}>
+                  <button className="btn ghost sm" title={t('servers.moveUp')} disabled={pos === 0} onClick={() => move(pos, -1)}>
                     <ChevronUp />
                   </button>
-                  <button className="btn ghost sm" title="Move down" disabled={pos === visible.length - 1} onClick={() => move(pos, 1)}>
+                  <button className="btn ghost sm" title={t('servers.moveDown')} disabled={pos === visible.length - 1} onClick={() => move(pos, 1)}>
                     <ChevronDown />
                   </button>
                 </div>
@@ -141,7 +142,7 @@ export default function ServersTab({ inst }: { inst: Instance }) {
                   <div className="it-meta">
                     <span className="mono">{s.ip}</span>
                     {p?.state === 'ok' && p.status.version && <span>{p.status.version}</span>}
-                    {s.acceptTextures != null && <span>Resource packs {s.acceptTextures ? 'on' : 'off'}</span>}
+                    {s.acceptTextures != null && <span>{t(s.acceptTextures ? 'servers.packs.on' : 'servers.packs.off')}</span>}
                   </div>
                   {p?.state === 'ok' && p.status.motd.trim() && (
                     <div className="it-motd">
@@ -151,10 +152,10 @@ export default function ServersTab({ inst }: { inst: Instance }) {
                 </div>
                 <PingStatus ping={p} />
                 <div className="it-actions">
-                  <button className="btn ghost icon sm" title="Edit" onClick={() => setEditing({ index, entry: s })}>
+                  <button className="btn ghost icon sm" title={t('common.edit')} onClick={() => setEditing({ index, entry: s })}>
                     <Pencil />
                   </button>
-                  <button className="btn ghost icon sm danger" title="Remove" onClick={() => setRemoving(index)}>
+                  <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving(index)}>
                     <Trash2 />
                   </button>
                 </div>
@@ -180,9 +181,9 @@ export default function ServersTab({ inst }: { inst: Instance }) {
 
       {removing != null && servers?.[removing] && (
         <ConfirmModal
-          title={`Remove ${servers[removing].name || servers[removing].ip}?`}
-          body="It will be removed from this instance's server list."
-          confirm="Remove"
+          title={t('servers.remove.title', { name: servers[removing].name || servers[removing].ip })}
+          body={t('servers.remove.body')}
+          confirm={t('common.remove')}
           onClose={() => setRemoving(undefined)}
           onConfirm={() => persist(current.current.filter((_, i) => i !== removing))}
         />
@@ -202,7 +203,7 @@ function PingStatus({ ping }: { ping?: Ping }) {
     return (
       <div className="it-status" title={ping.error}>
         <span className="bad">
-          <WifiOff /> Offline
+          <WifiOff /> {t('servers.offline')}
         </span>
         <span className="hint ellipsis" style={{ maxWidth: 140 }}>
           {ping.error}
@@ -213,10 +214,10 @@ function PingStatus({ ping }: { ping?: Ping }) {
   return (
     <div className="it-status" title={players.sample.length ? players.sample.join('\n') : undefined}>
       <span className={latency < 150 ? 'good' : latency < 400 ? 'ok' : 'bad'}>
-        <Signal /> {latency} ms
+        <Signal /> {t('servers.latency', { ms: latency })}
       </span>
       <span>
-        <Users /> {players.online.toLocaleString()} / {players.max.toLocaleString()}
+        <Users /> {t('servers.players', { online: players.online, max: players.max })}
       </span>
     </div>
   )
@@ -293,21 +294,21 @@ function EditServer({ entry, isNew, onClose, onSave }: { entry: ServerEntry; isN
 
   return (
     <Modal
-      title={isNew ? 'Add server' : 'Edit server'}
+      title={isNew ? t('servers.add') : t('servers.edit.title')}
       onClose={onClose}
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!valid || busy} onClick={submit}>
-            {busy && <Loader2 className="spin" />} {isNew ? 'Add server' : 'Save'}
+            {busy && <Loader2 className="spin" />} {isNew ? t('servers.add') : t('common.save')}
           </button>
         </>
       }
     >
       <div className="field">
-        <label htmlFor="srv-name">Server name</label>
+        <label htmlFor="srv-name">{t('servers.edit.name')}</label>
         <input
           id="srv-name"
           className="input"
@@ -318,23 +319,23 @@ function EditServer({ entry, isNew, onClose, onSave }: { entry: ServerEntry; isN
         />
       </div>
       <div className="field">
-        <label htmlFor="srv-ip">Server address</label>
+        <label htmlFor="srv-ip">{t('servers.edit.address')}</label>
         <input
           id="srv-ip"
           className="input mono"
           autoFocus
           value={ip}
-          placeholder="play.example.com or 192.168.1.20:25565"
+          placeholder={t('servers.edit.addressPlaceholder')}
           onChange={(e) => setIp(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void submit()}
         />
       </div>
       <div className="field">
-        <label htmlFor="srv-packs">Server resource packs</label>
+        <label htmlFor="srv-packs">{t('servers.edit.packs')}</label>
         <select id="srv-packs" className="select" value={packs} onChange={(e) => setPacks(e.target.value)}>
-          <option value="prompt">Prompt</option>
-          <option value="enabled">Enabled</option>
-          <option value="disabled">Disabled</option>
+          <option value="prompt">{t('servers.edit.packs.prompt')}</option>
+          <option value="enabled">{t('common.enabled')}</option>
+          <option value="disabled">{t('common.disabled')}</option>
         </select>
       </div>
     </Modal>

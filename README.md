@@ -22,12 +22,30 @@ ResinCraft's feature set is modelled on [Prism Launcher](https://github.com/Pris
 
 ## Getting started
 
+ResinCraft is moving from Electron to **Tauri 2 + Rust** (branch `tauri`). The React UI is shared: it talks to the engine through `window.resin`, built from one channel map in `src/shared/bridge.ts`, so it runs unchanged on either shell.
+
+### Tauri (new)
+
+Needs Rust (stable, MSVC on Windows) and, on Windows, the Visual Studio C++ Build Tools. WebView2 ships with Windows 10/11.
+
+```bash
+npm install
+npm run dev:tauri
+```
+
+- `npm run dev:tauri` starts the UI on Vite (port 1420) and the Rust engine in `src-tauri/`, with hot reload for the UI.
+- `npm run build:tauri` builds a release installer (NSIS) into `src-tauri/target/release/bundle/`.
+- Engine layout: `src-tauri/src/core` (context, events/tasks, downloads, paths, settings, instances, IPC router), `game` (versions, loaders, Java, launching), `content` (Modrinth, CurseForge, FTB, ATLauncher, Technic, import/export), `player` (accounts, worlds, servers, screenshots, notes).
+- Headless checks: `cargo run --example smoke -- 1.21.1 fabric`, `cargo run --example check_content`, `cargo run --example check_player` (run inside `src-tauri/`).
+
+### Electron (current release build)
+
 ```bash
 npm install
 npm run dev
 ```
 
-- `npm run dev` starts the app with hot reload. In dev mode all game data lives in `.dev-data/` inside the project, so testing never touches a real install.
+- `npm run dev` starts the app with hot reload. In dev mode all game data lives in `.dev-data/` inside the project, so testing never touches a real install. The Tauri build uses the same folder.
 - `npm run build` creates a production build in `out/`. `npm start` runs it.
 - `npm run dist` packages an installer with electron-builder (output in `dist/`).
 - `npm run typecheck` / `npm run format`.
@@ -74,3 +92,17 @@ scripts/smoke.ts       Headless launch test
 - Modpack export (`.mrpack`)
 - Skin changer
 - Auto-update for the launcher itself
+
+## Code signing (Windows "Publisher: unverified")
+
+Windows shows **Publisher: unverified** and SmartScreen warnings for unsigned installers. Fixing it needs a code-signing certificate issued to you (Puirkle); no app setting can do it. Options: SignPath Foundation (free, open-source projects), Certum Open Source Code Signing (individuals), Microsoft Azure Artifact Signing (cheapest commercial, limited regions for individuals), or a standard OV/EV certificate.
+
+Once you have one, add it to `src-tauri/tauri.conf.json` and every `npm run build:tauri` signs automatically:
+
+- Certificate installed in Windows (token or .pfx):
+  ```json
+  "bundle": { "windows": { "certificateThumbprint": "<SHA1 thumbprint>", "digestAlgorithm": "sha256", "timestampUrl": "http://timestamp.digicert.com" } }
+  ```
+- Cloud signing (Azure Artifact Signing, SimplySign, …): use `"bundle": { "windows": { "signCommand": "<tool> sign … %1" } }`, where `%1` is the file to sign.
+
+Signed builds show "Puirkle" as the publisher immediately; SmartScreen's warning fades as the signed installer gains download reputation.

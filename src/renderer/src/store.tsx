@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AccountView, AppInfo, ContentKind, GameEvent, Instance, LogLine, Settings, TaskInfo } from '@shared/types'
 import { api } from './api'
+import { t } from './i18n'
 
 export type Route =
   | { page: 'home' }
@@ -87,7 +88,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       api.on.game((e) => {
         setGames((g) => ({ ...g, [e.instanceId]: e.state }))
         if (e.state === 'stopped' || e.state === 'crashed') void refreshInstances()
-        if (e.state === 'crashed') toast(`The game closed unexpectedly (exit code ${e.code}). Check the Logs tab for details.`, 'error')
+        if (e.state === 'crashed') toast(t('app.crashed', { code: e.code ?? '?' }), 'error')
       }),
       api.on.log((e) =>
         setLogs((l) => {

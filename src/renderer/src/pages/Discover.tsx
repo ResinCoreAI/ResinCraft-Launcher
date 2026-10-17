@@ -23,13 +23,88 @@ import { Empty, InstanceTile, Modal, Segmented } from '../components/ui'
 import VersionPicker from '../components/VersionPicker'
 import { useStore } from '../store'
 import { compact, describe, timeAgo } from '../util'
+import { currentLanguage, rich, t, type Key } from '../i18n'
 
-const KINDS: { value: ContentKind; label: string; icon: React.ReactNode }[] = [
-  { value: 'mod', label: 'Mods', icon: <Blocks size={15} /> },
-  { value: 'modpack', label: 'Modpacks', icon: <Package size={15} /> },
-  { value: 'resourcepack', label: 'Resource packs', icon: <Image size={15} /> },
-  { value: 'shader', label: 'Shaders', icon: <Sparkles size={15} /> }
+const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.ReactNode }[] = [
+  { value: 'mod', labelKey: 'discover.kind.mod', searchKey: 'discover.search.mod', icon: <Blocks size={15} /> },
+  { value: 'modpack', labelKey: 'discover.kind.modpack', searchKey: 'discover.search.modpack', icon: <Package size={15} /> },
+  { value: 'resourcepack', labelKey: 'discover.kind.resourcepack', searchKey: 'discover.search.resourcepack', icon: <Image size={15} /> },
+  { value: 'shader', labelKey: 'discover.kind.shader', searchKey: 'discover.search.shader', icon: <Sparkles size={15} /> }
 ]
+
+const SORTS: { value: SortMode; labelKey: Key }[] = [
+  { value: 'relevance', labelKey: 'discover.sort.relevance' },
+  { value: 'downloads', labelKey: 'discover.sort.downloads' },
+  { value: 'follows', labelKey: 'discover.sort.follows' },
+  { value: 'newest', labelKey: 'discover.sort.newest' },
+  { value: 'updated', labelKey: 'discover.sort.updated' }
+]
+
+/** Category tags we can translate, by Modrinth id. Anything else (loaders, resolutions, other sources' own tags) is shown as it comes. */
+const CATEGORY_KEYS: Record<string, Key> = {
+  adventure: 'discover.category.adventure',
+  cursed: 'discover.category.cursed',
+  decoration: 'discover.category.decoration',
+  economy: 'discover.category.economy',
+  equipment: 'discover.category.equipment',
+  food: 'discover.category.food',
+  'game-mechanics': 'discover.category.gameMechanics',
+  library: 'discover.category.library',
+  magic: 'discover.category.magic',
+  management: 'discover.category.management',
+  minigame: 'discover.category.minigame',
+  mobs: 'discover.category.mobs',
+  optimization: 'discover.category.optimization',
+  social: 'discover.category.social',
+  storage: 'discover.category.storage',
+  technology: 'discover.category.technology',
+  transportation: 'discover.category.transportation',
+  utility: 'discover.category.utility',
+  worldgen: 'discover.category.worldgen',
+  challenging: 'discover.category.challenging',
+  combat: 'discover.category.combat',
+  'kitchen-sink': 'discover.category.kitchenSink',
+  lightweight: 'discover.category.lightweight',
+  multiplayer: 'discover.category.multiplayer',
+  quests: 'discover.category.quests',
+  audio: 'discover.category.audio',
+  blocks: 'discover.category.blocks',
+  'core-shaders': 'discover.category.coreShaders',
+  entities: 'discover.category.entities',
+  environment: 'discover.category.environment',
+  fonts: 'discover.category.fonts',
+  gui: 'discover.category.gui',
+  items: 'discover.category.items',
+  locale: 'discover.category.locale',
+  modded: 'discover.category.modded',
+  models: 'discover.category.models',
+  realistic: 'discover.category.realistic',
+  simplistic: 'discover.category.simplistic',
+  themed: 'discover.category.themed',
+  tweaks: 'discover.category.tweaks',
+  'vanilla-like': 'discover.category.vanillaLike',
+  atmosphere: 'discover.category.atmosphere',
+  bloom: 'discover.category.bloom',
+  'colored-lighting': 'discover.category.coloredLighting',
+  foliage: 'discover.category.foliage',
+  'path-tracing': 'discover.category.pathTracing',
+  reflections: 'discover.category.reflections',
+  shadows: 'discover.category.shadows',
+  cartoon: 'discover.category.cartoon',
+  fantasy: 'discover.category.fantasy',
+  'semi-realistic': 'discover.category.semiRealistic',
+  potato: 'discover.category.potato',
+  low: 'discover.category.low',
+  medium: 'discover.category.medium',
+  high: 'discover.category.high',
+  screenshot: 'discover.category.screenshot'
+}
+
+/** A category tag for display: Modrinth ids (and other sources' tags with the same name, like "Magic") are translated. */
+function categoryLabel(c: string): string {
+  const key = CATEGORY_KEYS[c.toLowerCase().replace(/\s+/g, '-')]
+  return key ? t(key) : c
+}
 
 export const SOURCES: { value: ContentSource; label: string; color: string; kinds: ContentKind[] }[] = [
   { value: 'modrinth', label: 'Modrinth', color: '#39e58c', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] },
@@ -58,7 +133,7 @@ function savedSource(): ContentSource {
 type InstallState = 'busy' | 'done'
 
 export default function Discover({ initialKind, instanceId }: { initialKind?: ContentKind; instanceId?: string }) {
-  const { instances, go, toast, refreshInstances, settings } = useStore()
+  const { instances, go, toast, refreshInstances, info } = useStore()
   const target = instances.find((i) => i.id === instanceId)
   const [source, setSourceState] = useState<ContentSource>(() => {
     const s = savedSource()
@@ -67,7 +142,8 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
   })
   const [kind, setKind] = useState<ContentKind>(initialKind ?? (modpackOnly(source) ? 'modpack' : 'mod'))
   const sourceInfo = SOURCES.find((s) => s.value === source)!
-  const needsKey = source === 'curseforge' && !settings?.curseforgeKey
+  // Builds without a CurseForge key can't search it at all.
+  const needsKey = source === 'curseforge' && !!info && !info.curseforge
 
   const setSource = (s: ContentSource) => {
     setSourceState(s)
@@ -167,17 +243,17 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
       if (hit.kind === 'modpack') {
         const created = await api.content.installModpack(hit.id, versionId)
         await refreshInstances()
-        toast(`${created.name} is ready to play`)
+        toast(t('discover.toast.modpackReady', { name: created.name }))
         go({ page: 'instance', id: created.id })
         return true
       }
       await api.content.install(into!.id, hit.id, hit.kind, versionId)
-      if (!quiet) toast(`Installed ${hit.title} into ${into!.name}`)
+      if (!quiet) toast(t('discover.toast.installed', { title: hit.title, instance: into!.name }))
       mark('done')
       if (into!.id === target?.id) await loadInstalled()
       return true
     } catch (e) {
-      toast(`${hit.title}: ${(e as Error).message}`, 'error')
+      toast(t('discover.toast.installFailed', { title: hit.title, error: (e as Error).message }), 'error')
       mark(undefined)
       return false
     }
@@ -188,7 +264,9 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
     let ok = 0
     for (const h of list) if (await install(h, inst, undefined, true)) ok++
     toast(
-      ok === list.length ? `Installed ${ok} item${ok === 1 ? '' : 's'} into ${inst.name}` : `Installed ${ok} of ${list.length} into ${inst.name}`,
+      ok === list.length
+        ? t('discover.toast.installedMany', { count: ok, instance: inst.name })
+        : t('discover.toast.installedSome', { done: ok, count: list.length, instance: inst.name }),
       ok === list.length ? 'success' : 'info'
     )
   }
@@ -212,8 +290,8 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Discover</h1>
-          <p>Mods, modpacks, resource packs and shaders from Modrinth, CurseForge and FTB.</p>
+          <h1>{t('discover.title')}</h1>
+          <p>{t('discover.subtitle')}</p>
         </div>
       </div>
 
@@ -221,13 +299,13 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
         <div className="context-banner">
           <InstanceTile inst={target} />
           <div className="grow">
-            <b>Installing into {target.name}</b>
-            <div className="hint">Showing results compatible with {describe(target)}</div>
+            <b>{t('discover.target.title', { name: target.name })}</b>
+            <div className="hint">{t('discover.target.compatible', { target: describe(target) })}</div>
           </div>
           <button className="btn sm" onClick={() => go({ page: 'instance', id: target.id })}>
-            Back to instance
+            {t('discover.target.back')}
           </button>
-          <button className="btn ghost icon sm" title="Browse without an instance" onClick={() => go({ page: 'discover', kind })}>
+          <button className="btn ghost icon sm" title={t('discover.target.clear')} onClick={() => go({ page: 'discover', kind })}>
             <X />
           </button>
         </div>
@@ -254,26 +332,32 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
             value: k.value,
             label: (
               <>
-                {k.icon} {k.label}
+                {k.icon} {t(k.labelKey)}
               </>
             )
           }))}
         />
-        {canSelect && <span className="hint">Tick the boxes to install several at once.</span>}
+        {canSelect && <span className="hint">{t('discover.selectHint')}</span>}
       </div>
       <div className="toolbar">
         <div className="search">
           <Search />
           <input
             className="input"
-            placeholder={`Search ${KINDS.find((k) => k.value === kind)?.label.toLowerCase()}…`}
+            placeholder={t(KINDS.find((k) => k.value === kind)?.searchKey ?? 'discover.search.mod')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
           />
         </div>
-        <select className="select" value={gameVersion} onChange={(e) => setGameVersion(e.target.value)} disabled={!!target} aria-label="Game version">
-          <option value="">All versions</option>
+        <select
+          className="select"
+          value={gameVersion}
+          onChange={(e) => setGameVersion(e.target.value)}
+          disabled={!!target}
+          aria-label={t('discover.filter.gameVersion')}
+        >
+          <option value="">{t('discover.filter.allVersions')}</option>
           {target && !versions.some((v) => v.id === target.mcVersion) && <option value={target.mcVersion}>{target.mcVersion}</option>}
           {versions.map((v) => (
             <option key={v.id} value={v.id}>
@@ -282,37 +366,35 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
           ))}
         </select>
         {kind === 'mod' && (
-          <select className="select" value={loader} onChange={(e) => setLoader(e.target.value as LoaderType)} disabled={!!target} aria-label="Loader">
-            <option value="">Any loader</option>
+          <select
+            className="select"
+            value={loader}
+            onChange={(e) => setLoader(e.target.value as LoaderType)}
+            disabled={!!target}
+            aria-label={t('discover.filter.loader')}
+          >
+            <option value="">{t('discover.filter.anyLoader')}</option>
             <option value="fabric">Fabric</option>
             <option value="quilt">Quilt</option>
             <option value="forge">Forge</option>
             <option value="neoforge">NeoForge</option>
           </select>
         )}
-        <select className="select" value={sort} onChange={(e) => setSort(e.target.value as SortMode)} aria-label="Sort">
-          <option value="relevance">Relevance</option>
-          <option value="downloads">Most downloads</option>
-          <option value="follows">Most followed</option>
-          <option value="newest">Newest</option>
-          <option value="updated">Recently updated</option>
+        <select className="select" value={sort} onChange={(e) => setSort(e.target.value as SortMode)} aria-label={t('discover.sort.label')}>
+          {SORTS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {t(s.labelKey)}
+            </option>
+          ))}
         </select>
       </div>
 
       {needsKey ? (
-        <Empty
-          icon={<KeyRound />}
-          title="CurseForge needs an API key"
-          action={
-            <button className="btn primary" onClick={() => go({ page: 'settings' })}>
-              <KeyRound /> Add your key in Settings
-            </button>
-          }
-        >
-          CurseForge only lets apps search and download with a personal API key. It's free; Settings explains how to get one.
+        <Empty icon={<KeyRound />} title={t('discover.noKey.title')}>
+          {t('discover.noKey.body')}
         </Empty>
       ) : error ? (
-        <Empty icon={<X />} title={`Couldn't reach ${sourceInfo.label}`}>
+        <Empty icon={<X />} title={t('discover.error.title', { source: sourceInfo.label })}>
           {error}
         </Empty>
       ) : !hits ? (
@@ -322,8 +404,8 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
           ))}
         </div>
       ) : hits.length === 0 ? (
-        <Empty icon={<Search />} title="No results">
-          Try different words or loosen the filters.
+        <Empty icon={<Search />} title={t('discover.empty.title')}>
+          {t('discover.empty.body')}
         </Empty>
       ) : (
         <div className="results">
@@ -338,9 +420,9 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                     className={`check ${isSelected ? 'on' : ''}`}
                     role="checkbox"
                     aria-checked={isSelected}
-                    aria-label={`Select ${h.title}`}
+                    aria-label={t('discover.result.select', { title: h.title })}
                     disabled={!!have || state === 'busy'}
-                    title={have ? 'Already installed' : 'Select'}
+                    title={have ? t('discover.result.alreadyInstalled') : t('discover.result.selectTooltip')}
                     onClick={() => toggleSelect(h)}
                   >
                     {isSelected && <Check strokeWidth={3} />}
@@ -350,7 +432,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                 <div className="grow">
                   <h3>
                     {h.title}
-                    <small>by {h.author}</small>
+                    <small>{t('discover.result.by', { author: h.author })}</small>
                   </h3>
                   <p>{h.description}</p>
                   <div className="stats-line">
@@ -363,11 +445,11 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                       </span>
                     )}
                     <span>
-                      <Calendar /> Updated {timeAgo(h.updated).toLowerCase()}
+                      <Calendar /> {t('discover.result.updated', { when: timeAgo(h.updated, true) })}
                     </span>
                     {h.categories.slice(0, 3).map((c) => (
                       <span key={c} className="chip">
-                        {c}
+                        {categoryLabel(c)}
                       </span>
                     ))}
                   </div>
@@ -376,15 +458,15 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                   {have ? (
                     <>
                       <span className="chip success">
-                        <Check /> Installed{have.versionNumber ? ` · ${have.versionNumber}` : ''}
+                        <Check /> {have.versionNumber ? t('discover.result.installedVersion', { version: have.versionNumber }) : t('common.installed')}
                       </span>
                       <button className="btn sm" onClick={() => chooseVersion(h)}>
-                        <Repeat /> Change version
+                        <Repeat /> {t('discover.result.changeVersion')}
                       </button>
                     </>
                   ) : state === 'done' ? (
                     <button className="btn sm" disabled>
-                      <Check /> Installed
+                      <Check /> {t('common.installed')}
                     </button>
                   ) : (
                     <>
@@ -392,17 +474,22 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                         className="btn primary sm"
                         onClick={() => void install(h)}
                         disabled={state === 'busy'}
-                        title="Install the latest compatible version"
+                        title={t('discover.result.installLatestHint')}
                       >
-                        {state === 'busy' ? <Loader2 className="spin" /> : <Download />} {h.kind === 'modpack' ? 'Install pack' : 'Install'}
+                        {state === 'busy' ? <Loader2 className="spin" /> : <Download />}{' '}
+                        {h.kind === 'modpack' ? t('discover.result.installPack') : t('common.install')}
                       </button>
                       <button className="btn sm" onClick={() => chooseVersion(h)} disabled={state === 'busy'}>
-                        Choose version <ChevronDown />
+                        {t('discover.result.chooseVersion')} <ChevronDown />
                       </button>
                     </>
                   )}
-                  <button className="btn ghost sm" title={`Open on ${sourceInfo.label}`} onClick={() => void api.app.openExternal(h.url)}>
-                    Details <ExternalLink />
+                  <button
+                    className="btn ghost sm"
+                    title={t('discover.result.openOn', { source: sourceInfo.label })}
+                    onClick={() => void api.app.openExternal(h.url)}
+                  >
+                    {t('discover.result.details')} <ExternalLink />
                   </button>
                 </div>
               </div>
@@ -410,7 +497,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
           })}
           {hits.length < total && (
             <button className="btn" style={{ alignSelf: 'center', marginTop: 8 }} onClick={more} disabled={loadingMore}>
-              {loadingMore && <Loader2 className="spin" />} Load more
+              {loadingMore && <Loader2 className="spin" />} {t('discover.loadMore')}
             </button>
           )}
         </div>
@@ -419,15 +506,19 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
       {selected.size > 0 && (
         <div className="select-bar">
           <ListChecks size={18} />
-          <span>
-            <b>{selected.size}</b> selected
-          </span>
+          <span>{rich('discover.selection.count', { b: (s) => <b>{s}</b> }, { count: selected.size })}</span>
           <button className="btn ghost sm" onClick={() => setSelected(new Map())}>
-            Clear
+            {t('discover.selection.clear')}
           </button>
           <button className="btn primary sm" onClick={() => (target ? void installMany([...selected.values()], target) : setPicking([...selected.values()]))}>
-            <Download /> Install {selected.size === 1 ? 'it' : `all ${selected.size}`}
-            {target ? ` into ${target.name}` : ''}
+            <Download />{' '}
+            {selected.size === 1
+              ? target
+                ? t('discover.selection.installOneInto', { instance: target.name })
+                : t('discover.selection.installOne')
+              : target
+                ? t('discover.selection.installAllInto', { count: selected.size, instance: target.name })
+                : t('discover.selection.installAll', { count: selected.size })}
           </button>
         </div>
       )}
@@ -453,7 +544,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
             if (current && inst) {
               try {
                 await api.content.changeVersion(inst.id, hit.kind, current.filename, versionId)
-                toast(`${hit.title} switched version`)
+                toast(t('discover.toast.versionChanged', { title: hit.title }))
                 await loadInstalled()
               } catch (e) {
                 toast((e as Error).message, 'error')
@@ -491,21 +582,27 @@ function PickInstance({
 
   return (
     <Modal
-      title={single ? `Install ${hits[0].title}` : `Install ${hits.length} items`}
-      subtitle={single ? 'Choose which instance it goes into.' : `${hits.map((h) => h.title).join(', ')}. Each gets its latest compatible version.`}
+      title={single ? t('discover.pick.titleOne', { title: hits[0].title }) : t('discover.pick.titleMany', { count: hits.length })}
+      subtitle={
+        single
+          ? t('discover.pick.subtitleOne')
+          : t('discover.pick.subtitleMany', {
+              titles: new Intl.ListFormat(currentLanguage(), { style: 'short', type: 'unit' }).format(hits.map((h) => h.title))
+            })
+      }
       onClose={onClose}
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           {single && (
             <button className="btn" disabled={!selected} onClick={done(onChooseVersion)}>
-              Choose version <ChevronDown />
+              {t('discover.result.chooseVersion')} <ChevronDown />
             </button>
           )}
           <button className="btn primary" disabled={!selected} onClick={done(onInstall)}>
-            <Download /> {single ? 'Install latest' : `Install all ${hits.length}`}
+            <Download /> {single ? t('discover.pick.installLatest') : t('discover.selection.installAll', { count: hits.length })}
           </button>
         </>
       }
@@ -514,16 +611,19 @@ function PickInstance({
         <div className="callout">
           <Blocks />
           <div>
-            You don't have an instance that can use {needsLoader ? 'mods' : 'this'} yet.{' '}
-            <button
-              className="link"
-              onClick={() => {
-                onClose()
-                setNewInstanceOpen(true)
-              }}
-            >
-              Create a modded instance
-            </button>
+            {rich(needsLoader ? 'discover.pick.noModInstance' : 'discover.pick.noInstance', {
+              link: (s) => (
+                <button
+                  className="link"
+                  onClick={() => {
+                    onClose()
+                    setNewInstanceOpen(true)
+                  }}
+                >
+                  {s}
+                </button>
+              )
+            })}
           </div>
         </div>
       ) : (

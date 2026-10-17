@@ -1,6 +1,7 @@
 // A fake backend so the UI can be designed and previewed in a normal browser (npm run dev, then open the Vite URL).
 import type { AccountView, ContentItem, Instance, McVersion, ProjectHit, ResinApi, Settings } from '@shared/types'
 import { mockInstanceTabs } from './mock-instance-tabs'
+import { mockProfile } from './mock-profile'
 
 export function mockApi(): ResinApi {
   const now = Date.now()
@@ -43,6 +44,7 @@ export function mockApi(): ResinApi {
   let accounts: AccountView[] = [{ id: 'a1', type: 'msa', username: 'Puirkle', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', active: true }]
   let settings: Settings = {
     theme: 'dark',
+    language: 'system',
     memoryMb: 4096,
     jvmArgs: '',
     javaPath: '',
@@ -120,7 +122,7 @@ export function mockApi(): ResinApi {
 
   return {
     app: {
-      info: () => wait({ version: '0.1.0', dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher', platform: 'win32', totalMemMb: 16384, dev: true }),
+      info: () => wait({ version: '0.1.0', dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher', platform: 'win32', totalMemMb: 16384, dev: true, microsoft: true, curseforge: true }),
       openExternal: async (u) => void window.open(u),
       setTitleBar: async () => {},
       showItem: async () => {},
@@ -163,7 +165,11 @@ export function mockApi(): ResinApi {
         return a
       },
       setActive: async (id) => void (accounts = accounts.map((a) => ({ ...a, active: a.id === id }))),
-      remove: async (id) => void (accounts = accounts.filter((a) => a.id !== id))
+      remove: async (id) => void (accounts = accounts.filter((a) => a.id !== id)),
+      ...mockProfile(
+        () => accounts,
+        (list) => (accounts = list)
+      )
     },
     java: {
       list: () =>

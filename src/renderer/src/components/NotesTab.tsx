@@ -3,6 +3,7 @@ import { Check, Loader2, PencilLine } from 'lucide-react'
 import type { Instance } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
+import { t } from '../i18n'
 import '../instance-tabs.css'
 
 const SAVE_DELAY = 700
@@ -26,7 +27,7 @@ export default function NotesTab({ inst }: { inst: Instance }) {
       }
     } catch (e) {
       setState('dirty')
-      toast(`Couldn't save notes: ${(e as Error).message}`, 'error')
+      toast(t('notes.saveFailed', { error: (e as Error).message }), 'error')
     }
   }
 
@@ -58,21 +59,19 @@ export default function NotesTab({ inst }: { inst: Instance }) {
   return (
     <div className="it-notes">
       <div className="toolbar">
-        <span className="hint grow">
-          Anything worth remembering: coordinates, to-dos, which mods need configuring. Saved to notes.md in the instance folder.
-        </span>
+        <span className="hint grow">{t('notes.hint')}</span>
         <span className="it-save-state" aria-live="polite">
           {state === 'saving' ? (
             <>
-              <Loader2 className="spin" /> Saving…
+              <Loader2 className="spin" /> {t('notes.saving')}
             </>
           ) : state === 'dirty' ? (
             <>
-              <PencilLine /> Editing
+              <PencilLine /> {t('notes.editing')}
             </>
           ) : (
             <>
-              <Check /> Saved
+              <Check /> {t('notes.saved')}
             </>
           )}
         </span>
@@ -84,8 +83,8 @@ export default function NotesTab({ inst }: { inst: Instance }) {
           className="input"
           value={text}
           spellCheck
-          placeholder={`Notes for ${inst.name}…`}
-          aria-label="Instance notes"
+          placeholder={t('notes.placeholder', { name: inst.name })}
+          aria-label={t('notes.label')}
           onChange={(e) => change(e.target.value)}
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {

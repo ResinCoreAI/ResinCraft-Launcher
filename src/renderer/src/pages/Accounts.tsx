@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, ExternalLink, Info, Loader2, LogIn, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react'
-import type { DeviceCode } from '@shared/types'
+import { Check, Copy, ExternalLink, Info, Loader2, LogIn, Shirt, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react'
+import type { AccountView, DeviceCode } from '@shared/types'
 import { api } from '../api'
 import { Avatar, ConfirmModal, Empty, Modal } from '../components/ui'
 import { useStore } from '../store'
+import ProfileManager from '../components/ProfileManager'
+import { rich, t } from '../i18n'
 
 export default function Accounts() {
   const { accounts, refreshAccounts, toast, go, settings, info } = useStore()
   const [signingIn, setSigningIn] = useState(false)
   const [offline, setOffline] = useState(false)
   const [removing, setRemoving] = useState<string>()
+  const [managing, setManaging] = useState<AccountView>()
   const hasMsa = accounts.some((a) => a.type === 'msa')
   // Release builds need a Microsoft account first; dev builds allow testing before Mojang approval.
   const canOffline = hasMsa || !!info?.dev
@@ -18,27 +21,23 @@ export default function Accounts() {
     <div className="page" style={{ maxWidth: 860 }}>
       <div className="page-head">
         <div>
-          <h1>Accounts</h1>
-          <p>Sign in with the Microsoft account that owns Minecraft: Java Edition.</p>
+          <h1>{t('accounts.title')}</h1>
+          <p>{t('accounts.subtitle')}</p>
         </div>
         <div className="spacer" />
-        <button className="btn" disabled={!canOffline} title={canOffline ? '' : 'Add a Microsoft account first'} onClick={() => setOffline(true)}>
-          <UserPlus /> Offline profile
+        <button className="btn" disabled={!canOffline} title={canOffline ? '' : t('accounts.offlineNeedsMsa')} onClick={() => setOffline(true)}>
+          <UserPlus /> {t('accounts.offlineProfile')}
         </button>
         <button className="btn primary" onClick={() => setSigningIn(true)}>
-          <LogIn /> Sign in with Microsoft
+          <LogIn /> {t('accounts.signIn')}
         </button>
       </div>
 
-      {!settings?.msClientId && (
+      {info && !info.microsoft && (
         <div className="callout" style={{ marginBottom: 16 }}>
           <Info />
           <div>
-            <b>One-time setup needed.</b> Microsoft sign-in needs an Azure application Client ID that Mojang has approved for Minecraft.{' '}
-            <button className="link" onClick={() => go({ page: 'settings' })}>
-              Add it in Settings
-            </button>
-            .
+            {rich('accounts.noMicrosoft', { b: (s) => <b>{s}</b> })}
           </div>
         </div>
       )}
@@ -47,14 +46,14 @@ export default function Accounts() {
         <div className="card">
           <Empty
             icon={<Users />}
-            title="No accounts yet"
+            title={t('accounts.empty.title')}
             action={
               <button className="btn primary" onClick={() => setSigningIn(true)}>
-                <LogIn /> Sign in with Microsoft
+                <LogIn /> {t('accounts.signIn')}
               </button>
             }
           >
-            Your password never touches ResinCraft. You sign in on Microsoft's own website.
+            {t('accounts.empty.body')}
           </Empty>
         </div>
       ) : (
@@ -64,11 +63,16 @@ export default function Accounts() {
               <Avatar account={a} size={44} />
               <div className="grow">
                 <div className="title">{a.username}</div>
-                <div className="file">{a.type === 'msa' ? 'Microsoft account' : 'Offline profile: singleplayer & offline-mode servers only'}</div>
+                <div className="file">{t(a.type === 'msa' ? 'accounts.kind.msa' : 'accounts.kind.offline')}</div>
               </div>
+              {a.type === 'msa' && (
+                <button className="btn sm" title={t('accounts.manage.tip')} onClick={() => setManaging(a)}>
+                  <Shirt /> {t('accounts.manage')}
+                </button>
+              )}
               {a.active ? (
                 <span className="chip accent">
-                  <Check /> Active
+                  <Check /> {t('accounts.active')}
                 </span>
               ) : (
                 <button
@@ -78,10 +82,10 @@ export default function Accounts() {
                     await refreshAccounts()
                   }}
                 >
-                  Use this account
+                  {t('accounts.use')}
                 </button>
               )}
-              <button className="btn ghost icon sm danger" title="Remove" onClick={() => setRemoving(a.id)}>
+              <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving(a.id)}>
                 <Trash2 />
               </button>
             </div>
@@ -91,21 +95,22 @@ export default function Accounts() {
 
       <div className="callout" style={{ marginTop: 16 }}>
         <ShieldCheck />
-        <div>Sign-in tokens are encrypted with your operating system's secure storage and only ever sent to Microsoft and Mojang.</div>
+        <div>{t('accounts.security')}</div>
       </div>
 
       {signingIn && <MicrosoftLogin onClose={() => setSigningIn(false)} />}
       {offline && <OfflineModal onClose={() => setOffline(false)} />}
+      {managing && <ProfileManager account={managing} onClose={() => setManaging(undefined)} />}
       {removing && (
         <ConfirmModal
-          title="Remove this account?"
-          body="You can sign in again at any time."
-          confirm="Remove"
+          title={t('accounts.remove.title')}
+          body={t('accounts.remove.body')}
+          confirm={t('common.remove')}
           onClose={() => setRemoving(undefined)}
           onConfirm={async () => {
             await api.accounts.remove(removing)
             await refreshAccounts()
-            toast('Account removed', 'info')
+            toast(t('accounts.removed'), 'info')
           }}
         />
       )}
@@ -123,7 +128,7 @@ function MicrosoftLogin({ onClose }: { onClose: () => void }) {
     const off = api.on.login(async (e) => {
       if (e.state === 'success') {
         await refreshAccounts()
-        toast(`Welcome, ${e.account?.username}!`)
+        toast(t('accounts.login.welcome', { name: e.account?.username ?? '' }))
         onClose()
       } else setError(e.error)
     })
@@ -142,7 +147,7 @@ function MicrosoftLogin({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Sign in with Microsoft" subtitle="You'll finish signing in on Microsoft's website." onClose={onClose}>
+    <Modal title={t('accounts.login.title')} subtitle={t('accounts.login.subtitle')} onClose={onClose}>
       {error ? (
         <div className="callout danger">
           <Info />
@@ -155,16 +160,16 @@ function MicrosoftLogin({ onClose }: { onClose: () => void }) {
       ) : (
         <>
           <ol className="muted" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.9 }}>
-            <li>Click the button below. It copies your code and opens Microsoft's sign-in page.</li>
-            <li>Paste the code, then sign in with the account that owns Minecraft.</li>
-            <li>Come back here. ResinCraft finishes on its own.</li>
+            <li>{t('accounts.login.step1')}</li>
+            <li>{t('accounts.login.step2')}</li>
+            <li>{t('accounts.login.step3')}</li>
           </ol>
           <div className="device-code">{code.userCode}</div>
           <button className="btn primary lg" onClick={open}>
-            {copied ? <Check /> : <Copy />} {copied ? 'Copied! Opening browser…' : 'Copy code & open browser'} <ExternalLink />
+            {copied ? <Check /> : <Copy />} {t(copied ? 'accounts.login.opening' : 'accounts.login.open')} <ExternalLink />
           </button>
           <div className="row hint" style={{ justifyContent: 'center' }}>
-            <Loader2 className="spin" size={14} /> Waiting for you to finish in the browser…
+            <Loader2 className="spin" size={14} /> {t('accounts.login.waiting')}
           </div>
         </>
       )}
@@ -182,7 +187,7 @@ function OfflineModal({ onClose }: { onClose: () => void }) {
     try {
       await api.accounts.addOffline(name)
       await refreshAccounts()
-      toast(`Added offline profile ${name}`)
+      toast(t('accounts.offline.added', { name }))
       onClose()
     } catch (e) {
       setError((e as Error).message)
@@ -191,22 +196,22 @@ function OfflineModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Add offline profile"
-      subtitle="Play singleplayer or LAN without signing in each time."
+      title={t('accounts.offline.title')}
+      subtitle={t('accounts.offline.subtitle')}
       onClose={onClose}
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!valid} onClick={add}>
-            Add profile
+            {t('accounts.offline.add')}
           </button>
         </>
       }
     >
       <div className="field">
-        <label htmlFor="off-name">Username</label>
+        <label htmlFor="off-name">{t('accounts.offline.username')}</label>
         <input
           id="off-name"
           className="input"
@@ -216,7 +221,7 @@ function OfflineModal({ onClose }: { onClose: () => void }) {
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && valid && void add()}
         />
-        <span className="hint">3–16 characters: letters, numbers and underscores.</span>
+        <span className="hint">{t('accounts.offline.rules')}</span>
       </div>
       {error && <div className="callout danger">{error}</div>}
     </Modal>

@@ -5,6 +5,7 @@ import { api } from '../api'
 import { ConfirmModal, Empty, InstanceTile, Menu } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
 import { describe, playtime } from '../util'
+import { t } from '../i18n'
 
 type Sort = 'recent' | 'name' | 'version' | 'playtime'
 
@@ -31,7 +32,7 @@ export default function Library() {
       const inst = await api.content.importModpack()
       if (inst) {
         await refreshInstances()
-        toast(`Imported ${inst.name}`)
+        toast(t('library.imported', { name: inst.name }))
         go({ page: 'instance', id: inst.id })
       }
     } catch (e) {
@@ -45,47 +46,47 @@ export default function Library() {
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Library</h1>
-          <p>All your Minecraft setups in one place.</p>
+          <h1>{t('library.title')}</h1>
+          <p>{t('library.subtitle')}</p>
         </div>
         <div className="spacer" />
         <button className="btn" onClick={importPack} disabled={importing}>
-          {importing ? <Loader2 className="spin" /> : <FileDown />} Import modpack
+          {importing ? <Loader2 className="spin" /> : <FileDown />} {t('library.importModpack')}
         </button>
         <button className="btn primary" onClick={() => setNewInstanceOpen(true)}>
-          <Plus /> New instance
+          <Plus /> {t('library.newInstance')}
         </button>
       </div>
 
       {instances.length === 0 ? (
         <Empty
           icon={<Layers />}
-          title="No instances yet"
+          title={t('library.empty.title')}
           action={
             <div className="row" style={{ justifyContent: 'center' }}>
               <button className="btn primary" onClick={() => setNewInstanceOpen(true)}>
-                <Plus /> Create one
+                <Plus /> {t('library.empty.create')}
               </button>
               <button className="btn" onClick={() => go({ page: 'discover', kind: 'modpack' })}>
-                Browse modpacks
+                {t('library.empty.browse')}
               </button>
             </div>
           }
         >
-          Create a fresh instance or install a ready-made modpack to get started.
+          {t('library.empty.body')}
         </Empty>
       ) : (
         <>
           <div className="toolbar">
             <div className="search">
               <Search />
-              <input className="input" placeholder="Search instances…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input className="input" placeholder={t('library.search')} value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            <select className="select" value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort">
-              <option value="recent">Recently played</option>
-              <option value="name">Name</option>
-              <option value="version">Game version</option>
-              <option value="playtime">Play time</option>
+            <select className="select" value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t('library.sort.label')}>
+              <option value="recent">{t('library.sort.recent')}</option>
+              <option value="name">{t('library.sort.name')}</option>
+              <option value="version">{t('library.sort.version')}</option>
+              <option value="playtime">{t('library.sort.playtime')}</option>
             </select>
           </div>
           <div className="grid">
@@ -94,8 +95,8 @@ export default function Library() {
             ))}
           </div>
           {shown.length === 0 && (
-            <Empty icon={<Search />} title="Nothing matches">
-              Try a different search.
+            <Empty icon={<Search />} title={t('library.noMatch.title')}>
+              {t('library.noMatch.body')}
             </Empty>
           )}
         </>
@@ -120,10 +121,10 @@ export function InstanceCard({ inst, withMenu }: { inst: Instance; withMenu?: bo
         onKeyDown={(e) => e.key === 'Enter' && go({ page: 'instance', id: inst.id })}
       >
         <InstanceTile inst={inst} wide />
-        {state === 'running' && <span className="chip success badge-live">● Running</span>}
+        {state === 'running' && <span className="chip success badge-live">● {t('library.card.running')}</span>}
         <button
           className={`quick ${state === 'running' ? 'running busy' : state === 'preparing' ? 'busy' : ''}`}
-          title={state === 'running' ? 'Stop' : 'Play'}
+          title={state === 'running' ? t('common.stop') : t('common.play')}
           onClick={(e) => {
             e.stopPropagation()
             if (state === 'running') void stop(inst.id)
@@ -138,7 +139,9 @@ export function InstanceCard({ inst, withMenu }: { inst: Instance; withMenu?: bo
               <div className="name ellipsis">{inst.name}</div>
               <div className="sub">
                 {state === 'preparing' ? (
-                  <span style={{ color: 'var(--accent)' }}>{task?.progress != null ? `Preparing ${Math.round(task.progress * 100)}%` : 'Preparing…'}</span>
+                  <span style={{ color: 'var(--accent)' }}>
+                    {task?.progress != null ? t('library.card.preparingProgress', { percent: Math.round(task.progress * 100) }) : t('library.card.preparing')}
+                  </span>
                 ) : (
                   <>
                     <span className="ellipsis">{describe(inst)}</span>
@@ -151,22 +154,22 @@ export function InstanceCard({ inst, withMenu }: { inst: Instance; withMenu?: bo
             {withMenu && (
               <Menu
                 items={[
-                  { label: 'Settings', icon: <Settings2 />, onClick: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
-                  { label: 'Open folder', icon: <FolderOpen />, onClick: () => void api.instances.openFolder(inst.id) },
+                  { label: t('library.card.settings'), icon: <Settings2 />, onClick: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
+                  { label: t('common.openFolder'), icon: <FolderOpen />, onClick: () => void api.instances.openFolder(inst.id) },
                   {
-                    label: 'Duplicate',
+                    label: t('library.card.duplicate'),
                     icon: <Copy />,
                     onClick: async () => {
                       try {
                         await api.instances.duplicate(inst.id)
                         await refreshInstances()
-                        toast(`Duplicated ${inst.name}`)
+                        toast(t('library.card.duplicated', { name: inst.name }))
                       } catch (e) {
                         toast((e as Error).message, 'error')
                       }
                     }
                   },
-                  { label: 'Delete', icon: <Trash2 />, danger: true, divider: true, onClick: () => setConfirm(true) }
+                  { label: t('common.delete'), icon: <Trash2 />, danger: true, divider: true, onClick: () => setConfirm(true) }
                 ]}
               />
             )}
@@ -182,17 +185,15 @@ export function DeleteInstance({ inst, onClose, onDeleted }: { inst: Instance; o
   const { refreshInstances, toast } = useStore()
   return (
     <ConfirmModal
-      title={`Delete ${inst.name}?`}
-      body={
-        <>The instance, including its worlds, mods and settings, will be moved to your Recycle Bin. You can restore it from there if you change your mind.</>
-      }
-      confirm="Move to Recycle Bin"
+      title={t('library.delete.title', { name: inst.name })}
+      body={<>{t('library.delete.body')}</>}
+      confirm={t('library.delete.confirm')}
       onClose={onClose}
       onConfirm={async () => {
         try {
           await api.instances.remove(inst.id)
           await refreshInstances()
-          toast(`Deleted ${inst.name}`)
+          toast(t('library.delete.done', { name: inst.name }))
           onDeleted?.()
         } catch (e) {
           toast((e as Error).message, 'error')

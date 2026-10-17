@@ -2,23 +2,30 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
 import type { AccountView, Instance } from '@shared/types'
 import { useInstanceTask, useStore } from '../store'
+import { t } from '../i18n'
 
+/** The ResinCraft mark: a resin drop holding a block, with a pixel "R" on its side. Same art as resources/logo.svg. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden>
-      <defs>
-        <linearGradient id="resin-frame" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#b26bff" />
-          <stop offset="1" stopColor="#22d3ee" />
-        </linearGradient>
-        <linearGradient id="resin-drop" x1="0" y1="0" x2="0.6" y2="1">
-          <stop offset="0" stopColor="#39ff88" />
-          <stop offset="1" stopColor="#22d3ee" />
-        </linearGradient>
-      </defs>
-      <path d="M32 4 56 18v28L32 60 8 46V18z" fill="#120c1f" stroke="url(#resin-frame)" strokeWidth="3.5" strokeLinejoin="round" />
-      <path d="M32 15c7 9 11 15 11 21a11 11 0 0 1-22 0c0-6 4-12 11-21z" fill="url(#resin-drop)" />
-      <path d="M26.5 37.5a5.5 5.5 0 0 0 5.5 5.5" stroke="#fff" strokeOpacity=".6" strokeWidth="3" strokeLinecap="round" fill="none" />
+    <svg viewBox="140 30 744 970" className={className} aria-hidden>
+      <path fill="#8b46ff" d="M512 48C490 150 400 252 268 402C206 472 168 548 168 632A344 344 0 0 0 856 632C856 548 818 472 756 402C624 252 534 150 512 48Z" />
+      <path fill="#4aff86" d="M299 500L520 372L741 500L520 628Z" />
+      <path fill="#1bc866" d="M284 525L506 653L506 907L284 780Z" />
+      <path fill="#3a178c" d="M534 653L755 525L755 780L534 907Z" />
+      <g fill="#4aff86">
+        <path d="M550 650L585 630L585 668L550 688Z" />
+        <path d="M550 698L585 678L585 716L550 736Z" />
+        <path d="M550 746L585 726L585 764L550 784Z" />
+        <path d="M550 794L585 774L585 812L550 832Z" />
+        <path d="M550 842L585 822L585 860L550 880Z" />
+        <path d="M593 626L628 606L628 644L593 664Z" />
+        <path d="M636 601L671 581L671 619L636 639Z" />
+        <path d="M678 625L713 605L713 643L678 663Z" />
+        <path d="M593 722L628 702L628 740L593 760Z" />
+        <path d="M636 697L671 677L671 715L636 735Z" />
+        <path d="M636 745L671 725L671 763L636 783Z" />
+        <path d="M679 776C679 765 689 758 701 757C712 757 713 769 708 781C702 793 691 801 684 799C680 797 679 790 679 776Z" />
+      </g>
     </svg>
   )
 }
@@ -117,19 +124,19 @@ export function PlayButton({ inst, size = '' }: { inst: Instance; size?: 'lg' | 
   const state = games[inst.id]
   if (state === 'running')
     return (
-      <button className={`btn play-btn running ${size}`} onClick={() => void stop(inst.id)} title="Force-stop the game">
-        <Square /> Stop
+      <button className={`btn play-btn running ${size}`} onClick={() => void stop(inst.id)} title={t('common.forceStop')}>
+        <Square /> {t('common.stop')}
       </button>
     )
   if (state === 'preparing')
     return (
       <button className={`btn primary play-btn ${size}`} disabled>
-        <Loader2 className="spin" /> {task?.progress != null ? <span className="pct">{Math.round(task.progress * 100)}%</span> : 'Preparing'}
+        <Loader2 className="spin" /> {task?.progress != null ? <span className="pct">{Math.round(task.progress * 100)}%</span> : t('common.preparing')}
       </button>
     )
   return (
     <button className={`btn primary play-btn ${size}`} onClick={() => void play(inst.id)}>
-      <Play fill="currentColor" /> Play
+      <Play fill="currentColor" /> {t('common.play')}
     </button>
   )
 }
@@ -162,7 +169,7 @@ export function Modal({
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
-          <button className="btn ghost icon sm" onClick={onClose} aria-label="Close">
+          <button className="btn ghost icon sm" onClick={onClose} aria-label={t('common.close')}>
             <X />
           </button>
         </div>
@@ -192,7 +199,7 @@ export function Menu({ items, trigger }: { items: MenuItem[]; trigger?: ReactNod
   }, [open])
   return (
     <div className="menu-wrap" ref={ref} onClick={(e) => e.stopPropagation()}>
-      <button className="btn icon" onClick={() => setOpen((o) => !o)} aria-label="More actions">
+      <button className="btn icon" onClick={() => setOpen((o) => !o)} aria-label={t('common.moreActions')}>
         {trigger ?? <MoreHorizontal />}
       </button>
       {open && (
@@ -274,7 +281,7 @@ export function ConfirmModal({
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             className="btn danger solid"
@@ -304,32 +311,32 @@ export function Dock() {
   const icons = { success: <CheckCircle2 />, error: <AlertTriangle />, info: <Info /> }
   return (
     <div className="dock" aria-live="polite">
-      {tasks.map((t) => (
-        <div className="task" key={t.id}>
+      {tasks.map((task) => (
+        <div className="task" key={task.id}>
           <div className="top">
-            {t.state === 'error' ? (
+            {task.state === 'error' ? (
               <AlertTriangle style={{ color: 'var(--danger)' }} />
-            ) : t.state === 'done' ? (
+            ) : task.state === 'done' ? (
               <CheckCircle2 style={{ color: 'var(--success)' }} />
             ) : (
               <Loader2 className="spin" />
             )}
-            <span className="grow ellipsis">{t.title}</span>
-            {t.progress != null && t.state === 'running' && <span className="faint">{Math.round(t.progress * 100)}%</span>}
+            <span className="grow ellipsis">{task.title}</span>
+            {task.progress != null && task.state === 'running' && <span className="faint">{Math.round(task.progress * 100)}%</span>}
           </div>
-          <div className="detail ellipsis">{t.state === 'error' ? t.error : (t.detail ?? 'Working…')}</div>
-          {t.state === 'running' && (
-            <div className={`bar ${t.progress == null ? 'indeterminate' : ''}`}>
-              <i style={{ width: `${(t.progress ?? 0) * 100}%` }} />
+          <div className="detail ellipsis">{task.state === 'error' ? task.error : (task.detail ?? t('common.working'))}</div>
+          {task.state === 'running' && (
+            <div className={`bar ${task.progress == null ? 'indeterminate' : ''}`}>
+              <i style={{ width: `${(task.progress ?? 0) * 100}%` }} />
             </div>
           )}
         </div>
       ))}
-      {toasts.map((t) => (
-        <div className={`toast ${t.kind}`} key={t.id}>
-          {icons[t.kind]}
-          <span className="grow">{t.text}</span>
-          <button className="x" onClick={() => dismiss(t.id)} aria-label="Dismiss">
+      {toasts.map((toast) => (
+        <div className={`toast ${toast.kind}`} key={toast.id}>
+          {icons[toast.kind]}
+          <span className="grow">{toast.text}</span>
+          <button className="x" onClick={() => dismiss(toast.id)} aria-label={t('common.dismiss')}>
             <X size={15} />
           </button>
         </div>

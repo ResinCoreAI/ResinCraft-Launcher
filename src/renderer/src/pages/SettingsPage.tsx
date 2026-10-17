@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Coffee, Flame, Download, FolderSearch, Gamepad2, Info, KeyRound, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
+import { Coffee, Download, FolderSearch, Gamepad2, Info, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
 import type { JavaInstall, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
 import { useStore } from '../store'
+import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
+import { fixed } from '../util'
 
-const SECTIONS = [
-  { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
-  { id: 'game', label: 'Game', icon: <Gamepad2 size={16} /> },
-  { id: 'java', label: 'Java', icon: <Coffee size={16} /> },
-  { id: 'downloads', label: 'Downloads', icon: <Download size={16} /> },
-  { id: 'microsoft', label: 'Microsoft sign-in', icon: <KeyRound size={16} /> },
-  { id: 'curseforge', label: 'CurseForge', icon: <Flame size={16} /> },
-  { id: 'about', label: 'About', icon: <Info size={16} /> }
+const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
+  { id: 'appearance', label: 'settings.nav.appearance', icon: <Palette size={16} /> },
+  { id: 'game', label: 'settings.nav.game', icon: <Gamepad2 size={16} /> },
+  { id: 'java', label: 'settings.nav.java', icon: <Coffee size={16} /> },
+  { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
+  { id: 'about', label: 'settings.nav.about', icon: <Info size={16} /> }
 ]
 
 export default function SettingsPage() {
@@ -21,8 +21,6 @@ export default function SettingsPage() {
   const [scanning, setScanning] = useState(false)
   const [mem, setMem] = useState(s?.memoryMb ?? 4096)
   const [jvm, setJvm] = useState(s?.jvmArgs ?? '')
-  const [clientId, setClientId] = useState(s?.msClientId ?? '')
-  const [cfKey, setCfKey] = useState(s?.curseforgeKey ?? '')
   const [size, setSize] = useState({ w: s?.gameWidth ?? 1280, h: s?.gameHeight ?? 720 })
 
   const scan = async () => {
@@ -37,13 +35,14 @@ export default function SettingsPage() {
   const set = (p: Partial<Settings>) => void updateSettings(p)
   const totalMem = info?.totalMemMb ?? 8192
   const maxMem = Math.max(4096, Math.floor((totalMem * 0.75) / 512) * 512)
+  const systemLanguage = matchLanguage(navigator.languages ?? [navigator.language])
 
   return (
     <div className="page">
       <div className="page-head">
         <div>
-          <h1>Settings</h1>
-          <p>Defaults for every instance. Each instance can override these in its own Settings tab.</p>
+          <h1>{t('settings.title')}</h1>
+          <p>{t('settings.subtitle')}</p>
         </div>
       </div>
 
@@ -51,20 +50,20 @@ export default function SettingsPage() {
         <nav className="settings-nav">
           {SECTIONS.map((x) => (
             <button key={x.id} className="nav-item" onClick={() => document.getElementById(x.id)?.scrollIntoView({ behavior: 'smooth' })}>
-              {x.icon} {x.label}
+              {x.icon} <span className="ellipsis">{t(x.label)}</span>
             </button>
           ))}
         </nav>
 
         <div>
           <section className="settings-section" id="appearance">
-            <h3>Appearance</h3>
-            <p>Make ResinCraft feel like home.</p>
+            <h3>{t('settings.nav.appearance')}</h3>
+            <p>{t('settings.appearance.lead')}</p>
             <div className="card">
               <div className="setting">
                 <div className="text">
-                  <b>Theme</b>
-                  <span>System follows your OS light/dark setting.</span>
+                  <b>{t('settings.theme')}</b>
+                  <span>{t('settings.theme.hint')}</span>
                 </div>
                 <Segmented
                   value={s.theme}
@@ -74,7 +73,7 @@ export default function SettingsPage() {
                       value: 'dark',
                       label: (
                         <>
-                          <Moon size={14} /> Dark
+                          <Moon size={14} /> {t('settings.theme.dark')}
                         </>
                       )
                     },
@@ -82,7 +81,7 @@ export default function SettingsPage() {
                       value: 'light',
                       label: (
                         <>
-                          <Sun size={14} /> Light
+                          <Sun size={14} /> {t('settings.theme.light')}
                         </>
                       )
                     },
@@ -90,27 +89,43 @@ export default function SettingsPage() {
                       value: 'system',
                       label: (
                         <>
-                          <Monitor size={14} /> System
+                          <Monitor size={14} /> {t('settings.theme.system')}
                         </>
                       )
                     }
                   ]}
                 />
               </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.language')}</b>
+                  <span>{t('settings.language.hint')}</span>
+                </div>
+                <select className="select" style={{ width: 220 }} value={s.language || 'system'} onChange={(e) => set({ language: e.target.value })}>
+                  <option value="system">
+                    {t('settings.language.system', { name: LANGUAGES.find((l) => l.code === systemLanguage)?.name ?? 'English' })}
+                  </option>
+                  {LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code} lang={l.code}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </section>
 
           <section className="settings-section" id="game">
-            <h3>Game</h3>
-            <p>How Minecraft starts.</p>
+            <h3>{t('settings.nav.game')}</h3>
+            <p>{t('settings.game.lead')}</p>
             <div className="card">
               <div className="setting stack">
                 <div className="row">
                   <div className="text grow">
-                    <b>Memory</b>
-                    <span>Most modpacks are happy with 4–6 GB. Your computer has {(totalMem / 1024).toFixed(0)} GB.</span>
+                    <b>{t('settings.memory')}</b>
+                    <span>{t('settings.memory.hint', { total: Math.round(totalMem / 1024) })}</span>
                   </div>
-                  <span className="mem-value">{(mem / 1024).toFixed(1)} GB</span>
+                  <span className="mem-value">{t('common.size.gb', { n: fixed(mem / 1024, 1) })}</span>
                 </div>
                 <div>
                   <input
@@ -124,15 +139,15 @@ export default function SettingsPage() {
                     onKeyUp={() => set({ memoryMb: mem })}
                   />
                   <div className="mem-scale">
-                    <span>1 GB</span>
-                    <span>{(maxMem / 1024).toFixed(0)} GB</span>
+                    <span>{t('common.size.gb', { n: 1 })}</span>
+                    <span>{t('common.size.gb', { n: Math.round(maxMem / 1024) })}</span>
                   </div>
                 </div>
               </div>
               <div className="setting">
                 <div className="text">
-                  <b>Window size</b>
-                  <span>Starting resolution of the game window.</span>
+                  <b>{t('settings.windowSize')}</b>
+                  <span>{t('settings.windowSize.hint')}</span>
                 </div>
                 <div className="row" style={{ width: 220 }}>
                   <input
@@ -142,7 +157,7 @@ export default function SettingsPage() {
                     value={size.w}
                     onChange={(e) => setSize({ ...size, w: Number(e.target.value) })}
                     onBlur={() => set({ gameWidth: size.w })}
-                    aria-label="Width"
+                    aria-label={t('settings.width')}
                   />
                   <span className="faint">×</span>
                   <input
@@ -152,14 +167,14 @@ export default function SettingsPage() {
                     value={size.h}
                     onChange={(e) => setSize({ ...size, h: Number(e.target.value) })}
                     onBlur={() => set({ gameHeight: size.h })}
-                    aria-label="Height"
+                    aria-label={t('settings.height')}
                   />
                 </div>
               </div>
               <div className="setting">
                 <div className="text">
-                  <b>When the game starts</b>
-                  <span>What the launcher window does while you play.</span>
+                  <b>{t('settings.onLaunch')}</b>
+                  <span>{t('settings.onLaunch.hint')}</span>
                 </div>
                 <select
                   className="select"
@@ -167,40 +182,40 @@ export default function SettingsPage() {
                   value={s.onLaunch}
                   onChange={(e) => set({ onLaunch: e.target.value as Settings['onLaunch'] })}
                 >
-                  <option value="minimize">Minimize</option>
-                  <option value="hide">Hide until the game closes</option>
-                  <option value="keep">Stay open</option>
+                  <option value="minimize">{t('settings.onLaunch.minimize')}</option>
+                  <option value="hide">{t('settings.onLaunch.hide')}</option>
+                  <option value="keep">{t('settings.onLaunch.keep')}</option>
                 </select>
               </div>
               <div className="setting">
                 <div className="text">
-                  <b>Show snapshots</b>
-                  <span>Include test builds when creating instances.</span>
+                  <b>{t('settings.snapshots')}</b>
+                  <span>{t('settings.snapshots.hint')}</span>
                 </div>
-                <Switch on={s.showSnapshots} onChange={(v) => set({ showSnapshots: v })} label="Show snapshots" />
+                <Switch on={s.showSnapshots} onChange={(v) => set({ showSnapshots: v })} label={t('settings.snapshots')} />
               </div>
             </div>
           </section>
 
           <section className="settings-section" id="java">
-            <h3>Java</h3>
-            <p>Minecraft runs on Java. ResinCraft picks the right version for each game and can download it for you.</p>
+            <h3>{t('settings.nav.java')}</h3>
+            <p>{t('settings.java.lead')}</p>
             <div className="card">
               <div className="setting">
                 <div className="text">
-                  <b>Download Java automatically</b>
-                  <span>Installs Eclipse Temurin when no suitable Java is found.</span>
+                  <b>{t('settings.autoJava')}</b>
+                  <span>{t('settings.autoJava.hint')}</span>
                 </div>
-                <Switch on={s.autoJava} onChange={(v) => set({ autoJava: v })} label="Download Java automatically" />
+                <Switch on={s.autoJava} onChange={(v) => set({ autoJava: v })} label={t('settings.autoJava')} />
               </div>
               <div className="setting stack">
                 <div className="row">
                   <div className="text grow">
-                    <b>Java to use</b>
-                    <span>Automatic is best unless you know you need a specific one.</span>
+                    <b>{t('settings.javaToUse')}</b>
+                    <span>{t('settings.javaToUse.hint')}</span>
                   </div>
                   <button className="btn sm" onClick={scan} disabled={scanning}>
-                    <RefreshCw className={scanning ? 'spin' : ''} /> Rescan
+                    <RefreshCw className={scanning ? 'spin' : ''} /> {t('settings.rescan')}
                   </button>
                   <button
                     className="btn sm"
@@ -209,28 +224,28 @@ export default function SettingsPage() {
                       if (p) set({ javaPath: p })
                     }}
                   >
-                    <FolderSearch /> Browse
+                    <FolderSearch /> {t('common.browse')}
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div className={`java-row ${!s.javaPath ? 'on' : ''}`} onClick={() => set({ javaPath: '' })}>
                     <span className="radio" />
                     <div className="grow">
-                      <b>Automatic</b>{' '}
+                      <b>{t('settings.javaAuto')}</b>{' '}
                       <span className="chip accent" style={{ marginLeft: 6 }}>
-                        Recommended
+                        {t('common.recommended')}
                       </span>
-                      <div className="hint">Matches Java to each Minecraft version.</div>
+                      <div className="hint">{t('settings.javaAuto.hint')}</div>
                     </div>
                   </div>
                   {javas?.map((j) => (
                     <div key={j.path} className={`java-row ${s.javaPath === j.path ? 'on' : ''}`} onClick={() => set({ javaPath: j.path })}>
                       <span className="radio" />
                       <div className="grow" style={{ minWidth: 0 }}>
-                        <b>Java {j.major}</b> <span className="faint">{j.version}</span>
+                        <b>{t('settings.javaVersion', { major: j.major })}</b> <span className="faint">{j.version}</span>
                         {j.managed && (
                           <span className="chip" style={{ marginLeft: 6 }}>
-                            Installed by ResinCraft
+                            {t('settings.javaManaged')}
                           </span>
                         )}
                         <div className="hint ellipsis mono">{j.path}</div>
@@ -243,13 +258,13 @@ export default function SettingsPage() {
                       <div className="grow hint mono ellipsis">{s.javaPath}</div>
                     </div>
                   )}
-                  {javas?.length === 0 && <div className="hint">No Java found yet. That's fine: ResinCraft will download one when you first play.</div>}
+                  {javas?.length === 0 && <div className="hint">{t('settings.noJava')}</div>}
                 </div>
               </div>
               <div className="setting stack">
                 <div className="text">
-                  <b>Default JVM arguments</b>
-                  <span>Advanced: extra flags passed to Java for every instance.</span>
+                  <b>{t('settings.jvmArgs')}</b>
+                  <span>{t('settings.jvmArgs.hint')}</span>
                 </div>
                 <textarea
                   className="input"
@@ -264,13 +279,13 @@ export default function SettingsPage() {
           </section>
 
           <section className="settings-section" id="downloads">
-            <h3>Downloads</h3>
-            <p>Lower this if your connection struggles when preparing games.</p>
+            <h3>{t('settings.nav.downloads')}</h3>
+            <p>{t('settings.downloads.lead')}</p>
             <div className="card">
               <div className="setting">
                 <div className="text">
-                  <b>Parallel downloads</b>
-                  <span>Files fetched at the same time.</span>
+                  <b>{t('settings.parallel')}</b>
+                  <span>{t('settings.parallel.hint')}</span>
                 </div>
                 <select className="select" style={{ width: 120 }} value={s.concurrency} onChange={(e) => set({ concurrency: Number(e.target.value) })}>
                   {[4, 8, 16, 24, 32].map((n) => (
@@ -283,73 +298,15 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          <section className="settings-section" id="microsoft">
-            <h3>Microsoft sign-in</h3>
-            <p>
-              ResinCraft signs in through your own Azure app registration. Create one (personal Microsoft accounts, public client flows enabled), then{' '}
-              <a href="https://aka.ms/mce-reviewappid" target="_blank" rel="noreferrer">
-                ask Mojang to approve it
-              </a>{' '}
-              for Minecraft. Details are in the README.
-            </p>
-            <div className="card">
-              <div className="setting">
-                <div className="text">
-                  <b>Azure Client ID</b>
-                  <span>Looks like 00000000-0000-0000-0000-000000000000</span>
-                </div>
-                <div className="control">
-                  <input
-                    className="input mono"
-                    value={clientId}
-                    placeholder="Application (client) ID"
-                    onChange={(e) => setClientId(e.target.value)}
-                    onBlur={() => set({ msClientId: clientId.trim() })}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="settings-section" id="curseforge">
-            <h3>CurseForge</h3>
-            <p>
-              Searching and downloading from CurseForge needs a free API key. Sign in at{' '}
-              <a href="https://console.curseforge.com/" target="_blank" rel="noreferrer">
-                console.curseforge.com
-              </a>
-              , request an API key for your app, and paste it here. Modrinth and FTB work without one.
-            </p>
-            <div className="card">
-              <div className="setting">
-                <div className="text">
-                  <b>API key</b>
-                  <span>{s.curseforgeKey ? 'Saved. CurseForge appears in Discover.' : 'Not set'}</span>
-                </div>
-                <div className="control">
-                  <input
-                    className="input mono"
-                    type="password"
-                    autoComplete="off"
-                    value={cfKey}
-                    placeholder="$2a$10$…"
-                    onChange={(e) => setCfKey(e.target.value)}
-                    onBlur={() => set({ curseforgeKey: cfKey.trim() })}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
           <section className="settings-section" id="about">
-            <h3>About</h3>
+            <h3>{t('settings.nav.about')}</h3>
             <div className="card pad row" style={{ gap: 16 }}>
               <Logo className="about-logo" />
               <div className="grow">
                 <b style={{ fontSize: 16 }}>ResinCraft Launcher</b> <span className="faint">v{info?.version}</span>
-                <div className="muted">Made by Puirkle. Its feature set is inspired by Prism Launcher; all code is original.</div>
+                <div className="muted">{t('settings.about.credit')}</div>
                 <div className="hint mono ellipsis" style={{ marginTop: 6 }}>
-                  Data folder: {info?.dataDir}
+                  {t('settings.about.dataFolder', { path: info?.dataDir ?? '' })}
                 </div>
               </div>
             </div>

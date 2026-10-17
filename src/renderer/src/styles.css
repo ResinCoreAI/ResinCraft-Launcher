@@ -350,6 +350,14 @@ h3 {
 .page {
   max-width: 1220px;
   margin: 0 auto;
+  /* Each page eases in when you switch to it (pages remount on navigation). */
+  animation: page-in 0.24s var(--ease);
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .page-head {
@@ -2066,4 +2074,38 @@ button.stat b {
 .empty > .btn,
 .empty > .row {
   justify-self: start;
+}
+
+/* ---------- Tauri window controls (frameless window) ---------- */
+
+.win-controls {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: var(--titlebar);
+  display: flex;
+  z-index: 150;
+}
+.win-controls button {
+  width: 46px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.1s var(--ease), color 0.1s var(--ease);
+}
+.win-controls button svg {
+  width: 15px;
+  height: 15px;
+}
+.win-controls button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.win-controls button.close:hover {
+  background: #e81123;
+  color: #fff;
 }

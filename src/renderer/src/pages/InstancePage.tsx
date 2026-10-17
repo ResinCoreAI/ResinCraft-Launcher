@@ -28,7 +28,8 @@ import type { ContentItem, ContentKind, Instance, JavaInstall } from '@shared/ty
 import { api } from '../api'
 import { ConfirmModal, Empty, InstanceTile, PlayButton, Segmented, Switch } from '../components/ui'
 import { useStore } from '../store'
-import { bytes, COLORS, describe, playtime, timeAgo } from '../util'
+import { bytes, COLORS, describe, fixed, playtime, timeAgo } from '../util'
+import { t } from '../i18n'
 import ExportModal from '../components/ExportModal'
 import VersionPicker from '../components/VersionPicker'
 import { DeleteInstance } from './Library'
@@ -51,10 +52,10 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
       <div className="page">
         <Empty
           icon={<Package />}
-          title="Instance not found"
+          title={t('instance.notFound')}
           action={
             <button className="btn" onClick={() => go({ page: 'library' })}>
-              Back to Library
+              {t('instance.backToLibrary')}
             </button>
           }
         />
@@ -76,19 +77,19 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
               <Timer /> {playtime(inst.playtime)}
             </span>
             <span className="chip">
-              <Clock /> {inst.lastPlayed ? timeAgo(inst.lastPlayed) : 'Never played'}
+              <Clock /> {inst.lastPlayed ? timeAgo(inst.lastPlayed) : t('time.neverPlayed')}
             </span>
             {inst.modpack && (
               <span className="chip accent">
-                <Package /> Modpack
+                <Package /> {t('instance.modpack')}
               </span>
             )}
           </div>
         </div>
-        <button className="btn lg" title="Export as a modpack file" onClick={() => setExporting(true)}>
-          <PackageOpen /> Export
+        <button className="btn lg" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
+          <PackageOpen /> {t('instance.export')}
         </button>
-        <button className="btn lg icon" title="Open folder" onClick={() => void api.instances.openFolder(inst.id)}>
+        <button className="btn lg icon" title={t('common.openFolder')} onClick={() => void api.instances.openFolder(inst.id)}>
           <FolderOpen />
         </button>
         <PlayButton inst={inst} size="lg" />
@@ -97,25 +98,25 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
 
       <div className="tabs" role="tablist">
         <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>
-          <Blocks /> Content
+          <Blocks /> {t('instance.tab.content')}
         </button>
         <button className={tab === 'worlds' ? 'on' : ''} onClick={() => setTab('worlds')}>
-          <Earth /> Worlds
+          <Earth /> {t('instance.tab.worlds')}
         </button>
         <button className={tab === 'servers' ? 'on' : ''} onClick={() => setTab('servers')}>
-          <Server /> Servers
+          <Server /> {t('instance.tab.servers')}
         </button>
         <button className={tab === 'screenshots' ? 'on' : ''} onClick={() => setTab('screenshots')}>
-          <Camera /> Screenshots
+          <Camera /> {t('instance.tab.screenshots')}
         </button>
         <button className={tab === 'notes' ? 'on' : ''} onClick={() => setTab('notes')}>
-          <NotebookPen /> Notes
+          <NotebookPen /> {t('instance.tab.notes')}
         </button>
         <button className={tab === 'logs' ? 'on' : ''} onClick={() => setTab('logs')}>
-          <ScrollText /> Logs
+          <ScrollText /> {t('instance.tab.logs')}
         </button>
         <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>
-          <Settings2 /> Settings
+          <Settings2 /> {t('instance.tab.settings')}
         </button>
       </div>
 
@@ -132,12 +133,13 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
 
 // ---------- Content ----------
 
-const KIND_LABEL: Record<Exclude<ContentKind, 'modpack'>, string> = { mod: 'Mods', resourcepack: 'Resource packs', shader: 'Shaders' }
-const KIND_FOLDER: Record<Exclude<ContentKind, 'modpack'>, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
+type Kind = Exclude<ContentKind, 'modpack'>
+const KINDS: Kind[] = ['mod', 'resourcepack', 'shader']
+const KIND_FOLDER: Record<Kind, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
 
 function ContentTab({ inst }: { inst: Instance }) {
   const { go, toast } = useStore()
-  const [kind, setKind] = useState<Exclude<ContentKind, 'modpack'>>(inst.loader === 'vanilla' ? 'resourcepack' : 'mod')
+  const [kind, setKind] = useState<Kind>(inst.loader === 'vanilla' ? 'resourcepack' : 'mod')
   const [items, setItems] = useState<ContentItem[]>()
   const [q, setQ] = useState('')
   const [checking, setChecking] = useState(false)
@@ -168,7 +170,7 @@ function ContentTab({ inst }: { inst: Instance }) {
       const res = await api.content.checkUpdates(inst.id)
       setItems(res)
       const n = res.filter((m) => m.update).length
-      toast(n ? `${n} update${n === 1 ? '' : 's'} available` : 'Everything is up to date', 'info')
+      toast(n ? t('instance.content.updatesAvailable', { count: n }) : t('instance.content.upToDate'), 'info')
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
@@ -182,11 +184,15 @@ function ContentTab({ inst }: { inst: Instance }) {
       try {
         await api.content.update(inst.id, m.filename)
       } catch (e) {
-        toast(`${m.title ?? m.filename}: ${(e as Error).message}`, 'error')
+        toast(t('instance.content.updateFailed', { name: m.title ?? m.filename, error: (e as Error).message }), 'error')
       }
     }
     setUpdating(undefined)
-    toast(list.length === 1 ? `Updated ${list[0].title ?? list[0].filename}` : `Updated ${list.length} mods`)
+    toast(
+      list.length === 1
+        ? t('instance.content.updatedOne', { name: list[0].title ?? list[0].filename })
+        : t('instance.content.updatedMany', { count: list.length })
+    )
     await load()
   }
 
@@ -194,29 +200,25 @@ function ContentTab({ inst }: { inst: Instance }) {
     <>
       {!!inst.pendingDownloads?.length && <PendingDownloads inst={inst} onDone={load} />}
       <div className="toolbar">
-        <Segmented
-          value={kind}
-          onChange={setKind}
-          options={(Object.keys(KIND_LABEL) as (keyof typeof KIND_LABEL)[]).map((k) => ({ value: k, label: KIND_LABEL[k] }))}
-        />
+        <Segmented value={kind} onChange={setKind} options={KINDS.map((k) => ({ value: k, label: t(`instance.content.kind.${k}`) }))} />
         <div className="search">
           <Search />
-          <input className="input" placeholder={`Search ${KIND_LABEL[kind].toLowerCase()}…`} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" placeholder={t(`instance.content.search.${kind}`)} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         {kind === 'mod' && inst.loader !== 'vanilla' && (
           <>
             {updates.length > 0 ? (
               <button className="btn" disabled={!!updating} onClick={() => void update(updates)}>
-                <ArrowUpCircle /> Update all ({updates.length})
+                <ArrowUpCircle /> {t('instance.content.updateAll', { count: updates.length })}
               </button>
             ) : (
               <button className="btn" disabled={checking} onClick={checkUpdates}>
-                {checking ? <Loader2 className="spin" /> : <RefreshCw />} Check for updates
+                {checking ? <Loader2 className="spin" /> : <RefreshCw />} {t('instance.content.checkUpdates')}
               </button>
             )}
           </>
         )}
-        <button className="btn icon" title="Open folder" onClick={() => void api.instances.openFolder(inst.id, KIND_FOLDER[kind])}>
+        <button className="btn icon" title={t('common.openFolder')} onClick={() => void api.instances.openFolder(inst.id, KIND_FOLDER[kind])}>
           <FolderOpen />
         </button>
         <button
@@ -224,13 +226,13 @@ function ContentTab({ inst }: { inst: Instance }) {
           disabled={kind === 'mod' && inst.loader === 'vanilla'}
           onClick={() => go({ page: 'discover', kind, instanceId: inst.id })}
         >
-          <Plus /> Add {KIND_LABEL[kind].toLowerCase()}
+          <Plus /> {t(`instance.content.add.${kind}`)}
         </button>
       </div>
 
       {kind === 'mod' && inst.loader === 'vanilla' ? (
-        <Empty icon={<Blocks />} title="Vanilla instances can't use mods">
-          Create a new instance with Fabric or Quilt to install mods. Resource packs and shaders still work here.
+        <Empty icon={<Blocks />} title={t('instance.content.vanillaTitle')}>
+          {t('instance.content.vanillaBody')}
         </Empty>
       ) : !items ? (
         <div className="results">
@@ -240,16 +242,14 @@ function ContentTab({ inst }: { inst: Instance }) {
       ) : items.length === 0 ? (
         <Empty
           icon={kind === 'mod' ? <Blocks /> : kind === 'shader' ? <Sparkles /> : <Image />}
-          title={`No ${KIND_LABEL[kind].toLowerCase()} yet`}
+          title={t(`instance.content.empty.${kind}`)}
           action={
             <button className="btn primary" onClick={() => go({ page: 'discover', kind, instanceId: inst.id })}>
-              <Plus /> Browse {KIND_LABEL[kind].toLowerCase()}
+              <Plus /> {t(`instance.content.browse.${kind}`)}
             </button>
           }
         >
-          {kind === 'shader'
-            ? 'Shaders need Iris (a mod) or OptiFine installed to show up in game.'
-            : 'Find something you like in Discover and it lands right here.'}
+          {kind === 'shader' ? t('instance.content.shaderHint') : t('instance.content.emptyHint')}
         </Empty>
       ) : (
         <div className="list">
@@ -270,22 +270,27 @@ function ContentTab({ inst }: { inst: Instance }) {
                 </div>
               </div>
               {m.update && (
-                <button className="btn sm" disabled={!!updating} onClick={() => void update([m])} title={`Update to ${m.update.versionNumber}`}>
+                <button
+                  className="btn sm"
+                  disabled={!!updating}
+                  onClick={() => void update([m])}
+                  title={t('instance.content.updateTo', { version: m.update.versionNumber })}
+                >
                   {updating === m.filename ? <Loader2 className="spin" /> : <ArrowUpCircle />} {m.update.versionNumber}
                 </button>
               )}
               {m.projectId ? (
-                <button className="btn sm ver-btn" title="Change version" onClick={() => setChangingVersion(m)}>
-                  {m.versionNumber ?? 'Version'} <ChevronDown />
+                <button className="btn sm ver-btn" title={t('instance.content.changeVersion')} onClick={() => setChangingVersion(m)}>
+                  {m.versionNumber ?? t('instance.content.version')} <ChevronDown />
                 </button>
               ) : (
-                <span className="hint" title="Not found on Modrinth or CurseForge, so its version can't be changed here">
-                  Manual file
+                <span className="hint" title={t('instance.content.manualFileHint')}>
+                  {t('instance.content.manualFile')}
                 </span>
               )}
               <Switch
                 on={m.enabled}
-                label={m.enabled ? 'Disable' : 'Enable'}
+                label={m.enabled ? t('instance.content.disable') : t('instance.content.enable')}
                 onChange={async () => {
                   try {
                     await api.content.toggle(inst.id, kind, m.filename)
@@ -295,7 +300,7 @@ function ContentTab({ inst }: { inst: Instance }) {
                   }
                 }}
               />
-              <button className="btn ghost icon sm danger" title="Remove" onClick={() => setRemoving(m)}>
+              <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving(m)}>
                 <Trash2 />
               </button>
             </div>
@@ -313,7 +318,7 @@ function ContentTab({ inst }: { inst: Instance }) {
           onPick={async (versionId) => {
             try {
               await api.content.changeVersion(inst.id, kind, changingVersion.filename, versionId)
-              toast(`${changingVersion.title ?? changingVersion.filename} switched version`)
+              toast(t('instance.content.switchedVersion', { name: changingVersion.title ?? changingVersion.filename }))
               await load()
             } catch (e) {
               toast((e as Error).message, 'error')
@@ -325,9 +330,9 @@ function ContentTab({ inst }: { inst: Instance }) {
 
       {removing && (
         <ConfirmModal
-          title={`Remove ${removing.title ?? removing.filename}?`}
-          body="The file will be moved to your Recycle Bin."
-          confirm="Remove"
+          title={t('instance.content.removeTitle', { name: removing.title ?? removing.filename })}
+          body={t('instance.content.removeBody')}
+          confirm={t('common.remove')}
           onClose={() => setRemoving(undefined)}
           onConfirm={async () => {
             try {
@@ -351,12 +356,8 @@ function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void
     <div className="callout pending" style={{ marginBottom: 16 }}>
       <Download />
       <div className="grow" style={{ minWidth: 0 }}>
-        <b>
-          {list.length} file{list.length === 1 ? '' : 's'} need{list.length === 1 ? 's' : ''} a manual download
-        </b>
-        <div style={{ margin: '2px 0 10px' }}>
-          Their authors only allow downloads from the CurseForge website. Download each one, then drop it into the folder shown.
-        </div>
+        <b>{t('instance.pending.title', { count: list.length })}</b>
+        <div style={{ margin: '2px 0 10px' }}>{t('instance.pending.body')}</div>
         <div className="pending-list">
           {list.map((p) => (
             <div key={p.fileName} className="row">
@@ -367,7 +368,7 @@ function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void
                 <FolderOpen /> {p.folder}
               </button>
               <button className="btn sm primary" onClick={() => void api.app.openExternal(p.url)}>
-                Get file <ExternalLink />
+                {t('instance.pending.getFile')} <ExternalLink />
               </button>
             </div>
           ))}
@@ -381,7 +382,7 @@ function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void
             onDone()
           }}
         >
-          <Check /> I've added them
+          <Check /> {t('instance.pending.done')}
         </button>
       </div>
     </div>
@@ -417,39 +418,39 @@ function LogsTab({ inst }: { inst: Instance }) {
       <div className="toolbar">
         <div className="search">
           <Search />
-          <input className="input" placeholder="Filter log…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <input className="input" placeholder={t('instance.logs.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
         </div>
         <Segmented
           value={level}
           onChange={setLevel}
           options={[
-            { value: 'all', label: 'All' },
-            { value: 'warn', label: 'Warnings' },
-            { value: 'error', label: 'Errors' }
+            { value: 'all', label: t('common.all') },
+            { value: 'warn', label: t('instance.logs.warnings') },
+            { value: 'error', label: t('instance.logs.errors') }
           ]}
         />
-        <span className="hint">Auto-scroll</span>
-        <Switch on={follow} onChange={setFollow} label="Auto-scroll" />
+        <span className="hint">{t('instance.logs.autoScroll')}</span>
+        <Switch on={follow} onChange={setFollow} label={t('instance.logs.autoScroll')} />
         <button
           className="btn icon"
-          title="Copy log"
+          title={t('instance.logs.copy')}
           onClick={async () => {
             await navigator.clipboard.writeText(shown.map((l) => l.text).join('\n'))
-            toast('Log copied to clipboard', 'info')
+            toast(t('instance.logs.copied'), 'info')
           }}
         >
           <Copy />
         </button>
-        <button className="btn icon" title="Clear" onClick={() => clearLogs(inst.id)}>
+        <button className="btn icon" title={t('instance.logs.clear')} onClick={() => clearLogs(inst.id)}>
           <Eraser />
         </button>
-        <button className="btn icon" title="Open logs folder" onClick={() => void api.instances.openFolder(inst.id, 'logs')}>
+        <button className="btn icon" title={t('instance.logs.openFolder')} onClick={() => void api.instances.openFolder(inst.id, 'logs')}>
           <FolderOpen />
         </button>
       </div>
       <div className="console" ref={box} onWheel={(e) => e.deltaY < 0 && setFollow(false)}>
         {shown.length === 0 ? (
-          <div className="empty-log">{games[inst.id] ? 'Waiting for the game to say something…' : 'Press Play and the game log streams here live.'}</div>
+          <div className="empty-log">{games[inst.id] ? t('instance.logs.waiting') : t('instance.logs.idle')}</div>
         ) : (
           shown.map((l, i) => (
             <div key={i} className={l.level}>
@@ -488,11 +489,11 @@ function SettingsTab({ inst }: { inst: Instance }) {
   return (
     <>
       <div className="settings-section">
-        <h3>General</h3>
+        <h3>{t('instance.settings.general')}</h3>
         <div className="card">
           <div className="setting">
             <div className="text">
-              <b>Name</b>
+              <b>{t('instance.settings.name')}</b>
             </div>
             <div className="control">
               <input
@@ -505,8 +506,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
           </div>
           <div className="setting">
             <div className="text">
-              <b>Color</b>
-              <span>Used for the instance's artwork.</span>
+              <b>{t('instance.settings.color')}</b>
+              <span>{t('instance.settings.colorHint')}</span>
             </div>
             <div className="control swatches">
               {COLORS.map((c) => (
@@ -515,7 +516,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
                   className={`swatch ${c === inst.color ? 'on' : ''}`}
                   style={{ background: c }}
                   onClick={() => void save({ color: c })}
-                  aria-label={`Color ${c}`}
+                  aria-label={t('instance.settings.colorOption', { color: c })}
                 />
               ))}
             </div>
@@ -524,20 +525,24 @@ function SettingsTab({ inst }: { inst: Instance }) {
       </div>
 
       <div className="settings-section">
-        <h3>Performance</h3>
+        <h3>{t('instance.settings.performance')}</h3>
         <div className="card">
           <div className="setting">
             <div className="text">
-              <b>Custom memory</b>
-              <span>Otherwise uses the launcher default ({((settings?.memoryMb ?? 4096) / 1024).toFixed(1)} GB).</span>
+              <b>{t('instance.settings.customMemory')}</b>
+              <span>{t('instance.settings.customMemoryHint', { size: t('common.size.gb', { n: fixed((settings?.memoryMb ?? 4096) / 1024, 1) }) })}</span>
             </div>
-            <Switch on={inst.memoryMb != null} onChange={(v) => void save({ memoryMb: v ? (settings?.memoryMb ?? 4096) : undefined })} label="Custom memory" />
+            <Switch
+              on={inst.memoryMb != null}
+              onChange={(v) => void save({ memoryMb: v ? (settings?.memoryMb ?? 4096) : undefined })}
+              label={t('instance.settings.customMemory')}
+            />
           </div>
           {inst.memoryMb != null && (
             <div className="setting stack">
               <div className="row">
-                <span className="grow muted">Maximum memory</span>
-                <span className="mem-value">{(inst.memoryMb / 1024).toFixed(1)} GB</span>
+                <span className="grow muted">{t('instance.settings.maxMemory')}</span>
+                <span className="mem-value">{t('common.size.gb', { n: fixed(inst.memoryMb / 1024, 1) })}</span>
               </div>
               <input
                 type="range"
@@ -553,11 +558,11 @@ function SettingsTab({ inst }: { inst: Instance }) {
           <div className="setting">
             <div className="text">
               <b>Java</b>
-              <span>Automatic picks the right Java for {inst.mcVersion} and downloads it if needed.</span>
+              <span>{t('instance.settings.javaHint', { version: inst.mcVersion })}</span>
             </div>
             <div className="control">
               <select className="select" value={inst.javaPath ?? ''} onChange={(e) => void save({ javaPath: e.target.value || undefined })}>
-                <option value="">Automatic (recommended)</option>
+                <option value="">{t('instance.settings.javaAuto')}</option>
                 {javas?.map((j) => (
                   <option key={j.path} value={j.path}>
                     Java {j.major} · {j.version}
@@ -570,8 +575,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
           </div>
           <div className="setting stack">
             <div className="text">
-              <b>Extra JVM arguments</b>
-              <span>Advanced. Leave empty to use the launcher default.</span>
+              <b>{t('instance.settings.jvmArgs')}</b>
+              <span>{t('instance.settings.jvmArgsHint')}</span>
             </div>
             <textarea
               className="input"
@@ -586,15 +591,15 @@ function SettingsTab({ inst }: { inst: Instance }) {
       </div>
 
       <div className="settings-section">
-        <h3>Danger zone</h3>
+        <h3>{t('instance.settings.dangerZone')}</h3>
         <div className="card">
           <div className="setting">
             <div className="text">
-              <b>Delete instance</b>
-              <span>Moves everything, including worlds, to the Recycle Bin.</span>
+              <b>{t('instance.settings.delete')}</b>
+              <span>{t('instance.settings.deleteHint')}</span>
             </div>
             <button className="btn danger" onClick={() => setDeleting(true)}>
-              <Trash2 /> Delete
+              <Trash2 /> {t('common.delete')}
             </button>
           </div>
         </div>

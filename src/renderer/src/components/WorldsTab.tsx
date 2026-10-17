@@ -4,10 +4,16 @@ import type { GameMode, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes, timeAgo } from '../util'
+import { currentLanguage, rich, t, type Key } from '../i18n'
 import { ConfirmModal, Empty, Menu, Modal } from './ui'
 import '../instance-tabs.css'
 
-const MODE_LABEL: Record<GameMode, string> = { survival: 'Survival', creative: 'Creative', adventure: 'Adventure', spectator: 'Spectator' }
+const MODE_LABEL: Record<GameMode, Key> = {
+  survival: 'worlds.mode.survival',
+  creative: 'worlds.mode.creative',
+  adventure: 'worlds.mode.adventure',
+  spectator: 'worlds.mode.spectator'
+}
 
 export default function WorldsTab({ inst }: { inst: Instance }) {
   const { toast, games } = useStore()
@@ -39,7 +45,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
     setBackingUp((b) => [...b, w.folder])
     try {
       await api.worlds.backup(inst.id, w.folder)
-      toast(`Backed up ${w.name} to the backups folder`)
+      toast(t('worlds.backup.done', { name: w.name }))
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
@@ -52,7 +58,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
     try {
       const w = await api.worlds.import(inst.id)
       if (w) {
-        toast(`Imported ${w.name}`)
+        toast(t('worlds.imported', { name: w.name }))
         await load()
       }
     } catch (e) {
@@ -67,31 +73,31 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
       <div className="toolbar">
         <div className="search">
           <Search />
-          <input className="input" placeholder="Search worlds…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" placeholder={t('worlds.search')} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <button className="btn icon" title="Refresh" onClick={() => void load()}>
+        <button className="btn icon" title={t('common.refresh')} onClick={() => void load()}>
           <RefreshCw />
         </button>
-        <button className="btn icon" title="Open backups folder" onClick={() => void api.instances.openFolder(inst.id, 'backups')}>
+        <button className="btn icon" title={t('worlds.openBackups')} onClick={() => void api.instances.openFolder(inst.id, 'backups')}>
           <Archive />
         </button>
-        <button className="btn icon" title="Open saves folder" onClick={() => void api.instances.openFolder(inst.id, 'saves')}>
+        <button className="btn icon" title={t('worlds.openSaves')} onClick={() => void api.instances.openFolder(inst.id, 'saves')}>
           <FolderOpen />
         </button>
         <button
           className="btn primary"
           disabled={importing || running}
-          title={running ? 'Close the game first' : 'Import a world from a .zip file'}
+          title={running ? t('worlds.closeGameFirst') : t('worlds.import.hint')}
           onClick={importZip}
         >
-          {importing ? <Loader2 className="spin" /> : <Upload />} Import world
+          {importing ? <Loader2 className="spin" /> : <Upload />} {t('worlds.import')}
         </button>
       </div>
 
       {running && (
         <div className="callout" style={{ marginBottom: 16 }}>
           <AlertTriangle />
-          <div>The game is running. Close it before renaming, deleting or importing worlds; backups made now may miss the last few seconds of play.</div>
+          <div>{t('worlds.running')}</div>
         </div>
       )}
 
@@ -103,14 +109,14 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
       ) : worlds.length === 0 ? (
         <Empty
           icon={<Earth />}
-          title="No worlds yet"
+          title={t('worlds.empty.title')}
           action={
             <button className="btn" disabled={running} onClick={importZip}>
-              <Upload /> Import a world
+              <Upload /> {t('worlds.empty.action')}
             </button>
           }
         >
-          Create one in game and it shows up here, or import a world from a .zip file.
+          {t('worlds.empty.body')}
         </Empty>
       ) : (
         <div className="list">
@@ -122,10 +128,10 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
                   {w.name}
                   {w.hardcore && (
                     <span className="it-tag danger">
-                      <Skull /> Hardcore
+                      <Skull /> {t('worlds.hardcore')}
                     </span>
                   )}
-                  {w.cheats && <span className="it-tag">Cheats</span>}
+                  {w.cheats && <span className="it-tag">{t('worlds.cheats')}</span>}
                 </div>
                 <div className="it-meta">
                   {w.error ? (
@@ -134,10 +140,10 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
                     </span>
                   ) : (
                     <>
-                      {w.gameMode && <span>{MODE_LABEL[w.gameMode]}</span>}
+                      {w.gameMode && <span>{t(MODE_LABEL[w.gameMode])}</span>}
                       {w.version && <span>{w.version}</span>}
-                      <span title={w.lastPlayed ? new Date(w.lastPlayed).toLocaleString() : undefined}>
-                        <Clock /> {w.lastPlayed ? timeAgo(w.lastPlayed) : 'Never played'}
+                      <span title={w.lastPlayed ? new Date(w.lastPlayed).toLocaleString(currentLanguage()) : undefined}>
+                        <Clock /> {w.lastPlayed ? timeAgo(w.lastPlayed) : t('time.neverPlayed')}
                       </span>
                     </>
                   )}
@@ -148,49 +154,44 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
                 </div>
               </div>
               <div className="it-actions">
-                <button
-                  className="btn sm"
-                  disabled={backingUp.includes(w.folder)}
-                  title="Zip this world into the backups folder"
-                  onClick={() => void backup(w)}
-                >
-                  {backingUp.includes(w.folder) ? <Loader2 className="spin" /> : <Archive />} Back up
+                <button className="btn sm" disabled={backingUp.includes(w.folder)} title={t('worlds.backup.hint')} onClick={() => void backup(w)}>
+                  {backingUp.includes(w.folder) ? <Loader2 className="spin" /> : <Archive />} {t('worlds.backup')}
                 </button>
-                <button className="btn ghost icon sm" title="Rename" disabled={!!w.error || running} onClick={() => setRenaming(w)}>
+                <button className="btn ghost icon sm" title={t('common.rename')} disabled={!!w.error || running} onClick={() => setRenaming(w)}>
                   <Pencil />
                 </button>
                 <Menu
                   items={[
                     {
-                      label: 'Open folder',
+                      label: t('common.openFolder'),
                       icon: <FolderOpen />,
                       onClick: () => void api.worlds.openFolder(inst.id, w.folder).catch((e) => toast(e.message, 'error'))
                     },
                     ...(w.seed
                       ? [
                           {
-                            label: 'Copy seed',
+                            label: t('worlds.copySeed'),
                             icon: <Copy />,
                             onClick: async () => {
                               await navigator.clipboard.writeText(w.seed!)
-                              toast(`Seed ${w.seed} copied`, 'info')
+                              toast(t('worlds.seedCopied', { seed: w.seed }), 'info')
                             }
                           }
                         ]
                       : []),
                     {
-                      label: 'Delete',
+                      label: t('common.delete'),
                       icon: <Trash2 />,
                       danger: true,
                       divider: true,
-                      onClick: () => (running ? toast('Close the game first', 'error') : setRemoving(w))
+                      onClick: () => (running ? toast(t('worlds.closeGameFirst'), 'error') : setRemoving(w))
                     }
                   ]}
                 />
               </div>
             </div>
           ))}
-          {shown.length === 0 && <div className="list-row hint">No worlds match “{q}”.</div>}
+          {shown.length === 0 && <div className="list-row hint">{t('worlds.noMatch', { query: q })}</div>}
         </div>
       )}
 
@@ -200,7 +201,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
           onClose={() => setRenaming(undefined)}
           onRename={async (name) => {
             await api.worlds.rename(inst.id, renaming.folder, name)
-            toast(`Renamed to ${name}`)
+            toast(t('worlds.renamed', { name }))
             await load()
           }}
         />
@@ -208,14 +209,9 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
 
       {removing && (
         <ConfirmModal
-          title={`Delete ${removing.name}?`}
-          body={
-            <>
-              The world folder <span className="mono">saves/{removing.folder}</span> ({bytes(removing.size)}) will be moved to your Recycle Bin. You can restore
-              it from there.
-            </>
-          }
-          confirm="Delete world"
+          title={t('worlds.delete.title', { name: removing.name })}
+          body={rich('worlds.delete.body', { folder: (s) => <span className="mono">{s}</span> }, { folder: removing.folder, size: bytes(removing.size) })}
+          confirm={t('worlds.delete.confirm')}
           onClose={() => setRemoving(undefined)}
           onConfirm={async () => {
             try {
@@ -252,22 +248,22 @@ function RenameWorld({ world, onClose, onRename }: { world: WorldInfo; onClose: 
 
   return (
     <Modal
-      title="Rename world"
-      subtitle="Changes the name shown in game. The folder name stays the same."
+      title={t('worlds.rename.title')}
+      subtitle={t('worlds.rename.subtitle')}
       onClose={onClose}
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!valid || busy} onClick={submit}>
-            {busy && <Loader2 className="spin" />} Rename
+            {busy && <Loader2 className="spin" />} {t('common.rename')}
           </button>
         </>
       }
     >
       <div className="field">
-        <label htmlFor="world-name">World name</label>
+        <label htmlFor="world-name">{t('worlds.rename.label')}</label>
         <input
           id="world-name"
           className="input"

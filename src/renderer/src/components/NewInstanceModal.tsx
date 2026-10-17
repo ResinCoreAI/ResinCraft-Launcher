@@ -4,6 +4,7 @@ import type { LoaderType, LoaderVersion, McVersion } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { COLORS, LOADER_LABEL } from '../util'
+import { currentLanguage, t } from '../i18n'
 import { InstanceTile, Modal, Segmented, Switch } from './ui'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
@@ -27,7 +28,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         setVersions(v)
         setMc(v.find((x) => x.type === 'release')?.id)
       })
-      .catch((e) => setError(`Couldn't load Minecraft versions: ${(e as Error).message}`))
+      .catch((e) => setError(t('newInstance.loadFailed', { error: (e as Error).message })))
   }, [])
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
   const unavailable = loader !== 'vanilla' && loaderVersions?.length === 0
   const legacyForge = !!mc && /^1\.(\d|1[0-2])(\.|$)/.test(mc)
-  const placeholder = mc ? `${loader === 'vanilla' ? 'Minecraft' : LOADER_LABEL[loader]} ${mc}` : 'My new world'
+  const placeholder = mc ? `${loader === 'vanilla' ? 'Minecraft' : LOADER_LABEL[loader]} ${mc}` : t('newInstance.defaultName')
 
   const create = async () => {
     if (!mc) return
@@ -64,7 +65,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
     try {
       const inst = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color })
       await refreshInstances()
-      toast(`Created ${inst.name}`)
+      toast(t('newInstance.created', { name: inst.name }))
       onClose()
       go({ page: 'instance', id: inst.id })
     } catch (e) {
@@ -76,17 +77,17 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="New instance"
-      subtitle="An instance is a separate Minecraft install with its own mods, worlds and settings."
+      title={t('newInstance.title')}
+      subtitle={t('newInstance.subtitle')}
       onClose={onClose}
       wide
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!mc || busy || unavailable || (loader !== 'vanilla' && !loaderVersion)} onClick={create}>
-            {busy && <Loader2 className="spin" />} Create instance
+            {busy && <Loader2 className="spin" />} {t('newInstance.create')}
           </button>
         </>
       }
@@ -95,19 +96,25 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         <InstanceTile inst={{ name: name || placeholder, color }} style={{ width: 72, height: 72, borderRadius: 6, flex: 'none' }} />
         <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="field">
-            <label htmlFor="inst-name">Name</label>
+            <label htmlFor="inst-name">{t('newInstance.name')}</label>
             <input id="inst-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
           <div className="swatches">
             {COLORS.map((c) => (
-              <button key={c} className={`swatch ${c === color ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor(c)} aria-label={`Color ${c}`} />
+              <button
+                key={c}
+                className={`swatch ${c === color ? 'on' : ''}`}
+                style={{ background: c }}
+                onClick={() => setColor(c)}
+                aria-label={t('newInstance.colorOption', { color: c })}
+              />
             ))}
           </div>
         </div>
       </div>
 
       <div className="field">
-        <label>Mod loader</label>
+        <label>{t('newInstance.modLoader')}</label>
         <Segmented<LoaderType>
           value={loader}
           onChange={setLoader}
@@ -121,20 +128,20 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         />
         <span className="hint">
           {loader === 'vanilla'
-            ? 'Plain Minecraft, exactly as Mojang ships it.'
-            : `${LOADER_LABEL[loader]} lets you add mods from Discover.${loader === 'forge' || loader === 'neoforge' ? ' The first launch takes a little longer while it installs.' : ''}`}
+            ? t('newInstance.vanillaHint')
+            : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', { loader: LOADER_LABEL[loader] })}
         </span>
       </div>
 
       <div className="field">
         <div className="row">
-          <label className="label grow">Minecraft version</label>
-          <span className="hint">Snapshots</span>
-          <Switch on={snapshots} onChange={setSnapshots} label="Show snapshots" />
+          <label className="label grow">{t('newInstance.mcVersion')}</label>
+          <span className="hint">{t('newInstance.snapshots')}</span>
+          <Switch on={snapshots} onChange={setSnapshots} label={t('newInstance.showSnapshots')} />
         </div>
         <div className="search">
           <Search />
-          <input className="input" placeholder="Filter versions…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <input className="input" placeholder={t('newInstance.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
         </div>
         <div className="version-list">
           {!versions && !error && (
@@ -145,8 +152,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
           {shown.map((v) => (
             <button key={v.id} className={v.id === mc ? 'on' : ''} onClick={() => setMc(v.id)}>
               {v.id}
-              {v.type !== 'release' && <span className="chip">{v.type.replace('old_', '')}</span>}
-              <span className="date">{new Date(v.releaseTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+              {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
+              <span className="date">{new Date(v.releaseTime).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })}</span>
             </button>
           ))}
         </div>
@@ -154,12 +161,10 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
       {loader !== 'vanilla' && (
         <div className="field">
-          <label htmlFor="loader-ver">{LOADER_LABEL[loader]} version</label>
+          <label htmlFor="loader-ver">{t('newInstance.loaderVersion', { loader: LOADER_LABEL[loader] })}</label>
           {unavailable ? (
             <div className="callout danger">
-              {loader === 'forge' && legacyForge
-                ? `ResinCraft supports Forge for Minecraft 1.13 and newer. Pick a newer version or another loader.`
-                : `${LOADER_LABEL[loader]} doesn't support Minecraft ${mc} yet. Pick another version or loader.`}
+              {loader === 'forge' && legacyForge ? t('newInstance.legacyForge') : t('newInstance.unsupported', { loader: LOADER_LABEL[loader], version: mc })}
             </div>
           ) : (
             <select
@@ -169,11 +174,14 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setLoaderVersion(e.target.value)}
               disabled={!loaderVersions}
             >
-              {!loaderVersions && <option>Loading…</option>}
+              {!loaderVersions && <option>{t('common.loading')}</option>}
               {loaderVersions?.map((l, i) => (
                 <option key={l.version} value={l.version}>
-                  {l.version}
-                  {i === loaderVersions.findIndex((x) => x.stable) ? ' (recommended)' : l.stable ? '' : ' (beta)'}
+                  {i === loaderVersions.findIndex((x) => x.stable)
+                    ? t('newInstance.optionRecommended', { version: l.version })
+                    : l.stable
+                      ? l.version
+                      : t('newInstance.optionBeta', { version: l.version })}
                 </option>
               ))}
             </select>

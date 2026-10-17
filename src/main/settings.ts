@@ -7,6 +7,7 @@ function defaults(): Settings {
   const totalMb = Math.floor(totalmem() / 1024 / 1024)
   return {
     theme: 'dark',
+    language: 'system',
     // A quarter of system RAM, kept between 2 GB and 6 GB, is a sane default for most packs.
     memoryMb: Math.min(6144, Math.max(2048, Math.floor(totalMb / 4 / 512) * 512)),
     jvmArgs: '',

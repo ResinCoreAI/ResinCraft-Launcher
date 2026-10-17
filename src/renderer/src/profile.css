@@ -1,0 +1,168 @@
+/* Accounts → Manage (skin, cape, name). Theme variables only, see styles.css. */
+
+.pm {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.pm-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  min-width: 0;
+}
+.pm-views {
+  display: flex;
+  gap: 14px;
+}
+.pm-views figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.pm-views figcaption {
+  font: 500 11px/1 var(--mono);
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.skin-view,
+.cape-view {
+  image-rendering: pixelated;
+  display: block;
+}
+.pm-name {
+  margin-top: 6px;
+  font: 600 16px/1.2 var(--font-display);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.pm-panel {
+  min-width: 0;
+}
+.pm-tabs {
+  margin: 0 0 14px;
+}
+.pm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pm-section > p {
+  margin: 0;
+}
+.pm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.pm-capes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.pm-cape {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px 10px;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font: 500 12px/1.2 var(--font);
+  cursor: pointer;
+}
+.pm-cape > .ellipsis {
+  max-width: 100%;
+}
+.pm-cape:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.pm-cape:disabled {
+  cursor: default;
+}
+.pm-cape.on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.pm-cape-art {
+  width: 40px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+}
+.pm-cape-art.none {
+  border: 1px dashed var(--border-strong);
+  border-radius: 2px;
+  color: var(--text-faint);
+}
+.pm-cape-art.none svg {
+  width: 18px;
+  height: 18px;
+}
+.pm-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+.pm-current {
+  font: 600 15px var(--mono);
+  color: var(--data);
+}
+.pm-status {
+  min-height: 18px;
+  font-size: 12.5px;
+}
+.pm-status .row {
+  gap: 6px;
+}
+.pm-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--success);
+  font-size: 12.5px;
+}
+.pm-error {
+  color: var(--danger);
+  font-size: 12.5px;
+}
+.pm-warn {
+  color: var(--warning);
+  font-size: 12.5px;
+}
+.pm-confirm {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .pm {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

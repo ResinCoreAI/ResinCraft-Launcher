@@ -4,6 +4,7 @@ import type { Instance, ScreenshotInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes } from '../util'
+import { currentLanguage, rich, t } from '../i18n'
 import { ConfirmModal, Empty } from './ui'
 import '../instance-tabs.css'
 
@@ -11,7 +12,7 @@ import '../instance-tabs.css'
 const thumbs = new Map<string, string>()
 const thumbKey = (id: string, s: ScreenshotInfo) => `${id}/${s.name}/${s.mtime}`
 
-const when = (s: ScreenshotInfo) => new Date(s.mtime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const when = (s: ScreenshotInfo) => new Date(s.mtime).toLocaleString(currentLanguage(), { dateStyle: 'medium', timeStyle: 'short' })
 
 export default function ScreenshotsTab({ inst }: { inst: Instance }) {
   const { toast } = useStore()
@@ -36,7 +37,7 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
   const copy = async (s: ScreenshotInfo) => {
     try {
       await api.screenshots.copy(inst.id, s.name)
-      toast('Screenshot copied to clipboard', 'info')
+      toast(t('screenshots.copied'), 'info')
     } catch (e) {
       toast((e as Error).message, 'error')
     }
@@ -46,15 +47,11 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
   return (
     <>
       <div className="toolbar">
-        <span className="hint grow">
-          {shots?.length
-            ? `${shots.length} screenshot${shots.length === 1 ? '' : 's'} · press F2 in game to take one`
-            : 'Press F2 in game to take a screenshot.'}
-        </span>
-        <button className="btn icon" title="Refresh" onClick={() => void load()}>
+        <span className="hint grow">{shots?.length ? t('screenshots.count', { count: shots.length }) : t('screenshots.hint')}</span>
+        <button className="btn icon" title={t('common.refresh')} onClick={() => void load()}>
           <RefreshCw />
         </button>
-        <button className="btn icon" title="Open screenshots folder" onClick={() => void api.instances.openFolder(inst.id, 'screenshots')}>
+        <button className="btn icon" title={t('screenshots.openFolder')} onClick={() => void api.instances.openFolder(inst.id, 'screenshots')}>
           <FolderOpen />
         </button>
       </div>
@@ -66,8 +63,8 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
           ))}
         </div>
       ) : shots.length === 0 ? (
-        <Empty icon={<Camera />} title="No screenshots yet">
-          Press F2 while playing and your screenshots land here.
+        <Empty icon={<Camera />} title={t('screenshots.empty.title')}>
+          {t('screenshots.empty.body')}
         </Empty>
       ) : (
         <div className="it-shots">
@@ -81,13 +78,13 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
                   {when(s)}
                 </span>
                 <div className="it-actions">
-                  <button className="btn ghost icon sm" title="Copy image" onClick={() => void copy(s)}>
+                  <button className="btn ghost icon sm" title={t('screenshots.copyImage')} onClick={() => void copy(s)}>
                     <Copy />
                   </button>
-                  <button className="btn ghost icon sm" title="Show in folder" onClick={() => show(s)}>
+                  <button className="btn ghost icon sm" title={t('screenshots.showInFolder')} onClick={() => show(s)}>
                     <FolderOpen />
                   </button>
-                  <button className="btn ghost icon sm danger" title="Delete" onClick={() => setRemoving(s)}>
+                  <button className="btn ghost icon sm danger" title={t('common.delete')} onClick={() => setRemoving(s)}>
                     <Trash2 />
                   </button>
                 </div>
@@ -112,13 +109,9 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
 
       {removing && (
         <ConfirmModal
-          title="Delete screenshot?"
-          body={
-            <>
-              <span className="mono">{removing.name}</span> will be moved to your Recycle Bin.
-            </>
-          }
-          confirm="Delete"
+          title={t('screenshots.delete.title')}
+          body={rich('screenshots.delete.body', { file: (s) => <span className="mono">{s}</span> }, { name: removing.name })}
+          confirm={t('common.delete')}
           onClose={() => setRemoving(undefined)}
           onConfirm={async () => {
             try {
@@ -229,12 +222,12 @@ function Viewer({
         <div className="it-viewer-stage" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
           {src ? <img src={src} alt={shot.name} /> : <Loader2 className="spin" />}
           {index > 0 && (
-            <button className="btn icon it-viewer-nav prev" title="Previous (←)" onClick={() => onIndex(index - 1)}>
+            <button className="btn icon it-viewer-nav prev" title={t('screenshots.viewer.previous')} onClick={() => onIndex(index - 1)}>
               <ChevronLeft />
             </button>
           )}
           {index < shots.length - 1 && (
-            <button className="btn icon it-viewer-nav next" title="Next (→)" onClick={() => onIndex(index + 1)}>
+            <button className="btn icon it-viewer-nav next" title={t('screenshots.viewer.next')} onClick={() => onIndex(index + 1)}>
               <ChevronRight />
             </button>
           )}
@@ -245,19 +238,19 @@ function Viewer({
               {when(shot)}
             </div>
             <div className="hint ellipsis">
-              {shot.name} · {bytes(shot.size)} · {index + 1} of {shots.length}
+              {shot.name} · {bytes(shot.size)} · {t('screenshots.viewer.position', { index: index + 1, total: shots.length })}
             </div>
           </div>
           <button className="btn sm" onClick={() => onCopy(shot)}>
-            <Copy /> Copy
+            <Copy /> {t('common.copy')}
           </button>
           <button className="btn sm" onClick={() => onShow(shot)}>
-            <FolderOpen /> Show in folder
+            <FolderOpen /> {t('screenshots.showInFolder')}
           </button>
-          <button className="btn ghost icon sm danger" title="Delete" onClick={() => onDelete(shot)}>
+          <button className="btn ghost icon sm danger" title={t('common.delete')} onClick={() => onDelete(shot)}>
             <Trash2 />
           </button>
-          <button className="btn ghost icon sm" title="Close (Esc)" onClick={onClose}>
+          <button className="btn ghost icon sm" title={t('screenshots.viewer.close')} onClick={onClose}>
             <X />
           </button>
         </div>

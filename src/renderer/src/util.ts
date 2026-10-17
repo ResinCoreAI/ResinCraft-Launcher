@@ -1,4 +1,5 @@
 import type { Instance, LoaderType } from '@shared/types'
+import { currentLanguage, t } from './i18n'
 
 export const LOADER_LABEL: Record<LoaderType, string> = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
 
@@ -9,18 +10,19 @@ export function describe(i: Instance): string {
 }
 
 export function playtime(seconds: number): string {
-  if (seconds < 60) return seconds ? 'Under a minute' : 'Never played'
+  if (seconds < 60) return seconds ? t('time.underMinute') : t('time.neverPlayed')
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
-  return h ? `${h}h ${m}m` : `${m}m`
+  return h ? t('time.hoursMinutes', { h, m }) : t('time.minutes', { m })
 }
 
-export function timeAgo(ts?: number | string): string {
-  if (!ts) return 'Never'
-  const t = typeof ts === 'string' ? Date.parse(ts) : ts
-  const s = Math.round((Date.now() - t) / 1000)
-  if (s < 60) return 'Just now'
-  const units: [number, string][] = [
+/** "3 days ago" in the UI language. `inline` gives the mid-sentence form ("Updated just now"). */
+export function timeAgo(ts?: number | string, inline = false): string {
+  if (!ts) return t(inline ? 'time.neverInline' : 'common.never')
+  const time = typeof ts === 'string' ? Date.parse(ts) : ts
+  const s = Math.round((Date.now() - time) / 1000)
+  if (s < 60) return t(inline ? 'time.justNowInline' : 'common.justNow')
+  const units: [number, Intl.RelativeTimeFormatUnit][] = [
     [60, 'minute'],
     [3600, 'hour'],
     [86400, 'day'],
@@ -28,20 +30,24 @@ export function timeAgo(ts?: number | string): string {
     [2629800, 'month'],
     [31557600, 'year']
   ]
-  let [div, name] = units[0]
-  for (const u of units) if (s >= u[0]) [div, name] = u
-  const n = Math.floor(s / div)
-  return `${n} ${name}${n === 1 ? '' : 's'} ago`
+  let [div, unit] = units[0]
+  for (const u of units) if (s >= u[0]) [div, unit] = u
+  return new Intl.RelativeTimeFormat(currentLanguage(), { numeric: 'always' }).format(-Math.floor(s / div), unit)
 }
 
 export function compact(n: number): string {
-  return Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  return Intl.NumberFormat(currentLanguage(), { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 }
 
 export function bytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1048576) return `${(n / 1024).toFixed(0)} KB`
-  return `${(n / 1048576).toFixed(1)} MB`
+  if (n < 1024) return t('common.size.b', { n })
+  if (n < 1048576) return t('common.size.kb', { n: Math.round(n / 1024) })
+  return t('common.size.mb', { n: fixed(n / 1048576, 1) })
+}
+
+/** A number with a fixed number of decimals, formatted for the UI language ("1,5" in German). */
+export function fixed(n: number, digits: number): string {
+  return n.toLocaleString(currentLanguage(), { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
 export function tileStyle(color: string): React.CSSProperties {
@@ -58,5 +64,5 @@ export function initials(name: string): string {
 
 export function greeting(): string {
   const h = new Date().getHours()
-  return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+  return t(h < 5 ? 'greeting.late' : h < 12 ? 'greeting.morning' : h < 18 ? 'greeting.afternoon' : 'greeting.evening')
 }

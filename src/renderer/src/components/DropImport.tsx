@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { PackageOpen } from 'lucide-react'
-import { api } from '../api'
+import { api, isTauri } from '../api'
 import { useStore } from '../store'
+import { t } from '../i18n'
 
 const PACK = /\.(mrpack|zip)$/i
 
@@ -10,7 +11,50 @@ export default function DropImport() {
   const { refreshInstances, toast, go } = useStore()
   const [over, setOver] = useState(false)
 
+  const importPath = useCallback(
+    async (path: string) => {
+      const name = path.split(/[\\/]/).pop() ?? path
+      if (!PACK.test(name)) return toast(t('drop.wrongType'), 'info')
+      toast(t('drop.importing', { name }), 'info')
+      try {
+        const inst = await api.content.importModpackFile(path)
+        await refreshInstances()
+        toast(t('drop.imported', { name: inst.name }))
+        go({ page: 'instance', id: inst.id })
+      } catch (err) {
+        toast((err as Error).message, 'error')
+      }
+    },
+    [refreshInstances, toast, go]
+  )
+
+  // Tauri: the OS drop arrives as file paths through webview events.
   useEffect(() => {
+    if (!isTauri) return
+    let off: (() => void) | undefined
+    let cancelled = false
+    void import('@tauri-apps/api/webview').then(({ getCurrentWebview }) =>
+      getCurrentWebview()
+        .onDragDropEvent((e) => {
+          const p = e.payload
+          if (p.type === 'enter') setOver(true)
+          else if (p.type === 'leave') setOver(false)
+          else if (p.type === 'drop') {
+            setOver(false)
+            if (p.paths[0]) void importPath(p.paths[0])
+          }
+        })
+        .then((u) => (cancelled ? u() : (off = u)))
+    )
+    return () => {
+      cancelled = true
+      off?.()
+    }
+  }, [importPath])
+
+  // Electron (and plain browsers): HTML5 drag events; the preload turns the File into a path.
+  useEffect(() => {
+    if (isTauri) return
     let depth = 0
     const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
     const enter = (e: DragEvent) => {
@@ -26,30 +70,22 @@ export default function DropImport() {
       depth = Math.max(0, depth - 1)
       if (!depth) setOver(false)
     }
-    const drop = async (e: DragEvent) => {
+    const drop = (e: DragEvent) => {
       if (!hasFiles(e)) return
       e.preventDefault()
       depth = 0
       setOver(false)
       const file = e.dataTransfer?.files[0]
       if (!file) return
-      if (!PACK.test(file.name)) return toast('Drop a Modrinth .mrpack or a CurseForge modpack .zip to import it.', 'info')
+      if (!PACK.test(file.name)) return toast(t('drop.wrongType'), 'info')
       let path = ''
       try {
         path = api.app.pathForFile(file)
       } catch {
         // falls through to the error below
       }
-      if (!path) return toast("Couldn't read that file's location. Use Library → Import modpack instead.", 'error')
-      toast(`Importing ${file.name}…`, 'info')
-      try {
-        const inst = await api.content.importModpackFile(path)
-        await refreshInstances()
-        toast(`Imported ${inst.name}`)
-        go({ page: 'instance', id: inst.id })
-      } catch (err) {
-        toast((err as Error).message, 'error')
-      }
+      if (!path) return toast(t('drop.noPath'), 'error')
+      void importPath(path)
     }
     window.addEventListener('dragenter', enter)
     window.addEventListener('dragover', dragOver)
@@ -61,15 +97,15 @@ export default function DropImport() {
       window.removeEventListener('dragleave', leave)
       window.removeEventListener('drop', drop)
     }
-  }, [refreshInstances, toast, go])
+  }, [importPath, toast])
 
   if (!over) return null
   return (
     <div className="drop-overlay" aria-hidden>
       <div className="drop-card">
         <PackageOpen size={28} />
-        <b>Drop to import</b>
-        <span>Modrinth .mrpack or CurseForge .zip</span>
+        <b>{t('drop.title')}</b>
+        <span>{t('drop.formats')}</span>
       </div>
     </div>
   )

@@ -85,6 +85,35 @@ export interface DeviceCode {
   expiresIn: number
 }
 
+export type SkinVariant = 'classic' | 'slim'
+
+/** A Microsoft account's Minecraft profile (Accounts → Manage). */
+export interface PlayerProfile {
+  id: string
+  name: string
+  /** Missing means Minecraft's default skin. */
+  skin?: { url: string; variant: SkinVariant }
+  capes: CapeInfo[]
+  /** Missing when Mojang didn't say. */
+  nameChange?: { allowed: boolean; changedAt?: string }
+}
+
+export interface CapeInfo {
+  id: string
+  alias: string
+  url: string
+  active: boolean
+}
+
+/** A new skin: a PNG (base64 or data: URL) or a public image link. */
+export interface SkinUpload {
+  variant: SkinVariant
+  png?: string
+  url?: string
+}
+
+export type NameStatus = 'available' | 'taken' | 'not_allowed' | 'invalid'
+
 export interface LoginEvent {
   state: 'success' | 'error'
   account?: AccountView
@@ -103,6 +132,8 @@ export type CloseBehavior = 'keep' | 'minimize' | 'hide'
 
 export interface Settings {
   theme: 'dark' | 'light' | 'system'
+  /** 'system' follows the OS locale; otherwise a locale code such as 'de' or 'pt-BR'. */
+  language: string
   memoryMb: number
   jvmArgs: string
   javaPath: string
@@ -123,6 +154,10 @@ export interface AppInfo {
   totalMemMb: number
   /** True in `npm run dev` builds. */
   dev: boolean
+  /** This build can sign in with Microsoft (it has a Client ID built in). */
+  microsoft: boolean
+  /** This build can use CurseForge (it has an API key built in). */
+  curseforge: boolean
 }
 
 export interface TaskInfo {
@@ -332,6 +367,14 @@ export interface ResinApi {
     addOffline(username: string): Promise<AccountView>
     setActive(id: string): Promise<void>
     remove(id: string): Promise<void>
+    /** Fetches the Minecraft profile (skin, capes, name) and syncs the stored username and skin. */
+    profile(id: string): Promise<PlayerProfile>
+    setSkin(id: string, skin: SkinUpload): Promise<PlayerProfile>
+    resetSkin(id: string): Promise<PlayerProfile>
+    setCape(id: string, capeId: string): Promise<PlayerProfile>
+    hideCape(id: string): Promise<PlayerProfile>
+    nameAvailable(id: string, name: string): Promise<NameStatus>
+    changeName(id: string, name: string): Promise<PlayerProfile>
   }
   java: {
     list(): Promise<JavaInstall[]>

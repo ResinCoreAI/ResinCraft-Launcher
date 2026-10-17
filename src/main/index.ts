@@ -73,13 +73,18 @@ function handle(channel: string, fn: (...args: any[]) => unknown): void {
 
 function registerIpc(): void {
   registerInstanceTabsIpc(handle, () => win)
-  handle('app:info', () => ({
-    version: app.getVersion(),
-    dataDir: paths.root,
-    platform: process.platform,
-    totalMemMb: Math.floor(totalmem() / 1048576),
-    dev: !app.isPackaged
-  }))
+  handle('app:info', async () => {
+    const st = await getSettings()
+    return {
+      version: app.getVersion(),
+      dataDir: paths.root,
+      platform: process.platform,
+      totalMemMb: Math.floor(totalmem() / 1048576),
+      dev: !app.isPackaged,
+      microsoft: !!st.msClientId.trim(),
+      curseforge: !!st.curseforgeKey.trim()
+    }
+  })
   handle('app:openExternal', (url: string) => {
     if (!/^https:\/\//.test(url)) throw new Error('Only https links can be opened')
     return shell.openExternal(url)

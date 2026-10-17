@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ResinCraft Launcher",
+  "version": "0.1.0",
+  "identifier": "ai.resincore.resincraft",
+  "build": {
+    "frontendDist": "../out/web",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev:web",
+    "beforeBuildCommand": "npm run build:web"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ResinCraft Launcher",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 620,
+        "decorations": false,
+        "backgroundColor": "#0a0912",
+        "dragDropEnabled": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' https: data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Puirkle",
+    "copyright": "© 2026 Puirkle",
+    "category": "Game",
+    "shortDescription": "A modern Minecraft: Java Edition launcher",
+    "longDescription": "ResinCraft Launcher by Puirkle: separate instances for every Minecraft version and modpack, mods from Modrinth, CurseForge, FTB, ATLauncher and Technic, and Java handled for you.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "windows": { "nsis": { "installMode": "currentUser" } }
+  }
+}

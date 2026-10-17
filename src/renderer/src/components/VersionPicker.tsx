@@ -3,6 +3,7 @@ import { Check, Download, Loader2, Repeat } from 'lucide-react'
 import type { Instance, ProjectVersion } from '@shared/types'
 import { api } from '../api'
 import { compact, describe, timeAgo } from '../util'
+import { t } from '../i18n'
 import { Modal, Segmented } from './ui'
 
 const LOADER_NAMES: Record<string, string> = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge', minecraft: 'Vanilla' }
@@ -69,18 +70,22 @@ export default function VersionPicker({
 
   return (
     <Modal
-      title={currentVersionId ? `Change ${title} version` : `Choose ${title} version`}
-      subtitle={instance ? `Showing versions that work with ${describe(instance)}` : 'All published versions'}
+      title={currentVersionId ? t('versionPicker.changeTitle', { title }) : t('versionPicker.chooseTitle', { title })}
+      subtitle={instance ? t('versionPicker.compatible', { target: describe(instance) }) : t('versionPicker.allPublished')}
       onClose={onClose}
       wide
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!pick || isCurrent || busy} onClick={confirm}>
             {busy ? <Loader2 className="spin" /> : currentVersionId ? <Repeat /> : <Download />}
-            {isCurrent ? 'Already installed' : currentVersionId ? `Switch to ${pick?.versionNumber ?? ''}` : `Install ${pick?.versionNumber ?? ''}`}
+            {isCurrent
+              ? t('versionPicker.alreadyInstalled')
+              : currentVersionId
+                ? t('versionPicker.switchTo', { version: pick?.versionNumber ?? '' })
+                : t('versionPicker.install', { version: pick?.versionNumber ?? '' })}
           </button>
         </>
       }
@@ -90,12 +95,12 @@ export default function VersionPicker({
           value={channel}
           onChange={setChannel}
           options={[
-            { value: 'release', label: 'Stable releases' },
-            { value: 'all', label: 'All (incl. beta & alpha)' }
+            { value: 'release', label: t('versionPicker.stable') },
+            { value: 'all', label: t('versionPicker.all') }
           ]}
         />
         <span className="grow" />
-        {versions && <span className="hint">{shown.length} versions</span>}
+        {versions && <span className="hint">{t('versionPicker.count', { count: shown.length })}</span>}
       </div>
 
       {error ? (
@@ -105,9 +110,11 @@ export default function VersionPicker({
           <Loader2 className="spin" />
         </div>
       ) : versions.length === 0 ? (
-        <div className="callout danger">{instance ? `${title} has no version for ${describe(instance)}.` : `${title} has no published versions.`}</div>
+        <div className="callout danger">
+          {instance ? t('versionPicker.noneFor', { title, target: describe(instance) }) : t('versionPicker.none', { title })}
+        </div>
       ) : (
-        <div className="vlist" role="listbox" aria-label="Versions">
+        <div className="vlist" role="listbox" aria-label={t('versionPicker.versions')}>
           {shown.map((v) => (
             <button
               key={v.id}
@@ -121,22 +128,22 @@ export default function VersionPicker({
               <div className="grow" style={{ minWidth: 0 }}>
                 <div className="row" style={{ gap: 8 }}>
                   <b>{v.versionNumber}</b>
-                  {v.type !== 'release' && <span className={`chip ${v.type === 'alpha' ? 'danger' : 'warn'}`}>{v.type}</span>}
-                  {v.id === latest && <span className="chip accent">Latest</span>}
+                  {v.type !== 'release' && <span className={`chip ${v.type === 'alpha' ? 'danger' : 'warn'}`}>{t(`versionPicker.type.${v.type}`)}</span>}
+                  {v.id === latest && <span className="chip accent">{t('versionPicker.latest')}</span>}
                   {v.id === currentVersionId && (
                     <span className="chip success">
-                      <Check /> Installed
+                      <Check /> {t('common.installed')}
                     </span>
                   )}
                 </div>
                 <div className="hint ellipsis">
                   {v.name !== v.versionNumber && <>{v.name} · </>}
-                  MC {gameRange(v.gameVersions)} · {v.loaders.map((l) => LOADER_NAMES[l] ?? l).join(', ')}
+                  {t('versionPicker.gameVersions', { versions: gameRange(v.gameVersions) })} · {v.loaders.map((l) => LOADER_NAMES[l] ?? l).join(', ')}
                 </div>
               </div>
               <div className="vmeta">
                 <span>{timeAgo(v.published)}</span>
-                <span>{compact(v.downloads)} downloads</span>
+                <span>{t('versionPicker.downloads', { count: v.downloads, downloads: compact(v.downloads) })}</span>
               </div>
             </button>
           ))}

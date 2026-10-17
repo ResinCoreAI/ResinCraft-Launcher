@@ -1,0 +1,50 @@
+[package]
+name = "resincraft"
+version = "0.1.0"
+description = "ResinCraft Launcher: a modern Minecraft: Java Edition launcher by Puirkle"
+authors = ["Puirkle"]
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+name = "resincraft_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+futures = "0.3"
+anyhow = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+flate2 = "1"
+uuid = { version = "1", features = ["v4"] }
+regex = "1"
+urlencoding = "2"
+trash = "5"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+sysinfo = { version = "0.33", default-features = false, features = ["system"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+quick-xml = "0.37"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
