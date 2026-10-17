@@ -1,0 +1,16 @@
+appId: ai.resincore.resincraft
+productName: ResinCraft Launcher
+directories:
+  output: dist
+files:
+  - out/**/*
+  - package.json
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: dmg
+linux:
+  target: AppImage

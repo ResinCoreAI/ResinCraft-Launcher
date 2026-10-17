@@ -1,0 +1,224 @@
+/* Notes, Worlds, Servers and Screenshots tabs on the instance page. Uses only the app's theme variables. */
+
+/* ---------- Notes ---------- */
+.it-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.it-notes textarea {
+  width: 100%;
+  min-height: 420px;
+  height: calc(100vh - 380px);
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 14px 16px;
+}
+.it-save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.it-save-state svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- shared row bits ---------- */
+.it-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.it-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.it-meta svg {
+  width: 13px;
+  height: 13px;
+}
+.it-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  margin-left: 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.it-tag.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.it-tag svg {
+  width: 12px;
+  height: 12px;
+}
+.it-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.it-warn {
+  color: var(--warning);
+}
+
+/* ---------- Servers ---------- */
+.it-motd {
+  margin-top: 4px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  /* Server messages are coloured for the game's dark list, so keep them on a dark strip in every theme. */
+  background: #15121f;
+  color: #aaaaaa;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 560px;
+}
+.it-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 96px;
+  flex: none;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: right;
+}
+.it-status svg {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+.it-status .good {
+  color: var(--success);
+}
+.it-status .ok {
+  color: var(--warning);
+}
+.it-status .bad {
+  color: var(--danger);
+}
+.it-reorder {
+  display: flex;
+  flex-direction: column;
+}
+.it-reorder .btn {
+  height: 18px;
+  min-height: 0;
+  padding: 0 4px;
+}
+
+/* ---------- Screenshots ---------- */
+.it-shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+.it-shot {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+.it-shot:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.it-shot > button.it-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  background: var(--surface-3);
+  cursor: zoom-in;
+}
+.it-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.it-shot-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 7px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.it-shot-foot .it-actions {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.it-shot:hover .it-shot-foot .it-actions,
+.it-shot:focus-within .it-shot-foot .it-actions {
+  opacity: 1;
+}
+
+.it-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(1280px, 100%);
+  max-height: 100%;
+}
+.it-viewer-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  flex: 1;
+}
+.it-viewer-stage img {
+  max-width: 100%;
+  max-height: calc(100vh - 150px);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  object-fit: contain;
+}
+.it-viewer-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.it-viewer-nav.prev {
+  left: 8px;
+}
+.it-viewer-nav.next {
+  right: 8px;
+}
+.it-viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}

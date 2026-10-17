@@ -1,0 +1,187 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2, Search } from 'lucide-react'
+import type { LoaderType, LoaderVersion, McVersion } from '@shared/types'
+import { api } from '../api'
+import { useStore } from '../store'
+import { COLORS, LOADER_LABEL } from '../util'
+import { InstanceTile, Modal, Segmented, Switch } from './ui'
+
+export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
+  const { settings, refreshInstances, go, toast } = useStore()
+  const [versions, setVersions] = useState<McVersion[]>()
+  const [snapshots, setSnapshots] = useState(settings?.showSnapshots ?? false)
+  const [filter, setFilter] = useState('')
+  const [mc, setMc] = useState<string>()
+  const [loader, setLoader] = useState<LoaderType>('fabric')
+  const [loaderVersions, setLoaderVersions] = useState<LoaderVersion[]>()
+  const [loaderVersion, setLoaderVersion] = useState<string>()
+  const [name, setName] = useState('')
+  const [color, setColor] = useState(COLORS[Math.floor(Math.random() * COLORS.length)])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+
+  useEffect(() => {
+    api.versions
+      .list()
+      .then((v) => {
+        setVersions(v)
+        setMc(v.find((x) => x.type === 'release')?.id)
+      })
+      .catch((e) => setError(`Couldn't load Minecraft versions: ${(e as Error).message}`))
+  }, [])
+
+  useEffect(() => {
+    setLoaderVersions(undefined)
+    setLoaderVersion(undefined)
+    if (!mc || loader === 'vanilla') return
+    let live = true
+    api.versions
+      .loaders(loader, mc)
+      .then((list) => {
+        if (!live) return
+        setLoaderVersions(list)
+        setLoaderVersion((list.find((l) => l.stable) ?? list[0])?.version)
+      })
+      .catch(() => live && setLoaderVersions([]))
+    return () => {
+      live = false
+    }
+  }, [mc, loader])
+
+  const shown = useMemo(
+    () => (versions ?? []).filter((v) => (snapshots ? true : v.type === 'release') && v.id.toLowerCase().includes(filter.trim().toLowerCase())),
+    [versions, snapshots, filter]
+  )
+
+  const unavailable = loader !== 'vanilla' && loaderVersions?.length === 0
+  const legacyForge = !!mc && /^1\.(\d|1[0-2])(\.|$)/.test(mc)
+  const placeholder = mc ? `${loader === 'vanilla' ? 'Minecraft' : LOADER_LABEL[loader]} ${mc}` : 'My new world'
+
+  const create = async () => {
+    if (!mc) return
+    setBusy(true)
+    setError(undefined)
+    try {
+      const inst = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color })
+      await refreshInstances()
+      toast(`Created ${inst.name}`)
+      onClose()
+      go({ page: 'instance', id: inst.id })
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      title="New instance"
+      subtitle="An instance is a separate Minecraft install with its own mods, worlds and settings."
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary" disabled={!mc || busy || unavailable || (loader !== 'vanilla' && !loaderVersion)} onClick={create}>
+            {busy && <Loader2 className="spin" />} Create instance
+          </button>
+        </>
+      }
+    >
+      <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
+        <InstanceTile inst={{ name: name || placeholder, color }} style={{ width: 72, height: 72, borderRadius: 6, flex: 'none' }} />
+        <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="field">
+            <label htmlFor="inst-name">Name</label>
+            <input id="inst-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </div>
+          <div className="swatches">
+            {COLORS.map((c) => (
+              <button key={c} className={`swatch ${c === color ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor(c)} aria-label={`Color ${c}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="field">
+        <label>Mod loader</label>
+        <Segmented<LoaderType>
+          value={loader}
+          onChange={setLoader}
+          options={[
+            { value: 'vanilla', label: 'Vanilla' },
+            { value: 'fabric', label: 'Fabric' },
+            { value: 'quilt', label: 'Quilt' },
+            { value: 'forge', label: 'Forge' },
+            { value: 'neoforge', label: 'NeoForge' }
+          ]}
+        />
+        <span className="hint">
+          {loader === 'vanilla'
+            ? 'Plain Minecraft, exactly as Mojang ships it.'
+            : `${LOADER_LABEL[loader]} lets you add mods from Discover.${loader === 'forge' || loader === 'neoforge' ? ' The first launch takes a little longer while it installs.' : ''}`}
+        </span>
+      </div>
+
+      <div className="field">
+        <div className="row">
+          <label className="label grow">Minecraft version</label>
+          <span className="hint">Snapshots</span>
+          <Switch on={snapshots} onChange={setSnapshots} label="Show snapshots" />
+        </div>
+        <div className="search">
+          <Search />
+          <input className="input" placeholder="Filter versions…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        </div>
+        <div className="version-list">
+          {!versions && !error && (
+            <div className="empty" style={{ padding: 30 }}>
+              <Loader2 className="spin" />
+            </div>
+          )}
+          {shown.map((v) => (
+            <button key={v.id} className={v.id === mc ? 'on' : ''} onClick={() => setMc(v.id)}>
+              {v.id}
+              {v.type !== 'release' && <span className="chip">{v.type.replace('old_', '')}</span>}
+              <span className="date">{new Date(v.releaseTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loader !== 'vanilla' && (
+        <div className="field">
+          <label htmlFor="loader-ver">{LOADER_LABEL[loader]} version</label>
+          {unavailable ? (
+            <div className="callout danger">
+              {loader === 'forge' && legacyForge
+                ? `ResinCraft supports Forge for Minecraft 1.13 and newer. Pick a newer version or another loader.`
+                : `${LOADER_LABEL[loader]} doesn't support Minecraft ${mc} yet. Pick another version or loader.`}
+            </div>
+          ) : (
+            <select
+              id="loader-ver"
+              className="select"
+              value={loaderVersion ?? ''}
+              onChange={(e) => setLoaderVersion(e.target.value)}
+              disabled={!loaderVersions}
+            >
+              {!loaderVersions && <option>Loading…</option>}
+              {loaderVersions?.map((l, i) => (
+                <option key={l.version} value={l.version}>
+                  {l.version}
+                  {i === loaderVersions.findIndex((x) => x.stable) ? ' (recommended)' : l.stable ? '' : ' (beta)'}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {error && <div className="callout danger">{error}</div>}
+    </Modal>
+  )
+}
