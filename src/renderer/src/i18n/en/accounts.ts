@@ -13,7 +13,6 @@ export default {
   'accounts.active': 'Active',
   'accounts.use': 'Use this account',
   'accounts.manage': 'Manage',
-  'accounts.manage.tip': 'Skin, cape and name',
   'accounts.security': "Sign-in tokens are encrypted with your operating system's secure storage and only ever sent to Microsoft and Mojang.",
   'accounts.remove.title': 'Remove this account?',
   'accounts.remove.body': 'You can sign in again at any time.',

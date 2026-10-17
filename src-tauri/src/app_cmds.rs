@@ -6,6 +6,7 @@ use serde_json::Value;
 use crate::core::router::{done, json};
 use crate::core::types::{AppInfo, NewInstance};
 use crate::core::{ctx, instances, paths, settings, shell, Args};
+use crate::bail_tr;
 
 pub async fn handle(channel: &str, args: Args) -> Result<Value> {
     match channel {
@@ -43,7 +44,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "instances:remove" => {
             let id: String = args.get(0)?;
             if crate::game::running_ids().contains(&id) {
-                bail!("Stop the game before deleting this instance");
+                bail_tr!("instance.stopBeforeDelete", "Stop the game before deleting this instance");
             }
             instances::get(&id).await?;
             // Recycle Bin, not a permanent delete: worlds are precious.

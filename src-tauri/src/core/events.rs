@@ -9,6 +9,7 @@ use serde_json::Value;
 use tauri::Emitter;
 
 use super::ctx;
+use super::text::{text_of, Text};
 use super::types::TaskInfo;
 
 type Sink = Box<dyn Fn(&str, Value) + Send + Sync>;
@@ -35,24 +36,30 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(title: impl Into<String>, instance_id: Option<String>) -> Arc<Task> {
+    pub fn new(title: impl Into<Text>, instance_id: Option<String>) -> Arc<Task> {
+        let title = title.into();
         let info = TaskInfo {
             id: uuid::Uuid::new_v4().to_string(),
-            title: title.into(),
+            title: title.text.clone(),
             detail: None,
             progress: None,
             state: "running",
             error: None,
             instance_id,
+            title_text: (!title.is_plain()).then_some(title),
+            detail_text: None,
+            error_text: None,
         };
         emit("task", info.clone());
         Arc::new(Task { info: Mutex::new(info), last: Mutex::new(Instant::now() - Duration::from_secs(1)) })
     }
 
-    pub fn update(&self, detail: impl Into<String>, progress: Option<f64>) {
+    pub fn update(&self, detail: impl Into<Text>, progress: Option<f64>) {
+        let detail = detail.into();
         let snapshot = {
             let mut info = self.info.lock().unwrap();
-            info.detail = Some(detail.into());
+            info.detail = Some(detail.text.clone());
+            info.detail_text = (!detail.is_plain()).then_some(detail);
             info.progress = progress;
             let mut last = self.last.lock().unwrap();
             if last.elapsed() < Duration::from_millis(100) && progress != Some(1.0) {
@@ -65,12 +72,12 @@ impl Task {
     }
 
     /// A progress callback for `net::download_all`: "Label (done/total)".
-    pub fn counter(self: &Arc<Self>, label: &str) -> impl Fn(usize, usize) + Send + Sync + 'static {
+    pub fn counter(self: &Arc<Self>, label: impl Into<Text>) -> impl Fn(usize, usize) + Send + Sync + 'static {
         let task = self.clone();
-        let label = label.to_string();
+        let label = label.into();
         move |done, total| {
             let p = if total == 0 { 1.0 } else { done as f64 / total as f64 };
-            task.update(format!("{label} ({done}/{total})"), Some(p));
+            task.update(crate::tr!("task.progress", "{label} ({done}/{total})", label = label, done = done, total = total), Some(p));
         }
     }
 
@@ -89,13 +96,14 @@ impl Task {
             let mut info = self.info.lock().unwrap();
             info.state = "error";
             info.error = Some(err.to_string());
+            info.error_text = text_of(err).cloned();
             info.clone()
         };
         emit("task", snapshot);
     }
 
     /// Runs `f` as a task, marking it done or failed.
-    pub async fn run<T, F, Fut>(title: impl Into<String>, instance_id: Option<String>, f: F) -> anyhow::Result<T>
+    pub async fn run<T, F, Fut>(title: impl Into<Text>, instance_id: Option<String>, f: F) -> anyhow::Result<T>
     where
         F: FnOnce(Arc<Task>) -> Fut,
         Fut: Future<Output = anyhow::Result<T>>,

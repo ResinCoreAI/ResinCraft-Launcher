@@ -1,0 +1,41 @@
+# Builds the Windows installer and attaches it to a draft GitHub Release when a version tag is pushed:
+#   git tag v0.1.0 && git push origin v0.1.0
+# Repository secrets RESINCRAFT_MS_CLIENT_ID and RESINCRAFT_CURSEFORGE_KEY are compiled into the app
+# (see src-tauri/build.rs); they are never stored in the code.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESINCRAFT_MS_CLIENT_ID: ${{ secrets.RESINCRAFT_MS_CLIENT_ID }}
+          RESINCRAFT_CURSEFORGE_KEY: ${{ secrets.RESINCRAFT_CURSEFORGE_KEY }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ResinCraft Launcher ${{ github.ref_name }}
+          releaseBody: Download the installer below. Windows may warn that the publisher is unverified until releases are code-signed.
+          releaseDraft: true
+          prerelease: false

@@ -89,6 +89,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <button className="btn lg" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
           <PackageOpen /> {t('instance.export')}
         </button>
+        <button className="btn lg icon" title={t('servers.fromInstance')} onClick={() => go({ page: 'servers', fromInstance: inst.id })}>
+          <Server />
+        </button>
         <button className="btn lg icon" title={t('common.openFolder')} onClick={() => void api.instances.openFolder(inst.id)}>
           <FolderOpen />
         </button>

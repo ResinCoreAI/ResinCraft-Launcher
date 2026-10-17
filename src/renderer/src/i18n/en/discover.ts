@@ -1,7 +1,7 @@
 // Strings for this area of the UI (see ../index.tsx for the format).
 export default {
   'discover.title': 'Discover',
-  'discover.subtitle': 'Mods, modpacks, resource packs and shaders from Modrinth, CurseForge and FTB.',
+  'discover.subtitle': 'Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher and Technic.',
   'discover.target.title': 'Installing into {name}',
   'discover.target.compatible': 'Showing results compatible with {target}',
   'discover.target.back': 'Back to instance',

@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub use super::text::Text;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LoaderType {
@@ -134,6 +136,9 @@ pub struct Instance {
     pub modpack: Option<ModpackRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending_downloads: Option<Vec<PendingDownload>>,
+    /// Library group (like Prism's instance groups); None = Ungrouped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +151,8 @@ pub struct NewInstance {
     pub loader_version: Option<String>,
     #[serde(default)]
     pub color: Option<String>,
+    #[serde(default)]
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,12 +245,16 @@ pub struct SkinUpload {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginEvent {
     pub state: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account: Option<AccountView>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// `error` in a form the UI can translate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_text: Option<Text>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -285,6 +296,13 @@ pub struct TaskInfo {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instance_id: Option<String>,
+    /// `title`, `detail` and `error` in a form the UI can translate (absent for plain text).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title_text: Option<Text>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail_text: Option<Text>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_text: Option<Text>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -452,6 +470,9 @@ pub struct WorldInfo {
     pub size: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// `error` in a form the UI can translate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_text: Option<Text>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -489,4 +510,273 @@ pub struct ScreenshotInfo {
     pub name: String,
     pub size: u64,
     pub mtime: i64,
+}
+
+// ---------- Server hosting ----------
+
+/// The server software a hosted server runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ServerKind {
+    Vanilla,
+    Paper,
+    Purpur,
+    Folia,
+    /// Built locally with Spigot's BuildTools (Spigot can't be downloaded ready-made).
+    Spigot,
+    Fabric,
+    Quilt,
+    Forge,
+    Neoforge,
+}
+
+impl ServerKind {
+    /// The mod loader behind a mod server (None for vanilla and plugin servers).
+    pub fn loader(self) -> Option<LoaderType> {
+        match self {
+            Self::Fabric => Some(LoaderType::Fabric),
+            Self::Quilt => Some(LoaderType::Quilt),
+            Self::Forge => Some(LoaderType::Forge),
+            Self::Neoforge => Some(LoaderType::Neoforge),
+            _ => None,
+        }
+    }
+    pub fn from_loader(l: LoaderType) -> ServerKind {
+        match l {
+            LoaderType::Vanilla => Self::Vanilla,
+            LoaderType::Fabric => Self::Fabric,
+            LoaderType::Quilt => Self::Quilt,
+            LoaderType::Forge => Self::Forge,
+            LoaderType::Neoforge => Self::Neoforge,
+        }
+    }
+    /// Bukkit-style plugin servers (plugins/ folder).
+    pub fn plugins(self) -> bool {
+        matches!(self, Self::Paper | Self::Purpur | Self::Folia | Self::Spigot)
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Vanilla => "Vanilla",
+            Self::Paper => "Paper",
+            Self::Purpur => "Purpur",
+            Self::Folia => "Folia",
+            Self::Spigot => "Spigot",
+            Self::Fabric => "Fabric",
+            Self::Quilt => "Quilt",
+            Self::Forge => "Forge",
+            Self::Neoforge => "NeoForge",
+        }
+    }
+}
+
+/// How a server is started: `-jar <jar>`, or a Java @argument file (modern Forge/NeoForge). Paths are relative to the server folder.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerLaunch {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jar: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub args_file: Option<String>,
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// `<dataDir>/servers/<id>/server.json`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerMeta {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub kind: ServerKind,
+    pub mc_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loader: Option<LoaderType>,
+    /// Mod loader version, or the Paper/Purpur/Folia build.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loader_version: Option<String>,
+    pub memory_mb: u32,
+    pub port: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub java_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jvm_args: Option<String>,
+    pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_started: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modpack: Option<ModpackRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    #[serde(default)]
+    pub launch: ServerLaunch,
+    /// Open the port on the router automatically (UPnP) while the server runs.
+    #[serde(default = "yes")]
+    pub public: bool,
+    /// Start Java with Aikar's tuned G1GC flags (and -Xms = -Xmx).
+    #[serde(default = "yes")]
+    pub optimized_flags: bool,
+    /// How the server is shared over the internet when `public` is on.
+    #[serde(default)]
+    pub tunnel: TunnelMode,
+    /// A bore relay to use instead of bore.pub ("host" or "host:port"), e.g. a self-hosted one nearby.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_host: Option<String>,
+    /// The secret of that relay (`bore server --secret`), if it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_secret: Option<String>,
+}
+
+/// How a public server reaches the internet. The relay (bore.pub or `relay_host`) is always the last resort.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TunnelMode {
+    /// Open the port on the router (UPnP, direct), else the relay.
+    #[default]
+    Auto,
+    /// playit.gg: a stable *.joinmc.link address after linking a playit account once, else the relay.
+    Playit,
+    /// Always the relay.
+    Relay,
+}
+
+/// Internet access for a running server (UPnP).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerNet {
+    /// "off" | "opening" | "open" | "failed"
+    pub state: &'static str,
+    /// Public "ip:port" to share once the router opened the port.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// "router" (port opened with UPnP, direct), "playit" (playit.gg) or "relay" (public relay, no setup).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub via: Option<&'static str>,
+    /// While opening through playit.gg for the first time: the page where the player links this launcher.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claim_url: Option<String>,
+}
+
+/// A server as the UI sees it: its metadata plus live state.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInfo {
+    #[serde(flatten)]
+    pub meta: ServerMeta,
+    pub eula_accepted: bool,
+    /// "stopped" | "starting" | "running" | "stopping" | "crashed"
+    pub state: &'static str,
+    pub players: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net: Option<ServerNet>,
+}
+
+/// Where a new server's content comes from (besides plain server software).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase", rename_all_fields = "camelCase")]
+pub enum ServerSource {
+    /// A Modrinth, CurseForge ("cf:") or FTB ("ftb:") modpack.
+    Modpack { project_id: String, version_id: Option<String> },
+    /// A ResinCraft instance (its mods minus client-only ones, plus configs).
+    Instance { instance_id: String },
+    /// A local .mrpack or CurseForge .zip; a file picker opens when there's no path.
+    File { path: Option<String> },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewServer {
+    pub name: String,
+    #[serde(default, rename = "type")]
+    pub kind: Option<ServerKind>,
+    #[serde(default)]
+    pub mc_version: Option<String>,
+    #[serde(default)]
+    pub loader_version: Option<String>,
+    #[serde(default)]
+    pub memory_mb: Option<u32>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub source: Option<ServerSource>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerCreated {
+    pub server: ServerInfo,
+    /// Client-only mods that were left out.
+    pub dropped: Vec<String>,
+    /// Files the pack author only allows from their website.
+    pub pending: Vec<PendingDownload>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerEvent {
+    pub server_id: String,
+    pub state: &'static str,
+    pub players: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net: Option<ServerNet>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerLogEvent {
+    pub server_id: String,
+    pub lines: Vec<LogLine>,
+}
+
+/// One server.properties line.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PropEntry {
+    pub key: String,
+    pub value: String,
+}
+
+/// An entry of whitelist.json, ops.json, banned-players.json or banned-ips.json.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerListEntry {
+    /// Player name, or the address for banned-ips.
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uuid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// A plugin or mod found for a hosted server.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerAddonHit {
+    /// Bare id for Modrinth, "hangar:<slug>", "cf:<id>".
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    pub author: String,
+    pub downloads: u64,
+    /// "modrinth" | "hangar" | "spigot" | "curseforge"
+    pub source: &'static str,
+    /// Can't be installed from the launcher (premium, or hosted on another website): open `url` instead.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub external: bool,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ServerAddonResult {
+    pub hits: Vec<ServerAddonHit>,
+    pub total: u64,
 }

@@ -31,35 +31,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
 
         "instances:launch" => {
-            let id: String = args.get(0)?;
-            let settings = settings::get().await;
-            let auth = crate::player::accounts::get_launch_auth().await?;
-            let mode = settings.on_launch.clone();
-            let exit_mode = mode.clone();
-            let hooks = launch::LaunchHooks {
-                on_started: Some(Box::new(move || {
-                    if let Some(win) = main_window() {
-                        match mode.as_str() {
-                            "minimize" => {
-                                let _ = win.minimize();
-                            }
-                            "hide" => {
-                                let _ = win.hide();
-                            }
-                            _ => {}
-                        }
-                    }
-                })),
-                on_exit: Some(Box::new(move |_code| {
-                    if exit_mode != "keep" && running_ids().is_empty() {
-                        if let Some(win) = main_window() {
-                            let _ = win.show();
-                            let _ = win.unminimize();
-                        }
-                    }
-                })),
-            };
-            launch::launch_instance(&id, &settings, auth, hooks).await?;
+            launch(&args.get::<String>(0)?, None).await?;
             done()
         }
         "instances:kill" => {
@@ -70,6 +42,39 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
 
         _ => bail!("Unknown request: {channel}"),
     }
+}
+
+/// Launches an instance with the player's account and the "on launch" window behaviour from Settings.
+/// `server` ("host:port") joins that server once the game is up.
+pub async fn launch(id: &str, server: Option<String>) -> Result<()> {
+    let settings = settings::get().await;
+    let auth = crate::player::accounts::get_launch_auth().await?;
+    let mode = settings.on_launch.clone();
+    let exit_mode = mode.clone();
+    let hooks = launch::LaunchHooks {
+        on_started: Some(Box::new(move || {
+            if let Some(win) = main_window() {
+                match mode.as_str() {
+                    "minimize" => {
+                        let _ = win.minimize();
+                    }
+                    "hide" => {
+                        let _ = win.hide();
+                    }
+                    _ => {}
+                }
+            }
+        })),
+        on_exit: Some(Box::new(move |_code| {
+            if exit_mode != "keep" && running_ids().is_empty() {
+                if let Some(win) = main_window() {
+                    let _ = win.show();
+                    let _ = win.unminimize();
+                }
+            }
+        })),
+    };
+    launch::launch_instance_to(id, &settings, auth, hooks, server.as_deref()).await
 }
 
 fn main_window() -> Option<tauri::WebviewWindow> {

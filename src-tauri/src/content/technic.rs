@@ -7,7 +7,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use serde::Deserialize;
 use serde_json::Value;
@@ -18,6 +18,7 @@ use crate::core::instances;
 use crate::core::net::{download_all, fetch_json, DownloadItem, Hash};
 use crate::core::paths;
 use crate::core::types::{ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, ProjectHit, ProjectVersion, SearchQuery, SearchResult};
+use crate::{bail_tr, err_tr, tr};
 
 const API: &str = "https://api.technicpack.net";
 // The API refuses requests without a launcher build number; any recent one works.
@@ -319,7 +320,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         let s: SolderPack = fetch_json(&p.solder_url("")).await?;
         build = version_id.or(s.recommended.clone()).or(s.latest.clone()).or(s.builds.last().cloned()).unwrap_or_default();
         if build.is_empty() {
-            bail!("{} has no build to install", p.display_name);
+            bail_tr!("technic.noBuild", "{name} has no build to install", name = p.display_name);
         }
         let b: SolderBuild = fetch_json(&p.solder_url(&format!("/{}", enc(&build)))).await?;
         mc = Some(b.minecraft.clone()).filter(|m| !m.is_empty());
@@ -330,28 +331,32 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             files.push(DownloadItem::new(&m.url, dest).hash(hash).size(m.filesize.filter(|s| *s > 0)));
         }
     } else {
-        let url = p.url().ok_or_else(|| anyhow!("{} has no download on Technic", p.display_name))?;
+        let url = p.url().ok_or_else(|| err_tr!("technic.noDownload", "{name} has no download on Technic", name = p.display_name))?;
         files.push(DownloadItem::new(url, tmp.join("pack.zip")));
     }
-    let mc = mc.ok_or_else(|| anyhow!("{} doesn't say which Minecraft version it needs", p.display_name))?;
+    let mc = mc.ok_or_else(|| err_tr!("modpack.noMcVersion", "{name} doesn't say which Minecraft version it needs", name = p.display_name))?;
     // Practically every pre-1.13 Technic pack is built on legacy Forge; don't download gigabytes to find out.
     if is_legacy_mc(&mc) {
-        bail!(
-            "{} is for Minecraft {mc}. ResinCraft can install Technic packs for Minecraft 1.13 and newer (older ones need the legacy Forge installer).",
-            p.display_name
+        bail_tr!(
+            "technic.legacyMc",
+            "{name} is for Minecraft {mc}. ResinCraft can install Technic packs for Minecraft 1.13 and newer (older ones need the legacy Forge installer).",
+            name = p.display_name,
+            mc = mc
         );
     }
 
     let tmp2 = tmp.clone();
-    let res = Task::run(format!("Installing {}", p.display_name), None, move |task| async move {
+    let res = Task::run(tr!("modpack.installing", "Installing {name}", name = p.display_name), None, move |task| async move {
         let paths_: Vec<PathBuf> = files.iter().map(|f| f.dest.clone()).collect();
-        download_all(files, 4, task.counter("Downloading modpack")).await?;
-        task.update("Reading modpack…", None);
+        download_all(files, 4, task.counter(tr!("technic.downloading", "Downloading modpack"))).await?;
+        task.update(tr!("technic.reading", "Reading modpack…"), None);
         let name = p.display_name.clone();
         let (zips, found) = tokio::task::spawn_blocking(move || -> Result<(Vec<Zip>, Found)> {
             let mut zips = Vec::new();
             for f in &paths_ {
-                zips.push(open_zip(f).map_err(|_| anyhow!("{name}'s download isn't a zip file. The author's download link may be broken."))?);
+                zips.push(open_zip(f).map_err(|_| {
+                    err_tr!("technic.notZip", "{name}'s download isn't a zip file. The author's download link may be broken.", name = name)
+                })?);
             }
             let found = read_version_json(&mut zips)?;
             Ok((zips, found))
@@ -359,13 +364,19 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         .await??;
         let (vj, (loader, loader_version)) = match found {
             Found::Unreadable => {
-                bail!("{} ships a custom bin/modpack.jar that ResinCraft can't read, so it can't tell which mod loader to install.", p.display_name)
+                bail_tr!(
+                    "technic.customModpackJar",
+                    "{name} ships a custom bin/modpack.jar that ResinCraft can't read, so it can't tell which mod loader to install.",
+                    name = p.display_name
+                )
             }
             Found::None => (None, (LoaderType::Vanilla, None)),
             Found::Json(v) => {
                 let Some(l) = detect_loader(&v) else {
-                    let id = v.id.as_ref().filter(|i| !i.is_empty()).map(|i| format!(" ({i})")).unwrap_or_default();
-                    bail!("{} uses a mod loader ResinCraft doesn't recognise{id}.", p.display_name);
+                    if let Some(id) = v.id.as_ref().filter(|i| !i.is_empty()) {
+                        bail_tr!("technic.unknownLoaderId", "{name} uses a mod loader ResinCraft doesn't recognise ({id}).", name = p.display_name, id = id);
+                    }
+                    bail_tr!("technic.unknownLoader", "{name} uses a mod loader ResinCraft doesn't recognise.", name = p.display_name);
                 };
                 (Some(v), l)
             }
@@ -375,7 +386,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         let mc_version = vj.as_ref().and_then(|v| v.inherits_from.clone()).filter(|m| !m.is_empty()).unwrap_or(mc);
         let modpack = ModpackRef { name: p.display_name.clone(), project_id: Some(format!("technic:{}", p.name)), version_id: Some(build.clone()) };
         let icon = p.icon();
-        let new = NewInstance { name: p.display_name.clone(), mc_version, loader, loader_version, color: None };
+        let new = NewInstance { name: p.display_name.clone(), mc_version, loader, loader_version, color: None, group: None };
         let inst = instances::create(new, move |i| {
             i.icon_url = icon;
             i.memory_mb = memory_mb;
@@ -383,7 +394,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         })
         .await?;
         let dir = paths::game_dir(&inst.id);
-        task.update("Unpacking modpack…", None);
+        task.update(tr!("technic.unpacking", "Unpacking modpack…"), None);
         let unpacked = tokio::task::spawn_blocking(move || -> Result<()> {
             for mut zip in zips {
                 // bin/ holds the Technic Launcher's own loader jar; ResinCraft installs the loader itself.

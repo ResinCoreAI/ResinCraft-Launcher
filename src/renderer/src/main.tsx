@@ -1,8 +1,9 @@
 import { StrictMode, useEffect } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
 import App from './App'
 import { restoreLanguage, setLanguage, useLanguage } from './i18n'
 import { StoreProvider, useStore } from './store'
+import { installDesktopBehaviour } from './desktop'
 // Fonts are bundled with the app (no network): Chakra Petch for display, IBM Plex for text and data.
 // Extra subsets cover the shipped languages; Chinese, Japanese and Korean use the system's CJK fonts.
 import '@fontsource/chakra-petch/latin-500.css'
@@ -25,6 +26,7 @@ import '@fontsource/ibm-plex-sans/vietnamese-600.css'
 import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-500.css'
 import './styles.css'
+import './i18n/fonts.css'
 
 /** Follows the Language setting; the whole UI re-renders in the new language when it changes. */
 function Localized() {
@@ -37,8 +39,13 @@ function Localized() {
   return <App key={lang} />
 }
 
+installDesktopBehaviour()
+
+// Hot reload re-runs this file during development; reuse the existing root instead of creating a second one.
+const holder = window as unknown as { __resinRoot?: Root }
+
 void restoreLanguage().finally(() =>
-  createRoot(document.getElementById('root')!).render(
+  (holder.__resinRoot ??= createRoot(document.getElementById('root')!)).render(
     <StrictMode>
       <StoreProvider>
         <Localized />

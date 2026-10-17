@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -17,6 +17,7 @@ use crate::core::paths;
 use crate::core::types::{
     ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectHit, ProjectVersion, SearchQuery, SearchResult,
 };
+use crate::{bail_tr, err_tr, tr};
 
 const API: &str = "https://api.atlauncher.com/v1";
 const CDN: &str = "https://download.nodecdn.net/containers/atl";
@@ -243,21 +244,30 @@ fn loader_of(name: &str, cfg: &AtlConfig) -> Result<(LoaderType, Option<String>)
         let legacy = cfg.libraries.as_ref().is_some_and(|l| !l.is_empty())
             || cfg.mods.iter().any(|m| m.client != Some(false) && ["forge", "jar", "coremods", "mods"].contains(&m.kind.as_str()));
         if legacy {
-            bail!("{name} {} uses ATLauncher's legacy install format (Minecraft {mc}), which ResinCraft doesn't support.", cfg.version);
+            bail_tr!(
+                "atlauncher.legacyFormat",
+                "{name} {version} uses ATLauncher's legacy install format (Minecraft {mc}), which ResinCraft doesn't support.",
+                name = name,
+                version = cfg.version,
+                mc = mc
+            );
         }
         return Ok((LoaderType::Vanilla, None));
     };
     let md = &l.metadata;
     match l.kind.to_lowercase().as_str() {
-        "forge" if is_legacy_mc(mc) => bail!(
-            "{name} {} is for Minecraft {mc}. ResinCraft supports Forge for Minecraft 1.13 and newer; pick a newer version of the pack if there is one.",
-            cfg.version
+        "forge" if is_legacy_mc(mc) => bail_tr!(
+            "atlauncher.legacyForge",
+            "{name} {version} is for Minecraft {mc}. ResinCraft supports Forge for Minecraft 1.13 and newer; pick a newer version of the pack if there is one.",
+            name = name,
+            version = cfg.version,
+            mc = mc
         ),
         "forge" => Ok((LoaderType::Forge, if md.latest == Some(true) { None } else { md.version.clone() })),
         "neoforge" => Ok((LoaderType::Neoforge, if md.latest == Some(true) { None } else { md.version.clone() })),
         "fabric" => Ok((LoaderType::Fabric, md.loader.clone())),
         "quilt" => Ok((LoaderType::Quilt, md.loader.clone())),
-        _ => bail!("{name} needs the {} loader, which ResinCraft doesn't support yet.", l.kind),
+        _ => bail_tr!("atlauncher.unsupportedLoader", "{name} needs the {loader} loader, which ResinCraft doesn't support yet.", name = name, loader = l.kind),
     }
 }
 
@@ -279,7 +289,9 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         Some(v) => p.versions.iter().find(|x| &x.version == v),
         None => p.versions.first(),
     };
-    let summary = summary.ok_or_else(|| anyhow!("{} has no version {} to install", p.name, version_id.clone().unwrap_or_default()))?;
+    let summary = summary.ok_or_else(|| {
+        err_tr!("atlauncher.noSuchVersion", "{name} has no version {version} to install", name = p.name, version = version_id.clone().unwrap_or_default())
+    })?;
     let base = format!("{CDN}/packs/{}/versions/{}", enc(&p.safe_name), enc(&summary.version));
     let cfg: AtlConfig = fetch_json(&format!("{base}/Configs.json")).await?;
     let (loader, loader_version) = loader_of(&p.name, &cfg)?;
@@ -287,17 +299,29 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
     // Optional mods are pre-ticked in ATLauncher when "selected"; there's no picker here, so take that default.
     let mods: Vec<AtlMod> = cfg.mods.iter().filter(|m| m.client != Some(false) && (m.optional != Some(true) || m.selected == Some(true))).cloned().collect();
     if let Some(odd) = mods.iter().find(|m| m.kind != "extract" && folder_for(&m.kind, &cfg.minecraft).is_none()) {
-        bail!("{} {} installs \"{}\" as a {} file, which ResinCraft can't install.", p.name, cfg.version, odd.name, odd.kind);
+        bail_tr!(
+            "atlauncher.unsupportedFileType",
+            "{name} {version} installs \"{file}\" as a {kind} file, which ResinCraft can't install.",
+            name = p.name,
+            version = cfg.version,
+            file = odd.name,
+            kind = odd.kind
+        );
     }
     if let Some(m) = mods.iter().find(|m| m.kind == "extract" && m.download == "browser") {
-        bail!("{} needs \"{}\" downloaded by hand and unpacked, which ResinCraft can't do for you.", p.name, m.name);
+        bail_tr!(
+            "atlauncher.manualExtract",
+            "{name} needs \"{file}\" downloaded by hand and unpacked, which ResinCraft can't do for you.",
+            name = p.name,
+            file = m.name
+        );
     }
 
-    Task::run(format!("Installing {}", p.name), None, move |task| async move {
+    Task::run(tr!("modpack.installing", "Installing {name}", name = p.name), None, move |task| async move {
         let modpack = ModpackRef { name: p.name.clone(), project_id: Some(format!("atl:{}", p.safe_name)), version_id: Some(cfg.version.clone()) };
         let icon = Some(icon_of(&p));
         let memory = cfg.memory.filter(|m| *m > 0).map(|m| m as u32);
-        let new = NewInstance { name: p.name.clone(), mc_version: cfg.minecraft.clone(), loader, loader_version, color: None };
+        let new = NewInstance { name: p.name.clone(), mc_version: cfg.minecraft.clone(), loader, loader_version, color: None, group: None };
         let inst = instances::create(new, move |i| {
             i.icon_url = icon;
             i.memory_mb = memory;
@@ -346,9 +370,9 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
                 items.push(DownloadItem::new(format!("{base}/Configs.zip"), &zip).hash(hash).size(c.filesize));
                 extracts.push(Extract { zip, to: String::new(), folder: String::new() });
             }
-            download_all(items, 8, task.counter("Downloading modpack files")).await?;
+            download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
 
-            task.update("Applying modpack settings…", None);
+            task.update(tr!("modpack.applyingSettings", "Applying modpack settings…"), None);
             let dir2 = dir.clone();
             tokio::task::spawn_blocking(move || -> Result<()> {
                 for e in extracts {

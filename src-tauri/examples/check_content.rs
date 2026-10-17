@@ -143,7 +143,7 @@ async fn main() {
 
     // ---------- Instance with Modrinth mods ----------
     let inst = report("create Fabric 1.21.1 instance", async {
-        let new = NewInstance { name: "check-content test".into(), mc_version: "1.21.1".into(), loader: LoaderType::Fabric, loader_version: Some("0.16.5".into()), color: None };
+        let new = NewInstance { name: "check-content test".into(), mc_version: "1.21.1".into(), loader: LoaderType::Fabric, loader_version: Some("0.16.5".into()), color: None, group: None };
         instances::create(new, |_| {}).await
     }.await);
     let Some(inst) = inst else { return finish(&created, &work).await };
@@ -151,7 +151,7 @@ async fn main() {
     let id = inst.id.clone();
 
     report("vanilla instance refuses mods", async {
-        let new = NewInstance { name: "check-content vanilla".into(), mc_version: "1.21.1".into(), loader: LoaderType::Vanilla, loader_version: None, color: None };
+        let new = NewInstance { name: "check-content vanilla".into(), mc_version: "1.21.1".into(), loader: LoaderType::Vanilla, loader_version: None, color: None, group: None };
         let v = instances::create(new, |_| {}).await?;
         created.push(v.id.clone());
         match sources::install(&v.id, "lithium", ContentKind::Mod, None).await {

@@ -2,12 +2,13 @@
 
 use std::path::Path;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 
 use super::index::{has_entry, open_zip};
 use super::{atlauncher, curseforge, ftb, modrinth, technic};
 use crate::core::instances;
 use crate::core::types::{source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType, ProjectVersion, SearchQuery, SearchResult};
+use crate::{bail_tr, err_tr};
 
 pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
     match q.source {
@@ -32,9 +33,9 @@ pub async fn versions(project_id: &str, instance_id: Option<&str>) -> Result<Vec
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, version_id: Option<String>) -> Result<()> {
     match source_of(project_id) {
         ContentSource::Curseforge => curseforge::install(instance_id, project_id, kind, version_id).await,
-        ContentSource::Ftb => bail!("FTB only publishes modpacks"),
-        ContentSource::Atlauncher => bail!("ATLauncher only publishes modpacks"),
-        ContentSource::Technic => bail!("Technic only publishes modpacks"),
+        ContentSource::Ftb => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "FTB"),
+        ContentSource::Atlauncher => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "ATLauncher"),
+        ContentSource::Technic => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "Technic"),
         ContentSource::Modrinth => modrinth::install(instance_id, project_id, kind, version_id).await,
     }
 }
@@ -85,7 +86,11 @@ pub async fn update_content(instance_id: &str, filename: &str) -> Result<()> {
 pub async fn change_version(instance_id: &str, kind: ContentKind, filename: &str, version_id: &str) -> Result<()> {
     let item = modrinth::list_content(instance_id, kind).await?.into_iter().find(|x| x.filename == filename);
     let Some((item, project_id)) = item.and_then(|i| i.project_id.clone().map(|p| (i, p))) else {
-        bail!("ResinCraft doesn't know where {filename} came from, so it can't switch its version");
+        bail_tr!(
+            "content.unknownOrigin",
+            "ResinCraft doesn't know where {filename} came from, so it can't switch its version",
+            filename = filename
+        );
     };
     if item.version_id.as_deref() == Some(version_id) {
         return Ok(());
@@ -104,11 +109,11 @@ pub async fn change_version(instance_id: &str, kind: ContentKind, filename: &str
 pub async fn import_modpack_file(file: &Path) -> Result<Instance> {
     let ext = file.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
     if ext != "mrpack" && ext != "zip" {
-        bail!("Pick a Modrinth .mrpack or a CurseForge modpack .zip");
+        bail_tr!("modpack.pickFile", "Pick a Modrinth .mrpack or a CurseForge modpack .zip");
     }
     let f = file.to_path_buf();
     let (mr, cf) = tokio::task::spawn_blocking(move || -> Result<(bool, bool)> {
-        let zip = open_zip(&f).map_err(|_| anyhow!("That file isn't a Modrinth or CurseForge modpack"))?;
+        let zip = open_zip(&f).map_err(|_| err_tr!("modpack.notModpack", "That file isn't a Modrinth or CurseForge modpack"))?;
         Ok((has_entry(&zip, "modrinth.index.json"), has_entry(&zip, "manifest.json")))
     })
     .await??;
@@ -118,5 +123,5 @@ pub async fn import_modpack_file(file: &Path) -> Result<Instance> {
     if cf {
         return curseforge::install_cf_zip(file, Default::default()).await;
     }
-    bail!("That file isn't a Modrinth or CurseForge modpack")
+    bail_tr!("modpack.notModpack", "That file isn't a Modrinth or CurseForge modpack")
 }

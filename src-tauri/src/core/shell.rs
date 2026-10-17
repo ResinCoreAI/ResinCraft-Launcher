@@ -3,12 +3,13 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 use super::ctx;
+use crate::{bail_tr, err_tr};
 
 fn app() -> Result<&'static tauri::AppHandle> {
     ctx::app().ok_or_else(|| anyhow!("Not available without the app window"))
@@ -16,26 +17,28 @@ fn app() -> Result<&'static tauri::AppHandle> {
 
 /// Opens a folder (or file) with the system's default handler.
 pub fn open_path(path: &Path) -> Result<()> {
-    app()?.opener().open_path(path.to_string_lossy(), None::<&str>).map_err(|e| anyhow!("Couldn't open {}: {e}", path.display()))
+    app()?.opener().open_path(path.to_string_lossy(), None::<&str>).map_err(|e| err_tr!("shell.openFailed", "Couldn't open {path}: {error}", path = path.display().to_string(), error = e.to_string()))
 }
 
 /// Shows a file selected in Explorer / Finder.
 pub fn reveal(path: &Path) -> Result<()> {
-    app()?.opener().reveal_item_in_dir(path).map_err(|e| anyhow!("Couldn't show {}: {e}", path.display()))
+    app()?.opener().reveal_item_in_dir(path).map_err(|e| err_tr!("shell.showFailed", "Couldn't show {path}: {error}", path = path.display().to_string(), error = e.to_string()))
 }
 
 /// Opens an https link in the user's browser.
 pub fn open_url(url: &str) -> Result<()> {
     if !url.starts_with("https://") {
-        bail!("Only https links can be opened");
+        bail_tr!("shell.httpsOnly", "Only https links can be opened");
     }
-    app()?.opener().open_url(url, None::<&str>).map_err(|e| anyhow!("Couldn't open the link: {e}"))
+    app()?.opener().open_url(url, None::<&str>).map_err(|e| err_tr!("shell.openLinkFailed", "Couldn't open the link: {error}", error = e.to_string()))
 }
 
 /// Moves a file or folder to the Recycle Bin / Trash (never a permanent delete).
 pub async fn trash(path: &Path) -> Result<()> {
     let p = path.to_path_buf();
-    tokio::task::spawn_blocking(move || trash::delete(&p)).await?.map_err(|e| anyhow!("Couldn't move {} to the Recycle Bin: {e}", path.display()))
+    tokio::task::spawn_blocking(move || trash::delete(&p)).await?.map_err(|e| {
+        err_tr!("shell.trashFailed", "Couldn't move {path} to the Recycle Bin: {error}", path = path.display().to_string(), error = e.to_string())
+    })
 }
 
 /// A file-type filter for dialogs: ("Modrinth modpack", &["mrpack"]).
@@ -69,8 +72,8 @@ pub async fn save_file(title: &str, default_path: &Path, filters: &[Filter<'_>])
 
 /// Copies a PNG image to the clipboard.
 pub fn copy_png(png: &[u8]) -> Result<()> {
-    let image = tauri::image::Image::from_bytes(png).map_err(|e| anyhow!("Couldn't read the image: {e}"))?;
-    app()?.clipboard().write_image(&image).map_err(|e| anyhow!("Couldn't copy the image: {e}"))
+    let image = tauri::image::Image::from_bytes(png).map_err(|e| err_tr!("shell.imageUnreadable", "Couldn't read the image: {error}", error = e.to_string()))?;
+    app()?.clipboard().write_image(&image).map_err(|e| err_tr!("shell.copyImageFailed", "Couldn't copy the image: {error}", error = e.to_string()))
 }
 
 /// The user's Downloads folder (for default save locations).

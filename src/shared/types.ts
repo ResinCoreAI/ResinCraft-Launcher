@@ -47,6 +47,8 @@ export interface Instance {
   jvmArgs?: string
   modpack?: { projectId?: string; versionId?: string; name: string }
   pendingDownloads?: PendingDownload[]
+  /** Library group (like Prism's instance groups); none = Ungrouped. */
+  group?: string
 }
 
 export interface NewInstance {
@@ -55,9 +57,13 @@ export interface NewInstance {
   loader: LoaderType
   loaderVersion?: string
   color?: string
+  group?: string
 }
 
-export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'memoryMb' | 'javaPath' | 'jvmArgs' | 'loaderVersion' | 'pendingDownloads'>>
+export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'memoryMb' | 'javaPath' | 'jvmArgs' | 'loaderVersion' | 'pendingDownloads'>> & {
+  /** `null` moves the instance back to Ungrouped. */
+  group?: string | null
+}
 
 export interface McVersion {
   id: string
@@ -118,6 +124,18 @@ export interface LoginEvent {
   state: 'success' | 'error'
   account?: AccountView
   error?: string
+  /** `error` in a form the UI can translate. */
+  errorText?: EngineText
+}
+
+/**
+ * A message from the engine that the UI can show in the player's language: `key` names an `engine.*` string,
+ * `text` is the English (the fallback), `params` fill its {placeholders} (a param may itself be an EngineText).
+ */
+export interface EngineText {
+  key: string
+  text: string
+  params?: Record<string, unknown>
 }
 
 export interface JavaInstall {
@@ -169,6 +187,10 @@ export interface TaskInfo {
   state: 'running' | 'done' | 'error'
   error?: string
   instanceId?: string
+  /** `title`, `detail` and `error` in a form the UI can translate (absent for plain text). */
+  titleText?: EngineText
+  detailText?: EngineText
+  errorText?: EngineText
 }
 
 export interface GameEvent {
@@ -301,6 +323,7 @@ export interface WorldInfo {
   size: number
   /** Set when level.dat is missing or unreadable. */
   error?: string
+  errorText?: EngineText
 }
 
 /** An entry in the multiplayer server list (servers.dat). */
@@ -329,6 +352,134 @@ export interface ScreenshotInfo {
   name: string
   size: number
   mtime: number
+}
+
+// ---------- Server hosting ----------
+
+export type ServerKind = 'vanilla' | 'paper' | 'purpur' | 'folia' | 'spigot' | 'fabric' | 'quilt' | 'forge' | 'neoforge'
+/** 'auto': the router (UPnP), else the relay. 'playit': playit.gg, else the relay. 'relay': always the relay. */
+export type ServerTunnel = 'auto' | 'playit' | 'relay'
+export type ServerState = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed'
+
+/** Internet access for a running server: the port opened on the router automatically (UPnP). */
+export interface ServerNet {
+  state: 'off' | 'opening' | 'open' | 'failed'
+  /** Public "ip:port" to share once the router opened the port. */
+  address?: string
+  error?: string
+  /** 'router': port opened with UPnP (direct). 'playit': playit.gg (stable address). 'relay': a bore relay (no setup). */
+  via?: 'router' | 'playit' | 'relay'
+  /** While opening through playit.gg the first time: the page where the player links ResinCraft. */
+  claimUrl?: string
+}
+
+/** A hosted server: server.json plus live state. */
+export interface ServerInfo {
+  id: string
+  name: string
+  type: ServerKind
+  mcVersion: string
+  loader?: LoaderType
+  /** Mod loader version, or the Paper/Purpur/Folia build. */
+  loaderVersion?: string
+  memoryMb: number
+  port: number
+  javaPath?: string
+  jvmArgs?: string
+  createdAt: number
+  lastStarted?: number
+  modpack?: { projectId?: string; versionId?: string; name: string }
+  iconUrl?: string
+  launch: { jar?: string; argsFile?: string }
+  /** Open the port on the router automatically while running. */
+  public: boolean
+  /** Start with Aikar's tuned G1GC flags (-Xms = -Xmx). */
+  optimizedFlags: boolean
+  /** How the server is shared over the internet. The relay is always the last resort. */
+  tunnel: ServerTunnel
+  /** A bore relay instead of bore.pub ("host" or "host:port"), and its secret. */
+  relayHost?: string
+  relaySecret?: string
+  eulaAccepted: boolean
+  state: ServerState
+  players: string[]
+  net?: ServerNet
+}
+
+export type ServerSource =
+  | { kind: 'modpack'; projectId: string; versionId?: string }
+  | { kind: 'instance'; instanceId: string }
+  /** A local .mrpack / CurseForge .zip; a file picker opens when there is no path. */
+  | { kind: 'file'; path?: string }
+
+export interface NewServer {
+  name: string
+  type?: ServerKind
+  mcVersion?: string
+  loaderVersion?: string
+  memoryMb?: number
+  port?: number
+  source?: ServerSource
+}
+
+export interface ServerCreated {
+  server: ServerInfo
+  /** Client-only mods that were left out. */
+  dropped: string[]
+  pending: PendingDownload[]
+}
+
+export type ServerPatch = Partial<
+  Pick<ServerInfo, 'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'tunnel' | 'relayHost' | 'relaySecret'>
+>
+
+export interface ServerEvent {
+  serverId: string
+  state: ServerState
+  players: string[]
+  net?: ServerNet
+  code?: number
+}
+
+export interface ServerLogEvent {
+  serverId: string
+  lines: LogLine[]
+}
+
+export interface PropEntry {
+  key: string
+  value: string
+}
+
+export type PlayerListKind = 'whitelist' | 'ops' | 'bans' | 'ipBans'
+
+export interface ServerListEntry {
+  /** Player name, or the address for IP bans. */
+  name: string
+  uuid?: string
+  level?: number
+  reason?: string
+}
+
+export type AddonSource = 'modrinth' | 'hangar' | 'spigot' | 'curseforge'
+
+export interface ServerAddonHit {
+  /** Bare id for Modrinth, "hangar:<slug>", "spigot:<id>", "cf:<id>". */
+  id: string
+  title: string
+  description: string
+  iconUrl?: string
+  author: string
+  downloads: number
+  source: AddonSource
+  url: string
+  /** Premium or hosted elsewhere: open `url` instead of installing. */
+  external?: boolean
+}
+
+export interface ServerAddonResult {
+  hits: ServerAddonHit[]
+  total: number
 }
 
 /** The API exposed to the renderer as `window.resin`. */
@@ -429,10 +580,50 @@ export interface ResinApi {
     show(instanceId: string, name: string): Promise<void>
     remove(instanceId: string, name: string): Promise<void>
   }
+  server: {
+    list(): Promise<ServerInfo[]>
+    get(id: string): Promise<ServerInfo>
+    /** Minecraft versions Paper / Purpur / Folia / Spigot exist for (empty for other types). */
+    versions(type: ServerKind): Promise<string[]>
+    create(data: NewServer): Promise<ServerCreated>
+    update(id: string, patch: ServerPatch): Promise<ServerInfo>
+    /** Moves the server folder to the Recycle Bin. */
+    remove(id: string): Promise<void>
+    openFolder(id: string, sub?: string): Promise<void>
+    /** Writes eula.txt; only after the player ticked "I agree". */
+    acceptEula(id: string): Promise<void>
+    start(id: string): Promise<void>
+    /** Sends `stop`; the server is killed if it hasn't exited after 90 s. */
+    stop(id: string): Promise<void>
+    kill(id: string): Promise<void>
+    command(id: string, command: string): Promise<void>
+    log(id: string): Promise<LogLine[]>
+    /** The Java arguments the next start uses (after "java"). */
+    launchArgs(id: string): Promise<string[]>
+    properties(id: string): Promise<PropEntry[]>
+    setProperties(id: string, entries: PropEntry[]): Promise<void>
+    playerList(id: string, kind: PlayerListKind): Promise<ServerListEntry[]>
+    playerAdd(id: string, kind: PlayerListKind, name: string): Promise<void>
+    playerRemove(id: string, kind: PlayerListKind, name: string): Promise<void>
+    /** Zips the world into the server's backups folder; returns the zip path. */
+    backup(id: string): Promise<string>
+    addonSources(id: string): Promise<AddonSource[]>
+    addons(id: string): Promise<ContentItem[]>
+    addonSearch(id: string, query: string, source: AddonSource, offset?: number): Promise<ServerAddonResult>
+    addonVersions(id: string, projectId: string): Promise<ProjectVersion[]>
+    addonInstall(id: string, projectId: string, versionId?: string): Promise<void>
+    addonToggle(id: string, filename: string): Promise<void>
+    addonRemove(id: string, filename: string): Promise<void>
+    network(): Promise<{ lanIp: string | null }>
+    /** Launches an instance and joins this server (quick play on 1.20+, --server before). */
+    play(id: string, instanceId: string): Promise<void>
+  }
   on: {
     task(cb: (t: TaskInfo) => void): () => void
     game(cb: (e: GameEvent) => void): () => void
     log(cb: (e: LogEvent) => void): () => void
     login(cb: (e: LoginEvent) => void): () => void
+    server(cb: (e: ServerEvent) => void): () => void
+    serverLog(cb: (e: ServerLogEvent) => void): () => void
   }
 }

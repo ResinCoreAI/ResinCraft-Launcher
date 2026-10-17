@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AccountView, AppInfo, ContentKind, GameEvent, Instance, LogLine, Settings, TaskInfo } from '@shared/types'
 import { api } from './api'
-import { t } from './i18n'
+import { t, type EngineError } from './i18n'
 
 export type Route =
   | { page: 'home' }
@@ -9,6 +9,7 @@ export type Route =
   | { page: 'instance'; id: string; tab?: 'content' | 'logs' | 'settings' }
   | { page: 'discover'; kind?: ContentKind; instanceId?: string }
   | { page: 'accounts' }
+  | { page: 'servers'; id?: string; fromInstance?: string }
   | { page: 'settings' }
 
 export type GameState = GameEvent['state']
@@ -125,7 +126,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setGames((g) => ({ ...g, [id]: 'stopped' }))
         toast((e as Error).message, 'error')
         // Missing account is the most common first-run problem; take the user straight there.
-        if (/sign in|account/i.test((e as Error).message)) setRoute({ page: 'accounts' })
+        const { key, message } = e as EngineError
+        if (key ? key.startsWith('accounts.') : /sign in|account/i.test(message)) setRoute({ page: 'accounts' })
       }
     },
     [toast]

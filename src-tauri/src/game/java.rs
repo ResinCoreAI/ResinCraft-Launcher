@@ -5,13 +5,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use serde::Deserialize;
 
 use crate::core::events::Task;
 use crate::core::net::{download_file, fetch_json, DownloadItem, Hash};
 use crate::core::paths;
 use crate::core::types::JavaInstall;
+use crate::{bail_tr, err_tr, tr};
 
 const EXE: &str = if cfg!(windows) { "java.exe" } else { "java" };
 
@@ -202,16 +203,16 @@ pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall
         "linux"
     };
     let cpu = if cfg!(target_arch = "aarch64") { "aarch64" } else { "x64" };
-    task.update(format!("Finding Java {major}…"), None);
+    task.update(tr!("java.finding", "Finding Java {major}…", major = major), None);
     let assets: Vec<AdoptiumAsset> =
         fetch_json(&format!("https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={cpu}&image_type=jre&os={os}&vendor=eclipse")).await?;
-    let pkg = assets.into_iter().next().map(|a| a.binary.package).ok_or_else(|| anyhow!("No Java {major} download is available for this computer"))?;
+    let pkg = assets.into_iter().next().map(|a| a.binary.package).ok_or_else(|| err_tr!("java.noDownload", "No Java {major} download is available for this computer", major = major))?;
 
     let archive = crate::game::mojang::join_rel(&paths::cache(), &pkg.name);
-    task.update(format!("Downloading Java {major}…"), None);
+    task.update(tr!("java.downloading", "Downloading Java {major}…", major = major), None);
     download_file(&DownloadItem::new(pkg.link.clone(), &archive).hash(Some(Hash::sha256(pkg.checksum.clone()))).size(Some(pkg.size))).await?;
 
-    task.update(format!("Unpacking Java {major}…"), None);
+    task.update(tr!("java.unpacking", "Unpacking Java {major}…", major = major), None);
     let staging = paths::java().join(format!(".staging-{major}"));
     let target = paths::java().join(format!("java-{major}"));
     let _ = tokio::fs::remove_dir_all(&staging).await;
@@ -227,7 +228,7 @@ pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall
     } else {
         let status = hidden_command("tar").arg("-xzf").arg(&archive).arg("-C").arg(&staging).status().await?;
         if !status.success() {
-            bail!("Couldn't unpack Java {major} (tar exited with {status})");
+            bail_tr!("java.tarFailed", "Couldn't unpack Java {major} (tar exited with {status})", major = major, status = status.to_string());
         }
     }
     let mut top = None;
@@ -235,7 +236,7 @@ pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall
     if let Some(e) = rd.next_entry().await? {
         top = Some(e.path());
     }
-    let top = top.ok_or_else(|| anyhow!("The Java {major} download was empty"))?;
+    let top = top.ok_or_else(|| err_tr!("java.emptyDownload", "The Java {major} download was empty", major = major))?;
     let _ = tokio::fs::remove_dir_all(&target).await;
     tokio::fs::rename(&top, &target).await?;
     let _ = tokio::fs::remove_dir_all(&staging).await;
@@ -252,5 +253,5 @@ pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall
         Some(h) => probe(&h, true).await,
         None => None,
     };
-    installed.ok_or_else(|| anyhow!("Java {major} was downloaded but couldn't be started"))
+    installed.ok_or_else(|| err_tr!("java.wontStart", "Java {major} was downloaded but couldn't be started", major = major))
 }

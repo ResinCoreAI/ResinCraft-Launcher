@@ -86,6 +86,37 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       show: fn('screenshots:show'),
       remove: fn('screenshots:remove')
     },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login') }
+    server: {
+      list: fn('server:list'),
+      get: fn('server:get'),
+      versions: fn('server:versions'),
+      create: fn('server:create'),
+      update: fn('server:update'),
+      remove: fn('server:remove'),
+      openFolder: fn('server:openFolder'),
+      acceptEula: fn('server:acceptEula'),
+      start: fn('server:start'),
+      stop: fn('server:stop'),
+      kill: fn('server:kill'),
+      command: fn('server:command'),
+      log: fn('server:log'),
+      launchArgs: fn('server:launchArgs'),
+      properties: fn('server:properties'),
+      setProperties: fn('server:setProperties'),
+      playerList: fn('server:playerList'),
+      playerAdd: fn('server:playerAdd'),
+      playerRemove: fn('server:playerRemove'),
+      backup: fn('server:backup'),
+      addonSources: fn('server:addonSources'),
+      addons: fn('server:addons'),
+      addonSearch: fn('server:addonSearch'),
+      addonVersions: fn('server:addonVersions'),
+      addonInstall: fn('server:addonInstall'),
+      addonToggle: fn('server:addonToggle'),
+      addonRemove: fn('server:addonRemove'),
+      network: fn('server:network'),
+      play: fn('server:play')
+    },
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog') }
   } as ResinApi
 }

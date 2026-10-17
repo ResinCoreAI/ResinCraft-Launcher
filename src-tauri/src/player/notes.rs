@@ -2,9 +2,10 @@
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use super::files::{instance_root, js_len, write_atomic};
+use crate::bail_tr;
 
 async fn notes_file(id: &str) -> Result<PathBuf> {
     Ok(instance_root(id).await?.join("notes.md"))
@@ -17,7 +18,7 @@ pub async fn get_notes(id: &str) -> Result<String> {
 
 pub async fn set_notes(id: &str, text: &str) -> Result<()> {
     if js_len(text) > 1_000_000 {
-        bail!("Notes are too long");
+        bail_tr!("notes.tooLong", "Notes are too long");
     }
     let file = notes_file(id).await?;
     if text.trim().is_empty() {

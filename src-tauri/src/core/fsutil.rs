@@ -1,8 +1,10 @@
 use std::path::{Component, Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+
+use crate::err_tr;
 
 /// Reads and parses a JSON file; None if it's missing or unreadable.
 pub async fn read_json<T: DeserializeOwned>(path: &Path) -> Option<T> {
@@ -17,7 +19,7 @@ pub async fn write_json<T: Serialize + ?Sized>(path: &Path, value: &T) -> Result
     }
     let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
     tokio::fs::write(&tmp, serde_json::to_vec_pretty(value)?).await?;
-    tokio::fs::rename(&tmp, path).await.with_context(|| format!("couldn't save {}", path.display()))?;
+    tokio::fs::rename(&tmp, path).await.map_err(|_| err_tr!("fs.saveFailed", "Couldn't save {path}", path = path.display().to_string()))?;
     Ok(())
 }
 

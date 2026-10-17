@@ -3,7 +3,7 @@
 
 use std::sync::OnceLock;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use base64::Engine;
 use regex::Regex;
 use reqwest::Method;
@@ -13,7 +13,9 @@ use serde_json::{json, Value};
 use super::accounts::{https_texture, minecraft_token, sync_profile};
 use crate::core::ctx::http;
 use crate::core::net::{status_of, HttpError};
+use crate::core::text::Text;
 use crate::core::types::{CapeInfo, NameChange, PlayerProfile, SkinInfo, SkinUpload};
+use crate::{bail_tr, err_tr, tr};
 
 const API: &str = "https://api.minecraftservices.com/minecraft/profile";
 /// Real skins are a few KB; anything this big isn't one.
@@ -68,7 +70,7 @@ async fn send(account_id: &str, req: &Req) -> Result<Value> {
         r => r,
     }
     .map_err(|e| match e.downcast_ref::<HttpError>() {
-        Some(h) => anyhow!(friendly_error(req.op, h.status, &h.body)),
+        Some(h) => friendly_error(req.op, h.status, &h.body).into(),
         None => e,
     })
 }
@@ -80,7 +82,7 @@ async fn send_once(token: &str, req: &Req) -> Result<Value> {
         Body::Json(v) => b.json(v),
         Body::Multipart { boundary, bytes } => b.header("Content-Type", format!("multipart/form-data; boundary={boundary}")).body(bytes.clone()),
     };
-    let res = b.send().await.map_err(|_| anyhow!("Couldn't reach Minecraft services. Check your internet connection, then try again."))?;
+    let res = b.send().await.map_err(|_| err_tr!("profile.offline", "Couldn't reach Minecraft services. Check your internet connection, then try again."))?;
     let status = res.status();
     let text = res.text().await.unwrap_or_default();
     if !status.is_success() {
@@ -89,32 +91,32 @@ async fn send_once(token: &str, req: &Req) -> Result<Value> {
     if text.trim().is_empty() {
         return Ok(Value::Null);
     }
-    serde_json::from_str(&text).map_err(|_| anyhow!("Minecraft services sent a response ResinCraft couldn't read. Try again in a moment."))
+    serde_json::from_str(&text).map_err(|_| err_tr!("profile.badResponse", "Minecraft services sent a response ResinCraft couldn't read. Try again in a moment."))
 }
 
 /// Turns a Minecraft services error into something a player can act on.
-fn friendly_error(op: Op, status: u16, body: &str) -> String {
+fn friendly_error(op: Op, status: u16, body: &str) -> Text {
     let v: Value = serde_json::from_str(body).unwrap_or(Value::Null);
     let detail = v.pointer("/details/status").and_then(Value::as_str);
     let message = v.get("errorMessage").and_then(Value::as_str).map(str::trim).filter(|m| !m.is_empty());
     match (op, status) {
-        (_, 401) => "Your Minecraft sign-in has expired. Remove this account and sign in again.".into(),
-        (_, 429) => "Minecraft is limiting requests from this account right now. Wait a minute, then try again.".into(),
-        (_, s) if s >= 500 => "Minecraft services aren't responding right now. Try again in a few minutes.".into(),
-        (Op::Name, 400) => "That name isn't valid. Names are 3–16 characters: letters, numbers and _.".into(),
+        (_, 401) => tr!("profile.expired", "Your Minecraft sign-in has expired. Remove this account and sign in again."),
+        (_, 429) => tr!("profile.rateLimited", "Minecraft is limiting requests from this account right now. Wait a minute, then try again."),
+        (_, s) if s >= 500 => tr!("profile.down", "Minecraft services aren't responding right now. Try again in a few minutes."),
+        (Op::Name, 400) => tr!("profile.name.invalid", "That name isn't valid. Names are 3–16 characters: letters, numbers and _."),
         (Op::Name, 403 | 409) => match detail {
-            Some("DUPLICATE") => "That name is already taken. Try a different one.".into(),
-            Some("NOT_ALLOWED") => "Mojang doesn't allow that name. Try a different one.".into(),
-            _ => "You can't change your name right now. Minecraft allows one change every 30 days.".into(),
+            Some("DUPLICATE") => tr!("profile.name.taken", "That name is already taken. Try a different one."),
+            Some("NOT_ALLOWED") => tr!("profile.name.notAllowed", "Mojang doesn't allow that name. Try a different one."),
+            _ => tr!("profile.name.cooldown", "You can't change your name right now. Minecraft allows one change every 30 days."),
         },
         (Op::Skin, 400) => match message {
-            Some(m) => format!("Minecraft didn't accept this skin: {m}"),
-            None => "Minecraft didn't accept this skin. Use a 64×64 or 64×32 PNG, or a direct link to one.".into(),
+            Some(m) => tr!("profile.skin.rejectedBecause", "Minecraft didn't accept this skin: {reason}", reason = m),
+            None => tr!("profile.skin.rejected", "Minecraft didn't accept this skin. Use a 64×64 or 64×32 PNG, or a direct link to one."),
         },
-        (Op::Cape, 400 | 404) => "This account doesn't own that cape.".into(),
-        (_, 404) => "This Microsoft account doesn't own Minecraft: Java Edition.".into(),
-        (_, 403) => "Minecraft refused this change for this account.".into(),
-        _ => format!("Minecraft services returned an error (HTTP {status}). Try again later."),
+        (Op::Cape, 400 | 404) => tr!("profile.cape.notOwned", "This account doesn't own that cape."),
+        (_, 404) => tr!("accounts.noMinecraft", "This Microsoft account doesn't own Minecraft: Java Edition."),
+        (_, 403) => tr!("profile.refused", "Minecraft refused this change for this account."),
+        _ => tr!("profile.httpError", "Minecraft services returned an error (HTTP {status}). Try again later.", status = status.to_string()),
     }
 }
 
@@ -145,7 +147,7 @@ struct RawProfile {
 }
 
 fn parse_profile(v: Value, name_change: Option<NameChange>) -> Result<PlayerProfile> {
-    let raw: RawProfile = serde_json::from_value(v).map_err(|_| anyhow!("Minecraft services sent a profile ResinCraft couldn't read."))?;
+    let raw: RawProfile = serde_json::from_value(v).map_err(|_| err_tr!("profile.badProfile", "Minecraft services sent a profile ResinCraft couldn't read."))?;
     let skin = raw.skins.iter().find(|s| s.state == "ACTIVE" && !s.url.is_empty()).map(|s| SkinInfo {
         url: https_texture(&s.url),
         variant: if s.variant.as_deref().is_some_and(|v| v.eq_ignore_ascii_case("slim")) { "slim" } else { "classic" }.into(),
@@ -170,7 +172,7 @@ fn parse_name_status(v: &Value) -> Result<&'static str> {
         Some("AVAILABLE") => "available",
         Some("DUPLICATE") => "taken",
         Some("NOT_ALLOWED") => "not_allowed",
-        _ => bail!("Couldn't check that name right now. Try again in a moment."),
+        _ => bail_tr!("profile.name.checkFailed", "Couldn't check that name right now. Try again in a moment."),
     })
 }
 
@@ -183,7 +185,7 @@ fn valid_name(name: &str) -> bool {
 
 fn check_name(name: &str) -> Result<()> {
     if !valid_name(name) {
-        bail!("Names are 3–16 characters: letters, numbers and _.");
+        bail_tr!("profile.name.rules", "Names are 3–16 characters: letters, numbers and _.");
     }
     Ok(())
 }
@@ -202,14 +204,14 @@ fn png_size(bytes: &[u8]) -> Option<(u32, u32)> {
 /// Decodes and checks an uploaded skin: base64 (or a data: URL) of a 64×64 or 64×32 PNG.
 fn decode_skin_png(data: &str) -> Result<Vec<u8>> {
     let b64 = data.split_once(";base64,").map_or(data, |(_, rest)| rest).trim();
-    let bytes = base64::engine::general_purpose::STANDARD.decode(b64).map_err(|_| anyhow!("That file couldn't be read as an image."))?;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(b64).map_err(|_| err_tr!("profile.skin.unreadable", "That file couldn't be read as an image."))?;
     if bytes.len() > MAX_PNG {
-        bail!("That file is too big to be a skin. Skins are small 64×64 PNG images.");
+        bail_tr!("profile.skin.tooBig", "That file is too big to be a skin. Skins are small 64×64 PNG images.");
     }
     match png_size(&bytes) {
         Some((64, 64 | 32)) => Ok(bytes),
-        Some((w, h)) => bail!("Skins must be 64×64 or 64×32 pixels. This image is {w}×{h}."),
-        None => bail!("Skins must be PNG images."),
+        Some((w, h)) => bail_tr!("profile.skin.badSize", "Skins must be 64×64 or 64×32 pixels. This image is {width}×{height}.", width = w, height = h),
+        None => bail_tr!("profile.skin.notPng", "Skins must be PNG images."),
     }
 }
 
@@ -217,7 +219,7 @@ fn check_variant(v: &str) -> Result<&'static str> {
     match v {
         "classic" => Ok("classic"),
         "slim" => Ok("slim"),
-        _ => bail!("Choose Classic or Slim arms."),
+        _ => bail_tr!("profile.skin.badVariant", "Choose Classic or Slim arms."),
     }
 }
 
@@ -239,10 +241,10 @@ fn skin_request(upload: &SkinUpload, boundary: &str) -> Result<Req> {
     }
     let url = upload.url.as_deref().map(str::trim).unwrap_or_default();
     if url.is_empty() {
-        bail!("Choose a skin file or paste a link to one.");
+        bail_tr!("profile.skin.missing", "Choose a skin file or paste a link to one.");
     }
     if !(url.starts_with("https://") || url.starts_with("http://")) || url.contains(char::is_whitespace) {
-        bail!("That doesn't look like a web link. Paste a direct link to a skin PNG (https://…).");
+        bail_tr!("profile.skin.badLink", "That doesn't look like a web link. Paste a direct link to a skin PNG (https://…).");
     }
     Ok(req.json(json!({ "variant": variant, "url": url })))
 }
@@ -296,7 +298,7 @@ pub async fn reset_skin(account_id: &str) -> Result<PlayerProfile> {
 
 pub async fn set_cape(account_id: &str, cape_id: &str) -> Result<PlayerProfile> {
     if cape_id.trim().is_empty() {
-        bail!("Choose a cape first.");
+        bail_tr!("profile.cape.missing", "Choose a cape first.");
     }
     after_change(account_id, send(account_id, &cape_request(Some(cape_id))).await?).await
 }
@@ -321,8 +323,12 @@ pub async fn change_name(account_id: &str, name: &str) -> Result<PlayerProfile> 
     // Mojang answers a name change during the cooldown with a vague 403, so check first and say why.
     if let Some(NameChange { allowed: false, changed_at }) = name_change(account_id).await {
         match changed_at.as_deref().and_then(|d| d.get(..10)) {
-            Some(day) => bail!("You can't change your name yet. Minecraft allows one change every 30 days, and you last changed it on {day}."),
-            None => bail!("You can't change your name yet. Minecraft allows one change every 30 days."),
+            Some(day) => bail_tr!(
+                "profile.name.cooldownSince",
+                "You can't change your name yet. Minecraft allows one change every 30 days, and you last changed it on {date}.",
+                date = day
+            ),
+            None => bail_tr!("profile.name.cooldownYet", "You can't change your name yet. Minecraft allows one change every 30 days."),
         }
     }
     let v = send(account_id, &Req::new(Op::Name, Method::PUT, name_url(name))).await?;
@@ -449,16 +455,16 @@ mod tests {
     #[test]
     fn explains_errors() {
         let dup = r#"{"path":"/minecraft/profile/name/Notch","errorType":"FORBIDDEN","details":{"status":"DUPLICATE"}}"#;
-        assert!(friendly_error(Op::Name, 403, dup).contains("already taken"));
-        assert!(friendly_error(Op::Name, 403, r#"{"details":{"status":"NOT_ALLOWED"}}"#).contains("doesn't allow"));
-        assert!(friendly_error(Op::Name, 403, "").contains("30 days"));
-        assert!(friendly_error(Op::Name, 400, "").contains("3–16"));
-        assert!(friendly_error(Op::Skin, 400, r#"{"errorMessage":"Could not validate image data."}"#).ends_with("Could not validate image data."));
-        assert!(friendly_error(Op::Skin, 400, "<html>").contains("64×64"));
-        assert!(friendly_error(Op::Cape, 400, "").contains("doesn't own that cape"));
-        assert!(friendly_error(Op::Profile, 404, "").contains("doesn't own Minecraft"));
-        assert!(friendly_error(Op::Skin, 401, "").contains("sign in again"));
-        assert!(friendly_error(Op::Skin, 429, "").contains("Wait a minute"));
-        assert!(friendly_error(Op::Cape, 503, "").contains("aren't responding"));
+        assert!(friendly_error(Op::Name, 403, dup).text.contains("already taken"));
+        assert!(friendly_error(Op::Name, 403, r#"{"details":{"status":"NOT_ALLOWED"}}"#).text.contains("doesn't allow"));
+        assert!(friendly_error(Op::Name, 403, "").text.contains("30 days"));
+        assert!(friendly_error(Op::Name, 400, "").text.contains("3–16"));
+        assert!(friendly_error(Op::Skin, 400, r#"{"errorMessage":"Could not validate image data."}"#).text.ends_with("Could not validate image data."));
+        assert!(friendly_error(Op::Skin, 400, "<html>").text.contains("64×64"));
+        assert!(friendly_error(Op::Cape, 400, "").text.contains("doesn't own that cape"));
+        assert!(friendly_error(Op::Profile, 404, "").text.contains("doesn't own Minecraft"));
+        assert!(friendly_error(Op::Skin, 401, "").text.contains("sign in again"));
+        assert!(friendly_error(Op::Skin, 429, "").text.contains("Wait a minute"));
+        assert!(friendly_error(Op::Cape, 503, "").text.contains("aren't responding"));
     }
 }

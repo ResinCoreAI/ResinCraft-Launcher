@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { buildApi } from '@shared/bridge'
 import type { ResinApi } from '@shared/types'
+import { engineError } from './i18n'
 
 /** True when running inside the Tauri shell. */
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
@@ -13,8 +14,8 @@ export function tauriApi(): ResinApi {
       try {
         return await invoke('ipc', { channel, args })
       } catch (e) {
-        // Rust errors arrive as plain strings; turn them into Errors so callers can read `.message`.
-        throw new Error(typeof e === 'string' ? e : ((e as Error)?.message ?? String(e)))
+        // Engine errors arrive as {message, key?, params?}: shown in the player's language when they have a key.
+        throw engineError(e)
       }
     },
     (event) => (cb) => {

@@ -4,7 +4,7 @@ import type { GameMode, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes, timeAgo } from '../util'
-import { currentLanguage, rich, t, type Key } from '../i18n'
+import { currentLanguage, rich, t, tx, type Key } from '../i18n'
 import { ConfirmModal, Empty, Menu, Modal } from './ui'
 import '../instance-tabs.css'
 
@@ -136,7 +136,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
                 <div className="it-meta">
                   {w.error ? (
                     <span className="it-warn">
-                      <AlertTriangle /> {w.error}
+                      <AlertTriangle /> {tx(w.errorText, w.error)}
                     </span>
                   ) : (
                     <>

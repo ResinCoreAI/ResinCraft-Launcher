@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use futures::future::BoxFuture;
 use serde::Deserialize;
 
@@ -15,6 +15,7 @@ use crate::core::fsutil::{read_json, write_json};
 use crate::core::net::{fetch_json, HttpError};
 use crate::core::paths;
 use crate::core::types::{LoaderType, LoaderVersion};
+use crate::{bail_tr, err_tr};
 
 use super::mojang::{get_vanilla_version, merge_versions, VersionJson};
 
@@ -54,7 +55,11 @@ pub async fn loader_versions(loader: LoaderType, mc_version: &str) -> Result<Vec
         LoaderType::Forge => forge_versions(mc_version).await,
         LoaderType::Neoforge => neoforge_versions(mc_version).await,
         LoaderType::Fabric | LoaderType::Quilt => {
-            let list: Vec<MetaEntry> = fetch_json(&format!("{}/versions/loader/{}", meta(loader), enc(mc_version))).await?;
+            let mut list: Vec<MetaEntry> = fetch_json(&format!("{}/versions/loader/{}", meta(loader), enc(mc_version))).await?;
+            // Quilt's meta isn't sorted (e.g. 0.20.0-beta.9 comes before 0.30.1); list newest first like Fabric's.
+            if loader == LoaderType::Quilt {
+                list.sort_by(|a, b| compare_versions(&b.loader.version, &a.loader.version));
+            }
             let pre = prerelease_re();
             Ok(list
                 .into_iter()
@@ -69,7 +74,11 @@ pub async fn loader_versions(loader: LoaderType, mc_version: &str) -> Result<Vec
 }
 
 pub(crate) fn legacy_forge_error(mc: &str) -> anyhow::Error {
-    anyhow!("ResinCraft supports Forge for Minecraft 1.13 and newer. Minecraft {mc} uses an older Forge installer that isn't supported yet.")
+    err_tr!(
+        "loader.legacyForge",
+        "ResinCraft supports Forge for Minecraft 1.13 and newer. Minecraft {mc} uses an older Forge installer that isn't supported yet.",
+        mc = mc
+    )
 }
 
 /// Newest stable loader version for a game version.
@@ -81,7 +90,7 @@ pub async fn latest_loader(loader: LoaderType, mc_version: &str) -> Result<Strin
     let pick = versions.iter().find(|v| v.stable).or(versions.first());
     match pick {
         Some(v) => Ok(v.version.clone()),
-        None => bail!("{} isn't available for Minecraft {mc_version} yet", loader.label()),
+        None => bail_tr!("loader.notAvailable", "{loader} isn't available for Minecraft {mc} yet", loader = loader.label(), mc = mc_version),
     }
 }
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, CheckCircle2, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
 import type { AccountView, Instance } from '@shared/types'
 import { useInstanceTask, useStore } from '../store'
-import { t } from '../i18n'
+import { t, tx } from '../i18n'
 
 /** The ResinCraft mark: a resin drop holding a block, with a pixel "R" on its side. Same art as resources/logo.svg. */
 export function Logo({ className }: { className?: string }) {
@@ -161,7 +162,9 @@ export function Modal({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
-  return (
+  // Rendered into <body>: a page's entrance animation uses a transform, which would otherwise
+  // make this fixed backdrop cover (and centre within) the page instead of the window.
+  return createPortal(
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal aria-label={title}>
         <div className="modal-head">
@@ -176,7 +179,8 @@ export function Modal({
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -321,10 +325,10 @@ export function Dock() {
             ) : (
               <Loader2 className="spin" />
             )}
-            <span className="grow ellipsis">{task.title}</span>
+            <span className="grow ellipsis">{tx(task.titleText, task.title)}</span>
             {task.progress != null && task.state === 'running' && <span className="faint">{Math.round(task.progress * 100)}%</span>}
           </div>
-          <div className="detail ellipsis">{task.state === 'error' ? task.error : (task.detail ?? t('common.working'))}</div>
+          <div className="detail ellipsis">{task.state === 'error' ? tx(task.errorText, task.error) : tx(task.detailText, task.detail) || t('common.working')}</div>
           {task.state === 'running' && (
             <div className={`bar ${task.progress == null ? 'indeterminate' : ''}`}>
               <i style={{ width: `${(task.progress ?? 0) * 100}%` }} />

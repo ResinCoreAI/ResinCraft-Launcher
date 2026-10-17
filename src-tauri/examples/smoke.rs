@@ -52,7 +52,7 @@ async fn run() -> anyhow::Result<bool> {
         None => mojang::list_versions().await?.into_iter().find(|v| v.kind == "release").map(|v| v.id).unwrap_or_default(),
     };
     let inst = instances::create(
-        NewInstance { name: format!("Smoke {mc} {}", loader.as_str()), mc_version: mc.clone(), loader, loader_version: argv.get(2).cloned(), color: None },
+        NewInstance { name: format!("Smoke {mc} {}", loader.as_str()), mc_version: mc.clone(), loader, loader_version: argv.get(2).cloned(), color: None, group: None },
         |_| {},
     )
     .await?;

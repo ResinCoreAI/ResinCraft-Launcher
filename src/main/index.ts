@@ -43,7 +43,11 @@ function createWindow(): void {
       sandbox: true
     }
   })
-  win.once('ready-to-show', () => win?.show())
+  win.once('ready-to-show', () => {
+    // Start maximised: fills the screen but keeps the taskbar (not fullscreen).
+    win?.maximize()
+    win?.show()
+  })
   win.on('closed', () => (win = null))
 
   // Links open in the user's browser, never inside the launcher.

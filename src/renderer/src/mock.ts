@@ -1,9 +1,12 @@
 // A fake backend so the UI can be designed and previewed in a normal browser (npm run dev, then open the Vite URL).
 import type { AccountView, ContentItem, Instance, McVersion, ProjectHit, ResinApi, Settings } from '@shared/types'
 import { mockInstanceTabs } from './mock-instance-tabs'
+import { mockEngine } from './mock-engine'
 import { mockProfile } from './mock-profile'
+import { mockServers } from './mock-servers'
 
 export function mockApi(): ResinApi {
+  const servers = mockServers()
   const now = Date.now()
   let instances: Instance[] = [
     {
@@ -19,6 +22,7 @@ export function mockApi(): ResinApi {
     },
     {
       id: 'create',
+      group: 'Modpacks',
       name: 'Tech & Automation',
       mcVersion: '1.20.1',
       loader: 'quilt',
@@ -31,6 +35,7 @@ export function mockApi(): ResinApi {
     { id: 'vanilla', name: 'Vanilla Latest', mcVersion: '26.3', loader: 'vanilla', color: '#b26bff', createdAt: now - 5e8, playtime: 0 },
     {
       id: 'skyblock',
+      group: 'Modpacks',
       name: 'Skyblock Adventures',
       mcVersion: '1.20.4',
       loader: 'fabric',
@@ -145,13 +150,14 @@ export function mockApi(): ResinApi {
         return inst
       },
       update: async (id, p) => {
-        instances = instances.map((i) => (i.id === id ? { ...i, ...p } : i))
+        // `group: null` means Ungrouped.
+        instances = instances.map((i) => (i.id === id ? { ...i, ...p, group: p.group === null ? undefined : (p.group ?? i.group) } : i))
         return instances.find((i) => i.id === id)!
       },
       duplicate: async (id) => instances.find((i) => i.id === id)!,
       remove: async (id) => void (instances = instances.filter((i) => i.id !== id)),
       openFolder: async () => {},
-      launch: () => wait(undefined, 1500),
+      launch: (id) => mockEngine.launch(instances.find((i) => i.id === id), accounts.length > 0),
       kill: async () => {},
       running: () => wait([])
     },
@@ -236,6 +242,7 @@ export function mockApi(): ResinApi {
         )
     },
     ...mockInstanceTabs(),
-    on: { task: noop, game: noop, log: noop, login: noop }
+    server: servers.server,
+    on: { task: mockEngine.onTask, game: noop, log: noop, login: noop, server: servers.onServer, serverLog: servers.onServerLog }
   }
 }

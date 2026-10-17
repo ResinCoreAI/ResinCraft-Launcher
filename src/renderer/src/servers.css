@@ -1,0 +1,469 @@
+/* Server hosting page. Theme variables only; flat surfaces, 1px rules, small corners.
+   purple = clickable · cyan = data (versions, ports, addresses) · green = running. */
+
+.sv-icon {
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.sv-icon img,
+.sv-icon .block-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---------- State ---------- */
+.sv-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font: 600 12px var(--font-display);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.sv-state i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.sv-state.running {
+  color: var(--success);
+  border-color: transparent;
+  background: var(--success-soft);
+}
+.sv-state.running i {
+  background: var(--success);
+}
+.sv-state.starting i,
+.sv-state.stopping i {
+  background: var(--warning);
+  animation: sv-blink 1s steps(2, start) infinite;
+}
+.sv-state.crashed {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: transparent;
+}
+.sv-state.crashed i {
+  background: var(--danger);
+}
+@keyframes sv-blink {
+  to {
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-state i {
+    animation: none !important;
+  }
+}
+
+.sv-stop {
+  color: var(--danger);
+}
+.sv-stop svg {
+  fill: currentColor;
+}
+
+/* ---------- List ---------- */
+.sv-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.sv-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.sv-row:last-child {
+  border-bottom: 0;
+}
+.sv-row:hover {
+  background: var(--surface-2);
+}
+.sv-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.sv-row.running {
+  box-shadow: inset 3px 0 0 var(--success);
+}
+.sv-row .name {
+  font: 600 15px var(--font-display);
+}
+.sv-row .sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+.sv-row .sub .data {
+  color: var(--data);
+  font-family: var(--mono);
+}
+.sv-players {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 500 12.5px var(--mono);
+  color: var(--data);
+}
+.sv-players svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- Create ---------- */
+.sv-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+.sv-type {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+.sv-type:hover {
+  border-color: var(--border-strong);
+}
+.sv-type.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.sv-type b {
+  font: 600 13.5px var(--font-display);
+}
+.sv-type span {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.35;
+}
+
+.sv-pick-list {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.sv-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+.sv-pick:last-child {
+  border-bottom: 0;
+}
+.sv-pick:hover {
+  background: var(--surface-2);
+}
+.sv-pick.on {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.sv-pick .ico {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-3);
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+.sv-pick .ico img,
+.sv-pick .ico .block-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sv-pick .grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sv-pick .grow b {
+  font-size: 13px;
+}
+.sv-pick .grow span {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.sv-pick > svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------- Add-ons ---------- */
+.sv-results {
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 2px;
+}
+.sv-results .result .ico {
+  position: relative;
+}
+.sv-results .result .ico img {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-3);
+}
+.sv-src {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  font: 600 10.5px var(--font-display);
+  color: var(--text-dim);
+  vertical-align: 2px;
+}
+.sv-src.curseforge {
+  color: var(--cf);
+  border-color: rgba(241, 100, 54, 0.45);
+}
+.sv-src.modrinth {
+  color: var(--success);
+  border-color: var(--success-soft);
+}
+.sv-src.hangar,
+.sv-src.spigot {
+  color: var(--data);
+}
+
+/* ---------- Console ---------- */
+.sv-connect {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 14px;
+}
+.sv-connect .cell {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px;
+  border-right: 1px solid var(--border);
+  min-width: 0;
+}
+.sv-connect .cell:last-child {
+  border-right: 0;
+}
+.sv-connect .label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 12px var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.sv-connect .label svg {
+  width: 14px;
+  height: 14px;
+}
+.sv-connect .hint {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  line-height: 1.4;
+}
+.sv-connect .hint svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  margin-top: 2px;
+}
+.sv-connect .hint.ok {
+  color: var(--success);
+}
+.sv-connect .hint.bad {
+  color: var(--danger);
+}
+.play-here {
+  display: flex;
+  gap: 6px;
+}
+.play-here .select {
+  flex: 1;
+  min-width: 0;
+}
+.sv-address {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--data);
+  cursor: pointer;
+  font-size: 13px;
+}
+.sv-address span {
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.sv-address svg {
+  width: 13px;
+  height: 13px;
+  color: var(--text-faint);
+  flex: none;
+}
+.sv-address:hover {
+  border-color: var(--accent);
+}
+.sv-address:hover svg {
+  color: var(--accent);
+}
+
+.sv-console {
+  height: calc(100vh - 560px);
+  min-height: 260px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.sv-cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--surface);
+}
+.sv-cmd .input {
+  flex: 1;
+  font-size: 13px;
+}
+
+/* ---------- Players / properties ---------- */
+.sv-add-row {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+.sv-add-row .input {
+  flex: 1;
+  max-width: 340px;
+}
+.sv-savebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sv-num {
+  width: 110px;
+}
+.sv-props {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 0 18px;
+  padding: 6px 16px;
+}
+.sv-prop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.sv-prop .input {
+  height: 30px;
+  font-size: 12px;
+}
+.sv-agree {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 11px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.sv-agree input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+.sv-agree a {
+  color: var(--accent);
+}
+.sv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sv-command {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--data);
+  font: 11.5px/1.55 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+@media (max-width: 960px) {
+  .sv-connect {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sv-connect .cell {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .sv-connect .cell:last-child {
+    border-bottom: 0;
+  }
+}

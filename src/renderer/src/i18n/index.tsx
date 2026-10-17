@@ -6,13 +6,21 @@
 //
 // Strings use {name} placeholders. A plural message is an object of Intl plural categories ({ one, other, … }).
 import { Fragment, useSyncExternalStore, type ReactNode } from 'react'
+import type { EngineText } from '@shared/types'
 import en from './en'
 
 export type Key = keyof typeof en
 export type Plural = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string }
 export type Msg = string | Plural
-/** A complete translation: every English key must be present (tsc checks this). */
-export type Dict = Record<Key, Msg>
+/** Strings that come from the Rust engine (en/engine.ts, generated). */
+export type EngineKey = Extract<Key, `engine.${string}`>
+/**
+ * A translation: every UI key must be present (tsc checks this). Engine keys may be missing, so a new engine
+ * message never breaks the build; it shows in English until translated (tools/check-i18n.ts lists them).
+ */
+export type Dict = Record<Exclude<Key, EngineKey | NewKey>, Msg> & Partial<Record<EngineKey | NewKey, Msg>>
+/** UI areas added after the last translation pass (en/servers.ts); they show in English until translated. */
+export type NewKey = Extract<Key, `servers.${string}`>
 export type Params = Record<string, string | number | undefined>
 
 export interface Language {
@@ -153,6 +161,40 @@ export function t(key: Key, params?: Params): string {
     if (v == null) return m
     return typeof v === 'number' ? numbers.format(v) : v
   })
+}
+
+function isEngineText(v: unknown): v is EngineText {
+  return !!v && typeof v === 'object' && typeof (v as EngineText).text === 'string' && typeof (v as EngineText).key === 'string'
+}
+
+/** Shows an engine message in the UI language, falling back to its English text (or `fallback` when there is none). */
+export function tx(text: EngineText | null | undefined, fallback = ''): string {
+  if (!text) return fallback
+  const key = `engine.${text.key}`
+  if (!text.key || !(key in en)) return text.text
+  const params: Params = {}
+  for (const [k, v] of Object.entries(text.params ?? {})) params[k] = isEngineText(v) ? tx(v) : typeof v === 'number' ? v : String(v ?? '')
+  return t(key as Key, params)
+}
+
+/** An engine error in the UI language. `key` keeps the engine's message id for code that reacts to one error. */
+export class EngineError extends Error {
+  key?: string
+  constructor(message: string, key?: string) {
+    super(message)
+    this.key = key
+  }
+}
+
+/** Turns whatever an engine call rejected with ({message, key, params}, a string, an Error) into an Error. */
+export function engineError(e: unknown): EngineError {
+  if (e instanceof EngineError) return e
+  if (typeof e === 'string') return new EngineError(e)
+  if (e && typeof e === 'object' && typeof (e as { message?: unknown }).message === 'string') {
+    const { message, key, params } = e as { message: string; key?: string; params?: Record<string, unknown> }
+    return new EngineError(key ? tx({ key, text: message, params }) : message, key)
+  }
+  return new EngineError(String(e))
 }
 
 /**

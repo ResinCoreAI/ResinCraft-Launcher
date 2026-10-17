@@ -3,14 +3,16 @@
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Result};
 use base64::Engine;
 
 use super::files::{child_path, folder_size, game_subdir, js_len, unique_name, write_atomic};
 use super::nbt::{self, compound, long, num, str, Compound, NbtFile, Tag};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
+use crate::core::text::Text;
 use crate::core::types::WorldInfo;
+use crate::{bail_tr, err_tr, tr};
 
 const GAME_MODES: [&str; 4] = ["survival", "creative", "adventure", "spectator"];
 
@@ -23,9 +25,10 @@ pub async fn world_path(id: &str, folder: &str) -> Result<PathBuf> {
     child_path(&saves_dir(id).await?, folder)
 }
 
-fn assert_stopped(id: &str, action: &str) -> Result<()> {
+/// `message` says what to close the game for, e.g. "Close the game before you rename this world".
+fn assert_stopped(id: &str, message: Text) -> Result<()> {
     if crate::game::running_ids().iter().any(|r| r == id) {
-        bail!("Close the game before you {action}");
+        return Err(message.into());
     }
     Ok(())
 }
@@ -72,6 +75,7 @@ fn describe_level(data: &Compound, folder: &str, size: u64, icon: Option<String>
         icon,
         size,
         error: None,
+        error_text: None,
     }
 }
 
@@ -83,13 +87,14 @@ async fn read_world(dir: &Path, folder: &str) -> WorldInfo {
             .map(|b| format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(b)))
     });
     let described = read_level(dir).await.and_then(|level| {
-        let data = compound(level.root.get("Data")).ok_or_else(|| anyhow!("level.dat has no Data section"))?;
+        let data = compound(level.root.get("Data")).ok_or_else(|| err_tr!("worlds.noDataSection", "level.dat has no Data section"))?;
         Ok(describe_level(data, folder, size, icon.clone()))
     });
     match described {
         Ok(info) => info,
         Err(e) => {
             let missing = e.downcast_ref::<std::io::Error>().is_some_and(|io| io.kind() == ErrorKind::NotFound);
+            let error = if missing { tr!("worlds.noLevelDat", "No level.dat found") } else { tr!("worlds.levelUnreadable", "level.dat could not be read") };
             WorldInfo {
                 folder: folder.to_string(),
                 name: folder.to_string(),
@@ -101,7 +106,8 @@ async fn read_world(dir: &Path, folder: &str) -> WorldInfo {
                 seed: None,
                 icon,
                 size,
-                error: Some(if missing { "No level.dat found" } else { "level.dat could not be read" }.to_string()),
+                error: Some(error.text.clone()),
+                error_text: Some(error),
             }
         }
     }
@@ -134,22 +140,22 @@ pub async fn list_worlds(id: &str) -> Result<Vec<WorldInfo>> {
 pub async fn rename_world(id: &str, folder: &str, name: &str) -> Result<()> {
     let name = name.trim();
     if name.is_empty() {
-        bail!("Enter a name for the world");
+        bail_tr!("worlds.nameMissing", "Enter a name for the world");
     }
     if js_len(name) > 100 {
-        bail!("That name is too long");
+        bail_tr!("worlds.nameTooLong", "That name is too long");
     }
-    assert_stopped(id, "rename this world")?;
+    assert_stopped(id, tr!("worlds.closeToRename", "Close the game before you rename this world"))?;
     let dir = world_path(id, folder).await?;
     let file = dir.join("level.dat");
     let mut level = nbt::parse(&tokio::fs::read(&file).await?)?;
-    let Some(Tag::Compound(data)) = level.root.get_mut("Data") else { bail!("level.dat has no Data section") };
+    let Some(Tag::Compound(data)) = level.root.get_mut("Data") else { bail_tr!("worlds.noDataSection", "level.dat has no Data section") };
     data.set("LevelName", Tag::String(name.to_string()));
     let out = nbt::write(&level)?;
     // Sanity check before touching the real file: what we wrote must read back.
     let check = nbt::parse(&out)?;
     if str(compound(check.root.get("Data")).and_then(|d| d.get("LevelName"))) != Some(name) {
-        bail!("Could not write level.dat");
+        bail_tr!("worlds.writeFailed", "Could not write level.dat");
     }
     tokio::fs::copy(&file, dir.join("level.dat_old")).await?;
     write_atomic(&file, &out).await
@@ -160,7 +166,7 @@ fn stamp() -> String {
 }
 
 /// Adds every file below `dir` to the zip under `prefix/`, skipping session.lock.
-fn zip_folder<W: std::io::Write + std::io::Seek>(zip: &mut zip::ZipWriter<W>, dir: &Path, prefix: &str) -> Result<()> {
+pub(crate) fn zip_folder<W: std::io::Write + std::io::Seek>(zip: &mut zip::ZipWriter<W>, dir: &Path, prefix: &str) -> Result<()> {
     let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated).large_file(true);
     let mut entries: Vec<_> = std::fs::read_dir(dir)?.collect::<std::io::Result<_>>()?;
     entries.sort_by_key(|e| e.file_name());
@@ -191,14 +197,14 @@ pub async fn backup_world(id: &str, folder: &str) -> Result<String> {
     let backups = game_subdir(id, "backups").await?;
     let target = backups.join(unique_name(&backups, &format!("{}_{folder}", stamp()), ".zip").await);
     let folder = folder.to_string();
-    Task::run(format!("Backing up {folder}"), Some(id.to_string()), |t| async move {
-        t.update("Compressing files…", None);
+    Task::run(tr!("worlds.backingUp", "Backing up {folder}", folder = folder), Some(id.to_string()), |t| async move {
+        t.update(tr!("worlds.compressing", "Compressing files…"), None);
         let tmp = PathBuf::from(format!("{}.part", target.display()));
         let (tmp2, t2) = (tmp.clone(), t.clone());
         let res = tokio::task::spawn_blocking(move || -> Result<()> {
             let mut zip = zip::ZipWriter::new(std::fs::File::create(&tmp2)?);
             zip_folder(&mut zip, &dir, &folder)?;
-            t2.update("Writing zip…", None);
+            t2.update(tr!("worlds.writingZip", "Writing zip…"), None);
             zip.finish()?;
             Ok(())
         })
@@ -233,15 +239,15 @@ fn base_name(p: &str) -> &str {
 
 /// Imports a world from a zip that has level.dat at its root or inside one folder.
 pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
-    assert_stopped(id, "import a world")?;
+    assert_stopped(id, tr!("worlds.closeToImport", "Close the game before you import a world"))?;
     if !zip_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
-        bail!("Choose a .zip file");
+        bail_tr!("worlds.chooseZip", "Choose a .zip file");
     }
     let saves = saves_dir(id).await?;
     let zp = zip_path.to_path_buf();
     // (index, normalised path) of every file entry.
     let entries: Vec<(usize, String)> = tokio::task::spawn_blocking(move || -> Result<Vec<(usize, String)>> {
-        let mut zip = zip::ZipArchive::new(std::fs::File::open(&zp)?).context("That file isn't a valid zip")?;
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(&zp)?).map_err(|_| err_tr!("worlds.invalidZip", "That file isn't a valid zip"))?;
         let mut out = Vec::new();
         for i in 0..zip.len() {
             let f = zip.by_index_raw(i)?;
@@ -254,7 +260,7 @@ pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
     .await??;
     let mut levels: Vec<&str> = entries.iter().map(|(_, p)| p.as_str()).filter(|p| *p == "level.dat" || p.ends_with("/level.dat")).collect();
     if levels.is_empty() {
-        bail!("That zip doesn't contain a Minecraft world (no level.dat)");
+        bail_tr!("worlds.noWorldInZip", "That zip doesn't contain a Minecraft world (no level.dat)");
     }
     // The shallowest level.dat is the world root; deeper ones belong to nested dimensions or junk.
     levels.sort_by_key(|p| p.split('/').count());
@@ -273,7 +279,7 @@ pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
         .collect();
     let zp = zip_path.to_path_buf();
 
-    Task::run(format!("Importing {folder}"), Some(id.to_string()), |t| async move {
+    Task::run(tr!("worlds.importing", "Importing {folder}", folder = folder), Some(id.to_string()), |t| async move {
         tokio::fs::create_dir(&dest).await?;
         let d = dest.clone();
         let res = tokio::task::spawn_blocking(move || -> Result<()> {
@@ -287,7 +293,7 @@ pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
                 let mut entry = zip.by_index(*i)?;
                 let mut f = std::fs::File::create(&out)?;
                 std::io::copy(&mut entry, &mut f)?;
-                t.update(format!("Extracting ({}/{n})", k + 1), Some((k + 1) as f64 / n as f64));
+                t.update(tr!("worlds.extracting", "Extracting ({done}/{total})", done = k + 1, total = n), Some((k + 1) as f64 / n as f64));
             }
             Ok(())
         })
@@ -306,7 +312,7 @@ pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
 
 /// Moves the world folder to the Recycle Bin, never a permanent delete.
 pub async fn remove_world(id: &str, folder: &str) -> Result<()> {
-    assert_stopped(id, "delete this world")?;
+    assert_stopped(id, tr!("worlds.closeToDelete", "Close the game before you delete this world"))?;
     let dir = world_path(id, folder).await?;
     tokio::fs::metadata(&dir).await?;
     crate::core::shell::trash(&dir).await

@@ -5,7 +5,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -21,10 +21,12 @@ use crate::core::instances;
 use crate::core::net::{download_all, download_file, send_json, status_of, DownloadItem, Hash};
 use crate::core::paths;
 use crate::core::settings;
+use crate::core::text::Text;
 use crate::core::types::{
     ContentItem, ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectHit, ProjectVersion, SearchQuery,
     SearchResult, UpdateRef,
 };
+use crate::{bail_tr, err_tr, tr};
 
 const API: &str = "https://api.curseforge.com/v1";
 const MINECRAFT: u32 = 432;
@@ -195,7 +197,7 @@ impl CfFile {
 async fn api_key() -> Result<String> {
     let key = settings::curseforge_key().await;
     if key.is_empty() {
-        bail!("CurseForge isn't available in this build of ResinCraft.");
+        bail_tr!("curseforge.unavailable", "CurseForge isn't available in this build of ResinCraft.");
     }
     Ok(key)
 }
@@ -205,7 +207,7 @@ async fn has_key() -> bool {
 }
 
 /// Raw response (data + pagination).
-async fn cf_raw<T: DeserializeOwned>(path: &str, body: Option<Value>) -> Result<T> {
+pub(crate) async fn cf_raw<T: DeserializeOwned>(path: &str, body: Option<Value>) -> Result<T> {
     let key = api_key().await?;
     let url = format!("{API}{path}");
     let req = match body {
@@ -213,12 +215,12 @@ async fn cf_raw<T: DeserializeOwned>(path: &str, body: Option<Value>) -> Result<
         None => http().get(&url),
     };
     match send_json(req.header("x-api-key", key)).await {
-        Err(e) if matches!(status_of(&e), Some(401 | 403)) => bail!("CurseForge rejected the API key. Check it in Settings → CurseForge."),
+        Err(e) if matches!(status_of(&e), Some(401 | 403)) => bail_tr!("curseforge.badKey", "CurseForge rejected this build's API key. Try again later, or update ResinCraft."),
         r => r,
     }
 }
 
-async fn cf<T: DeserializeOwned>(path: &str, body: Option<Value>) -> Result<T> {
+pub(crate) async fn cf<T: DeserializeOwned>(path: &str, body: Option<Value>) -> Result<T> {
     #[derive(Deserialize)]
     struct Data<T> {
         data: T,
@@ -385,14 +387,22 @@ pub struct BlockedDownloadError {
     pub pending: PendingDownload,
 }
 
+impl BlockedDownloadError {
+    fn text(&self) -> Text {
+        let p = &self.pending;
+        tr!(
+            "curseforge.blockedDownload",
+            "{name}'s author only allows downloads from the CurseForge website. Download {file} there and put it in the {folder} folder.",
+            name = p.title,
+            file = p.file_name,
+            folder = p.folder
+        )
+    }
+}
+
 impl fmt::Display for BlockedDownloadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let p = &self.pending;
-        write!(
-            f,
-            "{}'s author only allows downloads from the CurseForge website. Download {} there and put it in the {} folder.",
-            p.title, p.file_name, p.folder
-        )
+        self.text().fmt(f)
     }
 }
 impl std::error::Error for BlockedDownloadError {}
@@ -430,11 +440,11 @@ async fn install_file(inst: &Instance, kind: ContentKind, m: &CfMod, f: &CfFile,
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, version_id: Option<String>) -> Result<()> {
     let inst = instances::get(instance_id).await?;
     if kind == ContentKind::Mod && inst.loader == LoaderType::Vanilla {
-        bail!("{} is a vanilla instance. Mods need a mod loader; create a modded instance first.", inst.name);
+        bail_tr!("curseforge.vanillaInstance", "{name} is a vanilla instance. Mods need a mod loader; create a modded instance first.", name = inst.name);
     }
     let root = cf_id(project_id);
     let file_id: Option<u64> = version_id.and_then(|v| v.parse().ok());
-    Task::run("Installing from CurseForge", Some(inst.id.clone()), move |task| async move {
+    Task::run(tr!("curseforge.installing", "Installing from CurseForge"), Some(inst.id.clone()), move |task| async move {
         let mut idx = load_index(&inst.id).await;
         let mut installed: HashSet<String> = idx.values().map(|e| e.project_id.clone()).collect();
         let mut blocked: Vec<PendingDownload> = Vec::new();
@@ -446,20 +456,28 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
                     continue;
                 }
                 let m: CfMod = cf(&format!("/mods/{mod_id}"), None).await?;
-                task.update(format!("Installing {}…", m.name), None);
+                task.update(tr!("content.installingItem", "Installing {name}…", name = m.name), None);
                 let f = match fid {
                     Some(fid) => Some(cf::<CfFile>(&format!("/mods/{mod_id}/files/{fid}"), None).await?),
                     None => files(mod_id, Some(&inst), Some(kind)).await?.into_iter().next(),
                 };
                 let Some(f) = f else {
-                    let with = if kind == ContentKind::Mod { format!(" with {}", inst.loader.as_str()) } else { String::new() };
-                    bail!("{} has no file for Minecraft {}{with}", m.name, inst.mc_version);
+                    if kind == ContentKind::Mod {
+                        bail_tr!(
+                            "curseforge.noFileWithLoader",
+                            "{name} has no file for Minecraft {mc} with {loader}",
+                            name = m.name,
+                            mc = inst.mc_version,
+                            loader = inst.loader.as_str()
+                        );
+                    }
+                    bail_tr!("curseforge.noFile", "{name} has no file for Minecraft {mc}", name = m.name, mc = inst.mc_version);
                 };
                 if let Err(e) = install_file(&inst, kind, &m, &f, &mut idx).await {
                     // A blocked dependency shouldn't stop the main install; list it for the user instead.
                     match e.downcast::<BlockedDownloadError>() {
                         Ok(b) if is_dep => blocked.push(b.pending),
-                        Ok(b) => return Err(b.into()),
+                        Ok(b) => return Err(b.text().into()),
                         Err(e) => return Err(e),
                     }
                 }
@@ -682,7 +700,7 @@ fn parse_loader(id: Option<&str>) -> Result<(LoaderType, Option<String>)> {
         "neoforge" => LoaderType::Neoforge,
         "fabric" => LoaderType::Fabric,
         "quilt" => LoaderType::Quilt,
-        _ => bail!("This modpack needs {name}, which ResinCraft doesn't support yet."),
+        _ => bail_tr!("modpack.unsupportedLoader", "This modpack needs {name}, which ResinCraft doesn't support yet.", name = name),
     };
     Ok((loader, (!rest.is_empty()).then_some(rest)))
 }
@@ -702,12 +720,14 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         Some(v) => Some(cf::<CfFile>(&format!("/mods/{}/files/{v}", m.id), None).await?),
         None => files(m.id, None, None).await?.into_iter().next(),
     };
-    let pack = pack.ok_or_else(|| anyhow!("{} has no downloadable version", m.name))?;
-    let Some(url) = pack.url() else { bail!("{}'s author only allows downloads from the CurseForge website.", m.name) };
+    let pack = pack.ok_or_else(|| err_tr!("curseforge.noDownloadableVersion", "{name} has no downloadable version", name = m.name))?;
+    let Some(url) = pack.url() else {
+        bail_tr!("curseforge.packBlocked", "{name}'s author only allows downloads from the CurseForge website.", name = m.name)
+    };
 
     let archive = safe_join(&paths::cache().join("modpacks"), safe_name(&pack.file_name)?)?;
     let item = DownloadItem::new(url, &archive).size(pack.file_length);
-    Task::run(format!("Downloading {}", m.name), None, |_| async move { download_file(&item).await }).await?;
+    Task::run(tr!("modpack.downloading", "Downloading {name}", name = m.name), None, |_| async move { download_file(&item).await }).await?;
     let meta = CfPackMeta { name: Some(m.name.clone()), icon_url: m.icon(), project_id: Some(prefixed(m.id)), version_id: Some(pack.id.to_string()) };
     let res = install_cf_zip(&archive, meta).await;
     let _ = tokio::fs::remove_file(&archive).await;
@@ -718,25 +738,25 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
 pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance> {
     let a = archive.to_path_buf();
     let raw = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
-        let mut zip = open_zip(&a).map_err(|_| anyhow!("This file isn't a CurseForge modpack (it has no manifest.json)"))?;
+        let mut zip = open_zip(&a).map_err(|_| err_tr!("curseforge.notModpack", "This file isn't a CurseForge modpack (it has no manifest.json)"))?;
         read_zip_text(&mut zip, "manifest.json")
     })
     .await??;
-    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| anyhow!("This file isn't a CurseForge modpack (it has no manifest.json)"))?;
+    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| err_tr!("curseforge.notModpack", "This file isn't a CurseForge modpack (it has no manifest.json)"))?;
     let manifest: CfManifest = serde_json::from_str(&raw)?;
     let name = meta.name.clone().or(manifest.name.clone()).unwrap_or_else(|| "Imported modpack".into());
     let primary = manifest.minecraft.mod_loaders.iter().find(|l| l.primary == Some(true)).or(manifest.minecraft.mod_loaders.first());
     let (loader, loader_version) = parse_loader(primary.map(|l| l.id.as_str()))?;
     // Fail before creating anything if we can't resolve the mod list.
     if !manifest.files.is_empty() && !has_key().await {
-        bail!("Importing CurseForge modpacks isn't available in this build of ResinCraft.");
+        bail_tr!("curseforge.importUnavailable", "Importing CurseForge modpacks isn't available in this build of ResinCraft.");
     }
 
     let archive = archive.to_path_buf();
-    Task::run(format!("Installing {name}"), None, move |task| async move {
+    Task::run(tr!("modpack.installing", "Installing {name}", name = name), None, move |task| async move {
         let modpack = ModpackRef { name: name.clone(), project_id: meta.project_id.clone(), version_id: meta.version_id.clone().or(manifest.version.clone()) };
         let icon = meta.icon_url.clone();
-        let new = NewInstance { name: name.clone(), mc_version: manifest.minecraft.version.clone(), loader, loader_version, color: None };
+        let new = NewInstance { name: name.clone(), mc_version: manifest.minecraft.version.clone(), loader, loader_version, color: None, group: None };
         let inst = instances::create(new, move |i| {
             i.icon_url = icon;
             i.modpack = Some(modpack);
@@ -761,7 +781,7 @@ pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance
 async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task: &Arc<Task>) -> Result<Vec<PendingDownload>> {
     let dir = paths::game_dir(&inst.id);
     let wanted: Vec<&CfManifestFile> = manifest.files.iter().filter(|f| f.required != Some(false)).collect();
-    task.update("Looking up modpack files…", None);
+    task.update(tr!("curseforge.lookingUpFiles", "Looking up modpack files…"), None);
     let mut file_list: Vec<CfFile> = Vec::new();
     let mut mod_list: Vec<CfMod> = Vec::new();
     for chunk in wanted.chunks(500) {
@@ -799,10 +819,10 @@ async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task:
             },
         );
     }
-    download_all(items, 8, task.counter("Downloading modpack files")).await?;
+    download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
     save_index(&inst.id, &idx).await?;
 
-    task.update("Applying modpack settings…", None);
+    task.update(tr!("modpack.applyingSettings", "Applying modpack settings…"), None);
     let mut prefix = manifest.overrides.clone().unwrap_or_else(|| "overrides".into());
     if !prefix.ends_with('/') {
         prefix.push('/');

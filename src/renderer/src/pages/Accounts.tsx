@@ -5,7 +5,7 @@ import { api } from '../api'
 import { Avatar, ConfirmModal, Empty, Modal } from '../components/ui'
 import { useStore } from '../store'
 import ProfileManager from '../components/ProfileManager'
-import { rich, t } from '../i18n'
+import { rich, t, tx } from '../i18n'
 
 export default function Accounts() {
   const { accounts, refreshAccounts, toast, go, settings, info } = useStore()
@@ -66,7 +66,7 @@ export default function Accounts() {
                 <div className="file">{t(a.type === 'msa' ? 'accounts.kind.msa' : 'accounts.kind.offline')}</div>
               </div>
               {a.type === 'msa' && (
-                <button className="btn sm" title={t('accounts.manage.tip')} onClick={() => setManaging(a)}>
+                <button className="btn sm" onClick={() => setManaging(a)}>
                   <Shirt /> {t('accounts.manage')}
                 </button>
               )}
@@ -130,7 +130,7 @@ function MicrosoftLogin({ onClose }: { onClose: () => void }) {
         await refreshAccounts()
         toast(t('accounts.login.welcome', { name: e.account?.username ?? '' }))
         onClose()
-      } else setError(e.error)
+      } else setError(tx(e.errorText, e.error))
     })
     api.accounts.beginMicrosoft().then(setCode, (e) => setError((e as Error).message))
     return () => {

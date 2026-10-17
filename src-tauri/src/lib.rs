@@ -6,21 +6,24 @@
 //! - `game`: Minecraft versions, mod loaders, Java, launching
 //! - `content`: Modrinth / CurseForge / FTB / ATLauncher / Technic, modpack import & export
 //! - `player`: accounts, worlds, servers, screenshots, notes
+//! - `server`: hosting Minecraft servers on this computer
 
 pub mod app_cmds;
 pub mod content;
 pub mod core;
 pub mod game;
 pub mod player;
+pub mod server;
 
 use serde_json::Value;
 use tauri::Manager;
 
 #[tauri::command]
-async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, String> {
+async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, Value> {
     core::router::dispatch(&channel, core::Args::new(args)).await.map_err(|e| {
         eprintln!("[{channel}] {e:#}");
-        e.to_string()
+        // {message, key?, params?}: the UI shows `key` in the player's language (see core::text).
+        core::text::error_payload(&e)
     })
 }
 
@@ -36,6 +39,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![ipc])
-        .run(tauri::generate_context!())
-        .expect("error while running ResinCraft");
+        .build(tauri::generate_context!())
+        .expect("error while running ResinCraft")
+        .run(|_, event| {
+            // Hosted servers would otherwise keep running (and holding their port) after the launcher closes.
+            if let tauri::RunEvent::Exit = event {
+                tauri::async_runtime::block_on(server::runtime::shutdown_all(std::time::Duration::from_secs(20)));
+            }
+        });
 }

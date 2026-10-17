@@ -378,7 +378,7 @@ async fn main() {
     let level_dat = test_nbt(&data_dir).await;
 
     let inst = instances::create(
-        NewInstance { name: "check-player temp".into(), mc_version: "1.21.1".into(), loader: LoaderType::Vanilla, loader_version: None, color: None },
+        NewInstance { name: "check-player temp".into(), mc_version: "1.21.1".into(), loader: LoaderType::Vanilla, loader_version: None, color: None, group: None },
         |_| {},
     )
     .await

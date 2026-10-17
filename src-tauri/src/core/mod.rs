@@ -10,6 +10,7 @@ pub mod paths;
 pub mod router;
 pub mod settings;
 pub mod shell;
+pub mod text;
 pub mod types;
 
 pub use router::Args;

@@ -51,8 +51,9 @@
 .pm-panel {
   min-width: 0;
 }
-.pm-tabs {
+.tabs.pm-tabs {
   margin: 0 0 14px;
+  overflow: visible;
 }
 .pm-section {
   display: flex;

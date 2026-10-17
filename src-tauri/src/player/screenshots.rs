@@ -5,11 +5,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use base64::Engine;
 
 use super::files::{child_path, game_subdir};
 use crate::core::types::ScreenshotInfo;
+use crate::err_tr;
 
 const IMAGE_EXTS: [&str; 3] = ["png", "jpg", "jpeg"];
 const THUMB_WIDTH: u32 = 384;
@@ -61,7 +62,7 @@ struct ThumbCache {
 static THUMBS: Mutex<Option<ThumbCache>> = Mutex::new(None);
 
 fn decode(bytes: &[u8]) -> Result<image::DynamicImage> {
-    image::load_from_memory(bytes).map_err(|_| anyhow!("Could not read image"))
+    image::load_from_memory(bytes).map_err(|_| err_tr!("screenshots.unreadable", "Could not read image"))
 }
 
 /// Builds a small JPEG data URL (at most 384 px wide) from image bytes.

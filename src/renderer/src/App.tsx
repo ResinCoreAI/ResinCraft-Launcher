@@ -1,5 +1,5 @@
-import { ChevronRight, Compass, Home as HomeIcon, Layers, Settings as SettingsIcon, Users } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { ChevronRight, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Users } from 'lucide-react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Avatar, BlockArt, Dock, Logo } from './components/ui'
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
@@ -14,10 +14,14 @@ import SettingsPage from './pages/SettingsPage'
 import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
 
+// Server hosting is self-contained and fairly large; load it on first visit.
+const Servers = lazy(() => import('./pages/Servers'))
+
 const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'home', label: 'nav.home', icon: <HomeIcon /> },
   { page: 'library', label: 'nav.library', icon: <Layers /> },
   { page: 'discover', label: 'nav.discover', icon: <Compass /> },
+  { page: 'servers', label: 'servers.nav', icon: <Server /> },
   { page: 'accounts', label: 'nav.accounts', icon: <Users /> },
   { page: 'settings', label: 'nav.settings', icon: <SettingsIcon /> }
 ]
@@ -27,6 +31,7 @@ const TITLES: Record<Route['page'], Key> = {
   library: 'nav.library',
   instance: 'nav.library',
   discover: 'nav.discover',
+  servers: 'servers.nav',
   accounts: 'nav.accounts',
   settings: 'nav.settings'
 }
@@ -110,6 +115,11 @@ export default function App() {
           )}
           {route.page === 'accounts' && <Accounts />}
           {route.page === 'settings' && <SettingsPage />}
+          {route.page === 'servers' && (
+            <Suspense fallback={null}>
+              <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />
+            </Suspense>
+          )}
         </div>
       </main>
 

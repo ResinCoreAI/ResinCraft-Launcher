@@ -21,7 +21,8 @@
         "decorations": false,
         "backgroundColor": "#0a0912",
         "dragDropEnabled": true,
-        "center": true
+        "center": true,
+        "maximized": true
       }
     ],
     "security": {
@@ -30,13 +31,25 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "Puirkle",
     "copyright": "© 2026 Puirkle",
     "category": "Game",
     "shortDescription": "A modern Minecraft: Java Edition launcher",
     "longDescription": "ResinCraft Launcher by Puirkle: separate instances for every Minecraft version and modpack, mods from Modrinth, CurseForge, FTB, ATLauncher and Technic, and Java handled for you.",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-    "windows": { "nsis": { "installMode": "currentUser" } }
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
   }
 }

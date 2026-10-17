@@ -1,11 +1,12 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde_json::Value;
 
 use super::fsutil::{now_ms, read_json, slugify, write_json};
 use super::paths;
 use super::types::{Instance, LoaderType, NewInstance};
+use crate::err_tr;
 
 pub const INSTANCE_COLORS: [&str; 8] = ["#b26bff", "#22d3ee", "#39e58c", "#6d7bff", "#f472b6", "#2dd4bf", "#a3e635", "#fb7185"];
 
@@ -30,7 +31,7 @@ pub async fn list() -> Result<Vec<Instance>> {
 }
 
 pub async fn get(id: &str) -> Result<Instance> {
-    read_json(&meta_file(id)).await.ok_or_else(|| anyhow!("That instance no longer exists"))
+    read_json(&meta_file(id)).await.ok_or_else(|| err_tr!("instance.missing", "That instance no longer exists"))
 }
 
 pub async fn save(inst: &Instance) -> Result<()> {
@@ -67,6 +68,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         jvm_args: None,
         modpack: None,
         pending_downloads: None,
+        group: data.group.map(|g| g.trim().to_string()).filter(|g| !g.is_empty()),
     };
     extra(&mut inst);
     tokio::fs::create_dir_all(paths::game_dir(&id)).await?;
@@ -102,6 +104,7 @@ pub async fn duplicate(id: &str) -> Result<Instance> {
         loader: src.loader,
         loader_version: src.loader_version.clone(),
         color: Some(src.color.clone()),
+        group: src.group.clone(),
     };
     let s = src.clone();
     let copy = create(new, move |i| {

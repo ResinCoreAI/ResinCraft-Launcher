@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use base64::Engine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,7 @@ use crate::core::fsutil::{now_ms, read_json, write_json};
 use crate::core::net::{body_of, send_json, status_of, HttpError};
 use crate::core::types::{AccountView, DeviceCode, LoginEvent};
 use crate::core::{paths, settings};
+use crate::{bail_tr, err_tr};
 
 const MS_BASE: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const SCOPE: &str = "XboxLive.signin offline_access";
@@ -147,10 +148,11 @@ fn is_unreadable(s: Option<&str>) -> bool {
 }
 
 fn sign_in_again(acc: &StoredAccount) -> anyhow::Error {
-    anyhow!(
-        "Please sign in to {0} again: add your Microsoft account under Accounts (this replaces the old entry). \
+    err_tr!(
+        "accounts.signInAgain",
+        "Please sign in to {name} again: add your Microsoft account under Accounts (this replaces the old entry). \
          Sign-ins saved by the previous version of ResinCraft can't be read by this one.",
-        acc.username
+        name = acc.username
     )
 }
 
@@ -204,7 +206,7 @@ async fn upsert(mut acc: StoredAccount) -> Result<StoredAccount> {
 async fn client_id() -> Result<String> {
     let id = settings::ms_client_id().await;
     if id.is_empty() {
-        bail!("Microsoft sign-in isn't set up in this build of ResinCraft.");
+        bail_tr!("accounts.noClientId", "Microsoft sign-in isn't set up in this build of ResinCraft.");
     }
     Ok(id)
 }
@@ -226,20 +228,20 @@ async fn ms_form(path: &str, body: &[(&str, &str)]) -> Result<Value> {
     if !status.is_success() && !has_error {
         return Err(HttpError { status: status.as_u16(), url: path.to_string(), body: String::new() }.into());
     }
-    parsed.ok_or_else(|| anyhow!("Unexpected response from Microsoft sign-in"))
+    parsed.ok_or_else(|| err_tr!("accounts.badResponse", "Unexpected response from Microsoft sign-in"))
 }
 
 fn s<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
     v.get(key).and_then(Value::as_str)
 }
 
-fn xsts_error(code: &str) -> Option<&'static str> {
+fn xsts_error(code: &str) -> Option<anyhow::Error> {
     Some(match code {
-        "2148916227" => "This Xbox account is banned.",
-        "2148916233" => "This Microsoft account doesn't have an Xbox profile yet. Sign in once at xbox.com, then try again.",
-        "2148916235" => "Xbox Live isn't available in this account's country.",
-        "2148916236" | "2148916237" => "This account needs adult verification on xbox.com (South Korea).",
-        "2148916238" => "This is a child account. An adult needs to add it to a Microsoft Family group first.",
+        "2148916227" => err_tr!("accounts.xbox.banned", "This Xbox account is banned."),
+        "2148916233" => err_tr!("accounts.xbox.noProfile", "This Microsoft account doesn't have an Xbox profile yet. Sign in once at xbox.com, then try again."),
+        "2148916235" => err_tr!("accounts.xbox.country", "Xbox Live isn't available in this account's country."),
+        "2148916236" | "2148916237" => err_tr!("accounts.xbox.adultCheck", "This account needs adult verification on xbox.com (South Korea)."),
+        "2148916238" => err_tr!("accounts.xbox.child", "This is a child account. An adult needs to add it to a Microsoft Family group first."),
         _ => return None,
     })
 }
@@ -308,12 +310,12 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
             let re = XERR.get_or_init(|| Regex::new(r#""XErr"\s*:\s*(\d+)"#).unwrap());
             let code = body_of(&e).and_then(|b| re.captures(b)).map(|c| c[1].to_string());
             match code.as_deref().and_then(xsts_error) {
-                Some(msg) => bail!(msg),
-                None => bail!("Xbox sign-in failed: {e}"),
+                Some(err) => return Err(err),
+                None => bail_tr!("accounts.xbox.failed", "Xbox sign-in failed: {error}", error = e.to_string()),
             }
         }
     };
-    let claim = xsts.display_claims.xui.first().ok_or_else(|| anyhow!("Xbox sign-in failed: no user claims"))?;
+    let claim = xsts.display_claims.xui.first().ok_or_else(|| err_tr!("accounts.xbox.failed", "Xbox sign-in failed: {error}", error = "no user claims"))?;
 
     let mc: McLogin = match send_json(
         http().post("https://api.minecraftservices.com/authentication/login_with_xbox").json(&json!({ "identityToken": format!("XBL3.0 x={};{}", claim.uhs, xsts.token) })),
@@ -322,14 +324,17 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
     {
         Ok(m) => m,
         Err(e) if status_of(&e) == Some(403) => {
-            bail!("Minecraft rejected this app's Client ID. New Azure apps must be approved by Mojang before they can sign in to Minecraft.")
+            bail_tr!(
+                "accounts.clientRejected",
+                "Minecraft rejected this app's Client ID. New Azure apps must be approved by Mojang before they can sign in to Minecraft."
+            )
         }
         Err(e) => return Err(e),
     };
 
     let profile: Profile = match send_json(http().get("https://api.minecraftservices.com/minecraft/profile").bearer_auth(&mc.access_token)).await {
         Ok(p) => p,
-        Err(e) if status_of(&e) == Some(404) => bail!("This Microsoft account doesn't own Minecraft: Java Edition."),
+        Err(e) if status_of(&e) == Some(404) => bail_tr!("accounts.noMinecraft", "This Microsoft account doesn't own Minecraft: Java Edition."),
         Err(e) => return Err(e),
     };
 
@@ -355,7 +360,10 @@ pub async fn begin_microsoft_login() -> Result<DeviceCode> {
     let client = client_id().await?;
     let dc = ms_form("devicecode", &[("client_id", &client), ("scope", SCOPE)]).await?;
     let Some(device_code) = s(&dc, "device_code").map(String::from) else {
-        bail!("{}", s(&dc, "error_description").unwrap_or("Microsoft sign-in could not start"));
+        match s(&dc, "error_description") {
+            Some(desc) => bail!("{desc}"),
+            None => bail_tr!("accounts.loginNoStart", "Microsoft sign-in could not start"),
+        }
     };
     let expires_in = dc.get("expires_in").and_then(Value::as_u64).unwrap_or(0);
     let interval = dc.get("interval").and_then(Value::as_u64).filter(|i| *i > 0).unwrap_or(5);
@@ -368,9 +376,12 @@ pub async fn begin_microsoft_login() -> Result<DeviceCode> {
             return;
         }
         match result {
-            Ok(Some(acc)) => emit("login", LoginEvent { state: "success", account: Some(view(&acc)), error: None }),
+            Ok(Some(acc)) => emit("login", LoginEvent { state: "success", account: Some(view(&acc)), error: None, error_text: None }),
             Ok(None) => {}
-            Err(e) => emit("login", LoginEvent { state: "error", account: None, error: Some(e.to_string()) }),
+            Err(e) => {
+                let error_text = crate::core::text::text_of(&e).cloned();
+                emit("login", LoginEvent { state: "error", account: None, error: Some(e.to_string()), error_text })
+            }
         }
     });
 
@@ -401,12 +412,15 @@ async fn poll_device_code(client: &str, device_code: &str, interval_s: u64, expi
                 interval += Duration::from_secs(5);
                 continue;
             }
-            Some("authorization_declined") => bail!("Sign-in was cancelled in the browser."),
+            Some("authorization_declined") => bail_tr!("accounts.loginCancelled", "Sign-in was cancelled in the browser."),
             _ => {}
         }
         let access = s(&tok, "access_token").filter(|t| !t.is_empty());
         let Some(access) = access.filter(|_| tok.get("error").map_or(true, Value::is_null)) else {
-            bail!("{}", s(&tok, "error_description").unwrap_or("Microsoft sign-in failed"));
+            match s(&tok, "error_description") {
+                Some(desc) => bail!("{desc}"),
+                None => bail_tr!("accounts.loginFailed", "Microsoft sign-in failed"),
+            }
         };
         let mc = minecraft_login(access).await?;
         if abort.load(Ordering::SeqCst) {
@@ -428,7 +442,7 @@ async fn poll_device_code(client: &str, device_code: &str, interval_s: u64, expi
         .await?;
         return Ok(Some(acc));
     }
-    bail!("The sign-in code expired. Please try again.")
+    bail_tr!("accounts.codeExpired", "The sign-in code expired. Please try again.")
 }
 
 pub fn cancel_microsoft_login() {
@@ -442,10 +456,11 @@ async fn refresh(acc: &StoredAccount) -> Result<StoredAccount> {
     let client = client_id().await?;
     let tok = ms_form("token", &[("grant_type", "refresh_token"), ("client_id", &client), ("refresh_token", &refresh_token), ("scope", SCOPE)]).await?;
     let Some(access) = s(&tok, "access_token").filter(|t| !t.is_empty()) else {
-        bail!(
-            "Your Microsoft session expired. Remove and re-add {}. ({})",
-            acc.username,
-            s(&tok, "error_description").unwrap_or("no token")
+        bail_tr!(
+            "accounts.sessionExpired",
+            "Your Microsoft session expired. Remove and re-add {name}. ({reason})",
+            name = acc.username,
+            reason = s(&tok, "error_description").unwrap_or("no token")
         );
     };
     let mc = minecraft_login(access).await?;
@@ -482,12 +497,12 @@ pub async fn add_offline_account(username: &str) -> Result<AccountView> {
     let name = username.trim();
     static NAME: OnceLock<Regex> = OnceLock::new();
     if !NAME.get_or_init(|| Regex::new("^[A-Za-z0-9_]{3,16}$").unwrap()).is_match(name) {
-        bail!("Usernames are 3–16 characters: letters, numbers and _");
+        bail_tr!("accounts.badUsername", "Usernames are 3–16 characters: letters, numbers and _");
     }
     // Like Prism, offline play is only for people who own the game. Dev builds skip this so the
     // launcher can be tested before Mojang approves the Azure app.
     if !ctx().dev && !load().await.iter().any(|a| a.kind == "msa") {
-        bail!("Add a Microsoft account that owns Minecraft before creating offline profiles.");
+        bail_tr!("accounts.offlineNeedsMsa", "Add a Microsoft account that owns Minecraft before creating offline profiles.");
     }
     let acc = upsert(StoredAccount {
         id: uuid::Uuid::new_v4().to_string(),
@@ -507,7 +522,7 @@ pub async fn add_offline_account(username: &str) -> Result<AccountView> {
 pub async fn get_launch_auth() -> Result<LaunchAuth> {
     let list = load().await;
     let Some(acc) = list.iter().find(|a| a.active).or_else(|| list.first()).cloned() else {
-        bail!("Sign in with your Microsoft account before playing.");
+        bail_tr!("accounts.signInFirst", "Sign in with your Microsoft account before playing.");
     };
     if acc.kind == "offline" {
         return Ok(LaunchAuth { username: acc.username, uuid: acc.uuid, access_token: "0".into(), user_type: "legacy", xuid: None });
@@ -535,10 +550,10 @@ async fn fresh_token(mut acc: StoredAccount, force: bool) -> Result<(StoredAccou
 /// (used after a 401).
 pub(super) async fn minecraft_token(id: &str, force: bool) -> Result<String> {
     let Some(acc) = load().await.into_iter().find(|a| a.id == id) else {
-        bail!("This account isn't signed in any more. It may have been removed.");
+        bail_tr!("accounts.gone", "This account isn't signed in any more. It may have been removed.");
     };
     if acc.kind != "msa" {
-        bail!("Offline profiles can't change skins, capes or names. Sign in with Microsoft to do that.");
+        bail_tr!("accounts.offlineNoProfile", "Offline profiles can't change skins, capes or names. Sign in with Microsoft to do that.");
     }
     Ok(fresh_token(acc, force).await?.1)
 }

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use serde_json::json;
 use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc;
@@ -20,6 +20,7 @@ use crate::core::paths;
 use crate::core::settings::Settings;
 use crate::core::types::{GameEvent, Instance, LoaderType, LogEvent, LogLine};
 use crate::player::accounts::LaunchAuth;
+use crate::{bail_tr, err_tr, tr};
 
 use super::java::{find_java, hidden_command, install_java};
 use super::loaders::{resolve_version, JavaPicker, ResolveContext};
@@ -85,7 +86,12 @@ async fn choose_java(inst: &Instance, settings: &Settings, required: u32, task: 
     if settings.auto_java {
         return Ok(install_java(required, task).await?.path);
     }
-    bail!("Minecraft {} needs Java {required}. Install it, or turn on automatic Java downloads in Settings.", inst.mc_version)
+    bail_tr!(
+        "launch.needJava",
+        "Minecraft {version} needs Java {major}. Install it, or turn on automatic Java downloads in Settings.",
+        version = inst.mc_version,
+        major = required
+    )
 }
 
 /// Like `net::download_all`, but files that can't be downloaded (no URL) must already exist.
@@ -94,14 +100,14 @@ async fn download_checked(items: Vec<DownloadItem>, concurrency: usize, progress
     for item in local {
         if tokio::fs::metadata(&item.dest).await.is_err() {
             let file = item.dest.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            bail!("{file} is missing and can't be downloaded. Try reinstalling the mod loader.");
+            bail_tr!("launch.fileMissing", "{file} is missing and can't be downloaded. Try reinstalling the mod loader.", file = file);
         }
     }
     download_all(remote, concurrency, progress).await
 }
 
 async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Result<Prepared> {
-    task.update("Reading version info…", None);
+    task.update(tr!("launch.readingVersion", "Reading version info…"), None);
     let picker: JavaPicker = {
         let (inst, settings, task) = (inst.clone(), settings.clone(), task.clone());
         Box::new(move |major| {
@@ -122,11 +128,11 @@ async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Resu
     if let Some(l) = &logging {
         items.push(l.item.clone());
     }
-    download_checked(items, settings.concurrency, task.counter("Downloading libraries")).await?;
-    download_all(assets.items, settings.concurrency * 2, task.counter("Downloading assets")).await?;
+    download_checked(items, settings.concurrency, task.counter(tr!("launch.downloadingLibraries", "Downloading libraries"))).await?;
+    download_all(assets.items, settings.concurrency * 2, task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
     let game_assets = materialize_legacy_assets(&assets.index, &assets.id, &paths::game_dir(&inst.id)).await?;
 
-    task.update("Unpacking natives…", None);
+    task.update(tr!("launch.unpackingNatives", "Unpacking natives…"), None);
     let natives = paths::natives_dir(&inst.id);
     let _ = tokio::fs::remove_dir_all(&natives).await;
     tokio::fs::create_dir_all(&natives).await?;
@@ -136,7 +142,7 @@ async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Resu
         tokio::task::spawn_blocking(move || -> Result<()> {
             let re = regex::Regex::new(r"(?i)\.(dll|so|dylib|jnilib)$").unwrap();
             for (jar, exclude) in extract {
-                let mut zip = zip::ZipArchive::new(std::fs::File::open(&jar)?).map_err(|e| anyhow!("Couldn't open {}: {e}", jar.display()))?;
+                let mut zip = zip::ZipArchive::new(std::fs::File::open(&jar)?).map_err(|e| err_tr!("shell.openFailed", "Couldn't open {path}: {error}", path = jar.display().to_string(), error = e.to_string()))?;
                 for i in 0..zip.len() {
                     let mut entry = zip.by_index(i)?;
                     let name = entry.name().to_string();
@@ -157,7 +163,7 @@ async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Resu
         .await??;
     }
 
-    task.update("Checking Java…", None);
+    task.update(tr!("launch.checkingJava", "Checking Java…"), None);
     let java = choose_java(inst, settings, version.java_major(), task).await?;
 
     let mut classpath: Vec<PathBuf> = libraries.iter().filter(|l| l.classpath).map(|l| l.item.dest.clone()).collect();
@@ -199,7 +205,8 @@ pub fn split_args(s: &str) -> Vec<String> {
     re.captures_iter(s).map(|c| c.get(1).or_else(|| c.get(2)).map(|m| m.as_str().to_string()).unwrap_or_default()).collect()
 }
 
-fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchAuth) -> Result<Vec<String>> {
+/// `server` ("host:port") joins a server right after the game starts: quick play on 1.20+, `--server` before.
+fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchAuth, server: Option<&str>) -> Result<Vec<String>> {
     let v = &p.version;
     let dir = paths::game_dir(&inst.id);
     let uuid = auth.uuid.replace('-', "");
@@ -227,10 +234,15 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
         ("launcher_version", LAUNCHER_VERSION.into()),
         ("resolution_width", settings.game_width.to_string()),
         ("resolution_height", settings.game_height.to_string()),
+        ("quickPlayMultiplayer", server.unwrap_or_default().to_string()),
     ]);
     let re = regex::Regex::new(r"\$\{([^}]+)\}").unwrap();
     let sub = |s: &String| -> String { re.replace_all(s, |c: &regex::Captures| vars.get(&c[1]).cloned().unwrap_or_else(|| c[0].to_string())).into_owned() };
-    let features = BTreeMap::from([("has_custom_resolution".to_string(), true), ("is_demo_user".to_string(), false)]);
+    let features = BTreeMap::from([
+        ("has_custom_resolution".to_string(), true),
+        ("is_demo_user".to_string(), false),
+        ("is_quick_play_multiplayer".to_string(), server.is_some()),
+    ]);
 
     let (jvm, game): (Vec<String>, Vec<String>) = match v.minecraft_arguments.as_deref().filter(|s| !s.is_empty()) {
         Some(legacy) => {
@@ -247,7 +259,16 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
         ),
     };
 
-    let main_class = v.main_class.clone().filter(|m| !m.is_empty()).ok_or_else(|| anyhow!("Version {} has no main class", v.id))?;
+    let mut game = game;
+    if let Some(addr) = server {
+        // Versions before 1.20 have no quick play; they accept --server/--port instead.
+        if !game.iter().any(|a| a == "--quickPlayMultiplayer") {
+            let (host, port) = addr.rsplit_once(':').unwrap_or((addr, "25565"));
+            game.extend(["--server".to_string(), host.to_string(), "--port".to_string(), port.to_string()]);
+        }
+    }
+
+    let main_class = v.main_class.clone().filter(|m| !m.is_empty()).ok_or_else(|| err_tr!("launch.noMainClass", "Version {version} has no main class", version = v.id))?;
     let memory = inst.memory_mb.unwrap_or(settings.memory_mb);
     let user_jvm = non_empty(inst.jvm_args.as_deref()).unwrap_or_else(|| settings.jvm_args.clone());
     let mut args = vec![format!("-Xmx{memory}M"), format!("-Xms{}M", memory.min(1024))];
@@ -410,13 +431,18 @@ fn loader_label(inst: &Instance) -> String {
 
 /// Prepares and starts the game. Returns once Java is running; the game is watched in the background.
 pub async fn launch_instance(id: &str, settings: &Settings, auth: LaunchAuth, hooks: LaunchHooks) -> Result<()> {
+    launch_instance_to(id, settings, auth, hooks, None).await
+}
+
+/// Like `launch_instance`, joining `server` ("host:port") once the game is up.
+pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth, hooks: LaunchHooks, server: Option<&str>) -> Result<()> {
     if running(|m| m.contains_key(id)) {
-        bail!("This instance is already running");
+        bail_tr!("launch.alreadyRunning", "This instance is already running");
     }
     let inst = instances::get(id).await?;
     game_event(id, "preparing", None, None);
 
-    let prepared = match Task::run(format!("Preparing {}", inst.name), Some(id.to_string()), |t| {
+    let prepared = match Task::run(tr!("launch.preparing", "Preparing {name}", name = inst.name), Some(id.to_string()), |t| {
         let (inst, settings) = (inst.clone(), settings.clone());
         async move { prepare(&inst, &settings, &t).await }
     })
@@ -429,7 +455,7 @@ pub async fn launch_instance(id: &str, settings: &Settings, auth: LaunchAuth, ho
         }
     };
 
-    let args = build_args(&inst, settings, &prepared, &auth)?;
+    let args = build_args(&inst, settings, &prepared, &auth, server)?;
     let shown: Vec<&str> = args.iter().map(|a| if *a == auth.access_token { "<access token hidden>" } else { a.as_str() }).collect();
 
     // Batch log lines so a chatty game doesn't flood IPC.
@@ -464,7 +490,7 @@ pub async fn launch_instance(id: &str, settings: &Settings, auth: LaunchAuth, ho
         Err(e) => {
             flush();
             game_event(id, "stopped", None, Some(e.to_string()));
-            bail!("Couldn't start Java ({}): {e}", prepared.java);
+            bail_tr!("launch.javaStartFailed", "Couldn't start Java ({java}): {error}", java = prepared.java, error = e.to_string());
         }
     };
     let (kill_tx, mut kill_rx) = mpsc::unbounded_channel::<()>();

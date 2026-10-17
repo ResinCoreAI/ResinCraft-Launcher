@@ -27,5 +27,22 @@ export default {
   'library.delete.body':
     'The instance, including its worlds, mods and settings, will be moved to your Recycle Bin. You can restore it from there if you change your mind.',
   'library.delete.confirm': 'Move to Recycle Bin',
-  'library.delete.done': 'Deleted {name}'
+  'library.delete.done': 'Deleted {name}',
+  'library.group.ungrouped': 'Ungrouped',
+  'library.group.toggle': 'Show or hide {name}',
+  'library.group.change': 'Change group…',
+  'library.group.title': 'Change group',
+  'library.group.body': 'Groups keep your Library tidy: modpacks, testing, worlds with friends.',
+  'library.group.none': 'No group',
+  'library.group.new': 'New group name',
+  'library.group.label': 'Group',
+  'library.group.moved': 'Moved {name} to {group}',
+  'library.group.rename': 'Rename group',
+  'library.group.remove': 'Remove group',
+  'library.group.removeBody': 'The instances in {name} move to Ungrouped. Nothing is deleted.',
+  'library.group.create': "New group",
+  'library.group.createTitle': "Create a group",
+  'library.group.empty': "Drag instances here",
+  'library.group.dragHint': "Tip: drag an instance onto a group to move it.",
+  'library.group.created': "Created group {name}"
 }

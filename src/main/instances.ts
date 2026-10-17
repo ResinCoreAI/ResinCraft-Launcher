@@ -46,6 +46,7 @@ export async function createInstance(data: NewInstance, extra: Partial<Instance>
     color: data.color ?? INSTANCE_COLORS[Math.floor(Math.random() * INSTANCE_COLORS.length)],
     createdAt: Date.now(),
     playtime: 0,
+    group: data.group?.trim() || undefined,
     ...extra
   }
   await mkdir(gameDir(id), { recursive: true })
@@ -53,13 +54,16 @@ export async function createInstance(data: NewInstance, extra: Partial<Instance>
 }
 
 export async function updateInstance(id: string, patch: InstancePatch | Partial<Instance>): Promise<Instance> {
-  return saveInstance({ ...(await getInstance(id)), ...patch, id })
+  const current = await getInstance(id)
+  // `group: null` moves the instance back to Ungrouped.
+  const group = patch.group === null ? undefined : (patch.group ?? current.group)
+  return saveInstance({ ...current, ...patch, id, group })
 }
 
 export async function duplicateInstance(id: string): Promise<Instance> {
   const src = await getInstance(id)
   const copy = await createInstance(
-    { name: `${src.name} (copy)`, mcVersion: src.mcVersion, loader: src.loader, loaderVersion: src.loaderVersion, color: src.color },
+    { name: `${src.name} (copy)`, mcVersion: src.mcVersion, loader: src.loader, loaderVersion: src.loaderVersion, color: src.color, group: src.group },
     { memoryMb: src.memoryMb, javaPath: src.javaPath, jvmArgs: src.jvmArgs, iconUrl: src.iconUrl, modpack: src.modpack }
   )
   await cp(gameDir(id), gameDir(copy.id), { recursive: true })

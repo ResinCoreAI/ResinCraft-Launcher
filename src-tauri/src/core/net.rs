@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use futures::stream::{self, StreamExt};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -14,6 +14,7 @@ use sha1::Digest;
 use tokio::io::AsyncWriteExt;
 
 use super::ctx::http;
+use crate::err_tr;
 
 /// A non-2xx response. Use `status_of(&err)` to read the status from an anyhow error.
 #[derive(Debug)]
@@ -49,7 +50,7 @@ pub async fn send_json<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> Res
         return Err(HttpError { status: status.as_u16(), url, body }.into());
     }
     let bytes = res.bytes().await?;
-    serde_json::from_slice(&bytes).with_context(|| format!("Unexpected response from {url}"))
+    serde_json::from_slice(&bytes).map_err(|_| err_tr!("download.unexpectedResponse", "Unexpected response from {url}", url = url))
 }
 
 pub async fn fetch_json<T: DeserializeOwned>(url: &str) -> Result<T> {
@@ -180,7 +181,8 @@ async fn is_valid(item: &DownloadItem) -> bool {
 /// Downloads one file to `dest` (via `<dest>.part`), verifying size and hash. Retries 3 times.
 pub async fn download_file(item: &DownloadItem) -> Result<()> {
     if item.url.trim().is_empty() {
-        return Err(anyhow!("No download address for {}", item.dest.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()));
+        let file = item.dest.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        return Err(err_tr!("download.noAddress", "No download address for {file}", file = file));
     }
     if let Some(parent) = item.dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -201,7 +203,7 @@ pub async fn download_file(item: &DownloadItem) -> Result<()> {
             }
         }
     }
-    Err(last.unwrap_or_else(|| anyhow!("Download failed: {}", item.url)))
+    Err(last.unwrap_or_else(|| err_tr!("download.failed", "Download failed: {url}", url = item.url)))
 }
 
 async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {

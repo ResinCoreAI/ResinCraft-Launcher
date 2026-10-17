@@ -47,7 +47,8 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
     try {
       const next = await call()
       setProfile((old) => ({ ...next, nameChange: next.nameChange ?? old?.nameChange }))
-      setVariant(next.skin?.variant ?? variant)
+      // Keep an arm style the user is still choosing unless this change was to the skin itself.
+      if (what === 'skin' || what === 'reset') setVariant(next.skin?.variant ?? 'classic')
       await refreshAccounts()
       toast(done(next))
       return true

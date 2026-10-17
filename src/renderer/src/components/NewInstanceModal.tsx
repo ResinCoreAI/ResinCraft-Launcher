@@ -6,6 +6,7 @@ import { useStore } from '../store'
 import { COLORS, LOADER_LABEL } from '../util'
 import { currentLanguage, t } from '../i18n'
 import { InstanceTile, Modal, Segmented, Switch } from './ui'
+import { useGroupNames } from '../pages/Library'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const { settings, refreshInstances, go, toast } = useStore()
@@ -17,6 +18,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const [loaderVersions, setLoaderVersions] = useState<LoaderVersion[]>()
   const [loaderVersion, setLoaderVersion] = useState<string>()
   const [name, setName] = useState('')
+  const [group, setGroup] = useState('')
+  const groups = useGroupNames()
   const [color, setColor] = useState(COLORS[Math.floor(Math.random() * COLORS.length)])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -63,7 +66,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
     setBusy(true)
     setError(undefined)
     try {
-      const inst = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color })
+      const inst = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color, group: group.trim() || undefined })
       await refreshInstances()
       toast(t('newInstance.created', { name: inst.name }))
       onClose()
@@ -98,6 +101,22 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
           <div className="field">
             <label htmlFor="inst-name">{t('newInstance.name')}</label>
             <input id="inst-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </div>
+          <div className="field">
+            <label htmlFor="inst-group">{t('library.group.label')}</label>
+            <input
+              id="inst-group"
+              className="input"
+              list="inst-groups"
+              placeholder={t('library.group.none')}
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+            />
+            <datalist id="inst-groups">
+              {groups.map((g) => (
+                <option key={g} value={g} />
+              ))}
+            </datalist>
           </div>
           <div className="swatches">
             {COLORS.map((c) => (

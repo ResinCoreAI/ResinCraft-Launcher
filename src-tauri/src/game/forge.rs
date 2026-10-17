@@ -5,14 +5,16 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::core::fsutil::{read_json, safe_join, write_json};
 use crate::core::net::{download_all, download_file, hash_file, status_of, DownloadItem, HashAlgo};
 use crate::core::paths;
+use crate::core::text::Text;
 use crate::core::types::LoaderType;
+use crate::{bail_tr, err_tr, tr};
 
 use super::java::{find_java, hidden_command};
 use super::loaders::{installer_url, is_legacy_forge, legacy_forge_error, ResolveContext};
@@ -82,7 +84,7 @@ pub async fn resolve_forge_like(mc: &str, loader: LoaderType, ver: &str, ctx: &R
     Ok(installed.version)
 }
 
-fn update(ctx: &ResolveContext, detail: String, progress: Option<f64>) {
+fn update(ctx: &ResolveContext, detail: impl Into<Text>, progress: Option<f64>) {
     if let Some(t) = &ctx.task {
         t.update(detail, progress);
     }
@@ -90,11 +92,11 @@ fn update(ctx: &ResolveContext, detail: String, progress: Option<f64>) {
 
 async fn install_forge_like(mc: &str, loader: LoaderType, ver: &str, dir: &Path, ctx: &ResolveContext) -> Result<InstalledLoader> {
     let name = format!("{} {ver}", loader.label());
-    update(ctx, format!("Downloading the {name} installer…"), None);
+    update(ctx, tr!("forge.downloadingInstaller", "Downloading the {name} installer…", name = name), None);
     let installer = dir.join("installer.jar");
     if let Err(e) = download_file(&DownloadItem::new(installer_url(loader, mc, ver), &installer)).await {
         if status_of(&e) == Some(404) {
-            bail!("{name} for Minecraft {mc} couldn't be found");
+            bail_tr!("forge.notFound", "{name} for Minecraft {mc} couldn't be found", name = name, mc = mc);
         }
         return Err(e);
     }
@@ -128,14 +130,14 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
         let (installer, name) = (installer.to_path_buf(), name.to_string());
         blocking(move || -> Result<(InstallProfile, VersionJson)> {
             let mut zip = open_zip(&installer)?;
-            let text = read_entry(&mut zip, "install_profile.json").filter(|t| !t.is_empty()).ok_or_else(|| anyhow!("The {name} installer is missing install_profile.json"))?;
+            let text = read_entry(&mut zip, "install_profile.json").filter(|t| !t.is_empty()).ok_or_else(|| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = "install_profile.json"))?;
             let profile: InstallProfile = serde_json::from_slice(&text)?;
             let json = profile.json.clone().filter(|j| !j.is_empty());
             if profile.install.is_some() || profile.version_info.is_some() || json.is_none() {
-                bail!("{name} uses the old (Minecraft 1.12 and earlier) installer format, which ResinCraft doesn't support yet.");
+                bail_tr!("forge.oldInstaller", "{name} uses the old (Minecraft 1.12 and earlier) installer format, which ResinCraft doesn't support yet.", name = name);
             }
             let json = json.unwrap_or_default();
-            let text = read_entry(&mut zip, json.trim_start_matches('/')).filter(|t| !t.is_empty()).ok_or_else(|| anyhow!("The {name} installer is missing {json}"))?;
+            let text = read_entry(&mut zip, json.trim_start_matches('/')).filter(|t| !t.is_empty()).ok_or_else(|| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = json))?;
             Ok((profile, serde_json::from_slice(&text)?))
         })
         .await?
@@ -145,7 +147,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
     let client = client_jar(&vanilla)?;
 
     // Some libraries (the loader's own jars) ship inside the installer instead of on a Maven server.
-    update(ctx, format!("Unpacking {name}…"), None);
+    update(ctx, tr!("forge.unpacking", "Unpacking {name}…", name = name), None);
     {
         let installer = installer.to_path_buf();
         blocking(move || -> Result<()> {
@@ -179,7 +181,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
     items.extend(game_libs.iter().map(|l| l.item.clone()));
     items.retain(|i| !i.url.is_empty());
     let progress: Box<dyn Fn(usize, usize) + Send + Sync> = match &ctx.task {
-        Some(t) => Box::new(t.counter(&format!("Downloading {name} libraries"))),
+        Some(t) => Box::new(t.counter(tr!("forge.downloadingLibraries", "Downloading {name} libraries", name = name))),
         None => Box::new(|_, _| {}),
     };
     download_all(items, concurrency, progress).await?;
@@ -213,7 +215,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
         blocking(move || -> Result<()> {
             let mut zip = open_zip(&installer)?;
             for (v, rel, dest) in bundled {
-                let bytes = read_entry(&mut zip, &rel).ok_or_else(|| anyhow!("The {name} installer is missing {v}"))?;
+                let bytes = read_entry(&mut zip, &rel).ok_or_else(|| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = v))?;
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
@@ -234,7 +236,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
         for c in token.captures_iter(arg) {
             let m = c.get(0).unwrap();
             let key = &c[1];
-            let val = data.get(key).ok_or_else(|| anyhow!("The {name} installer refers to an unknown value {{{key}}}"))?;
+            let val = data.get(key).ok_or_else(|| err_tr!("forge.unknownValue", "The {name} installer refers to an unknown value {value}", name = name, value = format!("{{{key}}}")))?;
             out.push_str(&arg[last..m.start()]);
             out.push_str(val);
             last = m.end();
@@ -248,7 +250,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
     let java = if processors.is_empty() { String::new() } else { pick_java(vanilla.java_major(), ctx).await? };
     let n = processors.len();
     for (i, p) in processors.iter().enumerate() {
-        update(ctx, format!("Installing {name} (step {} of {n})…", i + 1), Some(i as f64 / n as f64));
+        update(ctx, tr!("forge.installingStep", "Installing {name} (step {step} of {total})…", name = name, step = i + 1, total = n), Some(i as f64 / n as f64));
         let mut outputs = Vec::new();
         for (file, sha1) in p.outputs.iter().flatten() {
             outputs.push((PathBuf::from(sub(file)?), sub(sha1)?));
@@ -269,7 +271,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
         let main = main_class_of(&jar).await?;
         run_processor(&java, &classpath, &main, &args, name).await?;
         if !outputs.is_empty() && !outputs_valid(&outputs).await {
-            bail!("{name} installation produced unexpected files. Try again, or pick another version.");
+            bail_tr!("forge.unexpectedFiles", "{name} installation produced unexpected files. Try again, or pick another version.", name = name);
         }
     }
 
@@ -277,7 +279,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
     let local: Vec<PathBuf> = game_libs.iter().filter(|l| l.item.url.is_empty()).map(|l| l.item.dest.clone()).collect();
     for f in &local {
         if !exists(f).await {
-            bail!("{name} installation didn't produce {}", f.display());
+            bail_tr!("forge.fileNotProduced", "{name} installation didn't produce {file}", name = name, file = f.display().to_string());
         }
     }
     let mut patched = child.clone();
@@ -312,7 +314,7 @@ async fn pick_java(major: u32, ctx: &ResolveContext) -> Result<String> {
     }
     match find_java(major).await? {
         Some(j) => Ok(j.path),
-        None => bail!("Installing this mod loader needs Java {major}"),
+        None => bail_tr!("forge.needJava", "Installing this mod loader needs Java {major}", major = major),
     }
 }
 
@@ -332,12 +334,12 @@ async fn outputs_valid(outputs: &[(PathBuf, String)]) -> bool {
 async fn main_class_of(jar: &Path) -> Result<String> {
     let jar = jar.to_path_buf();
     blocking(move || {
-        let mut zip = open_zip(&jar).map_err(|e| anyhow!("Couldn't open {}: {e}", jar.display()))?;
+        let mut zip = open_zip(&jar).map_err(|e| err_tr!("shell.openFailed", "Couldn't open {path}: {error}", path = jar.display().to_string(), error = e.to_string()))?;
         let manifest = String::from_utf8_lossy(&read_entry(&mut zip, "META-INF/MANIFEST.MF").unwrap_or_default()).into_owned();
         // Manifest lines wrap at 72 bytes; continuation lines start with a space.
         let unfolded = manifest.replace("\r\n ", "").replace("\n ", "");
         let re = regex::Regex::new(r"(?m)^Main-Class:\s*(.+)$").unwrap();
-        re.captures(&unfolded).map(|c| c[1].trim().to_string()).filter(|m| !m.is_empty()).ok_or_else(|| anyhow!("{} has no Main-Class", jar.display()))
+        re.captures(&unfolded).map(|c| c[1].trim().to_string()).filter(|m| !m.is_empty()).ok_or_else(|| err_tr!("forge.noMainClass", "{jar} has no Main-Class", jar = jar.display().to_string()))
     })
     .await
 }
@@ -346,7 +348,7 @@ async fn run_processor(java: &str, classpath: &[PathBuf], main_class: &str, args
     let cp = std::env::join_paths(classpath.iter().map(|p| path_str(p))).map_err(|e| anyhow!("Bad classpath: {e}"))?;
     let mut cmd = hidden_command(java);
     cmd.arg("-cp").arg(cp).arg(main_class).args(args).stdin(std::process::Stdio::null()).kill_on_drop(true);
-    let out = cmd.output().await.map_err(|e| anyhow!("Couldn't run Java ({java}) to install {name}: {e}"))?;
+    let out = cmd.output().await.map_err(|e| err_tr!("forge.javaRunFailed", "Couldn't run Java ({java}) to install {name}: {error}", java = java, name = name, error = e.to_string()))?;
     if out.status.success() {
         return Ok(());
     }
@@ -354,5 +356,5 @@ async fn run_processor(java: &str, classpath: &[PathBuf], main_class: &str, args
     let lines: Vec<&str> = text.lines().filter(|l| !l.is_empty()).collect();
     let tail = lines[lines.len().saturating_sub(15)..].join("\n");
     let code = out.status.code().map(|c| c.to_string()).unwrap_or_else(|| "null".into());
-    bail!("Installing {name} failed ({main_class} exited with code {code}):\n{tail}")
+    bail_tr!("forge.processorFailed", "Installing {name} failed ({main_class} exited with code {code}):\n{tail}", name = name, main_class = main_class, code = code, tail = tail)
 }

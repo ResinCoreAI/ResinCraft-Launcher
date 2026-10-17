@@ -3,6 +3,8 @@ name = "resincraft"
 version = "0.1.0"
 description = "ResinCraft Launcher: a modern Minecraft: Java Edition launcher by Puirkle"
 authors = ["Puirkle"]
+license = "MIT"
+repository = "https://github.com/Puirkle/ResinCraft-Launcher"
 edition = "2021"
 rust-version = "1.85"
 
@@ -39,6 +41,13 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 quick-xml = "0.37"
+# UPnP port mapping so friends can join a hosted server without manual port forwarding.
+igd-next = "0.17"
+# Stable public addresses for hosted servers through playit.gg (BSD-2-Clause agent), and bore relay auth.
+playit-agent-core = { git = "https://github.com/playit-cloud/playit-agent", rev = "633d650869a9cdb2c906efa9effc58aa8b7725a3" }
+playit-api-client = { git = "https://github.com/playit-cloud/playit-agent", rev = "633d650869a9cdb2c906efa9effc58aa8b7725a3" }
+hmac = "0.12"
+tokio-util = "0.7"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns"] }

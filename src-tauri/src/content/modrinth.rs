@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -21,6 +21,7 @@ use crate::core::types::{
     source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, ProjectHit, ProjectVersion, SearchQuery,
     SearchResult, UpdateRef,
 };
+use crate::{bail_tr, err_tr, tr};
 
 const API: &str = "https://api.modrinth.com/v2";
 
@@ -227,7 +228,9 @@ async fn install_version(inst: &Instance, kind: ContentKind, version: &MrVersion
         .iter()
         .find(|f| f.primary)
         .or_else(|| version.files.first())
-        .ok_or_else(|| anyhow!("{} {} has no files to download", project.title, version.version_number))?;
+        .ok_or_else(|| {
+            err_tr!("modrinth.noFiles", "{name} {version} has no files to download", name = project.title, version = version.version_number)
+        })?;
     let folder = folder_of(inst, kind);
     remove_project_files(inst, kind, &project.id, idx).await?;
 
@@ -252,11 +255,15 @@ async fn install_version(inst: &Instance, kind: ContentKind, version: &MrVersion
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, version_id: Option<String>) -> Result<()> {
     let inst = instances::get(instance_id).await?;
     if kind == ContentKind::Mod && inst.loader == LoaderType::Vanilla {
-        bail!("{} is a vanilla instance. Mods need a mod loader such as Fabric or NeoForge; create a modded instance first.", inst.name);
+        bail_tr!(
+            "modrinth.vanillaInstance",
+            "{name} is a vanilla instance. Mods need a mod loader such as Fabric or NeoForge; create a modded instance first.",
+            name = inst.name
+        );
     }
     let id = inst.id.clone();
     let project_id = project_id.to_string();
-    Task::run("Installing content", Some(id), move |task| async move {
+    Task::run(tr!("modrinth.installing", "Installing content"), Some(id), move |task| async move {
         let mut idx = load_index(&inst.id).await;
         let mut installed: HashSet<String> = idx.values().map(|e| e.project_id.clone()).collect();
         // Depth-first, like the recursive TypeScript version: (project, pinned version, is the root).
@@ -266,14 +273,22 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
                 continue;
             }
             let project = project(&pid).await?;
-            task.update(format!("Installing {}…", project.title), None);
+            task.update(tr!("content.installingItem", "Installing {name}…", name = project.title), None);
             let version = match &vid {
                 Some(v) => Some(version(v).await?),
                 None => project_versions(&pid, Some(&inst), Some(kind)).await?.into_iter().next(),
             };
             let Some(version) = version else {
-                let with = if kind == ContentKind::Mod { format!(" with {}", inst.loader.as_str()) } else { String::new() };
-                bail!("{} has no version for Minecraft {}{with}", project.title, inst.mc_version);
+                if kind == ContentKind::Mod {
+                    bail_tr!(
+                        "modrinth.noVersionWithLoader",
+                        "{name} has no version for Minecraft {mc} with {loader}",
+                        name = project.title,
+                        mc = inst.mc_version,
+                        loader = inst.loader.as_str()
+                    );
+                }
+                bail_tr!("modrinth.noVersion", "{name} has no version for Minecraft {mc}", name = project.title, mc = inst.mc_version);
             };
             install_version(&inst, kind, &version, &project, &mut idx).await?;
             installed.insert(project.id.clone());
@@ -493,11 +508,11 @@ pub struct PackMeta {
 pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
     let f = file.to_path_buf();
     let raw = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
-        let mut zip = open_zip(&f).map_err(|_| anyhow!("This file isn't a Modrinth modpack (.mrpack)"))?;
+        let mut zip = open_zip(&f).map_err(|_| err_tr!("modrinth.notModpack", "This file isn't a Modrinth modpack (.mrpack)"))?;
         read_zip_text(&mut zip, "modrinth.index.json")
     })
     .await??;
-    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| anyhow!("This file isn't a Modrinth modpack (.mrpack)"))?;
+    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| err_tr!("modrinth.notModpack", "This file isn't a Modrinth modpack (.mrpack)"))?;
     let pack: PackIndex = serde_json::from_str(&raw)?;
     let deps = &pack.dependencies;
     let (loader, loader_version) = if let Some(v) = deps.get("fabric-loader") {
@@ -511,14 +526,14 @@ pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
     } else {
         (LoaderType::Vanilla, None)
     };
-    let mc = deps.get("minecraft").cloned().ok_or_else(|| anyhow!("The modpack does not say which Minecraft version it needs"))?;
+    let mc = deps.get("minecraft").cloned().ok_or_else(|| err_tr!("modrinth.noMcVersion", "The modpack does not say which Minecraft version it needs"))?;
 
     let file = file.to_path_buf();
-    Task::run(format!("Installing {}", pack.name), None, move |task| async move {
+    Task::run(tr!("modpack.installing", "Installing {name}", name = pack.name), None, move |task| async move {
         let modpack = ModpackRef { name: pack.name.clone(), project_id: meta.project_id.clone(), version_id: meta.version_id.clone().or(pack.version_id.clone()) };
         let icon = meta.icon_url.clone();
         // Without a pinned loader version, `create` picks the latest one.
-        let new = NewInstance { name: pack.name.clone(), mc_version: mc, loader, loader_version, color: None };
+        let new = NewInstance { name: pack.name.clone(), mc_version: mc, loader, loader_version, color: None, group: None };
         let inst = instances::create(new, move |i| {
             i.icon_url = icon;
             i.modpack = Some(modpack);
@@ -544,12 +559,12 @@ async fn fill_pack(inst: &Instance, pack: &PackIndex, file: &Path, task: &Arc<Ta
             .downloads
             .iter()
             .find(|u| reqwest::Url::parse(u).ok().and_then(|x| x.host_str().map(|h| PACK_HOSTS.contains(&h))).unwrap_or(false))
-            .ok_or_else(|| anyhow!("Modpack file {} comes from an untrusted host", f.path))?;
+            .ok_or_else(|| err_tr!("modrinth.untrustedHost", "Modpack file {path} comes from an untrusted host", path = f.path))?;
         items.push(DownloadItem::new(url, safe_join(&dir, &f.path)?).hash(Some(Hash::sha1(&f.hashes.sha1))).size(f.file_size));
     }
-    download_all(items, 8, task.counter("Downloading modpack files")).await?;
+    download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
 
-    task.update("Applying modpack settings…", None);
+    task.update(tr!("modpack.applyingSettings", "Applying modpack settings…"), None);
     let (file, dir) = (file.to_path_buf(), dir.clone());
     tokio::task::spawn_blocking(move || extract_overrides(&file, &["overrides/".into(), "client-overrides/".into()], &dir)).await?
 }
@@ -563,11 +578,12 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             .into_iter()
             .find(|v| v.loaders.iter().any(|l| ["fabric", "quilt", "forge", "neoforge", "minecraft"].contains(&l.as_str()))),
     };
-    let v = v.ok_or_else(|| anyhow!("{} has no version ResinCraft can install", p.title))?;
-    let file = v.files.iter().find(|f| f.primary).or_else(|| v.files.first()).ok_or_else(|| anyhow!("{} has no version ResinCraft can install", p.title))?;
+    let no_version = || err_tr!("modrinth.noInstallableVersion", "{name} has no version ResinCraft can install", name = p.title);
+    let v = v.ok_or_else(no_version)?;
+    let file = v.files.iter().find(|f| f.primary).or_else(|| v.files.first()).ok_or_else(no_version)?;
     let dest = safe_join(&paths::cache().join("modpacks"), safe_name(&file.filename)?)?;
     let item = DownloadItem::new(&file.url, &dest).hash(Some(Hash::sha1(&file.hashes.sha1))).size(Some(file.size));
-    Task::run(format!("Downloading {}", p.title), None, |_| async move { download_file(&item).await }).await?;
+    Task::run(tr!("modpack.downloading", "Downloading {name}", name = p.title), None, |_| async move { download_file(&item).await }).await?;
     let res = install_mrpack(&dest, PackMeta { icon_url: p.icon_url.clone(), project_id: Some(p.id.clone()), version_id: Some(v.id.clone()) }).await;
     let _ = tokio::fs::remove_file(&dest).await;
     res

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use regex::Regex;
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -14,7 +14,9 @@ use tokio::net::TcpStream;
 
 use super::files::{game_subdir, js_len, write_atomic};
 use super::nbt::{self, compound, list, num, str, Compound, NbtFile, Tag};
+use crate::core::text::Text;
 use crate::core::types::{ServerEntry, ServerPlayers, ServerStatus};
+use crate::{bail_tr, err_tr, tr};
 
 async fn servers_file(id: &str) -> Result<PathBuf> {
     Ok(game_subdir(id, ".").await?.join("servers.dat"))
@@ -22,9 +24,9 @@ async fn servers_file(id: &str) -> Result<PathBuf> {
 
 async fn read_servers_file(file: &Path) -> Result<Option<NbtFile>> {
     match tokio::fs::read(file).await {
-        Ok(bytes) => nbt::parse(&bytes).map(Some).map_err(|e| anyhow!("servers.dat could not be read: {e}")),
+        Ok(bytes) => nbt::parse(&bytes).map(Some).map_err(|e| err_tr!("servers.unreadable", "servers.dat could not be read: {error}", error = e.to_string())),
         Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-        Err(e) => bail!("servers.dat could not be read: {e}"),
+        Err(e) => bail_tr!("servers.unreadable", "servers.dat could not be read: {error}", error = e.to_string()),
     }
 }
 
@@ -53,10 +55,10 @@ fn base64_re() -> &'static Regex {
 
 fn to_compound(s: &ServerEntry) -> Result<Tag> {
     if s.ip.trim().is_empty() {
-        bail!("Every server needs an address");
+        bail_tr!("servers.addressMissing", "Every server needs an address");
     }
     if js_len(&s.name) > 200 || js_len(&s.ip) > 300 {
-        bail!("Server name or address is too long");
+        bail_tr!("servers.tooLong", "Server name or address is too long");
     }
     let mut c = Compound::new();
     c.set("name", Tag::String(s.name.clone()));
@@ -264,7 +266,7 @@ fn read_varint(buf: &[u8], pos: usize) -> Result<Option<(i32, usize)>> {
             return Ok(Some((value as i32, pos + i + 1)));
         }
     }
-    bail!("Bad response from server")
+    bail_tr!("servers.badResponse", "Bad response from server")
 }
 
 /// Splits "host", "host:port", "[v6]:port" into parts; port is None when not given.
@@ -279,10 +281,10 @@ fn parse_address(address: &str) -> Result<(String, Option<u16>)> {
     let host = m.as_ref().map(|c| c[1].to_string()).unwrap_or_else(|| a.to_string());
     let port = m.as_ref().and_then(|c| c.get(2)).map(|p| p.as_str().parse::<f64>().unwrap_or(f64::INFINITY));
     if host.is_empty() || host.chars().any(char::is_whitespace) {
-        bail!("Invalid server address");
+        bail_tr!("servers.invalidAddress", "Invalid server address");
     }
     match port {
-        Some(p) if !(1.0..=65535.0).contains(&p) => bail!("Invalid port"),
+        Some(p) if !(1.0..=65535.0).contains(&p) => bail_tr!("servers.invalidPort", "Invalid port"),
         Some(p) => Ok((host, Some(p as u16))),
         None => Ok((host, None)),
     }
@@ -409,10 +411,11 @@ struct PingState {
     status_at: u64,
 }
 
-fn io_message(e: &std::io::Error) -> String {
+/// A connection error for the Servers tab; other errors keep the system's own wording.
+fn io_message(e: &std::io::Error) -> Text {
     match e.kind() {
-        ErrorKind::ConnectionRefused => "Connection refused".into(),
-        _ => e.to_string(),
+        ErrorKind::ConnectionRefused => tr!("servers.connectionRefused", "Connection refused"),
+        _ => Text::plain(e.to_string()),
     }
 }
 
@@ -458,11 +461,11 @@ fn parse_status(json: &Value) -> ServerStatus {
 
 /// Connects, asks for the status and measures a ping. Fills `st.status` as soon as the status arrives.
 async fn exchange(handshake_host: &str, host: &str, port: u16, started: Instant, st: &mut PingState) -> Result<u64> {
-    let addrs: Vec<_> = tokio::net::lookup_host((host, port)).await.map_err(|_| anyhow!("Unknown host"))?.collect();
+    let addrs: Vec<_> = tokio::net::lookup_host((host, port)).await.map_err(|_| err_tr!("servers.unknownHost", "Unknown host"))?.collect();
     if addrs.is_empty() {
-        bail!("Unknown host");
+        bail_tr!("servers.unknownHost", "Unknown host");
     }
-    let mut socket = TcpStream::connect(&addrs[..]).await.map_err(|e| anyhow!(io_message(&e)))?;
+    let mut socket = TcpStream::connect(&addrs[..]).await.map_err(|e| io_message(&e))?;
     let mut hs = Vec::new();
     // Protocol -1 asks "what do you run?"; vanilla answers the status request regardless.
     varint(-1, &mut hs);
@@ -471,24 +474,24 @@ async fn exchange(handshake_host: &str, host: &str, port: u16, started: Instant,
     varint(1, &mut hs);
     let mut first = packet(0x00, &hs);
     first.extend(packet(0x00, &[]));
-    socket.write_all(&first).await.map_err(|e| anyhow!(io_message(&e)))?;
+    socket.write_all(&first).await.map_err(|e| io_message(&e))?;
 
     let mut buf: Vec<u8> = Vec::new();
     let mut chunk = [0u8; 16 * 1024];
     let mut ping_at = Instant::now();
     loop {
-        let n = socket.read(&mut chunk).await.map_err(|e| anyhow!(io_message(&e)))?;
+        let n = socket.read(&mut chunk).await.map_err(|e| io_message(&e))?;
         if n == 0 {
-            bail!("Can't reach server");
+            bail_tr!("servers.unreachable", "Can't reach server");
         }
         buf.extend_from_slice(&chunk[..n]);
         if buf.len() > 4 * 1024 * 1024 {
-            bail!("Response too large");
+            bail_tr!("servers.responseTooLarge", "Response too large");
         }
         loop {
             let Some((len, next)) = read_varint(&buf, 0)? else { break };
             if len < 0 {
-                bail!("Bad response from server");
+                bail_tr!("servers.badResponse", "Bad response from server");
             }
             let end = next + len as usize;
             if buf.len() < end {
@@ -496,16 +499,16 @@ async fn exchange(handshake_host: &str, host: &str, port: u16, started: Instant,
             }
             let body: Vec<u8> = buf[next..end].to_vec();
             buf.drain(..end);
-            let Some((id, at)) = read_varint(&body, 0)? else { bail!("Bad response from server") };
+            let Some((id, at)) = read_varint(&body, 0)? else { bail_tr!("servers.badResponse", "Bad response from server") };
             if id == 0x00 && st.status.is_none() {
                 st.status_at = started.elapsed().as_millis() as u64;
-                let Some((slen, sat)) = read_varint(&body, at)? else { bail!("Bad response from server") };
+                let Some((slen, sat)) = read_varint(&body, at)? else { bail_tr!("servers.badResponse", "Bad response from server") };
                 let s_end = (sat + slen.max(0) as usize).min(body.len());
                 let json: Value = serde_json::from_slice(&body[sat.min(s_end)..s_end])?;
                 st.status = Some(parse_status(&json));
                 let payload = crate::core::fsutil::now_ms().to_be_bytes();
                 ping_at = Instant::now();
-                socket.write_all(&packet(0x01, &payload)).await.map_err(|e| anyhow!(io_message(&e)))?;
+                socket.write_all(&packet(0x01, &payload)).await.map_err(|e| io_message(&e))?;
             } else if id == 0x01 && st.status.is_some() {
                 return Ok(ping_at.elapsed().as_millis() as u64);
             }
@@ -535,7 +538,7 @@ pub async fn ping_server(address: &str, timeout: Duration) -> Result<ServerStatu
             return Ok(s);
         }
         Ok(Err(e)) => e,
-        Err(_) => anyhow!("Timed out"),
+        Err(_) => err_tr!("servers.timedOut", "Timed out"),
     };
     // Got the status but not the pong: still a useful answer.
     match st.status {

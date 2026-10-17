@@ -1,0 +1,18 @@
+/* Chinese, Japanese and Korean aren't in the bundled fonts: name each language's own system UI font so the
+   right glyph variants are used (Han characters differ between them). Latin text keeps IBM Plex / Chakra Petch. */
+:root:lang(ja) {
+  --font: 'IBM Plex Sans', 'Yu Gothic UI', 'Meiryo UI', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Chakra Petch', 'Yu Gothic UI', 'Meiryo UI', system-ui, sans-serif;
+}
+:root:lang(ko) {
+  --font: 'IBM Plex Sans', 'Malgun Gothic', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Chakra Petch', 'Malgun Gothic', system-ui, sans-serif;
+}
+:root:lang(zh-CN) {
+  --font: 'IBM Plex Sans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Chakra Petch', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+}
+:root:lang(zh-TW) {
+  --font: 'IBM Plex Sans', 'Microsoft JhengHei UI', 'Microsoft JhengHei', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Chakra Petch', 'Microsoft JhengHei UI', 'Microsoft JhengHei', system-ui, sans-serif;
+}

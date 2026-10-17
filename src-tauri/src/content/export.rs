@@ -19,6 +19,7 @@ use crate::core::instances;
 use crate::core::net::{hash_bytes, HashAlgo};
 use crate::core::paths;
 use crate::core::types::{ContentKind, ExportEntry, ExportOptions, ExportResult, Instance, LoaderType};
+use crate::tr;
 
 // Content folders are exported file-by-file (as links where possible); everything else is opt-in overrides.
 const CONTENT_FOLDERS: [&str; 3] = ["mods", "resourcepacks", "shaderpacks"];
@@ -223,7 +224,7 @@ fn loader_key(l: LoaderType) -> Option<&'static str> {
 type Built = (&'static str, Vec<u8>, u64, Vec<LocalFile>);
 
 async fn build_mrpack(inst: &Instance, opts: &ExportOptions, files: Vec<LocalFile>, task: &Arc<Task>) -> Result<Built> {
-    task.update("Looking up files on Modrinth…", None);
+    task.update(tr!("export.lookingUpModrinth", "Looking up files on Modrinth…"), None);
     let found = modrinth::lookup_hashes(&files.iter().map(|f| f.sha1.clone()).collect::<Vec<_>>()).await?;
     let (linked, bundled): (Vec<LocalFile>, Vec<LocalFile>) = files.into_iter().partition(|f| found.contains_key(&f.sha1));
 
@@ -255,7 +256,7 @@ async fn build_mrpack(inst: &Instance, opts: &ExportOptions, files: Vec<LocalFil
 }
 
 async fn build_curseforge(inst: &Instance, opts: &ExportOptions, files: Vec<LocalFile>, task: &Arc<Task>) -> Result<Built> {
-    task.update("Looking up files on CurseForge…", None);
+    task.update(tr!("export.lookingUpCurseforge", "Looking up files on CurseForge…"), None);
     // Prefer what we installed from CurseForge ourselves; fingerprint the rest (needs an API key).
     let idx = load_index(&inst.id).await;
     let mut refs: HashMap<PathBuf, (u64, u64)> = HashMap::new();
@@ -303,13 +304,13 @@ async fn build_curseforge(inst: &Instance, opts: &ExportOptions, files: Vec<Loca
 pub async fn export_modpack(instance_id: &str, opts: ExportOptions, dest: &Path) -> Result<ExportResult> {
     let inst = instances::get(instance_id).await?;
     let dest = dest.to_path_buf();
-    Task::run(format!("Exporting {}", opts.name), Some(instance_id.to_string()), move |task| async move {
-        task.update("Reading mods…", None);
+    Task::run(tr!("export.exporting", "Exporting {name}", name = opts.name), Some(instance_id.to_string()), move |task| async move {
+        task.update(tr!("export.readingMods", "Reading mods…"), None);
         let i2 = inst.clone();
         let (files, skipped_disabled) = tokio::task::spawn_blocking(move || content_files(&i2)).await??;
         let (manifest_name, manifest, linked, bundled) =
             if opts.format == "mrpack" { build_mrpack(&inst, &opts, files, &task).await? } else { build_curseforge(&inst, &opts, files, &task).await? };
-        task.update("Packing configs…", None);
+        task.update(tr!("export.packingConfigs", "Packing configs…"), None);
         let bundled_names: Vec<String> = bundled.iter().map(|f| f.rel.clone()).collect();
         let (d, include) = (dest.clone(), opts.include.clone());
         tokio::task::spawn_blocking(move || -> Result<()> {

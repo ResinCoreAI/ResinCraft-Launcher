@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
@@ -17,6 +17,7 @@ use crate::core::paths;
 use crate::core::types::{
     ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectHit, ProjectVersion, SearchQuery, SearchResult,
 };
+use crate::{err_tr, tr};
 
 const API: &str = "https://api.feed-the-beast.com/v1/modpacks/public";
 
@@ -204,23 +205,28 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         Some(vid) => p.versions.iter().find(|v| &v.id.to_string() == vid),
         None => p.versions.iter().filter(|v| v.kind == "release").max_by_key(|v| v.released).or(p.versions.last()),
     };
-    let summary = summary.ok_or_else(|| anyhow!("{} has no version to install", p.name))?;
+    let summary = summary.ok_or_else(|| err_tr!("ftb.noVersion", "{name} has no version to install", name = p.name))?;
     let version: FtbVersion = fetch_json(&format!("{API}/modpack/{}/{}", p.id, summary.id)).await?;
 
-    let mc = version.summary.target("game").map(|t| t.version.clone()).ok_or_else(|| anyhow!("{} doesn't say which Minecraft version it needs", p.name))?;
+    let mc = version
+        .summary
+        .target("game")
+        .map(|t| t.version.clone())
+        .ok_or_else(|| err_tr!("modpack.noMcVersion", "{name} doesn't say which Minecraft version it needs", name = p.name))?;
     let ml = version.summary.target("modloader").cloned();
     let loader = match &ml {
         None => LoaderType::Vanilla,
-        Some(t) => parse_loader(&t.name).ok_or_else(|| anyhow!("{} needs {}, which ResinCraft doesn't support yet.", p.name, t.name))?,
+        Some(t) => parse_loader(&t.name)
+            .ok_or_else(|| err_tr!("modpack.needsUnsupportedLoader", "{name} needs {loader}, which ResinCraft doesn't support yet.", name = p.name, loader = t.name))?,
     };
 
-    Task::run(format!("Installing {}", p.name), None, move |task| async move {
+    Task::run(tr!("modpack.installing", "Installing {name}", name = p.name), None, move |task| async move {
         let modpack = ModpackRef { name: p.name.clone(), project_id: Some(format!("ftb:{}", p.id)), version_id: Some(version.summary.id.to_string()) };
         let icon = icon_of(&p);
         // FTB tells us how much memory the pack wants; start there.
         let memory = version.summary.specs.as_ref().map(|s| s.recommended).filter(|m| *m > 0);
         let loader_version = ml.as_ref().map(|t| t.version.clone()).filter(|v| !v.is_empty());
-        let new = NewInstance { name: p.name.clone(), mc_version: mc, loader, loader_version, color: None };
+        let new = NewInstance { name: p.name.clone(), mc_version: mc, loader, loader_version, color: None, group: None };
         let inst = instances::create(new, move |i| {
             i.icon_url = icon;
             i.memory_mb = memory;
@@ -255,7 +261,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
                 let hash = (!f.sha1.is_empty()).then(|| Hash::sha1(&f.sha1));
                 items.push(DownloadItem::new(&f.url, dest).hash(hash).size(f.size));
             }
-            download_all(items, 8, task.counter("Downloading modpack files")).await?;
+            download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
             if !pending.is_empty() {
                 instances::update(&inst.id, json!({ "pendingDownloads": pending })).await?;
             }

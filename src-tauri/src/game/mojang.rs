@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -14,6 +14,7 @@ use crate::core::fsutil::{read_json, safe_join, write_json};
 use crate::core::net::{download_file, fetch_json, hash_file, DownloadItem, Hash};
 use crate::core::paths;
 use crate::core::types::McVersion;
+use crate::err_tr;
 
 const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 const RESOURCES_URL: &str = "https://resources.download.minecraft.net";
@@ -352,7 +353,7 @@ async fn refresh(item: &DownloadItem) -> Result<()> {
 pub async fn get_vanilla_version(id: &str) -> Result<VersionJson> {
     let file = paths::versions().join(id).join(format!("{id}.json"));
     let fetched: Result<()> = async {
-        let entry = manifest().await?.into_iter().find(|v| v.id == id).ok_or_else(|| anyhow!("Minecraft {id} isn't a known version"))?;
+        let entry = manifest().await?.into_iter().find(|v| v.id == id).ok_or_else(|| err_tr!("mojang.unknownVersion", "Minecraft {id} isn't a known version", id = id))?;
         refresh(&DownloadItem::new(entry.url, &file).hash(Some(Hash::sha1(entry.sha1)))).await
     }
     .await;
@@ -362,7 +363,7 @@ pub async fn get_vanilla_version(id: &str) -> Result<VersionJson> {
         }
     }
     let text = tokio::fs::read_to_string(&file).await?;
-    serde_json::from_str(&text).with_context(|| format!("{} is damaged", file.display()))
+    serde_json::from_str(&text).map_err(|_| err_tr!("mojang.damaged", "{file} is damaged", file = file.display().to_string()))
 }
 
 /// Layers a mod-loader profile (Fabric/Quilt/Forge) on top of its vanilla parent.
@@ -499,7 +500,7 @@ pub fn resolve_library_list(libs: &[Library], dedupe: bool) -> Vec<ResolvedLibra
 }
 
 pub fn client_jar(v: &VersionJson) -> Result<DownloadItem> {
-    let c = v.downloads.as_ref().and_then(|d| d.get("client")).ok_or_else(|| anyhow!("Version {} has no client download", v.id))?;
+    let c = v.downloads.as_ref().and_then(|d| d.get("client")).ok_or_else(|| err_tr!("mojang.noClientDownload", "Version {version} has no client download", version = v.id))?;
     let dest = paths::versions().join(&v.id).join(format!("{}.jar", v.id));
     Ok(DownloadItem::new(c.url.clone(), dest).hash(c.sha1.clone().map(Hash::sha1)).size(c.size))
 }
@@ -581,7 +582,7 @@ pub async fn materialize_legacy_assets(index: &AssetIndex, id: &str, game_direct
         if let Some(parent) = dest.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        tokio::fs::copy(object_path(&obj.hash), &dest).await.with_context(|| format!("couldn't copy asset {name}"))?;
+        tokio::fs::copy(object_path(&obj.hash), &dest).await.map_err(|_| err_tr!("mojang.copyAssetFailed", "Couldn't copy asset {name}", name = name))?;
     }
     Ok(target)
 }
