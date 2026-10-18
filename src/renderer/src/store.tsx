@@ -10,6 +10,7 @@ export type Route =
   | { page: 'discover'; kind?: ContentKind; instanceId?: string }
   | { page: 'accounts' }
   | { page: 'servers'; id?: string; fromInstance?: string }
+  | { page: 'bedrock' }
   | { page: 'settings' }
 
 export type GameState = GameEvent['state']

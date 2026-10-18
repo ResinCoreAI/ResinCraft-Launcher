@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import {
   Archive,
   Ban,
+  Blocks,
   ClipboardCopy,
   Copy,
   Crown,
@@ -30,7 +31,9 @@ import {
   Wifi
 } from 'lucide-react'
 import type { ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
+import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api } from '../api'
+import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
 import FileManager from '../components/FileManager'
 import ServerAddons from '../components/ServerAddons'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
@@ -44,10 +47,13 @@ import '../servers.css'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
 const MAX_LOG = 3000
-const isPluginServer = (s: ServerInfo) => ['paper', 'purpur', 'folia', 'spigot'].includes(s.type)
+const isPluginServer = (s: ServerInfo) => PLUGIN_SERVERS.includes(s.type)
+/** Plugins and mods together (two tabs). */
+const isHybrid = (s: ServerInfo) => HYBRID_SERVERS.includes(s.type)
+const isBedrock = (s: ServerInfo) => s.type === 'bedrock'
 const live = (s: ServerInfo) => s.state === 'starting' || s.state === 'running' || s.state === 'stopping'
 
-type Tab = 'console' | 'players' | 'addons' | 'properties' | 'files' | 'settings'
+type Tab = 'console' | 'players' | 'addons' | 'mods' | 'properties' | 'files' | 'settings'
 
 export default function Servers({ id, fromInstance }: { id?: string; fromInstance?: string }) {
   const { go, toast } = useStore()
@@ -343,8 +349,15 @@ function ServerDetail({
   const [tab, setTab] = useState<Tab>('console')
   const tabs: { id: Tab; icon: ReactNode; label: string; hidden?: boolean }[] = [
     { id: 'console', icon: <Terminal />, label: t('servers.tab.console') },
-    { id: 'players', icon: <Users />, label: t('servers.tab.players') },
-    { id: 'addons', icon: <Puzzle />, label: t(isPluginServer(s) ? 'servers.tab.plugins' : 'servers.tab.mods'), hidden: s.type === 'vanilla' },
+    // Bedrock keeps its own allow list and permissions (by Xbox id): managed in the Console and Files for now.
+    { id: 'players', icon: <Users />, label: t('servers.tab.players'), hidden: isBedrock(s) },
+    {
+      id: 'addons',
+      icon: <Puzzle />,
+      label: t(isPluginServer(s) || isHybrid(s) ? 'servers.tab.plugins' : 'servers.tab.mods'),
+      hidden: s.type === 'vanilla' || isBedrock(s)
+    },
+    { id: 'mods', icon: <Blocks />, label: t('servers.tab.mods'), hidden: !isHybrid(s) },
     { id: 'properties', icon: <SlidersHorizontal />, label: t('servers.tab.properties') },
     { id: 'files', icon: <FolderTree />, label: t('files.tab') },
     { id: 'settings', icon: <Settings2 />, label: t('servers.tab.settings') }
@@ -388,7 +401,8 @@ function ServerDetail({
 
       {tab === 'console' && <ConsoleTab s={s} />}
       {tab === 'players' && <PlayersTab s={s} />}
-      {tab === 'addons' && <ServerAddons s={s} />}
+      {tab === 'addons' && <ServerAddons key="plugins" s={s} area={isHybrid(s) ? 'plugins' : undefined} />}
+      {tab === 'mods' && <ServerAddons key="mods" s={s} area="mods" />}
       {tab === 'properties' && <PropertiesTab s={s} />}
       {tab === 'files' && <FileManager root={{ kind: 'server', id: s.id }} rootLabel={t('files.root.server')} running={live(s)} />}
       {tab === 'settings' && <SettingsTab s={s} reload={reload} onDeleted={() => go({ page: 'servers' })} />}
@@ -438,8 +452,14 @@ function CopyAddress({ value, small }: { value: string; small?: boolean }) {
 function ConnectCard({ s }: { s: ServerInfo }) {
   const { instances, toast } = useStore()
   const [lanIp, setLanIp] = useState<string | null>()
+  const [bedrockJoin] = useBedrockJoin(s)
+  // Plugin servers take any client; hybrids a vanilla one or one with their mod loader.
   const compatible = useMemo(
-    () => instances.filter((i) => i.mcVersion === s.mcVersion && (isPluginServer(s) || s.type === 'vanilla' ? true : i.loader === s.loader)),
+    () =>
+      instances.filter(
+        (i) =>
+          i.mcVersion === s.mcVersion && (isPluginServer(s) || s.type === 'vanilla' ? true : i.loader === s.loader || (isHybrid(s) && i.loader === 'vanilla'))
+      ),
     [instances, s]
   )
   const [instanceId, setInstanceId] = useState<string>()
@@ -453,40 +473,58 @@ function ConnectCard({ s }: { s: ServerInfo }) {
 
   const net = s.net
   const running = s.state === 'running'
+  const openBedrock = async () => {
+    setLaunching(true)
+    try {
+      await api.server.play(s.id)
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setLaunching(false)
+    }
+  }
   return (
-    <div className="sv-connect">
+    <div className={`sv-connect ${bedrockJoin?.geyser ? 'four' : ''}`}>
       <div className="cell">
         <span className="label">
           <HomeIcon /> {t('servers.connect.thisPc')}
         </span>
-        <CopyAddress value={`localhost:${s.port}`} />
-        <div className="play-here">
-          <select className="select" value={instanceId ?? ''} onChange={(e) => setInstanceId(e.target.value)} disabled={!compatible.length}>
-            {!compatible.length && <option value="">{t('servers.connect.noInstance', { version: s.mcVersion })}</option>}
-            {compatible.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-              </option>
-            ))}
-          </select>
-          <button
-            className="btn primary"
-            disabled={!instanceId || launching || s.state === 'stopped' || s.state === 'crashed'}
-            title={s.state === 'stopped' ? t('servers.connect.startFirst') : undefined}
-            onClick={async () => {
-              setLaunching(true)
-              try {
-                await api.server.play(s.id, instanceId!)
-              } catch (e) {
-                toast((e as Error).message, 'error')
-              } finally {
-                setLaunching(false)
-              }
-            }}
-          >
-            {launching ? <Loader2 className="spin" /> : <Gamepad2 />} {t('servers.connect.play')}
-          </button>
-        </div>
+        <CopyAddress value={isBedrock(s) ? `127.0.0.1:${s.port}` : `localhost:${s.port}`} />
+        {isBedrock(s) ? (
+          <div className="play-here">
+            <button className="btn primary" disabled={launching || s.state === 'stopped' || s.state === 'crashed'} onClick={() => void openBedrock()}>
+              {launching ? <Loader2 className="spin" /> : <Gamepad2 />} {t('servers.connect.openBedrock')}
+            </button>
+          </div>
+        ) : (
+          <div className="play-here">
+            <select className="select" value={instanceId ?? ''} onChange={(e) => setInstanceId(e.target.value)} disabled={!compatible.length}>
+              {!compatible.length && <option value="">{t('servers.connect.noInstance', { version: s.mcVersion })}</option>}
+              {compatible.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn primary"
+              disabled={!instanceId || launching || s.state === 'stopped' || s.state === 'crashed'}
+              title={s.state === 'stopped' ? t('servers.connect.startFirst') : undefined}
+              onClick={async () => {
+                setLaunching(true)
+                try {
+                  await api.server.play(s.id, instanceId!)
+                } catch (e) {
+                  toast((e as Error).message, 'error')
+                } finally {
+                  setLaunching(false)
+                }
+              }}
+            >
+              {launching ? <Loader2 className="spin" /> : <Gamepad2 />} {t('servers.connect.play')}
+            </button>
+          </div>
+        )}
       </div>
       <div className="cell">
         <span className="label">
@@ -533,12 +571,16 @@ function ConnectCard({ s }: { s: ServerInfo }) {
         ) : net?.state === 'failed' ? (
           <>
             <span className="hint bad">{net.errorText ? tx(net.errorText) : net.error}</span>
-            <span className="hint">{t('servers.connect.forwardHint', { port: String(s.port), ip: lanIp ?? '…' })}</span>
+            <span className="hint">
+              {t(isBedrock(s) ? 'servers.connect.forwardHintUdp' : 'servers.connect.forwardHint', { port: String(s.port), ip: lanIp ?? '…' })}
+            </span>
+            {isBedrock(s) && net.playitHint && <span className="hint">{t('servers.connect.playitHintBedrock')}</span>}
           </>
         ) : (
           <span className="hint">{running ? t('servers.connect.opening') : t('servers.connect.internetLater')}</span>
         )}
       </div>
+      <BedrockPlayersCell s={s} status={bedrockJoin} lanIp={lanIp} copy={(v, small) => <CopyAddress value={v} small={small} />} />
     </div>
   )
 }
@@ -701,7 +743,11 @@ function PlayersTab({ s }: { s: ServerInfo }) {
             {s.players.map((p) => (
               <div key={p} className="list-row">
                 <div className="ico">
-                  <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p)}/40`} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
+                  <img
+                    src={`https://mc-heads.net/avatar/${encodeURIComponent(p)}/40`}
+                    alt=""
+                    onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
+                  />
                 </div>
                 <div className="grow title">{p}</div>
                 <button className="btn sm" disabled={busy} onClick={() => void command(`op ${p}`)}>
@@ -753,7 +799,11 @@ function PlayersTab({ s }: { s: ServerInfo }) {
               <div key={en.name} className="list-row">
                 <div className="ico">
                   {kind !== 'ipBans' && (
-                    <img src={`https://mc-heads.net/avatar/${encodeURIComponent(en.uuid ?? en.name)}/40`} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
+                    <img
+                      src={`https://mc-heads.net/avatar/${encodeURIComponent(en.uuid ?? en.name)}/40`}
+                      alt=""
+                      onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
+                    />
                   )}
                 </div>
                 <div className="grow">
@@ -761,7 +811,12 @@ function PlayersTab({ s }: { s: ServerInfo }) {
                   <div className="file mono">{en.uuid ?? en.reason ?? ''}</div>
                 </div>
                 {en.level != null && <span className="chip">{t('servers.players.level', { level: en.level })}</span>}
-                <button className="btn ghost icon sm danger" disabled={busy} title={t('common.remove')} onClick={() => void act(() => api.server.playerRemove(s.id, kind, en.name))}>
+                <button
+                  className="btn ghost icon sm danger"
+                  disabled={busy}
+                  title={t('common.remove')}
+                  onClick={() => void act(() => api.server.playerRemove(s.id, kind, en.name))}
+                >
                   <Trash2 />
                 </button>
               </div>
@@ -837,7 +892,9 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
   return (
     <>
       <div className="sv-savebar">
-        <span className="hint grow">{!entries.some((e) => e.key === 'motd') ? t('servers.properties.notYet') : live(s) ? t('servers.properties.restartHint') : ''}</span>
+        <span className="hint grow">
+          {!entries.some((e) => e.key === 'motd') ? t('servers.properties.notYet') : live(s) ? t('servers.properties.restartHint') : ''}
+        </span>
         <button className="btn ghost" disabled={!dirty || saving} onClick={() => void load()}>
           {t('servers.properties.revert')}
         </button>
@@ -861,7 +918,14 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
               <b>{t('servers.properties.maxPlayers')}</b>
             </div>
             <div className="control">
-              <input className="input sv-num" type="number" min={1} max={1000} value={get('max-players')} onChange={(e) => set('max-players', e.target.value)} />
+              <input
+                className="input sv-num"
+                type="number"
+                min={1}
+                max={1000}
+                value={get('max-players')}
+                onChange={(e) => set('max-players', e.target.value)}
+              />
             </div>
           </div>
           <div className="setting">
@@ -980,13 +1044,14 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
   useEffect(() => {
     void api.java.list().then(setJavas)
   }, [])
-  // The exact Java arguments the next start uses (after any setting change).
+  // The exact Java arguments the next start uses (after any setting change). Bedrock runs no Java.
   useEffect(() => {
+    if (s.type === 'bedrock') return
     void api.server
       .launchArgs(s.id)
       .then(setCommand)
       .catch(() => setCommand(undefined))
-  }, [s.id, s.optimizedFlags, s.memoryMb, s.jvmArgs])
+  }, [s.id, s.type, s.optimizedFlags, s.memoryMb, s.jvmArgs])
 
   const save = async (patch: Parameters<typeof api.server.update>[1]) => {
     try {
@@ -1007,7 +1072,12 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               <b>{t('servers.settings.name')}</b>
             </div>
             <div className="control">
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== s.name && void save({ name: name.trim() })} />
+              <input
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={() => name.trim() && name !== s.name && void save({ name: name.trim() })}
+              />
             </div>
           </div>
           <div className="setting">
@@ -1027,66 +1097,83 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               />
             </div>
           </div>
-          <div className="setting stack">
-            <div className="row">
-              <span className="grow">
-                <b>{t('servers.settings.memory')}</b>
-              </span>
-              <span className="mem-value">{t('common.size.gb', { n: fixed(memory / 1024, 1) })}</span>
+          {isBedrock(s) ? (
+            <div className="setting stack">
+              <span className="hint">{t('servers.settings.bedrockHint')}</span>
             </div>
-            <input
-              type="range"
-              min={1024}
-              max={maxMem}
-              step={512}
-              value={memory}
-              onChange={(e) => setMemory(Number(e.target.value))}
-              onMouseUp={() => memory !== s.memoryMb && void save({ memoryMb: memory })}
-              onKeyUp={() => memory !== s.memoryMb && void save({ memoryMb: memory })}
-            />
-            <span className="hint">{t('servers.settings.memoryHint')}</span>
-          </div>
-          <div className="setting">
-            <div className="text">
-              <b>Java</b>
-              <span>{t('servers.settings.javaHint', { version: s.mcVersion })}</span>
-            </div>
-            <div className="control">
-              <select className="select" value={s.javaPath ?? ''} onChange={(e) => void save({ javaPath: e.target.value || undefined })}>
-                <option value="">{t('servers.settings.javaAuto')}</option>
-                {javas?.map((j) => (
-                  <option key={j.path} value={j.path}>
-                    Java {j.major} · {j.version}
-                    {j.managed ? ' (ResinCraft)' : ''}
-                  </option>
-                ))}
-                {s.javaPath && !javas?.some((j) => j.path === s.javaPath) && <option value={s.javaPath}>{s.javaPath}</option>}
-              </select>
-            </div>
-          </div>
-          <div className="setting">
-            <div className="text">
-              <b>{t('servers.settings.optimized')}</b>
-              <span>{t('servers.settings.optimizedHint')}</span>
-            </div>
-            <Switch on={s.optimizedFlags} onChange={(v) => void save({ optimizedFlags: v })} label={t('servers.settings.optimized')} />
-          </div>
-          <div className="setting stack">
-            <div className="text">
-              <b>{t('servers.settings.jvmArgs')}</b>
-              <span>{t('servers.settings.jvmArgsHint')}</span>
-            </div>
-            <textarea className="input" rows={2} value={jvm} placeholder="-XX:+UseG1GC" onChange={(e) => setJvm(e.target.value)} onBlur={() => jvm !== (s.jvmArgs ?? '') && void save({ jvmArgs: jvm || undefined })} />
-          </div>
-          <div className="setting stack">
-            <div className="text">
-              <b>{t('servers.settings.command')}</b>
-              <span>{running ? t('servers.settings.commandRunning') : t('servers.settings.commandHint')}</span>
-            </div>
-            <pre className="sv-command">{command ? `java ${command.join(' ')}` : '…'}</pre>
-          </div>
+          ) : (
+            <>
+              <div className="setting stack">
+                <div className="row">
+                  <span className="grow">
+                    <b>{t('servers.settings.memory')}</b>
+                  </span>
+                  <span className="mem-value">{t('common.size.gb', { n: fixed(memory / 1024, 1) })}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1024}
+                  max={maxMem}
+                  step={512}
+                  value={memory}
+                  onChange={(e) => setMemory(Number(e.target.value))}
+                  onMouseUp={() => memory !== s.memoryMb && void save({ memoryMb: memory })}
+                  onKeyUp={() => memory !== s.memoryMb && void save({ memoryMb: memory })}
+                />
+                <span className="hint">{t('servers.settings.memoryHint')}</span>
+              </div>
+              <div className="setting">
+                <div className="text">
+                  <b>Java</b>
+                  <span>{t('servers.settings.javaHint', { version: s.mcVersion })}</span>
+                </div>
+                <div className="control">
+                  <select className="select" value={s.javaPath ?? ''} onChange={(e) => void save({ javaPath: e.target.value || undefined })}>
+                    <option value="">{t('servers.settings.javaAuto')}</option>
+                    {javas?.map((j) => (
+                      <option key={j.path} value={j.path}>
+                        Java {j.major} · {j.version}
+                        {j.managed ? ' (ResinCraft)' : ''}
+                      </option>
+                    ))}
+                    {s.javaPath && !javas?.some((j) => j.path === s.javaPath) && <option value={s.javaPath}>{s.javaPath}</option>}
+                  </select>
+                </div>
+              </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('servers.settings.optimized')}</b>
+                  <span>{t('servers.settings.optimizedHint')}</span>
+                </div>
+                <Switch on={s.optimizedFlags} onChange={(v) => void save({ optimizedFlags: v })} label={t('servers.settings.optimized')} />
+              </div>
+              <div className="setting stack">
+                <div className="text">
+                  <b>{t('servers.settings.jvmArgs')}</b>
+                  <span>{t('servers.settings.jvmArgsHint')}</span>
+                </div>
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={jvm}
+                  placeholder="-XX:+UseG1GC"
+                  onChange={(e) => setJvm(e.target.value)}
+                  onBlur={() => jvm !== (s.jvmArgs ?? '') && void save({ jvmArgs: jvm || undefined })}
+                />
+              </div>
+              <div className="setting stack">
+                <div className="text">
+                  <b>{t('servers.settings.command')}</b>
+                  <span>{running ? t('servers.settings.commandRunning') : t('servers.settings.commandHint')}</span>
+                </div>
+                <pre className="sv-command">{command ? `java ${command.join(' ')}` : '…'}</pre>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      <BedrockJoinSettings s={s} />
 
       <div className="settings-section">
         <h3>{t('servers.settings.internet')}</h3>
@@ -1110,31 +1197,36 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
             <Segmented<ServerTunnel>
               value={s.tunnel}
               onChange={(v) => v !== s.tunnel && void save({ tunnel: v })}
-              // ResinCraft Relay only in builds that have one (still shown if it's the current choice).
-              options={TUNNELS.filter((v) => v !== 'resin' || relay?.available || s.tunnel === 'resin').map((v) => ({
+              // ResinCraft Relay only in builds that have one (still shown if it's the current choice). Bedrock talks UDP,
+              // which only the router and playit.gg carry.
+              options={TUNNELS.filter((v) =>
+                isBedrock(s) ? ['auto', 'playit', 'manual'].includes(v) || v === s.tunnel : v !== 'resin' || relay?.available || s.tunnel === 'resin'
+              ).map((v) => ({
                 value: v,
                 label: t(`servers.settings.tunnel.${v}`)
               }))}
             />
           </div>
-          {(s.tunnel === 'auto' || s.tunnel === 'resin') && <RelaySettings s={s} info={relay} reload={reload} />}
-          <div className="setting">
-            <div className="text">
-              <b>{t('servers.settings.relayHost')}</b>
-              <span>{t('servers.settings.relayHostHint')}</span>
+          {!isBedrock(s) && (s.tunnel === 'auto' || s.tunnel === 'resin') && <RelaySettings s={s} info={relay} reload={reload} />}
+          {!isBedrock(s) && (
+            <div className="setting">
+              <div className="text">
+                <b>{t('servers.settings.relayHost')}</b>
+                <span>{t('servers.settings.relayHostHint')}</span>
+              </div>
+              <div className="control">
+                <input
+                  className="input"
+                  value={relayHost}
+                  placeholder="bore.pub"
+                  spellCheck={false}
+                  onChange={(e) => setRelayHost(e.target.value)}
+                  onBlur={() => relayHost.trim() !== (s.relayHost ?? '') && void save({ relayHost: relayHost.trim() })}
+                />
+              </div>
             </div>
-            <div className="control">
-              <input
-                className="input"
-                value={relayHost}
-                placeholder="bore.pub"
-                spellCheck={false}
-                onChange={(e) => setRelayHost(e.target.value)}
-                onBlur={() => relayHost.trim() !== (s.relayHost ?? '') && void save({ relayHost: relayHost.trim() })}
-              />
-            </div>
-          </div>
-          {(relayHost.trim() || s.relaySecret) && (
+          )}
+          {!isBedrock(s) && (relayHost.trim() || s.relaySecret) && (
             <div className="setting">
               <div className="text">
                 <b>{t('servers.settings.relaySecret')}</b>
@@ -1151,7 +1243,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               </div>
             </div>
           )}
-          <DomainSettings s={s} save={save} />
+          {!isBedrock(s) && <DomainSettings s={s} save={save} />}
           <div className="setting stack">
             <span className="hint">{rich('servers.settings.publicHelp', { b: (x) => <b>{x}</b> })}</span>
           </div>
@@ -1267,7 +1359,15 @@ function EulaModal({ server, onAgree, onClose }: { server: ServerInfo; onAgree: 
       </button>
       <label className="sv-agree">
         <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-        <span>{rich('servers.eula.agree', { link: (x) => <a href={EULA_URL} onClick={(e) => (e.preventDefault(), void api.app.openExternal(EULA_URL))}>{x}</a> })}</span>
+        <span>
+          {rich('servers.eula.agree', {
+            link: (x) => (
+              <a href={EULA_URL} onClick={(e) => (e.preventDefault(), void api.app.openExternal(EULA_URL))}>
+                {x}
+              </a>
+            )
+          })}
+        </span>
       </label>
     </Modal>
   )
@@ -1321,4 +1421,3 @@ function CreatedSummary({ result, onClose }: { result: ServerCreated; onClose: (
     </Modal>
   )
 }
-

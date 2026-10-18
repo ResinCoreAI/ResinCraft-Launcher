@@ -8,13 +8,14 @@ export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack'
  * "atl:SkyFactory4", "technic:tekkit"); bare ids are Modrinth, so the rest of the API doesn't need a
  * separate source argument.
  */
-export type ContentSource = 'modrinth' | 'curseforge' | 'ftb' | 'atlauncher' | 'technic'
+export type ContentSource = 'modrinth' | 'curseforge' | 'ftb' | 'atlauncher' | 'technic' | 'github'
 
 const PREFIXES: [string, ContentSource][] = [
   ['cf:', 'curseforge'],
   ['ftb:', 'ftb'],
   ['atl:', 'atlauncher'],
-  ['technic:', 'technic']
+  ['technic:', 'technic'],
+  ['gh:', 'github']
 ]
 
 export function sourceOf(projectId: string): ContentSource {
@@ -444,9 +445,73 @@ export interface ScreenshotInfo {
   mtime: number
 }
 
+// ---------- Bedrock Edition ----------
+
+/** The game, and Minecraft Preview (beta builds of the next update). */
+export type BedrockEditionKind = 'release' | 'preview'
+
+export interface BedrockWorld {
+  id: string
+  name: string
+  /** Last played (ms since 1970). */
+  modified: number
+}
+
+export interface BedrockEdition {
+  edition: BedrockEditionKind
+  installed: boolean
+  /** The game version, e.g. "1.26.52.3". */
+  version?: string
+  /** The most recently played first. */
+  worlds: BedrockWorld[]
+}
+
+export interface BedrockStatus {
+  /** Bedrock Edition only exists as an app on Windows. */
+  supported: boolean
+  editions: BedrockEdition[]
+}
+
 // ---------- Server hosting ----------
 
-export type ServerKind = 'vanilla' | 'paper' | 'purpur' | 'folia' | 'spigot' | 'fabric' | 'quilt' | 'forge' | 'neoforge'
+export type ServerKind =
+  | 'vanilla'
+  | 'paper'
+  | 'purpur'
+  | 'folia'
+  | 'spigot'
+  | 'leaf'
+  | 'fabric'
+  | 'quilt'
+  | 'forge'
+  | 'neoforge'
+  /** Mods and Bukkit plugins together, on Forge, NeoForge or Fabric (`loader`). */
+  | 'arclight'
+  /** Bedrock Dedicated Server: its own program and UDP port, no Java. */
+  | 'bedrock'
+
+/** Bukkit-style plugin servers. */
+export const PLUGIN_SERVERS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf']
+/** Servers with plugins and mods (managed as two areas). */
+export const HYBRID_SERVERS: ServerKind[] = ['arclight']
+/** Which of a hybrid server's folders an add-on call is about. */
+export type AddonArea = 'plugins' | 'mods'
+
+/** A build of server software to choose from (Arclight: one per mod loader it runs on; id "loader@version"). */
+export interface ServerBuild {
+  id: string
+  label: string
+  stable: boolean
+}
+
+/** Whether Bedrock players can join a Java server (Geyser + Floodgate), and the UDP port they use. */
+export interface BedrockJoin {
+  /** Geyser runs on this server type (plugin servers, Arclight, Fabric, Quilt, NeoForge). */
+  supported: boolean
+  geyser: boolean
+  floodgate: boolean
+  port: number
+}
 /**
  * 'auto': the router (UPnP), else ResinCraft Relay (with a Microsoft account), else playit.gg (once linked), else the
  * bore relay. 'resin': ResinCraft Relay (name.rscraft.resincore.tech). 'playit': playit.gg. 'relay': the bore relay.
@@ -473,6 +538,8 @@ export interface ServerNet {
   playitHint?: boolean
   /** ResinCraft Relay: name, traffic and reconnecting while `via` is 'resin', or why it wasn't used. */
   resin?: ResinNet
+  /** Java servers with Geyser: where Bedrock players join (UDP). */
+  bedrockAddress?: string
   /** Automatic skipped ResinCraft Relay because no Microsoft account is signed in: suggest signing in. */
   resinHint?: boolean
 }
@@ -566,7 +633,7 @@ export interface ServerInfo {
   type: ServerKind
   mcVersion: string
   loader?: LoaderType
-  /** Mod loader version, or the Paper/Purpur/Folia build. */
+  /** Mod loader version, or the build of Paper, Purpur, Folia, Leaf or Arclight. */
   loaderVersion?: string
   memoryMb: number
   port: number
@@ -576,7 +643,7 @@ export interface ServerInfo {
   lastStarted?: number
   modpack?: { projectId?: string; versionId?: string; name: string }
   iconUrl?: string
-  launch: { jar?: string; argsFile?: string }
+  launch: { jar?: string; argsFile?: string; exe?: string }
   /** Open the port on the router automatically while running. */
   public: boolean
   /** Start with Aikar's tuned G1GC flags (-Xms = -Xmx). */
@@ -622,7 +689,10 @@ export interface ServerCreated {
 }
 
 export type ServerPatch = Partial<
-  Pick<ServerInfo, 'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'tunnel' | 'relayHost' | 'relaySecret' | 'domain' | 'dnsAuto'>
+  Pick<
+    ServerInfo,
+    'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'tunnel' | 'relayHost' | 'relaySecret' | 'domain' | 'dnsAuto'
+  >
 >
 
 export interface ServerEvent {
@@ -653,16 +723,19 @@ export interface ServerListEntry {
   reason?: string
 }
 
-export type AddonSource = 'modrinth' | 'hangar' | 'spigot' | 'curseforge'
+/** 'bukkit' is dev.bukkit.org (CurseForge's Bukkit plugins); 'geysermc' only names installed Geyser/Floodgate. */
+export type AddonSource = 'modrinth' | 'hangar' | 'spigot' | 'bukkit' | 'curseforge' | 'github' | 'geysermc'
 
 export interface ServerAddonHit {
-  /** Bare id for Modrinth, "hangar:<slug>", "spigot:<id>", "cf:<id>". */
+  /** Bare id for Modrinth, "hangar:<slug>", "spigot:<id>", "cf:<id>", "gh:<owner>/<repo>". */
   id: string
   title: string
   description: string
   iconUrl?: string
   author: string
   downloads: number
+  /** GitHub: stars instead of downloads. */
+  stars?: number
   source: AddonSource
   url: string
   /** Premium or hosted elsewhere: open `url` instead of installing. */
@@ -743,6 +816,16 @@ export interface ResinApi {
     get(): Promise<Settings>
     set(patch: Partial<Settings>): Promise<Settings>
   }
+  /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
+  bedrock: {
+    status(): Promise<BedrockStatus>
+    /** Opens the game. */
+    play(edition: BedrockEditionKind): Promise<void>
+    /** Opens its Microsoft Store page. */
+    get(edition: BedrockEditionKind): Promise<void>
+    /** Opens a world's folder, or the edition's worlds folder. */
+    openFolder(edition: BedrockEditionKind, worldId?: string): Promise<void>
+  }
   /** ResinCraft's own updates. */
   update: {
     status(): Promise<UpdateStatus>
@@ -797,6 +880,8 @@ export interface ResinApi {
     search(q: SearchQuery): Promise<SearchResult>
     versions(projectId: string, instanceId?: string): Promise<ProjectVersion[]>
     install(instanceId: string, projectId: string, kind: ContentKind, versionId?: string): Promise<void>
+    /** Installs what a link points to (a Modrinth, CurseForge or GitHub page, or a .jar) into an instance. */
+    installFromLink(instanceId: string, url: string, kind: ContentKind): Promise<void>
     /** Which picks are the same mod from two sites, and which the instance already has from another site. */
     duplicates(instanceId: string, picks: ModPick[]): Promise<DuplicateCheck>
     /** Installs picks in one task, each from its own site, after moving `replace` to the Recycle Bin. */
@@ -851,8 +936,10 @@ export interface ResinApi {
   server: {
     list(): Promise<ServerInfo[]>
     get(id: string): Promise<ServerInfo>
-    /** Minecraft versions Paper / Purpur / Folia / Spigot exist for (empty for other types). */
+    /** Minecraft versions a type has its own list of (Paper, Leaf, Arclight… and Bedrock's server versions). */
     versions(type: ServerKind): Promise<string[]>
+    /** Builds to choose from for a type and version (Arclight: per mod loader); empty for the others. */
+    builds(type: ServerKind, mcVersion: string): Promise<ServerBuild[]>
     create(data: NewServer): Promise<ServerCreated>
     update(id: string, patch: ServerPatch): Promise<ServerInfo>
     /** Moves the server folder to the Recycle Bin. */
@@ -875,20 +962,28 @@ export interface ResinApi {
     playerRemove(id: string, kind: PlayerListKind, name: string): Promise<void>
     /** Zips the world into the server's backups folder; returns the zip path. */
     backup(id: string): Promise<string>
-    addonSources(id: string): Promise<AddonSource[]>
-    addons(id: string): Promise<ServerAddon[]>
-    addonSearch(id: string, query: string, source: AddonSource, offset?: number): Promise<ServerAddonResult>
+    // The add-on calls take an optional last `area` for hybrid servers (Arclight): 'plugins' (default) or 'mods'.
+    addonSources(id: string, area?: AddonArea): Promise<AddonSource[]>
+    addons(id: string, area?: AddonArea): Promise<ServerAddon[]>
+    addonSearch(id: string, query: string, source: AddonSource, offset?: number, area?: AddonArea): Promise<ServerAddonResult>
     /** Every version of an installed project, newest first, marked compatible or not. */
-    addonVersions(id: string, projectId: string): Promise<ServerAddonVersion[]>
+    addonVersions(id: string, projectId: string, area?: AddonArea): Promise<ServerAddonVersion[]>
     /** Switches a jar to another version (keeping it enabled/disabled). True = queued until the server stops. */
-    addonChangeVersion(id: string, filename: string, versionId: string): Promise<boolean>
+    addonChangeVersion(id: string, filename: string, versionId: string, area?: AddonArea): Promise<boolean>
     /** The installed list with `update` set where a newer compatible version exists. */
-    addonCheckUpdates(id: string): Promise<ServerAddon[]>
+    addonCheckUpdates(id: string, area?: AddonArea): Promise<ServerAddon[]>
     /** Drops a change queued for when the server stops. */
-    addonCancelPending(id: string, filename: string): Promise<void>
-    addonInstall(id: string, projectId: string, versionId?: string): Promise<void>
-    addonToggle(id: string, filename: string): Promise<void>
-    addonRemove(id: string, filename: string): Promise<void>
+    addonCancelPending(id: string, filename: string, area?: AddonArea): Promise<void>
+    addonInstall(id: string, projectId: string, versionId?: string, area?: AddonArea): Promise<void>
+    addonToggle(id: string, filename: string, area?: AddonArea): Promise<void>
+    addonRemove(id: string, filename: string, area?: AddonArea): Promise<void>
+    /** Installs what a link points to: a project page on a source (Modrinth, CurseForge, dev.bukkit.org, Hangar,
+     * SpigotMC, GitHub), with its version when the link names one, or a .jar from anywhere. */
+    addonFromLink(id: string, url: string, area?: AddonArea): Promise<void>
+    /** Whether Bedrock players can join this Java server (Geyser + Floodgate installed). */
+    bedrockJoin(id: string): Promise<BedrockJoin>
+    /** Installs (true) or removes (false) Geyser and Floodgate. */
+    setBedrockJoin(id: string, on: boolean): Promise<BedrockJoin>
     network(): Promise<{ lanIp: string | null }>
     /** ResinCraft Relay for this server: whether it's available, the account it uses and the name. */
     relayInfo(id: string): Promise<RelayInfo>
@@ -906,8 +1001,9 @@ export interface ResinApi {
     checkDns(id: string): Promise<DomainInfo>
     /** Saves (or with null, removes) the Cloudflare API token for automatic DNS updates. */
     setDnsToken(id: string, token: string | null): Promise<DomainInfo>
-    /** Launches an instance and joins this server (quick play on 1.20+, --server before). */
-    play(id: string, instanceId: string): Promise<void>
+    /** Launches an instance and joins this server (quick play on 1.20+, --server before). Bedrock servers open
+     * Minecraft (Bedrock) with the server added to its list; no instance needed. */
+    play(id: string, instanceId?: string): Promise<void>
   }
   /** The file manager. Every path is relative to the root, `/`-separated; "" is the root itself. */
   files: {

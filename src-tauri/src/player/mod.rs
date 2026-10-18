@@ -1,6 +1,8 @@
-//! Accounts (and their Minecraft profiles), and the instance page's Worlds / Servers / Screenshots / Notes tabs.
+//! Accounts (and their Minecraft profiles), the instance page's Worlds / Servers / Screenshots / Notes tabs, and
+//! Bedrock Edition as installed on Windows.
 
 pub mod accounts;
+pub mod bedrock;
 pub mod files;
 pub mod nbt;
 pub mod notes;

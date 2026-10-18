@@ -1,0 +1,30 @@
+// The Bedrock page: Bedrock Edition as installed from the Microsoft Store, its worlds and Bedrock servers.
+export default {
+  'bedrock.title': 'Bedrock Edition',
+  'bedrock.subtitle': 'Minecraft for Windows from the Microsoft Store: play with friends on phones and consoles.',
+  'bedrock.release': 'Minecraft for Windows',
+  'bedrock.releaseHint': 'The Bedrock game. The Microsoft Store keeps it up to date.',
+  'bedrock.preview': 'Minecraft Preview',
+  'bedrock.previewHint': 'Try the next update early. It installs next to the game, with its own worlds.',
+  'bedrock.version': 'Version {version}',
+  'bedrock.notInstalled': 'Not installed',
+  'bedrock.play': 'Play',
+  'bedrock.get': 'Get it from the Microsoft Store',
+  'bedrock.openFolder': 'Worlds folder',
+  'bedrock.worlds': 'Worlds',
+  'bedrock.played': 'Played {when}',
+  'bedrock.openWorld': 'Show this world in Explorer',
+  'bedrock.servers': 'Bedrock servers on this computer',
+  'bedrock.serverRunning': 'running',
+  'bedrock.serverStopped': 'stopped',
+  'bedrock.manage': 'Manage',
+  'bedrock.join': 'Join',
+  'bedrock.startFirst': 'Start the server first',
+  'bedrock.host': 'Host a server',
+  'bedrock.hostHint': 'Host a Bedrock server here: friends on phones, consoles and Windows can join.',
+  'bedrock.hostAnother': 'Host another Bedrock server.',
+  'bedrock.versionsNote':
+    "Windows installs and updates Bedrock only through the Microsoft Store or the Xbox app, so ResinCraft can't switch it to an older version. To play the next update early, use Minecraft Preview. To keep a world on an older version, host a Bedrock server of that version.",
+  'bedrock.unsupported.title': 'Bedrock Edition is a Windows app',
+  'bedrock.unsupported.body': 'On this system, play Bedrock on a phone, console or Windows PC. You can still host Bedrock servers here.'
+}

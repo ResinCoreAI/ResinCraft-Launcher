@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{anyhow, bail, Result};
-use resincraft_lib::content::{curseforge, export, modrinth, sources};
+use resincraft_lib::content::{curseforge, export, github, links, modrinth, sources};
 use resincraft_lib::core::types::{ContentKind, ContentSource, ExportOptions, LoaderType, NewInstance, SearchQuery};
 use resincraft_lib::core::{ctx, events, instances, net, paths, settings};
 use serde_json::Value;
@@ -162,6 +162,46 @@ async fn main() {
 
     report("modrinth install lithium", sources::install(&id, "lithium", ContentKind::Mod, None).await);
     report("modrinth install iris (pulls in sodium)", sources::install(&id, "iris", ContentKind::Mod, None).await);
+
+    // ---------- GitHub releases and links ----------
+    check_source("github", query("", ContentKind::Mod, ContentSource::Github)).await;
+    report("github versions say which releases fit 1.21.1", async {
+        let v = github::versions_for("gh:gnembon/fabric-carpet", Some(&id)).await?;
+        let fit: Vec<String> = v.iter().filter(|x| !x.game_versions.is_empty()).map(|x| x.name.clone()).collect();
+        println!("     {} releases, fitting: {fit:?}", v.len());
+        if fit.iter().any(|n| n.contains("26.") || n.contains("1.21.2")) {
+            bail!("a release for another Minecraft version was marked as fitting");
+        }
+        Ok(())
+    }.await);
+    report("link: a GitHub release download installs that release", async {
+        let url = "https://github.com/gnembon/fabric-carpet/releases/download/1.4.147/fabric-carpet-1.21-1.4.147+v240613.jar";
+        links::install_link(&id, url, ContentKind::Mod).await?;
+        let items = sources::list_content(&id, ContentKind::Mod).await?;
+        let carpet = items.iter().find(|i| i.project_id.as_deref() == Some("gh:gnembon/fabric-carpet")).ok_or_else(|| anyhow!("carpet not listed"))?;
+        println!("     {} -> {:?} {:?}", carpet.filename, carpet.version_id, carpet.version_number);
+        if carpet.version_id.as_deref() != Some("1.4.147") {
+            bail!("wrong release");
+        }
+        Ok(())
+    }.await);
+    report("link: a Modrinth page installs the mod", async {
+        links::install_link(&id, "https://modrinth.com/mod/ferrite-core", ContentKind::Mod).await?;
+        let items = sources::list_content(&id, ContentKind::Mod).await?;
+        if !items.iter().any(|i| i.title.as_deref().is_some_and(|t| t.contains("FerriteCore"))) {
+            bail!("FerriteCore missing");
+        }
+        Ok(())
+    }.await);
+    report("link: a server plugin page is refused", async {
+        match links::install_link(&id, "https://hangar.papermc.io/HelpChat/PlaceholderAPI", ContentKind::Mod).await {
+            Err(e) => {
+                println!("     {e}");
+                Ok(())
+            }
+            Ok(()) => Err(anyhow!("a plugin was installed into an instance")),
+        }
+    }.await);
     let listed = report("content list identifies mods", async {
         let items = sources::list_content(&id, ContentKind::Mod).await?;
         for i in &items {

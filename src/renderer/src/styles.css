@@ -671,6 +671,10 @@ textarea.input {
     transform 0.15s var(--ease),
     background-color 0.15s var(--ease);
 }
+.switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .switch.on {
   background: var(--success-soft);
   border-color: var(--success);
@@ -2104,7 +2108,9 @@ button.stat b {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: background-color 0.1s var(--ease), color 0.1s var(--ease);
+  transition:
+    background-color 0.1s var(--ease),
+    color 0.1s var(--ease);
 }
 .win-controls button svg {
   width: 15px;
@@ -2181,7 +2187,11 @@ button.stat b {
   }
 }
 .icard {
-  transition: transform 0.2s var(--ease), border-color 0.15s var(--ease), background-color 0.15s var(--ease), opacity 0.15s var(--ease);
+  transition:
+    transform 0.2s var(--ease),
+    border-color 0.15s var(--ease),
+    background-color 0.15s var(--ease),
+    opacity 0.15s var(--ease);
 }
 /* Lifts, and leans a couple of degrees toward the pointer (--tilt-* are set by `tilt` in ui.tsx). */
 .icard:hover {
@@ -2196,7 +2206,9 @@ button.stat b {
   transform: scale(1.06);
 }
 .icard .quick {
-  transition: transform 0.15s var(--ease), background-color 0.12s var(--ease);
+  transition:
+    transform 0.15s var(--ease),
+    background-color 0.12s var(--ease);
 }
 .icard .quick:hover {
   transform: scale(1.1);
@@ -2271,7 +2283,9 @@ body.dragging * {
   padding: 2px 8px 8px;
   margin: 0 -8px;
   border-radius: 10px;
-  transition: background-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+  transition:
+    background-color 0.15s var(--ease),
+    box-shadow 0.15s var(--ease);
 }
 .inst-group.droppable {
   box-shadow: inset 0 0 0 1px var(--border);
@@ -2287,7 +2301,9 @@ body.dragging * {
   color: var(--text-faint);
   font-size: 13px;
   text-align: center;
-  transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
+  transition:
+    border-color 0.15s var(--ease),
+    color 0.15s var(--ease);
 }
 .inst-group.drop-target .group-empty {
   border-color: var(--accent);
@@ -2302,7 +2318,9 @@ body.dragging * {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 0.32s var(--ease), opacity 0.24s var(--ease);
+  transition:
+    grid-template-rows 0.32s var(--ease),
+    opacity 0.24s var(--ease);
 }
 .group-body.open {
   grid-template-rows: 1fr;
@@ -2329,7 +2347,9 @@ body.dragging * {
   overflow: hidden;
   background: none;
   cursor: pointer;
-  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease);
+  transition:
+    transform 0.15s var(--ease),
+    border-color 0.15s var(--ease);
 }
 .pic-icon-btn .tile {
   border-radius: 0;
@@ -2377,7 +2397,9 @@ body.dragging * {
   color: var(--text-dim);
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
+  transition:
+    border-color 0.15s var(--ease),
+    color 0.15s var(--ease);
 }
 .pic-banner.empty:hover,
 .pic-banner.empty:focus-visible {
@@ -2509,7 +2531,10 @@ body.dragging * {
   cursor: grab;
   touch-action: none;
   opacity: 0.55;
-  transition: opacity 0.15s var(--ease), color 0.15s var(--ease), background 0.15s var(--ease);
+  transition:
+    opacity 0.15s var(--ease),
+    color 0.15s var(--ease),
+    background 0.15s var(--ease);
 }
 .group-grip svg {
   width: 16px;
@@ -2532,4 +2557,41 @@ body.dragging * {
 }
 .inst-group.group-drop-after {
   box-shadow: 0 3px 0 0 var(--accent);
+}
+
+/* ---------- Bedrock ---------- */
+.bd-editions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.bd-edition {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px;
+}
+.bd-edition h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.bd-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.bd-edition.missing .bd-icon {
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+@media (max-width: 860px) {
+  .bd-editions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

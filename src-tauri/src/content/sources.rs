@@ -5,7 +5,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use super::index::{has_entry, open_zip};
-use super::{atlauncher, curseforge, ftb, modrinth, technic};
+use super::{atlauncher, curseforge, ftb, github, modrinth, technic};
 use crate::core::instances;
 use crate::core::types::{source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType, ProjectVersion, SearchQuery, SearchResult};
 use crate::{bail_tr, err_tr};
@@ -16,6 +16,7 @@ pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
         Some(ContentSource::Ftb) => ftb::search(q).await,
         Some(ContentSource::Atlauncher) => atlauncher::search(q).await,
         Some(ContentSource::Technic) => technic::search(q).await,
+        Some(ContentSource::Github) => github::search_hits(q).await,
         _ => modrinth::search(q).await,
     }
 }
@@ -26,6 +27,7 @@ pub async fn versions(project_id: &str, instance_id: Option<&str>) -> Result<Vec
         ContentSource::Ftb => ftb::versions(project_id).await,
         ContentSource::Atlauncher => atlauncher::versions(project_id).await,
         ContentSource::Technic => technic::versions(project_id).await,
+        ContentSource::Github => github::versions_for(project_id, instance_id).await,
         ContentSource::Modrinth => modrinth::versions(project_id, instance_id).await,
     }
 }
@@ -36,6 +38,7 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
         ContentSource::Ftb => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "FTB"),
         ContentSource::Atlauncher => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "ATLauncher"),
         ContentSource::Technic => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "Technic"),
+        ContentSource::Github => github::install(instance_id, project_id, kind, version_id).await,
         ContentSource::Modrinth => modrinth::install(instance_id, project_id, kind, version_id).await,
     }
 }
@@ -46,6 +49,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         ContentSource::Ftb => ftb::install_modpack(project_id, version_id).await,
         ContentSource::Atlauncher => atlauncher::install_modpack(project_id, version_id).await,
         ContentSource::Technic => technic::install_modpack(project_id, version_id).await,
+        ContentSource::Github => bail_tr!("github.modsOnly", "GitHub only offers mods here"),
         ContentSource::Modrinth => modrinth::install_modpack(project_id, version_id).await,
     }
 }
@@ -70,6 +74,7 @@ pub async fn check_updates(instance_id: &str) -> Result<Vec<ContentItem>> {
     let mut mods = modrinth::check_updates(instance_id).await?;
     if inst.loader != LoaderType::Vanilla {
         let _ = curseforge::check_updates(&inst, &mut mods).await;
+        let _ = github::check_updates(&inst, &mut mods).await;
     }
     Ok(mods)
 }

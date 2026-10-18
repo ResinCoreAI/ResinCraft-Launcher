@@ -24,6 +24,12 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       pathForFile
     },
     settings: { get: fn('settings:get'), set: fn('settings:set') },
+    bedrock: {
+      status: fn('bedrock:status'),
+      play: fn('bedrock:play'),
+      get: fn('bedrock:get'),
+      openFolder: fn('bedrock:openFolder')
+    },
     update: {
       status: fn('update:status'),
       check: fn('update:check'),
@@ -65,6 +71,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       search: fn('content:search'),
       versions: fn('content:versions'),
       install: fn('content:install'),
+      installFromLink: fn('content:installFromLink'),
       duplicates: fn('content:duplicates'),
       installMany: fn('content:installMany'),
       list: fn('content:list'),
@@ -102,6 +109,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       list: fn('server:list'),
       get: fn('server:get'),
       versions: fn('server:versions'),
+      builds: fn('server:builds'),
       create: fn('server:create'),
       update: fn('server:update'),
       remove: fn('server:remove'),
@@ -129,6 +137,9 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       addonInstall: fn('server:addonInstall'),
       addonToggle: fn('server:addonToggle'),
       addonRemove: fn('server:addonRemove'),
+      addonFromLink: fn('server:addonFromLink'),
+      bedrockJoin: fn('server:bedrockJoin'),
+      setBedrockJoin: fn('server:setBedrockJoin'),
       network: fn('server:network'),
       relayInfo: fn('server:relayInfo'),
       relayCheck: fn('server:relayCheck'),

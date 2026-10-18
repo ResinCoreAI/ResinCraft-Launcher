@@ -196,11 +196,14 @@ fn local_port(data: &AgentRunDataV1, tunnel: uuid::Uuid) -> Option<u16> {
     t.agent_config.fields.iter().find(|f| f.name == "local_port").and_then(|f| f.value.parse().ok())
 }
 
-/// Shares the server listening on `port` through playit.gg and returns its public address.
+/// Shares the server listening on `port` through playit.gg and returns its public address. `bedrock` makes a
+/// Bedrock (UDP) tunnel instead of a Java one. `id` keys the saved tunnel: the server's id, or "<id>#bedrock" for
+/// Geyser next to a Java server.
 pub async fn open(
     id: &str,
     port: u16,
     name: &str,
+    bedrock: bool,
     on_claim: impl Fn(String) + Send + Sync,
     wanted: impl Fn() -> bool + Send + Sync,
 ) -> Result<String> {
@@ -226,7 +229,7 @@ pub async fn open(
             None => {
                 let label: String = format!("ResinCraft {name}").chars().filter(|c| c.is_ascii_graphic() || *c == ' ').take(40).collect();
                 let req = ReqTunnelsCreateV1 {
-                    ports: TunnelPortDetails::TunnelType(TunnelType::MinecraftJava),
+                    ports: TunnelPortDetails::TunnelType(if bedrock { TunnelType::MinecraftBedrock } else { TunnelType::MinecraftJava }),
                     origin: AccountTunnelOriginCreate::Agent(AgentOrigin { agent_id: Some(agent_id), config: tunnel_config(port) }),
                     enabled: true,
                     alloc: None,

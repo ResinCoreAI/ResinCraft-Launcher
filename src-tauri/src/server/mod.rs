@@ -34,6 +34,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:get" => json(store::info(store::get(&args.get::<String>(0)?).await?).await),
         "server:versions" => json(installers::software_versions(args.get::<ServerKind>(0)?).await?),
+        "server:builds" => json(installers::builds(args.get::<ServerKind>(0)?, &args.get::<String>(1)?).await?),
         "server:create" => json(create::create(args.get::<NewServer>(0)?).await?),
         "server:update" => {
             let id: String = args.get(0)?;
@@ -120,33 +121,51 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "server:backup" => json(runtime::backup(&args.get::<String>(0)?).await?),
-        "server:addonSources" => json(plugins::sources(store::get(&args.get::<String>(0)?).await?.kind)),
-        "server:addons" => json(plugins::list(&args.get::<String>(0)?).await?),
+        // The add-on calls end with an optional area ("plugins" / "mods") for hybrid servers.
+        "server:addonSources" => json(plugins::sources(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
+        "server:addons" => json(plugins::list(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addonSearch" => {
             let (id, query, source): (String, String, String) = (args.get(0)?, args.get::<Option<String>>(1)?.unwrap_or_default(), args.get(2)?);
             let offset: Option<usize> = args.get(3)?;
-            json(plugins::search(&id, &query, &source, offset.unwrap_or(0)).await?)
+            let area: Option<String> = args.get(4)?;
+            json(plugins::search(&id, &query, &source, offset.unwrap_or(0), area.as_deref()).await?)
         }
-        "server:addonVersions" => json(plugins::versions(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
-        "server:addonChangeVersion" => {
-            json(plugins::change_version(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?)
+        "server:addonVersions" => {
+            json(plugins::versions(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<String>>(2)?.as_deref()).await?)
         }
-        "server:addonCheckUpdates" => json(plugins::check_updates(&args.get::<String>(0)?).await?),
+        "server:addonChangeVersion" => json(
+            plugins::change_version(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?, args.get::<Option<String>>(3)?.as_deref()).await?,
+        ),
+        "server:addonCheckUpdates" => json(plugins::check_updates(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addonCancelPending" => {
-            plugins::cancel_pending(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            plugins::cancel_pending(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<String>>(2)?.as_deref()).await?;
             done()
         }
         "server:addonInstall" => {
-            plugins::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get(2)?).await?;
+            plugins::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get(2)?, args.get::<Option<String>>(3)?.as_deref()).await?;
             done()
         }
         "server:addonToggle" => {
-            plugins::toggle(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            plugins::toggle(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<String>>(2)?.as_deref()).await?;
             done()
         }
         "server:addonRemove" => {
-            plugins::remove(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            plugins::remove(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<String>>(2)?.as_deref()).await?;
             done()
+        }
+        "server:addonFromLink" => {
+            plugins::install_link(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<String>>(2)?.as_deref()).await?;
+            done()
+        }
+        "server:bedrockJoin" => json(plugins::bedrock_status(&args.get::<String>(0)?).await?),
+        "server:setBedrockJoin" => {
+            let (id, on): (String, bool) = (args.get(0)?, args.get(1)?);
+            if on {
+                plugins::bedrock_enable(&id).await?;
+            } else {
+                plugins::bedrock_disable(&id).await?;
+            }
+            json(plugins::bedrock_status(&id).await?)
         }
         "server:domain" => json(domain::info(&args.get::<String>(0)?).await?),
         "server:checkDns" => json(domain::check_now(&args.get::<String>(0)?).await?),
@@ -173,8 +192,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:network" => json(json!({ "lanIp": network::lan_ip().map(|ip| ip.to_string()) })),
         "server:play" => {
-            let (id, instance): (String, String) = (args.get(0)?, args.get(1)?);
+            let (id, instance): (String, Option<String>) = (args.get(0)?, args.get(1)?);
             let meta = store::get(&id).await?;
+            if meta.kind.bedrock() {
+                // Minecraft (Bedrock) adds the server to its Servers list and opens there.
+                let name: String = meta.name.chars().filter(|c| *c != '|').collect();
+                shell::open_url(&format!("minecraft://?addExternalServer={}|127.0.0.1:{}", urlencoding::encode(&name), meta.port))?;
+                return done();
+            }
+            let instance = instance.ok_or_else(|| anyhow::anyhow!("Choose an instance to play with"))?;
             crate::game::launch(&instance, Some(format!("localhost:{}", meta.port))).await?;
             done()
         }

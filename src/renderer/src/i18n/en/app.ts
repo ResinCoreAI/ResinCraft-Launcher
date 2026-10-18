@@ -2,6 +2,7 @@
 export default {
   'nav.home': 'Home',
   'nav.library': 'Library',
+  'nav.bedrock': 'Bedrock',
   'nav.discover': 'Discover',
   'nav.accounts': 'Accounts',
   'nav.settings': 'Settings',

@@ -133,7 +133,16 @@ export function mockApi(): ResinApi {
 
   return {
     app: {
-      info: () => wait({ version: '0.3.0', dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher', platform: 'win32', totalMemMb: 16384, dev: true, microsoft: true, curseforge: true }),
+      info: () =>
+        wait({
+          version: '0.3.0',
+          dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher',
+          platform: 'win32',
+          totalMemMb: 16384,
+          dev: true,
+          microsoft: true,
+          curseforge: true
+        }),
       openExternal: async (u) => void window.open(u),
       setTitleBar: async () => {},
       showItem: async () => {},
@@ -179,7 +188,11 @@ export function mockApi(): ResinApi {
       },
       remove: async (id) => void (instances = instances.filter((i) => i.id !== id)),
       openFolder: async () => {},
-      launch: (id) => mockEngine.launch(instances.find((i) => i.id === id), accounts.length > 0),
+      launch: (id) =>
+        mockEngine.launch(
+          instances.find((i) => i.id === id),
+          accounts.length > 0
+        ),
       kill: async () => {},
       running: () => wait([])
     },
@@ -209,7 +222,17 @@ export function mockApi(): ResinApi {
     },
     content: {
       search: (q) => {
-        const base = q.source === 'curseforge' ? mockCurseForgeHits(now) : hits.map((h) => ({ ...h, source: q.source ?? 'modrinth' }))
+        const base =
+          q.source === 'curseforge'
+            ? mockCurseForgeHits(now)
+            : q.source === 'github'
+              ? q.kind === 'mod'
+                ? hits
+                    .slice(0, 4)
+                    .map((h) => ({ ...h, id: `gh:sample/${h.slug}`, source: 'github' as const, downloads: 0, follows: Math.round(h.downloads / 4000) }))
+                : []
+              : hits.map((h) => ({ ...h, source: q.source ?? 'modrinth' }))
+        if (!base.length) return wait({ hits: [], total: 0, offset: q.offset ?? 0 }, 300)
         // Pages like the real sources do, so scrolling down loads more: the samples repeat up to 48 results.
         const all = Array.from({ length: Math.max(base.length, 48) }, (_, i) => {
           const h = base[i % base.length]
@@ -242,6 +265,10 @@ export function mockApi(): ResinApi {
           }))
         ),
       install: () => wait(undefined, 800),
+      installFromLink: async (_i, url) => {
+        await wait(undefined, 900)
+        if (!/^https?:\/\//.test(url)) throw new Error("That isn't a web address")
+      },
       duplicates: (_i, picks) => wait(mockDuplicates(picks, mods), 500),
       installMany: (_i, picks, replace) => wait(mockInstallMany(mods, picks, replace), 900),
       list: (_i, kind) => wait(kind === 'mod' ? [...mods] : []),
@@ -282,6 +309,30 @@ export function mockApi(): ResinApi {
       return instances.find((i) => i.id === id)!
     }),
     server: servers.server,
+    bedrock: {
+      status: () =>
+        wait(
+          {
+            supported: true,
+            editions: [
+              {
+                edition: 'release' as const,
+                installed: true,
+                version: '1.26.52.3',
+                worlds: [
+                  { id: 'ZxKDIpkP4Tc=', name: 'Island Survival', modified: now - 3.6e6 },
+                  { id: 'xLICWZyiNe4=', name: 'Creative Build', modified: now - 4.3e8 }
+                ]
+              },
+              { edition: 'preview' as const, installed: false, worlds: [] }
+            ]
+          },
+          500
+        ),
+      play: () => wait(undefined, 300),
+      get: () => wait(undefined, 300),
+      openFolder: () => wait(undefined, 100)
+    },
     ...mockFiles(),
     on: { task: mockEngine.onTask, game: noop, log: noop, login: noop, server: servers.onServer, serverLog: servers.onServerLog, update: updates.onUpdate }
   }

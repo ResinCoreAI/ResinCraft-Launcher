@@ -6,8 +6,10 @@ pub mod curseforge;
 pub mod dupes;
 pub mod export;
 pub mod ftb;
+pub mod github;
 pub mod index;
 pub mod jarmeta;
+pub mod links;
 pub mod modrinth;
 pub mod sources;
 pub mod technic;
@@ -32,6 +34,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "content:install" => {
             sources::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?, args.get(3)?).await?;
+            done()
+        }
+        "content:installFromLink" => {
+            links::install_link(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?).await?;
             done()
         }
         "content:duplicates" => json(dupes::check(&args.get::<String>(0)?, args.get(1)?).await?),

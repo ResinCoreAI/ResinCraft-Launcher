@@ -28,6 +28,7 @@ const MODRINTH: &str = "https://api.modrinth.com/v2";
 const FTB: &str = "https://api.feed-the-beast.com/v1/modpacks/public";
 const PACK_HOSTS: [&str; 4] = ["cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"];
 const DEFAULT_PORT: u16 = 25565;
+const BEDROCK_PORT: u16 = 19132;
 
 /// What a server is built from, once the source has been looked at.
 struct Plan {
@@ -66,7 +67,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
     let name = Some(req.name.trim()).filter(|n| !n.is_empty()).map(str::to_string).unwrap_or_else(|| plan.name.clone());
     let id = store::new_id(&name);
     let dir = store::dir(&id)?;
-    let modded = plan.kind.loader().is_some();
+    let modded = plan.kind.modded();
     let total = total_memory_mb() as u32;
     let memory = req.memory_mb.or(plan.memory).unwrap_or(if modded { 4096 } else { 2048 }).min((total / 2).max(1024)).max(512);
     let meta = ServerMeta {
@@ -79,7 +80,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         memory_mb: memory,
         port: match req.port {
             Some(p) if p > 0 => p,
-            _ => free_port().await,
+            _ => free_port(plan.kind.bedrock()).await,
         },
         java_path: None,
         jvm_args: None,
@@ -129,10 +130,11 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
     }
 }
 
-/// 25565, or the next port no other server uses.
-async fn free_port() -> u16 {
-    let used: HashSet<u16> = store::list().await.unwrap_or_default().into_iter().map(|m| m.port).collect();
-    (DEFAULT_PORT..DEFAULT_PORT + 100).find(|p| !used.contains(p)).unwrap_or(DEFAULT_PORT)
+/// 25565 (Bedrock: 19132), or the next port no other server uses. Bedrock also takes the port after it (IPv6).
+async fn free_port(bedrock: bool) -> u16 {
+    let used: HashSet<u16> = store::list().await.unwrap_or_default().into_iter().flat_map(|m| [m.port, m.port + u16::from(m.kind.bedrock())]).collect();
+    let (first, step) = if bedrock { (BEDROCK_PORT, 2) } else { (DEFAULT_PORT, 1) };
+    (0..100).map(|i| first + i * step).find(|p| !used.contains(p) && !(bedrock && used.contains(&(p + 1)))).unwrap_or(first)
 }
 
 async fn resolve(req: &NewServer) -> Result<Plan> {

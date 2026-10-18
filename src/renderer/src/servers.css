@@ -277,6 +277,10 @@
   background: var(--surface);
   margin-bottom: 14px;
 }
+/* Java servers with Geyser get a fourth cell for Bedrock players. */
+.sv-connect.four {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+}
 .sv-connect .cell {
   display: flex;
   flex-direction: column;
@@ -488,8 +492,22 @@
   flex: none;
 }
 
+/* Four cells only fit side by side on wide windows: two by two below that. */
+@media (max-width: 1280px) {
+  .sv-connect.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sv-connect.four .cell:nth-child(2n) {
+    border-right: 0;
+  }
+  .sv-connect.four .cell:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+}
+
 @media (max-width: 960px) {
-  .sv-connect {
+  .sv-connect,
+  .sv-connect.four {
     grid-template-columns: minmax(0, 1fr);
   }
   .sv-connect .cell {

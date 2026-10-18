@@ -1,6 +1,7 @@
-//! Running hosted servers: start (Java + the server's launch spec), the live console (log lines out,
-//! commands in on stdin), players from the log, graceful stop (`stop`, then kill after a timeout), the
-//! router port while it runs, world backups and stopping everything when the launcher quits.
+//! Running hosted servers: start (Java + the server's launch spec, or Bedrock's own program), the live console
+//! (log lines out, commands in on stdin), players from the log, graceful stop (`stop`, then kill after a timeout),
+//! the router port while it runs (UDP for Bedrock and Geyser), world backups and stopping everything when the
+//! launcher quits.
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::path::PathBuf;
@@ -14,7 +15,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::core::events::{emit, Task};
 use crate::core::text::{text_of, Text};
-use crate::core::types::{LogLine, ResinNet, ServerEvent, ServerKind, ServerLogEvent, ServerMeta, ServerNet, TunnelMode};
+use crate::core::types::{LogLine, ResinNet, ServerEvent, ServerLogEvent, ServerMeta, ServerNet, TunnelMode};
 use crate::game::java::hidden_command;
 use crate::game::launch::{split_args, LogParser};
 use crate::player::files::unique_name;
@@ -36,6 +37,9 @@ struct Proc {
     stopping: bool,
     net: Option<ServerNet>,
     lines: broadcast::Sender<String>,
+    /// Geyser next to a Java server: where Bedrock players join, and the UDP port opened on the router for it.
+    bedrock: Option<String>,
+    bedrock_port: Option<u16>,
 }
 
 #[derive(Default)]
@@ -72,7 +76,12 @@ pub fn players(id: &str) -> Vec<String> {
 }
 
 pub fn net(id: &str) -> Option<ServerNet> {
-    with(|w| w.procs.get(id).and_then(|p| p.net.clone()))
+    with(|w| {
+        let p = w.procs.get(id)?;
+        let mut n = p.net.clone()?;
+        n.bedrock_address = p.bedrock.clone();
+        Some(n)
+    })
 }
 
 /// The console so far (the current run, or the last one).
@@ -124,16 +133,21 @@ struct Patterns {
     joined: Regex,
     left: Regex,
     list: Regex,
+    /// Bedrock Dedicated Server: "Player connected: Name, xuid: …" (gamertags may have spaces).
+    bedrock_joined: Regex,
+    bedrock_left: Regex,
 }
 
 fn patterns() -> &'static Patterns {
     static P: OnceLock<Patterns> = OnceLock::new();
     P.get_or_init(|| Patterns {
         ansi: Regex::new(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[()][A-Za-z0-9]").unwrap(),
-        done: Regex::new(r#"Done \(\d+[.,]?\d*m?s\)! For help, type"#).unwrap(),
+        done: Regex::new(r#"Done \(\d+[.,]?\d*m?s\)! For help, type|INFO\] Server started\."#).unwrap(),
         joined: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) joined the game\s*$").unwrap(),
         left: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) left the game\s*$").unwrap(),
         list: Regex::new(r"There are \d+ (?:of a max(?:imum)? of|out of maximum) \d+ players online[.:]?\s*(.*)$").unwrap(),
+        bedrock_joined: Regex::new(r"Player connected: (.+?), xuid").unwrap(),
+        bedrock_left: Regex::new(r"Player disconnected: (.+?), xuid").unwrap(),
     })
 }
 
@@ -149,9 +163,9 @@ fn on_line(id: &str, text: &str) -> bool {
             changed = true;
             became_running = true;
         }
-        if let Some(c) = p.joined.captures(text) {
+        if let Some(c) = p.joined.captures(text).or_else(|| p.bedrock_joined.captures(text)) {
             changed |= proc.players.insert(c[1].to_string());
-        } else if let Some(c) = p.left.captures(text) {
+        } else if let Some(c) = p.left.captures(text).or_else(|| p.bedrock_left.captures(text)) {
             changed |= proc.players.remove(&c[1]);
         } else if let Some(c) = p.list.captures(text) {
             let names: BTreeSet<String> = c[1].split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
@@ -238,11 +252,16 @@ pub async fn start(id: &str) -> Result<()> {
     if !store::eula_accepted(id).await {
         bail!("Agree to the Minecraft EULA before starting {}.", meta.name);
     }
-    if !network::port_free(meta.port) {
+    let bedrock = meta.kind.bedrock();
+    let port_free = if bedrock { network::udp_port_free(meta.port) } else { network::port_free(meta.port) };
+    if !port_free {
         bail!("Port {} is already in use (maybe another server is running). Pick a different port in the server's settings.", meta.port);
     }
-    let args = launch_args(&meta)?;
-    for (_, file) in [("jar", &meta.launch.jar), ("args", &meta.launch.args_file)] {
+    let args = if bedrock { Vec::new() } else { launch_args(&meta)? };
+    if bedrock && meta.launch.exe.is_none() {
+        bail!("{} isn't fully installed. Create it again.", meta.name);
+    }
+    for (_, file) in [("jar", &meta.launch.jar), ("args", &meta.launch.args_file), ("exe", &meta.launch.exe)] {
         if let Some(f) = file {
             if !crate::core::fsutil::safe_join(&dir, f)?.is_file() {
                 bail!("{f} is missing from the server folder. Create the server again.");
@@ -257,7 +276,18 @@ pub async fn start(id: &str) -> Result<()> {
     with(|w| {
         w.procs.insert(
             id.to_string(),
-            Proc { run: RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed), stdin: stdin_tx, kill: kill_tx, state: "starting", players: BTreeSet::new(), stopping: false, net: None, lines: lines_tx.clone() },
+            Proc {
+                run: RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                stdin: stdin_tx,
+                kill: kill_tx,
+                state: "starting",
+                players: BTreeSet::new(),
+                stopping: false,
+                net: None,
+                lines: lines_tx.clone(),
+                bedrock: None,
+                bedrock_port: None,
+            },
         );
         w.logs.insert(id.to_string(), VecDeque::new());
         w.last.remove(id);
@@ -269,24 +299,32 @@ pub async fn start(id: &str) -> Result<()> {
         emit_state(id, None);
         e
     };
-    let java = installers::choose_java(&meta).await.map_err(fail)?;
-    properties::set_values(&dir, &[("server-port", meta.port.to_string())]).await.map_err(fail)?;
+    // Bedrock runs its own program; everything else runs Java.
+    let program = match &meta.launch.exe {
+        Some(exe) if bedrock => crate::game::mojang::plain(&crate::core::fsutil::safe_join(&dir, exe)?),
+        _ => installers::choose_java(&meta).await.map_err(fail)?,
+    };
+    let mut ports = vec![("server-port", meta.port.to_string())];
+    if bedrock {
+        ports.push(("server-portv6", (meta.port + 1).to_string()));
+    }
+    properties::set_values(&dir, &ports).await.map_err(fail)?;
     // Plugin/mod changes queued while the server last ran (normally applied when it stopped).
     let applied = super::plugins::apply_pending(id).await.unwrap_or_default();
 
     // Only Paperclip and Spigot need it; other loaders resolve real paths and break across drives.
-    let run_dir = if matches!(meta.kind, ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Spigot) {
+    let run_dir = if meta.kind.plugins() {
         launch_dir(id, &dir).await
     } else {
         dir.clone()
     };
-    let mut cmd = hidden_command(&java);
+    let mut cmd = hidden_command(&program);
     cmd.args(&args)
         .current_dir(&run_dir)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| fail(anyhow!("Couldn't start Java ({java}): {e}")))?;
+    let mut child = cmd.spawn().map_err(|e| fail(anyhow!("Couldn't start {program}: {e}")))?;
     store::touch_started(id).await;
 
     // Batch console lines so a chatty server doesn't flood the UI.
@@ -327,8 +365,10 @@ pub async fn start(id: &str) -> Result<()> {
     for text in applied {
         push(LogLine { text, level: "info" });
     }
-    push(LogLine { text: format!("Java: {java}"), level: "info" });
-    push(LogLine { text: format!("Command: java {}", args.join(" ")), level: "debug" });
+    if !bedrock {
+        push(LogLine { text: format!("Java: {program}"), level: "info" });
+        push(LogLine { text: format!("Command: java {}", args.join(" ")), level: "debug" });
+    }
 
     let mut readers = Vec::new();
     if let Some(mut out) = child.stdout.take() {
@@ -496,7 +536,19 @@ fn make_link(link: &std::path::Path, target: &std::path::Path) -> std::io::Resul
 }
 
 fn net_state(state: &'static str, address: Option<String>, error: Option<String>, via: Option<&'static str>) -> ServerNet {
-    ServerNet { state, address, error, via, error_text: None, claim_url: None, domain_ok: None, playit_hint: false, resin: None, resin_hint: false }
+    ServerNet {
+        state,
+        address,
+        error,
+        via,
+        error_text: None,
+        claim_url: None,
+        domain_ok: None,
+        playit_hint: false,
+        resin: None,
+        resin_hint: false,
+        bedrock_address: None,
+    }
 }
 
 /// Why ResinCraft Relay wasn't used, for the card.
@@ -632,6 +684,119 @@ fn on_resin_status(id: &str, status: relay::Status) {
 /// to it (never a claim page there), then ResinCraft Relay if a Microsoft account is signed in, then bore.
 async fn open_internet(id: String) {
     let Ok(meta) = store::get(&id).await else { return };
+    if meta.kind.bedrock() {
+        return open_bedrock(id, meta).await;
+    }
+    tokio::spawn(open_geyser(id.clone(), meta.name.clone()));
+    open_java(id, meta).await
+}
+
+/// Keeps a router mapping alive (it has a lease) while the server runs and still uses it.
+async fn renew_mapping(id: &str, udp: bool, port: u16, name: &str, in_use: impl Fn() -> bool) {
+    loop {
+        tokio::time::sleep(Duration::from_secs(network::LEASE_SECS as u64 / 2)).await;
+        if !is_running(id) || !in_use() {
+            break;
+        }
+        let _ = if udp { network::open_udp(port, name.to_string()).await } else { network::open_port(port, name.to_string()).await };
+    }
+}
+
+/// Bedrock servers talk UDP, which ResinCraft Relay and bore can't carry: the router (UPnP), else playit.gg.
+async fn open_bedrock(id: String, meta: ServerMeta) {
+    let port = meta.port;
+    set_net(&id, Some(net_state("opening", None, None, None)));
+    if meta.tunnel == TunnelMode::Manual {
+        match network::public_ipv4().await {
+            Ok(ip) if is_running(&id) => set_net(&id, Some(net_state("open", Some(format!("{ip}:{port}")), None, Some("manual")))),
+            Ok(_) => {}
+            Err(e) => set_net(&id, Some(net_state("failed", None, Some(format!("{e}.")), None))),
+        }
+        return;
+    }
+    let mut first_err = None;
+    if meta.tunnel != TunnelMode::Playit {
+        match network::open_udp(port, meta.name.clone()).await {
+            Ok(address) => {
+                if !is_running(&id) {
+                    network::close_udp(port).await;
+                    return;
+                }
+                set_net(&id, Some(net_state("open", Some(address), None, Some("router"))));
+                let check = id.clone();
+                renew_mapping(&id, true, port, &meta.name, move || net(&check).map(|n| n.via) == Some(Some("router"))).await;
+                return;
+            }
+            Err(e) => first_err = Some(e),
+        }
+    }
+    if meta.tunnel == TunnelMode::Playit || playit::linked().await {
+        let (claim_id, wanted_id) = (id.clone(), id.clone());
+        let opened = playit::open(
+            &id,
+            port,
+            &meta.name,
+            true,
+            move |url| set_net(&claim_id, Some(ServerNet { claim_url: Some(url), ..net_state("opening", None, None, None) })),
+            move || is_running(&wanted_id) && net(&wanted_id).is_some_and(|n| n.state == "opening"),
+        )
+        .await;
+        match opened {
+            Ok(address) if is_running(&id) => {
+                set_net(&id, Some(net_state("open", Some(address), None, Some("playit"))));
+                return;
+            }
+            Ok(_) => {
+                playit::close(&id).await;
+                return;
+            }
+            Err(_) if !is_running(&id) || net(&id).is_none() => return,
+            Err(e) => first_err = Some(first_err.map(|f| anyhow!("{f} {e}")).unwrap_or(e)),
+        }
+    }
+    let msg = first_err.map(|e| format!("{e}.")).unwrap_or_default();
+    set_net(&id, Some(ServerNet { playit_hint: !playit::linked().await, ..net_state("failed", None, Some(msg), None) }));
+}
+
+/// Geyser next to a Java server: opens its UDP port for Bedrock players (the router, else playit.gg once
+/// linked). Nothing to do when Geyser isn't installed.
+async fn open_geyser(id: String, name: String) {
+    let Ok(status) = super::plugins::bedrock_status(&id).await else { return };
+    if status.get("geyser").and_then(serde_json::Value::as_bool) != Some(true) {
+        return;
+    }
+    let port = status.get("port").and_then(serde_json::Value::as_u64).and_then(|p| u16::try_from(p).ok()).unwrap_or(19132);
+    let set = |address: Option<String>, mapped: Option<u16>| {
+        with(|w| {
+            if let Some(p) = w.procs.get_mut(&id) {
+                p.bedrock = address;
+                p.bedrock_port = mapped;
+            }
+        });
+        emit_state(&id, None);
+    };
+    match network::open_udp(port, format!("{name} (Bedrock)")).await {
+        Ok(address) if is_running(&id) => {
+            set(Some(address), Some(port));
+            let check = id.clone();
+            renew_mapping(&id, true, port, &format!("{name} (Bedrock)"), move || with(|w| w.procs.get(&check).is_some_and(|p| p.bedrock_port == Some(port)))).await;
+        }
+        Ok(_) => network::close_udp(port).await,
+        Err(_) if playit::linked().await => {
+            let key = format!("{id}#bedrock");
+            let wanted = id.clone();
+            match playit::open(&key, port, &format!("{name} Bedrock"), true, |_| {}, move || is_running(&wanted)).await {
+                Ok(address) if is_running(&id) => set(Some(address), None),
+                Ok(_) => playit::close(&key).await,
+                Err(e) => eprintln!("[server] Geyser's port couldn't be shared through playit.gg: {e:#}"),
+            }
+        }
+        Err(e) => eprintln!("[server] Geyser's port couldn't be opened on the router: {e:#}"),
+    }
+}
+
+/// Java servers: the router, playit.gg, ResinCraft Relay or the bore relay, as the server is set up.
+async fn open_java(id: String, meta: ServerMeta) {
     let port = meta.port;
     set_net(&id, Some(net_state("opening", None, None, None)));
     // Automatic only: playit.gg isn't linked, so the relay's card suggests linking it.
@@ -677,6 +842,7 @@ async fn open_internet(id: String) {
                         &id,
                         port,
                         &meta.name,
+                        false,
                         move |_| flag.store(true, std::sync::atomic::Ordering::Relaxed),
                         move || {
                             !wanted_flag.load(std::sync::atomic::Ordering::Relaxed)
@@ -725,6 +891,7 @@ async fn open_internet(id: String) {
                 &id,
                 port,
                 &meta.name,
+                false,
                 // First time: show the page where the player links the launcher to playit.gg.
                 move |url| set_net(&claim_id, Some(ServerNet { claim_url: Some(url), ..net_state("opening", None, None, None) })),
                 move || is_running(&wanted_id) && net(&wanted_id).is_some_and(|n| n.state == "opening"),
@@ -797,8 +964,24 @@ async fn close_internet(id: &str, port: u16) {
         t.abort();
     }
     playit::close(id).await;
+    playit::close(&format!("{id}#bedrock")).await;
+    let bedrock = store::get(id).await.is_ok_and(|m| m.kind.bedrock());
     if current.as_ref().is_some_and(|n| n.state == "open" && n.via == Some("router")) {
-        network::close_port(port).await;
+        if bedrock {
+            network::close_udp(port).await;
+        } else {
+            network::close_port(port).await;
+        }
+    }
+    // Geyser's port.
+    let geyser = with(|w| {
+        w.procs.get_mut(id).and_then(|p| {
+            p.bedrock = None;
+            p.bedrock_port.take()
+        })
+    });
+    if let Some(p) = geyser {
+        network::close_udp(p).await;
     }
 }
 
@@ -947,6 +1130,26 @@ pub async fn backup(id: &str) -> Result<String> {
     let dir = store::dir(id)?;
     let level = properties::get_value(&dir, "level-name").await.filter(|l| !l.trim().is_empty()).unwrap_or_else(|| "world".into());
     let level = crate::content::index::safe_name(level.trim())?.to_string();
+    if meta.kind.bedrock() {
+        if is_running(id) {
+            bail!("Stop {} first: a Bedrock world is backed up while the server is off.", meta.name);
+        }
+        let world = format!("worlds/{level}");
+        if !dir.join(&world).is_dir() {
+            bail!("{} has no world yet. Start the server once to create it.", meta.name);
+        }
+        let backups = dir.join("backups");
+        tokio::fs::create_dir_all(&backups).await?;
+        let stamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+        let target = backups.join(unique_name(&backups, &format!("{stamp}_{level}"), ".zip").await);
+        let t2 = target.clone();
+        Task::run(format!("Backing up {}", meta.name), Some(id.to_string()), |t| async move {
+            t.update("Compressing the world…", None);
+            zip_worlds(dir, vec![world], t2).await
+        })
+        .await?;
+        return Ok(target.to_string_lossy().into_owned());
+    }
     // Flush first: a running server may not have written its world files yet.
     let running = state(id) == "running";
     if running {

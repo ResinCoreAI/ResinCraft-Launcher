@@ -43,6 +43,7 @@ pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
         ("files", _) => crate::files::handle(channel, args).await,
         ("update", _) => crate::updater::handle(channel, args).await,
         ("accounts" | "notes" | "worlds" | "servers" | "screenshots", _) => crate::player::handle(channel, args).await,
+        ("bedrock", _) => crate::player::bedrock::handle(channel, args).await,
         _ => bail!("Unknown request: {channel}"),
     }
 }

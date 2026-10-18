@@ -261,7 +261,8 @@ Status labels: **[0.2.0]** is in the published v0.2.0. **[next]** is built or be
 - Play time per instance, and a crash notice.
 
 ### 6.2 Mods, modpacks and Discover [0.2.0]
-- **Sources:** Modrinth, CurseForge, FTB, ATLauncher and Technic.
+- **Sources:** Modrinth, CurseForge, FTB, ATLauncher and Technic; **GitHub releases** for mods `[next]`.
+- **All sites at once** `[next]`: an "All" tab searches every site; a project on several sites shows once ("Also on CurseForge"). Pasting a link (Modrinth, CurseForge, GitHub page, or a .jar) installs it directly.
 - **Kinds:** mods, modpacks, resource packs and shaders, filtered to the instance's game version and loader.
 - **Versions and installing:** install the newest or **pick any version**; tick several to install them together; switch versions later, newer or older; dependencies are added automatically.
 - **Mod management:** update checks for Modrinth and CurseForge mods; toggle mods on and off; mods dropped in by hand are recognised; downloads are checked against the sites' published hashes.
@@ -282,6 +283,8 @@ Status labels: **[0.2.0]** is in the published v0.2.0. **[next]** is built or be
 
 ### 6.5 Server hosting [0.2.0]
 - **Create from:** server software (Vanilla; plugin servers Paper, Purpur, Folia and Spigot, the last built with Spigot's official BuildTools; mod servers Fabric, Quilt, Forge and NeoForge), a modpack (Modrinth, CurseForge, FTB), one of your instances, or a modpack file.
+- **More server types** `[next]`: **Snapshot** (vanilla on a test version), **Leaf** (a fast Paper fork), **Arclight** (mods and Bukkit plugins on one server, on Forge, NeoForge or Fabric; separate Plugins and Mods tabs) and **Bedrock** (Mojang's Bedrock Dedicated Server for players on phones, consoles and Windows; any released version).
+- **Bedrock players can join** `[next]`: one switch on a Java server installs Geyser and Floodgate, so Bedrock players join without a Java account. They use their own UDP port, opened on the router (or through playit.gg).
 - **Server tabs:**
   - Console (live, with commands);
   - Players (online players with Op, Kick and Ban; whitelist, operators, banned players and banned IPs);
@@ -304,6 +307,11 @@ Status labels: **[0.2.0]** is in the published v0.2.0. **[next]** is built or be
   - "Check for updates", per-plugin "Update" and "Update all";
   - source tracking (Modrinth, Hangar, Spiget, CurseForge);
   - multi-select for bulk actions.
+- **More places to get plugins and mods** `[next]`: dev.bukkit.org and GitHub releases, an "All" tab that searches every site at once, and installing from a pasted link (Modrinth, CurseForge, dev.bukkit.org, Hangar, SpigotMC or GitHub page, or a .jar).
+
+### 6.5b Bedrock Edition `[next]`
+- A **Bedrock** page: the installed Minecraft for Windows and Minecraft Preview (from the Microsoft Store), their versions and worlds, Play, and "Join" for Bedrock servers hosted in ResinCraft.
+- Windows only lets the Microsoft Store or the Xbox app install and update Bedrock, so ResinCraft doesn't switch Bedrock versions. Say so plainly if it comes up: Preview is for the next update; an older version is kept by hosting a Bedrock server of that version.
 
 ### 6.6 Files and editor [0.2.0]
 - A **Files** tab on every instance and server: breadcrumbs, new file and folder, rename (F2), copy and paste, drag to move, drop files in from Explorer, "Show in Explorer".

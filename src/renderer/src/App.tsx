@@ -1,4 +1,4 @@
-import { ChevronRight, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Users } from 'lucide-react'
+import { ChevronRight, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Smartphone, Users } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { Instance } from '@shared/types'
 import { Avatar, BlockArt, ContextMenuHost, Dock, Logo } from './components/ui'
@@ -9,6 +9,7 @@ import { RelayWatcher } from './components/ServerRelay'
 import { isTauri } from './api'
 import NewInstanceModal from './components/NewInstanceModal'
 import Accounts from './pages/Accounts'
+import Bedrock from './pages/Bedrock'
 import Discover from './pages/Discover'
 import Home from './pages/Home'
 import InstancePage from './pages/InstancePage'
@@ -23,6 +24,7 @@ const Servers = lazy(() => import('./pages/Servers'))
 const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'home', label: 'nav.home', icon: <HomeIcon /> },
   { page: 'library', label: 'nav.library', icon: <Layers /> },
+  { page: 'bedrock', label: 'nav.bedrock', icon: <Smartphone /> },
   { page: 'discover', label: 'nav.discover', icon: <Compass /> },
   { page: 'servers', label: 'servers.nav', icon: <Server /> },
   { page: 'accounts', label: 'nav.accounts', icon: <Users /> },
@@ -32,6 +34,7 @@ const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
 const TITLES: Record<Route['page'], Key> = {
   home: 'nav.home',
   library: 'nav.library',
+  bedrock: 'nav.bedrock',
   instance: 'nav.library',
   discover: 'nav.discover',
   servers: 'servers.nav',
@@ -125,6 +128,7 @@ export default function App() {
             <Discover key={`${route.instanceId ?? ''}${route.kind ?? ''}`} initialKind={route.kind} instanceId={route.instanceId} />
           )}
           {route.page === 'accounts' && <Accounts />}
+          {route.page === 'bedrock' && <Bedrock />}
           {route.page === 'settings' && <SettingsPage />}
           {route.page === 'servers' && (
             <Suspense fallback={null}>

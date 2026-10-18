@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   Heart,
+  Link2,
   Image,
   KeyRound,
   Link,
@@ -18,6 +19,7 @@ import {
   Search,
   Sparkles,
   SquareCheck,
+  Star,
   X
 } from 'lucide-react'
 import type { ContentFileRef, ContentItem, ContentKind, ContentSource, Instance, LoaderType, McVersion, ModPick, ProjectHit, SortMode } from '@shared/types'
@@ -25,7 +27,17 @@ import { api } from '../api'
 import { AutoLoadMore } from '../components/AutoLoadMore'
 import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, useCopy, type ContextEntry } from '../components/ui'
 import VersionPicker from '../components/VersionPicker'
-import { applyChoices, buildRows, byHand, DuplicatesDialog, packDupesNote, preferredChoice, type DupAnswer, type DupChoice, type DupRow } from '../components/DuplicatesDialog'
+import {
+  applyChoices,
+  buildRows,
+  byHand,
+  DuplicatesDialog,
+  packDupesNote,
+  preferredChoice,
+  type DupAnswer,
+  type DupChoice,
+  type DupRow
+} from '../components/DuplicatesDialog'
 import { useStore } from '../store'
 import { compact, describe, timeAgo } from '../util'
 import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
@@ -116,23 +128,59 @@ export const SOURCES: { value: ContentSource; label: string; color: string; kind
   { value: 'curseforge', label: 'CurseForge', color: '#f16436', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] },
   { value: 'ftb', label: 'FTB', color: '#b26bff', kinds: ['modpack'] },
   { value: 'atlauncher', label: 'ATLauncher', color: '#38bdf8', kinds: ['modpack'] },
-  { value: 'technic', label: 'Technic', color: '#facc15', kinds: ['modpack'] }
+  { value: 'technic', label: 'Technic', color: '#facc15', kinds: ['modpack'] },
+  { value: 'github', label: 'GitHub', color: '#a8b3c2', kinds: ['mod'] }
 ]
 
+/** "All": every site that has the chosen kind at once. */
+type Site = ContentSource | 'all'
+const ALL_KINDS: ContentKind[] = ['mod', 'modpack', 'resourcepack', 'shader']
+const siteLabel = (s: ContentSource) => SOURCES.find((x) => x.value === s)?.label ?? s
+
 /** Sources that only publish modpacks, which can't go into an existing instance. */
-const modpackOnly = (s: ContentSource) => !SOURCES.find((x) => x.value === s)?.kinds.includes('mod')
+const modpackOnly = (s: Site) => s !== 'all' && !SOURCES.find((x) => x.value === s)?.kinds.includes('mod')
 
 const PAGE = 20
 const SOURCE_KEY = 'resincraft.discover.source'
 
-function savedSource(): ContentSource {
+function savedSource(): Site {
   try {
     const v = localStorage.getItem(SOURCE_KEY)
-    if (v && SOURCES.some((s) => s.value === v)) return v as ContentSource
+    if (v === 'all' || (v && SOURCES.some((s) => s.value === v))) return v as Site
   } catch {
     // storage unavailable
   }
-  return 'modrinth'
+  return 'all'
+}
+
+/** A result; in "All", the same project found on other sites rides along in `also`. */
+type Hit = ProjectHit & { also?: ProjectHit[] }
+const squash = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+const isLink = (q: string) => /^https?:\/\/\S+$/i.test(q.trim())
+
+/** The best result of each site first, then the second best, and so on. */
+function interleave(lists: ProjectHit[][]): ProjectHit[] {
+  const out: ProjectHit[] = []
+  for (let i = 0; lists.some((l) => i < l.length); i++) for (const l of lists) if (i < l.length) out.push(l[i])
+  return out
+}
+
+/** Adds results to a list, folding a project that's on several sites into its first appearance. */
+function mergeHits(list: Hit[], incoming: ProjectHit[]): Hit[] {
+  const out = list.map((h) => ({ ...h }))
+  const at = new Map(out.map((h, i) => [squash(h.title), i]))
+  for (const h of incoming) {
+    if (out.some((x) => x.id === h.id)) continue
+    const k = squash(h.title)
+    const i = k ? at.get(k) : undefined
+    if (i !== undefined && out[i].source !== h.source) {
+      if (!out[i].also?.some((a) => a.source === h.source)) out[i].also = [...(out[i].also ?? []), h]
+      continue
+    }
+    if (k) at.set(k, out.length)
+    out.push(h)
+  }
+  return out
 }
 
 type InstallState = 'busy' | 'done'
@@ -145,24 +193,28 @@ const toPick = (h: ProjectHit, versionId?: string): ModPick => ({ id: h.id, kind
 export default function Discover({ initialKind, instanceId }: { initialKind?: ContentKind; instanceId?: string }) {
   const { instances, go, toast, refreshInstances, info, settings, updateSettings } = useStore()
   const target = instances.find((i) => i.id === instanceId)
-  const [source, setSourceState] = useState<ContentSource>(() => {
+  const [source, setSourceState] = useState<Site>(() => {
     const s = savedSource()
     // FTB only has modpacks, which can't go into an existing instance.
-    return (target || (initialKind && initialKind !== 'modpack')) && modpackOnly(s) ? 'modrinth' : s
+    return (target || (initialKind && initialKind !== 'modpack')) && modpackOnly(s) ? 'all' : s
   })
   const [kind, setKind] = useState<ContentKind>(initialKind ?? (modpackOnly(source) ? 'modpack' : 'mod'))
-  const sourceInfo = SOURCES.find((s) => s.value === source)!
+  const sourceInfo =
+    source === 'all'
+      ? { value: 'all' as const, label: t('discover.allSites'), color: 'var(--accent)', kinds: ALL_KINDS }
+      : SOURCES.find((s) => s.value === source)!
   // Builds without a CurseForge key can't search it at all.
-  const needsKey = source === 'curseforge' && !!info && !info.curseforge
+  const noCurseForge = !!info && !info.curseforge
+  const needsKey = source === 'curseforge' && noCurseForge
 
-  const setSource = (s: ContentSource) => {
+  const setSource = (s: Site) => {
     setSourceState(s)
     try {
       localStorage.setItem(SOURCE_KEY, s)
     } catch {
       // storage unavailable
     }
-    const kinds = SOURCES.find((x) => x.value === s)!.kinds
+    const kinds = s === 'all' ? ALL_KINDS : SOURCES.find((x) => x.value === s)!.kinds
     if (!kinds.includes(kind)) setKind(kinds[0])
   }
   const [query, setQuery] = useState('')
@@ -171,7 +223,12 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
   const [gameVersion, setGameVersion] = useState(target?.mcVersion ?? '')
   const [loader, setLoader] = useState<LoaderType | ''>(target && target.loader !== 'vanilla' ? target.loader : '')
   const [versions, setVersions] = useState<McVersion[]>([])
-  const [hits, setHits] = useState<ProjectHit[]>()
+  const [hits, setHits] = useState<Hit[]>()
+  /** "All": how far each site's results go, and the sites that didn't answer. */
+  const cursor = useRef<Partial<Record<ContentSource, { next: number; total: number }>>>({})
+  const [failed, setFailed] = useState<ContentSource[]>([])
+  const [linking, setLinking] = useState(false)
+  const [linkInto, setLinkInto] = useState<string>()
   const [total, setTotal] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string>()
@@ -224,37 +281,102 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
   }, [loadInstalled])
 
   const q = useMemo(
-    () => ({ query: debounced, kind, source, sort, gameVersion: gameVersion || undefined, loader: (kind === 'mod' && loader) || undefined }),
-    [debounced, kind, source, sort, gameVersion, loader]
+    () => ({ query: debounced, kind, sort, gameVersion: gameVersion || undefined, loader: (kind === 'mod' && loader) || undefined }),
+    [debounced, kind, sort, gameVersion, loader]
   )
+  /** The sites "All" asks: those with this kind (not CurseForge without a key; no modpack-only ones for an instance). */
+  const allSites = useMemo(
+    () => SOURCES.filter((s) => s.kinds.includes(kind) && !(s.value === 'curseforge' && noCurseForge) && !(target && modpackOnly(s.value))).map((s) => s.value),
+    [kind, noCurseForge, target]
+  )
+
+  /** One page from every site in "All", interleaved; `fresh` starts over. */
+  const searchAll = async (fresh: boolean): Promise<{ hits: ProjectHit[]; failed: ContentSource[] }> => {
+    const from = allSites.filter((s) => fresh || (cursor.current[s]?.next ?? 0) < (cursor.current[s]?.total ?? 0))
+    const settled = await Promise.allSettled(
+      from.map((s) => api.content.search({ ...q, source: s, offset: fresh ? 0 : (cursor.current[s]?.next ?? 0), limit: PAGE }))
+    )
+    const lists: ProjectHit[][] = []
+    const why: ContentSource[] = []
+    settled.forEach((r, i) => {
+      const s = from[i]
+      if (r.status === 'fulfilled') {
+        cursor.current[s] = { next: (fresh ? 0 : (cursor.current[s]?.next ?? 0)) + r.value.hits.length, total: r.value.total }
+        lists.push(r.value.hits)
+      } else {
+        cursor.current[s] = { next: 0, total: 0 }
+        why.push(s)
+      }
+    })
+    return { hits: interleave(lists), failed: why }
+  }
 
   useEffect(() => {
     let live = true
     setHits(undefined)
     setError(undefined)
-    if (needsKey) return
-    api.content
-      .search({ ...q, offset: 0, limit: PAGE })
-      .then((r) => {
-        if (!live) return
-        setHits(r.hits)
-        setTotal(r.total)
-      })
-      .catch((e) => live && setError((e as Error).message))
+    setFailed([])
+    if (needsKey || isLink(debounced)) return
+    if (source === 'all') {
+      cursor.current = {}
+      searchAll(true)
+        .then((r) => {
+          if (!live) return
+          if (!r.hits.length && r.failed.length) setError(t('discover.allFailed'))
+          setHits(mergeHits([], r.hits))
+          setFailed(r.failed)
+        })
+        .catch((e) => live && setError((e as Error).message))
+    } else {
+      api.content
+        .search({ ...q, source, offset: 0, limit: PAGE })
+        .then((r) => {
+          if (!live) return
+          setHits(r.hits)
+          setTotal(r.total)
+        })
+        .catch((e) => live && setError((e as Error).message))
+    }
     return () => {
       live = false
     }
-  }, [q, needsKey])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, source, needsKey, allSites])
+
+  const hasMore = source === 'all' ? Object.values(cursor.current).some((c) => c && c.next < c.total) : !!hits && hits.length < total
 
   const more = async () => {
     setLoadingMore(true)
     try {
-      const r = await api.content.search({ ...q, offset: hits?.length ?? 0, limit: PAGE })
-      setHits((h) => [...(h ?? []), ...r.hits])
+      if (source === 'all') {
+        const r = await searchAll(false)
+        setHits((h) => mergeHits(h ?? [], r.hits))
+      } else {
+        const r = await api.content.search({ ...q, source, offset: hits?.length ?? 0, limit: PAGE })
+        setHits((h) => [...(h ?? []), ...r.hits])
+      }
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
       setLoadingMore(false)
+    }
+  }
+
+  /** Installs whatever a pasted link points to into the instance being browsed for (or the one picked). */
+  const installLink = async () => {
+    const into = target ?? instances.find((i) => i.id === (linkInto ?? instances[0]?.id))
+    if (!into) return
+    setLinking(true)
+    try {
+      await api.content.installFromLink(into.id, query.trim(), kind)
+      toast(t('discover.link.installed', { instance: into.name }))
+      setQuery('')
+      await loadInstalled()
+      void refreshInstances()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setLinking(false)
     }
   }
 
@@ -394,7 +516,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
         ? { label: t(selected.has(h.id) ? 'menu.discover.deselect' : 'menu.discover.select'), icon: <SquareCheck />, onSelect: () => toggleSelect(h) }
         : null,
       '-',
-      { label: t('discover.result.openOn', { source: sourceInfo.label }), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(h.url) },
+      { label: t('discover.result.openOn', { source: siteLabel(h.source) }), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(h.url) },
       { label: t('menu.copyLink'), icon: <Link />, onSelect: () => void copy(h.url) }
     ]
   }
@@ -443,17 +565,20 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
       )}
 
       <div className="toolbar">
-        <Segmented
+        <Segmented<Site>
           value={source}
           onChange={setSource}
-          options={SOURCES.filter((s) => !(target && modpackOnly(s.value))).map((s) => ({
-            value: s.value,
-            label: (
-              <>
-                <span className="source-dot" style={{ background: s.color }} /> {s.label}
-              </>
-            )
-          }))}
+          options={[
+            { value: 'all' as Site, label: <>{t('discover.allSites')}</> },
+            ...SOURCES.filter((s) => !(target && modpackOnly(s.value))).map((s) => ({
+              value: s.value as Site,
+              label: (
+                <>
+                  <span className="source-dot" style={{ background: s.color }} /> {s.label}
+                </>
+              )
+            }))
+          ]}
         />
         <span className="toolbar-divider" />
         <Segmented
@@ -520,7 +645,46 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
         </select>
       </div>
 
-      {needsKey ? (
+      {source === 'all' && failed.length > 0 && hits && hits.length > 0 && (
+        <span className="hint bad">{t('discover.someFailed', { sources: failed.map(siteLabel).join(', ') })}</span>
+      )}
+      {isLink(query) ? (
+        <div className="results">
+          <div className="result">
+            <div className="ico">
+              <Link2 />
+            </div>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <h3>{t('discover.link.title')}</h3>
+              <p className="ellipsis">{query.trim()}</p>
+              <div className="stats-line">
+                <span className="faint">{kind === 'modpack' ? t('discover.link.noModpacks') : t('discover.link.hint')}</span>
+              </div>
+            </div>
+            {kind !== 'modpack' && (
+              <div className="actions">
+                {!target && (
+                  <select
+                    className="select"
+                    value={linkInto ?? instances[0]?.id ?? ''}
+                    onChange={(e) => setLinkInto(e.target.value)}
+                    aria-label={t('discover.link.into')}
+                  >
+                    {instances.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button className="btn primary sm" disabled={linking || (!target && !instances.length)} onClick={() => void installLink()}>
+                  {linking ? <Loader2 className="spin" /> : <Download />} {t('common.install')}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : needsKey ? (
         <Empty icon={<KeyRound />} title={t('discover.noKey.title')}>
           {t('discover.noKey.body')}
         </Empty>
@@ -567,14 +731,28 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                   </h3>
                   <p>{h.description}</p>
                   <div className="stats-line">
-                    <span>
-                      <Download /> {compact(h.downloads)}
-                    </span>
-                    {h.follows > 0 && (
+                    {h.source === 'github' ? (
+                      <span title={t('discover.result.stars')}>
+                        <Star /> {compact(h.follows)}
+                      </span>
+                    ) : (
+                      <>
+                        <span>
+                          <Download /> {compact(h.downloads)}
+                        </span>
+                        {h.follows > 0 && (
+                          <span>
+                            <Heart /> {compact(h.follows)}
+                          </span>
+                        )}
+                      </>
+                    )}
+                    {source === 'all' && (
                       <span>
-                        <Heart /> {compact(h.follows)}
+                        <span className="source-dot" style={{ background: SOURCES.find((s) => s.value === h.source)?.color }} /> {siteLabel(h.source)}
                       </span>
                     )}
+                    {h.also && <span className="faint">{t('discover.alsoOn', { sources: h.also.map((a) => siteLabel(a.source)).join(', ') })}</span>}
                     <span>
                       <Calendar /> {t('discover.result.updated', { when: timeAgo(h.updated, true) })}
                     </span>
@@ -617,7 +795,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                   )}
                   <button
                     className="btn ghost sm"
-                    title={t('discover.result.openOn', { source: sourceInfo.label })}
+                    title={t('discover.result.openOn', { source: siteLabel(h.source) })}
                     onClick={() => void api.app.openExternal(h.url)}
                   >
                     {t('discover.result.details')} <ExternalLink />
@@ -626,8 +804,14 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
               </div>
             )
           })}
-          {hits.length < total && (
-            <AutoLoadMore onLoad={more} loading={loadingMore} count={hits.length} label={t('discover.loadMore')} style={{ alignSelf: 'center', marginTop: 8 }} />
+          {hasMore && (
+            <AutoLoadMore
+              onLoad={more}
+              loading={loadingMore}
+              count={hits.length}
+              label={t('discover.loadMore')}
+              style={{ alignSelf: 'center', marginTop: 8 }}
+            />
           )}
         </div>
       )}

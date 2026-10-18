@@ -73,9 +73,12 @@ pub enum ContentSource {
     Ftb,
     Atlauncher,
     Technic,
+    /// Mods published as GitHub releases ("gh:owner/repo").
+    Github,
 }
 
-/// Project ids carry their source as a prefix ("cf:238222", "ftb:100", "atl:Foo", "technic:bar"); bare ids are Modrinth.
+/// Project ids carry their source as a prefix ("cf:238222", "ftb:100", "atl:Foo", "technic:bar", "gh:owner/repo");
+/// bare ids are Modrinth.
 pub fn source_of(project_id: &str) -> ContentSource {
     if project_id.starts_with("cf:") {
         ContentSource::Curseforge
@@ -85,6 +88,8 @@ pub fn source_of(project_id: &str) -> ContentSource {
         ContentSource::Atlauncher
     } else if project_id.starts_with("technic:") {
         ContentSource::Technic
+    } else if project_id.starts_with("gh:") {
+        ContentSource::Github
     } else {
         ContentSource::Modrinth
     }
@@ -174,6 +179,14 @@ pub struct McVersion {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoaderVersion {
     pub version: String,
+    pub stable: bool,
+}
+
+/// A build of server software to choose from (Arclight: one per mod loader it runs on).
+#[derive(Debug, Clone, Serialize)]
+pub struct ServerBuild {
+    pub id: String,
+    pub label: String,
     pub stable: bool,
 }
 
@@ -531,10 +544,16 @@ pub enum ServerKind {
     Folia,
     /// Built locally with Spigot's BuildTools (Spigot can't be downloaded ready-made).
     Spigot,
+    /// A Paper fork tuned for performance.
+    Leaf,
     Fabric,
     Quilt,
     Forge,
     Neoforge,
+    /// Mods and Bukkit plugins together, on Forge, NeoForge or Fabric (which one is in `ServerMeta::loader`).
+    Arclight,
+    /// Bedrock Dedicated Server from minecraft.net: its own program, UDP port, worlds and packs (no Java).
+    Bedrock,
 }
 
 impl ServerKind {
@@ -559,7 +578,18 @@ impl ServerKind {
     }
     /// Bukkit-style plugin servers (plugins/ folder).
     pub fn plugins(self) -> bool {
-        matches!(self, Self::Paper | Self::Purpur | Self::Folia | Self::Spigot)
+        matches!(self, Self::Paper | Self::Purpur | Self::Folia | Self::Spigot | Self::Leaf)
+    }
+    /// Hybrids (Arclight) run mods (mods/) and Bukkit plugins (plugins/) together.
+    pub fn hybrid(self) -> bool {
+        matches!(self, Self::Arclight)
+    }
+    /// Runs mods, as a mod loader or a hybrid.
+    pub fn modded(self) -> bool {
+        self.loader().is_some() || self.hybrid()
+    }
+    pub fn bedrock(self) -> bool {
+        self == Self::Bedrock
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -568,15 +598,19 @@ impl ServerKind {
             Self::Purpur => "Purpur",
             Self::Folia => "Folia",
             Self::Spigot => "Spigot",
+            Self::Leaf => "Leaf",
             Self::Fabric => "Fabric",
             Self::Quilt => "Quilt",
             Self::Forge => "Forge",
             Self::Neoforge => "NeoForge",
+            Self::Arclight => "Arclight",
+            Self::Bedrock => "Bedrock",
         }
     }
 }
 
-/// How a server is started: `-jar <jar>`, or a Java @argument file (modern Forge/NeoForge). Paths are relative to the server folder.
+/// How a server is started: `-jar <jar>`, a Java @argument file (modern Forge/NeoForge), or a program of its own
+/// (Bedrock). Paths are relative to the server folder.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerLaunch {
@@ -584,6 +618,8 @@ pub struct ServerLaunch {
     pub jar: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub args_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exe: Option<String>,
 }
 
 fn yes() -> bool {
@@ -601,7 +637,7 @@ pub struct ServerMeta {
     pub mc_version: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loader: Option<LoaderType>,
-    /// Mod loader version, or the Paper/Purpur/Folia build.
+    /// Mod loader version, or the build of Paper, Purpur, Folia, Leaf or Arclight.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loader_version: Option<String>,
     pub memory_mb: u32,
@@ -693,6 +729,9 @@ pub struct ServerNet {
     /// Automatic fell back to the relay because playit.gg isn't linked yet: suggest linking it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub playit_hint: bool,
+    /// Java servers with Geyser: where Bedrock players join (UDP), through the router or playit.gg.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bedrock_address: Option<String>,
     /// ResinCraft Relay: the name, traffic and connection state while `via` is "resin", or why it wasn't used
     /// when another route took over.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -928,7 +967,7 @@ pub struct ServerListEntry {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerAddonHit {
-    /// Bare id for Modrinth, "hangar:<slug>", "cf:<id>".
+    /// Bare id for Modrinth, "hangar:<slug>", "spigot:<id>", "cf:<id>", "gh:<owner>/<repo>".
     pub id: String,
     pub title: String,
     pub description: String,
@@ -936,7 +975,10 @@ pub struct ServerAddonHit {
     pub icon_url: Option<String>,
     pub author: String,
     pub downloads: u64,
-    /// "modrinth" | "hangar" | "spigot" | "curseforge"
+    /// GitHub: stars instead of downloads.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stars: Option<u64>,
+    /// "modrinth" | "hangar" | "spigot" | "bukkit" | "curseforge" | "github"
     pub source: &'static str,
     /// Can't be installed from the launcher (premium, or hosted on another website): open `url` instead.
     #[serde(skip_serializing_if = "std::ops::Not::not")]

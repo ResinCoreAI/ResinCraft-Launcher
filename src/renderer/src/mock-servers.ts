@@ -1,6 +1,8 @@
 // Fake server hosting for the browser preview (see mock.ts): a couple of servers, a simulated boot log,
 // console commands, players joining, and the router port opening.
 import type {
+  AddonSource,
+  BedrockJoin,
   DnsCheck,
   DnsRecord,
   DomainInfo,
@@ -24,13 +26,28 @@ type Listener<T> = (e: T) => void
 export function mockServers(): { server: ResinApi['server']; onServer: ResinApi['on']['server']; onServerLog: ResinApi['on']['serverLog'] } {
   const now = Date.now()
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
-  const base = { launch: { jar: 'server.jar' }, public: true, optimizedFlags: true, tunnel: 'auto' as const, dnsAuto: false, players: [] as string[], state: 'stopped' as const, eulaAccepted: true }
+  const base = {
+    launch: { jar: 'server.jar' },
+    public: true,
+    optimizedFlags: true,
+    tunnel: 'auto' as const,
+    dnsAuto: false,
+    players: [] as string[],
+    state: 'stopped' as const,
+    eulaAccepted: true
+  }
   const PUBLIC_IP = '203.0.113.7'
   const RELAY_DOMAIN = 'rscraft.resincore.tech'
   const PUIRKLE = '069a79f4-44e9-4726-a5be-fca90e38aaf5'
   /** Mirrors proto::suggest_name in the relay crate. */
   const suggestRelayName = (text: string) => {
-    let n = text.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24).replace(/-+$/, '')
+    let n = text
+      .toLowerCase()
+      .replace(/['’]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24)
+      .replace(/-+$/, '')
     if (n.length < 3) n = n ? `${n}-mc` : 'my-server'
     return n
   }
@@ -67,7 +84,10 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       altRecords: d && route === 'resin' && net?.address ? [srv(net.address, 25565)] : undefined,
       hostsLine: d && route === 'direct' ? `${PUBLIC_IP} ${d}` : undefined,
       playitGuest: route === 'playit',
-      check: checks[id]?.records.length && records.every((r) => checks[id]!.records.some((c) => JSON.stringify(c.record) === JSON.stringify(r))) ? checks[id] : undefined,
+      check:
+        checks[id]?.records.length && records.every((r) => checks[id]!.records.some((c) => JSON.stringify(c.record) === JSON.stringify(r)))
+          ? checks[id]
+          : undefined,
       cloudflareToken: !!cfTokens[id],
       cloudflareStatus:
         s.dnsAuto && route !== 'none'
@@ -105,8 +125,49 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       modpack: { name: 'Create: Above and Beyond', projectId: 'abc' },
       launch: { jar: 'fabric-server-launch.jar' }
     },
-    { ...base, id: 'fresh', name: 'Vanilla 1.21.4', type: 'vanilla', mcVersion: '1.21.4', memoryMb: 2048, port: 25567, createdAt: now - 3e6, eulaAccepted: false }
+    {
+      ...base,
+      id: 'fresh',
+      name: 'Vanilla 1.21.4',
+      type: 'vanilla',
+      mcVersion: '1.21.4',
+      memoryMb: 2048,
+      port: 25567,
+      createdAt: now - 3e6,
+      eulaAccepted: false
+    },
+    {
+      ...base,
+      id: 'hybrid',
+      name: 'Modded with plugins',
+      type: 'arclight',
+      loader: 'neoforge',
+      mcVersion: '1.21.1',
+      loaderVersion: '1.0.1-8ec9529',
+      memoryMb: 6144,
+      port: 25568,
+      createdAt: now - 9e6,
+      launch: { jar: 'arclight.jar' }
+    },
+    {
+      ...base,
+      id: 'bedrock',
+      name: 'Bedrock world',
+      type: 'bedrock',
+      mcVersion: '1.26.52.3',
+      memoryMb: 2048,
+      port: 19132,
+      createdAt: now - 4e6,
+      launch: { exe: 'bedrock_server.exe' }
+    }
   ]
+  /** Geyser + Floodgate per server (preview: the SMP starts with them). */
+  const geyser: Record<string, boolean> = { smp: true }
+  const bedrockJoin = (id: string): BedrockJoin => {
+    const s = find(id)
+    const on = !!geyser[id]
+    return { supported: !['vanilla', 'forge', 'bedrock'].includes(s.type), geyser: on, floodgate: on, port: 19132 }
+  }
   const logs: Record<string, LogLine[]> = {}
   const listeners: Listener<ServerEvent>[] = []
   const logListeners: Listener<ServerLogEvent>[] = []
@@ -132,17 +193,103 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     bans: [],
     ipBans: []
   }
+  /** An Arclight server's mods (its plugins are `addons`). */
+  let modAddons: ServerAddon[] = [
+    {
+      filename: 'create-1.21.1-6.0.4.jar',
+      enabled: true,
+      size: 15_800_000,
+      kind: 'mod',
+      title: 'Create',
+      projectId: 'LNytGWDc',
+      versionId: 'c1',
+      versionNumber: '6.0.4',
+      source: 'modrinth'
+    }
+  ]
   let addons: ServerAddon[] = [
-    { filename: 'LuckPerms-Bukkit-5.4.130.jar', enabled: true, size: 1_400_000, kind: 'mod', title: 'LuckPerms', projectId: 'Vebnzrzj', versionId: 'v1', versionNumber: '5.4.130', source: 'modrinth' },
-    { filename: 'EssentialsX-2.21.0.jar', enabled: true, size: 3_100_000, kind: 'mod', title: 'EssentialsX', projectId: 'spigot:9089', versionId: '639442', versionNumber: '2.21.0', source: 'spigot' },
-    { filename: 'worldedit-bukkit-7.3.6.jar.disabled', enabled: false, size: 5_900_000, kind: 'mod', title: 'WorldEdit', projectId: 'cf:31043', versionId: 'w1', versionNumber: '7.3.6', source: 'curseforge' },
+    {
+      filename: 'LuckPerms-Bukkit-5.4.130.jar',
+      enabled: true,
+      size: 1_400_000,
+      kind: 'mod',
+      title: 'LuckPerms',
+      projectId: 'Vebnzrzj',
+      versionId: 'v1',
+      versionNumber: '5.4.130',
+      source: 'modrinth'
+    },
+    {
+      filename: 'EssentialsX-2.21.0.jar',
+      enabled: true,
+      size: 3_100_000,
+      kind: 'mod',
+      title: 'EssentialsX',
+      projectId: 'spigot:9089',
+      versionId: '639442',
+      versionNumber: '2.21.0',
+      source: 'spigot'
+    },
+    {
+      filename: 'worldedit-bukkit-7.3.6.jar.disabled',
+      enabled: false,
+      size: 5_900_000,
+      kind: 'mod',
+      title: 'WorldEdit',
+      projectId: 'cf:31043',
+      versionId: 'w1',
+      versionNumber: '7.3.6',
+      source: 'curseforge'
+    },
     { filename: 'MyHomes.jar', enabled: true, size: 120_000, kind: 'mod', title: 'MyHomes', versionNumber: '1.2' }
   ]
   const VERSIONS: ServerAddonVersion[] = [
-    { id: 'v3', name: '5.4.150 (1.21.4)', versionNumber: '5.4.150', gameVersions: ['1.21.4'], loaders: ['paper'], type: 'release', published: new Date(now - 1e8).toISOString(), downloads: 1200, compatible: false, changelogUrl: 'https://modrinth.com' },
-    { id: 'v2', name: '5.4.141', versionNumber: '5.4.141', gameVersions: ['1.21', '1.21.1'], loaders: ['paper', 'spigot'], type: 'release', published: new Date(now - 4e8).toISOString(), downloads: 9000, compatible: true, changelogUrl: 'https://modrinth.com' },
-    { id: 'v2b', name: '5.4.141-beta', versionNumber: '5.4.141-beta', gameVersions: ['1.21.1'], loaders: ['paper'], type: 'beta', published: new Date(now - 5e8).toISOString(), downloads: 300, compatible: true },
-    { id: 'v1', name: '5.4.130', versionNumber: '5.4.130', gameVersions: ['1.21', '1.21.1'], loaders: ['paper', 'spigot'], type: 'release', published: new Date(now - 9e8).toISOString(), downloads: 40000, compatible: true }
+    {
+      id: 'v3',
+      name: '5.4.150 (1.21.4)',
+      versionNumber: '5.4.150',
+      gameVersions: ['1.21.4'],
+      loaders: ['paper'],
+      type: 'release',
+      published: new Date(now - 1e8).toISOString(),
+      downloads: 1200,
+      compatible: false,
+      changelogUrl: 'https://modrinth.com'
+    },
+    {
+      id: 'v2',
+      name: '5.4.141',
+      versionNumber: '5.4.141',
+      gameVersions: ['1.21', '1.21.1'],
+      loaders: ['paper', 'spigot'],
+      type: 'release',
+      published: new Date(now - 4e8).toISOString(),
+      downloads: 9000,
+      compatible: true,
+      changelogUrl: 'https://modrinth.com'
+    },
+    {
+      id: 'v2b',
+      name: '5.4.141-beta',
+      versionNumber: '5.4.141-beta',
+      gameVersions: ['1.21.1'],
+      loaders: ['paper'],
+      type: 'beta',
+      published: new Date(now - 5e8).toISOString(),
+      downloads: 300,
+      compatible: true
+    },
+    {
+      id: 'v1',
+      name: '5.4.130',
+      versionNumber: '5.4.130',
+      gameVersions: ['1.21', '1.21.1'],
+      loaders: ['paper', 'spigot'],
+      type: 'release',
+      published: new Date(now - 9e8).toISOString(),
+      downloads: 40000,
+      compatible: true
+    }
   ]
 
   const find = (id: string) => servers.find((s) => s.id === id)!
@@ -174,20 +321,58 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
   const ts = () => new Date().toTimeString().slice(0, 8)
 
   const hit = (id: string, title: string, description: string, downloads: number, source: ServerAddonHit['source'], external = false): ServerAddonHit => ({
-    id,
+    id: source === 'modrinth' ? id : `${source}:${id}`,
     title,
     description,
     author: source === 'spigot' ? '' : 'someone',
-    downloads,
+    downloads: source === 'github' ? 0 : downloads,
+    stars: source === 'github' ? Math.round(downloads / 900) : undefined,
     source,
     url: 'https://example.com/' + id,
     external
   })
+  const PLUGIN_TYPES = ['paper', 'purpur', 'folia', 'spigot', 'leaf']
+  const sourcesOf = (id: string, area?: string): AddonSource[] => {
+    const type = find(id).type
+    if (type === 'vanilla' || type === 'bedrock') return []
+    if (PLUGIN_TYPES.includes(type)) return ['modrinth', 'hangar', 'spigot', 'bukkit', 'github']
+    if (type === 'arclight' && area !== 'mods') return ['modrinth', 'spigot', 'bukkit', 'github']
+    return ['modrinth', 'curseforge', 'github']
+  }
+  const listOf = (area?: string) => (area === 'mods' ? modAddons : addons)
+  const setList = (area: string | undefined, f: (l: ServerAddon[]) => ServerAddon[]) => {
+    if (area === 'mods') modAddons = f(modAddons)
+    else addons = f(addons)
+  }
 
   const server: ResinApi['server'] = {
     list: () => wait(servers, 150),
     get: async (id) => find(id),
-    versions: (type) => wait(type === 'vanilla' ? [] : ['1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20.4', '1.20.1', '1.19.4', '1.18.2']),
+    versions: (type) =>
+      wait(
+        type === 'vanilla'
+          ? []
+          : type === 'bedrock'
+            ? ['1.26.52.3', '1.26.51.1', '1.26.45.1', '1.26.40.2']
+            : type === 'arclight'
+              ? ['1.21.11', '1.21.1', '1.20.4', '1.20.2', '1.20.1', '1.19.4', '1.19.2', '1.18.2', '1.17.1', '1.16.5']
+              : type === 'leaf'
+                ? ['26.3', '26.2', '26.1.2', '1.21.11', '1.21.8', '1.21.4']
+                : ['1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20.4', '1.20.1', '1.19.4', '1.18.2']
+      ),
+    builds: (type, mc) =>
+      wait(
+        type !== 'arclight'
+          ? []
+          : mc === '1.21.1'
+            ? [
+                { id: 'neoforge@1.0.1-8ec9529', label: 'NeoForge · 1.0.1-8ec9529', stable: true },
+                { id: 'forge@1.0.1-8ec9529', label: 'Forge · 1.0.1-8ec9529', stable: true },
+                { id: 'fabric@1.0.1-8ec9529', label: 'Fabric · 1.0.1-8ec9529', stable: true },
+                { id: 'neoforge@1.0.2-SNAPSHOT-d27101f', label: 'NeoForge · 1.0.2-SNAPSHOT-d27101f', stable: false }
+              ]
+            : [{ id: 'forge@1.0.5-1a8925b1', label: 'Forge · 1.0.5-1a8925b1', stable: true }]
+      ),
     create: async (data) => {
       const id = `server-${servers.length + 1}`
       const s: ServerInfo = {
@@ -197,7 +382,11 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
         type: data.type ?? 'fabric',
         mcVersion: data.mcVersion ?? '1.20.1',
         memoryMb: data.memoryMb ?? 4096,
-        port: 25565 + servers.length,
+        port: data.type === 'bedrock' ? 19134 : 25565 + servers.length,
+        ...(data.type === 'arclight'
+          ? { loader: (data.loaderVersion?.split('@')[0] ?? 'neoforge') as ServerInfo['loader'], loaderVersion: data.loaderVersion?.split('@')[1] }
+          : {}),
+        ...(data.type === 'bedrock' ? { launch: { exe: 'bedrock_server.exe' } } : {}),
         createdAt: Date.now(),
         eulaAccepted: false,
         ...(data.source ? { modpack: { name: data.name || 'Modpack' } } : {})
@@ -219,18 +408,32 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       patch(id, { state: 'starting', players: [], net: undefined })
       fire(id)
       say(id, `ResinCraft is starting ${s.name}`)
-      const boot = [
-        `Starting minecraft server version ${s.mcVersion}`,
-        'Loading properties',
-        'Default game type: SURVIVAL',
-        `Starting Minecraft server on *:${s.port}`,
-        'Preparing level "world"',
-        'Preparing spawn area: 42%',
-        'Preparing spawn area: 91%'
-      ]
-      boot.forEach((t, i) => later(id, 300 + i * 260, () => say(id, `[${ts()}] [Server thread/INFO]: ${t}`)))
+      const bedrock = s.type === 'bedrock'
+      const boot = bedrock
+        ? [
+            `Version: ${s.mcVersion}`,
+            'Session ID: 2b5e9a1c',
+            'Level Name: Bedrock level',
+            'Game mode: 0 Survival',
+            'Difficulty: 1 EASY',
+            `IPv4 supported, port: ${s.port}: Used for gameplay and LAN discovery`,
+            `IPv6 supported, port: ${s.port + 1}: Used for gameplay`
+          ]
+        : [
+            `Starting minecraft server version ${s.mcVersion}`,
+            'Loading properties',
+            'Default game type: SURVIVAL',
+            `Starting Minecraft server on *:${s.port}`,
+            'Preparing level "world"',
+            'Preparing spawn area: 42%',
+            'Preparing spawn area: 91%'
+          ]
+      const line = (t: string) => (bedrock ? `[2026-10-19 ${ts()}:120 INFO] ${t}` : `[${ts()}] [Server thread/INFO]: ${t}`)
+      boot.forEach((t, i) => later(id, 300 + i * 260, () => say(id, line(t))))
+      if (geyser[id])
+        later(id, 300 + boot.length * 260 + 100, () => say(id, `[${ts()}] [Server thread/INFO]: [Geyser-Spigot] Started Geyser on UDP port 19132`))
       later(id, 300 + boot.length * 260, () => {
-        say(id, `[${ts()}] [Server thread/INFO]: Done (4.212s)! For help, type "help"`)
+        say(id, bedrock ? line('Server started.') : `[${ts()}] [Server thread/INFO]: Done (4.212s)! For help, type "help"`)
         patch(id, { state: 'running', net: s.public ? { state: 'opening' } : undefined })
         fire(id)
       })
@@ -246,32 +449,42 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
         }
         if (!cur.relayName && (cur.tunnel === 'resin' || (cur.tunnel === 'auto' && cur.port % 2 === 0))) patch(id, { relayName, relayAccount: PUIRKLE })
         const net: ServerNet =
-          cur.tunnel === 'resin'
-            ? resin
-            : cur.tunnel === 'playit'
-              ? { state: 'open', address: 'tidy-fern.joinmc.link', via: 'playit' }
-              : cur.tunnel === 'relay'
-                ? { state: 'open', address: 'bore.pub:41234', via: 'relay' }
-                : cur.tunnel === 'auto' && cur.port % 2 === 0
-                  ? // A router without UPnP: ResinCraft Relay (a Microsoft account is signed in).
-                    resin
-                  : { state: 'open', address: `${PUBLIC_IP}:${cur.port}`, via: cur.tunnel === 'manual' ? 'manual' : 'router' }
+          cur.type === 'bedrock'
+            ? {
+                state: 'open',
+                address: cur.tunnel === 'playit' ? 'bright-oak.at.ply.gg:19132' : `${PUBLIC_IP}:${cur.port}`,
+                via: cur.tunnel === 'playit' ? 'playit' : cur.tunnel === 'manual' ? 'manual' : 'router'
+              }
+            : cur.tunnel === 'resin'
+              ? resin
+              : cur.tunnel === 'playit'
+                ? { state: 'open', address: 'tidy-fern.joinmc.link', via: 'playit' }
+                : cur.tunnel === 'relay'
+                  ? { state: 'open', address: 'bore.pub:41234', via: 'relay' }
+                  : cur.tunnel === 'auto' && cur.port % 2 === 0
+                    ? // A router without UPnP: ResinCraft Relay (a Microsoft account is signed in).
+                      resin
+                    : { state: 'open', address: `${PUBLIC_IP}:${cur.port}`, via: cur.tunnel === 'manual' ? 'manual' : 'router' }
         // The sample domain checks out on the direct route.
         if (cur.domain && net.via !== 'relay') net.domainOk = net.via !== 'playit'
         // ?relay=ended shows a finished session.
         if (net.via === 'resin' && new URLSearchParams(location.search).get('relay') === 'ended') {
-          patch(id, { net: { state: 'failed', error: 'The ResinCraft Relay session ended.', resin: { name: relayName, usedBytes: 0, limitBytes: 0, ended: true } } })
+          patch(id, {
+            net: { state: 'failed', error: 'The ResinCraft Relay session ended.', resin: { name: relayName, usedBytes: 0, limitBytes: 0, ended: true } }
+          })
           fire(id)
           return
         }
-        if (net.via === 'resin' && net.resin?.warning) say(id, `[${ts()}] [Server thread/INFO]: [Server] ResinCraft Relay closes in ${net.resin.warning} minutes unless the host continues.`)
+        if (geyser[id]) net.bedrockAddress = `${PUBLIC_IP}:19132`
+        if (net.via === 'resin' && net.resin?.warning)
+          say(id, `[${ts()}] [Server thread/INFO]: [Server] ResinCraft Relay closes in ${net.resin.warning} minutes unless the host continues.`)
         patch(id, { net })
         fire(id)
       })
       later(id, 6000, () => {
         if (find(id).state !== 'running') return
-        say(id, `[${ts()}] [Server thread/INFO]: Steve joined the game`)
-        patch(id, { players: ['Steve'] })
+        say(id, bedrock ? line('Player connected: Cool Gamer 21, xuid: 2535411234567890') : `[${ts()}] [Server thread/INFO]: Steve joined the game`)
+        patch(id, { players: [bedrock ? 'Cool Gamer 21' : 'Steve'] })
         fire(id)
       })
     },
@@ -296,7 +509,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     command: async (id, cmd) => {
       const net = find(id).net
       if (cmd.trim().toLowerCase() === 'continue' && net?.resin?.warning) {
-        say(id, '> continue  (sent to ResinCraft Relay: the session goes on, it wasn\'t typed into the server)', 'info')
+        say(id, "> continue  (sent to ResinCraft Relay: the session goes on, it wasn't typed into the server)", 'info')
         continueSession(id)
         return
       }
@@ -310,7 +523,17 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       const s = find(id)
       const mem = `${s.memoryMb}M`
       const flags = s.optimizedFlags
-        ? [`-Xms${mem}`, `-Xmx${mem}`, '-XX:+UseG1GC', '-XX:+ParallelRefProcEnabled', '-XX:MaxGCPauseMillis=200', '-XX:+UnlockExperimentalVMOptions', '-XX:+DisableExplicitGC', '-XX:+AlwaysPreTouch', '-Dusing.aikars.flags=https://mcflags.emc.gs']
+        ? [
+            `-Xms${mem}`,
+            `-Xmx${mem}`,
+            '-XX:+UseG1GC',
+            '-XX:+ParallelRefProcEnabled',
+            '-XX:MaxGCPauseMillis=200',
+            '-XX:+UnlockExperimentalVMOptions',
+            '-XX:+DisableExplicitGC',
+            '-XX:+AlwaysPreTouch',
+            '-Dusing.aikars.flags=https://mcflags.emc.gs'
+          ]
         : [`-Xmx${mem}`, '-Xms1024M']
       return [...flags, ...(s.jvmArgs ? s.jvmArgs.split(' ') : []), '-jar', s.launch.jar ?? 'server.jar', 'nogui']
     },
@@ -320,56 +543,124 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     playerAdd: async (_id, kind, name) => void (lists[kind] = [...lists[kind], { name, level: kind === 'ops' ? 4 : undefined }]),
     playerRemove: async (_id, kind, name) => void (lists[kind] = lists[kind].filter((e) => e.name !== name)),
     backup: () => wait('C:/…/servers/smp/backups/2026-10-18_14-02-11_world.zip', 1200),
-    addonSources: async (id) => (find(id).type === 'vanilla' ? [] : ['paper', 'purpur', 'folia', 'spigot'].includes(find(id).type) ? ['modrinth', 'hangar', 'spigot', 'curseforge'] : ['modrinth', 'curseforge']),
-    addons: () => wait(addons),
-    addonSearch: (_id, _q, source) =>
-      wait(
-        {
-          hits: [
+    addonSources: async (id, area) => sourcesOf(id, area),
+    addons: (_id, area) => wait(listOf(area)),
+    addonSearch: (_id, _q, source, offset = 0, area) => {
+      const mods = area === 'mods' || ['fabric', 'quilt', 'forge', 'neoforge'].includes(find(_id).type)
+      const page = mods
+        ? [
+            hit('create', 'Create', 'Building tools and aesthetic technology.', 9_100_000, source),
+            hit('lithium', 'Lithium', 'No-compromises game logic optimisation.', 18_000_000, source),
+            hit(`only-${source}`, `${source[0].toUpperCase()}${source.slice(1)} pick`, 'Only on this site.', 210_000, source)
+          ]
+        : [
             hit('luckperms', 'LuckPerms', 'A permissions plugin for Minecraft servers.', 3_400_000, source),
             hit('essentialsx', 'EssentialsX', 'The essential plugin suite for Minecraft servers.', 5_900_000, source, source === 'spigot'),
             hit('chunky', 'Chunky', 'Pre-generates chunks, quickly and efficiently.', 1_200_000, source),
+            hit(`only-${source}`, `${source[0].toUpperCase()}${source.slice(1)} pick`, 'Only on this site.', 210_000, source),
             hit('premium', 'MythicMobs Premium', 'Create custom mobs, items and skills.', 980_000, source, true)
-          ],
-          total: 4
-        },
-        400
-      ),
+          ]
+      // A second page for the first site, so "load more" has something to do in "All".
+      const second = offset > 0 ? [] : source === 'modrinth' ? [hit('spark', 'spark', 'A performance profiler.', 2_800_000, source)] : []
+      return wait({ hits: offset > 0 ? second : page, total: page.length + (source === 'modrinth' ? 1 : 0) }, source === 'github' ? 700 : 400)
+    },
     addonVersions: () => wait(VERSIONS, 400),
-    addonChangeVersion: async (id, filename, versionId) => {
+    addonChangeVersion: async (id, filename, versionId, area) => {
       await wait(null, 900)
       const v = VERSIONS.find((x) => x.id === versionId)
       const running = find(id).state !== 'stopped' && find(id).state !== 'crashed'
-      addons = addons.map((a) =>
-        a.filename !== filename
-          ? a
-          : running
-            ? { ...a, pending: 'update', pendingVersion: v?.versionNumber ?? a.update?.versionNumber ?? versionId, update: undefined }
-            : { ...a, versionId, versionNumber: v?.versionNumber ?? versionId, update: undefined, pending: undefined }
+      setList(area, (list) =>
+        list.map((a) =>
+          a.filename !== filename
+            ? a
+            : running
+              ? { ...a, pending: 'update', pendingVersion: v?.versionNumber ?? a.update?.versionNumber ?? versionId, update: undefined }
+              : { ...a, versionId, versionNumber: v?.versionNumber ?? versionId, update: undefined, pending: undefined }
+        )
       )
       return running
     },
-    addonCheckUpdates: async () => {
+    addonCheckUpdates: async (_id, area) => {
       await wait(null, 700)
-      addons = addons.map((a) =>
-        a.title === 'LuckPerms' && a.versionId !== 'v2'
-          ? { ...a, update: { versionId: 'v2', versionNumber: '5.4.141' }, updateUrl: 'https://modrinth.com' }
-          : a.title === 'WorldEdit'
-            ? { ...a, update: { versionId: 'w2', versionNumber: '7.3.8' } }
-            : a
+      setList(area, (list) =>
+        list.map((a) =>
+          a.title === 'LuckPerms' && a.versionId !== 'v2'
+            ? { ...a, update: { versionId: 'v2', versionNumber: '5.4.141' }, updateUrl: 'https://modrinth.com' }
+            : a.title === 'WorldEdit'
+              ? { ...a, update: { versionId: 'w2', versionNumber: '7.3.8' } }
+              : a
+        )
       )
-      return addons
+      return listOf(area)
     },
-    addonCancelPending: async (_id, filename) => void (addons = addons.map((a) => (a.filename === filename ? { ...a, pending: undefined, pendingVersion: undefined } : a))),
-    addonInstall: async (_id, projectId) => {
+    addonCancelPending: async (_id, filename, area) =>
+      setList(area, (list) => list.map((a) => (a.filename === filename ? { ...a, pending: undefined, pendingVersion: undefined } : a))),
+    addonInstall: async (_id, projectId, _v, area) => {
       await wait(null, 900)
-      addons = [...addons, { filename: `${projectId}.jar`, enabled: true, size: 800_000, kind: 'mod', title: projectId, projectId }]
+      const name = projectId.replace(/^[a-z]+:/, '')
+      const source = projectId.includes(':') ? (projectId.split(':')[0] as AddonSource) : 'modrinth'
+      setList(area, (list) => [
+        ...list,
+        {
+          filename: `${name}.jar`,
+          enabled: true,
+          size: 800_000,
+          kind: 'mod',
+          title: name,
+          projectId,
+          source: source === ('gh' as AddonSource) ? 'github' : source
+        }
+      ])
     },
-    addonToggle: async (_id, filename) =>
-      void (addons = addons.map((a) =>
-        a.filename === filename ? { ...a, enabled: !a.enabled, filename: a.enabled ? `${filename}.disabled` : filename.replace(/\.disabled$/, '') } : a
-      )),
-    addonRemove: async (_id, filename) => void (addons = addons.filter((a) => a.filename !== filename)),
+    addonToggle: async (_id, filename, area) =>
+      setList(area, (list) =>
+        list.map((a) =>
+          a.filename === filename ? { ...a, enabled: !a.enabled, filename: a.enabled ? `${filename}.disabled` : filename.replace(/\.disabled$/, '') } : a
+        )
+      ),
+    addonRemove: async (_id, filename, area) => setList(area, (list) => list.filter((a) => a.filename !== filename)),
+    addonFromLink: async (_id, url, area) => {
+      await wait(null, 1100)
+      if (!/^https?:\/\//.test(url)) throw new Error("That isn't a web address")
+      const name = url.split('/').filter(Boolean).pop() ?? 'plugin.jar'
+      setList(area, (list) => [
+        ...list,
+        { filename: name.endsWith('.jar') ? name : `${name}.jar`, enabled: true, size: 640_000, kind: 'mod', title: name.replace(/\.jar$/, '') }
+      ])
+    },
+    bedrockJoin: async (id) => wait(bedrockJoin(id), 200),
+    setBedrockJoin: async (id, on) => {
+      await wait(null, 1400)
+      geyser[id] = on
+      addons = on
+        ? [
+            ...addons.filter((a) => !/^(geyser|floodgate)/i.test(a.filename)),
+            {
+              filename: 'floodgate-spigot.jar',
+              enabled: true,
+              size: 11_500_000,
+              kind: 'mod',
+              title: 'Floodgate',
+              projectId: 'geysermc:floodgate',
+              versionId: '2.2.5-b141',
+              versionNumber: '2.2.5 (build 141)',
+              source: 'geysermc'
+            },
+            {
+              filename: 'Geyser-Spigot.jar',
+              enabled: true,
+              size: 19_800_000,
+              kind: 'mod',
+              title: 'Geyser',
+              projectId: 'geysermc:geyser',
+              versionId: '2.9.0-b900',
+              versionNumber: '2.9.0 (build 900)',
+              source: 'geysermc'
+            }
+          ]
+        : addons.filter((a) => !/^(geyser|floodgate)/i.test(a.filename))
+      return bedrockJoin(id)
+    },
     network: async () => ({ lanIp: '192.168.1.42' }),
     relayInfo: async (id) => ({
       available: true,
@@ -381,7 +672,12 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     relayCheck: async (id, name) => {
       await wait(null, 450)
       if (['smp', 'survival', 'test-server'].includes(name)) {
-        return { name, available: false, mine: false, reason: { key: 'hostRelay.nameTaken', text: `"${name}" belongs to another player. Pick another name.`, params: { name } } }
+        return {
+          name,
+          available: false,
+          mine: false,
+          reason: { key: 'hostRelay.nameTaken', text: `"${name}" belongs to another player. Pick another name.`, params: { name } }
+        }
       }
       return { name, available: true, mine: name === find(id).relayName }
     },
@@ -395,7 +691,14 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       patch(id, { net: { state: 'opening' } })
       fire(id)
       await wait(null, 700)
-      patch(id, { net: { state: 'open', address: `${name}.${RELAY_DOMAIN}`, via: 'resin', resin: { name, usedBytes: 2_400_000_000, limitBytes: 100_000_000_000, endsAt: Date.now() + 2 * 3600_000, continues: 0 } } })
+      patch(id, {
+        net: {
+          state: 'open',
+          address: `${name}.${RELAY_DOMAIN}`,
+          via: 'resin',
+          resin: { name, usedBytes: 2_400_000_000, limitBytes: 100_000_000_000, endsAt: Date.now() + 2 * 3600_000, continues: 0 }
+        }
+      })
       fire(id)
     },
     relayName: async (id, name) => {

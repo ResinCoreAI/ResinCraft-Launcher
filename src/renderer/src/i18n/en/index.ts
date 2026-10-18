@@ -3,6 +3,7 @@
 import accounts from './accounts'
 import art from './art'
 import app from './app'
+import bedrock from './bedrock'
 import common from './common'
 import discover from './discover'
 import engine from './engine'
@@ -16,5 +17,22 @@ import settings from './settings'
 import tabs from './tabs'
 import updates from './updates'
 
-const en = { ...common, ...app, ...accounts, ...settings, ...home, ...library, ...discover, ...instance, ...art, ...tabs, ...files, ...menu, ...servers, ...updates, ...engine }
+const en = {
+  ...common,
+  ...app,
+  ...accounts,
+  ...settings,
+  ...home,
+  ...library,
+  ...bedrock,
+  ...discover,
+  ...instance,
+  ...art,
+  ...tabs,
+  ...files,
+  ...menu,
+  ...servers,
+  ...updates,
+  ...engine
+}
 export default en

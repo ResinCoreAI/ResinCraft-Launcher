@@ -41,6 +41,10 @@ export function projectUrl(projectId?: string): string | undefined {
       return `https://hangar.papermc.io/?query=${id}`
     case 'spigot':
       return `https://www.spigotmc.org/resources/${id}/`
+    case 'gh':
+      return /^[\w.-]+\/[\w.-]+$/.test(rest) ? `https://github.com/${rest}` : undefined
+    case 'geysermc':
+      return 'https://geysermc.org/download'
     default:
       return undefined
   }

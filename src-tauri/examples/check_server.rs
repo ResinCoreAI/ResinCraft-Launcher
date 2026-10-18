@@ -1,9 +1,11 @@
 //! Headless end-to-end check of server hosting (no window needed):
-//!   cargo run --example check_server -- [type…] [--mc 1.21.1] [--keep] [--upnp] [--tunnel auto|playit|relay] [--relay host[:port]] [--relay-secret s] [--managed-java] [--update-test] [--port 25590] [--verbose]
-//! Types: vanilla paper purpur folia spigot fabric quilt forge neoforge, or modpack:<Modrinth id or slug>
-//! (default: vanilla paper fabric). Each server is created, given a plugin (Paper/Purpur: LuckPerms from
-//! Modrinth) or a server-side mod (Fabric/Quilt: Lithium), started until "Done (…)! For help, type "help"",
-//! asked `list`, backed up and stopped with `stop`. Servers are deleted afterwards unless --keep is given.
+//!   cargo run --example check_server -- [type[@version]…] [--mc 1.21.1] [--keep] [--upnp] [--tunnel auto|playit|relay] [--relay host[:port]] [--relay-secret s] [--managed-java] [--update-test] [--geyser] [--port 25590] [--verbose]
+//! Types: vanilla paper purpur folia spigot leaf fabric quilt forge neoforge arclight bedrock, or
+//! modpack:<Modrinth id or slug> (default: vanilla paper fabric). "type@version" picks that type's Minecraft
+//! version (Bedrock: its server version; without one, the newest). Each server is created, given a plugin
+//! (plugin servers and hybrids: LuckPerms from Modrinth) or a server-side mod (Fabric/Quilt: Lithium), started
+//! until it's ready, asked `list`, backed up and stopped with `stop`. --geyser also lets Bedrock players join
+//! (Geyser + Floodgate) and checks Geyser starts. Servers are deleted afterwards unless --keep is given.
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -40,6 +42,10 @@ struct Opts {
     relay_secret: Option<String>,
     /// Plugin servers: start with an older ViaVersion from Modrinth and update it while the server runs.
     update_test: bool,
+    /// Install Geyser and Floodgate ("Bedrock players can join") and check Geyser starts.
+    geyser: bool,
+    /// Plugin servers and hybrids: also install from a Hangar link and from GitHub; hybrids: a mod in their mods.
+    sources: bool,
 }
 
 async fn run() -> Result<bool> {
@@ -60,7 +66,7 @@ async fn run() -> Result<bool> {
         Ok(Some(v))
     };
     let (tunnel, relay, relay_secret) = (value("--tunnel")?.unwrap_or_else(|| "auto".into()), value("--relay")?, value("--relay-secret")?);
-    let opts = Opts { tunnel, relay, relay_secret, keep: flag(&mut argv, "--keep"), upnp: flag(&mut argv, "--upnp"), verbose: flag(&mut argv, "--verbose"), managed_java: flag(&mut argv, "--managed-java"), update_test: flag(&mut argv, "--update-test"), mc: {
+    let opts = Opts { tunnel, relay, relay_secret, keep: flag(&mut argv, "--keep"), upnp: flag(&mut argv, "--upnp"), verbose: flag(&mut argv, "--verbose"), managed_java: flag(&mut argv, "--managed-java"), update_test: flag(&mut argv, "--update-test"), geyser: flag(&mut argv, "--geyser"), sources: flag(&mut argv, "--sources"), mc: {
         let mut mc = "1.21.1".to_string();
         if let Some(i) = argv.iter().position(|a| a == "--mc") {
             mc = argv.get(i + 1).cloned().ok_or_else(|| anyhow!("--mc needs a version"))?;
@@ -116,14 +122,27 @@ async fn run() -> Result<bool> {
 }
 
 async fn check(t: &str, opts: &Opts, port: u16) -> Result<()> {
+    let (t, version) = t.split_once('@').map(|(a, b)| (a, Some(b.to_string()))).unwrap_or((t, None));
     let (kind, source) = match t.strip_prefix("modpack:") {
         Some(pack) => (None, Some(ServerSource::Modpack { project_id: pack.to_string(), version_id: None })),
         None => (Some(serde_json::from_value::<ServerKind>(json!(t)).map_err(|_| anyhow!("unknown server type {t}"))?), None),
     };
+    let mc = match (version, kind) {
+        (Some(v), _) => v,
+        // Bedrock's versions are its own: take the newest.
+        (None, Some(k)) if k.bedrock() => resincraft_lib::server::installers::software_versions(k).await?.first().cloned().ok_or_else(|| anyhow!("no Bedrock versions"))?,
+        _ => opts.mc.clone(),
+    };
+    if let Some(k) = kind {
+        let builds = resincraft_lib::server::installers::builds(k, &mc).await?;
+        if !builds.is_empty() {
+            println!("  builds: {}", builds.iter().map(|b| format!("{}{}", b.label, if b.stable { "" } else { " (dev)" })).collect::<Vec<_>>().join(", "));
+        }
+    }
     let req = NewServer {
         name: format!("check-server {t}"),
         kind,
-        mc_version: source.is_none().then(|| opts.mc.clone()),
+        mc_version: source.is_none().then(|| mc.clone()),
         loader_version: None,
         memory_mb: Some(2048),
         port: Some(port),
@@ -148,27 +167,57 @@ async fn check(t: &str, opts: &Opts, port: u16) -> Result<()> {
 
 async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     let meta = store::get(id).await?;
-    // One add-on per kind of server, from Modrinth.
+    let bedrock = meta.kind.bedrock();
+    // One add-on per kind of server, from Modrinth (hybrids: a plugin).
     let addon = match meta.kind {
-        ServerKind::Paper | ServerKind::Purpur | ServerKind::Spigot => Some("luckperms"),
+        k if k.plugins() || k.hybrid() => Some("luckperms"),
         ServerKind::Fabric | ServerKind::Quilt => Some("lithium"),
         _ => None,
     };
     if let (Some(a), None) = (addon, &meta.modpack) {
-        plugins::install(id, a, None).await?;
-        let list = plugins::list(id).await?;
+        plugins::install(id, a, None, None).await?;
+        let list = plugins::list(id, None).await?;
         let names: Vec<String> = list.iter().map(|c| c.item.title.clone().unwrap_or_else(|| c.item.filename.clone())).collect();
         println!("  installed add-ons: {}", names.join(", "));
         if list.is_empty() {
             bail!("{a} wasn't installed");
         }
     }
+    if opts.sources && (meta.kind.plugins() || meta.kind.hybrid()) {
+        plugins::install_link(id, "https://hangar.papermc.io/HelpChat/PlaceholderAPI", Some("plugins")).await?;
+        plugins::install(id, "gh:EssentialsX/Essentials", None, Some("plugins")).await?;
+        let list = plugins::list(id, Some("plugins")).await?;
+        let shown: Vec<String> = list.iter().map(|a| format!("{} [{}]", a.item.title.clone().unwrap_or_default(), a.source.unwrap_or("?"))).collect();
+        println!("  plugins: {}", shown.join(", "));
+        for want in ["hangar", "github"] {
+            if !list.iter().any(|a| a.source == Some(want)) {
+                bail!("nothing from {want} in the plugins");
+            }
+        }
+        if meta.kind.hybrid() {
+            plugins::install(id, "spark", None, Some("mods")).await?;
+            let mods = plugins::list(id, Some("mods")).await?;
+            println!("  mods: {}", mods.iter().map(|a| a.item.filename.clone()).collect::<Vec<_>>().join(", "));
+            if mods.iter().any(|a| a.item.filename.to_lowercase().contains("luckperms")) || mods.is_empty() {
+                bail!("the plugins and mods areas got mixed up");
+            }
+        }
+    }
+    if opts.geyser {
+        plugins::bedrock_enable(id).await?;
+        let status = plugins::bedrock_status(id).await?;
+        let names: Vec<String> = plugins::list(id, Some("plugins")).await?.iter().map(|c| c.item.filename.clone()).collect();
+        println!("  Bedrock players: {status} ({})", names.join(", "));
+        if status.get("geyser") != Some(&json!(true)) || status.get("floodgate") != Some(&json!(true)) {
+            bail!("Geyser and Floodgate weren't installed");
+        }
+    }
     let mut old_via = None;
     if opts.update_test && meta.kind.plugins() {
-        let versions = plugins::versions(id, "viaversion").await?;
+        let versions = plugins::versions(id, "viaversion", None).await?;
         let compatible: Vec<_> = versions.iter().filter(|v| v.compatible && v.version.kind == "release").collect();
         let old = compatible.get(3).or(compatible.last()).ok_or_else(|| anyhow!("no compatible ViaVersion"))?;
-        plugins::install(id, "viaversion", Some(old.version.id.clone())).await?;
+        plugins::install(id, "viaversion", Some(old.version.id.clone()), None).await?;
         println!("  installed ViaVersion {} ({} compatible releases, newest {})", old.version.version_number, compatible.len(), compatible[0].version.version_number);
         old_via = Some((old.version.version_number.clone(), compatible[0].version.version_number.clone()));
     }
@@ -189,7 +238,9 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
         println!("  managed Java {} at {}", java.version, java.path);
         store::update(id, json!({ "javaPath": java.path })).await?;
     }
-    println!("  java {}", runtime::launch_args(&store::get(id).await?)?.join(" "));
+    if !bedrock {
+        println!("  java {}", runtime::launch_args(&store::get(id).await?)?.join(" "));
+    }
     if runtime::start(id).await.is_ok() {
         bail!("the server started without the EULA being accepted");
     }
@@ -200,10 +251,21 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
         print_tail(id, 25);
         bail!("the server {state} before it was ready");
     }
-    let done = runtime::log(id).into_iter().find(|l| l.text.contains("Done (")).map(|l| l.text).unwrap_or_default();
+    let done = runtime::log(id).into_iter().find(|l| l.text.contains("Done (") || l.text.contains("Server started.")).map(|l| l.text).unwrap_or_default();
     println!("  {done}");
+    if opts.geyser {
+        // Geyser starts once the Java server is up.
+        let geyser_re = Regex::new(r"(?i)started geyser|geyser.*(?:listening|started) on")?;
+        let started = runtime::log(id).into_iter().find(|l| geyser_re.is_match(&l.text)).map(|l| l.text);
+        let started = match started {
+            Some(l) => l,
+            None => runtime::wait_line(id, &geyser_re, Duration::from_secs(90)).await?,
+        };
+        println!("  {started}");
+    }
 
-    let list_re = Regex::new(r"There are \d+ (?:of a max(?:imum)? of|out of maximum) \d+ players online")?;
+    // Java: "There are 0 of a max of 20 players online"; Bedrock: "There are 0/10 players online".
+    let list_re = Regex::new(r"There are \d+(?: (?:of a max(?:imum)? of|out of maximum) |/)\d+ players online")?;
     let waiter = runtime::wait_line(id, &list_re, Duration::from_secs(30));
     runtime::command(id, "list")?;
     println!("  list → {}", waiter.await?);
@@ -232,15 +294,15 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
 
     let mut expect_via = None;
     if let Some((old, newest)) = &old_via {
-        let checked = plugins::check_updates(id).await?;
+        let checked = plugins::check_updates(id, None).await?;
         let via = checked.iter().find(|a| a.item.title.as_deref() == Some("ViaVersion")).ok_or_else(|| anyhow!("ViaVersion missing"))?;
         let up = via.item.update.clone().ok_or_else(|| anyhow!("no update found for ViaVersion {old}"))?;
         println!("  update check: ViaVersion {old} → {} ({})", up.version_number, via.update_url.clone().unwrap_or_default());
         if &up.version_number != newest {
             bail!("expected the newest compatible version {newest}, got {}", up.version_number);
         }
-        let queued = plugins::change_version(id, &via.item.filename, &up.version_id).await?;
-        let pending = plugins::list(id).await?.into_iter().find(|a| a.item.title.as_deref() == Some("ViaVersion")).and_then(|a| a.pending);
+        let queued = plugins::change_version(id, &via.item.filename, &up.version_id, None).await?;
+        let pending = plugins::list(id, None).await?.into_iter().find(|a| a.item.title.as_deref() == Some("ViaVersion")).and_then(|a| a.pending);
         println!("  update queued while running: {queued} (pending: {pending:?})");
         if !queued {
             bail!("a running server's jar was replaced directly");
@@ -248,11 +310,14 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
         expect_via = Some(up.version_number);
     }
 
-    let zip = runtime::backup(id).await?;
-    let size = std::fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
-    println!("  backup {zip} ({} KB)", size / 1024);
-    if size == 0 {
-        bail!("the backup is empty");
+    // Bedrock worlds are backed up while the server is off (below).
+    if !bedrock {
+        let zip = runtime::backup(id).await?;
+        let size = std::fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
+        println!("  backup {zip} ({} KB)", size / 1024);
+        if size == 0 {
+            bail!("the backup is empty");
+        }
     }
 
     runtime::stop(id)?;
@@ -263,9 +328,17 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     }
     let tail = runtime::log(id).last().map(|l| l.text.clone()).unwrap_or_default();
     println!("  stopped cleanly ({tail})");
+    if bedrock {
+        let zip = runtime::backup(id).await?;
+        let size = std::fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
+        println!("  backup {zip} ({} KB)", size / 1024);
+        if size == 0 {
+            bail!("the backup is empty");
+        }
+    }
     if let Some(want) = expect_via {
         let applied: Vec<String> = runtime::log(id).iter().filter(|l| l.text.starts_with("Updated ")).map(|l| l.text.clone()).collect();
-        let list = plugins::list(id).await?;
+        let list = plugins::list(id, None).await?;
         let vias: Vec<_> = list.iter().filter(|a| a.item.title.as_deref() == Some("ViaVersion")).collect();
         let now = vias.first().and_then(|a| a.item.version_number.clone()).unwrap_or_default();
         println!("  after stop: {applied:?}; ViaVersion is {now} ({} jar(s), pending {:?})", vias.len(), vias.first().and_then(|a| a.pending));

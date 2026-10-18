@@ -1,7 +1,8 @@
-//! Plugins (Paper / Purpur / Folia / Spigot → `plugins/`) and mods (Fabric / Quilt / Forge / NeoForge →
-//! `mods/`) for hosted servers. Sources: Modrinth, Hangar (PaperMC), SpigotMC (through the Spiget API) and
-//! CurseForge (mods, and Bukkit plugins from dev.bukkit.org). Installed files are tracked in the server's
-//! own `content-index.json`, the same format instances use.
+//! Plugins (Paper / Purpur / Folia / Spigot / Leaf → `plugins/`) and mods (Fabric / Quilt / Forge / NeoForge →
+//! `mods/`) for hosted servers; the Arclight hybrid has both, managed as two areas. Sources:
+//! Modrinth, Hangar (PaperMC), SpigotMC (through the Spiget API), dev.bukkit.org and CurseForge (both through
+//! CurseForge's API), GitHub releases, and GeyserMC (Geyser and Floodgate, for Bedrock players). Installed files
+//! are tracked in the server's own `content-index.json`, the same format instances use.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -11,13 +12,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::content::curseforge::{cf, cf_raw};
+use crate::content::github;
+use crate::content::links::{self, Link};
 use crate::content::index::{display_cmp, index_key, iso_from_secs, safe_name, ContentIndex, IndexEntry};
 use crate::core::ctx::http;
 use crate::core::events::Task;
 use crate::core::fsutil::{read_json, safe_join, write_json};
 use crate::core::net::{download_file, fetch_json, hash_file, post_json, DownloadItem, Hash, HashAlgo};
 use crate::core::types::{
-    ContentItem, ContentKind, ProjectVersion, ServerAddon, ServerAddonHit, ServerAddonResult, ServerAddonVersion, ServerKind, ServerMeta, UpdateRef,
+    ContentItem, ContentKind, LoaderType, ProjectVersion, ServerAddon, ServerAddonHit, ServerAddonResult, ServerAddonVersion, ServerKind, ServerMeta,
+    UpdateRef,
 };
 use crate::{bail_tr, err_tr, tr};
 use crate::core::{settings, shell};
@@ -27,20 +31,65 @@ use super::{runtime, store};
 const MODRINTH: &str = "https://api.modrinth.com/v2";
 const HANGAR: &str = "https://hangar.papermc.io/api/v1";
 const SPIGET: &str = "https://api.spiget.org/v2";
+const GEYSERMC: &str = "https://download.geysermc.org/v2/projects";
 const PAGE: usize = 20;
 
 fn enc(s: &str) -> String {
     urlencoding::encode(s).into_owned()
 }
 
-/// The sources that make sense for a server type, in the order the UI offers them.
-pub fn sources(kind: ServerKind) -> Vec<&'static str> {
-    match kind {
-        ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia => vec!["modrinth", "hangar", "spigot", "curseforge"],
-        ServerKind::Spigot => vec!["modrinth", "spigot", "curseforge"],
-        ServerKind::Vanilla => Vec::new(),
-        _ => vec!["modrinth", "curseforge"],
+/// A server's plugins or its mods, handled as if they were a server of their own: a hybrid's plugins like a Spigot
+/// server's, its mods like a server of the mod loader it runs on. `meta.kind` is that stand-in, so everything below
+/// only ever sees plugin servers and mod servers.
+struct View {
+    meta: ServerMeta,
+    /// A hybrid's plugins: kept apart from its mods (their own index and queue files).
+    hybrid_plugins: bool,
+}
+
+impl std::ops::Deref for View {
+    type Target = ServerMeta;
+    fn deref(&self) -> &ServerMeta {
+        &self.meta
     }
+}
+
+/// `area` is "plugins" or "mods" for hybrids; other servers have one area and ignore it.
+async fn view(id: &str, area: Option<&str>) -> Result<View> {
+    let mut meta = store::get(id).await?;
+    let mut hybrid_plugins = false;
+    if meta.kind.hybrid() {
+        if area == Some("mods") {
+            meta.kind = ServerKind::from_loader(meta.loader.unwrap_or(LoaderType::Forge));
+        } else {
+            meta.kind = ServerKind::Spigot;
+            hybrid_plugins = true;
+        }
+    }
+    Ok(View { meta, hybrid_plugins })
+}
+
+/// The areas of a server: one, or plugins and mods for a hybrid.
+fn areas(kind: ServerKind) -> Vec<Option<&'static str>> {
+    if kind.hybrid() {
+        vec![Some("plugins"), Some("mods")]
+    } else {
+        vec![None]
+    }
+}
+
+/// The sources that make sense for a server type, in the order the UI offers them.
+fn sources_for(kind: ServerKind) -> Vec<&'static str> {
+    match kind {
+        ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf => vec!["modrinth", "hangar", "spigot", "bukkit", "github"],
+        ServerKind::Spigot => vec!["modrinth", "spigot", "bukkit", "github"],
+        ServerKind::Vanilla | ServerKind::Bedrock => Vec::new(),
+        _ => vec!["modrinth", "curseforge", "github"],
+    }
+}
+
+pub async fn sources(id: &str, area: Option<&str>) -> Result<Vec<&'static str>> {
+    Ok(sources_for(view(id, area).await?.kind))
 }
 
 fn folder(meta: &ServerMeta) -> Result<PathBuf> {
@@ -54,17 +103,17 @@ fn folder(meta: &ServerMeta) -> Result<PathBuf> {
     }
 }
 
-fn index_file(meta: &ServerMeta) -> Result<PathBuf> {
-    Ok(store::dir(&meta.id)?.join("content-index.json"))
+fn index_file(v: &View) -> Result<PathBuf> {
+    Ok(store::dir(&v.id)?.join(if v.hybrid_plugins { "content-index-plugins.json" } else { "content-index.json" }))
 }
-async fn load_index(meta: &ServerMeta) -> ContentIndex {
-    match index_file(meta) {
+async fn load_index(v: &View) -> ContentIndex {
+    match index_file(v) {
         Ok(f) => read_json(&f).await.unwrap_or_default(),
         Err(_) => ContentIndex::new(),
     }
 }
-async fn save_index(meta: &ServerMeta, idx: &ContentIndex) -> Result<()> {
-    write_json(&index_file(meta)?, idx).await
+async fn save_index(v: &View, idx: &ContentIndex) -> Result<()> {
+    write_json(&index_file(v)?, idx).await
 }
 fn key(filename: &str) -> String {
     index_key(ContentKind::Mod, filename)
@@ -73,7 +122,7 @@ fn key(filename: &str) -> String {
 /// Modrinth loader tags a server type can run.
 fn mr_loaders(meta: &ServerMeta) -> Vec<&'static str> {
     match meta.kind {
-        ServerKind::Paper => vec!["paper", "spigot", "bukkit"],
+        ServerKind::Paper | ServerKind::Leaf => vec!["paper", "spigot", "bukkit"],
         ServerKind::Purpur => vec!["purpur", "paper", "spigot", "bukkit"],
         ServerKind::Folia => vec!["folia"],
         ServerKind::Spigot => vec!["spigot", "bukkit"],
@@ -82,7 +131,9 @@ fn mr_loaders(meta: &ServerMeta) -> Vec<&'static str> {
         ServerKind::Forge => vec!["forge"],
         ServerKind::Neoforge if meta.mc_version == "1.20.1" => vec!["neoforge", "forge"],
         ServerKind::Neoforge => vec!["neoforge"],
-        ServerKind::Vanilla => Vec::new(),
+        // Hybrids are always viewed as Spigot (plugins) or their loader (mods); see `View`.
+        ServerKind::Arclight => vec!["spigot", "bukkit"],
+        ServerKind::Vanilla | ServerKind::Bedrock => Vec::new(),
     }
 }
 
@@ -97,8 +148,8 @@ fn cf_loader_id(kind: ServerKind) -> Option<u32> {
 
 // ---------- Listing ----------
 
-/// Where a project id comes from.
-fn source_of(project_id: &str) -> Option<&'static str> {
+/// Where a project id comes from. CurseForge's Bukkit plugins are dev.bukkit.org's.
+fn source_of(project_id: &str, plugins: bool) -> Option<&'static str> {
     if project_id.is_empty() {
         None
     } else if project_id.starts_with("hangar:") {
@@ -106,7 +157,11 @@ fn source_of(project_id: &str) -> Option<&'static str> {
     } else if project_id.starts_with("spigot:") {
         Some("spigot")
     } else if project_id.starts_with("cf:") {
-        Some("curseforge")
+        Some(if plugins { "bukkit" } else { "curseforge" })
+    } else if project_id.starts_with(github::PREFIX) {
+        Some("github")
+    } else if project_id.starts_with("geysermc:") {
+        Some("geysermc")
     } else {
         Some("modrinth")
     }
@@ -126,8 +181,8 @@ async fn jar_names(folder: &Path) -> Result<Vec<String>> {
     Ok(names)
 }
 
-pub async fn list(id: &str) -> Result<Vec<ServerAddon>> {
-    let meta = store::get(id).await?;
+pub async fn list(id: &str, area: Option<&str>) -> Result<Vec<ServerAddon>> {
+    let meta = view(id, area).await?;
     let folder = folder(&meta)?;
     let names = jar_names(&folder).await?;
     let mut idx = load_index(&meta).await;
@@ -143,7 +198,7 @@ pub async fn list(id: &str) -> Result<Vec<ServerAddon>> {
         let size = tokio::fs::metadata(folder.join(&n)).await.map(|m| m.len()).unwrap_or(0);
         let op = pending.iter().find(|p| p.filename() == n);
         items.push(ServerAddon {
-            source: known.and_then(|e| source_of(&e.project_id)),
+            source: known.and_then(|e| source_of(&e.project_id, meta.kind.plugins())),
             pending: op.map(PendingOp::kind),
             pending_version: op.and_then(|p| match p {
                 PendingOp::Replace { entry, .. } => Some(entry.version_number.clone()),
@@ -197,7 +252,7 @@ async fn identify(meta: &ServerMeta, folder: &Path, names: &[String], idx: &mut 
         if let Some((plugin, version)) = plugin_yml(&folder.join(&name)).await {
             entry.title = plugin.clone();
             entry.version_number = version.clone();
-            if sources(meta.kind).contains(&"hangar") {
+            if sources_for(meta.kind).contains(&"hangar") {
                 if let Ok(p) = fetch_json::<HangarProject>(&format!("{HANGAR}/projects/{}", enc(&plugin))).await {
                     entry.project_id = format!("hangar:{}", p.namespace.slug);
                     entry.version_id = version;
@@ -230,8 +285,8 @@ async fn plugin_yml(jar: &Path) -> Option<(String, String)> {
     .flatten()
 }
 
-pub async fn toggle(id: &str, filename: &str) -> Result<()> {
-    let meta = store::get(id).await?;
+pub async fn toggle(id: &str, filename: &str, area: Option<&str>) -> Result<()> {
+    let meta = view(id, area).await?;
     let folder = folder(&meta)?;
     safe_name(filename)?;
     if runtime::is_running(id) {
@@ -252,8 +307,8 @@ async fn toggle_now(folder: &Path, filename: &str) -> Result<()> {
 }
 
 /// Moves the file to the Recycle Bin (never a permanent delete); queued while the server runs.
-pub async fn remove(id: &str, filename: &str) -> Result<()> {
-    let meta = store::get(id).await?;
+pub async fn remove(id: &str, filename: &str, area: Option<&str>) -> Result<()> {
+    let meta = view(id, area).await?;
     safe_name(filename)?;
     if runtime::is_running(id) {
         return queue(&meta, PendingOp::Remove { filename: filename.to_string() }).await;
@@ -279,37 +334,56 @@ async fn remove_project(folder: &Path, project_id: &str, idx: &mut ContentIndex)
 
 // ---------- Search ----------
 
-pub async fn search(id: &str, query: &str, source: &str, offset: usize) -> Result<ServerAddonResult> {
-    let meta = store::get(id).await?;
+pub async fn search(id: &str, query: &str, source: &str, offset: usize, area: Option<&str>) -> Result<ServerAddonResult> {
+    let meta = view(id, area).await?;
     folder(&meta)?;
     match source {
         "modrinth" => modrinth_search(&meta, query, offset).await,
         "hangar" => hangar_search(&meta, query, offset).await,
         "spigot" => spiget_search(query, offset).await,
-        "curseforge" => cf_search(&meta, query, offset).await,
+        "curseforge" | "bukkit" => cf_search(&meta, query, offset).await,
+        "github" => gh_search(&meta, query, offset).await,
         _ => bail!("Unknown source: {source}"),
     }
 }
 
-pub async fn install(id: &str, project_id: &str, version_id: Option<String>) -> Result<()> {
-    let meta = store::get(id).await?;
+pub async fn install(id: &str, project_id: &str, version_id: Option<String>, area: Option<&str>) -> Result<()> {
+    let meta = view(id, area).await?;
     let folder = folder(&meta)?;
     tokio::fs::create_dir_all(&folder).await?;
     let pid = project_id.to_string();
     Task::run("Installing on the server", Some(meta.id.clone()), move |task| async move {
         let mut idx = load_index(&meta).await;
-        if let Some(slug) = pid.strip_prefix("hangar:") {
-            hangar_install(&meta, &folder, slug, version_id, &mut idx, &task).await?;
-        } else if let Some(rid) = pid.strip_prefix("spigot:") {
-            spiget_install(&folder, rid, &mut idx, &task).await?;
-        } else if let Some(cid) = pid.strip_prefix("cf:") {
-            cf_install(&meta, &folder, cid, version_id, &mut idx, &task).await?;
-        } else {
-            mr_install(&meta, &folder, &pid, version_id, &mut idx, &task).await?;
-        }
+        install_into(&meta, &folder, &pid, version_id, &mut idx, &task).await?;
         save_index(&meta, &idx).await
     })
     .await
+}
+
+async fn install_into(meta: &ServerMeta, folder: &Path, pid: &str, version_id: Option<String>, idx: &mut ContentIndex, task: &std::sync::Arc<Task>) -> Result<()> {
+    if let Some(slug) = pid.strip_prefix("hangar:") {
+        hangar_install(meta, folder, slug, version_id, idx, task).await
+    } else if let Some(rid) = pid.strip_prefix("spigot:") {
+        spiget_install(folder, rid, idx, task).await
+    } else if let Some(cid) = pid.strip_prefix("cf:") {
+        cf_install(meta, folder, cid, version_id, idx, task).await
+    } else if pid.starts_with(github::PREFIX) || pid.starts_with("geysermc:") {
+        task.update(format!("Installing {}…", pid.rsplit([':', '/']).next().unwrap_or(pid)), None);
+        let r = resolve(meta, pid, version_id.as_deref()).await?;
+        let dest = safe_join(folder, &r.filename)?;
+        remove_project(folder, &r.entry.project_id, idx).await;
+        download_file(&DownloadItem::new(&r.url, &dest).hash(r.hash.clone()).size(r.size)).await?;
+        if !is_jar(&dest).await {
+            let _ = tokio::fs::remove_file(&dest).await;
+            bail_tr!("hostAddon.notJar", "The download for {name} isn't a plugin file", name = r.entry.title);
+        }
+        let mut entry = r.entry;
+        entry.sha1 = hash_file(&dest, HashAlgo::Sha1).await.unwrap_or_default();
+        idx.insert(key(&r.filename), entry);
+        Ok(())
+    } else {
+        mr_install(meta, folder, pid, version_id, idx, task).await
+    }
 }
 
 // ---------- Modrinth ----------
@@ -419,6 +493,7 @@ async fn modrinth_search(meta: &ServerMeta, query: &str, offset: usize) -> Resul
                 icon_url: h.icon_url.filter(|u| !u.is_empty()),
                 author: h.author,
                 downloads: h.downloads,
+                stars: None,
                 source: "modrinth",
                 external: false,
             })
@@ -576,6 +651,7 @@ fn hangar_hit(p: HangarProject) -> ServerAddonHit {
         icon_url: p.avatar_url,
         author: p.namespace.owner,
         downloads: p.stats.downloads,
+        stars: None,
         source: "hangar",
         external: false,
     }
@@ -711,6 +787,7 @@ async fn spiget_search(query: &str, offset: usize) -> Result<ServerAddonResult> 
                 description: r.tag,
                 author: String::new(),
                 downloads: r.downloads,
+                stars: None,
                 source: "spigot",
             })
             .collect(),
@@ -836,6 +913,7 @@ async fn cf_search(meta: &ServerMeta, query: &str, offset: usize) -> Result<Serv
                 icon_url: m.get("logo").and_then(|l| l.get("thumbnailUrl")).and_then(Value::as_str).filter(|u| !u.is_empty()).map(str::to_string),
                 author: m.get("authors").and_then(Value::as_array).and_then(|a| a.first()).map(|a| cf_s(a, "name")).unwrap_or_default(),
                 downloads: cf_u(m, "downloadCount"),
+                stars: None,
                 source: "curseforge",
                 url: m.get("links").map(|l| cf_s(l, "websiteUrl")).unwrap_or_default(),
                 external: m.get("allowModDistribution").and_then(Value::as_bool) == Some(false),
@@ -939,6 +1017,204 @@ async fn cf_install(meta: &ServerMeta, folder: &Path, mod_id: &str, version: Opt
     Ok(())
 }
 
+// ---------- From a link ----------
+
+/// Installs whatever a link points to: a project page on one of the sources (with its version, when the link
+/// names one), or a .jar from anywhere else.
+pub async fn install_link(id: &str, url: &str, area: Option<&str>) -> Result<()> {
+    let meta = view(id, area).await?;
+    let folder = folder(&meta)?;
+    tokio::fs::create_dir_all(&folder).await?;
+    let link = links::parse_link(url)?;
+    Task::run("Installing on the server", Some(meta.id.clone()), move |task| async move {
+        let mut idx = load_index(&meta).await;
+        match link {
+            Link::Project { id, mut version } => {
+                // Modrinth links name a version by its number as often as by its id.
+                if let (false, Some(v)) = (id.contains(':'), &version) {
+                    version = Some(links::modrinth_version_id(&id, v).await?);
+                }
+                install_into(&meta, &folder, &id, version, &mut idx, &task).await?
+            }
+            Link::CurseForge { slug, class, file } => {
+                let cid = links::cf_id_of_slug(&slug, class).await?;
+                install_into(&meta, &folder, &format!("cf:{cid}"), file, &mut idx, &task).await?
+            }
+            Link::File { url, name } => {
+                task.update(format!("Downloading {name}…"), None);
+                let dest = safe_join(&folder, safe_name(&name)?)?;
+                download_file(&DownloadItem::new(&url, &dest)).await?;
+                if !is_jar(&dest).await {
+                    let _ = tokio::fs::remove_file(&dest).await;
+                    bail_tr!("hostAddon.notJar", "The download for {name} isn't a plugin file", name = name);
+                }
+                // Left out of the index: the next listing names it from its plugin.yml or by hash.
+                idx.remove(&key(&name));
+            }
+        }
+        save_index(&meta, &idx).await
+    })
+    .await
+}
+
+// ---------- GitHub releases ----------
+
+/// Repositories tagged `minecraft-plugin` or `minecraft-mod`. Whether a release fits the server is judged from its
+/// file names when installing (see `github::pick`).
+async fn gh_search(meta: &ServerMeta, query: &str, offset: usize) -> Result<ServerAddonResult> {
+    let topic = if meta.kind.plugins() { "minecraft-plugin" } else { "minecraft-mod" };
+    let (repos, total) = github::search(query, topic, offset, PAGE).await?;
+    Ok(ServerAddonResult {
+        total,
+        hits: repos
+            .into_iter()
+            .map(|r| ServerAddonHit {
+                id: r.id(),
+                url: r.html_url.clone(),
+                title: r.name.clone(),
+                description: r.description(),
+                icon_url: r.avatar(),
+                author: r.owner(),
+                downloads: 0,
+                stars: Some(r.stargazers_count),
+                source: "github",
+                external: false,
+            })
+            .collect(),
+    })
+}
+
+// ---------- GeyserMC (Geyser and Floodgate) ----------
+
+/// GeyserMC's name for the platform a server (area) is: plugin servers run the Spigot builds.
+fn geyser_platform(meta: &ServerMeta) -> Result<&'static str> {
+    match meta.kind {
+        k if k.plugins() => Ok("spigot"),
+        ServerKind::Fabric | ServerKind::Quilt => Ok("fabric"),
+        ServerKind::Neoforge => Ok("neoforge"),
+        _ => bail_tr!(
+            "bedrockJoin.unsupported",
+            "Geyser doesn't run on {kind} servers. Use a plugin server (Paper, Purpur, Leaf…), Fabric or NeoForge.",
+            kind = meta.kind.label()
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+struct GeyserDownload {
+    name: String,
+    sha256: String,
+}
+#[derive(Deserialize)]
+struct GeyserBuild {
+    version: String,
+    build: u64,
+    #[serde(default)]
+    time: String,
+    #[serde(default)]
+    downloads: HashMap<String, GeyserDownload>,
+}
+
+/// The newest build of "geyser" or "floodgate".
+async fn geyser_latest(project: &str) -> Result<GeyserBuild> {
+    fetch_json(&format!("{GEYSERMC}/{project}/versions/latest/builds/latest")).await
+}
+
+fn geyser_title(project: &str) -> &'static str {
+    if project == "floodgate" {
+        "Floodgate"
+    } else {
+        "Geyser"
+    }
+}
+
+/// The icons GeyserMC uses for its projects on Modrinth.
+fn geyser_icon(project: &str) -> &'static str {
+    if project == "floodgate" {
+        "https://cdn.modrinth.com/data/bWrNNfkb/851eeb9b5daf37baaebe7e8f25e8437735897c9c_96.webp"
+    } else {
+        "https://cdn.modrinth.com/data/wKkoqHrH/6e8e781d5669ecef9e19a73b5c2eed060d6f73e7_96.webp"
+    }
+}
+
+// ---------- Bedrock players (Geyser + Floodgate) ----------
+
+const FABRIC_API: &str = "P7dR8mSH";
+
+/// Where a server stands with Bedrock players: whether Geyser and Floodgate are installed (in the plugins of a
+/// hybrid), and which UDP port Bedrock players use.
+pub async fn bedrock_status(id: &str) -> Result<Value> {
+    let meta = view(id, Some("plugins")).await?;
+    let supported = geyser_platform(&meta).is_ok();
+    let (mut geyser, mut floodgate) = (false, false);
+    if supported {
+        let idx = load_index(&meta).await;
+        let names = jar_names(&folder(&meta)?).await.unwrap_or_default();
+        for n in names.iter().filter(|n| !n.ends_with(".disabled")) {
+            let pid = idx.get(&key(n)).map(|e| e.project_id.as_str()).unwrap_or_default();
+            let lower = n.to_lowercase();
+            geyser |= pid == "geysermc:geyser" || pid == "wKkoqHrH" || lower.starts_with("geyser");
+            floodgate |= pid == "geysermc:floodgate" || pid == "bWrNNfkb" || lower.starts_with("floodgate");
+        }
+    }
+    let port = geyser_port(&meta).await.unwrap_or(19132);
+    Ok(json!({ "supported": supported, "geyser": geyser, "floodgate": floodgate, "port": port }))
+}
+
+/// The Bedrock port in Geyser's config once it exists (`bedrock: port:`), else Geyser's default.
+async fn geyser_port(meta: &ServerMeta) -> Option<u16> {
+    let dir = store::dir(&meta.id).ok()?;
+    for cfg in ["plugins/Geyser-Spigot/config.yml", "config/Geyser-Fabric/config.yml", "config/Geyser-NeoForge/config.yml"] {
+        let Ok(text) = tokio::fs::read_to_string(dir.join(cfg)).await else { continue };
+        let mut in_bedrock = false;
+        for line in text.lines() {
+            if !line.starts_with(' ') && !line.trim().is_empty() && !line.starts_with('#') {
+                in_bedrock = line.trim_end() == "bedrock:";
+            } else if in_bedrock {
+                if let Some(p) = line.trim().strip_prefix("port:") {
+                    return p.trim().parse().ok();
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Lets Bedrock players join a Java server: installs Floodgate, then Geyser (and Fabric API on Fabric). With
+/// Floodgate there, Geyser signs Bedrock players in through Floodgate by itself, so they need no Java account.
+pub async fn bedrock_enable(id: &str) -> Result<()> {
+    let meta = view(id, Some("plugins")).await?;
+    let platform = geyser_platform(&meta)?;
+    let folder = folder(&meta)?;
+    tokio::fs::create_dir_all(&folder).await?;
+    Task::run(tr!("bedrockJoin.task", "Letting Bedrock players join {server}", server = meta.name), Some(meta.id.clone()), move |task| async move {
+        let mut idx = load_index(&meta).await;
+        if platform == "fabric" && !idx.values().any(|e| e.project_id == FABRIC_API) {
+            mr_install(&meta, &folder, FABRIC_API, None, &mut idx, &task).await?;
+        }
+        for project in ["floodgate", "geyser"] {
+            install_into(&meta, &folder, &format!("geysermc:{project}"), None, &mut idx, &task).await?;
+        }
+        save_index(&meta, &idx).await
+    })
+    .await
+}
+
+/// Removes Geyser and Floodgate again (to the Recycle Bin, or once the server stops).
+pub async fn bedrock_disable(id: &str) -> Result<()> {
+    let meta = view(id, Some("plugins")).await?;
+    let idx = load_index(&meta).await;
+    let names = jar_names(&folder(&meta)?).await.unwrap_or_default();
+    for n in names {
+        let pid = idx.get(&key(&n)).map(|e| e.project_id.clone()).unwrap_or_default();
+        let lower = n.to_lowercase();
+        if pid.starts_with("geysermc:") || ["wKkoqHrH", "bWrNNfkb"].contains(&pid.as_str()) || lower.starts_with("geyser") || lower.starts_with("floodgate") {
+            remove(id, &n, Some("plugins")).await?;
+        }
+    }
+    Ok(())
+}
+
 // ---------- Versions, switching and updates ----------
 //
 // Switching a jar to another version (or updating it) always downloads into `<server>/.resincraft/staged`,
@@ -977,15 +1253,19 @@ fn work_dir(meta: &ServerMeta) -> Result<PathBuf> {
     Ok(store::dir(&meta.id)?.join(".resincraft"))
 }
 
-async fn load_pending(meta: &ServerMeta) -> Vec<PendingOp> {
-    match work_dir(meta) {
-        Ok(d) => read_json(&d.join("pending-addons.json")).await.unwrap_or_default(),
+fn pending_file(v: &View) -> Result<PathBuf> {
+    Ok(work_dir(v)?.join(if v.hybrid_plugins { "pending-plugins.json" } else { "pending-addons.json" }))
+}
+
+async fn load_pending(v: &View) -> Vec<PendingOp> {
+    match pending_file(v) {
+        Ok(f) => read_json(&f).await.unwrap_or_default(),
         Err(_) => Vec::new(),
     }
 }
 
-async fn save_pending(meta: &ServerMeta, ops: &[PendingOp]) -> Result<()> {
-    let file = work_dir(meta)?.join("pending-addons.json");
+async fn save_pending(v: &View, ops: &[PendingOp]) -> Result<()> {
+    let file = pending_file(v)?;
     if ops.is_empty() {
         let _ = tokio::fs::remove_file(&file).await;
         return Ok(());
@@ -1010,7 +1290,7 @@ fn flip_disabled(name: &str) -> String {
 
 /// Queues a change for when the server stops. One change per file: a second toggle cancels the first, a toggle
 /// after an update flips the update's enabled state, and anything else replaces what was queued.
-async fn queue(meta: &ServerMeta, op: PendingOp) -> Result<()> {
+async fn queue(meta: &View, op: PendingOp) -> Result<()> {
     let mut ops = load_pending(meta).await;
     let existing = ops.iter().position(|p| p.filename() == op.filename());
     match (existing.map(|i| ops[i].clone()), op) {
@@ -1057,21 +1337,28 @@ async fn apply_op(meta: &ServerMeta, folder: &Path, op: &PendingOp, idx: &mut Co
 /// Applies queued changes. Only for the runtime, at moments when no Java process has the jars open (just
 /// before starting, just after exiting). Returns a line per change for the console; failures stay queued.
 pub async fn apply_pending(id: &str) -> Result<Vec<String>> {
-    let meta = store::get(id).await?;
-    let ops = load_pending(&meta).await;
+    let mut done = Vec::new();
+    for area in areas(store::get(id).await?.kind) {
+        done.extend(apply_area(&view(id, area).await?).await?);
+    }
+    Ok(done)
+}
+
+async fn apply_area(meta: &View) -> Result<Vec<String>> {
+    let ops = load_pending(meta).await;
     if ops.is_empty() {
         return Ok(Vec::new());
     }
-    let folder = folder(&meta)?;
-    let mut idx = load_index(&meta).await;
+    let folder = folder(meta)?;
+    let mut idx = load_index(meta).await;
     let (mut left, mut done) = (Vec::new(), Vec::new());
     for op in ops {
         let name = op.filename().to_string();
-        let mut result = apply_op(&meta, &folder, &op, &mut idx).await;
+        let mut result = apply_op(meta, &folder, &op, &mut idx).await;
         if result.is_err() {
             // The Java process may need a moment to let go of its files.
             tokio::time::sleep(std::time::Duration::from_millis(600)).await;
-            result = apply_op(&meta, &folder, &op, &mut idx).await;
+            result = apply_op(meta, &folder, &op, &mut idx).await;
         }
         match result {
             Ok(()) => done.push(match &op {
@@ -1086,14 +1373,14 @@ pub async fn apply_pending(id: &str) -> Result<Vec<String>> {
             }
         }
     }
-    save_index(&meta, &idx).await?;
-    save_pending(&meta, &left).await?;
+    save_index(meta, &idx).await?;
+    save_pending(meta, &left).await?;
     Ok(done)
 }
 
 /// Cancels whatever is queued for a file.
-pub async fn cancel_pending(id: &str, filename: &str) -> Result<()> {
-    let meta = store::get(id).await?;
+pub async fn cancel_pending(id: &str, filename: &str, area: Option<&str>) -> Result<()> {
+    let meta = view(id, area).await?;
     let mut ops = load_pending(&meta).await;
     if let Some(i) = ops.iter().position(|p| p.filename() == filename) {
         let op = ops.remove(i);
@@ -1153,9 +1440,52 @@ fn cf_fits(meta: &ServerMeta, f: &Value) -> bool {
 }
 
 /// Every published version of an installed plugin or mod, newest first, marked compatible or not.
-pub async fn versions(id: &str, project_id: &str) -> Result<Vec<ServerAddonVersion>> {
-    let meta = store::get(id).await?;
+pub async fn versions(id: &str, project_id: &str, area: Option<&str>) -> Result<Vec<ServerAddonVersion>> {
+    let meta = view(id, area).await?;
     let mc = meta.mc_version.clone();
+    if project_id.starts_with(github::PREFIX) {
+        let loaders = mr_loaders(&meta);
+        return Ok(github::releases(project_id)
+            .await?
+            .into_iter()
+            .map(|r| {
+                let file = github::pick(&r, &mc, &loaders).map(|a| a.name.clone());
+                ServerAddonVersion {
+                    compatible: file.is_some(),
+                    changelog_url: Some(r.html_url.clone()),
+                    version: ProjectVersion {
+                        id: r.tag_name.clone(),
+                        name: file.unwrap_or_else(|| r.title()),
+                        version_number: r.title(),
+                        game_versions: Vec::new(),
+                        loaders: Vec::new(),
+                        kind: if r.prerelease { "beta".into() } else { "release".into() },
+                        published: r.published_at.clone().unwrap_or_default(),
+                        downloads: r.downloads(),
+                    },
+                }
+            })
+            .collect());
+    }
+    if let Some(project) = project_id.strip_prefix("geysermc:") {
+        // GeyserMC only serves the newest build of each version.
+        let b = geyser_latest(project).await?;
+        let platform = geyser_platform(&meta).ok();
+        return Ok(vec![ServerAddonVersion {
+            compatible: platform.is_some_and(|p| b.downloads.contains_key(p)),
+            changelog_url: Some(format!("https://geysermc.org/download?project={project}")),
+            version: ProjectVersion {
+                id: format!("{}-b{}", b.version, b.build),
+                name: format!("{} {}", geyser_title(project), b.version),
+                version_number: format!("{} (build {})", b.version, b.build),
+                game_versions: Vec::new(),
+                loaders: platform.map(|p| vec![p.to_string()]).unwrap_or_default(),
+                kind: "release".into(),
+                published: b.time,
+                downloads: 0,
+            },
+        }]);
+    }
     if let Some(slug) = project_id.strip_prefix("hangar:") {
         let p: HangarProject = fetch_json(&format!("{HANGAR}/projects/{}", enc(slug))).await?;
         let list: Vec<HangarVersion> = fetch_json::<HangarPage<HangarVersion>>(&format!("{HANGAR}/projects/{}/versions?limit=25&offset=0&platform=PAPER", enc(slug))).await?.result;
@@ -1220,6 +1550,65 @@ pub async fn versions(id: &str, project_id: &str) -> Result<Vec<ServerAddonVersi
 /// Finds the file for `version_id` (or the newest compatible version) of a project.
 async fn resolve(meta: &ServerMeta, project_id: &str, version_id: Option<&str>) -> Result<Resolved> {
     let target = format!("{} {}", meta.kind.label(), meta.mc_version);
+    if project_id.starts_with(github::PREFIX) {
+        let repo = github::repo(project_id).await?;
+        let loaders = mr_loaders(meta);
+        let (release, asset) = match version_id {
+            Some(tag) => {
+                let r = github::release(project_id, tag).await?;
+                let a = github::pick(&r, &meta.mc_version, &loaders).or_else(|| r.jars().into_iter().min_by_key(|a| a.name.len())).cloned();
+                (r, a)
+            }
+            None => {
+                let list = github::releases(project_id).await?;
+                // The newest full release with a file that fits, else the newest pre-release that has one.
+                let pick = |pre: bool| list.iter().filter(|r| r.prerelease == pre).find_map(|r| github::pick(r, &meta.mc_version, &loaders).map(|a| (r.clone(), a.clone())));
+                match pick(false).or_else(|| pick(true)) {
+                    Some((r, a)) => (r, Some(a)),
+                    None => {
+                        if list.is_empty() {
+                            bail_tr!("hostAddon.noReleases", "{name} doesn't publish its files as GitHub releases. Get it from its page: {link}", name = repo.name, link = repo.html_url);
+                        }
+                        bail_tr!("hostAddon.noVersion", "{name} has no version for {target}", name = repo.name, target = target);
+                    }
+                }
+            }
+        };
+        let a = asset.ok_or_else(|| err_tr!("hostAddon.noVersion", "{name} has no version for {target}", name = repo.name, target = target))?;
+        return Ok(Resolved {
+            url: a.url.clone(),
+            filename: safe_name(&a.name)?.to_string(),
+            hash: a.sha256().map(Hash::sha256),
+            size: Some(a.size).filter(|s| *s > 0),
+            entry: IndexEntry {
+                project_id: repo.id(),
+                version_id: release.tag_name.clone(),
+                version_number: release.title(),
+                title: repo.name.clone(),
+                icon_url: repo.avatar(),
+                sha1: String::new(),
+            },
+        });
+    }
+    if let Some(project) = project_id.strip_prefix("geysermc:") {
+        let platform = geyser_platform(meta)?;
+        let b = geyser_latest(project).await?;
+        let dl = b.downloads.get(platform).ok_or_else(|| anyhow!("{} has no {platform} download", geyser_title(project)))?;
+        return Ok(Resolved {
+            url: format!("{GEYSERMC}/{project}/versions/{}/builds/{}/downloads/{platform}", enc(&b.version), b.build),
+            filename: safe_name(&dl.name)?.to_string(),
+            hash: Some(Hash::sha256(&dl.sha256)),
+            size: None,
+            entry: IndexEntry {
+                project_id: format!("geysermc:{project}"),
+                version_id: format!("{}-b{}", b.version, b.build),
+                version_number: format!("{} (build {})", b.version, b.build),
+                title: geyser_title(project).to_string(),
+                icon_url: Some(geyser_icon(project).to_string()),
+                sha1: String::new(),
+            },
+        });
+    }
     if let Some(slug) = project_id.strip_prefix("hangar:") {
         let p: HangarProject = fetch_json(&format!("{HANGAR}/projects/{}", enc(slug))).await?;
         let v: HangarVersion = match version_id {
@@ -1330,8 +1719,8 @@ async fn resolve(meta: &ServerMeta, project_id: &str, version_id: Option<&str>) 
 
 /// Switches an installed jar to `version_id`, keeping it enabled or disabled. Returns true when the change
 /// waits for the server to stop.
-pub async fn change_version(id: &str, filename: &str, version_id: &str) -> Result<bool> {
-    let meta = store::get(id).await?;
+pub async fn change_version(id: &str, filename: &str, version_id: &str, area: Option<&str>) -> Result<bool> {
+    let meta = view(id, area).await?;
     let folder = folder(&meta)?;
     safe_name(filename)?;
     let idx = load_index(&meta).await;
@@ -1369,9 +1758,9 @@ pub async fn change_version(id: &str, filename: &str, version_id: &str) -> Resul
 }
 
 /// Marks every plugin/mod with a known source that has a newer compatible version.
-pub async fn check_updates(id: &str) -> Result<Vec<ServerAddon>> {
-    let meta = store::get(id).await?;
-    let mut items = list(id).await?;
+pub async fn check_updates(id: &str, area: Option<&str>) -> Result<Vec<ServerAddon>> {
+    let meta = view(id, area).await?;
+    let mut items = list(id, area).await?;
     let idx = load_index(&meta).await;
 
     // Modrinth: one request for all of them, by file hash.
@@ -1407,7 +1796,7 @@ pub async fn check_updates(id: &str) -> Result<Vec<ServerAddon>> {
     }
 
     // The other sites: one project at a time.
-    let checks = items.iter().enumerate().filter(|(_, a)| matches!(a.source, Some("hangar" | "spigot" | "curseforge"))).map(|(i, a)| {
+    let checks = items.iter().enumerate().filter(|(_, a)| matches!(a.source, Some("hangar" | "spigot" | "curseforge" | "bukkit" | "github" | "geysermc"))).map(|(i, a)| {
         let (pid, current, meta) = (a.item.project_id.clone().unwrap_or_default(), a.item.version_id.clone().unwrap_or_default(), &meta);
         async move {
             let newest: Result<Option<(String, String, String)>> = async {
@@ -1421,6 +1810,10 @@ pub async fn check_updates(id: &str) -> Result<Vec<ServerAddon>> {
                 if let Some(rid) = pid.strip_prefix("spigot:") {
                     let (r, v) = spiget_latest(rid).await?;
                     return Ok(r.installable().then(|| (v.id, v.version_number, format!("https://www.spigotmc.org/resources/{}/updates", r.id))));
+                }
+                if pid.starts_with(github::PREFIX) || pid.starts_with("geysermc:") {
+                    let r = resolve(meta, &pid, None).await?;
+                    return Ok(Some((r.entry.version_id, r.entry.version_number, String::new())));
                 }
                 let cid = pid.trim_start_matches("cf:");
                 let Some(f) = newest_cf_release(cf_files(meta, cid).await?) else { return Ok(None) };

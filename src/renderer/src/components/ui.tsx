@@ -770,8 +770,8 @@ export function celebrate(from?: Element | { x: number; y: number } | null): voi
   setTimeout(() => layer.remove(), 1500)
 }
 
-export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label?: string }) {
-  return <button className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />
+export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }) {
+  return <button className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} />
 }
 
 export function Segmented<T extends string>({
@@ -901,7 +901,9 @@ export function Dock() {
             <span className="grow ellipsis">{tx(task.titleText, task.title)}</span>
             {task.progress != null && task.state === 'running' && <span className="faint">{Math.round(task.progress * 100)}%</span>}
           </div>
-          <div className="detail ellipsis">{task.state === 'error' ? tx(task.errorText, task.error) : tx(task.detailText, task.detail) || t('common.working')}</div>
+          <div className="detail ellipsis">
+            {task.state === 'error' ? tx(task.errorText, task.error) : tx(task.detailText, task.detail) || t('common.working')}
+          </div>
           {task.state === 'running' && <TaskBar progress={task.progress} />}
         </div>
       ))}

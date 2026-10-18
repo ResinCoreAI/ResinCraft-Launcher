@@ -1,6 +1,7 @@
-//! Installing server software into a server folder: the official vanilla server.jar, Paper / Purpur / Folia
-//! from their download APIs, Fabric's server launcher, Quilt's installer, and the Forge / NeoForge installers
-//! (`--installServer`). Each fills in `ServerMeta::launch` (how to start it) and the loader/build version.
+//! Installing server software into a server folder: the official vanilla server.jar, Paper / Purpur / Folia /
+//! Leaf from their download APIs, Fabric's server launcher, Quilt's installer, the Forge / NeoForge installers
+//! (`--installServer`), the Arclight hybrid (one jar; it fetches its libraries on first start) and Bedrock
+//! Dedicated Server. Each fills in `ServerMeta::launch` (how to start it) and the loader/build version.
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -8,12 +9,13 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
+use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::content::index::natural_cmp;
 use crate::core::events::Task;
 use crate::core::net::{download_all, fetch_json, fetch_text, status_of, DownloadItem, Hash};
-use crate::core::types::{LoaderType, ServerKind, ServerLaunch, ServerMeta};
+use crate::core::types::{LoaderType, ServerBuild, ServerKind, ServerLaunch, ServerMeta};
 use crate::core::{paths, settings};
 use crate::game::java::{find_java, hidden_command, install_java};
 use crate::game::loaders::{installer_url, is_legacy_forge, latest_loader, legacy_forge_error, normalize_loader_version};
@@ -25,6 +27,14 @@ const FABRIC_META: &str = "https://meta.fabricmc.net/v2";
 const SPIGOT_VERSIONS: &str = "https://hub.spigotmc.org/versions/";
 const BUILDTOOLS: &str = "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar";
 const QUILT_INSTALLER: &str = "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer";
+const LEAF: &str = "https://api.leafmc.one/v2/projects/leaf";
+/// Arclight's own file server: one folder per Minecraft version (some are aliases of the same branch).
+const ARCLIGHT: &str = "https://files.hypertention.cn/v1/files/arclight/minecraft";
+/// Every Bedrock Dedicated Server version, kept by the Bedrock OSS community (the downloads are Mojang's).
+const BEDROCK_VERSIONS: &str = "https://raw.githubusercontent.com/Bedrock-OSS/BDS-Versions/main/versions.json";
+/// Mojang's own download links (the newest release), in case that list hasn't caught up yet.
+const BEDROCK_LINKS: &str = "https://net-secondary.web.minecraft-services.net/api/v1.0/download/links";
+const BEDROCK_CDN: &str = "https://www.minecraft.net/bedrockdedicatedserver";
 
 fn enc(s: &str) -> String {
     urlencoding::encode(s).into_owned()
@@ -86,6 +96,15 @@ pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
             let re = regex::Regex::new(r#"href="(\d+\.\d+(?:\.\d+)?)\.json""#)?;
             re.captures_iter(&html).map(|c| c[1].to_string()).collect()
         }
+        ServerKind::Leaf => {
+            #[derive(Deserialize)]
+            struct Project {
+                versions: Vec<String>,
+            }
+            fetch_json::<Project>(LEAF).await?.versions
+        }
+        ServerKind::Arclight => arclight_versions().await?,
+        ServerKind::Bedrock => bedrock_versions().await?,
         _ => return Ok(Vec::new()),
     };
     // Releases only; pre-releases and release candidates are experimental builds.
@@ -93,6 +112,15 @@ pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
     list.sort_by(|a, b| natural_cmp(b, a));
     list.dedup();
     Ok(list)
+}
+
+/// The builds a server type offers for a Minecraft version, when there's a choice to make: Arclight comes for
+/// Forge, NeoForge or Fabric. Empty for the other types (they take the newest build).
+pub async fn builds(kind: ServerKind, mc: &str) -> Result<Vec<ServerBuild>> {
+    match kind {
+        ServerKind::Arclight => arclight_builds(mc).await,
+        _ => Ok(Vec::new()),
+    }
 }
 
 fn project_of(kind: ServerKind) -> &'static str {
@@ -109,10 +137,24 @@ pub async fn install(meta: &mut ServerMeta, dir: &Path, task: &Arc<Task>) -> Res
     tokio::fs::create_dir_all(dir).await?;
     let mc = meta.mc_version.clone();
     let wanted = meta.loader_version.clone().filter(|v| !v.is_empty());
+    let mut loader = meta.kind.loader();
     let (launch, version) = match meta.kind {
         ServerKind::Vanilla => {
             vanilla_jar(&mc, &dir.join("server.jar"), task).await?;
             (jar("server.jar"), None)
+        }
+        ServerKind::Leaf => {
+            let build = leaf(&mc, wanted.as_deref(), dir, task).await?;
+            (jar("leaf.jar"), Some(build))
+        }
+        ServerKind::Arclight => {
+            let (on, build) = arclight(&mc, wanted.as_deref(), dir, task).await?;
+            loader = Some(on);
+            (jar("arclight.jar"), Some(build))
+        }
+        ServerKind::Bedrock => {
+            let exe = bedrock(&mc, dir, task).await?;
+            (ServerLaunch { exe: Some(exe), ..Default::default() }, None)
         }
         ServerKind::Paper | ServerKind::Folia => {
             let build = paper_like(meta.kind, &mc, wanted.as_deref(), dir, task).await?;
@@ -156,13 +198,13 @@ pub async fn install(meta: &mut ServerMeta, dir: &Path, task: &Arc<Task>) -> Res
         }
     };
     meta.launch = launch;
-    meta.loader = meta.kind.loader();
+    meta.loader = loader;
     meta.loader_version = version;
     Ok(())
 }
 
 fn jar(name: &str) -> ServerLaunch {
-    ServerLaunch { jar: Some(name.to_string()), args_file: None }
+    ServerLaunch { jar: Some(name.to_string()), ..Default::default() }
 }
 
 /// The official server.jar from the version JSON's `downloads.server`.
@@ -230,6 +272,216 @@ async fn purpur(mc: &str, build: Option<&str>, dir: &Path, task: &Arc<Task>) -> 
     let item = DownloadItem::new(url, dir.join("purpur.jar")).hash(b.md5.map(Hash::md5));
     download_all(vec![item], 1, task.counter("Downloading Purpur")).await?;
     Ok(b.build)
+}
+
+/// Leaf from its download API (the same shape as PaperMC's old one). Returns the build number.
+async fn leaf(mc: &str, build: Option<&str>, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    #[derive(Deserialize)]
+    struct Download {
+        name: String,
+        sha256: String,
+    }
+    #[derive(Deserialize)]
+    struct Build {
+        build: u64,
+        #[serde(default)]
+        channel: String,
+        downloads: HashMap<String, Download>,
+    }
+    #[derive(Deserialize)]
+    struct Builds {
+        builds: Vec<Build>,
+    }
+    task.update(format!("Finding Leaf for Minecraft {mc}…"), None);
+    let list = match fetch_json::<Builds>(&format!("{LEAF}/versions/{}/builds", enc(mc))).await {
+        Err(e) if matches!(status_of(&e), Some(400 | 404)) => bail!("Leaf isn't available for Minecraft {mc}"),
+        r => r?.builds,
+    };
+    // Oldest first; "default" is the stable channel.
+    let pick = match build {
+        Some(b) => list.iter().find(|x| x.build.to_string() == b),
+        None => list.iter().rev().find(|x| x.channel == "default").or(list.last()),
+    };
+    let pick = pick.ok_or_else(|| anyhow!("Leaf has no build for Minecraft {mc}"))?;
+    let dl = pick.downloads.get("primary").ok_or_else(|| anyhow!("Leaf build {} has no server download", pick.build))?;
+    let url = format!("{LEAF}/versions/{}/builds/{}/downloads/{}", enc(mc), pick.build, enc(&dl.name));
+    let item = DownloadItem::new(url, dir.join("leaf.jar")).hash(Some(Hash::sha256(&dl.sha256)));
+    download_all(vec![item], 1, task.counter("Downloading Leaf")).await?;
+    Ok(pick.build.to_string())
+}
+
+/// One entry of an Arclight file-server listing.
+#[derive(Deserialize, Clone)]
+struct ArcFile {
+    name: String,
+    key: String,
+    #[serde(default)]
+    permlink: Option<String>,
+}
+#[derive(Deserialize)]
+struct ArcListing {
+    #[serde(default)]
+    files: Vec<ArcFile>,
+    #[serde(default)]
+    key: String,
+}
+
+/// Minecraft versions with an Arclight build. Some names are aliases of the same branch ("1.21" is 1.21.1):
+/// only the newest name of each branch is kept.
+async fn arclight_versions() -> Result<Vec<String>> {
+    let names: Vec<String> = fetch_json::<ArcListing>(ARCLIGHT).await?.files.into_iter().map(|f| f.name).collect();
+    let checks = names.into_iter().map(|v| async move {
+        // A listing's own key names the branch behind the alias.
+        let branch = fetch_json::<ArcListing>(&format!("{ARCLIGHT}/{}/loaders", enc(&v))).await.ok().map(|l| l.key);
+        (v, branch)
+    });
+    let mut newest: HashMap<String, String> = HashMap::new();
+    for (v, branch) in futures::future::join_all(checks).await {
+        let branch = branch.filter(|b| !b.is_empty()).unwrap_or_else(|| v.clone());
+        match newest.get(&branch) {
+            Some(have) if natural_cmp(have, &v).is_ge() => {}
+            _ => {
+                newest.insert(branch, v);
+            }
+        }
+    }
+    Ok(newest.into_values().collect())
+}
+
+fn arc_loader(name: &str) -> Option<LoaderType> {
+    match name {
+        "forge" => Some(LoaderType::Forge),
+        "neoforge" => Some(LoaderType::Neoforge),
+        "fabric" => Some(LoaderType::Fabric),
+        _ => None,
+    }
+}
+
+/// The build version is the folder above the loader's file: `.../versions-stable/1.0.1-8ec9529/neoforge`.
+fn arc_version(f: &ArcFile) -> String {
+    f.key.rsplit('/').nth(1).unwrap_or_default().to_string()
+}
+
+/// The newest stable Arclight for each loader, then the newer development builds. Ids are "loader@version".
+async fn arclight_builds(mc: &str) -> Result<Vec<ServerBuild>> {
+    let mut out: Vec<ServerBuild> = Vec::new();
+    for (folder, stable) in [("latest-stable", true), ("latest-snapshot", false)] {
+        let Ok(list) = fetch_json::<ArcListing>(&format!("{ARCLIGHT}/{}/{folder}", enc(mc))).await else { continue };
+        let mut files = list.files;
+        // NeoForge first, then Forge, then Fabric.
+        files.sort_by_key(|f| ["neoforge", "forge", "fabric"].iter().position(|n| *n == f.name).unwrap_or(9));
+        for f in files {
+            let Some(loader) = arc_loader(&f.name) else { continue };
+            let id = format!("{}@{}", f.name, arc_version(&f));
+            if out.iter().any(|b| b.id == id) {
+                continue;
+            }
+            out.push(ServerBuild { label: format!("{} · {}", loader.label(), arc_version(&f)), id, stable });
+        }
+    }
+    Ok(out)
+}
+
+/// Arclight for `mc`: the build chosen in the UI ("loader@version"), else the newest stable one.
+/// Returns the mod loader it runs on and the build version.
+async fn arclight(mc: &str, build: Option<&str>, dir: &Path, task: &Arc<Task>) -> Result<(LoaderType, String)> {
+    task.update(format!("Finding Arclight for Minecraft {mc}…"), None);
+    let (name, version) = match build.and_then(|b| b.split_once('@')) {
+        Some((l, v)) => (l.to_string(), v.to_string()),
+        None => {
+            let first = arclight_builds(mc).await?.into_iter().next().ok_or_else(|| anyhow!("Arclight isn't available for Minecraft {mc}"))?;
+            let (l, v) = first.id.split_once('@').unwrap_or_default();
+            (l.to_string(), v.to_string())
+        }
+    };
+    let loader = arc_loader(&name).ok_or_else(|| anyhow!("Arclight doesn't come for {name}"))?;
+    let folders = ["latest-stable".to_string(), "latest-snapshot".to_string(), format!("versions-stable/{version}"), format!("versions-snapshot/{version}")];
+    let mut found = None;
+    for folder in folders {
+        let Ok(list) = fetch_json::<ArcListing>(&format!("{ARCLIGHT}/{}/{folder}", enc(mc))).await else { continue };
+        found = list.files.into_iter().find(|f| f.name == name && arc_version(f) == version && f.permlink.is_some());
+        if found.is_some() {
+            break;
+        }
+    }
+    let url = found.and_then(|f| f.permlink).ok_or_else(|| anyhow!("Arclight {version} for {} {mc} couldn't be found", loader.label()))?;
+    // The object's name is the SHA-1 of the file.
+    let sha1 = url.rsplit('/').next().filter(|h| h.len() == 40 && h.chars().all(|c| c.is_ascii_hexdigit())).map(Hash::sha1);
+    download_all(vec![DownloadItem::new(&url, dir.join("arclight.jar")).hash(sha1)], 1, task.counter("Downloading Arclight")).await?;
+    Ok((loader, version))
+}
+
+/// This computer's name in Mojang's download links and in the version list.
+fn bedrock_platform() -> (&'static str, &'static str, &'static str) {
+    if cfg!(windows) {
+        ("windows", "bin-win", "serverBedrockWindows")
+    } else {
+        ("linux", "bin-linux", "serverBedrockLinux")
+    }
+}
+
+/// Bedrock Dedicated Server versions (releases), from the community list plus Mojang's newest.
+async fn bedrock_versions() -> Result<Vec<String>> {
+    let (key, _, link) = bedrock_platform();
+    let mut list: Vec<String> = match fetch_json::<Value>(BEDROCK_VERSIONS).await {
+        Ok(v) => v.get(key).and_then(|p| p.get("versions")).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default(),
+        Err(e) => {
+            eprintln!("[server] Bedrock version list unavailable: {e:#}");
+            Vec::new()
+        }
+    };
+    if let Ok(v) = fetch_json::<Value>(BEDROCK_LINKS).await {
+        let newest = v
+            .pointer("/result/links")
+            .and_then(Value::as_array)
+            .and_then(|a| a.iter().find(|l| l.get("downloadType").and_then(Value::as_str) == Some(link)))
+            .and_then(|l| l.get("downloadUrl"))
+            .and_then(Value::as_str)
+            .and_then(|u| u.rsplit("bedrock-server-").next())
+            .and_then(|f| f.strip_suffix(".zip"))
+            .map(str::to_string);
+        if let Some(n) = newest.filter(|n| !list.contains(n)) {
+            list.push(n);
+        }
+    }
+    if list.is_empty() {
+        bail!("Couldn't load the Bedrock server versions. Check the internet connection");
+    }
+    Ok(list)
+}
+
+/// Bedrock Dedicated Server from minecraft.net, unpacked into the server folder. Mojang publishes no checksums,
+/// so the download is checked by unpacking it and finding the server program inside. Returns the program's name.
+async fn bedrock(version: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    let (_, folder, _) = bedrock_platform();
+    let zip = paths::cache().join("server-installers").join(format!("bedrock-server-{version}.zip"));
+    let url = format!("{BEDROCK_CDN}/{folder}/bedrock-server-{}.zip", enc(version));
+    task.update(format!("Downloading the Bedrock server {version}…"), None);
+    if let Err(e) = download_all(vec![DownloadItem::new(url, &zip)], 1, task.counter("Downloading the Bedrock server")).await {
+        if matches!(status_of(&e), Some(403 | 404)) {
+            bail!("Bedrock server {version} isn't available from minecraft.net");
+        }
+        return Err(e);
+    }
+    task.update("Unpacking the Bedrock server…", None);
+    let (zip2, dir2) = (zip.clone(), dir.to_path_buf());
+    let unpacked = tokio::task::spawn_blocking(move || -> Result<()> {
+        let mut archive = crate::content::index::open_zip(&zip2)?;
+        crate::content::index::extract_where(&mut archive, &dir2, |name| Some(name.to_string()))
+    })
+    .await?;
+    let _ = tokio::fs::remove_file(&zip).await;
+    unpacked.context("The Bedrock server download is damaged")?;
+    let exe = if cfg!(windows) { "bedrock_server.exe" } else { "bedrock_server" };
+    if !dir.join(exe).is_file() {
+        bail!("The Bedrock server download didn't contain {exe}");
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tokio::fs::set_permissions(dir.join(exe), std::fs::Permissions::from_mode(0o755)).await?;
+    }
+    Ok(exe.to_string())
 }
 
 /// Spigot can't be redistributed as a ready-made jar, so it's compiled locally with Spigot's official
@@ -336,7 +588,7 @@ async fn forge_like(loader: LoaderType, mc: &str, ver: &str, dir: &Path, java: &
     };
     if let Some(args_file) = found {
         let rel = args_file.strip_prefix(dir).unwrap_or(&args_file).to_string_lossy().replace('\\', "/");
-        return Ok(ServerLaunch { jar: None, args_file: Some(rel) });
+        return Ok(ServerLaunch { args_file: Some(rel), ..Default::default() });
     }
     // 1.13–1.16: the installer leaves forge-<mc>-<ver>.jar in the server folder.
     let mut rd = tokio::fs::read_dir(dir).await?;
@@ -417,9 +669,10 @@ async fn run_installer(java: &str, args: &[String], cwd: &Path, task: &Arc<Task>
 
 /// The version-specific loader info packs and instances carry, as the UI shows it.
 pub fn describe(meta: &ServerMeta) -> String {
-    match &meta.loader_version {
-        Some(v) => format!("{} {} ({v})", meta.kind.label(), meta.mc_version),
-        None => format!("{} {}", meta.kind.label(), meta.mc_version),
+    match (&meta.loader_version, meta.loader.filter(|_| meta.kind.hybrid())) {
+        (Some(v), Some(on)) => format!("{} {} ({}, {v})", meta.kind.label(), meta.mc_version, on.label()),
+        (Some(v), None) => format!("{} {} ({v})", meta.kind.label(), meta.mc_version),
+        (None, _) => format!("{} {}", meta.kind.label(), meta.mc_version),
     }
 }
 

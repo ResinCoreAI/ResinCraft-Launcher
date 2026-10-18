@@ -690,6 +690,7 @@ pub async fn install_many(instance_id: &str, picks: Vec<ModPick>, replace: Vec<R
                     ContentSource::Curseforge => {
                         curseforge::install_into(&inst, &task, &mut idx, &mut guard, &p.id, kind, p.version_id.clone(), &mut blocked).await
                     }
+                    ContentSource::Github => super::github::install_into(&inst, &task, &mut idx, &p.id, kind, p.version_id.clone()).await,
                     _ => Err(err_tr!("dupes.notSingle", "{name} can't be installed into an instance", name = p.title)),
                 };
                 match r {

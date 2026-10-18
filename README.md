@@ -11,13 +11,14 @@ A small native app built with Tauri 2 and Rust, with a React interface. It talks
 | **Instances** | Separate installs per version or modpack, each with its own mods, worlds, Java, memory and JVM arguments. Groups, your own order (drag to arrange), icons, banners and colours. Duplicate, open folder, delete to the Recycle Bin. |
 | **Any version** | Every release and snapshot from Mojang's manifest, back to the classic alphas (legacy asset layouts handled). |
 | **Mod loaders** | Fabric, Quilt, Forge and NeoForge, with a loader version picker. |
-| **Discover** | Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher and Technic, filtered to the instance's version and loader. |
+| **Discover** | Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher, Technic and GitHub releases, filtered to the instance's version and loader. "All" searches every site at once; paste a link to install it directly. |
 | **Smart installs** | Pick any version, install several at once, required dependencies added automatically, duplicate-mod check across sources. |
 | **Mod management** | Enable/disable, remove, recognise hand-added jars by hash, check for and apply updates (one or all). |
 | **Modpacks** | Import Modrinth `.mrpack`, CurseForge, FTB, ATLauncher and Technic packs; export an instance as `.mrpack` or a CurseForge `.zip`. |
 | **Java** | Auto-detects installed Javas (including the official launcher's runtimes), picks the right major version per game, and downloads Eclipse Temurin when none fits. |
 | **Accounts** | Microsoft sign-in via device code (no password ever enters the app), tokens encrypted with Windows' data protection, skins, capes and name changes, multiple accounts. Offline profiles for singleplayer and LAN, no Microsoft account needed. |
-| **Server hosting** | Vanilla, Paper, Purpur, Folia, Spigot, Fabric, Quilt, Forge and NeoForge servers, or a server from a modpack. Console, players, plugin and mod manager with updates, optimised startup flags. Friends join through the router, playit.gg, ResinCraft Relay (`<name>.rscraft.resincore.tech`) or bore.pub, or your own domain. |
+| **Server hosting** | Vanilla (releases and snapshots), Paper, Purpur, Folia, Spigot, Leaf, Fabric, Quilt, Forge, NeoForge, Arclight (mods and plugins together) and Bedrock Dedicated Server, or a server from a modpack. Console, players, plugin and mod manager with updates (Modrinth, Hangar, SpigotMC, dev.bukkit.org, CurseForge, GitHub, or a link), optimised startup flags, and "Bedrock players can join" (Geyser + Floodgate). Friends join through the router, playit.gg, ResinCraft Relay (`<name>.rscraft.resincore.tech`) or bore.pub, or your own domain. |
+| **Bedrock Edition** | Shows the installed Minecraft for Windows and Minecraft Preview with their worlds, opens them, and joins your Bedrock servers. |
 | **Files** | A file manager and editor on every instance and server. |
 | **Play** | Download progress, live colour-coded log console with filter/copy, crash notice, play-time tracking, minimize/hide launcher while playing. |
 | **Updates** | Signed in-app updates from GitHub releases. |
