@@ -128,7 +128,7 @@ export function mockApi(): ResinApi {
 
   return {
     app: {
-      info: () => wait({ version: '0.1.0', dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher', platform: 'win32', totalMemMb: 16384, dev: true, microsoft: true, curseforge: true }),
+      info: () => wait({ version: '0.2.0', dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher', platform: 'win32', totalMemMb: 16384, dev: true, microsoft: true, curseforge: true }),
       openExternal: async (u) => void window.open(u),
       setTitleBar: async () => {},
       showItem: async () => {},

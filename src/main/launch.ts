@@ -20,7 +20,7 @@ export interface LaunchAuth {
 }
 
 const LAUNCHER_NAME = 'ResinCraft'
-const LAUNCHER_VERSION = '0.1.0'
+const LAUNCHER_VERSION = '0.2.0'
 const running = new Map<string, ChildProcess>()
 
 export const runningInstances = () => [...running.keys()]
