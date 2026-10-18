@@ -6,13 +6,15 @@ use super::ctx::ctx;
 
 /// Development builds keep data in `ResinCraft/.dev-data` (same as Electron's `npm run dev`);
 /// release builds use `%APPDATA%\ResinCraft Launcher`, which is what the Electron release used too.
+/// A build made with `RESINCRAFT_DATA_FOLDER` set uses that folder name instead (only for the updater's
+/// end-to-end test, so test installs never touch real instances and accounts).
 pub fn default_data_dir(config_dir: Option<PathBuf>) -> PathBuf {
     if cfg!(debug_assertions) {
         // Not canonicalize(): on Windows it adds the \?\ long-path prefix, which Java can't load classes from.
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         return manifest.parent().unwrap_or(&manifest).join(".dev-data");
     }
-    config_dir.unwrap_or_else(std::env::temp_dir).join("ResinCraft Launcher")
+    config_dir.unwrap_or_else(std::env::temp_dir).join(option_env!("RESINCRAFT_DATA_FOLDER").unwrap_or("ResinCraft Launcher"))
 }
 
 pub fn root() -> PathBuf {

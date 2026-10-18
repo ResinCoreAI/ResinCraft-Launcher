@@ -8,13 +8,16 @@ use std::time::UNIX_EPOCH;
 use anyhow::{bail, Result};
 use base64::Engine;
 
-use super::files::{child_path, game_subdir};
-use crate::core::types::ScreenshotInfo;
+use super::files::{child_path, game_subdir, write_atomic};
+use crate::core::instances;
+use crate::core::types::{Instance, ScreenshotInfo};
 use crate::err_tr;
 
 const IMAGE_EXTS: [&str; 3] = ["png", "jpg", "jpeg"];
 const THUMB_WIDTH: u32 = 384;
 const JPEG_QUALITY: u8 = 82;
+/// Instance icons are square; 256 px stays sharp on the Library card and the Home hero.
+const ICON_SIZE: u32 = 256;
 
 fn ext_of(p: &Path) -> String {
     p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default()
@@ -80,6 +83,20 @@ pub fn make_thumbnail(bytes: &[u8]) -> Result<String> {
     Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(out)))
 }
 
+/// The middle square of an image, scaled down to an ICON_SIZE PNG.
+pub fn make_icon(bytes: &[u8]) -> Result<Vec<u8>> {
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+    let img = decode(bytes)?;
+    let side = img.width().min(img.height());
+    let square = img.crop_imm((img.width() - side) / 2, (img.height() - side) / 2, side, side);
+    let square = if side > ICON_SIZE { square.resize_exact(ICON_SIZE, ICON_SIZE, image::imageops::FilterType::Lanczos3) } else { square };
+    // Screenshots have no useful transparency, and RGB keeps the file (and the data URL) smaller.
+    let rgb = image::DynamicImage::ImageRgb8(square.to_rgb8());
+    let mut out = Vec::new();
+    rgb.write_with_encoder(PngEncoder::new_with_quality(&mut out, CompressionType::Best, FilterType::Adaptive))?;
+    Ok(out)
+}
+
 pub async fn screenshot_thumbnail(id: &str, name: &str) -> Result<String> {
     let p = screenshot_path(id, name).await?;
     let meta = tokio::fs::metadata(&p).await?;
@@ -138,4 +155,44 @@ pub async fn show_screenshot(id: &str, name: &str) -> Result<()> {
 
 pub async fn remove_screenshot(id: &str, name: &str) -> Result<()> {
     crate::core::shell::trash(&screenshot_path(id, name).await?).await
+}
+
+/// Makes the screenshot's middle square the instance's icon (`icon.png` next to instance.json).
+pub async fn set_as_icon(id: &str, name: &str) -> Result<Instance> {
+    let bytes = tokio::fs::read(screenshot_path(id, name).await?).await?;
+    let png = tokio::task::spawn_blocking(move || make_icon(&bytes)).await??;
+    write_atomic(&instances::icon_file(id), &png).await?;
+    let url = format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png));
+    instances::set_custom_icon(id, url).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn png_of(img: image::RgbImage) -> Vec<u8> {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(img).write_to(&mut out, image::ImageFormat::Png).unwrap();
+        out.into_inner()
+    }
+
+    #[test]
+    fn icon_is_the_middle_square() {
+        // 900×500: red bands on the left and right, blue in the middle 500×500.
+        let img = image::RgbImage::from_fn(900, 500, |x, _| if (200..700).contains(&x) { image::Rgb([0, 0, 255]) } else { image::Rgb([255, 0, 0]) });
+        let icon = image::load_from_memory(&make_icon(&png_of(img)).unwrap()).unwrap().to_rgb8();
+        assert_eq!(icon.dimensions(), (ICON_SIZE, ICON_SIZE));
+        assert!(icon.pixels().all(|p| p[2] > 200 && p[0] < 40), "only the blue middle is kept");
+    }
+
+    #[test]
+    fn small_images_are_not_upscaled() {
+        let icon = make_icon(&png_of(image::RgbImage::new(120, 80))).unwrap();
+        assert_eq!(image::load_from_memory(&icon).unwrap().to_rgb8().dimensions(), (80, 80));
+    }
+
+    #[test]
+    fn junk_is_refused() {
+        assert!(make_icon(b"not an image").is_err());
+    }
 }

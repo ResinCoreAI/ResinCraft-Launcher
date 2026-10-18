@@ -56,6 +56,36 @@ export default {
   'discover.toast.installedMany': { one: 'Installed {count} item into {instance}', other: 'Installed {count} items into {instance}' },
   'discover.toast.installedSome': { one: 'Installed {done} of {count} into {instance}', other: 'Installed {done} of {count} into {instance}' },
   'discover.toast.versionChanged': '{title} switched version',
+  // note for translators: one line per site in the selection's tooltip, e.g. "CurseForge: 2"
+  'discover.selection.bySource': '{source}: {count}',
+  'discover.selection.show': 'Show what is selected',
+  'discover.selection.remove': 'Remove {title} from the selection',
+  // The same mod picked from Modrinth and CurseForge, or already installed from the other site.
+  'discover.dupes.checking': 'Checking for duplicates…',
+  'discover.dupes.title': 'Same mod from more than one place',
+  'discover.dupes.subtitle': 'Choose where each one comes from. Two copies of one mod stop {instance} from starting.',
+  'discover.dupes.installedFrom': 'Installed from {source}',
+  // A jar neither Modrinth nor CurseForge knows, put in the mods folder by hand.
+  'discover.dupes.byHand': 'Added by hand as {file}',
+  'discover.dupes.use': 'Use {source}',
+  'discover.dupes.replaceWith': 'Replace with {source}',
+  'discover.dupes.keep': 'Keep installed',
+  'discover.dupes.reason.hash': 'Same file on both sites',
+  'discover.dupes.reason.modid': 'Same mod ID inside the file',
+  'discover.dupes.reason.link': 'Same source code',
+  'discover.dupes.reason.name': 'Same name and author',
+  'discover.dupes.reason.slug': 'Same project name',
+  // note for translators: followed by a drop-down with "Modrinth" / "CurseForge"
+  'discover.dupes.always': "Don't ask again, always prefer",
+  'discover.dupes.alwaysSource': 'Preferred source',
+  'discover.dupes.install': { one: 'Install {count}', other: 'Install {count}' },
+  'discover.dupes.keepAll': 'Keep what I have',
+  'discover.dupes.auto': { one: 'Used {source} for {count} mod that is on both sites', other: 'Used {source} for {count} mods that are on both sites' },
+  // After a modpack install: {titles} lists the mods, e.g. "Sodium, Iris Shaders".
+  'discover.dupes.packRemoved': {
+    one: '{name} had a mod twice, so ResinCraft removed the extra copy of {titles}',
+    other: '{name} had {count} mods twice, so ResinCraft removed the extra copies of {titles}'
+  },
   'discover.pick.titleOne': 'Install {title}',
   'discover.pick.titleMany': { one: 'Install {count} item', other: 'Install {count} items' },
   'discover.pick.subtitleOne': 'Choose which instance it goes into.',

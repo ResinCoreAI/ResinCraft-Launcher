@@ -3,9 +3,11 @@
 
 pub mod atlauncher;
 pub mod curseforge;
+pub mod dupes;
 pub mod export;
 pub mod ftb;
 pub mod index;
+pub mod jarmeta;
 pub mod modrinth;
 pub mod sources;
 pub mod technic;
@@ -32,6 +34,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             sources::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?, args.get(3)?).await?;
             done()
         }
+        "content:duplicates" => json(dupes::check(&args.get::<String>(0)?, args.get(1)?).await?),
+        "content:installMany" => json(dupes::install_many(&args.get::<String>(0)?, args.get(1)?, args.get::<Option<_>>(2)?.unwrap_or_default()).await?),
         "content:list" => json(sources::list_content(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:toggle" => {
             modrinth::toggle_content(&args.get::<String>(0)?, args.get(1)?, &args.get::<String>(2)?).await?;
@@ -51,15 +55,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             sources::change_version(&args.get::<String>(0)?, args.get(1)?, &args.get::<String>(2)?, &args.get::<String>(3)?).await?;
             done()
         }
-        "content:installModpack" => json(sources::install_modpack(&args.get::<String>(0)?, args.get(1)?).await?),
+        "content:installModpack" => dupes::pack_result(sources::install_modpack(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:importModpack" => {
             let picked = shell::pick_file("Import a modpack", &[("Modrinth or CurseForge modpack", &["mrpack", "zip"])]).await?;
             match picked {
-                Some(file) => json(sources::import_modpack_file(&file).await?),
+                Some(file) => dupes::pack_result(sources::import_modpack_file(&file).await?),
                 None => done(),
             }
         }
-        "content:importModpackFile" => json(sources::import_modpack_file(&PathBuf::from(args.get::<String>(0)?)).await?),
+        "content:importModpackFile" => dupes::pack_result(sources::import_modpack_file(&PathBuf::from(args.get::<String>(0)?)).await?),
         "content:exportPreview" => json(export::export_preview(&args.get::<String>(0)?).await?),
         "content:exportModpack" => {
             let id: String = args.get(0)?;

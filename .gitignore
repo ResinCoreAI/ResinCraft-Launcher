@@ -7,3 +7,8 @@ dist/
 
 # Private build-time keys (see keys.example.env)
 keys.local.env
+
+# Updater signing key and its password (see README, "Updates"). Never commit; back them up.
+updater.local.key
+updater.local.key.pub
+updater.local.env

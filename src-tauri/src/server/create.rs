@@ -95,6 +95,8 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         relay_secret: None,
         domain: None,
         dns_auto: false,
+        relay_name: None,
+        relay_account: None,
     };
     tokio::fs::create_dir_all(&dir).await?;
     store::save(&meta).await?;

@@ -3,7 +3,8 @@ import { isTauri } from './tauri-api'
 /**
  * Makes the Tauri window behave like an app, not a web page: no browser right-click menu (Back, Refresh,
  * Print, Inspect…) and no browser shortcuts like Ctrl+R or Ctrl+P. Text fields keep their own
- * Cut/Copy/Paste menu. Development builds keep Inspect and reload for debugging.
+ * Cut/Copy/Paste menu. The app's own right-click menus are openContextMenu() in components/ui.tsx.
+ * Development builds keep Inspect and reload for debugging.
  */
 export function installDesktopBehaviour(): void {
   if (!isTauri) return

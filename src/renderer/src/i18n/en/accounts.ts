@@ -3,7 +3,6 @@ export default {
   'accounts.title': 'Accounts',
   'accounts.subtitle': 'Sign in with the Microsoft account that owns Minecraft: Java Edition.',
   'accounts.offlineProfile': 'Offline profile',
-  'accounts.offlineNeedsMsa': 'Add a Microsoft account first',
   'accounts.signIn': 'Sign in with Microsoft',
   'accounts.noMicrosoft': "<b>Microsoft sign-in isn't available in this build.</b> You can still add an offline profile to try things out.",
   'accounts.empty.title': 'No accounts yet',

@@ -1,27 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import {
+  ArrowUpRight,
   ChevronRight,
+  ClipboardCopy,
   Copy,
   FileDown,
   FolderInput,
   FolderOpen,
   FolderPlus,
+  ImagePlus,
   Layers,
   Loader2,
+  PackageOpen,
+  Palette,
   Pencil,
   Play,
   Plus,
+  RotateCcw,
   Search,
   Settings2,
   Square,
   Trash2
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import type { Instance } from '@shared/types'
+import type { Instance, InstancePatch } from '@shared/types'
 import { api } from '../api'
-import { ConfirmModal, Empty, InstanceTile, Menu, Modal } from '../components/ui'
+import ExportModal from '../components/ExportModal'
+import { packDupesNote } from '../components/DuplicatesDialog'
+import { celebrate, ConfirmModal, Empty, InstanceTile, Modal, MoreButton, openContextMenu, tilt, useCopy, type ContextEntry, type ContextItem } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
-import { describe, playtime } from '../util'
+import { COLOR_NAMES, COLORS, describe, hasCustomIcon, instancePath, playtime } from '../util'
 import { t } from '../i18n'
 
 type Sort = 'recent' | 'name' | 'version' | 'playtime'
@@ -144,13 +152,16 @@ export default function Library() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!drag])
 
-  const importPack = async () => {
+  const importPack = async (from?: Element) => {
     setImporting(true)
     try {
       const inst = await api.content.importModpack()
       if (inst) {
         await refreshInstances()
         toast(t('library.imported', { name: inst.name }))
+        const dupes = packDupesNote(inst)
+        if (dupes) toast(dupes, 'info')
+        celebrate(from)
         go({ page: 'instance', id: inst.id })
       }
     } catch (e) {
@@ -164,15 +175,23 @@ export default function Library() {
     <InstanceCard key={i.id} inst={i} withMenu index={index} onDragStart={startDrag} dragging={drag?.inst.id === i.id} landed={landed === i.id} />
   )
 
+  // Right-clicking empty space in the Library.
+  const pageMenu = (e: React.MouseEvent) =>
+    openContextMenu(e, [
+      { label: t('library.newInstance'), icon: <Plus />, onSelect: () => setNewInstanceOpen(true) },
+      { label: t('library.importModpack'), icon: <FileDown />, disabled: importing, onSelect: () => void importPack() },
+      instances.length > 0 && { label: t('library.group.create'), icon: <FolderPlus />, onSelect: () => setCreating(true) }
+    ])
+
   return (
-    <div className="page">
+    <div className="page fill" onContextMenu={pageMenu}>
       <div className="page-head">
         <div>
           <h1>{t('library.title')}</h1>
           <p>{t('library.subtitle')}</p>
         </div>
         <div className="spacer" />
-        <button className="btn" onClick={importPack} disabled={importing}>
+        <button className="btn" onClick={(e) => void importPack(e.currentTarget)} disabled={importing}>
           {importing ? <Loader2 className="spin" /> : <FileDown />} {t('library.importModpack')}
         </button>
         <button className="btn primary" onClick={() => setNewInstanceOpen(true)}>
@@ -312,10 +331,9 @@ export function InstanceCard({
   dragging?: boolean
   landed?: boolean
 }) {
-  const { go, games, play, stop, refreshInstances, toast } = useStore()
+  const { go, games, play, stop } = useStore()
   const task = useInstanceTask(inst.id)
-  const [confirm, setConfirm] = useState(false)
-  const [changingGroup, setChangingGroup] = useState(false)
+  const menu = useInstanceMenu(inst)
   const state = games[inst.id]
   const ref = useRef<HTMLDivElement>(null)
   const dragged = useRef(false)
@@ -349,6 +367,9 @@ export function InstanceCard({
         role="button"
         tabIndex={0}
         onPointerDown={onPointerDown}
+        onPointerMove={tilt.onPointerMove}
+        onPointerLeave={tilt.onPointerLeave}
+        onContextMenu={menu.open}
         onClick={() => {
           if (dragged.current) {
             dragged.current = false
@@ -356,7 +377,7 @@ export function InstanceCard({
           }
           go({ page: 'instance', id: inst.id })
         }}
-        onKeyDown={(e) => e.key === 'Enter' && go({ page: 'instance', id: inst.id })}
+        onKeyDown={menu.onKeyDown}
       >
         <InstanceTile inst={inst} wide />
         {state === 'running' && <span className="chip success badge-live">● {t('library.card.running')}</span>}
@@ -389,36 +410,140 @@ export function InstanceCard({
                 )}
               </div>
             </div>
-            {withMenu && (
-              <Menu
-                items={[
-                  { label: t('library.card.settings'), icon: <Settings2 />, onClick: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
-                  { label: t('common.openFolder'), icon: <FolderOpen />, onClick: () => void api.instances.openFolder(inst.id) },
-                  { label: t('library.group.change'), icon: <FolderInput />, onClick: () => setChangingGroup(true) },
-                  {
-                    label: t('library.card.duplicate'),
-                    icon: <Copy />,
-                    onClick: async () => {
-                      try {
-                        await api.instances.duplicate(inst.id)
-                        await refreshInstances()
-                        toast(t('library.card.duplicated', { name: inst.name }))
-                      } catch (e) {
-                        toast((e as Error).message, 'error')
-                      }
-                    }
-                  },
-                  { label: t('common.delete'), icon: <Trash2 />, danger: true, divider: true, onClick: () => setConfirm(true) }
-                ]}
-              />
-            )}
+            {withMenu && <MoreButton items={menu.items} className="card-more" />}
           </div>
         </div>
       </div>
-      {confirm && <DeleteInstance inst={inst} onClose={() => setConfirm(false)} />}
-      {changingGroup && <GroupModal inst={inst} onClose={() => setChangingGroup(false)} />}
+      {menu.dialogs}
     </>
   )
+}
+
+/**
+ * What you can do to an instance from its right-click menu (Library and Home cards, the Home hero, the
+ * sidebar). Render `dialogs` beside the element, not inside it: events from a dialog bubble up the React tree.
+ */
+export function useInstanceMenu(inst: Instance) {
+  const { go, games, play, stop, refreshInstances, toast, info } = useStore()
+  const names = useGroupNames()
+  const copy = useCopy()
+  const [dialog, setDialog] = useState<'delete' | 'rename' | 'newGroup' | 'export'>()
+  const close = () => setDialog(undefined)
+  const state = games[inst.id]
+
+  const update = async (patch: InstancePatch, done?: string) => {
+    try {
+      await api.instances.update(inst.id, patch)
+      await refreshInstances()
+      if (done) toast(done)
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+  const moveTo = (group: string | null) => update({ group }, t('library.group.moved', { name: inst.name, group: group || t('library.group.ungrouped') }))
+  const duplicate = async () => {
+    try {
+      await api.instances.duplicate(inst.id)
+      await refreshInstances()
+      toast(t('library.card.duplicated', { name: inst.name }))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+  const resetIcon = async () => {
+    try {
+      await api.instances.resetIcon(inst.id)
+      await refreshInstances()
+      toast(t('menu.instance.iconReset', { name: inst.name }))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
+  const items = (): ContextEntry[] => {
+    const current = inst.group?.trim() ?? ''
+    return [
+      state === 'running'
+        ? { label: t('common.stop'), icon: <Square />, onSelect: () => void stop(inst.id) }
+        : { label: t(state === 'preparing' ? 'common.preparing' : 'common.play'), icon: <Play />, disabled: state === 'preparing', onSelect: () => void play(inst.id) },
+      { label: t('menu.open'), icon: <ArrowUpRight />, shortcut: 'Enter', onSelect: () => go({ page: 'instance', id: inst.id }) },
+      { label: t('menu.instance.settings'), icon: <Settings2 />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
+      '-',
+      {
+        label: t('menu.instance.group'),
+        icon: <FolderInput />,
+        items: [
+          { label: t('library.group.none'), checked: current === '', onSelect: () => void moveTo(null) },
+          ...names.map((g): ContextItem => ({ label: g, checked: current === g, onSelect: () => void moveTo(g) })),
+          '-',
+          { label: t('menu.instance.newGroup'), icon: <FolderPlus />, onSelect: () => setDialog('newGroup') }
+        ]
+      },
+      { label: t('menu.rename'), icon: <Pencil />, shortcut: 'F2', onSelect: () => setDialog('rename') },
+      {
+        label: t('menu.instance.color'),
+        icon: <Palette />,
+        items: COLORS.map((c, i) => ({
+          label: t(COLOR_NAMES[i]),
+          icon: <span className="ctx-swatch" style={{ background: c }} />,
+          checked: inst.color === c,
+          onSelect: () => void update({ color: c })
+        }))
+      },
+      { label: t('art.menu'), icon: <ImagePlus />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
+      hasCustomIcon(inst) && { label: t('menu.instance.resetIcon'), icon: <RotateCcw />, onSelect: () => void resetIcon() },
+      { label: t('library.card.duplicate'), icon: <Copy />, onSelect: () => void duplicate() },
+      { label: t('menu.instance.export'), icon: <PackageOpen />, onSelect: () => setDialog('export') },
+      '-',
+      { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id) },
+      info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(instancePath(info.dataDir, inst.id)) },
+      '-',
+      { label: t('common.delete'), icon: <Trash2 />, danger: true, shortcut: 'Del', onSelect: () => setDialog('delete') }
+    ]
+  }
+
+  const dialogs = (
+    <>
+      {dialog === 'delete' && <DeleteInstance inst={inst} onClose={close} />}
+      {dialog === 'rename' && (
+        <NameModal
+          title={t('menu.instance.renameTitle')}
+          initial={inst.name}
+          onClose={close}
+          onSave={async (name) => {
+            await api.instances.update(inst.id, { name })
+            await refreshInstances()
+            toast(t('menu.instance.renamed', { name }))
+          }}
+        />
+      )}
+      {dialog === 'newGroup' && (
+        <NameModal
+          title={t('library.group.createTitle')}
+          initial=""
+          placeholder={t('library.group.new')}
+          onClose={close}
+          onSave={async (group) => {
+            addSavedGroup(group)
+            await moveTo(group)
+          }}
+        />
+      )}
+      {dialog === 'export' && <ExportModal inst={inst} onClose={close} />}
+    </>
+  )
+
+  /** For a focused card or row: Enter opens, F2 renames, Delete deletes. */
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter') go({ page: 'instance', id: inst.id })
+    else if (e.key === 'F2') setDialog('rename')
+    else if (e.key === 'Delete') setDialog('delete')
+    else return
+    e.preventDefault()
+  }
+
+  return { items, open: (e: React.MouseEvent) => openContextMenu(e, items()), dialogs, onKeyDown }
 }
 
 export function DeleteInstance({ inst, onClose, onDeleted }: { inst: Instance; onClose: () => void; onDeleted?: () => void }) {
@@ -522,8 +647,14 @@ function GroupHeader({ name, count, collapsed, onToggle }: { name: string; count
   const [renaming, setRenaming] = useState(false)
   const [removing, setRemoving] = useState(false)
   const label = name || t('library.group.ungrouped')
+  const items = (): ContextEntry[] => [
+    { label: t(collapsed ? 'menu.group.expand' : 'menu.group.collapse'), icon: <ChevronRight />, onSelect: onToggle },
+    name ? '-' : null,
+    name ? { label: t('library.group.rename'), icon: <Pencil />, onSelect: () => setRenaming(true) } : null,
+    name ? { label: t('library.group.remove'), icon: <Trash2 />, danger: true, onSelect: () => setRemoving(true) } : null
+  ]
   return (
-    <div className="group-head">
+    <div className="group-head" onContextMenu={(e) => openContextMenu(e, items())}>
       <button
         className={`group-toggle ${collapsed ? '' : 'open'}`}
         onClick={onToggle}
@@ -535,14 +666,7 @@ function GroupHeader({ name, count, collapsed, onToggle }: { name: string; count
         <span className="group-count">{count}</span>
       </button>
       <span className="group-line" />
-      {name && (
-        <Menu
-          items={[
-            { label: t('library.group.rename'), icon: <Pencil />, onClick: () => setRenaming(true) },
-            { label: t('library.group.remove'), icon: <Trash2 />, danger: true, divider: true, onClick: () => setRemoving(true) }
-          ]}
-        />
-      )}
+      {name && <MoreButton items={items} className="card-more" />}
       {renaming && (
         <NameModal
           title={t('library.group.rename')}
@@ -573,66 +697,6 @@ function GroupHeader({ name, count, collapsed, onToggle }: { name: string; count
         />
       )}
     </div>
-  )
-}
-
-/** Picks an existing group, "No group", or a new group name for one instance. */
-function GroupModal({ inst, onClose }: { inst: Instance; onClose: () => void }) {
-  const { refreshInstances, toast } = useStore()
-  const names = useGroupNames()
-  const current = inst.group?.trim() ?? ''
-  const [choice, setChoice] = useState(current)
-  const [typed, setTyped] = useState('')
-  const target = typed.trim() || choice
-  const save = async () => {
-    try {
-      if (target) addSavedGroup(target)
-      await api.instances.update(inst.id, { group: target || null })
-      await refreshInstances()
-      toast(t('library.group.moved', { name: inst.name, group: target || t('library.group.ungrouped') }))
-      onClose()
-    } catch (e) {
-      toast((e as Error).message, 'error')
-    }
-  }
-  return (
-    <Modal
-      title={t('library.group.title')}
-      subtitle={t('library.group.body')}
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn ghost" onClick={onClose}>
-            {t('common.cancel')}
-          </button>
-          <button className="btn primary" disabled={target === current} onClick={save}>
-            {t('common.save')}
-          </button>
-        </>
-      }
-    >
-      <div className="version-list" style={{ maxHeight: 240 }}>
-        {['', ...names].map((g) => (
-          <button
-            key={g || '~none'}
-            className={!typed.trim() && choice === g ? 'on' : ''}
-            onClick={() => {
-              setChoice(g)
-              setTyped('')
-            }}
-          >
-            {g || t('library.group.none')}
-          </button>
-        ))}
-      </div>
-      <input
-        className="input"
-        placeholder={t('library.group.new')}
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && target !== current && void save()}
-      />
-    </Modal>
   )
 }
 

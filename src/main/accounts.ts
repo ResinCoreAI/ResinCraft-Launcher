@@ -226,10 +226,7 @@ function offlineUuid(name: string): string {
 export async function addOfflineAccount(username: string): Promise<AccountView> {
   const name = username.trim()
   if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) throw new Error('Usernames are 3–16 characters: letters, numbers and _')
-  // Like Prism, offline play is only for people who own the game. Dev builds skip this so the
-  // launcher can be tested before Mojang approves the Azure app.
-  if (app.isPackaged && !(await load()).some((a) => a.type === 'msa'))
-    throw new Error('Add a Microsoft account that owns Minecraft before creating offline profiles.')
+  // Offline profiles don't need a Microsoft account first (the owner's choice).
   return view(await upsert({ id: randomUUID(), type: 'offline', username: name, uuid: offlineUuid(name), active: true }))
 }
 

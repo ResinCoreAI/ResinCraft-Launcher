@@ -11,6 +11,7 @@ pub mod network;
 pub mod playit;
 pub mod plugins;
 pub mod properties;
+pub mod relay;
 pub mod runtime;
 pub mod store;
 pub mod tunnel;
@@ -119,6 +120,14 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(plugins::search(&id, &query, &source, offset.unwrap_or(0)).await?)
         }
         "server:addonVersions" => json(plugins::versions(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:addonChangeVersion" => {
+            json(plugins::change_version(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?)
+        }
+        "server:addonCheckUpdates" => json(plugins::check_updates(&args.get::<String>(0)?).await?),
+        "server:addonCancelPending" => {
+            plugins::cancel_pending(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            done()
+        }
         "server:addonInstall" => {
             plugins::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get(2)?).await?;
             done()
@@ -141,6 +150,18 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
                 tokio::spawn(domain::on_open(id.clone()));
             }
             json(domain::info(&id).await?)
+        }
+        "server:relayInfo" => json(relay::info(&args.get::<String>(0)?).await?),
+        "server:relayCheck" => json(relay::check(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:relayName" => {
+            let (id, name): (String, String) = (args.get(0)?, args.get(1)?);
+            let before = store::get(&id).await?;
+            let meta = relay::set_name(&id, &name).await?;
+            // Online under the old name: come back under the new one.
+            if meta.relay_name != before.relay_name && runtime::net(&id).is_some_and(|n| n.via == Some("resin")) {
+                runtime::refresh_internet(&id).await;
+            }
+            json(store::info(meta).await)
         }
         "server:network" => json(json!({ "lanIp": network::lan_ip().map(|ip| ip.to_string()) })),
         "server:play" => {

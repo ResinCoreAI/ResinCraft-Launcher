@@ -1,5 +1,5 @@
 //! Headless end-to-end check of server hosting (no window needed):
-//!   cargo run --example check_server -- [type…] [--mc 1.21.1] [--keep] [--upnp] [--tunnel auto|playit|relay] [--relay host[:port]] [--relay-secret s] [--managed-java] [--port 25590] [--verbose]
+//!   cargo run --example check_server -- [type…] [--mc 1.21.1] [--keep] [--upnp] [--tunnel auto|playit|relay] [--relay host[:port]] [--relay-secret s] [--managed-java] [--update-test] [--port 25590] [--verbose]
 //! Types: vanilla paper purpur folia spigot fabric quilt forge neoforge, or modpack:<Modrinth id or slug>
 //! (default: vanilla paper fabric). Each server is created, given a plugin (Paper/Purpur: LuckPerms from
 //! Modrinth) or a server-side mod (Fabric/Quilt: Lithium), started until "Done (…)! For help, type "help"",
@@ -38,6 +38,8 @@ struct Opts {
     tunnel: String,
     relay: Option<String>,
     relay_secret: Option<String>,
+    /// Plugin servers: start with an older ViaVersion from Modrinth and update it while the server runs.
+    update_test: bool,
 }
 
 async fn run() -> Result<bool> {
@@ -58,7 +60,7 @@ async fn run() -> Result<bool> {
         Ok(Some(v))
     };
     let (tunnel, relay, relay_secret) = (value("--tunnel")?.unwrap_or_else(|| "auto".into()), value("--relay")?, value("--relay-secret")?);
-    let opts = Opts { tunnel, relay, relay_secret, keep: flag(&mut argv, "--keep"), upnp: flag(&mut argv, "--upnp"), verbose: flag(&mut argv, "--verbose"), managed_java: flag(&mut argv, "--managed-java"), mc: {
+    let opts = Opts { tunnel, relay, relay_secret, keep: flag(&mut argv, "--keep"), upnp: flag(&mut argv, "--upnp"), verbose: flag(&mut argv, "--verbose"), managed_java: flag(&mut argv, "--managed-java"), update_test: flag(&mut argv, "--update-test"), mc: {
         let mut mc = "1.21.1".to_string();
         if let Some(i) = argv.iter().position(|a| a == "--mc") {
             mc = argv.get(i + 1).cloned().ok_or_else(|| anyhow!("--mc needs a version"))?;
@@ -155,11 +157,20 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     if let (Some(a), None) = (addon, &meta.modpack) {
         plugins::install(id, a, None).await?;
         let list = plugins::list(id).await?;
-        let names: Vec<String> = list.iter().map(|c| c.title.clone().unwrap_or_else(|| c.filename.clone())).collect();
+        let names: Vec<String> = list.iter().map(|c| c.item.title.clone().unwrap_or_else(|| c.item.filename.clone())).collect();
         println!("  installed add-ons: {}", names.join(", "));
         if list.is_empty() {
             bail!("{a} wasn't installed");
         }
+    }
+    let mut old_via = None;
+    if opts.update_test && meta.kind.plugins() {
+        let versions = plugins::versions(id, "viaversion").await?;
+        let compatible: Vec<_> = versions.iter().filter(|v| v.compatible && v.version.kind == "release").collect();
+        let old = compatible.get(3).or(compatible.last()).ok_or_else(|| anyhow!("no compatible ViaVersion"))?;
+        plugins::install(id, "viaversion", Some(old.version.id.clone())).await?;
+        println!("  installed ViaVersion {} ({} compatible releases, newest {})", old.version.version_number, compatible.len(), compatible[0].version.version_number);
+        old_via = Some((old.version.version_number.clone(), compatible[0].version.version_number.clone()));
     }
     store::update(id, json!({ "public": opts.upnp, "tunnel": opts.tunnel, "relayHost": opts.relay, "relaySecret": opts.relay_secret })).await?;
     if opts.managed_java {
@@ -219,6 +230,24 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
         println!("  pinged {address}: \"{}\" {} ({}/{} players, {} ms)", status.motd, status.version, status.players.online, status.players.max, status.latency);
     }
 
+    let mut expect_via = None;
+    if let Some((old, newest)) = &old_via {
+        let checked = plugins::check_updates(id).await?;
+        let via = checked.iter().find(|a| a.item.title.as_deref() == Some("ViaVersion")).ok_or_else(|| anyhow!("ViaVersion missing"))?;
+        let up = via.item.update.clone().ok_or_else(|| anyhow!("no update found for ViaVersion {old}"))?;
+        println!("  update check: ViaVersion {old} → {} ({})", up.version_number, via.update_url.clone().unwrap_or_default());
+        if &up.version_number != newest {
+            bail!("expected the newest compatible version {newest}, got {}", up.version_number);
+        }
+        let queued = plugins::change_version(id, &via.item.filename, &up.version_id).await?;
+        let pending = plugins::list(id).await?.into_iter().find(|a| a.item.title.as_deref() == Some("ViaVersion")).and_then(|a| a.pending);
+        println!("  update queued while running: {queued} (pending: {pending:?})");
+        if !queued {
+            bail!("a running server's jar was replaced directly");
+        }
+        expect_via = Some(up.version_number);
+    }
+
     let zip = runtime::backup(id).await?;
     let size = std::fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
     println!("  backup {zip} ({} KB)", size / 1024);
@@ -234,6 +263,16 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     }
     let tail = runtime::log(id).last().map(|l| l.text.clone()).unwrap_or_default();
     println!("  stopped cleanly ({tail})");
+    if let Some(want) = expect_via {
+        let applied: Vec<String> = runtime::log(id).iter().filter(|l| l.text.starts_with("Updated ")).map(|l| l.text.clone()).collect();
+        let list = plugins::list(id).await?;
+        let vias: Vec<_> = list.iter().filter(|a| a.item.title.as_deref() == Some("ViaVersion")).collect();
+        let now = vias.first().and_then(|a| a.item.version_number.clone()).unwrap_or_default();
+        println!("  after stop: {applied:?}; ViaVersion is {now} ({} jar(s), pending {:?})", vias.len(), vias.first().and_then(|a| a.pending));
+        if now != want || vias.len() != 1 || vias[0].pending.is_some() {
+            bail!("the queued ViaVersion update wasn't applied cleanly");
+        }
+    }
     Ok(())
 }
 

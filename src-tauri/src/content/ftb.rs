@@ -8,6 +8,7 @@ use futures::stream::{self, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
 
+use super::dupes::dedupe_pack;
 use super::index::{discard_instance, iso_from_secs, parse_loader, safe_name};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
@@ -262,6 +263,8 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
                 items.push(DownloadItem::new(&f.url, dest).hash(hash).size(f.size));
             }
             download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
+            let listed: Vec<String> = version.files.iter().filter(|f| !f.serveronly && !f.url.is_empty() && f.path.trim_matches(['.', '/']) == "mods").map(|f| f.name.clone()).collect();
+            dedupe_pack(&inst, &task, &listed).await;
             if !pending.is_empty() {
                 instances::update(&inst.id, json!({ "pendingDownloads": pending })).await?;
             }

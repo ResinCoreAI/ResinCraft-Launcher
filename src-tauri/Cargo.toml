@@ -1,6 +1,6 @@
 [package]
 name = "resincraft"
-version = "0.2.0"
+version = "0.3.0"
 description = "ResinCraft Launcher: a modern Minecraft: Java Edition launcher by Puirkle"
 authors = ["Puirkle"]
 license = "MIT"
@@ -50,6 +50,14 @@ hmac = "0.12"
 tokio-util = "0.7"
 # Internationalised domain names (to punycode) for a hosted server's own domain.
 idna = "1"
+# In-app updates: the signed NSIS installer from each release, installed in place (see src/updater.rs).
+tauri-plugin-updater = "2"
+# ResinCraft Relay (../relay): the launcher's side of <name>.rscraft.resincore.tech tunnels.
+resincraft-relay = { path = "../relay", default-features = false, features = ["agent"] }
+
+[dev-dependencies]
+# The relay server itself, for examples/check_relay.rs.
+resincraft-relay = { path = "../relay" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns"] }

@@ -5,7 +5,7 @@ import { basename, dirname } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
-export const USER_AGENT = 'ResinCraftLauncher/0.2.0 (by Puirkle)'
+export const USER_AGENT = 'ResinCraftLauncher/0.3.0 (by Puirkle)'
 
 export class HttpError extends Error {
   constructor(

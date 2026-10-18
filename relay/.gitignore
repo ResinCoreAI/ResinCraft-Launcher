@@ -1,0 +1,5 @@
+/target/
+# A deployed relay's own config, data and certificates.
+/relay.toml
+/data/
+/tls/

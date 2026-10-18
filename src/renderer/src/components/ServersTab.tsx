@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Loader2, Pencil, Plus, RefreshCw, Server, Signal, Trash2, Users, WifiOff } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Loader2, Pencil, Plus, RefreshCw, Server, Signal, Trash2, Users, WifiOff } from 'lucide-react'
 import type { Instance, ServerEntry, ServerStatus } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t } from '../i18n'
-import { ConfirmModal, Empty, Modal } from './ui'
+import { ConfirmModal, Empty, Modal, openContextMenu, useCopy } from './ui'
 import '../instance-tabs.css'
 
 type Ping = { state: 'loading' } | { state: 'ok'; status: ServerStatus } | { state: 'error'; error: string }
 
 export default function ServersTab({ inst }: { inst: Instance }) {
   const { toast } = useStore()
+  const copy = useCopy()
   const [servers, setServers] = useState<ServerEntry[]>()
   const [pings, setPings] = useState<Record<string, Ping>>({})
   const [editing, setEditing] = useState<{ index: number | null; entry: ServerEntry }>()
@@ -127,7 +128,22 @@ export default function ServersTab({ inst }: { inst: Instance }) {
             const p = pings[s.ip]
             const icon = p?.state === 'ok' && p.status.favicon ? p.status.favicon : s.icon ? `data:image/png;base64,${s.icon}` : undefined
             return (
-              <div key={`${index}-${s.ip}`} className="list-row">
+              <div
+                key={`${index}-${s.ip}`}
+                className="list-row"
+                onContextMenu={(e) =>
+                  openContextMenu(e, [
+                    { label: t('common.edit'), icon: <Pencil />, onSelect: () => setEditing({ index, entry: s }) },
+                    { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(s.ip) },
+                    { label: t('common.refresh'), icon: <RefreshCw />, onSelect: () => void ping(s.ip) },
+                    '-',
+                    { label: t('servers.moveUp'), icon: <ChevronUp />, disabled: pos === 0, onSelect: () => move(pos, -1) },
+                    { label: t('servers.moveDown'), icon: <ChevronDown />, disabled: pos === visible.length - 1, onSelect: () => move(pos, 1) },
+                    '-',
+                    { label: t('common.remove'), icon: <Trash2 />, danger: true, onSelect: () => setRemoving(index) }
+                  ])
+                }
+              >
                 <div className="it-reorder">
                   <button className="btn ghost sm" title={t('servers.moveUp')} disabled={pos === 0} onClick={() => move(pos, -1)}>
                     <ChevronUp />

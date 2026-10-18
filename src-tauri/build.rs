@@ -14,10 +14,11 @@ fn main() {
     tauri_build::build()
 }
 
-/// Compiles the app's service keys in (Microsoft Client ID, CurseForge API key) so players never have to
-/// set them up. They come from environment variables or the git-ignored ../keys.local.env file.
+/// Compiles the app's service keys in (Microsoft Client ID, CurseForge API key, the ResinCraft Relay address)
+/// so players never have to set them up. They come from environment variables or the git-ignored
+/// ../keys.local.env file.
 fn embed_keys() {
-    const KEYS: [&str; 2] = ["RESINCRAFT_MS_CLIENT_ID", "RESINCRAFT_CURSEFORGE_KEY"];
+    const KEYS: [&str; 4] = ["RESINCRAFT_MS_CLIENT_ID", "RESINCRAFT_CURSEFORGE_KEY", "RESINCRAFT_RELAY_URL", "RESINCRAFT_RELAY_DOMAIN"];
     println!("cargo:rerun-if-changed=../keys.local.env");
     let file = std::fs::read_to_string("../keys.local.env").unwrap_or_default();
     for key in KEYS {

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, CheckCircle2, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, ChevronRight, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
 import type { AccountView, Instance } from '@shared/types'
 import { useInstanceTask, useStore } from '../store'
 import { t, tx } from '../i18n'
@@ -82,15 +82,16 @@ export function InstanceTile({
   style,
   wide
 }: {
-  inst: Pick<Instance, 'name' | 'color' | 'iconUrl'> & { id?: string }
+  inst: Pick<Instance, 'name' | 'color' | 'iconUrl' | 'bannerUrl'> & { id?: string }
   className?: string
   style?: React.CSSProperties
-  /** Use a 16×9 texture for banner-shaped tiles. */
+  /** Banner-shaped tile: shows the instance's banner if it has one, else a 16×9 texture. */
   wide?: boolean
 }) {
+  const src = (wide && inst.bannerUrl) || inst.iconUrl
   return (
     <div className={`tile ${className ?? ''}`} style={style}>
-      {inst.iconUrl ? <img src={inst.iconUrl} alt="" /> : <BlockArt seed={inst.id ?? inst.name} color={inst.color} cols={wide ? 16 : 8} rows={wide ? 9 : 8} />}
+      {src ? <img src={src} alt="" /> : <BlockArt seed={inst.id ?? inst.name} color={inst.color} cols={wide ? 16 : 8} rows={wide ? 9 : 8} />}
     </div>
   )
 }
@@ -131,7 +132,8 @@ export function PlayButton({ inst, size = '' }: { inst: Instance; size?: 'lg' | 
     )
   if (state === 'preparing')
     return (
-      <button className={`btn primary play-btn ${size}`} disabled>
+      // "launch" plays a one-off squash-and-pop as the button flips from Play to Preparing.
+      <button className={`btn primary play-btn launch ${size}`} disabled>
         <Loader2 className="spin" /> {task?.progress != null ? <span className="pct">{Math.round(task.progress * 100)}%</span> : t('common.preparing')}
       </button>
     )
@@ -157,15 +159,21 @@ export function Modal({
   onClose: () => void
   wide?: boolean
 }) {
+  const backdrop = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      // With dialogs stacked (e.g. a crop window over New instance), Esc closes only the top one.
+      const open = document.querySelectorAll('.backdrop')
+      if (open[open.length - 1] === backdrop.current) onClose()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   // Rendered into <body>: a page's entrance animation uses a transform, which would otherwise
   // make this fixed backdrop cover (and centre within) the page instead of the window.
   return createPortal(
-    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div ref={backdrop} className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal aria-label={title}>
         <div className="modal-head">
           <div className="grow">
@@ -229,6 +237,539 @@ export function Menu({ items, trigger }: { items: MenuItem[]; trigger?: ReactNod
   )
 }
 
+// ---------- Context menu (right-click) ----------
+
+/** One row of a context menu. Giving it `items` turns it into a submenu. */
+export interface ContextItem {
+  label: string
+  icon?: ReactNode
+  onSelect?: () => void
+  danger?: boolean
+  disabled?: boolean
+  /** A key that does the same thing, shown on the right (display only). */
+  shortcut?: string
+  /** For a pick-one list (group, colour): true marks the current choice. */
+  checked?: boolean
+  items?: ContextEntry[]
+}
+
+/** '-' is a separator. false / null / undefined are skipped, so menus can be written with `cond && {…}`. */
+export type ContextEntry = ContextItem | '-' | false | null | undefined
+
+/** Where to open a menu that isn't tied to a right-click (a "…" button, a row picked with the keyboard). */
+export interface MenuPoint {
+  x: number
+  y: number
+  /** Opened from the keyboard: the first item gets focus. */
+  keyboard?: boolean
+  /** Put the menu's right edge at x (menus that drop down from a button on the right). */
+  alignEnd?: boolean
+  /** Scrolling anything that contains this element closes the menu. */
+  origin?: Element | null
+}
+
+interface OpenMenu extends MenuPoint {
+  id: number
+  title?: string
+  entries: ContextEntry[]
+  /** Focus goes back here when the menu is closed with the keyboard or runs an item. */
+  restore: Element | null
+}
+
+let openMenu: OpenMenu | null = null
+let menuSeq = 0
+const menuListeners = new Set<() => void>()
+const setOpenMenu = (m: OpenMenu | null) => {
+  openMenu = m
+  menuListeners.forEach((f) => f())
+}
+/** The contextmenu event ContextMenuHost fires for Shift+F10 / the Menu key, so handlers can tell it from a click. */
+let keyboardEvent: Event | null = null
+/** The button whose menu was just closed by pressing it again; stops the click from reopening it. */
+let lastClosed = { el: null as Element | null, at: 0 }
+
+const editableSelector = 'input, textarea, select, [contenteditable="true"]'
+
+/** Text fields and selected text keep the native menu (Cut / Copy / Paste). */
+function wantsNativeMenu(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  if (target.closest(editableSelector) || (target instanceof HTMLElement && target.isContentEditable)) return true
+  const sel = window.getSelection()
+  return !!sel && !sel.isCollapsed && !!sel.toString().trim() && sel.containsNode(target, true)
+}
+
+/** True when this contextmenu event came from Shift+F10 or the Menu key rather than the mouse. */
+export function fromKeyboard(e: React.MouseEvent): boolean {
+  return e.nativeEvent === keyboardEvent
+}
+
+/**
+ * Opens the app's menu. From onContextMenu, pass the event: the menu opens at the pointer (or under the
+ * focused element for Shift+F10), and the innermost handler wins. Text fields and selected text keep the
+ * native menu. From a button, pass a MenuPoint.
+ */
+export function openContextMenu(at: React.MouseEvent | MenuPoint, entries: ContextEntry[], title?: string): void {
+  let point: MenuPoint
+  if ('nativeEvent' in at) {
+    if (at.type === 'contextmenu' && wantsNativeMenu(at.target)) return
+    at.preventDefault()
+    at.stopPropagation()
+    point = { x: at.clientX, y: at.clientY, keyboard: at.nativeEvent === keyboardEvent, origin: at.currentTarget as Element }
+  } else {
+    // Pressing a menu's own button again closes it instead of reopening it.
+    if (at.origin && lastClosed.el === at.origin && performance.now() - lastClosed.at < 400) return
+    point = at
+  }
+  setOpenMenu({ ...point, id: ++menuSeq, title, entries, restore: document.activeElement })
+}
+
+/** Opens a menu below a button, as its own dropdown. */
+export function openMenuBelow(button: HTMLElement, entries: ContextEntry[], keyboard: boolean, title?: string): void {
+  const r = button.getBoundingClientRect()
+  openContextMenu({ x: r.right, y: r.bottom + 4, keyboard, alignEnd: true, origin: button }, entries, title)
+}
+
+/** A "…" button showing the same menu as right-clicking its row. */
+export function MoreButton({ items, title, className = '' }: { items: () => ContextEntry[]; title?: string; className?: string }) {
+  return (
+    <button
+      className={`btn icon ${className}`}
+      aria-label={t('common.moreActions')}
+      title={t('common.moreActions')}
+      aria-haspopup="menu"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        openMenuBelow(e.currentTarget, items(), e.detail === 0, title)
+      }}
+    >
+      <MoreHorizontal />
+    </button>
+  )
+}
+
+/** Drops falsy entries and doubled, leading or trailing separators. */
+function tidy(entries: ContextEntry[]): (ContextItem | '-')[] {
+  const out: (ContextItem | '-')[] = []
+  for (const e of entries) {
+    if (!e || (e === '-' && (!out.length || out[out.length - 1] === '-'))) continue
+    out.push(e)
+  }
+  while (out[out.length - 1] === '-') out.pop()
+  return out
+}
+
+/**
+ * Renders whichever context menu is open (one at a time, into <body>), closes it on scroll, blur, resize or a
+ * click elsewhere, and turns Shift+F10 / the Menu key into a right-click on the focused element. Mounted once in App.
+ */
+export function ContextMenuHost() {
+  const menu = useSyncExternalStore(
+    (cb) => {
+      menuListeners.add(cb)
+      return () => menuListeners.delete(cb)
+    },
+    () => openMenu
+  )
+  const host = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ContextMenu' && !(e.key === 'F10' && e.shiftKey)) return
+      const target = document.activeElement
+      if (!(target instanceof HTMLElement) || target.closest(editableSelector)) return
+      // Chromium opens its own menu on Shift+F10, and on Windows on the Menu key's keyup.
+      e.preventDefault()
+      if (e.type !== 'keydown' || e.repeat || host.current?.contains(target)) return
+      const r = target.getBoundingClientRect()
+      const ev = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        button: 2,
+        clientX: r.left + Math.min(r.width / 2, 28),
+        clientY: r.top + Math.min(r.height / 2, 22)
+      })
+      keyboardEvent = ev
+      try {
+        target.dispatchEvent(ev)
+      } finally {
+        keyboardEvent = null
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('keyup', onKey, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('keyup', onKey, true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!menu) return
+    const inside = (n: EventTarget | null) => n instanceof Node && !!host.current?.contains(n)
+    const close = () => setOpenMenu(null)
+    const down = (e: PointerEvent) => {
+      if (inside(e.target)) return
+      if (menu.origin && e.target instanceof Node && menu.origin.contains(e.target)) lastClosed = { el: menu.origin, at: performance.now() }
+      close()
+    }
+    // Scrolling the page (or whatever holds the clicked row) closes the menu; a log scrolling itself elsewhere doesn't.
+    const scroll = (e: Event) => {
+      const s = e.target
+      if (inside(s)) return
+      if (!(s instanceof Node) || s === document || !menu.origin || s.contains(menu.origin)) close()
+    }
+    const wheel = (e: WheelEvent) => !inside(e.target) && close()
+    // The menu handles its own keys; this catches Escape if focus somehow ended up outside it.
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && !inside(e.target) && close()
+    window.addEventListener('keydown', key)
+    window.addEventListener('pointerdown', down, true)
+    window.addEventListener('scroll', scroll, true)
+    window.addEventListener('wheel', wheel, { capture: true, passive: true })
+    window.addEventListener('blur', close)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('keydown', key)
+      window.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('scroll', scroll, true)
+      window.removeEventListener('wheel', wheel, true)
+      window.removeEventListener('blur', close)
+      window.removeEventListener('resize', close)
+    }
+  }, [menu])
+
+  const done = useCallback((restore: boolean) => {
+    const el = openMenu?.restore
+    setOpenMenu(null)
+    if (restore && el instanceof HTMLElement && el !== document.body && el.isConnected) el.focus({ preventScroll: true })
+  }, [])
+
+  if (!menu) return null
+  const entries = tidy(menu.entries)
+  if (!entries.length) return null
+  return createPortal(
+    <div className="ctx-host" ref={host}>
+      <MenuPanel key={menu.id} entries={entries} title={menu.title} at={menu} level={0} focusFirst={!!menu.keyboard} onDone={done} />
+    </div>,
+    document.body
+  )
+}
+
+function MenuPanel({
+  entries,
+  title,
+  at,
+  anchor,
+  level,
+  focusFirst,
+  onDone,
+  onBack,
+  onEnter
+}: {
+  entries: (ContextItem | '-')[]
+  title?: string
+  /** A top-level menu opens at a point… */
+  at?: MenuPoint
+  /** …a submenu beside its parent item. */
+  anchor?: DOMRect
+  level: number
+  focusFirst: boolean
+  onDone: (restore: boolean) => void
+  /** Submenus: close and hand focus back to the parent item. */
+  onBack?: () => void
+  /** Submenus: the pointer came in, so the parent keeps it open. */
+  onEnter?: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const items = useRef<(HTMLButtonElement | null)[]>([])
+  const [pos, setPos] = useState<{ left: number; top: number; origin: string }>()
+  const [active, setActive] = useState(-1)
+  const [sub, setSub] = useState<{ index: number; focus: boolean }>()
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const typed = useRef({ text: '', at: 0 })
+
+  // Measure, then place it inside the window: flip left / up when there's no room, then clamp.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const { offsetWidth: w, offsetHeight: h } = el
+    const W = window.innerWidth
+    const H = window.innerHeight
+    const m = 6
+    let left: number
+    let top: number
+    let ox = 'left'
+    let oy = 'top'
+    if (anchor) {
+      left = anchor.right - 2
+      if (left + w > W - m) {
+        left = anchor.left - w + 2
+        ox = 'right'
+      }
+      top = anchor.top - 5
+    } else {
+      left = at!.alignEnd ? at!.x - w : at!.x
+      top = at!.y
+      if (at!.alignEnd) ox = 'right'
+      if (left + w > W - m) {
+        left = at!.x - w
+        ox = 'right'
+      }
+      if (top + h > H - m) {
+        top = Math.max(m, (at!.alignEnd ? at!.y - 8 : at!.y) - h)
+        oy = 'bottom'
+      }
+    }
+    setPos({ left: Math.max(m, Math.min(left, W - w - m)), top: Math.max(m, Math.min(top, H - h - m)), origin: `${ox} ${oy}` })
+  }, [])
+
+  const usable = (i: number) => {
+    const e = entries[i]
+    return !!e && e !== '-' && !e.disabled
+  }
+  /** The next usable item after `from` going `dir`, wrapping around. */
+  const step = (from: number, dir: 1 | -1) => {
+    const n = entries.length
+    const start = from < 0 ? (dir === 1 ? -1 : n) : from
+    for (let k = 1; k <= n; k++) {
+      const i = (((start + dir * k) % n) + n) % n
+      if (usable(i)) return i
+    }
+    return -1
+  }
+  const focusItem = (i: number) => {
+    if (i < 0) return
+    setActive(i)
+    const el = items.current[i]
+    el?.focus({ preventScroll: true })
+    el?.scrollIntoView({ block: 'nearest' })
+  }
+
+  // Focus once it's placed, so focusing doesn't scroll anything toward the off-screen spot.
+  const placed = !!pos
+  useLayoutEffect(() => {
+    if (!placed) return
+    if (focusFirst) focusItem(step(-1, 1))
+    // A submenu opened by hovering leaves focus on its parent item.
+    else if (level === 0) ref.current?.focus({ preventScroll: true })
+  }, [placed])
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  const openSub = (i: number, focus: boolean) => {
+    clearTimeout(timer.current)
+    setActive(i)
+    setSub({ index: i, focus })
+  }
+
+  const activate = (i: number, keyboard: boolean) => {
+    const it = entries[i]
+    if (!it || it === '-' || it.disabled) return
+    if (it.items) return openSub(i, keyboard)
+    // Close (and put focus back) first, so a dialog the item opens can take focus.
+    onDone(true)
+    it.onSelect?.()
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation()
+    const k = e.key
+    const cur = entries[active]
+    if (k === 'ArrowDown' || k === 'ArrowUp') focusItem(step(active, k === 'ArrowDown' ? 1 : -1))
+    else if (k === 'Home') focusItem(step(-1, 1))
+    else if (k === 'End') focusItem(step(-1, -1))
+    else if (k === 'ArrowRight') {
+      if (cur && cur !== '-' && cur.items && !cur.disabled) openSub(active, true)
+    } else if (k === 'ArrowLeft') {
+      if (level > 0) onBack?.()
+    } else if (k === 'Escape') {
+      if (level > 0) onBack?.()
+      else onDone(true)
+    } else if (k === 'Enter' || k === ' ') {
+      if (active >= 0) activate(active, true)
+    } else if (k === 'Tab') onDone(true)
+    else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Type to jump: the next item starting with what was typed.
+      const now = performance.now()
+      const text = (now - typed.current.at < 700 ? typed.current.text : '') + k.toLowerCase()
+      typed.current = { text, at: now }
+      const n = entries.length
+      for (let j = text.length > 1 ? 0 : 1; j <= n; j++) {
+        const i = (Math.max(active, 0) + j) % n
+        const it = entries[i]
+        if (usable(i) && it !== '-' && it.label.toLowerCase().startsWith(text)) {
+          focusItem(i)
+          break
+        }
+      }
+    } else return
+    e.preventDefault()
+  }
+
+  const subItem = sub ? entries[sub.index] : undefined
+  return (
+    <>
+      <div
+        ref={ref}
+        className="ctx-menu"
+        role="menu"
+        aria-label={title}
+        aria-orientation="vertical"
+        tabIndex={-1}
+        // Measured off-screen first (not hidden: a hidden element can't take focus), then placed.
+        style={pos ? { left: pos.left, top: pos.top, transformOrigin: pos.origin } : { left: -9999, top: -9999 }}
+        onKeyDown={onKeyDown}
+        onContextMenu={(e) => e.preventDefault()}
+        onPointerEnter={onEnter}
+        onPointerLeave={() => !sub && setActive(-1)}
+      >
+        {title && <div className="ctx-title ellipsis">{title}</div>}
+        {entries.map((it, i) =>
+          it === '-' ? (
+            <div key={i} className="ctx-sep" role="separator" />
+          ) : (
+            <button
+              key={i}
+              ref={(el) => {
+                items.current[i] = el
+              }}
+              type="button"
+              role={it.checked != null ? 'menuitemradio' : 'menuitem'}
+              aria-checked={it.checked ?? undefined}
+              aria-disabled={it.disabled || undefined}
+              aria-haspopup={it.items ? 'menu' : undefined}
+              aria-expanded={it.items ? sub?.index === i : undefined}
+              tabIndex={-1}
+              className={`ctx-item${it.danger ? ' danger' : ''}${active === i ? ' active' : ''}`}
+              onPointerEnter={() => {
+                clearTimeout(timer.current)
+                if (it.items && !it.disabled) {
+                  if (sub?.index !== i) timer.current = setTimeout(() => setSub({ index: i, focus: false }), 110)
+                } else if (sub) timer.current = setTimeout(() => setSub(undefined), 220)
+              }}
+              onPointerMove={() => {
+                if (active === i) return
+                setActive(i)
+                if (!it.disabled) items.current[i]?.focus({ preventScroll: true })
+              }}
+              onClick={() => activate(i, false)}
+            >
+              <span className="ctx-ico">{it.icon}</span>
+              <span className="ctx-label">{it.label}</span>
+              {it.shortcut && <kbd className="ctx-key">{it.shortcut}</kbd>}
+              {it.checked && <Check className="ctx-check" />}
+              {it.items && <ChevronRight className="ctx-arrow" />}
+            </button>
+          )
+        )}
+      </div>
+      {sub && subItem && subItem !== '-' && subItem.items && (
+        <MenuPanel
+          key={`${sub.index}:${sub.focus}`}
+          entries={tidy(subItem.items)}
+          anchor={items.current[sub.index]?.getBoundingClientRect()}
+          level={level + 1}
+          focusFirst={sub.focus}
+          onDone={onDone}
+          onBack={() => {
+            const i = sub.index
+            setSub(undefined)
+            focusItem(i)
+          }}
+          onEnter={() => {
+            clearTimeout(timer.current)
+            setActive(sub.index)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+/** Copies text and says so in a toast. */
+export function useCopy(): (text: string, message?: string) => Promise<void> {
+  const { toast } = useStore()
+  return useCallback(
+    async (text: string, message?: string) => {
+      try {
+        await navigator.clipboard.writeText(text)
+        toast(message ?? t('menu.copied'), 'info')
+      } catch (e) {
+        toast((e as Error).message, 'error')
+      }
+    },
+    [toast]
+  )
+}
+
+// ---------- Small delights ----------
+
+export const reducedMotion = (): boolean => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/** Pointer handlers that lean a card a couple of degrees toward the pointer (CSS reads --tilt-x / --tilt-y). */
+export const tilt = {
+  onPointerMove(e: React.PointerEvent<HTMLElement>) {
+    if (e.pointerType !== 'mouse' || reducedMotion() || document.body.classList.contains('dragging')) return
+    const el = e.currentTarget
+    const r = el.getBoundingClientRect()
+    const px = (e.clientX - r.left) / r.width - 0.5
+    const py = (e.clientY - r.top) / r.height - 0.5
+    el.style.setProperty('--tilt-x', `${(-py * 5).toFixed(2)}deg`)
+    el.style.setProperty('--tilt-y', `${(px * 5).toFixed(2)}deg`)
+  },
+  onPointerLeave(e: React.PointerEvent<HTMLElement>) {
+    e.currentTarget.style.removeProperty('--tilt-x')
+    e.currentTarget.style.removeProperty('--tilt-y')
+  }
+}
+
+const BURST = ['var(--accent)', 'var(--data)', 'var(--play)', 'var(--warning)']
+
+/**
+ * A quick burst of little blocks for a finished install or import. Starts from `from` (an element or a point),
+ * or above the toasts. Skipped when the system asks for reduced motion.
+ */
+export function celebrate(from?: Element | { x: number; y: number } | null): void {
+  if (reducedMotion()) return
+  let x = window.innerWidth - 190
+  let y = window.innerHeight - 64
+  if (from instanceof Element) {
+    const r = from.getBoundingClientRect()
+    if (r.width && from.isConnected) {
+      x = r.left + r.width / 2
+      y = r.top + r.height / 2
+    }
+  } else if (from) ({ x, y } = from)
+  const layer = document.createElement('div')
+  layer.className = 'burst'
+  layer.setAttribute('aria-hidden', 'true')
+  document.body.appendChild(layer)
+  const n = 18
+  let running = n
+  for (let i = 0; i < n; i++) {
+    const b = document.createElement('i')
+    const size = 4 + Math.round(Math.random() * 4)
+    b.style.cssText = `left:${x - size / 2}px;top:${y - size / 2}px;width:${size}px;height:${size}px;background:${BURST[i % BURST.length]}`
+    layer.appendChild(b)
+    const angle = (i / n) * Math.PI * 2 + Math.random() * 0.4
+    const dist = 34 + Math.random() * 44
+    const dx = Math.cos(angle) * dist
+    const dy = Math.sin(angle) * dist - 18
+    const spin = (Math.random() - 0.5) * 360
+    const anim = b.animate(
+      [
+        { transform: 'translate(0, 0) scale(0.3)', opacity: 1 },
+        { transform: `translate(${dx}px, ${dy}px) rotate(${spin * 0.7}deg) scale(1)`, opacity: 1, offset: 0.62 },
+        { transform: `translate(${dx * 1.12}px, ${dy + 22}px) rotate(${spin}deg) scale(0.7)`, opacity: 0 }
+      ],
+      { duration: 280 + Math.random() * 60, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' }
+    )
+    anim.onfinish = anim.oncancel = () => --running === 0 && layer.remove()
+  }
+  // Animations don't finish in a hidden or minimised window; don't leave the layer behind.
+  setTimeout(() => layer.remove(), 1500)
+}
+
 export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label?: string }) {
   return <button className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />
 }
@@ -256,7 +797,12 @@ export function Segmented<T extends string>({
 export function Empty({ icon, title, children, action }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="empty">
-      <div className="ico">{icon}</div>
+      {/* A little pixel-block pile (drawn in CSS) with the icon on the top block. */}
+      <div className="empty-art" aria-hidden>
+        <i className="blk a" />
+        <i className="blk b" />
+        <span className="blk c">{icon}</span>
+      </div>
       <h3>{title}</h3>
       {children && <p>{children}</p>}
       {action}
@@ -348,7 +894,7 @@ export function Dock() {
             {task.state === 'error' ? (
               <AlertTriangle style={{ color: 'var(--danger)' }} />
             ) : task.state === 'done' ? (
-              <CheckCircle2 style={{ color: 'var(--success)' }} />
+              <CheckCircle2 className="pop" style={{ color: 'var(--success)' }} />
             ) : (
               <Loader2 className="spin" />
             )}

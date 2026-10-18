@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowUp,
   ChevronRight,
+  ClipboardCopy,
   ClipboardPaste,
   Copy,
   Database,
@@ -31,15 +32,16 @@ import {
   Scissors,
   ScrollText,
   Search,
+  TextCursorInput,
   Trash2,
   X
 } from 'lucide-react'
 import type { FileEntry, FileRoot, TextFile } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
-import { bytes, timeAgo } from '../util'
+import { bytes, instancePath, serverPath, timeAgo } from '../util'
 import { rich, t } from '../i18n'
-import { ConfirmModal, Empty, Modal } from './ui'
+import { ConfirmModal, Empty, fromKeyboard, Modal, openContextMenu, useCopy, type ContextEntry } from './ui'
 import { useDropTarget, type DropTarget } from './DropImport'
 import type { CodeEditorHandle } from './CodeEditor'
 import '../files.css'
@@ -94,7 +96,8 @@ function sortEntries(list: FileEntry[], key: SortKey, desc: boolean): FileEntry[
 }
 
 export default function FileManager({ root, rootLabel, running }: { root: FileRoot; rootLabel: string; running?: boolean }) {
-  const { toast } = useStore()
+  const { toast, info } = useStore()
+  const copyText = useCopy()
   const key = rootKey(root)
   const [dir, setDir] = useState(() => lastDir.get(key) ?? '')
   const [entries, setEntries] = useState<FileEntry[]>()
@@ -106,7 +109,6 @@ export default function FileManager({ root, rootLabel, running }: { root: FileRo
   const [renaming, setRenaming] = useState<string>()
   const [creating, setCreating] = useState<'file' | 'folder'>()
   const [trashing, setTrashing] = useState<string[]>()
-  const [menu, setMenu] = useState<{ x: number; y: number; entry?: FileEntry }>()
   const [clip, setClipState] = useState<Clip | undefined>(() => clipboards.get(key))
   const [open, setOpen] = useState<{ file: TextFile; draft?: string }>()
   const [opening, setOpening] = useState<string>()
@@ -306,6 +308,61 @@ export default function FileManager({ root, rootLabel, running }: { root: FileRo
 
   const reveal = (path: string) => void api.files.reveal(root, path).catch(fail)
 
+  const pasteInto = async (into: string) => {
+    if (!clip) return
+    try {
+      if (clip.mode === 'cut') {
+        await api.files.move(root, clip.paths, into)
+        setClip(undefined)
+      } else await api.files.copy(root, clip.paths, into)
+    } catch (e) {
+      fail(e)
+    }
+    void load(dir)
+  }
+
+  /** Full paths on disk (relative ones if the data folder isn't known yet), one per line. */
+  const copyPaths = (paths: string[]) => {
+    const full = (p: string) => (!info ? p || '.' : root.kind === 'instance' ? instancePath(info.dataDir, root.id, p) : serverPath(info.dataDir, root.id, p))
+    void copyText(paths.map(full).join('\n'))
+  }
+
+  // ---- right-click menus ----
+
+  const entryMenu = (e: FileEntry, paths: string[]): ContextEntry[] => {
+    const one = paths.length === 1
+    return [
+      { label: e.dir ? t('files.open') : t('files.edit'), icon: e.dir ? <FolderOpen /> : <Pencil />, shortcut: 'Enter', disabled: !one, onSelect: () => void openEntry(e) },
+      { label: t('menu.rename'), icon: <TextCursorInput />, shortcut: 'F2', disabled: !one, onSelect: () => setRenaming(e.path) },
+      '-',
+      { label: t('common.copy'), icon: <Copy />, shortcut: 'Ctrl+C', onSelect: () => setClip({ mode: 'copy', paths }) },
+      { label: t('files.cut'), icon: <Scissors />, shortcut: 'Ctrl+X', onSelect: () => setClip({ mode: 'cut', paths }) },
+      clip && e.dir && one ? { label: t('files.pasteInto', { folder: e.name }), icon: <ClipboardPaste />, onSelect: () => void pasteInto(e.path) } : null,
+      clip ? { label: t('files.paste', { count: clip.paths.length }), icon: <ClipboardPaste />, shortcut: 'Ctrl+V', onSelect: () => void paste() } : null,
+      '-',
+      { label: t('files.newFile'), icon: <FilePlus />, onSelect: () => setCreating('file') },
+      { label: t('files.newFolder'), icon: <FolderPlus />, onSelect: () => setCreating('folder') },
+      '-',
+      { label: t('files.showInExplorer'), icon: <FolderOpen />, onSelect: () => reveal(e.path) },
+      { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => copyPaths(paths) },
+      '-',
+      { label: t('common.delete'), icon: <Trash2 />, danger: true, shortcut: 'Del', onSelect: () => setTrashing(paths) }
+    ]
+  }
+
+  const folderMenu = (): ContextEntry[] => [
+    { label: t('files.newFile'), icon: <FilePlus />, onSelect: () => setCreating('file') },
+    { label: t('files.newFolder'), icon: <FolderPlus />, onSelect: () => setCreating('folder') },
+    clip ? { label: t('files.paste', { count: clip.paths.length }), icon: <ClipboardPaste />, shortcut: 'Ctrl+V', onSelect: () => void paste() } : null,
+    '-',
+    { label: t('files.showInExplorer'), icon: <FolderOpen />, onSelect: () => reveal(dir) },
+    { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => copyPaths([dir]) },
+    '-',
+    { label: t('common.refresh'), icon: <RefreshCw />, onSelect: () => void load(dir) }
+  ]
+
+  const selectionTitle = (paths: string[]) => (paths.length > 1 ? t('menu.selected', { count: paths.length }) : undefined)
+
   const drop = useMemo<DropTarget | null>(
     () =>
       open
@@ -421,8 +478,14 @@ export default function FileManager({ root, rootLabel, running }: { root: FileRo
         onKeyDown={onListKey}
         onClick={(e) => e.target === e.currentTarget && setSelected(new Set())}
         onContextMenu={(e) => {
+          if ((e.target as HTMLElement).closest('.fm-row:not(.up)')) return
+          // Shift+F10 / the Menu key on the list: the menu of the selected file, under its row.
+          const sel = selection()
+          const focus = fromKeyboard(e) && sel.length ? shown.find((x) => x.path === (anchor.current && sel.includes(anchor.current) ? anchor.current : sel[0])) : undefined
+          if (!focus) return openContextMenu(e, folderMenu())
           e.preventDefault()
-          if (!(e.target as HTMLElement).closest('.fm-row')) setMenu({ x: e.clientX, y: e.clientY })
+          const r = listRef.current?.querySelector(`[data-path="${CSS.escape(focus.path)}"]`)?.getBoundingClientRect()
+          openContextMenu({ x: (r?.left ?? e.clientX) + 36, y: r?.bottom ?? e.clientY, keyboard: true, origin: listRef.current }, entryMenu(focus, sel), selectionTitle(sel))
         }}
       >
         <div className="fm-head" role="row">
@@ -470,11 +533,12 @@ export default function FileManager({ root, rootLabel, running }: { root: FileRo
               onClick={(ev) => clickRow(ev, e)}
               onDoubleClick={() => void openEntry(e)}
               onContextMenu={(ev) => {
-                ev.preventDefault()
-                ev.stopPropagation()
+                if (renaming === e.path) return
+                // Right-clicking outside the selection picks just that row, like Explorer.
+                const paths = selected.has(e.path) ? selection() : [e.path]
                 if (!selected.has(e.path)) setSelected(new Set([e.path]))
                 anchor.current = e.path
-                setMenu({ x: ev.clientX, y: ev.clientY, entry: e })
+                openContextMenu(ev, entryMenu(e, paths), selectionTitle(paths))
               }}
             >
               <span className={`fm-ico ${e.dir ? 'dir' : ''}`}>{opening === e.path ? <Loader2 className="spin" /> : <EntryIcon e={e} />}</span>
@@ -511,49 +575,6 @@ export default function FileManager({ root, rootLabel, running }: { root: FileRo
             <X />
           </button>
         </div>
-      )}
-
-      {menu && (
-        <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)}>
-          {menu.entry ? (
-            <>
-              <MenuButton icon={menu.entry.dir ? <FolderOpen /> : <Pencil />} label={menu.entry.dir ? t('files.open') : t('files.edit')} onClick={() => void openEntry(menu.entry!)} />
-              <MenuButton icon={<Pencil />} label={t('common.rename')} disabled={sel.length > 1} onClick={() => setRenaming(menu.entry!.path)} />
-              <hr />
-              <MenuButton icon={<Copy />} label={t('common.copy')} onClick={() => setClip({ mode: 'copy', paths: selection() })} />
-              <MenuButton icon={<Scissors />} label={t('files.cut')} onClick={() => setClip({ mode: 'cut', paths: selection() })} />
-              {clip && menu.entry.dir && (
-                <MenuButton
-                  icon={<ClipboardPaste />}
-                  label={t('files.pasteInto', { folder: menu.entry.name })}
-                  onClick={async () => {
-                    const into = menu.entry!.path
-                    try {
-                      if (clip.mode === 'cut') {
-                        await api.files.move(root, clip.paths, into)
-                        setClip(undefined)
-                      } else await api.files.copy(root, clip.paths, into)
-                    } catch (e) {
-                      fail(e)
-                    }
-                    void load(dir)
-                  }}
-                />
-              )}
-              <MenuButton icon={<FolderOpen />} label={t('files.showInExplorer')} onClick={() => reveal(menu.entry!.path)} />
-              <hr />
-              <MenuButton icon={<Trash2 />} label={t('common.delete')} danger onClick={() => setTrashing(selection())} />
-            </>
-          ) : (
-            <>
-              <MenuButton icon={<FilePlus />} label={t('files.newFile')} onClick={() => setCreating('file')} />
-              <MenuButton icon={<FolderPlus />} label={t('files.newFolder')} onClick={() => setCreating('folder')} />
-              {clip && <MenuButton icon={<ClipboardPaste />} label={t('files.paste', { count: clip.paths.length })} onClick={() => void paste()} />}
-              <hr />
-              <MenuButton icon={<FolderOpen />} label={t('files.showInExplorer')} onClick={() => reveal(dir)} />
-            </>
-          )}
-        </ContextMenu>
       )}
 
       {drag && <DragGhost x={drag.x} y={drag.y} paths={drag.paths} />}
@@ -713,40 +734,6 @@ function NewEntryModal({
       </label>
       {(problem || error) && <p className="fm-error">{problem ?? error}</p>}
     </Modal>
-  )
-}
-
-function ContextMenu({ x, y, children, onClose }: { x: number; y: number; children: ReactNode; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ left: x, top: y })
-  useEffect(() => {
-    const el = ref.current
-    if (el) setPos({ left: Math.min(x, window.innerWidth - el.offsetWidth - 8), top: Math.min(y, window.innerHeight - el.offsetHeight - 8) })
-    const close = (e: Event) => !ref.current?.contains(e.target as Node) && onClose()
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('pointerdown', close, true)
-    window.addEventListener('keydown', key)
-    window.addEventListener('blur', onClose)
-    return () => {
-      window.removeEventListener('pointerdown', close, true)
-      window.removeEventListener('keydown', key)
-      window.removeEventListener('blur', onClose)
-    }
-  }, [x, y, onClose])
-  return createPortal(
-    <div className="menu fm-menu" ref={ref} style={pos} role="menu" onClick={onClose} onContextMenu={(e) => e.preventDefault()}>
-      {children}
-    </div>,
-    document.body
-  )
-}
-
-function MenuButton({ icon, label, onClick, danger, disabled }: { icon: ReactNode; label: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
-  return (
-    <button className={danger ? 'danger' : ''} role="menuitem" disabled={disabled} onClick={onClick}>
-      {icon}
-      {label}
-    </button>
   )
 }
 

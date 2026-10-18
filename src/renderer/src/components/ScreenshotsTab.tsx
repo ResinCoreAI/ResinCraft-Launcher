@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, ChevronLeft, ChevronRight, Copy, FolderOpen, ImageOff, Loader2, RefreshCw, Trash2, X } from 'lucide-react'
+import { Camera, ChevronLeft, ChevronRight, ClipboardCopy, Copy, Eye, FileText, FolderOpen, ImageOff, ImageUp, Loader2, RefreshCw, Trash2, X } from 'lucide-react'
 import type { Instance, ScreenshotInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
-import { bytes } from '../util'
+import { bytes, instancePath } from '../util'
 import { currentLanguage, rich, t } from '../i18n'
-import { ConfirmModal, Empty } from './ui'
+import { ConfirmModal, Empty, openContextMenu, useCopy, type ContextEntry } from './ui'
 import '../instance-tabs.css'
 
 // Thumbnails survive tab switches; keyed by instance, file name and modification time.
@@ -15,7 +15,7 @@ const thumbKey = (id: string, s: ScreenshotInfo) => `${id}/${s.name}/${s.mtime}`
 const when = (s: ScreenshotInfo) => new Date(s.mtime).toLocaleString(currentLanguage(), { dateStyle: 'medium', timeStyle: 'short' })
 
 export default function ScreenshotsTab({ inst }: { inst: Instance }) {
-  const { toast } = useStore()
+  const { toast, info, refreshInstances } = useStore()
   const [shots, setShots] = useState<ScreenshotInfo[]>()
   const [viewing, setViewing] = useState<number>()
   const [removing, setRemoving] = useState<ScreenshotInfo>()
@@ -43,6 +43,28 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
     }
   }
   const show = (s: ScreenshotInfo) => void api.screenshots.show(inst.id, s.name).catch((e) => toast(e.message, 'error'))
+  const setIcon = async (s: ScreenshotInfo) => {
+    try {
+      await api.screenshots.setIcon(inst.id, s.name)
+      await refreshInstances()
+      toast(t('menu.screenshot.iconSet', { name: inst.name }))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+  const copyText = useCopy()
+
+  const menuFor = (s: ScreenshotInfo, i: number, inViewer = false): ContextEntry[] => [
+    !inViewer && { label: t('menu.screenshot.view'), icon: <Eye />, shortcut: 'Enter', onSelect: () => setViewing(i) },
+    { label: t('screenshots.copyImage'), icon: <Copy />, onSelect: () => void copy(s) },
+    { label: t('screenshots.showInFolder'), icon: <FolderOpen />, onSelect: () => show(s) },
+    { label: t('menu.screenshot.setIcon'), icon: <ImageUp />, onSelect: () => void setIcon(s) },
+    '-',
+    { label: t('menu.copyFileName'), icon: <FileText />, onSelect: () => void copyText(s.name) },
+    info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copyText(instancePath(info.dataDir, inst.id, `screenshots/${s.name}`)) },
+    '-',
+    { label: t('common.delete'), icon: <Trash2 />, danger: true, onSelect: () => setRemoving(s) }
+  ]
 
   return (
     <>
@@ -69,7 +91,7 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
       ) : (
         <div className="it-shots">
           {shots.map((s, i) => (
-            <div key={s.name} className="it-shot">
+            <div key={s.name} className="it-shot" onContextMenu={(e) => openContextMenu(e, menuFor(s, i))}>
               <button className="it-thumb" title={s.name} onClick={() => setViewing(i)}>
                 <Thumb instanceId={inst.id} shot={s} />
               </button>
@@ -104,6 +126,7 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
           onCopy={copy}
           onShow={show}
           onDelete={setRemoving}
+          menu={(s, i) => menuFor(s, i, true)}
         />
       )}
 
@@ -176,7 +199,8 @@ function Viewer({
   onClose,
   onCopy,
   onShow,
-  onDelete
+  onDelete,
+  menu
 }: {
   instanceId: string
   shots: ScreenshotInfo[]
@@ -186,6 +210,8 @@ function Viewer({
   onCopy: (s: ScreenshotInfo) => void
   onShow: (s: ScreenshotInfo) => void
   onDelete: (s: ScreenshotInfo) => void
+  /** Right-click on the picture. */
+  menu: (s: ScreenshotInfo, index: number) => ContextEntry[]
 }) {
   const shot = shots[index]
   const [full, setFull] = useState<{ name: string; src: string }>()
@@ -220,7 +246,7 @@ function Viewer({
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="it-viewer" role="dialog" aria-modal aria-label={shot.name} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
         <div className="it-viewer-stage" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-          {src ? <img src={src} alt={shot.name} /> : <Loader2 className="spin" />}
+          {src ? <img src={src} alt={shot.name} onContextMenu={(e) => openContextMenu(e, menu(shot, index))} /> : <Loader2 className="spin" />}
           {index > 0 && (
             <button className="btn icon it-viewer-nav prev" title={t('screenshots.viewer.previous')} onClick={() => onIndex(index - 1)}>
               <ChevronLeft />

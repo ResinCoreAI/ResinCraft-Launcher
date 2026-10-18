@@ -8,10 +8,12 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::dupes::{dedupe_pack, dep_facts, skipped_text, Guard, ModFacts};
 use super::index::{
     discard_instance, display_cmp, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, read_zip_text,
     remove_project_files, safe_name, save_index, ContentIndex, IndexEntry,
 };
+use super::jarmeta::RemoteFile;
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
@@ -112,6 +114,20 @@ struct MrProject {
     #[serde(default)]
     icon_url: Option<String>,
     project_type: String,
+    #[serde(default)]
+    slug: String,
+    #[serde(default)]
+    team: String,
+    #[serde(default)]
+    source_url: Option<String>,
+    #[serde(default)]
+    issues_url: Option<String>,
+}
+
+impl MrProject {
+    fn links(&self) -> Vec<String> {
+        [&self.source_url, &self.issues_url].into_iter().flatten().filter(|l| !l.is_empty()).cloned().collect()
+    }
 }
 
 fn kind_of(project_type: &str) -> Option<ContentKind> {
@@ -265,57 +281,91 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
     let project_id = project_id.to_string();
     Task::run(tr!("modrinth.installing", "Installing content"), Some(id), move |task| async move {
         let mut idx = load_index(&inst.id).await;
-        let mut installed: HashSet<String> = idx.values().map(|e| e.project_id.clone()).collect();
-        // Depth-first, like the recursive TypeScript version: (project, pinned version, is the root).
-        let mut stack: Vec<(String, Option<String>, bool)> = vec![(project_id, version_id, true)];
-        while let Some((pid, vid, root)) = stack.pop() {
-            if !root && installed.contains(&pid) {
-                continue;
-            }
-            let project = project(&pid).await?;
-            task.update(tr!("content.installingItem", "Installing {name}…", name = project.title), None);
-            let version = match &vid {
-                Some(v) => Some(version(v).await?),
-                None => project_versions(&pid, Some(&inst), Some(kind)).await?.into_iter().next(),
-            };
-            let Some(version) = version else {
-                if kind == ContentKind::Mod {
-                    bail_tr!(
-                        "modrinth.noVersionWithLoader",
-                        "{name} has no version for Minecraft {mc} with {loader}",
-                        name = project.title,
-                        mc = inst.mc_version,
-                        loader = inst.loader.as_str()
-                    );
-                }
-                bail_tr!("modrinth.noVersion", "{name} has no version for Minecraft {mc}", name = project.title, mc = inst.mc_version);
-            };
-            install_version(&inst, kind, &version, &project, &mut idx).await?;
-            installed.insert(project.id.clone());
-            // Pull in required dependencies we don't already have.
-            let mut deps = Vec::new();
-            for dep in &version.dependencies {
-                if dep.dependency_type != "required" {
-                    continue;
-                }
-                let mut dep_project = dep.project_id.clone();
-                if dep_project.is_none() {
-                    if let Some(v) = &dep.version_id {
-                        dep_project = Some(self::version(v).await?.project_id);
-                    }
-                }
-                let Some(dp) = dep_project else { continue };
-                if installed.contains(&dp) {
-                    continue;
-                }
-                deps.push((dp, dep.version_id.clone(), false));
-            }
-            // Reverse so the first dependency is visited first.
-            stack.extend(deps.into_iter().rev());
-        }
+        let mut guard = Guard::open(&inst, kind, &idx).await;
+        let res = install_into(&inst, &task, &mut idx, &mut guard, &project_id, kind, version_id).await;
+        guard.save().await;
+        res?;
         save_index(&inst.id, &idx).await
     })
     .await
+}
+
+/// Installs a project and the required dependencies the instance doesn't have yet, recording them in `idx`.
+/// A dependency the instance already has from CurseForge (see `guard`) is skipped rather than installed twice.
+pub(crate) async fn install_into(
+    inst: &Instance,
+    task: &Task,
+    idx: &mut ContentIndex,
+    guard: &mut Guard,
+    project_id: &str,
+    kind: ContentKind,
+    version_id: Option<String>,
+) -> Result<()> {
+    let mut installed: HashSet<String> = idx.values().map(|e| e.project_id.clone()).collect();
+    // Depth-first, like the recursive TypeScript version: (project, pinned version, is the root).
+    let mut stack: Vec<(String, Option<String>, bool)> = vec![(project_id.to_string(), version_id, true)];
+    while let Some((pid, vid, root)) = stack.pop() {
+        if !root && installed.contains(&pid) {
+            continue;
+        }
+        let project = project(&pid).await?;
+        task.update(tr!("content.installingItem", "Installing {name}…", name = project.title), None);
+        let version = match &vid {
+            Some(v) => Some(version(v).await?),
+            None => project_versions(&pid, Some(inst), Some(kind)).await?.into_iter().next(),
+        };
+        let Some(version) = version else {
+            if kind == ContentKind::Mod {
+                bail_tr!(
+                    "modrinth.noVersionWithLoader",
+                    "{name} has no version for Minecraft {mc} with {loader}",
+                    name = project.title,
+                    mc = inst.mc_version,
+                    loader = inst.loader.as_str()
+                );
+            }
+            bail_tr!("modrinth.noVersion", "{name} has no version for Minecraft {mc}", name = project.title, mc = inst.mc_version);
+        };
+        let mut facts = dep_facts(
+            project.id.clone(),
+            &project.title,
+            &project.slug,
+            vec![],
+            project.links(),
+            version.files.iter().map(|f| f.hashes.sha1.clone()).collect(),
+        );
+        if !root {
+            if let Some((copy, _)) = guard.copy_of(&mut facts).await {
+                task.update(skipped_text(&project.title, &copy), None);
+                installed.insert(project.id.clone());
+                continue;
+            }
+        }
+        install_version(inst, kind, &version, &project, idx).await?;
+        installed.insert(project.id.clone());
+        guard.add(facts);
+        // Pull in required dependencies we don't already have.
+        let mut deps = Vec::new();
+        for dep in &version.dependencies {
+            if dep.dependency_type != "required" {
+                continue;
+            }
+            let mut dep_project = dep.project_id.clone();
+            if dep_project.is_none() {
+                if let Some(v) = &dep.version_id {
+                    dep_project = Some(self::version(v).await?.project_id);
+                }
+            }
+            let Some(dp) = dep_project else { continue };
+            if installed.contains(&dp) {
+                continue;
+            }
+            deps.push((dp, dep.version_id.clone(), false));
+        }
+        // Reverse so the first dependency is visited first.
+        stack.extend(deps.into_iter().rev());
+    }
+    Ok(())
 }
 
 // ---------- Listing / toggling ----------
@@ -554,6 +604,7 @@ pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
 async fn fill_pack(inst: &Instance, pack: &PackIndex, file: &Path, task: &Arc<Task>) -> Result<()> {
     let dir = paths::game_dir(&inst.id);
     let mut items = Vec::new();
+    let mut listed = Vec::new();
     for f in pack.files.iter().filter(|f| f.env.as_ref().and_then(|e| e.client.as_deref()) != Some("unsupported")) {
         let url = f
             .downloads
@@ -561,12 +612,16 @@ async fn fill_pack(inst: &Instance, pack: &PackIndex, file: &Path, task: &Arc<Ta
             .find(|u| reqwest::Url::parse(u).ok().and_then(|x| x.host_str().map(|h| PACK_HOSTS.contains(&h))).unwrap_or(false))
             .ok_or_else(|| err_tr!("modrinth.untrustedHost", "Modpack file {path} comes from an untrusted host", path = f.path))?;
         items.push(DownloadItem::new(url, safe_join(&dir, &f.path)?).hash(Some(Hash::sha1(&f.hashes.sha1))).size(f.file_size));
+        listed.extend(f.path.strip_prefix("mods/").filter(|n| !n.contains('/')).map(str::to_string));
     }
     download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
 
     task.update(tr!("modpack.applyingSettings", "Applying modpack settings…"), None);
     let (file, dir) = (file.to_path_buf(), dir.clone());
-    tokio::task::spawn_blocking(move || extract_overrides(&file, &["overrides/".into(), "client-overrides/".into()], &dir)).await?
+    tokio::task::spawn_blocking(move || extract_overrides(&file, &["overrides/".into(), "client-overrides/".into()], &dir)).await??;
+    // The overrides may hold another copy of a listed mod.
+    dedupe_pack(inst, task, &listed).await;
+    Ok(())
 }
 
 pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Result<Instance> {
@@ -607,6 +662,54 @@ pub async fn lookup_hashes(sha1s: &[String]) -> Result<HashMap<String, HashHit>>
     for (sha1, v) in found {
         if let Some(f) = v.files.iter().find(|x| x.hashes.sha1 == sha1) {
             out.insert(sha1.clone(), HashHit { url: f.url.clone(), sha512: f.hashes.sha512.clone(), size: f.size });
+        }
+    }
+    Ok(out)
+}
+
+/// Which Modrinth project publishes each of these files (by SHA-1). Unknown hashes are left out.
+pub(crate) async fn projects_by_sha1(sha1s: &[String]) -> Result<HashMap<String, String>> {
+    let mut out = HashMap::new();
+    for chunk in sha1s.chunks(500) {
+        let found: HashMap<String, MrVersion> = post_json(&format!("{API}/version_files"), &json!({ "hashes": chunk, "algorithm": "sha1" })).await?;
+        out.extend(found.into_iter().map(|(h, v)| (h, v.project_id)));
+    }
+    Ok(out)
+}
+
+/// The file installing `project_id` into `inst` would download (`version_id`, else the newest compatible version).
+pub(crate) async fn planned_file(inst: &Instance, project_id: &str, kind: ContentKind, version_id: Option<&str>) -> Result<Option<RemoteFile>> {
+    let v = match version_id {
+        Some(v) => Some(version(v).await?),
+        None => project_versions(project_id, Some(inst), Some(kind)).await?.into_iter().next(),
+    };
+    Ok(v.and_then(|v| v.files.iter().find(|f| f.primary).or(v.files.first()).map(|f| RemoteFile { url: f.url.clone(), size: Some(f.size) })))
+}
+
+/// Names, slugs, links and team members of Modrinth projects, for spotting the same mod on CurseForge.
+pub(crate) async fn facts(ids: &[String]) -> Result<Vec<ModFacts>> {
+    #[derive(Deserialize)]
+    struct User {
+        username: String,
+    }
+    #[derive(Deserialize)]
+    struct Member {
+        team_id: String,
+        user: User,
+    }
+    let mut out = Vec::new();
+    for chunk in ids.chunks(100) {
+        let projects: Vec<MrProject> = fetch_json(&format!("{API}/projects?ids={}", enc(&serde_json::to_string(chunk)?))).await?;
+        let teams: Vec<&String> = projects.iter().map(|p| &p.team).filter(|t| !t.is_empty()).collect::<HashSet<_>>().into_iter().collect();
+        // Authors are a nice-to-have: without them, matching falls back to links, slugs and files.
+        let members: Vec<Vec<Member>> = if teams.is_empty() {
+            vec![]
+        } else {
+            fetch_json(&format!("{API}/teams?ids={}", enc(&serde_json::to_string(&teams)?))).await.unwrap_or_default()
+        };
+        for p in projects {
+            let authors = members.iter().flatten().filter(|m| m.team_id == p.team).map(|m| m.user.username.clone()).collect();
+            out.push(dep_facts(p.id.clone(), &p.title, &p.slug, authors, p.links(), vec![]));
         }
     }
     Ok(out)

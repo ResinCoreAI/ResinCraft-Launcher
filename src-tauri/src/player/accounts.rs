@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use crate::core::ctx::{ctx, http};
+use crate::core::ctx::http;
 use crate::core::events::emit;
 use crate::core::fsutil::{now_ms, read_json, write_json};
 use crate::core::net::{body_of, send_json, status_of, HttpError};
@@ -499,11 +499,7 @@ pub async fn add_offline_account(username: &str) -> Result<AccountView> {
     if !NAME.get_or_init(|| Regex::new("^[A-Za-z0-9_]{3,16}$").unwrap()).is_match(name) {
         bail_tr!("accounts.badUsername", "Usernames are 3–16 characters: letters, numbers and _");
     }
-    // Like Prism, offline play is only for people who own the game. Dev builds skip this so the
-    // launcher can be tested before Mojang approves the Azure app.
-    if !ctx().dev && !load().await.iter().any(|a| a.kind == "msa") {
-        bail_tr!("accounts.offlineNeedsMsa", "Add a Microsoft account that owns Minecraft before creating offline profiles.");
-    }
+    // Offline profiles don't need a Microsoft account first (the owner's choice).
     let acc = upsert(StoredAccount {
         id: uuid::Uuid::new_v4().to_string(),
         kind: "offline".into(),
@@ -542,6 +538,33 @@ async fn fresh_token(mut acc: StoredAccount, force: bool) -> Result<(StoredAccou
     }
     let token = unseal(acc.mc_token.as_deref()).map_err(|_| sign_in_again(&acc))?;
     Ok((acc, token))
+}
+
+// ---------- ResinCraft Relay (see `server::relay`) ----------
+
+/// A signed-in Microsoft account, for signing in to ResinCraft Relay.
+#[derive(Debug, Clone)]
+pub struct MicrosoftAccount {
+    pub id: String,
+    pub uuid: String,
+    pub username: String,
+}
+
+/// The Microsoft account the relay uses: `preferred` (a UUID, the account a server's name belongs to) while
+/// it's still signed in, else the active account if it's a Microsoft one, else the first Microsoft account.
+pub async fn microsoft_account(preferred: Option<&str>) -> Option<MicrosoftAccount> {
+    let list: Vec<StoredAccount> = load().await.into_iter().filter(|a| a.kind == "msa" && !is_unreadable(a.refresh_token.as_deref())).collect();
+    let same = |a: &&StoredAccount, uuid: &str| a.uuid.replace('-', "").eq_ignore_ascii_case(&uuid.replace('-', ""));
+    let acc = preferred
+        .and_then(|p| list.iter().find(|a| same(a, p)))
+        .or_else(|| list.iter().find(|a| a.active))
+        .or_else(|| list.first())?;
+    Some(MicrosoftAccount { id: acc.id.clone(), uuid: acc.uuid.clone(), username: acc.username.clone() })
+}
+
+/// A fresh Minecraft services token for a Microsoft account (`force`: refresh even if it looks valid).
+pub async fn microsoft_token(id: &str, force: bool) -> Result<String> {
+    minecraft_token(id, force).await
 }
 
 // ---------- Profile changes (see `player::profile`) ----------

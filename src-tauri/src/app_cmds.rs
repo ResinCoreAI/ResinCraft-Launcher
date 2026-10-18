@@ -41,6 +41,17 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "instances:create" => json(instances::create(args.get::<NewInstance>(0)?, |_| {}).await?),
         "instances:update" => json(instances::update(&args.get::<String>(0)?, args.raw(1)).await?),
         "instances:duplicate" => json(instances::duplicate(&args.get::<String>(0)?).await?),
+        "instances:setImage" => {
+            let id: String = args.get(0)?;
+            crate::player::files::instance_root(&id).await?;
+            let kind = crate::core::art::Kind::parse(&args.get::<String>(1)?)?;
+            json(crate::core::art::set_image(&id, kind, args.get::<Option<String>>(2)?).await?)
+        }
+        "instances:resetIcon" => {
+            let id: String = args.get(0)?;
+            crate::player::files::instance_root(&id).await?;
+            json(instances::reset_icon(&id).await?)
+        }
         "instances:remove" => {
             let id: String = args.get(0)?;
             if crate::game::running_ids().contains(&id) {

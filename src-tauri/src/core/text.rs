@@ -14,7 +14,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Text {
     /// Stable id without the UI's `engine.` prefix; empty for text that isn't translatable.
     pub key: String,

@@ -119,8 +119,12 @@ pub struct Instance {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loader_version: Option<String>,
     pub color: String,
+    /// A web URL (modpack icon) or, for a custom icon picked from a screenshot, a data URL of `icon.png`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_url: Option<String>,
+    /// The modpack's own icon while a custom one replaces it, so resetting the icon brings it back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pack_icon_url: Option<String>,
     pub created_at: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_played: Option<i64>,
@@ -139,6 +143,9 @@ pub struct Instance {
     /// Library group (like Prism's instance groups); None = Ungrouped.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
+    /// A data URL of banner.jpg (16:9), shown on Library cards and the instance page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub banner_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -633,15 +640,24 @@ pub struct ServerMeta {
     /// Keep the domain's DNS records up to date through the Cloudflare API (token kept apart, sealed).
     #[serde(default)]
     pub dns_auto: bool,
+    /// The server's ResinCraft Relay name (friends join `<name>.<relay domain>`), once chosen or reserved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_name: Option<String>,
+    /// The Minecraft account (UUID) that name is reserved for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_account: Option<String>,
 }
 
-/// How a public server reaches the internet. The relay (bore.pub or `relay_host`) is always the last resort.
+/// How a public server reaches the internet. The bore relay (bore.pub or `relay_host`) is always the last resort.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TunnelMode {
-    /// Open the port on the router (UPnP, direct), else the relay.
+    /// Open the port on the router (UPnP, direct), else ResinCraft Relay (with a Microsoft account), else
+    /// playit.gg (once linked), else the bore relay.
     #[default]
     Auto,
+    /// ResinCraft Relay: `<name>.rscraft.resincore.tech`, stable, needs a Microsoft account; else the bore relay.
+    Resin,
     /// playit.gg: a stable *.joinmc.link address after linking a playit account once, else the relay.
     Playit,
     /// Always the relay.
@@ -661,9 +677,13 @@ pub struct ServerNet {
     pub address: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// "router" (port opened with UPnP, direct), "playit" (playit.gg) or "relay" (public relay, no setup).
+    /// "router" (port opened with UPnP, direct), "resin" (ResinCraft Relay), "playit" (playit.gg), "relay"
+    /// (the bore relay, no setup) or "manual" (the player's own port forward).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub via: Option<&'static str>,
+    /// `error` as translatable text, when it is one (the UI shows this instead).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_text: Option<Text>,
     /// While opening through playit.gg for the first time: the page where the player links this launcher.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_url: Option<String>,
@@ -673,17 +693,71 @@ pub struct ServerNet {
     /// Automatic fell back to the relay because playit.gg isn't linked yet: suggest linking it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub playit_hint: bool,
+    /// ResinCraft Relay: the name, traffic and connection state while `via` is "resin", or why it wasn't used
+    /// when another route took over.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resin: Option<ResinNet>,
+    /// Automatic skipped ResinCraft Relay because no Microsoft account is signed in: suggest signing in.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub resin_hint: bool,
+}
+
+/// ResinCraft Relay's part of a server's internet state.
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ResinNet {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The connection to the relay dropped; reconnecting (the address stays the same).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub reconnecting: bool,
+    /// The account's relay traffic this month, and the monthly limit (0: none).
+    pub used_bytes: u64,
+    pub limit_bytes: u64,
+    /// Why ResinCraft Relay wasn't used (another route took over).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Text>,
+}
+
+/// The ResinCraft Relay part of a server's Settings, before asking the relay anything.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayInfo {
+    /// This build includes a relay.
+    pub available: bool,
+    /// Its base domain, e.g. "rscraft.resincore.tech".
+    pub domain: String,
+    /// The Microsoft account it would use (None: none signed in).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
+    /// The server's name, once chosen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// A name made from the server's name, for an empty field.
+    pub suggested: String,
+}
+
+/// Whether a ResinCraft Relay name can be used.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayNameCheck {
+    pub name: String,
+    pub available: bool,
+    /// Already reserved for this account.
+    pub mine: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<Text>,
 }
 
 /// A DNS record the player should have for their domain.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsRecord {
-    /// "A" | "AAAA" | "SRV"
+    /// "A" | "AAAA" | "CNAME" | "SRV"
     pub kind: &'static str,
     /// The full record name, e.g. "play.example.com" or "_minecraft._tcp.play.example.com".
     pub name: String,
-    /// A/AAAA: the IP address. SRV: the target host.
+    /// A/AAAA: the IP address. CNAME, SRV: the target host.
     pub value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
@@ -721,9 +795,12 @@ pub struct DnsCheck {
 pub struct DomainInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain: Option<String>,
-    /// How the server is reached right now: "direct" | "playit" | "relay" | "none" (not running or no address).
+    /// How the server is reached right now: "direct" | "resin" | "playit" | "relay" | "none" (not running or no address).
     pub route: &'static str,
     pub records: Vec<DnsRecord>,
+    /// Records that work instead of `records` (ResinCraft Relay: an SRV record, for a domain without a subdomain).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub alt_records: Vec<DnsRecord>,
     /// Direct route only: the line players can put in their own device's hosts file instead of DNS.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hosts_line: Option<String>,
@@ -856,4 +933,36 @@ pub struct ServerAddonHit {
 pub struct ServerAddonResult {
     pub hits: Vec<ServerAddonHit>,
     pub total: u64,
+}
+
+/// An installed plugin or mod on a hosted server, with where it came from and any change waiting for a restart.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerAddon {
+    #[serde(flatten)]
+    pub item: ContentItem,
+    /// "modrinth" | "hangar" | "spigot" | "curseforge"; None = unknown source (no updates).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<&'static str>,
+    /// A change queued until the server stops: "update" | "enable" | "disable" | "remove".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending: Option<&'static str>,
+    /// For a queued update: the version it switches to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending_version: Option<String>,
+    /// Release notes of the available update (set by an update check).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub update_url: Option<String>,
+}
+
+/// One version of a server plugin or mod, marked for whether it fits the server.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerAddonVersion {
+    #[serde(flatten)]
+    pub version: ProjectVersion,
+    /// Made for this server's Minecraft version and platform/loader.
+    pub compatible: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changelog_url: Option<String>,
 }

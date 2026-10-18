@@ -37,7 +37,10 @@ export interface Instance {
   loader: LoaderType
   loaderVersion?: string
   color: string
+  /** A modpack's icon, or a data URL for a custom icon picked from a screenshot. */
   iconUrl?: string
+  /** The modpack's own icon while a custom one replaces it (instances.resetIcon brings it back). */
+  packIconUrl?: string
   createdAt: number
   lastPlayed?: number
   /** Total play time in seconds. */
@@ -49,7 +52,11 @@ export interface Instance {
   pendingDownloads?: PendingDownload[]
   /** Library group (like Prism's instance groups); none = Ungrouped. */
   group?: string
+  /** A data URL of the 16:9 banner (banner.jpg), shown on Library cards and the instance page. */
+  bannerUrl?: string
 }
+
+export type InstanceImage = 'icon' | 'banner'
 
 export interface NewInstance {
   name: string
@@ -163,6 +170,42 @@ export interface Settings {
   curseforgeKey: string
   concurrency: number
   showSnapshots: boolean
+  /** Install a new ResinCraft version by itself when the launcher starts. */
+  autoUpdate: boolean
+  /** Which site wins when a mod is on both Modrinth and CurseForge ('ask' shows the duplicate dialog). */
+  preferredModSource: ModSourcePreference
+}
+
+export type ModSourcePreference = 'ask' | 'modrinth' | 'curseforge'
+
+/** A newer ResinCraft that can be installed. */
+export interface UpdateAvailable {
+  version: string
+  notes?: string
+  /** Release date (RFC 3339). */
+  date?: string
+  /** The release page with the full notes. */
+  notesUrl: string
+}
+
+/** Games and hosted servers (their names) that installing an update would cut off. */
+export interface UpdateBlockers {
+  games: string[]
+  servers: string[]
+}
+
+/** Where ResinCraft's own update stands (Settings → Updates and the update banner). */
+export interface UpdateStatus {
+  /** The running version. */
+  current: string
+  state: 'idle' | 'checking' | 'downloading' | 'waiting' | 'installing'
+  /** When the last check finished (ms since 1970). */
+  lastChecked?: number
+  available?: UpdateAvailable
+  /** Why the last check or install didn't work. */
+  error?: EngineText
+  /** While waiting to install: what is still running. */
+  waitingFor?: UpdateBlockers
 }
 
 export interface AppInfo {
@@ -273,6 +316,47 @@ export interface ContentItem {
   update?: { versionId: string; versionNumber: string }
 }
 
+/** A project picked in Discover, as the duplicate check and batch installs need it. */
+export interface ModPick {
+  id: string
+  kind: ContentKind
+  title: string
+  author: string
+  slug: string
+  /** A specific version; the latest compatible one when missing. */
+  versionId?: string
+}
+
+/** Why two listings look like the same mod: the same file, mod id inside the jar, source repository, name + author, or slug. */
+export type DuplicateReason = 'hash' | 'modid' | 'link' | 'name' | 'slug'
+
+export interface DuplicateCheck {
+  /** Picks that are the same mod from different sites (pick ids). */
+  groups: { ids: string[]; reason: DuplicateReason }[]
+  /**
+   * Picks the instance already has from another site (installed by ResinCraft or dropped in by hand), or as a jar
+   * neither site knows with the same mod id inside (`projectId` is then empty).
+   */
+  installed: { id: string; kind: ContentKind; filename: string; projectId: string; title: string; versionNumber?: string; reason: DuplicateReason }[]
+}
+
+/** A new modpack instance, plus the extra copies removed of mods the pack had twice (listed and in its overrides…). */
+export interface InstalledPack extends Instance {
+  duplicatesRemoved?: { filename: string; kept: string; title: string }[]
+}
+
+/** An installed file to move to the Recycle Bin before a batch install (another site's copy replaces it). */
+export interface ContentFileRef {
+  kind: ContentKind
+  filename: string
+}
+
+export interface InstallManyResult {
+  installed: string[]
+  /** `error` is shaped like a rejected engine call ({message, key?, params?}). */
+  failed: { id: string; error: unknown }[]
+}
+
 export type PackFormat = 'mrpack' | 'curseforge'
 
 /** A top-level file or folder in an instance that can be bundled into an exported pack. */
@@ -357,8 +441,12 @@ export interface ScreenshotInfo {
 // ---------- Server hosting ----------
 
 export type ServerKind = 'vanilla' | 'paper' | 'purpur' | 'folia' | 'spigot' | 'fabric' | 'quilt' | 'forge' | 'neoforge'
-/** 'auto': the router (UPnP), else the relay. 'playit': playit.gg, else the relay. 'relay': always the relay. */
-export type ServerTunnel = 'auto' | 'playit' | 'relay' | 'manual'
+/**
+ * 'auto': the router (UPnP), else ResinCraft Relay (with a Microsoft account), else playit.gg (once linked), else the
+ * bore relay. 'resin': ResinCraft Relay (name.rscraft.resincore.tech). 'playit': playit.gg. 'relay': the bore relay.
+ * 'manual': the player's own port forward.
+ */
+export type ServerTunnel = 'auto' | 'resin' | 'playit' | 'relay' | 'manual'
 export type ServerState = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed'
 
 /** Internet access for a running server: the port opened on the router automatically (UPnP). */
@@ -367,19 +455,59 @@ export interface ServerNet {
   /** Public "ip:port" to share once the router opened the port. */
   address?: string
   error?: string
-  /** 'router': port opened with UPnP (direct). 'playit': playit.gg (stable address). 'relay': a bore relay (no setup). */
-  via?: 'router' | 'playit' | 'relay' | 'manual'
+  /** `error` as translatable text, when it is one (shown instead of `error`). */
+  errorText?: EngineText
+  /** 'router': port opened with UPnP (direct). 'resin': ResinCraft Relay (stable name). 'playit': playit.gg (stable address). 'relay': a bore relay (no setup). */
+  via?: 'router' | 'resin' | 'playit' | 'relay' | 'manual'
   /** While opening through playit.gg the first time: the page where the player links ResinCraft. */
   claimUrl?: string
   /** Whether the server's own domain points at this address (absent: no domain, or not checked yet). */
   domainOk?: boolean
   /** Automatic fell back to the relay because playit.gg isn't linked yet: suggest linking it. */
   playitHint?: boolean
+  /** ResinCraft Relay: name, traffic and reconnecting while `via` is 'resin', or why it wasn't used. */
+  resin?: ResinNet
+  /** Automatic skipped ResinCraft Relay because no Microsoft account is signed in: suggest signing in. */
+  resinHint?: boolean
+}
+
+/** ResinCraft Relay's part of a server's internet state. */
+export interface ResinNet {
+  name?: string
+  /** The connection to the relay dropped; reconnecting (the address stays the same). */
+  reconnecting?: boolean
+  /** The account's relay traffic this month, and the monthly limit (0: none). */
+  usedBytes: number
+  limitBytes: number
+  /** Why ResinCraft Relay wasn't used (another route took over). */
+  error?: EngineText
+}
+
+/** The ResinCraft Relay part of a server's Settings. */
+export interface RelayInfo {
+  /** This build includes a relay. */
+  available: boolean
+  /** Its base domain, e.g. "rscraft.resincore.tech". */
+  domain: string
+  /** The Microsoft account it would use (absent: none signed in). */
+  account?: string
+  /** The server's name, once chosen. */
+  name?: string
+  /** A name made from the server's name. */
+  suggested: string
+}
+
+export interface RelayNameCheck {
+  name: string
+  available: boolean
+  /** Already reserved for this account. */
+  mine: boolean
+  reason?: EngineText
 }
 
 /** A DNS record the player should have for their own domain. */
 export interface DnsRecord {
-  kind: 'A' | 'AAAA' | 'SRV'
+  kind: 'A' | 'AAAA' | 'CNAME' | 'SRV'
   /** Full name, e.g. "play.example.com" or "_minecraft._tcp.play.example.com". */
   name: string
   /** A/AAAA: the IP. SRV: the target host. */
@@ -401,8 +529,10 @@ export interface DnsCheck {
 /** The server's own domain: the records for its current route, the last check and Cloudflare automation. */
 export interface DomainInfo {
   domain?: string
-  route: 'direct' | 'playit' | 'relay' | 'none'
+  route: 'direct' | 'resin' | 'playit' | 'relay' | 'none'
   records: DnsRecord[]
+  /** Records that work instead (ResinCraft Relay: an SRV record, for a domain without a subdomain). */
+  altRecords?: DnsRecord[]
   /** Direct route: a hosts-file line players can use on their own device instead of DNS. */
   hostsLine?: string
   /** playit.gg on a guest account: the address may change. */
@@ -442,6 +572,9 @@ export interface ServerInfo {
   /** The player's own domain for this server (normalised), and Cloudflare DNS automation. */
   domain?: string
   dnsAuto: boolean
+  /** The server's ResinCraft Relay name (friends join name.rscraft.resincore.tech), and the account it belongs to. */
+  relayName?: string
+  relayAccount?: string
   eulaAccepted: boolean
   state: ServerState
   players: string[]
@@ -524,6 +657,24 @@ export interface ServerAddonResult {
   total: number
 }
 
+/** An installed plugin or mod on a server. */
+export interface ServerAddon extends ContentItem {
+  /** Where the jar came from; missing = unknown source (no version picker or updates). */
+  source?: AddonSource
+  /** A change waiting for the server to stop (Java keeps its jars open while it runs). */
+  pending?: 'update' | 'enable' | 'disable' | 'remove'
+  /** For a queued update: the version it switches to. */
+  pendingVersion?: string
+  /** Release notes of the available update (after an update check). */
+  updateUrl?: string
+}
+
+/** A version of a server plugin or mod, marked for whether it fits the server. */
+export interface ServerAddonVersion extends ProjectVersion {
+  compatible: boolean
+  changelogUrl?: string
+}
+
 // ---------- File manager ----------
 
 /** Whose files: an instance's game folder or a hosted server's folder. */
@@ -575,6 +726,17 @@ export interface ResinApi {
     get(): Promise<Settings>
     set(patch: Partial<Settings>): Promise<Settings>
   }
+  /** ResinCraft's own updates. */
+  update: {
+    status(): Promise<UpdateStatus>
+    /** Asks the update server; network problems come back as `error`, not as a rejection. */
+    check(): Promise<UpdateStatus>
+    blockers(): Promise<UpdateBlockers>
+    /** Downloads and installs the found update (the app restarts). `waitForStop`: install once games and servers stop. */
+    install(waitForStop?: boolean): Promise<void>
+    /** Stops waiting for games and servers. */
+    cancel(): Promise<void>
+  }
   versions: {
     list(): Promise<McVersion[]>
     loaders(loader: LoaderType, mcVersion: string): Promise<LoaderVersion[]>
@@ -584,6 +746,10 @@ export interface ResinApi {
     create(data: NewInstance): Promise<Instance>
     update(id: string, patch: InstancePatch): Promise<Instance>
     duplicate(id: string): Promise<Instance>
+    /** Drops a custom icon (see screenshots.setIcon): back to the modpack's icon, or the generated block art. */
+    resetIcon(id: string): Promise<Instance>
+    /** Sets a picture the player chose (a cropped image as a data URL), or removes it with null. */
+    setImage(id: string, kind: InstanceImage, dataUrl: string | null): Promise<Instance>
     remove(id: string): Promise<void>
     openFolder(id: string, sub?: string): Promise<void>
     launch(id: string): Promise<void>
@@ -614,16 +780,20 @@ export interface ResinApi {
     search(q: SearchQuery): Promise<SearchResult>
     versions(projectId: string, instanceId?: string): Promise<ProjectVersion[]>
     install(instanceId: string, projectId: string, kind: ContentKind, versionId?: string): Promise<void>
+    /** Which picks are the same mod from two sites, and which the instance already has from another site. */
+    duplicates(instanceId: string, picks: ModPick[]): Promise<DuplicateCheck>
+    /** Installs picks in one task, each from its own site, after moving `replace` to the Recycle Bin. */
+    installMany(instanceId: string, picks: ModPick[], replace?: ContentFileRef[]): Promise<InstallManyResult>
     list(instanceId: string, kind: ContentKind): Promise<ContentItem[]>
     toggle(instanceId: string, kind: ContentKind, filename: string): Promise<void>
     remove(instanceId: string, kind: ContentKind, filename: string): Promise<void>
     checkUpdates(instanceId: string): Promise<ContentItem[]>
     update(instanceId: string, filename: string): Promise<void>
     changeVersion(instanceId: string, kind: ContentKind, filename: string, versionId: string): Promise<void>
-    installModpack(projectId: string, versionId?: string): Promise<Instance>
+    installModpack(projectId: string, versionId?: string): Promise<InstalledPack>
     /** Opens a file picker for a .mrpack or CurseForge .zip; null if cancelled. */
-    importModpack(): Promise<Instance | null>
-    importModpackFile(path: string): Promise<Instance>
+    importModpack(): Promise<InstalledPack | null>
+    importModpackFile(path: string): Promise<InstalledPack>
     exportPreview(instanceId: string): Promise<ExportEntry[]>
     /** Asks where to save, then writes the pack; null if cancelled. */
     exportModpack(instanceId: string, options: ExportOptions): Promise<ExportResult | null>
@@ -658,6 +828,8 @@ export interface ResinApi {
     copy(instanceId: string, name: string): Promise<void>
     show(instanceId: string, name: string): Promise<void>
     remove(instanceId: string, name: string): Promise<void>
+    /** Makes the screenshot's middle square the instance icon (`iconUrl` becomes a data URL, see hasCustomIcon). */
+    setIcon(instanceId: string, name: string): Promise<Instance>
   }
   server: {
     list(): Promise<ServerInfo[]>
@@ -687,13 +859,26 @@ export interface ResinApi {
     /** Zips the world into the server's backups folder; returns the zip path. */
     backup(id: string): Promise<string>
     addonSources(id: string): Promise<AddonSource[]>
-    addons(id: string): Promise<ContentItem[]>
+    addons(id: string): Promise<ServerAddon[]>
     addonSearch(id: string, query: string, source: AddonSource, offset?: number): Promise<ServerAddonResult>
-    addonVersions(id: string, projectId: string): Promise<ProjectVersion[]>
+    /** Every version of an installed project, newest first, marked compatible or not. */
+    addonVersions(id: string, projectId: string): Promise<ServerAddonVersion[]>
+    /** Switches a jar to another version (keeping it enabled/disabled). True = queued until the server stops. */
+    addonChangeVersion(id: string, filename: string, versionId: string): Promise<boolean>
+    /** The installed list with `update` set where a newer compatible version exists. */
+    addonCheckUpdates(id: string): Promise<ServerAddon[]>
+    /** Drops a change queued for when the server stops. */
+    addonCancelPending(id: string, filename: string): Promise<void>
     addonInstall(id: string, projectId: string, versionId?: string): Promise<void>
     addonToggle(id: string, filename: string): Promise<void>
     addonRemove(id: string, filename: string): Promise<void>
     network(): Promise<{ lanIp: string | null }>
+    /** ResinCraft Relay for this server: whether it's available, the account it uses and the name. */
+    relayInfo(id: string): Promise<RelayInfo>
+    /** Asks the relay whether a name is free (or already this account's). */
+    relayCheck(id: string, name: string): Promise<RelayNameCheck>
+    /** Reserves a name for the server (freeing its old one) and saves it. */
+    relayName(id: string, name: string): Promise<ServerInfo>
     /** The server's own domain: records for its current route and the last DNS check. */
     domain(id: string): Promise<DomainInfo>
     /** Checks the domain against a public DNS resolver now. */
@@ -729,5 +914,6 @@ export interface ResinApi {
     login(cb: (e: LoginEvent) => void): () => void
     server(cb: (e: ServerEvent) => void): () => void
     serverLog(cb: (e: ServerLogEvent) => void): () => void
+    update(cb: (s: UpdateStatus) => void): () => void
   }
 }

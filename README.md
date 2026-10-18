@@ -37,6 +37,7 @@ npm run dev:tauri
 - `npm run build:tauri` builds a release installer (NSIS) into `src-tauri/target/release/bundle/`.
 - Engine layout: `src-tauri/src/core` (context, events/tasks, downloads, paths, settings, instances, IPC router), `game` (versions, loaders, Java, launching), `content` (Modrinth, CurseForge, FTB, ATLauncher, Technic, import/export), `player` (accounts, worlds, servers, screenshots, notes).
 - Headless checks: `cargo run --example smoke -- 1.21.1 fabric`, `cargo run --example check_content`, `cargo run --example check_player` (run inside `src-tauri/`).
+- ResinCraft Relay (`relay/`, friends join hosted servers as `<name>.rscraft.resincore.tech`): `cargo test` inside `relay/`, and `cargo run --example check_relay` inside `src-tauri/` runs the relay locally with a real vanilla server and a headless Minecraft client. Deployment: [relay/README.md](relay/README.md).
 
 ### Electron (current release build)
 
@@ -91,7 +92,32 @@ scripts/smoke.ts       Headless launch test
 - World, screenshot and server-list management
 - Modpack export (`.mrpack`)
 - Skin changer
-- Auto-update for the launcher itself
+
+## Updates
+
+Installed copies update themselves with Tauri's updater (`src-tauri/src/updater.rs`, UI in `src/renderer/src/components/Updates.tsx`): a quiet check when ResinCraft starts and every 6 hours, a small "ResinCraft x.y is ready to install" banner (Update now / Release notes / Later), and **Settings → Updates** (check now, last checked, "Install updates automatically", release notes). The update file is the release's NSIS installer itself (`bundle.createUpdaterArtifacts`). It is checked against the public key in `tauri.conf.json` (and must carry the version it was signed for, `requireSignedVersion`, so a tampered latest.json can't pass off an older release as new), then runs in passive mode: it replaces the program files only, so `%APPDATA%\ResinCraft Launcher` (instances, accounts, settings) stays, and the new version starts by itself. If a game or a hosted server is running, ResinCraft offers to wait until they stop.
+
+Where it looks (`plugins.updater.endpoints`): `https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest/download/latest.json`, the `latest.json` of the newest published GitHub release. `/releases/latest` skips drafts and pre-releases, so a release reaches players only once its draft is published.
+
+**Signing key.** `updater.local.key` (the private key, password-protected) and `updater.local.env` (its password) sit next to `keys.local.env` and are git-ignored. **Back both up**: installed copies only accept updates signed with this key. CI reads them from the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; locally, export them before `npm run build:tauri`:
+
+```bash
+set -a; . ./updater.local.env; set +a; export TAURI_SIGNING_PRIVATE_KEY="$PWD/updater.local.key"
+```
+
+**Releasing an update.**
+
+1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
+2. Push a tag (`git tag v0.3.0 && git push origin v0.3.0`). CI makes a draft release with `ResinCraft.Launcher_<version>_x64-setup.exe`, its `.sig` and `latest.json`.
+3. Publish the draft on GitHub. That is the rollout: players get it at their next check (start, or within 6 hours).
+
+**Testing an update locally.** Build an older and a newer copy under a separate name, so the test never touches a real install or its data (`RESINCRAFT_DATA_FOLDER` is read at build time):
+
+```bash
+RESINCRAFT_DATA_FOLDER="ResinCraft Update Test" npx tauri build --config update-test.json
+```
+
+with `update-test.json` setting `productName`, `mainBinaryName`, `identifier`, `version`, and `plugins.updater` = `{ "endpoints": ["http://127.0.0.1:18765/latest.json"], "dangerousInsecureTransportProtocol": true }`. Install the older one, put the newer setup.exe and a `latest.json` (version, url, and the `.sig` text as `signature`) in a folder served on that port, and start the older copy.
 
 ## Code signing (Windows "Publisher: unverified")
 

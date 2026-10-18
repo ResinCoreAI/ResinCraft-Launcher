@@ -24,12 +24,21 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       pathForFile
     },
     settings: { get: fn('settings:get'), set: fn('settings:set') },
+    update: {
+      status: fn('update:status'),
+      check: fn('update:check'),
+      blockers: fn('update:blockers'),
+      install: fn('update:install'),
+      cancel: fn('update:cancel')
+    },
     versions: { list: fn('versions:list'), loaders: fn('versions:loaders') },
     instances: {
       list: fn('instances:list'),
       create: fn('instances:create'),
       update: fn('instances:update'),
       duplicate: fn('instances:duplicate'),
+      resetIcon: fn('instances:resetIcon'),
+      setImage: fn('instances:setImage'),
       remove: fn('instances:remove'),
       openFolder: fn('instances:openFolder'),
       launch: fn('instances:launch'),
@@ -56,6 +65,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       search: fn('content:search'),
       versions: fn('content:versions'),
       install: fn('content:install'),
+      duplicates: fn('content:duplicates'),
+      installMany: fn('content:installMany'),
       list: fn('content:list'),
       toggle: fn('content:toggle'),
       remove: fn('content:remove'),
@@ -84,7 +95,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       image: fn('screenshots:image'),
       copy: fn('screenshots:copy'),
       show: fn('screenshots:show'),
-      remove: fn('screenshots:remove')
+      remove: fn('screenshots:remove'),
+      setIcon: fn('screenshots:setIcon')
     },
     server: {
       list: fn('server:list'),
@@ -111,10 +123,16 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       addons: fn('server:addons'),
       addonSearch: fn('server:addonSearch'),
       addonVersions: fn('server:addonVersions'),
+      addonChangeVersion: fn('server:addonChangeVersion'),
+      addonCheckUpdates: fn('server:addonCheckUpdates'),
+      addonCancelPending: fn('server:addonCancelPending'),
       addonInstall: fn('server:addonInstall'),
       addonToggle: fn('server:addonToggle'),
       addonRemove: fn('server:addonRemove'),
       network: fn('server:network'),
+      relayInfo: fn('server:relayInfo'),
+      relayCheck: fn('server:relayCheck'),
+      relayName: fn('server:relayName'),
       domain: fn('server:domain'),
       checkDns: fn('server:checkDns'),
       setDnsToken: fn('server:setDnsToken'),
@@ -132,6 +150,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       trash: fn('files:trash'),
       reveal: fn('files:reveal')
     },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), update: on('update') }
   } as ResinApi
 }

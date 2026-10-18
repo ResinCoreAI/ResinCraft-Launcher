@@ -26,6 +26,7 @@ import '@fontsource/ibm-plex-sans/vietnamese-600.css'
 import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-500.css'
 import './styles.css'
+import './playful.css'
 import './i18n/fonts.css'
 
 /** Follows the Language setting; the whole UI re-renders in the new language when it changes. */

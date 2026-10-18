@@ -1,0 +1,16 @@
+{
+  "name": "resincraft-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Website for ResinCraft Launcher (static export)",
+  "scripts": {
+    "dev": "next dev -p 7811",
+    "build": "next build",
+    "start": "npx serve out -l 7811"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

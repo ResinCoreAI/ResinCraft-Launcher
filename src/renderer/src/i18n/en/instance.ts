@@ -162,6 +162,9 @@ export default {
   'versionPicker.type.beta': 'beta',
   'versionPicker.type.alpha': 'alpha',
   'versionPicker.latest': 'Latest',
+  'versionPicker.onlyCompatible': 'Only compatible',
+  'versionPicker.incompatible': 'Not compatible',
+  'versionPicker.releaseNotes': 'Release notes',
   // note for translators: "MC" is short for Minecraft, {versions} is a version or range like 1.20.1 – 1.21
   'versionPicker.gameVersions': 'MC {versions}',
   'versionPicker.downloads': { one: '{downloads} download', other: '{downloads} downloads' }

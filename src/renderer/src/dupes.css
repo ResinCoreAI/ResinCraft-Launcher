@@ -1,0 +1,206 @@
+/* Discover: the selection's per-site breakdown, and the "same mod from more than one place" dialog. */
+
+.select-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.select-count:hover,
+.select-count[aria-expanded='true'] {
+  background: var(--surface-3);
+}
+.select-count .chev {
+  width: 14px;
+  height: 14px;
+  color: var(--text-dim);
+  transition: transform 0.16s var(--ease);
+}
+.select-count[aria-expanded='true'] .chev {
+  transform: rotate(180deg);
+}
+.select-sites {
+  display: inline-flex;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--data);
+}
+.select-sites > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.select-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(340px, calc(100vw - 32px));
+  max-height: 340px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+}
+.select-pop h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.select-pop h4 b {
+  margin-left: auto;
+}
+.select-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.select-item:hover {
+  background: var(--surface-3);
+}
+.select-item .thumb {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+.select-item .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.select-item .thumb svg {
+  width: 12px;
+  height: 12px;
+}
+.select-item .btn {
+  margin-left: auto;
+}
+
+.dupe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dupe-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.dupe-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dupe-head b {
+  display: block;
+}
+.dupe-head .ico {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+.dupe-head .ico img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dupe-ver {
+  font-family: var(--mono);
+  color: var(--data);
+}
+.dupe-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dupe-choices button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s var(--ease),
+    background 0.12s var(--ease);
+}
+.dupe-choices button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.dupe-choices button.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.dupe-choices .radio-dot {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+}
+.dupe-choices button.on .radio-dot {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 3px, transparent 3.5px);
+}
+
+.dupe-always {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.dupe-always input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+.dupe-always .select {
+  width: auto;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 13px;
+}

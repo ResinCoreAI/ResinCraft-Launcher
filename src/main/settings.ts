@@ -19,7 +19,10 @@ function defaults(): Settings {
     msClientId: process.env.RESINCRAFT_MS_CLIENT_ID ?? '',
     curseforgeKey: process.env.RESINCRAFT_CURSEFORGE_KEY ?? '',
     concurrency: 16,
-    showSnapshots: false
+    showSnapshots: false,
+    // Only the Tauri build updates itself.
+    autoUpdate: false,
+    preferredModSource: 'ask'
   }
 }
 

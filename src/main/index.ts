@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron'
 import * as accounts from './accounts'
 import { setEventSink } from './events'
-import type { ExportOptions } from '@shared/types'
+import type { ContentFileRef, ExportOptions, InstallManyResult, ModPick } from '@shared/types'
 import { errorMessage, slugify } from './fsutil'
 import { exportModpack, exportPreview } from './export'
 import { createInstance, duplicateInstance, getInstance, listInstances, updateInstance } from './instances'
@@ -157,6 +157,21 @@ function registerIpc(): void {
   handle('content:search', sources.search)
   handle('content:versions', sources.versions)
   handle('content:install', sources.install)
+  // This engine doesn't compare sites for duplicates; a batch installs one pick after another.
+  handle('content:duplicates', async () => ({ groups: [], installed: [] }))
+  handle('content:installMany', async (id: string, picks: ModPick[], replace: ContentFileRef[] = []) => {
+    for (const r of replace) await modrinth.removeContent(id, r.kind, r.filename, (p) => shell.trashItem(p))
+    const result: InstallManyResult = { installed: [], failed: [] }
+    for (const p of picks) {
+      try {
+        await sources.install(id, p.id, p.kind, p.versionId)
+        result.installed.push(p.id)
+      } catch (e) {
+        result.failed.push({ id: p.id, error: { message: errorMessage(e) } })
+      }
+    }
+    return result
+  })
   handle('content:list', sources.listContent)
   handle('content:toggle', modrinth.toggleContent)
   handle('content:remove', (id: string, kind, file: string) => modrinth.removeContent(id, kind, file, (p) => shell.trashItem(p)))

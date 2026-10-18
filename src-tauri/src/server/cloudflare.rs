@@ -108,17 +108,36 @@ pub fn matches(existing: &Value, r: &DnsRecord) -> bool {
     }
 }
 
-/// Creates or updates `records` for `domain`. With `fix_srv` (direct route on the default port), an existing
-/// `_minecraft._tcp` SRV record is pointed back at the domain so it can't send players elsewhere.
-/// Returns how many records changed.
-pub async fn sync(token: &str, domain: &str, records: &[DnsRecord], fix_srv: bool) -> Result<usize> {
+/// Record types that can't share a name with a CNAME (and the other way round).
+fn clashing(kind: &str) -> &'static [&'static str] {
+    match kind {
+        "CNAME" => &["A", "AAAA"],
+        "A" | "AAAA" => &["CNAME"],
+        _ => &[],
+    }
+}
+
+/// Creates or updates `records` for `domain`. `srv_guard` is an SRV record that an existing `_minecraft._tcp`
+/// record is changed to (direct route on the default port, ResinCraft Relay), so a stale one can't send players
+/// elsewhere. Records of a clashing type at the same name (an A record from the direct route where ResinCraft
+/// Relay needs a CNAME, or the reverse) are removed. Returns how many records changed.
+pub async fn sync(token: &str, domain: &str, records: &[DnsRecord], srv_guard: Option<DnsRecord>) -> Result<usize> {
     let zone = zone_id(token, domain).await?;
     let mut wanted: Vec<(DnsRecord, bool)> = records.iter().cloned().map(|r| (r, false)).collect();
-    if fix_srv {
-        let srv = DnsRecord { kind: "SRV", name: format!("_minecraft._tcp.{domain}"), value: domain.to_string(), port: Some(25565), priority: Some(0), weight: Some(5) };
+    if let Some(srv) = srv_guard.filter(|g| !records.contains(g)) {
         wanted.push((srv, true));
     }
     let mut changed = 0;
+    for (r, _) in wanted.iter().filter(|(_, only_if_present)| !only_if_present) {
+        for kind in clashing(r.kind) {
+            let path = format!("/zones/{zone}/dns_records?type={kind}&name={}", urlencoding::encode(&r.name));
+            for old in call(token, reqwest::Method::GET, &path, None).await?.as_array().cloned().unwrap_or_default() {
+                let rid = old.get("id").and_then(Value::as_str).unwrap_or_default();
+                call(token, reqwest::Method::DELETE, &format!("/zones/{zone}/dns_records/{rid}"), None).await?;
+                changed += 1;
+            }
+        }
+    }
     for (r, only_if_present) in wanted {
         let path = format!("/zones/{zone}/dns_records?type={}&name={}", r.kind, urlencoding::encode(&r.name));
         let existing = call(token, reqwest::Method::GET, &path, None).await?;
@@ -153,6 +172,15 @@ mod tests {
         assert!(matches(&json!({ "content": "203.0.113.7", "proxied": false }), &a));
         assert!(!matches(&json!({ "content": "203.0.113.7", "proxied": true }), &a));
         assert!(!matches(&json!({ "content": "198.51.100.1" }), &a));
+
+        let cname = DnsRecord { kind: "CNAME", name: "play.example.com".into(), value: "smp.rscraft.resincore.tech".into(), port: None, priority: None, weight: None };
+        let body = record_body(&cname);
+        assert_eq!((body["type"].as_str(), body["content"].as_str(), body["proxied"].as_bool()), (Some("CNAME"), Some("smp.rscraft.resincore.tech"), Some(false)));
+        assert!(matches(&json!({ "content": "smp.rscraft.resincore.tech", "proxied": false }), &cname));
+        assert!(!matches(&json!({ "content": "smp.rscraft.resincore.tech", "proxied": true }), &cname));
+        assert_eq!(clashing("CNAME"), ["A", "AAAA"]);
+        assert_eq!(clashing("A"), ["CNAME"]);
+        assert!(clashing("SRV").is_empty());
 
         let srv = DnsRecord { kind: "SRV", name: "_minecraft._tcp.play.example.com".into(), value: "abc.ply.gg".into(), port: Some(12345), priority: Some(0), weight: Some(5) };
         let body = record_body(&srv);

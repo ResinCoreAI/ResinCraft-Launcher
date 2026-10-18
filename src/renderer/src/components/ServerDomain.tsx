@@ -6,6 +6,7 @@ import { CircleCheck, CircleX, Copy, ExternalLink, KeyRound, Loader2, RefreshCw,
 import type { DnsRecord, DomainInfo, ServerInfo, ServerPatch } from '@shared/types'
 import { api } from '../api'
 import { Switch } from './ui'
+import { useRelayInfo } from './ServerRelay'
 import { useStore } from '../store'
 import { timeAgo } from '../util'
 import { t, tx } from '../i18n'
@@ -57,6 +58,7 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
   const [info, setInfo] = useState<DomainInfo>()
   const [checking, setChecking] = useState(false)
   const [token, setToken] = useState('')
+  const relay = useRelayInfo(s)
   const net = s.net
   // Records depend on the live address; refresh whenever it (or the domain) changes.
   const liveKey = `${s.domain}|${s.dnsAuto}|${net?.state}|${net?.via}|${net?.address}|${net?.domainOk}`
@@ -113,13 +115,28 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
           ) : info.route === 'relay' ? (
             <>
               <span className="hint">{t('servers.domain.relay')}</span>
-              <button className="btn sm primary" style={{ alignSelf: 'flex-start' }} onClick={() => void save({ tunnel: 'playit' })}>
-                {t('servers.domain.usePlayit')}
-              </button>
+              <div className="row wrap">
+                {relay?.available && (
+                  <button className="btn sm primary" onClick={() => void save({ tunnel: 'resin' })}>
+                    {t('servers.domain.useResin')}
+                  </button>
+                )}
+                <button className={`btn sm${relay?.available ? '' : ' primary'}`} onClick={() => void save({ tunnel: 'playit' })}>
+                  {t('servers.domain.usePlayit')}
+                </button>
+              </div>
             </>
           ) : (
             <>
-              <span className="hint">{t(info.route === 'playit' ? 'servers.domain.recordsPlayit' : 'servers.domain.recordsDirect')}</span>
+              <span className="hint">
+                {t(
+                  info.route === 'playit'
+                    ? 'servers.domain.recordsPlayit'
+                    : info.route === 'resin'
+                      ? 'servers.domain.recordsResin'
+                      : 'servers.domain.recordsDirect'
+                )}
+              </span>
               {info.playitGuest && (
                 <span className="hint warn">
                   <TriangleAlert /> {t('servers.domain.playitGuest')}
@@ -130,6 +147,16 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
                   <RecordRow key={r.kind + r.name} r={r} />
                 ))}
               </div>
+              {!!info.altRecords?.length && (
+                <>
+                  <span className="hint">{t('servers.domain.resinSrv')}</span>
+                  <div className="sv-dns-records">
+                    {info.altRecords.map((r) => (
+                      <RecordRow key={r.kind + r.name} r={r} />
+                    ))}
+                  </div>
+                </>
+              )}
               {info.hostsLine && (
                 <>
                   <span className="hint">

@@ -5,7 +5,8 @@ import { api } from '../api'
 import { useStore } from '../store'
 import { COLORS, LOADER_LABEL } from '../util'
 import { currentLanguage, t } from '../i18n'
-import { InstanceTile, Modal, Segmented, Switch } from './ui'
+import { Modal, Segmented, Switch } from './ui'
+import { BannerPicker, IconPicker } from './ImagePicker'
 import { useGroupNames } from '../pages/Library'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
@@ -21,6 +22,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const [group, setGroup] = useState('')
   const groups = useGroupNames()
   const [color, setColor] = useState(COLORS[Math.floor(Math.random() * COLORS.length)])
+  const [icon, setIcon] = useState<string | null>(null)
+  const [banner, setBanner] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
@@ -67,6 +70,13 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
     setError(undefined)
     try {
       const inst = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color, group: group.trim() || undefined })
+      // Pictures are saved right after creating, so a bad picture never stops the instance being made.
+      try {
+        if (icon) await api.instances.setImage(inst.id, 'icon', icon)
+        if (banner) await api.instances.setImage(inst.id, 'banner', banner)
+      } catch (e) {
+        toast(t('art.saveFailed', { error: (e as Error).message }), 'error')
+      }
       await refreshInstances()
       toast(t('newInstance.created', { name: inst.name }))
       onClose()
@@ -96,7 +106,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
-        <InstanceTile inst={{ name: name || placeholder, color }} style={{ width: 72, height: 72, borderRadius: 6, flex: 'none' }} />
+        <IconPicker inst={{ name: name || placeholder, color, iconUrl: icon ?? undefined }} onChange={setIcon} onError={setError} />
         <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="field">
             <label htmlFor="inst-name">{t('newInstance.name')}</label>
@@ -131,6 +141,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
+
+      <BannerPicker value={banner ?? undefined} onChange={setBanner} onError={setError} />
 
       <div className="field">
         <label>{t('newInstance.modLoader')}</label>

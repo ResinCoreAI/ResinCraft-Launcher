@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Archive, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, RefreshCw, Search, Skull, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Archive, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, RefreshCw, Search, Skull, Trash2, Upload } from 'lucide-react'
 import type { GameMode, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
-import { bytes, timeAgo } from '../util'
+import { bytes, instancePath, timeAgo } from '../util'
 import { currentLanguage, rich, t, tx, type Key } from '../i18n'
-import { ConfirmModal, Empty, Menu, Modal } from './ui'
+import { ConfirmModal, Empty, Modal, MoreButton, openContextMenu, useCopy, type ContextEntry } from './ui'
 import '../instance-tabs.css'
 
 const MODE_LABEL: Record<GameMode, Key> = {
@@ -16,7 +16,8 @@ const MODE_LABEL: Record<GameMode, Key> = {
 }
 
 export default function WorldsTab({ inst }: { inst: Instance }) {
-  const { toast, games } = useStore()
+  const { toast, games, info } = useStore()
+  const copy = useCopy()
   const [worlds, setWorlds] = useState<WorldInfo[]>()
   const [q, setQ] = useState('')
   const [renaming, setRenaming] = useState<WorldInfo>()
@@ -52,6 +53,25 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
       setBackingUp((b) => b.filter((f) => f !== w.folder))
     }
   }
+
+  // The same actions as the row's buttons, plus a few more; the "…" button shows this menu too.
+  const menuFor = (w: WorldInfo): ContextEntry[] => [
+    { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.worlds.openFolder(inst.id, w.folder).catch((e) => toast(e.message, 'error')) },
+    { label: t('worlds.backup'), icon: <Archive />, disabled: backingUp.includes(w.folder), onSelect: () => void backup(w) },
+    { label: t('menu.rename'), icon: <Pencil />, disabled: !!w.error || running, onSelect: () => setRenaming(w) },
+    '-',
+    w.seed ? { label: t('worlds.copySeed'), icon: <Copy />, onSelect: () => void copy(w.seed!, t('worlds.seedCopied', { seed: w.seed })) } : null,
+    { label: t('menu.world.copyFolder'), icon: <Copy />, onSelect: () => void copy(w.folder) },
+    info ? { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(instancePath(info.dataDir, inst.id, `saves/${w.folder}`)) } : null,
+    '-',
+    {
+      label: t('common.delete'),
+      icon: <Trash2 />,
+      danger: true,
+      disabled: running,
+      onSelect: () => setRemoving(w)
+    }
+  ]
 
   const importZip = async () => {
     setImporting(true)
@@ -121,7 +141,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
       ) : (
         <div className="list">
           {shown.map((w) => (
-            <div key={w.folder} className="list-row">
+            <div key={w.folder} className="list-row" onContextMenu={(e) => openContextMenu(e, menuFor(w))}>
               <div className="ico">{w.icon ? <img src={w.icon} alt="" /> : <Earth />}</div>
               <div className="grow" style={{ minWidth: 0 }}>
                 <div className="title ellipsis">
@@ -160,34 +180,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
                 <button className="btn ghost icon sm" title={t('common.rename')} disabled={!!w.error || running} onClick={() => setRenaming(w)}>
                   <Pencil />
                 </button>
-                <Menu
-                  items={[
-                    {
-                      label: t('common.openFolder'),
-                      icon: <FolderOpen />,
-                      onClick: () => void api.worlds.openFolder(inst.id, w.folder).catch((e) => toast(e.message, 'error'))
-                    },
-                    ...(w.seed
-                      ? [
-                          {
-                            label: t('worlds.copySeed'),
-                            icon: <Copy />,
-                            onClick: async () => {
-                              await navigator.clipboard.writeText(w.seed!)
-                              toast(t('worlds.seedCopied', { seed: w.seed }), 'info')
-                            }
-                          }
-                        ]
-                      : []),
-                    {
-                      label: t('common.delete'),
-                      icon: <Trash2 />,
-                      danger: true,
-                      divider: true,
-                      onClick: () => (running ? toast(t('worlds.closeGameFirst'), 'error') : setRemoving(w))
-                    }
-                  ]}
-                />
+                <MoreButton items={() => menuFor(w)} className="sm ghost" />
               </div>
             </div>
           ))}

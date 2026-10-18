@@ -70,6 +70,8 @@ pub fn normalize(input: &str) -> Result<String> {
 pub enum Route {
     /// The public IP and port (router opened with UPnP, or forwarded by the player).
     Direct { ip: Ipv4Addr, ipv6: Option<Ipv6Addr>, port: u16 },
+    /// ResinCraft Relay: `<name>.rscraft.resincore.tech`, routed by name on port 25565.
+    Resin { target: String },
     /// playit.gg: the tunnel's host and port.
     Playit { target: String, port: u16 },
     /// A relay with a port that changes every start: no domain possible.
@@ -82,6 +84,7 @@ impl Route {
     fn name(&self) -> &'static str {
         match self {
             Route::Direct { .. } => "direct",
+            Route::Resin { .. } => "resin",
             Route::Playit { .. } => "playit",
             Route::Relay => "relay",
             Route::None => "none",
@@ -110,8 +113,28 @@ pub fn expected_records(domain: &str, route: &Route) -> Vec<DnsRecord> {
             }
             out
         }
+        // The relay routes by the name in the handshake: it follows a CNAME to <name>.rscraft.resincore.tech.
+        Route::Resin { target } => vec![DnsRecord { kind: "CNAME", name: domain.to_string(), value: target.clone(), port: None, priority: None, weight: None }],
         Route::Playit { target, port } => vec![srv(domain, target, *port)],
         Route::Relay | Route::None => Vec::new(),
+    }
+}
+
+/// Records that work instead of [`expected_records`]: for ResinCraft Relay, an SRV record (a domain without a
+/// subdomain can't have a CNAME). Minecraft then puts the SRV target into the handshake itself.
+pub fn alt_records(domain: &str, route: &Route) -> Vec<DnsRecord> {
+    match route {
+        Route::Resin { target } => vec![srv(domain, target, DEFAULT_PORT)],
+        _ => Vec::new(),
+    }
+}
+
+/// An SRV record Minecraft would follow before anything else; when one exists it has to point here too.
+fn srv_guard(domain: &str, route: &Route) -> Option<DnsRecord> {
+    match route {
+        Route::Direct { port: DEFAULT_PORT, .. } => Some(srv(domain, domain, DEFAULT_PORT)),
+        Route::Resin { target } => Some(srv(domain, target, DEFAULT_PORT)),
+        _ => None,
     }
 }
 
@@ -246,7 +269,8 @@ fn shown(a: &Answer) -> Option<String> {
         Answer::A(ip) => Some(ip.to_string()),
         Answer::Aaaa(ip) => Some(ip.to_string()),
         Answer::Srv { priority, weight, port, target } => Some(format!("{priority} {weight} {port} {target}")),
-        Answer::Cname(_) | Answer::Other => None,
+        Answer::Cname(target) => Some(target.clone()),
+        Answer::Other => None,
     }
 }
 
@@ -254,20 +278,22 @@ fn same_host(a: &str, b: &str) -> bool {
     a.trim_end_matches('.').eq_ignore_ascii_case(b.trim_end_matches('.'))
 }
 
-/// Compares what the public DNS says with `expected`. On the direct route with the default port, an SRV record
-/// would send players somewhere else, so one that doesn't point back at the domain fails the check too.
+/// Compares what the public DNS says with `expected`. On the direct route with the default port (and through
+/// ResinCraft Relay), an SRV record would send players somewhere else, so one that doesn't point where it
+/// should fails the check too.
 pub async fn check(domain: &str, expected: &[DnsRecord], route: &Route) -> DnsCheck {
     let mut records = Vec::new();
     let mut resolver = None;
     let mut error = None;
     let mut wanted: Vec<(DnsRecord, bool)> = expected.iter().cloned().map(|r| (r, false)).collect();
-    if matches!(route, Route::Direct { port: DEFAULT_PORT, .. }) {
-        wanted.push((srv(domain, domain, DEFAULT_PORT), true));
+    if let Some(guard) = srv_guard(domain, route).filter(|g| !expected.contains(g)) {
+        wanted.push((guard, true));
     }
     for (record, only_if_present) in wanted {
         let qtype = match record.kind {
             "A" => TYPE_A,
             "AAAA" => TYPE_AAAA,
+            "CNAME" => TYPE_CNAME,
             _ => TYPE_SRV,
         };
         match lookup(&record.name, qtype).await {
@@ -277,6 +303,7 @@ pub async fn check(domain: &str, expected: &[DnsRecord], route: &Route) -> DnsCh
                     (Answer::A(ip), "A") => ip.to_string() == record.value,
                     (Answer::Aaaa(ip), "AAAA") => record.value.parse::<Ipv6Addr>().is_ok_and(|v| v == *ip),
                     (Answer::Srv { port, target, .. }, "SRV") => Some(*port) == record.port && same_host(target, &record.value),
+                    (Answer::Cname(target), "CNAME") => same_host(target, &record.value),
                     _ => false,
                 });
                 let found: Vec<String> = answers.iter().filter_map(shown).collect();
@@ -331,6 +358,21 @@ async fn playit_target(address: &str) -> (String, u16) {
     (address.to_string(), DEFAULT_PORT)
 }
 
+/// Checks `expected`, then (when that fails) the alternative records, and returns whichever matched.
+async fn check_route(domain: &str, route: &Route) -> DnsCheck {
+    let result = check(domain, &expected_records(domain, route), route).await;
+    let alt = alt_records(domain, route);
+    if result.ok || result.error.is_some() || alt.is_empty() {
+        return result;
+    }
+    let other = check(domain, &alt, route).await;
+    if other.ok {
+        other
+    } else {
+        result
+    }
+}
+
 /// The server's current route, from its live internet state.
 pub async fn route_of(id: &str) -> Route {
     let Some(net) = runtime::net(id).filter(|n| n.state == "open") else { return Route::None };
@@ -344,6 +386,7 @@ pub async fn route_of(id: &str) -> Route {
             let (target, port) = playit_target(&address).await;
             Route::Playit { target, port }
         }
+        Some("resin") => Route::Resin { target: address },
         Some("relay") => Route::Relay,
         _ => Route::None,
     }
@@ -354,13 +397,16 @@ pub async fn info(id: &str) -> Result<DomainInfo> {
     let meta = store::get(id).await?;
     let route = route_of(id).await;
     let records = meta.domain.as_deref().map(|d| expected_records(d, &route)).unwrap_or_default();
+    let alt = meta.domain.as_deref().map(|d| alt_records(d, &route)).unwrap_or_default();
     // A check made for another route (the address changed since) says nothing about these records.
-    let check = recall(&CHECKS, id).filter(|c| records.iter().all(|r| c.records.iter().any(|x| &x.record == r)));
+    let covers = |c: &DnsCheck, wanted: &[DnsRecord]| !wanted.is_empty() && wanted.iter().all(|r| c.records.iter().any(|x| &x.record == r));
+    let check = recall(&CHECKS, id).filter(|c| covers(c, &records) || covers(c, &alt));
     Ok(DomainInfo {
         hosts_line: meta.domain.as_deref().and_then(|d| hosts_line(d, &route)),
         domain: meta.domain,
         route: route.name(),
         records,
+        alt_records: alt,
         playit_guest: matches!(route, Route::Playit { .. }) && playit::is_guest(),
         check,
         cloudflare_token: cloudflare::has_token(id).await,
@@ -379,7 +425,7 @@ pub async fn check_now(id: &str) -> Result<DomainInfo> {
         runtime::set_domain_ok(id, None);
         return info(id).await;
     }
-    let result = check(domain, &expected, &route).await;
+    let result = check_route(domain, &route).await;
     runtime::set_domain_ok(id, Some(result.ok));
     remember(&CHECKS, id, Some(result));
     info(id).await
@@ -399,7 +445,7 @@ pub async fn on_open(id: String) {
     }
     if meta.dns_auto {
         let status = match cloudflare::token(&id).await {
-            Some(token) => match cloudflare::sync(&token, &domain, &expected, matches!(route, Route::Direct { port: DEFAULT_PORT, .. })).await {
+            Some(token) => match cloudflare::sync(&token, &domain, &expected, srv_guard(&domain, &route)).await {
                 Ok(0) => tr!("hostDomain.cfUpToDate", "Cloudflare: the records were already up to date."),
                 Ok(n) => {
                     // Cloudflare answers from its own servers right away; give it a moment anyway.
@@ -412,7 +458,7 @@ pub async fn on_open(id: String) {
         };
         remember(&CF_STATUS, &id, Some(status));
     }
-    let result = check(&domain, &expected, &route).await;
+    let result = check_route(&domain, &route).await;
     if result.error.is_none() {
         runtime::set_domain_ok(&id, Some(result.ok));
     }
@@ -463,6 +509,15 @@ mod tests {
         assert_eq!(playit.len(), 1);
         assert_eq!((playit[0].kind, playit[0].value.as_str(), playit[0].port), ("SRV", "abc.ply.gg", Some(12345)));
 
+        let resin = Route::Resin { target: "smp.rscraft.resincore.tech".into() };
+        let cname = expected_records("play.example.com", &resin);
+        assert_eq!(cname.len(), 1);
+        assert_eq!((cname[0].kind, cname[0].name.as_str(), cname[0].value.as_str()), ("CNAME", "play.example.com", "smp.rscraft.resincore.tech"));
+        let alt = alt_records("example.com", &resin);
+        assert_eq!((alt[0].kind, alt[0].name.as_str(), alt[0].value.as_str(), alt[0].port), ("SRV", "_minecraft._tcp.example.com", "smp.rscraft.resincore.tech", Some(25565)));
+        assert_eq!(srv_guard("play.example.com", &resin).map(|r| r.value), Some("smp.rscraft.resincore.tech".to_string()));
+        assert_eq!(hosts_line("play.example.com", &resin), None);
+        assert!(alt_records("play.example.com", &Route::Direct { ip, ipv6: None, port: 25570 }).is_empty());
         assert!(expected_records("play.example.com", &Route::Relay).is_empty());
         assert!(expected_records("play.example.com", &Route::None).is_empty());
         assert_eq!(hosts_line("play.example.com", &Route::Direct { ip, ipv6: None, port: 25570 }).as_deref(), Some("203.0.113.7 play.example.com"));

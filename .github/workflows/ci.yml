@@ -20,9 +20,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
+          workspaces: |
+            src-tauri -> target
+            relay -> target
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build:web
       - run: cargo check --all-targets --locked
         working-directory: src-tauri
+      # ResinCraft Relay: unit tests and the end-to-end test on 127.0.0.1.
+      - run: cargo test --locked
+        working-directory: relay

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, ExternalLink, Info, Loader2, LogIn, Shirt, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react'
+import { Check, Copy, ExternalLink, Fingerprint, Info, Loader2, LogIn, Shirt, ShieldCheck, Trash2, UserCheck, UserPlus, Users } from 'lucide-react'
 import type { AccountView, DeviceCode } from '@shared/types'
 import { api } from '../api'
-import { Avatar, ConfirmModal, Empty, Modal } from '../components/ui'
+import { Avatar, ConfirmModal, Empty, Modal, openContextMenu, useCopy } from '../components/ui'
 import { useStore } from '../store'
 import ProfileManager from '../components/ProfileManager'
 import { rich, t, tx } from '../i18n'
@@ -13,10 +13,7 @@ export default function Accounts() {
   const [offline, setOffline] = useState(false)
   const [removing, setRemoving] = useState<string>()
   const [managing, setManaging] = useState<AccountView>()
-  const hasMsa = accounts.some((a) => a.type === 'msa')
-  // Release builds need a Microsoft account first; dev builds allow testing before Mojang approval.
-  const canOffline = hasMsa || !!info?.dev
-
+  const copy = useCopy()
   return (
     <div className="page" style={{ maxWidth: 860 }}>
       <div className="page-head">
@@ -25,7 +22,7 @@ export default function Accounts() {
           <p>{t('accounts.subtitle')}</p>
         </div>
         <div className="spacer" />
-        <button className="btn" disabled={!canOffline} title={canOffline ? '' : t('accounts.offlineNeedsMsa')} onClick={() => setOffline(true)}>
+        <button className="btn" onClick={() => setOffline(true)}>
           <UserPlus /> {t('accounts.offlineProfile')}
         </button>
         <button className="btn primary" onClick={() => setSigningIn(true)}>
@@ -59,7 +56,31 @@ export default function Accounts() {
       ) : (
         <div className="list">
           {accounts.map((a) => (
-            <div key={a.id} className="list-row" style={{ padding: '14px 16px' }}>
+            <div
+              key={a.id}
+              className="list-row"
+              style={{ padding: '14px 16px' }}
+              onContextMenu={(e) =>
+                openContextMenu(e, [
+                  {
+                    label: t('accounts.use'),
+                    icon: <UserCheck />,
+                    checked: a.active,
+                    disabled: a.active,
+                    onSelect: async () => {
+                      await api.accounts.setActive(a.id)
+                      await refreshAccounts()
+                    }
+                  },
+                  a.type === 'msa' && { label: t('menu.account.manage'), icon: <Shirt />, onSelect: () => setManaging(a) },
+                  '-',
+                  { label: t('menu.account.copyName'), icon: <Copy />, onSelect: () => void copy(a.username) },
+                  { label: t('menu.account.copyUuid'), icon: <Fingerprint />, onSelect: () => void copy(a.uuid) },
+                  '-',
+                  { label: t('common.remove'), icon: <Trash2 />, danger: true, onSelect: () => setRemoving(a.id) }
+                ])
+              }
+            >
               <Avatar account={a} size={44} />
               <div className="grow">
                 <div className="title">{a.username}</div>

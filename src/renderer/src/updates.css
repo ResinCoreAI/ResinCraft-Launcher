@@ -1,0 +1,79 @@
+/* ResinCraft's own updates (components/Updates.tsx). */
+
+/* Under the title bar, clear of the task dock in the bottom corner. */
+.update-banner {
+  position: fixed;
+  top: calc(var(--titlebar) + 12px);
+  right: 18px;
+  width: 340px;
+  z-index: 80;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  animation: modal-in 0.16s var(--ease);
+}
+.update-banner > .icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--accent);
+}
+.update-banner b {
+  display: block;
+  font-weight: 600;
+}
+.update-banner p {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.update-banner .actions {
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.update-running {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.update-running li + li {
+  margin-top: 2px;
+}
+
+/* Settings → Updates */
+.setting .text .update-new {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--data);
+}
+.update-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+/* Problems (offline, server busy) read as a note, not an alarm: ResinCraft simply tries again later. */
+.update-line .note {
+  flex: none;
+  color: var(--text-faint);
+}
+.update-line .ok {
+  color: var(--play);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-banner {
+    animation: none;
+  }
+}

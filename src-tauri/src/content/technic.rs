@@ -12,6 +12,7 @@ use futures::stream::{self, StreamExt};
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::dupes::dedupe_pack;
 use super::index::{discard_instance, extract_where, lenient_u64, lenient_u64_zero, natural_cmp, open_zip, safe_name, Zip};
 use crate::core::events::Task;
 use crate::core::instances;
@@ -409,6 +410,8 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             discard_instance(&inst.id).await;
             return Err(e);
         }
+        // Two of the pack's zips may carry the same mod; Technic lists none of them as such.
+        dedupe_pack(&inst, &task, &[]).await;
         instances::get(&inst.id).await
     })
     .await;

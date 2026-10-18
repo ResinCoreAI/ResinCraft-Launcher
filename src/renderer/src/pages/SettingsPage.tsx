@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Coffee, Download, FolderSearch, Gamepad2, Info, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
-import type { JavaInstall, Settings } from '@shared/types'
+import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
+import { UpdatesSection } from '../components/Updates'
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { fixed } from '../util'
@@ -12,11 +13,12 @@ const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'game', label: 'settings.nav.game', icon: <Gamepad2 size={16} /> },
   { id: 'java', label: 'settings.nav.java', icon: <Coffee size={16} /> },
   { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
+  { id: 'updates', label: 'updates.nav', icon: <RefreshCw size={16} /> },
   { id: 'about', label: 'settings.nav.about', icon: <Info size={16} /> }
 ]
 
 export default function SettingsPage() {
-  const { settings: s, updateSettings, info } = useStore()
+  const { settings: s, updateSettings, info, toast } = useStore()
   const [javas, setJavas] = useState<JavaInstall[]>()
   const [scanning, setScanning] = useState(false)
   const [mem, setMem] = useState(s?.memoryMb ?? 4096)
@@ -295,8 +297,38 @@ export default function SettingsPage() {
                   ))}
                 </select>
               </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.preferredSource')}</b>
+                  <span>{t('settings.preferredSource.hint')}</span>
+                  {s.preferredModSource && s.preferredModSource !== 'ask' && (
+                    <button
+                      className="link"
+                      style={{ alignSelf: 'flex-start' }}
+                      onClick={() => {
+                        set({ preferredModSource: 'ask' })
+                        toast(t('settings.preferredSource.resetDone'), 'info')
+                      }}
+                    >
+                      {t('settings.preferredSource.reset')}
+                    </button>
+                  )}
+                </div>
+                <select
+                  className="select"
+                  style={{ width: 220 }}
+                  value={s.preferredModSource ?? 'ask'}
+                  onChange={(e) => set({ preferredModSource: e.target.value as ModSourcePreference })}
+                >
+                  <option value="ask">{t('settings.preferredSource.ask')}</option>
+                  <option value="modrinth">Modrinth</option>
+                  <option value="curseforge">CurseForge</option>
+                </select>
+              </div>
             </div>
           </section>
+
+          <UpdatesSection />
 
           <section className="settings-section" id="about">
             <h3>{t('settings.nav.about')}</h3>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import {
   Archive,
   Ban,
+  ClipboardCopy,
   Copy,
   Crown,
   Eraser,
@@ -15,6 +16,7 @@ import {
   Play,
   Plus,
   Puzzle,
+  RotateCw,
   Search,
   Send,
   Server,
@@ -29,14 +31,15 @@ import {
 } from 'lucide-react'
 import type { ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { api } from '../api'
-import AddonBrowser, { ADDON_SOURCE_LABEL } from '../components/AddonBrowser'
 import FileManager from '../components/FileManager'
+import ServerAddons from '../components/ServerAddons'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
-import { BlockArt, ConfirmModal, Empty, Modal, Segmented, Switch } from '../components/ui'
+import { RelayNotes, RelaySettings, useRelayInfo } from '../components/ServerRelay'
+import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useStore } from '../store'
-import { bytes, fixed, timeAgo } from '../util'
-import { rich, t, type Key } from '../i18n'
+import { bytes, fixed, serverPath, timeAgo } from '../util'
+import { rich, t, tx, type Key } from '../i18n'
 import '../servers.css'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
@@ -110,7 +113,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
           <ServerDetail key={server.id} server={server} reload={load} onStart={start} onStop={stop} />
         ) : null
       ) : (
-        <ServerList servers={servers} onCreate={() => setCreating(true)} onStart={start} onStop={stop} />
+        <ServerList servers={servers} onCreate={() => setCreating(true)} onStart={start} onStop={stop} reload={load} />
       )}
 
       {creating && (
@@ -186,18 +189,58 @@ function StartStop({ s, onStart, onStop, size = '' }: { s: ServerInfo; onStart: 
   )
 }
 
+/** Stops a server, waits until the engine reports it stopped, then starts it again. */
+async function restart(s: ServerInfo, onStart: (s: ServerInfo) => void, onStop: (s: ServerInfo) => void) {
+  await new Promise<void>((resolve) => {
+    const done = () => {
+      off()
+      clearTimeout(giveUp)
+      resolve()
+    }
+    const off = api.on.server((e) => e.serverId === s.id && (e.state === 'stopped' || e.state === 'crashed') && done())
+    const giveUp = setTimeout(done, 120_000)
+    onStop(s)
+  })
+  onStart({ ...s, state: 'stopped' })
+}
+
 function ServerList({
   servers,
   onCreate,
   onStart,
-  onStop
+  onStop,
+  reload
 }: {
   servers?: ServerInfo[]
   onCreate: () => void
   onStart: (s: ServerInfo) => void
   onStop: (s: ServerInfo) => void
+  reload: () => Promise<void>
 }) {
-  const { go } = useStore()
+  const { go, toast, info } = useStore()
+  const copy = useCopy()
+  const [deleting, setDeleting] = useState<ServerInfo>()
+
+  const menuFor = (s: ServerInfo): ContextEntry[] => {
+    const up = s.state === 'starting' || s.state === 'running'
+    const address = s.net?.state === 'open' && s.net.address ? s.net.address : `localhost:${s.port}`
+    return [
+      up
+        ? { label: t('servers.stop'), icon: <Square />, onSelect: () => onStop(s) }
+        : s.state === 'stopping'
+          ? { label: t('servers.forceStop'), icon: <Square />, danger: true, onSelect: () => onStop(s) }
+          : { label: t('servers.start'), icon: <Play />, onSelect: () => onStart(s) },
+      { label: t('menu.server.restart'), icon: <RotateCw />, disabled: s.state !== 'running', onSelect: () => void restart(s, onStart, onStop) },
+      { label: t('menu.server.openConsole'), icon: <Terminal />, shortcut: 'Enter', onSelect: () => go({ page: 'servers', id: s.id }) },
+      '-',
+      { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(address) },
+      { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
+      info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
+      '-',
+      { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: live(s), onSelect: () => setDeleting(s) }
+    ]
+  }
+
   return (
     <>
       <div className="page-head">
@@ -231,7 +274,15 @@ function ServerList({
       ) : (
         <div className="sv-list">
           {servers.map((s) => (
-            <div key={s.id} className={`sv-row ${s.state}`} onClick={() => go({ page: 'servers', id: s.id })} role="button" tabIndex={0}>
+            <div
+              key={s.id}
+              className={`sv-row ${s.state}`}
+              onClick={() => go({ page: 'servers', id: s.id })}
+              onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && go({ page: 'servers', id: s.id })}
+              onContextMenu={(e) => openContextMenu(e, menuFor(s))}
+              role="button"
+              tabIndex={0}
+            >
               <ServerIcon s={s} />
               <div className="grow" style={{ minWidth: 0 }}>
                 <div className="name ellipsis">{s.name}</div>
@@ -254,6 +305,22 @@ function ServerList({
             </div>
           ))}
         </div>
+      )}
+      {deleting && (
+        <ConfirmModal
+          title={t('servers.settings.deleteTitle', { name: deleting.name })}
+          body={t('servers.settings.deleteBody')}
+          confirm={t('common.delete')}
+          onClose={() => setDeleting(undefined)}
+          onConfirm={async () => {
+            try {
+              await api.server.remove(deleting.id)
+              await reload()
+            } catch (e) {
+              toast((e as Error).message, 'error')
+            }
+          }}
+        />
       )}
     </>
   )
@@ -321,7 +388,7 @@ function ServerDetail({
 
       {tab === 'console' && <ConsoleTab s={s} />}
       {tab === 'players' && <PlayersTab s={s} />}
-      {tab === 'addons' && <AddonsTab s={s} />}
+      {tab === 'addons' && <ServerAddons s={s} />}
       {tab === 'properties' && <PropertiesTab s={s} />}
       {tab === 'files' && <FileManager root={{ kind: 'server', id: s.id }} rootLabel={t('files.root.server')} running={live(s)} />}
       {tab === 'settings' && <SettingsTab s={s} reload={reload} onDeleted={() => go({ page: 'servers' })} />}
@@ -438,16 +505,19 @@ function ConnectCard({ s }: { s: ServerInfo }) {
           <>
             <DomainAddress s={s} address={net.address} copy={(v, small) => <CopyAddress value={v} small={small} />} />
             <span className="hint ok">
-              {net.via === 'relay'
-                ? t('servers.connect.internetRelay', { host: net.address.replace(/:\d+$/, '') })
-                : net.via === 'playit'
-                  ? t('servers.connect.internetPlayit')
-                  : net.via === 'manual'
-                    ? t('servers.connect.internetManual')
-                    : t('servers.connect.internetOpen')}
+              {net.via === 'resin'
+                ? t('servers.connect.internetResin')
+                : net.via === 'relay'
+                  ? t('servers.connect.internetRelay', { host: net.address.replace(/:\d+$/, '') })
+                  : net.via === 'playit'
+                    ? t('servers.connect.internetPlayit')
+                    : net.via === 'manual'
+                      ? t('servers.connect.internetManual')
+                      : t('servers.connect.internetOpen')}
             </span>
             {net.via === 'relay' && net.error && <span className="hint bad">{t('servers.connect.relayInstead', { error: net.error })}</span>}
-            {net.via === 'relay' && net.playitHint && <span className="hint">{t('servers.connect.playitHint')}</span>}
+            {net.via === 'relay' && net.playitHint && !net.resinHint && <span className="hint">{t('servers.connect.playitHint')}</span>}
+            <RelayNotes s={s} />
           </>
         ) : net?.state === 'opening' && net.claimUrl ? (
           <>
@@ -462,7 +532,7 @@ function ConnectCard({ s }: { s: ServerInfo }) {
           </span>
         ) : net?.state === 'failed' ? (
           <>
-            <span className="hint bad">{net.error}</span>
+            <span className="hint bad">{net.errorText ? tx(net.errorText) : net.error}</span>
             <span className="hint">{t('servers.connect.forwardHint', { port: String(s.port), ip: lanIp ?? '…' })}</span>
           </>
         ) : (
@@ -704,120 +774,6 @@ function PlayersTab({ s }: { s: ServerInfo }) {
 
 // ---------- Plugins / mods ----------
 
-function AddonsTab({ s }: { s: ServerInfo }) {
-  const { toast } = useStore()
-  const [items, setItems] = useState<ContentItem[]>()
-  const [q, setQ] = useState('')
-  const [browsing, setBrowsing] = useState(false)
-  const [removing, setRemoving] = useState<ContentItem>()
-  const plugins = isPluginServer(s)
-
-  const load = useCallback(async () => {
-    try {
-      setItems(await api.server.addons(s.id))
-    } catch (e) {
-      setItems([])
-      toast((e as Error).message, 'error')
-    }
-  }, [s.id, toast])
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const shown = (items ?? []).filter((i) => `${i.title ?? ''} ${i.filename}`.toLowerCase().includes(q.toLowerCase()))
-  const installed = useMemo(() => new Set((items ?? []).map((i) => i.projectId).filter((x): x is string => !!x)), [items])
-  const sourceOf = (pid?: string) =>
-    pid?.startsWith('cf:') ? 'curseforge' : pid?.startsWith('hangar:') ? 'hangar' : pid?.startsWith('spigot:') ? 'spigot' : pid ? 'modrinth' : undefined
-
-  return (
-    <>
-      {live(s) && <div className="callout" style={{ marginBottom: 12 }}>{t('servers.addons.restartHint')}</div>}
-      <div className="toolbar">
-        <div className="search">
-          <Search />
-          <input className="input" placeholder={t(plugins ? 'servers.addons.filterPlugins' : 'servers.addons.filterMods')} value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <button className="btn icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id, plugins ? 'plugins' : 'mods')}>
-          <FolderOpen />
-        </button>
-        <button className="btn primary" onClick={() => setBrowsing(true)}>
-          <Plus /> {t(plugins ? 'servers.addons.addPlugins' : 'servers.addons.addMods')}
-        </button>
-      </div>
-      {!items ? (
-        <div className="results">
-          <div className="skeleton" style={{ height: 62 }} />
-        </div>
-      ) : items.length === 0 ? (
-        <Empty
-          icon={<Puzzle />}
-          title={t(plugins ? 'servers.addons.emptyPlugins' : 'servers.addons.emptyMods')}
-          action={
-            <button className="btn primary" onClick={() => setBrowsing(true)}>
-              <Plus /> {t(plugins ? 'servers.addons.addPlugins' : 'servers.addons.addMods')}
-            </button>
-          }
-        >
-          {t(plugins ? 'servers.addons.emptyPluginsHint' : 'servers.addons.emptyModsHint')}
-        </Empty>
-      ) : (
-        <div className="list">
-          {shown.map((m) => {
-            const src = sourceOf(m.projectId)
-            return (
-              <div key={m.filename} className={`list-row ${m.enabled ? '' : 'off'}`}>
-                <div className="ico">{m.iconUrl ? <img src={m.iconUrl} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} /> : <Puzzle />}</div>
-                <div className="grow">
-                  <div className="title ellipsis">
-                    {m.title ?? m.filename.replace(/\.jar(\.disabled)?$/, '')}
-                    {src && <span className={`sv-src ${src}`}>{ADDON_SOURCE_LABEL[src]}</span>}
-                  </div>
-                  <div className="file ellipsis">
-                    {m.filename} · {bytes(m.size)}
-                    {m.versionNumber ? ` · ${m.versionNumber}` : ''}
-                  </div>
-                </div>
-                <Switch
-                  on={m.enabled}
-                  label={m.enabled ? t('servers.addons.disable') : t('servers.addons.enable')}
-                  onChange={async () => {
-                    try {
-                      await api.server.addonToggle(s.id, m.filename)
-                      await load()
-                    } catch (e) {
-                      toast((e as Error).message, 'error')
-                    }
-                  }}
-                />
-                <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving(m)}>
-                  <Trash2 />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-      {browsing && <AddonBrowser server={s} installed={installed} onInstalled={() => void load()} onClose={() => setBrowsing(false)} />}
-      {removing && (
-        <ConfirmModal
-          title={t('servers.addons.removeTitle', { name: removing.title ?? removing.filename })}
-          body={t('servers.addons.removeBody')}
-          confirm={t('common.remove')}
-          onClose={() => setRemoving(undefined)}
-          onConfirm={async () => {
-            try {
-              await api.server.addonRemove(s.id, removing.filename)
-              await load()
-            } catch (e) {
-              toast((e as Error).message, 'error')
-            }
-          }}
-        />
-      )}
-    </>
-  )
-}
-
 // ---------- server.properties ----------
 
 const FRIENDLY = ['motd', 'max-players', 'gamemode', 'difficulty', 'pvp', 'white-list', 'online-mode', 'view-distance']
@@ -1002,10 +958,11 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
 
 // ---------- Settings ----------
 
-const TUNNELS: ServerTunnel[] = ['auto', 'playit', 'relay', 'manual']
+const TUNNELS: ServerTunnel[] = ['auto', 'resin', 'playit', 'relay', 'manual']
 
 function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Promise<void>; onDeleted: () => void }) {
   const { info, toast } = useStore()
+  const relay = useRelayInfo(s)
   const [name, setName] = useState(s.name)
   const [port, setPort] = useState(String(s.port))
   const [memory, setMemory] = useState(s.memoryMb)
@@ -1143,14 +1100,23 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
           <div className="setting stack">
             <div className="text">
               <b>{t('servers.settings.tunnel')}</b>
-              <span>{t(`servers.settings.tunnelHint.${s.tunnel}`)}</span>
+              <span>
+                {t(`servers.settings.tunnelHint.${s.tunnel}`, {
+                  address: `${s.relayName ?? relay?.name ?? relay?.suggested ?? 'name'}.${relay?.domain ?? 'rscraft.resincore.tech'}`
+                })}
+              </span>
             </div>
             <Segmented<ServerTunnel>
               value={s.tunnel}
               onChange={(v) => v !== s.tunnel && void save({ tunnel: v })}
-              options={TUNNELS.map((v) => ({ value: v, label: t(`servers.settings.tunnel.${v}`) }))}
+              // ResinCraft Relay only in builds that have one (still shown if it's the current choice).
+              options={TUNNELS.filter((v) => v !== 'resin' || relay?.available || s.tunnel === 'resin').map((v) => ({
+                value: v,
+                label: t(`servers.settings.tunnel.${v}`)
+              }))}
             />
           </div>
+          {(s.tunnel === 'auto' || s.tunnel === 'resin') && <RelaySettings s={s} info={relay} reload={reload} />}
           <div className="setting">
             <div className="text">
               <b>{t('servers.settings.relayHost')}</b>

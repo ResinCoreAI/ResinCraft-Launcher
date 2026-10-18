@@ -1,15 +1,17 @@
 import { ChevronRight, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Users } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
-import { Avatar, BlockArt, Dock, Logo } from './components/ui'
+import type { Instance } from '@shared/types'
+import { Avatar, BlockArt, ContextMenuHost, Dock, Logo } from './components/ui'
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
+import { UpdateBanner } from './components/Updates'
 import { isTauri } from './api'
 import NewInstanceModal from './components/NewInstanceModal'
 import Accounts from './pages/Accounts'
 import Discover from './pages/Discover'
 import Home from './pages/Home'
 import InstancePage from './pages/InstancePage'
-import Library from './pages/Library'
+import Library, { useInstanceMenu } from './pages/Library'
 import SettingsPage from './pages/SettingsPage'
 import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
@@ -34,6 +36,22 @@ const TITLES: Record<Route['page'], Key> = {
   servers: 'servers.nav',
   accounts: 'nav.accounts',
   settings: 'nav.settings'
+}
+
+/** An instance under "Jump back in"; right-click for the same menu as its Library card. */
+function RecentItem({ inst, active, running }: { inst: Instance; active: boolean; running: boolean }) {
+  const { go } = useStore()
+  const menu = useInstanceMenu(inst)
+  return (
+    <>
+      <button className={`nav-item ${active ? 'active' : ''}`} onClick={() => go({ page: 'instance', id: inst.id })} onContextMenu={menu.open}>
+        <span className="nav-dot">{inst.iconUrl ? <img src={inst.iconUrl} alt="" /> : <BlockArt seed={inst.id} color={inst.color} />}</span>
+        <span className="ellipsis">{inst.name}</span>
+        {running && <span className="live" title={t('app.running')} />}
+      </button>
+      {menu.dialogs}
+    </>
+  )
 }
 
 export default function App() {
@@ -71,15 +89,7 @@ export default function App() {
             </div>
           )}
           {recent.map((i) => (
-            <button
-              key={i.id}
-              className={`nav-item ${route.page === 'instance' && route.id === i.id ? 'active' : ''}`}
-              onClick={() => go({ page: 'instance', id: i.id })}
-            >
-              <span className="nav-dot">{i.iconUrl ? <img src={i.iconUrl} alt="" /> : <BlockArt seed={i.id} color={i.color} />}</span>
-              <span className="ellipsis">{i.name}</span>
-              {games[i.id] === 'running' && <span className="live" title={t('app.running')} />}
-            </button>
+            <RecentItem key={i.id} inst={i} active={route.page === 'instance' && route.id === i.id} running={games[i.id] === 'running'} />
           ))}
         </div>
 
@@ -125,6 +135,8 @@ export default function App() {
 
       {newInstanceOpen && <NewInstanceModal onClose={() => setNewInstanceOpen(false)} />}
       <Dock />
+      <UpdateBanner />
+      <ContextMenuHost />
       <DropImport />
       {isTauri && <WindowControls />}
     </div>

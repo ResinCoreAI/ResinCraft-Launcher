@@ -5,9 +5,12 @@ import { mockEngine } from './mock-engine'
 import { mockProfile } from './mock-profile'
 import { mockServers } from './mock-servers'
 import { mockFiles } from './mock-files'
+import { mockUpdate } from './mock-update'
+import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
 
 export function mockApi(): ResinApi {
   const servers = mockServers()
+  const updates = mockUpdate()
   const now = Date.now()
   let instances: Instance[] = [
     {
@@ -61,7 +64,9 @@ export function mockApi(): ResinApi {
     msClientId: '',
     curseforgeKey: '',
     concurrency: 16,
-    showSnapshots: false
+    showSnapshots: false,
+    autoUpdate: false,
+    preferredModSource: 'ask'
   }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },
@@ -128,13 +133,14 @@ export function mockApi(): ResinApi {
 
   return {
     app: {
-      info: () => wait({ version: '0.2.0', dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher', platform: 'win32', totalMemMb: 16384, dev: true, microsoft: true, curseforge: true }),
+      info: () => wait({ version: '0.3.0', dataDir: 'C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher', platform: 'win32', totalMemMb: 16384, dev: true, microsoft: true, curseforge: true }),
       openExternal: async (u) => void window.open(u),
       setTitleBar: async () => {},
       showItem: async () => {},
       pathForFile: (f: File) => f.name
     },
     settings: { get: () => wait(settings, 0), set: async (p) => (settings = { ...settings, ...p }) },
+    update: updates.update,
     versions: {
       list: () => wait(versions),
       loaders: () =>
@@ -156,6 +162,19 @@ export function mockApi(): ResinApi {
         return instances.find((i) => i.id === id)!
       },
       duplicate: async (id) => instances.find((i) => i.id === id)!,
+      resetIcon: async (id) => {
+        instances = instances.map((i) => (i.id === id ? { ...i, iconUrl: i.packIconUrl, packIconUrl: undefined } : i))
+        return instances.find((i) => i.id === id)!
+      },
+      setImage: async (id, kind, dataUrl) => {
+        instances = instances.map((i) => {
+          if (i.id !== id) return i
+          if (kind === 'banner') return { ...i, bannerUrl: dataUrl ?? undefined }
+          if (!dataUrl) return { ...i, iconUrl: i.packIconUrl, packIconUrl: undefined }
+          return { ...i, iconUrl: dataUrl, packIconUrl: i.iconUrl?.startsWith('data:') ? i.packIconUrl : i.iconUrl }
+        })
+        return instances.find((i) => i.id === id)!
+      },
       remove: async (id) => void (instances = instances.filter((i) => i.id !== id)),
       openFolder: async () => {},
       launch: (id) => mockEngine.launch(instances.find((i) => i.id === id), accounts.length > 0),
@@ -187,7 +206,10 @@ export function mockApi(): ResinApi {
       browse: async () => null
     },
     content: {
-      search: (q) => wait({ hits: hits.map((h) => ({ ...h, kind: q.kind, source: q.source ?? 'modrinth' })), total: hits.length, offset: 0 }, 400),
+      search: (q) => {
+        const list = q.source === 'curseforge' ? mockCurseForgeHits(now) : hits.map((h) => ({ ...h, source: q.source ?? 'modrinth' }))
+        return wait({ hits: list.map((h) => ({ ...h, kind: q.kind })), total: list.length, offset: 0 }, 400)
+      },
       versions: () =>
         wait(
           (
@@ -211,7 +233,9 @@ export function mockApi(): ResinApi {
           }))
         ),
       install: () => wait(undefined, 800),
-      list: (_i, kind) => wait(kind === 'mod' ? mods : []),
+      duplicates: (_i, picks) => wait(mockDuplicates(picks, mods), 500),
+      installMany: (_i, picks, replace) => wait(mockInstallMany(mods, picks, replace), 900),
+      list: (_i, kind) => wait(kind === 'mod' ? [...mods] : []),
       toggle: async () => {},
       remove: async () => {},
       checkUpdates: () =>
@@ -242,9 +266,14 @@ export function mockApi(): ResinApi {
           900
         )
     },
-    ...mockInstanceTabs(),
+    ...mockInstanceTabs((id, iconUrl) => {
+      // Like the engine: a modpack's own icon is kept for resetIcon.
+      const keep = (i: Instance) => (i.iconUrl?.startsWith('data:') ? i.packIconUrl : i.iconUrl)
+      instances = instances.map((i) => (i.id === id ? { ...i, iconUrl, packIconUrl: keep(i) } : i))
+      return instances.find((i) => i.id === id)!
+    }),
     server: servers.server,
     ...mockFiles(),
-    on: { task: mockEngine.onTask, game: noop, log: noop, login: noop, server: servers.onServer, serverLog: servers.onServerLog }
+    on: { task: mockEngine.onTask, game: noop, log: noop, login: noop, server: servers.onServer, serverLog: servers.onServerLog, update: updates.onUpdate }
   }
 }

@@ -28,6 +28,11 @@ pub struct Settings {
     pub curseforge_key: String,
     pub concurrency: usize,
     pub show_snapshots: bool,
+    /// Install a new ResinCraft version by itself when the launcher starts (Settings → Updates).
+    pub auto_update: bool,
+    /// When the same mod is on Modrinth and CurseForge: "ask" | "modrinth" | "curseforge" (Settings → Downloads,
+    /// or "Don't ask again" in the duplicate dialog).
+    pub preferred_mod_source: String,
 }
 
 pub fn total_memory_mb() -> u64 {
@@ -54,6 +59,8 @@ impl Default for Settings {
             curseforge_key: String::new(),
             concurrency: 16,
             show_snapshots: false,
+            auto_update: false,
+            preferred_mod_source: "ask".into(),
         }
     }
 }

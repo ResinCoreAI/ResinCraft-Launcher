@@ -18,6 +18,11 @@ export const mockEngine = {
     return () => void listeners.delete(cb)
   },
 
+  /** Shows a task in the dock, for other mock areas (e.g. the update download). */
+  emitTask(t: TaskInfo) {
+    listeners.forEach((l) => l(t))
+  },
+
   /** Plays the "Preparing …" task; fails like the engine when there's no account, or for the 1.20.4 instance (no Java 17). */
   async launch(inst: Instance | undefined, hasAccount: boolean): Promise<void> {
     if (!hasAccount) fail(text('accounts.signInFirst', 'Sign in with your Microsoft account before playing.'))

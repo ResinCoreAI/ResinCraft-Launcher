@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ResinCraft logo: a resin drop holding a block, with a pixel "R" on its side. -->
+  <path fill="#8b46ff" d="M512 48C490 150 400 252 268 402C206 472 168 548 168 632A344 344 0 0 0 856 632C856 548 818 472 756 402C624 252 534 150 512 48Z"/>
+  <path fill="#4aff86" d="M299 500L520 372L741 500L520 628Z"/>
+  <path fill="#1bc866" d="M284 525L506 653L506 907L284 780Z"/>
+  <path fill="#3a178c" d="M534 653L755 525L755 780L534 907Z"/>
+  <g fill="#4aff86">
+    <!-- stem -->
+    <path d="M550 650L585 630L585 668L550 688Z"/>
+    <path d="M550 698L585 678L585 716L550 736Z"/>
+    <path d="M550 746L585 726L585 764L550 784Z"/>
+    <path d="M550 794L585 774L585 812L550 832Z"/>
+    <path d="M550 842L585 822L585 860L550 880Z"/>
+    <!-- bowl -->
+    <path d="M593 626L628 606L628 644L593 664Z"/>
+    <path d="M636 601L671 581L671 619L636 639Z"/>
+    <path d="M678 625L713 605L713 643L678 663Z"/>
+    <path d="M593 722L628 702L628 740L593 760Z"/>
+    <path d="M636 697L671 677L671 715L636 735Z"/>
+    <!-- leg -->
+    <path d="M636 745L671 725L671 763L636 783Z"/>
+    <!-- the leg ends in a small drop -->
+    <path d="M679 776C679 765 689 758 701 757C712 757 713 769 708 781C702 793 691 801 684 799C680 797 679 790 679 776Z"/>
+  </g>
+</svg>

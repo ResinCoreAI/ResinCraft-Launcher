@@ -13,12 +13,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{broadcast, mpsc};
 
 use crate::core::events::{emit, Task};
-use crate::core::types::{LogLine, ServerEvent, ServerKind, ServerLogEvent, ServerMeta, ServerNet, TunnelMode};
+use crate::core::text::{text_of, Text};
+use crate::core::types::{LogLine, ResinNet, ServerEvent, ServerKind, ServerLogEvent, ServerMeta, ServerNet, TunnelMode};
 use crate::game::java::hidden_command;
 use crate::game::launch::{split_args, LogParser};
 use crate::player::files::unique_name;
 
-use super::{installers, network, playit, properties, store, tunnel};
+use super::{installers, network, playit, properties, relay, store, tunnel};
 
 /// How long a server gets to save and shut down after `stop` before it's killed.
 const STOP_TIMEOUT: Duration = Duration::from_secs(90);
@@ -85,15 +86,18 @@ fn emit_state(id: &str, code: Option<i32>) {
 }
 
 fn set_net(id: &str, n: Option<ServerNet>) {
-    let open = n.as_ref().is_some_and(|n| n.state == "open");
-    with(|w| {
-        if let Some(p) = w.procs.get_mut(id) {
-            p.net = n;
-        }
+    let open_at = |n: &Option<ServerNet>| n.as_ref().filter(|n| n.state == "open").map(|n| n.address.clone());
+    let now = open_at(&n);
+    let before = with(|w| {
+        let p = w.procs.get_mut(id)?;
+        let was = open_at(&p.net);
+        p.net = n;
+        Some(was)
     });
     emit_state(id, None);
-    if open {
-        // Re-check (and with Cloudflare, update) the server's own domain for this address.
+    // Newly reachable, or at a new address (not every traffic update): re-check (and with Cloudflare, update)
+    // the server's own domain for this address.
+    if now.is_some() && before.flatten() != now {
         tokio::spawn(super::domain::on_open(id.to_string()));
     }
 }
@@ -267,6 +271,8 @@ pub async fn start(id: &str) -> Result<()> {
     };
     let java = installers::choose_java(&meta).await.map_err(fail)?;
     properties::set_values(&dir, &[("server-port", meta.port.to_string())]).await.map_err(fail)?;
+    // Plugin/mod changes queued while the server last ran (normally applied when it stopped).
+    let applied = super::plugins::apply_pending(id).await.unwrap_or_default();
 
     // Only Paperclip and Spigot need it; other loaders resolve real paths and break across drives.
     let run_dir = if matches!(meta.kind, ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Spigot) {
@@ -318,6 +324,9 @@ pub async fn start(id: &str) -> Result<()> {
         }
     };
     push(LogLine { text: format!("ResinCraft is starting {} ({})", meta.name, installers::describe(&meta)), level: "info" });
+    for text in applied {
+        push(LogLine { text, level: "info" });
+    }
     push(LogLine { text: format!("Java: {java}"), level: "info" });
     push(LogLine { text: format!("Command: java {}", args.join(" ")), level: "debug" });
 
@@ -390,6 +399,11 @@ pub async fn start(id: &str) -> Result<()> {
         let stopping = with(|w| w.procs.get(&id).map(|p| p.stopping).unwrap_or(false));
         let crashed = !killed && !stopping && code != Some(0);
         close_internet(&id, port).await;
+        // Swap in plugin/mod changes that waited for the server to let go of its jars.
+        match super::plugins::apply_pending(&id).await {
+            Ok(lines) => lines.into_iter().for_each(|text| push(LogLine { text, level: "info" })),
+            Err(e) => push(LogLine { text: format!("Couldn't apply queued plugin changes: {e}"), level: "warn" }),
+        }
         let shown = if killed { "killed".to_string() } else { code.map(|c| c.to_string()).unwrap_or_else(|| "unknown".into()) };
         push(LogLine { text: format!("Server exited ({shown})"), level: if crashed { "error" } else { "info" } });
         flush();
@@ -482,19 +496,79 @@ fn make_link(link: &std::path::Path, target: &std::path::Path) -> std::io::Resul
 }
 
 fn net_state(state: &'static str, address: Option<String>, error: Option<String>, via: Option<&'static str>) -> ServerNet {
-    ServerNet { state, address, error, via, claim_url: None, domain_ok: None, playit_hint: false }
+    ServerNet { state, address, error, via, error_text: None, claim_url: None, domain_ok: None, playit_hint: false, resin: None, resin_hint: false }
+}
+
+/// Why ResinCraft Relay wasn't used, for the card.
+fn resin_failed(e: &anyhow::Error) -> ResinNet {
+    ResinNet { error: Some(text_of(e).cloned().unwrap_or_else(|| Text::plain(e.to_string()))), ..ResinNet::default() }
+}
+
+/// Brings the server online through ResinCraft Relay (`<name>.rscraft.resincore.tech`). Ok also when the server
+/// stopped meanwhile: nothing more to do then.
+async fn open_resin(id: &str) -> Result<()> {
+    let Ok(meta) = store::get(id).await else { return Ok(()) };
+    let status_id = id.to_string();
+    let opened = relay::open(id, meta.port, move |s| on_resin_status(&status_id, s)).await?;
+    if !is_running(id) || net(id).is_none() {
+        opened.task.abort();
+        return Ok(());
+    }
+    with(|w| {
+        if let Some(old) = w.tunnels.insert(id.to_string(), opened.task) {
+            old.abort();
+        }
+    });
+    let resin = ResinNet { name: Some(opened.name), used_bytes: opened.usage.bytes, limit_bytes: opened.limits.monthly_bytes, ..ResinNet::default() };
+    set_net(id, Some(ServerNet { resin: Some(resin), ..net_state("open", Some(opened.address), None, Some("resin")) }));
+    Ok(())
+}
+
+/// Updates from a running ResinCraft Relay tunnel: traffic, reconnecting, back online, or given up.
+fn on_resin_status(id: &str, status: relay::Status) {
+    let Some(mut n) = net(id).filter(|n| n.via == Some("resin")) else { return };
+    let resin = n.resin.get_or_insert_with(ResinNet::default);
+    match status {
+        relay::Status::Usage(u) => {
+            if resin.used_bytes == u.bytes {
+                return;
+            }
+            resin.used_bytes = u.bytes;
+        }
+        relay::Status::Reconnecting => {
+            if resin.reconnecting {
+                return;
+            }
+            resin.reconnecting = true;
+        }
+        relay::Status::Online { address, usage } => {
+            resin.reconnecting = false;
+            resin.used_bytes = usage.bytes;
+            n.address = Some(address);
+        }
+        relay::Status::Failed(e) => {
+            eprintln!("[server] ResinCraft Relay stopped: {e:#}");
+            n = ServerNet { error_text: text_of(&e).cloned(), ..net_state("failed", None, Some(e.to_string()), None) };
+        }
+    }
+    set_net(id, Some(n));
 }
 
 /// Makes a running server reachable from the internet the way its settings say (TunnelMode): the router
-/// (UPnP, a direct connection; the lease is renewed while it runs), playit.gg (a stable address), or the bore
-/// relay (no setup at all), which is also the fallback when the other two fail. Automatic tries the router,
-/// then playit.gg if this launcher is already linked to it (never a claim page there), then the relay.
+/// (UPnP, a direct connection; the lease is renewed while it runs), ResinCraft Relay (a stable name, needs a
+/// Microsoft account), playit.gg (a stable address), or the bore relay (no setup at all), which is also the
+/// fallback when the others fail. Automatic tries the router, then ResinCraft Relay if a Microsoft account is
+/// signed in, then playit.gg if this launcher is already linked to it (never a claim page there), then bore.
 async fn open_internet(id: String) {
     let Ok(meta) = store::get(&id).await else { return };
     let port = meta.port;
     set_net(&id, Some(net_state("opening", None, None, None)));
     // Automatic only: playit.gg isn't linked, so the relay's card suggests linking it.
     let mut playit_hint = false;
+    // Automatic only: no Microsoft account for ResinCraft Relay, so the card suggests signing in.
+    let mut resin_hint = false;
+    // Why ResinCraft Relay wasn't used, when it was tried.
+    let mut resin_note: Option<ResinNet> = None;
     let earlier_err = match meta.tunnel {
         // The player forwarded the port themselves: share the public IP with that port.
         TunnelMode::Manual => {
@@ -522,6 +596,19 @@ async fn open_internet(id: String) {
                 return;
             }
             Err(router_err) => {
+                // ResinCraft Relay next, when a Microsoft account is signed in.
+                if relay::usable(&meta).await {
+                    match open_resin(&id).await {
+                        Ok(()) => return,
+                        Err(_) if !is_running(&id) || net(&id).is_none() => return,
+                        Err(e) => {
+                            eprintln!("[server] ResinCraft Relay didn't work: {e:#}");
+                            resin_note = Some(resin_failed(&e));
+                        }
+                    }
+                } else if relay::settings().is_some() {
+                    resin_hint = true;
+                }
                 if playit::linked().await {
                     // Linked already, so no claim page. If playit.gg asks to link again (the agent was removed
                     // there), give up on it at once and use the relay instead of waiting for the browser.
@@ -586,6 +673,14 @@ async fn open_internet(id: String) {
                 Err(e) => Some(e),
             }
         }
+        TunnelMode::Resin => match open_resin(&id).await {
+            Ok(()) => return,
+            Err(_) if !is_running(&id) || net(&id).is_none() => return,
+            Err(e) => {
+                resin_note = Some(resin_failed(&e));
+                Some(e)
+            }
+        },
         TunnelMode::Relay => None,
     };
     let relay = tunnel::Relay::for_server(&meta);
@@ -610,14 +705,16 @@ async fn open_internet(id: String) {
             });
             // When playit.gg was chosen, say why the relay is used instead.
             let why = earlier_err.filter(|_| meta.tunnel == TunnelMode::Playit).map(|e| format!("{e}."));
-            set_net(&id, Some(ServerNet { playit_hint, ..net_state("open", Some(t.address), why, Some("relay")) }));
+            set_net(&id, Some(ServerNet { playit_hint, resin_hint, resin: resin_note, ..net_state("open", Some(t.address), why, Some("relay")) }));
         }
         Err(e) => {
             let msg = match earlier_err {
                 Some(first) => format!("{first} {e}."),
                 None => format!("{e}."),
             };
-            set_net(&id, Some(net_state("failed", None, Some(msg), None)));
+            // With ResinCraft Relay chosen, its (translated) reason is the one to show.
+            let error_text = resin_note.as_ref().filter(|_| meta.tunnel == TunnelMode::Resin).and_then(|r| r.error.clone());
+            set_net(&id, Some(ServerNet { error_text, resin: resin_note, ..net_state("failed", None, Some(msg), None) }));
         }
     }
 }

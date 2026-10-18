@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::content::curseforge::{cf, cf_raw};
@@ -16,10 +16,13 @@ use crate::core::ctx::http;
 use crate::core::events::Task;
 use crate::core::fsutil::{read_json, safe_join, write_json};
 use crate::core::net::{download_file, fetch_json, hash_file, post_json, DownloadItem, Hash, HashAlgo};
-use crate::core::types::{ContentItem, ContentKind, ProjectVersion, ServerAddonHit, ServerAddonResult, ServerKind, ServerMeta};
+use crate::core::types::{
+    ContentItem, ContentKind, ProjectVersion, ServerAddon, ServerAddonHit, ServerAddonResult, ServerAddonVersion, ServerKind, ServerMeta, UpdateRef,
+};
+use crate::{bail_tr, err_tr, tr};
 use crate::core::{settings, shell};
 
-use super::store;
+use super::{runtime, store};
 
 const MODRINTH: &str = "https://api.modrinth.com/v2";
 const HANGAR: &str = "https://hangar.papermc.io/api/v1";
@@ -94,12 +97,25 @@ fn cf_loader_id(kind: ServerKind) -> Option<u32> {
 
 // ---------- Listing ----------
 
-pub async fn list(id: &str) -> Result<Vec<ContentItem>> {
-    let meta = store::get(id).await?;
-    let folder = folder(&meta)?;
-    tokio::fs::create_dir_all(&folder).await?;
+/// Where a project id comes from.
+fn source_of(project_id: &str) -> Option<&'static str> {
+    if project_id.is_empty() {
+        None
+    } else if project_id.starts_with("hangar:") {
+        Some("hangar")
+    } else if project_id.starts_with("spigot:") {
+        Some("spigot")
+    } else if project_id.starts_with("cf:") {
+        Some("curseforge")
+    } else {
+        Some("modrinth")
+    }
+}
+
+async fn jar_names(folder: &Path) -> Result<Vec<String>> {
+    tokio::fs::create_dir_all(folder).await?;
     let mut names = Vec::new();
-    let mut rd = tokio::fs::read_dir(&folder).await?;
+    let mut rd = tokio::fs::read_dir(folder).await?;
     while let Some(e) = rd.next_entry().await? {
         let name = e.file_name().to_string_lossy().into_owned();
         let lower = name.to_lowercase();
@@ -107,44 +123,65 @@ pub async fn list(id: &str) -> Result<Vec<ContentItem>> {
             names.push(name);
         }
     }
+    Ok(names)
+}
+
+pub async fn list(id: &str) -> Result<Vec<ServerAddon>> {
+    let meta = store::get(id).await?;
+    let folder = folder(&meta)?;
+    let names = jar_names(&folder).await?;
     let mut idx = load_index(&meta).await;
     let unknown: Vec<String> = names.iter().filter(|n| !idx.contains_key(&key(n))).cloned().collect();
-    if !unknown.is_empty() && identify(&folder, &unknown, &mut idx).await.is_ok() {
+    if !unknown.is_empty() && identify(&meta, &folder, &unknown, &mut idx).await.is_ok() {
         let _ = save_index(&meta, &idx).await;
     }
+    let pending = load_pending(&meta).await;
     let mut items = Vec::new();
     for n in names {
         let e = idx.get(&key(&n));
+        let known = e.filter(|e| !e.project_id.is_empty());
         let size = tokio::fs::metadata(folder.join(&n)).await.map(|m| m.len()).unwrap_or(0);
-        items.push(ContentItem {
-            enabled: !n.ends_with(".disabled"),
-            size,
-            kind: ContentKind::Mod,
-            title: e.map(|e| e.title.clone()),
-            project_id: e.map(|e| e.project_id.clone()),
-            version_id: e.map(|e| e.version_id.clone()),
-            version_number: e.map(|e| e.version_number.clone()),
-            icon_url: e.and_then(|e| e.icon_url.clone()),
-            update: None,
-            filename: n,
+        let op = pending.iter().find(|p| p.filename() == n);
+        items.push(ServerAddon {
+            source: known.and_then(|e| source_of(&e.project_id)),
+            pending: op.map(PendingOp::kind),
+            pending_version: op.and_then(|p| match p {
+                PendingOp::Replace { entry, .. } => Some(entry.version_number.clone()),
+                _ => None,
+            }),
+            update_url: None,
+            item: ContentItem {
+                enabled: !n.ends_with(".disabled"),
+                size,
+                kind: ContentKind::Mod,
+                // Unknown-source jars still show the name and version from their plugin.yml.
+                title: e.map(|e| e.title.clone()).filter(|t| !t.is_empty()),
+                project_id: known.map(|e| e.project_id.clone()),
+                version_id: known.map(|e| e.version_id.clone()),
+                version_number: e.map(|e| e.version_number.clone()).filter(|v| !v.is_empty()),
+                icon_url: e.and_then(|e| e.icon_url.clone()),
+                update: None,
+                filename: n,
+            },
         });
     }
-    items.sort_by(|a, b| display_cmp(a.title.as_deref().unwrap_or(&a.filename), b.title.as_deref().unwrap_or(&b.filename)));
+    items.sort_by(|a, b| display_cmp(a.item.title.as_deref().unwrap_or(&a.item.filename), b.item.title.as_deref().unwrap_or(&b.item.filename)));
     Ok(items)
 }
 
-/// Names files dropped in by hand (or copied from an instance) via Modrinth's hash lookup.
-async fn identify(folder: &Path, names: &[String], idx: &mut ContentIndex) -> Result<()> {
+/// Names files dropped in by hand (or copied from an instance): by hash on Modrinth, then (plugin servers) by the
+/// plugin's name on Hangar. Files neither knows are remembered with an empty project id ("unknown source") so
+/// they aren't looked up again on every refresh.
+async fn identify(meta: &ServerMeta, folder: &Path, names: &[String], idx: &mut ContentIndex) -> Result<()> {
     let mut hashes: HashMap<String, String> = HashMap::new();
     for n in names {
         hashes.insert(hash_file(&folder.join(n), HashAlgo::Sha1).await?, n.clone());
     }
-    let found: HashMap<String, MrVersion> = post_json(&format!("{MODRINTH}/version_files"), &json!({ "hashes": hashes.keys().collect::<Vec<_>>(), "algorithm": "sha1" })).await?;
+    let found: HashMap<String, MrVersion> =
+        post_json(&format!("{MODRINTH}/version_files"), &json!({ "hashes": hashes.keys().collect::<Vec<_>>(), "algorithm": "sha1" })).await?;
     let ids: Vec<String> = found.values().map(|v| v.project_id.clone()).collect::<HashSet<_>>().into_iter().collect();
-    if ids.is_empty() {
-        return Ok(());
-    }
-    let projects: Vec<MrProject> = fetch_json(&format!("{MODRINTH}/projects?ids={}", enc(&serde_json::to_string(&ids)?))).await?;
+    let projects: Vec<MrProject> =
+        if ids.is_empty() { Vec::new() } else { fetch_json(&format!("{MODRINTH}/projects?ids={}", enc(&serde_json::to_string(&ids)?))).await? };
     for (hash, v) in found {
         let (Some(p), Some(name)) = (projects.iter().find(|p| p.id == v.project_id), hashes.get(&hash)) else { continue };
         idx.insert(
@@ -152,24 +189,76 @@ async fn identify(folder: &Path, names: &[String], idx: &mut ContentIndex) -> Re
             IndexEntry { project_id: p.id.clone(), version_id: v.id, version_number: v.version_number, title: p.title.clone(), icon_url: p.icon_url.clone(), sha1: hash },
         );
     }
+    for (hash, name) in hashes {
+        if idx.contains_key(&key(&name)) {
+            continue;
+        }
+        let mut entry = IndexEntry { sha1: hash, ..Default::default() };
+        if let Some((plugin, version)) = plugin_yml(&folder.join(&name)).await {
+            entry.title = plugin.clone();
+            entry.version_number = version.clone();
+            if sources(meta.kind).contains(&"hangar") {
+                if let Ok(p) = fetch_json::<HangarProject>(&format!("{HANGAR}/projects/{}", enc(&plugin))).await {
+                    entry.project_id = format!("hangar:{}", p.namespace.slug);
+                    entry.version_id = version;
+                    entry.title = p.name;
+                    entry.icon_url = p.avatar_url;
+                }
+            }
+        }
+        idx.insert(key(&name), entry);
+    }
     Ok(())
 }
 
+/// The `name` and `version` a plugin declares in paper-plugin.yml or plugin.yml.
+async fn plugin_yml(jar: &Path) -> Option<(String, String)> {
+    let jar = jar.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let mut zip = crate::content::index::open_zip(&jar).ok()?;
+        let text = ["paper-plugin.yml", "plugin.yml"].iter().find_map(|n| crate::content::index::read_zip_text(&mut zip, n).ok().flatten())?;
+        let field = |k: &str| {
+            text.lines().find_map(|l| {
+                let v = l.strip_prefix(k)?.trim_start().strip_prefix(':')?;
+                Some(v.trim().trim_matches(['"', '\'']).to_string()).filter(|v| !v.is_empty())
+            })
+        };
+        Some((field("name")?, field("version").unwrap_or_default()))
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 pub async fn toggle(id: &str, filename: &str) -> Result<()> {
-    let folder = folder(&store::get(id).await?)?;
-    let from = safe_join(&folder, safe_name(filename)?)?;
+    let meta = store::get(id).await?;
+    let folder = folder(&meta)?;
+    safe_name(filename)?;
+    if runtime::is_running(id) {
+        // A running Java server keeps its jars open (locked on Windows): switch it once the server stops.
+        return queue(&meta, PendingOp::Toggle { filename: filename.to_string() }).await;
+    }
+    toggle_now(&folder, filename).await
+}
+
+async fn toggle_now(folder: &Path, filename: &str) -> Result<()> {
+    let from = safe_join(folder, safe_name(filename)?)?;
     let to = match filename.strip_suffix(".disabled") {
-        Some(base) => safe_join(&folder, base)?,
+        Some(base) => safe_join(folder, base)?,
         None => PathBuf::from(format!("{}.disabled", from.display())),
     };
     tokio::fs::rename(&from, &to).await?;
     Ok(())
 }
 
-/// Moves the file to the Recycle Bin (never a permanent delete).
+/// Moves the file to the Recycle Bin (never a permanent delete); queued while the server runs.
 pub async fn remove(id: &str, filename: &str) -> Result<()> {
     let meta = store::get(id).await?;
-    shell::trash(&safe_join(&folder(&meta)?, safe_name(filename)?)?).await?;
+    safe_name(filename)?;
+    if runtime::is_running(id) {
+        return queue(&meta, PendingOp::Remove { filename: filename.to_string() }).await;
+    }
+    shell::trash(&safe_join(&folder(&meta)?, filename)?).await?;
     let mut idx = load_index(&meta).await;
     idx.remove(&key(filename));
     save_index(&meta, &idx).await
@@ -200,20 +289,6 @@ pub async fn search(id: &str, query: &str, source: &str, offset: usize) -> Resul
         "curseforge" => cf_search(&meta, query, offset).await,
         _ => bail!("Unknown source: {source}"),
     }
-}
-
-pub async fn versions(id: &str, project_id: &str) -> Result<Vec<ProjectVersion>> {
-    let meta = store::get(id).await?;
-    if let Some(slug) = project_id.strip_prefix("hangar:") {
-        return hangar_versions(&meta, slug).await;
-    }
-    if let Some(rid) = project_id.strip_prefix("spigot:") {
-        return Ok(vec![spiget_latest(rid).await?.1]);
-    }
-    if let Some(cid) = project_id.strip_prefix("cf:") {
-        return Ok(cf_files(&meta, cid).await?.iter().map(cf_version).collect());
-    }
-    Ok(mr_versions(&meta, project_id).await?.into_iter().map(mr_version).collect())
 }
 
 pub async fn install(id: &str, project_id: &str, version_id: Option<String>) -> Result<()> {
@@ -384,10 +459,7 @@ async fn mr_install(meta: &ServerMeta, folder: &Path, root: &str, version_id: Op
         task.update(format!("Installing {}…", p.title), None);
         let v = match vid {
             Some(v) => fetch_json::<MrVersion>(&format!("{MODRINTH}/version/{}", enc(&v))).await?,
-            None => mr_versions(meta, &pid)
-                .await?
-                .into_iter()
-                .next()
+            None => newest_release(mr_versions(meta, &pid).await?)
                 .ok_or_else(|| anyhow!("{} has no version for {} {}", p.title, meta.kind.label(), meta.mc_version))?,
         };
         let f = v.files.iter().find(|f| f.primary).or(v.files.first()).ok_or_else(|| anyhow!("{} has no files to download", p.title))?;
@@ -522,23 +594,6 @@ async fn hangar_version_list(meta: &ServerMeta, slug: &str) -> Result<Vec<Hangar
     Ok(fetch_json::<HangarPage<HangarVersion>>(&url).await?.result)
 }
 
-async fn hangar_versions(meta: &ServerMeta, slug: &str) -> Result<Vec<ProjectVersion>> {
-    Ok(hangar_version_list(meta, slug)
-        .await?
-        .into_iter()
-        .map(|v| ProjectVersion {
-            id: v.name.clone(),
-            version_number: v.name.clone(),
-            game_versions: v.platform_dependencies.get("PAPER").cloned().unwrap_or_default(),
-            loaders: vec!["paper".into()],
-            kind: if v.channel.name.eq_ignore_ascii_case("release") { "release".into() } else { "beta".into() },
-            published: v.created_at,
-            downloads: v.stats.total_downloads,
-            name: v.name,
-        })
-        .collect())
-}
-
 async fn hangar_install(meta: &ServerMeta, folder: &Path, slug: &str, version: Option<String>, idx: &mut ContentIndex, task: &std::sync::Arc<Task>) -> Result<()> {
     let p: HangarProject = fetch_json(&format!("{HANGAR}/projects/{}", enc(slug))).await?;
     task.update(format!("Installing {}…", p.name), None);
@@ -601,6 +656,8 @@ struct SpigetResource {
     premium: bool,
     external: bool,
     file: Option<SpigetFile>,
+    #[serde(rename = "testedVersions")]
+    tested_versions: Vec<String>,
 }
 #[derive(Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
@@ -621,7 +678,7 @@ impl SpigetResource {
     }
 }
 
-const SPIGET_FIELDS: &str = "id%2Cname%2Ctag%2Cdownloads%2Cpremium%2Cexternal%2Cfile";
+const SPIGET_FIELDS: &str = "id%2Cname%2Ctag%2Cdownloads%2Cpremium%2Cexternal%2Cfile%2CtestedVersions";
 
 async fn spiget_search(query: &str, offset: usize) -> Result<ServerAddonResult> {
     let page = offset / PAGE + 1;
@@ -842,10 +899,7 @@ async fn cf_install(meta: &ServerMeta, folder: &Path, mod_id: &str, version: Opt
         task.update(format!("Installing {title}…"), None);
         let file = match fid {
             Some(f) => cf::<Value>(&format!("/mods/{mid}/files/{f}"), None).await?,
-            None => cf_files(meta, &mid)
-                .await?
-                .into_iter()
-                .next()
+            None => newest_cf_release(cf_files(meta, &mid).await?)
                 .ok_or_else(|| anyhow!("{title} has no version for {} {}", meta.kind.label(), meta.mc_version))?,
         };
         let tags: Vec<String> = cf_tags(&file).iter().map(|t| t.to_lowercase()).collect();
@@ -883,4 +937,545 @@ async fn cf_install(meta: &ServerMeta, folder: &Path, mod_id: &str, version: Opt
         }
     }
     Ok(())
+}
+
+// ---------- Versions, switching and updates ----------
+//
+// Switching a jar to another version (or updating it) always downloads into `<server>/.resincraft/staged`,
+// verifies it, then swaps it in with one rename, keeping the enabled/disabled state. While the server runs,
+// Java holds its jars open (locked on Windows), so swaps, toggles and removals wait in
+// `<server>/.resincraft/pending-addons.json` and are applied as soon as the server stops (or before it starts).
+
+/// A change to a jar that waits until the server isn't running.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "op", rename_all = "camelCase")]
+enum PendingOp {
+    /// Replace `old` with the staged download, saved as `target`.
+    Replace { old: String, staged: String, target: String, entry: IndexEntry },
+    Toggle { filename: String },
+    Remove { filename: String },
+}
+
+impl PendingOp {
+    fn filename(&self) -> &str {
+        match self {
+            PendingOp::Replace { old, .. } => old,
+            PendingOp::Toggle { filename } | PendingOp::Remove { filename } => filename,
+        }
+    }
+    fn kind(&self) -> &'static str {
+        match self {
+            PendingOp::Replace { .. } => "update",
+            PendingOp::Toggle { filename } if filename.ends_with(".disabled") => "enable",
+            PendingOp::Toggle { .. } => "disable",
+            PendingOp::Remove { .. } => "remove",
+        }
+    }
+}
+
+fn work_dir(meta: &ServerMeta) -> Result<PathBuf> {
+    Ok(store::dir(&meta.id)?.join(".resincraft"))
+}
+
+async fn load_pending(meta: &ServerMeta) -> Vec<PendingOp> {
+    match work_dir(meta) {
+        Ok(d) => read_json(&d.join("pending-addons.json")).await.unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
+async fn save_pending(meta: &ServerMeta, ops: &[PendingOp]) -> Result<()> {
+    let file = work_dir(meta)?.join("pending-addons.json");
+    if ops.is_empty() {
+        let _ = tokio::fs::remove_file(&file).await;
+        return Ok(());
+    }
+    write_json(&file, ops).await
+}
+
+async fn drop_staged(meta: &ServerMeta, op: &PendingOp) {
+    if let (PendingOp::Replace { staged, .. }, Ok(dir)) = (op, work_dir(meta)) {
+        if let Ok(p) = safe_join(&dir.join("staged"), staged) {
+            let _ = tokio::fs::remove_file(p).await;
+        }
+    }
+}
+
+fn flip_disabled(name: &str) -> String {
+    match name.strip_suffix(".disabled") {
+        Some(base) => base.to_string(),
+        None => format!("{name}.disabled"),
+    }
+}
+
+/// Queues a change for when the server stops. One change per file: a second toggle cancels the first, a toggle
+/// after an update flips the update's enabled state, and anything else replaces what was queued.
+async fn queue(meta: &ServerMeta, op: PendingOp) -> Result<()> {
+    let mut ops = load_pending(meta).await;
+    let existing = ops.iter().position(|p| p.filename() == op.filename());
+    match (existing.map(|i| ops[i].clone()), op) {
+        (Some(PendingOp::Toggle { .. }), PendingOp::Toggle { .. }) => {
+            ops.remove(existing.unwrap_or(0));
+        }
+        (Some(PendingOp::Replace { old, staged, target, entry }), PendingOp::Toggle { .. }) => {
+            ops[existing.unwrap_or(0)] = PendingOp::Replace { old, staged, target: flip_disabled(&target), entry };
+        }
+        (Some(PendingOp::Toggle { .. }), PendingOp::Replace { old, staged, target, entry }) => {
+            ops[existing.unwrap_or(0)] = PendingOp::Replace { old, staged, target: flip_disabled(&target), entry };
+        }
+        (Some(prev), op) => {
+            drop_staged(meta, &prev).await;
+            ops[existing.unwrap_or(0)] = op;
+        }
+        (None, op) => ops.push(op),
+    }
+    save_pending(meta, &ops).await
+}
+
+async fn apply_op(meta: &ServerMeta, folder: &Path, op: &PendingOp, idx: &mut ContentIndex) -> Result<()> {
+    match op {
+        PendingOp::Replace { old, staged, target, entry } => {
+            let from = safe_join(&work_dir(meta)?.join("staged"), staged)?;
+            let to = safe_join(folder, safe_name(target)?)?;
+            // One rename: the new jar is either fully there or not at all (it replaces a same-named file).
+            tokio::fs::rename(&from, &to).await?;
+            if old != target {
+                let _ = tokio::fs::remove_file(safe_join(folder, safe_name(old)?)?).await;
+            }
+            idx.remove(&key(old));
+            idx.insert(key(target), entry.clone());
+        }
+        PendingOp::Toggle { filename } => toggle_now(folder, filename).await?,
+        PendingOp::Remove { filename } => {
+            shell::trash(&safe_join(folder, safe_name(filename)?)?).await?;
+            idx.remove(&key(filename));
+        }
+    }
+    Ok(())
+}
+
+/// Applies queued changes. Only for the runtime, at moments when no Java process has the jars open (just
+/// before starting, just after exiting). Returns a line per change for the console; failures stay queued.
+pub async fn apply_pending(id: &str) -> Result<Vec<String>> {
+    let meta = store::get(id).await?;
+    let ops = load_pending(&meta).await;
+    if ops.is_empty() {
+        return Ok(Vec::new());
+    }
+    let folder = folder(&meta)?;
+    let mut idx = load_index(&meta).await;
+    let (mut left, mut done) = (Vec::new(), Vec::new());
+    for op in ops {
+        let name = op.filename().to_string();
+        let mut result = apply_op(&meta, &folder, &op, &mut idx).await;
+        if result.is_err() {
+            // The Java process may need a moment to let go of its files.
+            tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+            result = apply_op(&meta, &folder, &op, &mut idx).await;
+        }
+        match result {
+            Ok(()) => done.push(match &op {
+                PendingOp::Replace { entry, .. } => format!("Updated {} to {}", if entry.title.is_empty() { &name } else { &entry.title }, entry.version_number),
+                PendingOp::Remove { .. } => format!("Removed {name}"),
+                PendingOp::Toggle { filename } if filename.ends_with(".disabled") => format!("Enabled {name}"),
+                PendingOp::Toggle { .. } => format!("Disabled {name}"),
+            }),
+            Err(e) => {
+                eprintln!("[server] queued change to {name} failed: {e:#}");
+                left.push(op);
+            }
+        }
+    }
+    save_index(&meta, &idx).await?;
+    save_pending(&meta, &left).await?;
+    Ok(done)
+}
+
+/// Cancels whatever is queued for a file.
+pub async fn cancel_pending(id: &str, filename: &str) -> Result<()> {
+    let meta = store::get(id).await?;
+    let mut ops = load_pending(&meta).await;
+    if let Some(i) = ops.iter().position(|p| p.filename() == filename) {
+        let op = ops.remove(i);
+        drop_staged(&meta, &op).await;
+    }
+    save_pending(&meta, &ops).await
+}
+
+/// What switching to a version needs: the download and what to record about it.
+struct Resolved {
+    url: String,
+    filename: String,
+    hash: Option<Hash>,
+    size: Option<u64>,
+    entry: IndexEntry,
+}
+
+fn mr_compatible(meta: &ServerMeta, v: &MrVersion) -> bool {
+    let loaders = mr_loaders(meta);
+    v.game_versions.contains(&meta.mc_version) && v.loaders.iter().any(|l| loaders.contains(&l.as_str()))
+}
+
+/// The newest stable release (the list is newest first), else the newest version of any kind.
+fn newest_release(list: Vec<MrVersion>) -> Option<MrVersion> {
+    let release = list.iter().position(|v| v.version_type == "release");
+    let mut list = list;
+    match release {
+        Some(i) => Some(list.swap_remove(i)),
+        None => list.into_iter().next(),
+    }
+}
+
+/// CurseForge: releaseType 1 = release, 2 = beta, 3 = alpha.
+fn newest_cf_release(list: Vec<Value>) -> Option<Value> {
+    let release = list.iter().position(|f| cf_u(f, "releaseType") == 1);
+    let mut list = list;
+    match release {
+        Some(i) => Some(list.swap_remove(i)),
+        None => list.into_iter().next(),
+    }
+}
+
+/// Plugin sites often tag "1.21" for every 1.21.x release.
+fn tag_matches(tag: &str, mc: &str) -> bool {
+    tag == mc || mc.starts_with(&format!("{tag}."))
+}
+
+fn cf_fits(meta: &ServerMeta, f: &Value) -> bool {
+    let tags: Vec<String> = cf_tags(f).iter().map(|t| t.to_lowercase()).collect();
+    if meta.kind.plugins() {
+        let versions: Vec<&String> = tags.iter().filter(|t| t.starts_with(|c: char| c.is_ascii_digit())).collect();
+        return versions.is_empty() || versions.iter().any(|t| tag_matches(t, &meta.mc_version));
+    }
+    let loaders = mr_loaders(meta);
+    let tagged: Vec<&String> = tags.iter().filter(|t| ["forge", "fabric", "quilt", "neoforge"].contains(&t.as_str())).collect();
+    tags.contains(&meta.mc_version) && (tagged.is_empty() || tagged.iter().any(|t| loaders.contains(&t.as_str())))
+}
+
+/// Every published version of an installed plugin or mod, newest first, marked compatible or not.
+pub async fn versions(id: &str, project_id: &str) -> Result<Vec<ServerAddonVersion>> {
+    let meta = store::get(id).await?;
+    let mc = meta.mc_version.clone();
+    if let Some(slug) = project_id.strip_prefix("hangar:") {
+        let p: HangarProject = fetch_json(&format!("{HANGAR}/projects/{}", enc(slug))).await?;
+        let list: Vec<HangarVersion> = fetch_json::<HangarPage<HangarVersion>>(&format!("{HANGAR}/projects/{}/versions?limit=25&offset=0&platform=PAPER", enc(slug))).await?.result;
+        return Ok(list
+            .into_iter()
+            .map(|v| {
+                let games = v.platform_dependencies.get("PAPER").cloned().unwrap_or_default();
+                ServerAddonVersion {
+                    compatible: games.iter().any(|g| tag_matches(g, &mc)),
+                    changelog_url: Some(format!("https://hangar.papermc.io/{}/{}/versions/{}", p.namespace.owner, p.namespace.slug, enc(&v.name))),
+                    version: ProjectVersion {
+                        id: v.name.clone(),
+                        version_number: v.name.clone(),
+                        game_versions: games,
+                        loaders: vec!["paper".into()],
+                        kind: if v.channel.name.eq_ignore_ascii_case("release") { "release".into() } else { "beta".into() },
+                        published: v.created_at,
+                        downloads: v.stats.total_downloads,
+                        name: v.name,
+                    },
+                }
+            })
+            .collect());
+    }
+    if let Some(rid) = project_id.strip_prefix("spigot:") {
+        // Spiget only mirrors the newest file; older ones are on SpigotMC behind a browser check.
+        let (r, v) = spiget_latest(rid).await?;
+        let tested = r.tested_versions.clone();
+        return Ok(vec![ServerAddonVersion {
+            compatible: r.installable() && (tested.is_empty() || tested.iter().any(|t| tag_matches(t, &mc))),
+            changelog_url: Some(format!("https://www.spigotmc.org/resources/{}/updates", r.id)),
+            version: ProjectVersion { game_versions: tested, ..v },
+        }]);
+    }
+    if let Some(cid) = project_id.strip_prefix("cf:") {
+        require_cf().await?;
+        let m: Value = cf(&format!("/mods/{cid}"), None).await?;
+        let site = m.get("links").map(|l| cf_s(l, "websiteUrl")).unwrap_or_default();
+        let mut files: Vec<Value> = cf(&format!("/mods/{cid}/files?pageSize=50"), None).await?;
+        files.retain(|f| f.get("isServerPack").and_then(Value::as_bool) != Some(true));
+        files.sort_by_key(|f| std::cmp::Reverse(cf_s(f, "fileDate")));
+        return Ok(files
+            .iter()
+            .map(|f| ServerAddonVersion {
+                compatible: cf_fits(&meta, f),
+                changelog_url: Some(format!("{site}/files/{}", cf_u(f, "id"))),
+                version: cf_version(f),
+            })
+            .collect());
+    }
+    let list: Vec<MrVersion> = fetch_json(&format!("{MODRINTH}/project/{}/version", enc(project_id))).await?;
+    Ok(list
+        .into_iter()
+        .map(|v| ServerAddonVersion {
+            compatible: mr_compatible(&meta, &v),
+            changelog_url: Some(format!("https://modrinth.com/project/{}/version/{}", v.project_id, v.id)),
+            version: mr_version(v),
+        })
+        .collect())
+}
+
+/// Finds the file for `version_id` (or the newest compatible version) of a project.
+async fn resolve(meta: &ServerMeta, project_id: &str, version_id: Option<&str>) -> Result<Resolved> {
+    let target = format!("{} {}", meta.kind.label(), meta.mc_version);
+    if let Some(slug) = project_id.strip_prefix("hangar:") {
+        let p: HangarProject = fetch_json(&format!("{HANGAR}/projects/{}", enc(slug))).await?;
+        let v: HangarVersion = match version_id {
+            Some(name) => fetch_json(&format!("{HANGAR}/projects/{}/versions/{}", enc(slug), enc(name))).await?,
+            None => {
+                let list = hangar_version_list(meta, slug).await?;
+                let pick = list.iter().find(|v| v.channel.name.eq_ignore_ascii_case("release")).or(list.first()).cloned();
+                pick.ok_or_else(|| err_tr!("hostAddon.noVersion", "{name} has no version for {target}", name = p.name, target = target))?
+            }
+        };
+        let dl = v.downloads.get("PAPER").cloned().unwrap_or_default();
+        let (Some(url), Some(info)) = (dl.download_url, dl.file_info) else {
+            let link = dl.external_url.unwrap_or_else(|| format!("https://hangar.papermc.io/{}/{}", p.namespace.owner, p.namespace.slug));
+            bail_tr!("hostAddon.external", "{name} is downloaded from its author's own website: {link}", name = p.name, link = link);
+        };
+        return Ok(Resolved {
+            url,
+            filename: safe_name(&info.name)?.to_string(),
+            hash: info.sha256_hash.clone().map(Hash::sha256),
+            size: info.size_bytes,
+            entry: IndexEntry {
+                project_id: format!("hangar:{}", p.namespace.slug),
+                version_id: v.name.clone(),
+                version_number: v.name.clone(),
+                title: p.name.clone(),
+                icon_url: p.avatar_url.clone(),
+                sha1: String::new(),
+            },
+        });
+    }
+    if let Some(rid) = project_id.strip_prefix("spigot:") {
+        let (r, v) = spiget_latest(rid).await?;
+        if version_id.is_some_and(|want| want != v.id) {
+            bail_tr!("hostAddon.spigotLatestOnly", "SpigotMC only offers the newest version of {name} for download", name = r.name);
+        }
+        if !r.installable() {
+            bail_tr!("hostAddon.external", "{name} is downloaded from its author's own website: {link}", name = r.name, link = r.page());
+        }
+        let base: String = r.name.chars().map(|c| if c.is_ascii_alphanumeric() || "-_.".contains(c) { c } else { '-' }).collect();
+        return Ok(Resolved {
+            url: format!("{SPIGET}/resources/{}/download", r.id),
+            filename: format!("{}.jar", base.trim_matches('-')),
+            hash: None,
+            size: None,
+            entry: IndexEntry {
+                project_id: format!("spigot:{}", r.id),
+                version_id: v.id,
+                version_number: v.version_number,
+                title: r.name.clone(),
+                icon_url: Some(format!("https://www.spigotmc.org/data/resource_icons/{}/{}.jpg", r.id / 1000, r.id)),
+                sha1: String::new(),
+            },
+        });
+    }
+    if let Some(cid) = project_id.strip_prefix("cf:") {
+        require_cf().await?;
+        let m: Value = cf(&format!("/mods/{cid}"), None).await?;
+        let title = cf_s(&m, "name");
+        let f: Value = match version_id {
+            Some(fid) => cf(&format!("/mods/{cid}/files/{fid}"), None).await?,
+            None => newest_cf_release(cf_files(meta, cid).await?)
+                .ok_or_else(|| err_tr!("hostAddon.noVersion", "{name} has no version for {target}", name = title, target = target))?,
+        };
+        let Some(url) = f.get("downloadUrl").and_then(Value::as_str).filter(|u| !u.is_empty()).map(str::to_string) else {
+            let site = m.get("links").map(|l| cf_s(l, "websiteUrl")).unwrap_or_default();
+            bail_tr!("hostAddon.external", "{name} is downloaded from its author's own website: {link}", name = title, link = site);
+        };
+        return Ok(Resolved {
+            url,
+            filename: safe_name(&cf_s(&f, "fileName"))?.to_string(),
+            hash: cf_sha1(&f).map(Hash::sha1),
+            size: f.get("fileLength").and_then(Value::as_u64),
+            entry: IndexEntry {
+                project_id: format!("cf:{cid}"),
+                version_id: cf_u(&f, "id").to_string(),
+                version_number: cf_s(&f, "displayName"),
+                title: title.clone(),
+                icon_url: m.get("logo").and_then(|l| l.get("thumbnailUrl")).and_then(Value::as_str).map(str::to_string),
+                sha1: String::new(),
+            },
+        });
+    }
+    let p: MrProject = fetch_json(&format!("{MODRINTH}/project/{}", enc(project_id))).await?;
+    if !meta.kind.plugins() && p.server_side == "unsupported" {
+        bail_tr!("hostAddon.clientOnly", "{name} only runs on the game client, so a server can't use it.", name = p.title);
+    }
+    let v: MrVersion = match version_id {
+        Some(vid) => fetch_json(&format!("{MODRINTH}/version/{}", enc(vid))).await?,
+        None => newest_release(mr_versions(meta, project_id).await?)
+            .ok_or_else(|| err_tr!("hostAddon.noVersion", "{name} has no version for {target}", name = p.title, target = target))?,
+    };
+    let f = v.files.iter().find(|f| f.primary).or(v.files.first()).ok_or_else(|| anyhow!("{} {} has no files to download", p.title, v.version_number))?;
+    Ok(Resolved {
+        url: f.url.clone(),
+        filename: safe_name(&f.filename)?.to_string(),
+        hash: Some(Hash::sha1(&f.hashes.sha1)),
+        size: Some(f.size),
+        entry: IndexEntry {
+            project_id: p.id.clone(),
+            version_id: v.id.clone(),
+            version_number: v.version_number.clone(),
+            title: p.title.clone(),
+            icon_url: p.icon_url.clone(),
+            sha1: f.hashes.sha1.clone(),
+        },
+    })
+}
+
+/// Switches an installed jar to `version_id`, keeping it enabled or disabled. Returns true when the change
+/// waits for the server to stop.
+pub async fn change_version(id: &str, filename: &str, version_id: &str) -> Result<bool> {
+    let meta = store::get(id).await?;
+    let folder = folder(&meta)?;
+    safe_name(filename)?;
+    let idx = load_index(&meta).await;
+    let pid = idx.get(&key(filename)).map(|e| e.project_id.clone()).filter(|p| !p.is_empty());
+    let Some(pid) = pid else {
+        bail_tr!("hostAddon.unknownSource", "ResinCraft doesn't know where {file} came from, so it can't change its version", file = filename);
+    };
+    let (filename, version_id) = (filename.to_string(), version_id.to_string());
+    Task::run(tr!("hostAddon.switching", "Switching versions on {server}", server = meta.name), Some(meta.id.clone()), move |task| async move {
+        let r = resolve(&meta, &pid, Some(&version_id)).await?;
+        task.update(tr!("hostAddon.downloading", "Downloading {name} {version}…", name = r.entry.title, version = r.entry.version_number), None);
+        let work = work_dir(&meta)?.join("staged");
+        tokio::fs::create_dir_all(&work).await?;
+        let staged = format!("{}-{}", &uuid::Uuid::new_v4().simple().to_string()[..8], r.filename);
+        let staged_path = safe_join(&work, &staged)?;
+        download_file(&DownloadItem::new(&r.url, &staged_path).hash(r.hash.clone()).size(r.size)).await?;
+        if !is_jar(&staged_path).await {
+            let _ = tokio::fs::remove_file(&staged_path).await;
+            bail_tr!("hostAddon.notJar", "The download for {name} isn't a plugin file", name = r.entry.title);
+        }
+        let mut entry = r.entry;
+        entry.sha1 = hash_file(&staged_path, HashAlgo::Sha1).await?;
+        let target = if filename.ends_with(".disabled") { format!("{}.disabled", r.filename) } else { r.filename };
+        let op = PendingOp::Replace { old: filename, staged, target, entry };
+        if runtime::is_running(&meta.id) {
+            queue(&meta, op).await?;
+            return Ok(true);
+        }
+        let mut idx = load_index(&meta).await;
+        apply_op(&meta, &folder, &op, &mut idx).await?;
+        save_index(&meta, &idx).await?;
+        Ok(false)
+    })
+    .await
+}
+
+/// Marks every plugin/mod with a known source that has a newer compatible version.
+pub async fn check_updates(id: &str) -> Result<Vec<ServerAddon>> {
+    let meta = store::get(id).await?;
+    let mut items = list(id).await?;
+    let idx = load_index(&meta).await;
+
+    // Modrinth: one request for all of them, by file hash.
+    let mut by_hash: HashMap<String, usize> = HashMap::new();
+    for (i, a) in items.iter().enumerate() {
+        if let Some(e) = idx.get(&key(&a.item.filename)) {
+            if a.source == Some("modrinth") && !e.sha1.is_empty() {
+                by_hash.insert(e.sha1.clone(), i);
+            }
+        }
+    }
+    if !by_hash.is_empty() {
+        let latest: HashMap<String, MrVersion> = post_json(
+            &format!("{MODRINTH}/version_files/update"),
+            &json!({ "hashes": by_hash.keys().collect::<Vec<_>>(), "algorithm": "sha1", "loaders": mr_loaders(&meta), "game_versions": [meta.mc_version] }),
+        )
+        .await?;
+        for (hash, mut v) in latest {
+            if let Some(&i) = by_hash.get(&hash) {
+                if v.version_type != "release" {
+                    // Modrinth's update lookup also offers betas and snapshots; stay on stable releases.
+                    match mr_versions(&meta, &v.project_id).await.ok().and_then(newest_release) {
+                        Some(r) if r.version_type == "release" => v = r,
+                        _ => continue,
+                    }
+                }
+                if items[i].item.version_id.as_deref() != Some(v.id.as_str()) {
+                    items[i].update_url = Some(format!("https://modrinth.com/project/{}/version/{}", v.project_id, v.id));
+                    items[i].item.update = Some(UpdateRef { version_id: v.id, version_number: v.version_number });
+                }
+            }
+        }
+    }
+
+    // The other sites: one project at a time.
+    let checks = items.iter().enumerate().filter(|(_, a)| matches!(a.source, Some("hangar" | "spigot" | "curseforge"))).map(|(i, a)| {
+        let (pid, current, meta) = (a.item.project_id.clone().unwrap_or_default(), a.item.version_id.clone().unwrap_or_default(), &meta);
+        async move {
+            let newest: Result<Option<(String, String, String)>> = async {
+                if let Some(slug) = pid.strip_prefix("hangar:") {
+                    let list = hangar_version_list(meta, slug).await?;
+                    let Some(v) = list.iter().find(|v| v.channel.name.eq_ignore_ascii_case("release")).or(list.first()) else { return Ok(None) };
+                    let p: HangarProject = fetch_json(&format!("{HANGAR}/projects/{}", enc(slug))).await?;
+                    let url = format!("https://hangar.papermc.io/{}/{}/versions/{}", p.namespace.owner, p.namespace.slug, enc(&v.name));
+                    return Ok(Some((v.name.clone(), v.name.clone(), url)));
+                }
+                if let Some(rid) = pid.strip_prefix("spigot:") {
+                    let (r, v) = spiget_latest(rid).await?;
+                    return Ok(r.installable().then(|| (v.id, v.version_number, format!("https://www.spigotmc.org/resources/{}/updates", r.id))));
+                }
+                let cid = pid.trim_start_matches("cf:");
+                let Some(f) = newest_cf_release(cf_files(meta, cid).await?) else { return Ok(None) };
+                Ok(Some((cf_u(&f, "id").to_string(), cf_s(&f, "displayName"), String::new())))
+            }
+            .await;
+            (i, current, newest)
+        }
+    });
+    for (i, current, newest) in futures::future::join_all(checks).await {
+        match newest {
+            Ok(Some((vid, number, url))) if vid != current => {
+                items[i].update_url = Some(url).filter(|u| !u.is_empty());
+                items[i].item.update = Some(UpdateRef { version_id: vid, version_number: number });
+            }
+            Ok(_) => {}
+            Err(e) => eprintln!("[server] update check for {} failed: {e:#}", items[i].item.filename),
+        }
+    }
+    Ok(items)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mr(id: &str, kind: &str) -> MrVersion {
+        serde_json::from_value(json!({ "id": id, "project_id": "p", "version_number": id, "version_type": kind })).unwrap()
+    }
+
+    #[test]
+    fn version_tags_match_patch_releases() {
+        assert!(tag_matches("1.21", "1.21.1"));
+        assert!(tag_matches("1.21.1", "1.21.1"));
+        assert!(!tag_matches("1.2", "1.21.1"));
+        assert!(!tag_matches("1.21.4", "1.21.1"));
+    }
+
+    #[test]
+    fn prefers_stable_releases() {
+        let list = vec![mr("snap", "beta"), mr("rel", "release"), mr("old", "release")];
+        assert_eq!(newest_release(list).unwrap().id, "rel");
+        assert_eq!(newest_release(vec![mr("a", "alpha")]).unwrap().id, "a");
+        let cf = vec![json!({ "id": 3, "releaseType": 2 }), json!({ "id": 2, "releaseType": 1 })];
+        assert_eq!(cf_u(&newest_cf_release(cf).unwrap(), "id"), 2);
+    }
+
+    #[test]
+    fn queued_changes_describe_themselves() {
+        let toggle_off = PendingOp::Toggle { filename: "a.jar".into() };
+        let toggle_on = PendingOp::Toggle { filename: "a.jar.disabled".into() };
+        assert_eq!((toggle_off.kind(), toggle_on.kind()), ("disable", "enable"));
+        assert_eq!(flip_disabled("a.jar"), "a.jar.disabled");
+        assert_eq!(flip_disabled("a.jar.disabled"), "a.jar");
+        let replace = PendingOp::Replace { old: "a.jar".into(), staged: "x-a.jar".into(), target: "a2.jar".into(), entry: IndexEntry::default() };
+        assert_eq!((replace.kind(), replace.filename()), ("update", "a.jar"));
+    }
 }

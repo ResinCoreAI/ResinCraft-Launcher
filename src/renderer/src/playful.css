@@ -1,0 +1,403 @@
+/*
+ * Right-click menus and the small moments of play: presses that squish, icons that hop, a pile of pixel
+ * blocks in empty states and a burst of blocks when an install lands. Same rules as styles.css: flat
+ * surfaces, no glows, no gradients. Every motion here is a one-off of about 300 ms or less; the
+ * reduced-motion block in styles.css cuts them to nothing (none of them loop, so nothing strobes).
+ */
+
+/* ---------- Context menu ---------- */
+
+.ctx-menu {
+  position: fixed;
+  z-index: 500;
+  min-width: 210px;
+  max-width: 320px;
+  max-height: calc(100vh - 12px);
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: ctx-in 0.16s var(--spring);
+  outline: none;
+}
+@keyframes ctx-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.ctx-title {
+  padding: 5px 9px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font: 500 11.5px var(--mono);
+  color: var(--data);
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: background-color 0.08s var(--ease);
+}
+.ctx-item:focus,
+.ctx-item:focus-visible {
+  outline: none;
+}
+.ctx-item.active {
+  background: var(--accent-soft);
+}
+.ctx-item[aria-expanded='true'] {
+  background: var(--surface-3);
+}
+.ctx-item.danger {
+  color: var(--danger);
+}
+.ctx-item.danger.active {
+  background: var(--danger-soft);
+}
+.ctx-item[aria-disabled] {
+  opacity: 0.42;
+  cursor: default;
+}
+.ctx-item[aria-disabled].active {
+  background: none;
+}
+.ctx-ico {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  transition: transform 0.2s var(--spring), color 0.08s var(--ease);
+}
+.ctx-ico svg {
+  width: 15px;
+  height: 15px;
+}
+.ctx-item.active:not([aria-disabled]) .ctx-ico {
+  color: var(--accent);
+  transform: scale(1.14);
+}
+.ctx-item.danger .ctx-ico {
+  color: var(--danger);
+}
+.ctx-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx-key {
+  padding-left: 14px;
+  font: 400 11px var(--mono);
+  color: var(--text-faint);
+}
+.ctx-check,
+.ctx-arrow {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.ctx-check {
+  color: var(--play);
+}
+.ctx-arrow {
+  color: var(--text-faint);
+  margin-right: -3px;
+}
+.ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+/* A colour choice: a little square of the colour itself. */
+.ctx-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* A page with a right-click menu for its empty space reaches the bottom of the window. */
+.page.fill {
+  min-height: 100%;
+  /* Keeps the heading's top margin inside, so filling the height never adds a scrollbar. */
+  display: flow-root;
+}
+
+/* The "…" on cards and group headers (same menu as right-clicking them). */
+.btn.icon.card-more {
+  width: 26px;
+  height: 26px;
+}
+
+/* ---------- Selected rows (Content tab) ---------- */
+
+.list-row.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.list-row.selected:hover {
+  background: color-mix(in srgb, var(--accent) 17%, transparent);
+}
+
+/* ---------- Empty states: a little pile of pixel blocks ---------- */
+
+.empty-art {
+  position: relative;
+  width: 56px;
+  height: 50px;
+}
+.empty-art .blk {
+  --c: var(--accent);
+  position: absolute;
+  bottom: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 20%, var(--surface-2));
+  /* Pixel bevel: lit top-left, shaded bottom-right. */
+  box-shadow:
+    inset 3px 3px 0 color-mix(in srgb, var(--c) 20%, transparent),
+    inset -3px -3px 0 rgba(0, 0, 0, 0.2);
+  animation: blk-drop 0.3s var(--spring) backwards;
+  transition: transform 0.24s var(--spring);
+}
+.empty-art .a {
+  --c: var(--play);
+  left: 3px;
+}
+.empty-art .b {
+  --c: var(--data);
+  left: 29px;
+  animation-delay: 50ms;
+}
+.empty-art .c {
+  left: 16px;
+  bottom: 24px;
+  display: grid;
+  place-items: center;
+  color: var(--c);
+  animation-delay: 110ms;
+}
+.empty-art .c svg {
+  width: 14px;
+  height: 14px;
+}
+/* Ore specks on the bottom two. */
+.empty-art .a::after,
+.empty-art .b::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  width: 3px;
+  height: 3px;
+  background: var(--c);
+  opacity: 0.75;
+  box-shadow:
+    7px 3px 0 var(--c),
+    3px 9px 0 var(--c);
+}
+.empty-art .b::after {
+  left: 9px;
+  top: 4px;
+}
+.empty:hover .empty-art .c {
+  transform: translateY(-4px) rotate(-7deg);
+}
+@keyframes blk-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(1px) scale(1.08, 0.88);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ---------- Block burst (celebrate() in ui.tsx) ---------- */
+
+.burst {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+  overflow: hidden;
+}
+.burst i {
+  position: absolute;
+  display: block;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+}
+
+/* ---------- Navigation ---------- */
+
+.nav-item svg,
+.nav-item .nav-dot {
+  transition: transform 0.22s var(--spring);
+}
+.nav > .nav-item:hover > svg {
+  transform: rotate(-8deg) scale(1.08);
+}
+/* The icon of the page you just opened hops once. */
+.nav > .nav-item.active > svg,
+.nav-item.active > .nav-dot {
+  animation: hop 0.34s var(--spring);
+}
+.nav-item.active::before {
+  animation: bar-in 0.24s var(--spring);
+}
+@keyframes hop {
+  0% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(-3px) scale(1.18) rotate(-8deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes bar-in {
+  from {
+    transform: scaleY(0.2);
+  }
+}
+
+.tabs button.on::after {
+  animation: tab-in 0.24s var(--spring);
+}
+@keyframes tab-in {
+  from {
+    transform: scaleX(0.3);
+  }
+}
+
+/* ---------- Play ---------- */
+
+.play-btn svg {
+  transition: transform 0.22s var(--spring);
+}
+.play-btn.primary:hover:not(:disabled) svg {
+  transform: translateX(2px) scale(1.12);
+}
+/* Pressing Play: squash, then pop into "Preparing". */
+.play-btn.launch,
+.icard .quick.busy:not(.running) {
+  animation: launch 0.3s var(--spring);
+}
+@keyframes launch {
+  0% {
+    transform: scale(0.9, 0.82);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ---------- Toasts, tasks, checks ---------- */
+
+.toast {
+  animation: toast-in 0.26s var(--spring);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(26px) scale(0.96);
+  }
+}
+.toast.success > svg:first-child,
+.task .top svg.pop {
+  animation: check-pop 0.34s var(--spring) 0.06s backwards;
+}
+.check.on svg {
+  animation: check-pop 0.26s var(--spring);
+}
+@keyframes check-pop {
+  0% {
+    transform: scale(0) rotate(-30deg);
+  }
+  60% {
+    transform: scale(1.25) rotate(6deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ---------- Controls ---------- */
+
+.switch::after {
+  transition:
+    transform 0.24s var(--spring),
+    width 0.12s var(--ease),
+    background-color 0.15s var(--ease);
+}
+/* The lever stretches while held. */
+.switch:active::after {
+  width: 18px;
+}
+.switch.on:active::after {
+  transform: translateX(12px);
+}
+.segmented button.on {
+  animation: seg-pop 0.22s var(--spring);
+}
+@keyframes seg-pop {
+  from {
+    transform: scale(0.9);
+  }
+}
+.swatch {
+  transition: transform 0.2s var(--spring);
+}
+.swatch:hover {
+  transform: scale(1.14);
+}
+.icard.new .plus {
+  transition:
+    transform 0.26s var(--spring),
+    border-color 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.icard.new:hover .plus {
+  transform: rotate(90deg);
+}
+.modal {
+  animation: modal-pop 0.22s var(--spring);
+}
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+.brand svg {
+  transition: transform 0.3s var(--spring);
+}
+.brand:hover svg {
+  transform: rotate(-8deg) scale(1.06);
+}

@@ -1,11 +1,11 @@
 // Fake Notes / Worlds / Servers / Screenshots data for the browser preview (see mock.ts).
-import type { ResinApi, ScreenshotInfo, ServerEntry, WorldInfo } from '@shared/types'
+import type { Instance, ResinApi, ScreenshotInfo, ServerEntry, WorldInfo } from '@shared/types'
 
 type TabsApi = Pick<ResinApi, 'notes' | 'worlds' | 'servers' | 'screenshots'>
 
-/** A tiny generated landscape, so screenshot cards have something to show. */
-function fakeShot(hue: number, w: number, h: number): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 16 9">
+/** A tiny generated landscape, so screenshot cards have something to show. `square` = its middle square (an icon). */
+function fakeShot(hue: number, w: number, h: number, square = false): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${square ? '3.5 0 9 9' : '0 0 16 9'}">
 <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${hue} 70% 68%)"/><stop offset="1" stop-color="hsl(${hue + 30} 60% 86%)"/></linearGradient></defs>
 <rect width="16" height="9" fill="url(#s)"/><circle cx="12" cy="2.4" r="1" fill="#fff6c8"/>
 <path d="M0 6 L3 4.4 L5 5.4 L8 3.6 L11 5.2 L13 4.4 L16 5.6 V9 H0Z" fill="hsl(${hue + 120} 35% 38%)"/>
@@ -13,7 +13,8 @@ function fakeShot(hue: number, w: number, h: number): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-export function mockInstanceTabs(): TabsApi {
+/** `setIcon` stores a custom icon on the mock instance (mock.ts owns the instance list). */
+export function mockInstanceTabs(setIcon: (instanceId: string, iconUrl: string) => Instance): TabsApi {
   const now = Date.now()
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
   const notes: Record<string, string> = {
@@ -110,7 +111,8 @@ export function mockInstanceTabs(): TabsApi {
       image: (_id, name) => wait(fakeShot(hue(name), 1920, 1080), 200),
       copy: async () => {},
       show: async () => {},
-      remove: async (_id, name) => void (shots = shots.filter((s) => s.name !== name))
+      remove: async (_id, name) => void (shots = shots.filter((s) => s.name !== name)),
+      setIcon: (id, name) => wait(setIcon(id, fakeShot(hue(name), 256, 256, true)), 300)
     }
   }
 }

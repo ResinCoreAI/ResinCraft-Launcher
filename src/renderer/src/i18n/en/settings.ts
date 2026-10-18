@@ -46,6 +46,11 @@ export default {
   'settings.downloads.lead': 'Lower this if your connection struggles when preparing games.',
   'settings.parallel': 'Parallel downloads',
   'settings.parallel.hint': 'Files fetched at the same time.',
+  'settings.preferredSource': 'Preferred source for mods',
+  'settings.preferredSource.hint': 'When a mod is on both Modrinth and CurseForge, install it from here.',
+  'settings.preferredSource.ask': 'Ask every time',
+  'settings.preferredSource.reset': 'Reset “Don’t ask again”',
+  'settings.preferredSource.resetDone': 'ResinCraft will ask again when a mod is on both sites',
   'settings.about.credit': 'Made by Puirkle. Its feature set is inspired by Prism Launcher; all code is original.',
   'settings.about.dataFolder': 'Data folder: {path}'
 }

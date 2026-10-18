@@ -8,6 +8,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::dupes::dedupe_pack;
 use super::index::{discard_instance, encode_uri, extract_where, iso_from_secs, lenient_u64, open_zip, safe_name};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
@@ -382,6 +383,9 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             })
             .await??;
             let _ = tokio::fs::remove_dir_all(&tmp).await;
+            // Configs.zip may hold another copy of a listed mod.
+            let listed: Vec<String> = mods.iter().filter(|m| m.download != "browser" && m.kind == "mods").map(|m| m.file.clone()).collect();
+            dedupe_pack(&inst, &task, &listed).await;
             if !pending.is_empty() {
                 instances::update(&inst.id, json!({ "pendingDownloads": pending })).await?;
             }

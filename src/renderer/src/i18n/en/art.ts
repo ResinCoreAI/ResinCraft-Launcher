@@ -1,0 +1,26 @@
+// Instance pictures: the icon and banner pickers and the crop window.
+export default {
+  'art.appearance': 'Appearance',
+  'art.icon': 'Icon',
+  'art.iconHint': 'A square picture for the instance, shown in lists and on its page.',
+  'art.chooseIcon': 'Choose an icon',
+  'art.remove': 'Remove',
+  'art.banner': 'Banner',
+  'art.addBanner': 'Add a banner',
+  'art.bannerHint': 'Shown on the Library card and at the top of the instance page. Wide pictures work best.',
+  'art.changeBanner': 'Change',
+  'art.removeBanner': 'Remove banner',
+  'art.cropIcon': 'Position your icon',
+  'art.cropBanner': 'Position your banner',
+  'art.cropHint': 'Drag to move the picture. Zoom with the slider or the mouse wheel.',
+  'art.zoom': 'Zoom',
+  'art.zoomIn': 'Zoom in',
+  'art.zoomOut': 'Zoom out',
+  'art.apply': 'Use picture',
+  'art.unsupported': 'Choose a PNG, JPEG, WebP or GIF picture.',
+  'art.tooBig': 'That picture is too large (over 15 MB).',
+  'art.saved': 'Picture saved',
+  'art.removed': 'Picture removed',
+  'art.saveFailed': "The instance was created, but its picture couldn't be saved: {error}",
+  'art.menu': 'Icon & banner…'
+}

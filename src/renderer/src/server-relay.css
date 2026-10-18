@@ -1,0 +1,53 @@
+/* ResinCraft Relay in a server's Settings: the name field with the relay's domain after it. */
+.sv-relay .hint {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  line-height: 1.4;
+}
+.sv-relay .hint svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  margin-top: 2px;
+}
+.sv-relay .hint.ok {
+  color: var(--success);
+}
+.sv-relay .hint.bad {
+  color: var(--danger);
+}
+.sv-relay .hint.warn {
+  color: var(--warning);
+}
+.sv-relay-field {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 260px;
+  min-width: 0;
+  max-width: 460px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+}
+.sv-relay-field:focus-within {
+  border-color: var(--accent);
+}
+.sv-relay-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 4px 7px 10px;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: right;
+}
+.sv-relay-field span {
+  padding: 7px 10px 7px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+}

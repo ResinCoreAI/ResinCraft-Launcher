@@ -3,6 +3,8 @@ import { FolderInput, PackageOpen } from 'lucide-react'
 import { api, isTauri } from '../api'
 import { useStore } from '../store'
 import { t } from '../i18n'
+import { celebrate } from './ui'
+import { packDupesNote } from './DuplicatesDialog'
 
 const PACK = /\.(mrpack|zip)$/i
 
@@ -40,6 +42,9 @@ export default function DropImport() {
         const inst = await api.content.importModpackFile(path)
         await refreshInstances()
         toast(t('drop.imported', { name: inst.name }))
+        const dupes = packDupesNote(inst)
+        if (dupes) toast(dupes, 'info')
+        celebrate()
         go({ page: 'instance', id: inst.id })
       } catch (err) {
         toast((err as Error).message, 'error')

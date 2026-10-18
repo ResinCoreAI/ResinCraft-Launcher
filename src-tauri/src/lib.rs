@@ -8,6 +8,7 @@
 //! - `player`: accounts, worlds, servers, screenshots, notes
 //! - `server`: hosting Minecraft servers on this computer
 //! - `files`: the file manager and text editor for instance and server folders
+//! - `updater`: checking for and installing new ResinCraft versions
 
 pub mod app_cmds;
 pub mod content;
@@ -16,6 +17,7 @@ pub mod files;
 pub mod game;
 pub mod player;
 pub mod server;
+pub mod updater;
 
 use serde_json::Value;
 use tauri::Manager;
@@ -34,6 +36,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = core::paths::default_data_dir(app.path().config_dir().ok());
             std::fs::create_dir_all(&data_dir)?;

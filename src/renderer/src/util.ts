@@ -1,9 +1,53 @@
 import type { Instance, LoaderType } from '@shared/types'
-import { currentLanguage, t } from './i18n'
+import { currentLanguage, t, type Key } from './i18n'
 
 export const LOADER_LABEL: Record<LoaderType, string> = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
 
 export const COLORS = ['#b26bff', '#22d3ee', '#39e58c', '#6d7bff', '#f472b6', '#2dd4bf', '#a3e635', '#fb7185']
+/** Names for COLORS, in the same order. */
+export const COLOR_NAMES: Key[] = [
+  'menu.color.purple',
+  'menu.color.cyan',
+  'menu.color.green',
+  'menu.color.blue',
+  'menu.color.pink',
+  'menu.color.teal',
+  'menu.color.lime',
+  'menu.color.coral'
+]
+
+/** A path inside the data folder, with the folder's own separator (`sub` may use "/"). */
+export function dataPath(dataDir: string, ...parts: (string | undefined)[]): string {
+  const sep = dataDir.includes('\\') ? '\\' : '/'
+  const rest = parts.flatMap((p) => (p ?? '').split('/')).filter(Boolean)
+  return [dataDir.replace(/[\\/]+$/, ''), ...rest].join(sep)
+}
+/** An instance's game folder (what "Open folder" opens), or something inside it. Same layout as core/paths.rs. */
+export const instancePath = (dataDir: string, id: string, sub?: string) => dataPath(dataDir, 'instances', id, 'minecraft', sub)
+/** A hosted server's folder (server/store.rs), or something inside it. */
+export const serverPath = (dataDir: string, id: string, sub?: string) => dataPath(dataDir, 'servers', id, sub)
+
+/** The project's page on its site, from a content id ("cf:238222", "hangar:ViaVersion", bare = Modrinth). */
+export function projectUrl(projectId?: string): string | undefined {
+  if (!projectId) return undefined
+  const [prefix, rest] = projectId.includes(':') ? [projectId.slice(0, projectId.indexOf(':')), projectId.slice(projectId.indexOf(':') + 1)] : ['', projectId]
+  const id = encodeURIComponent(rest)
+  switch (prefix) {
+    case '':
+      return `https://modrinth.com/project/${id}`
+    case 'cf':
+      return `https://www.curseforge.com/projects/${id}`
+    case 'hangar':
+      return `https://hangar.papermc.io/?query=${id}`
+    case 'spigot':
+      return `https://www.spigotmc.org/resources/${id}/`
+    default:
+      return undefined
+  }
+}
+
+/** True when the icon was picked from a screenshot (modpack icons are web URLs). */
+export const hasCustomIcon = (i: Pick<Instance, 'iconUrl'>) => !!i.iconUrl?.startsWith('data:')
 
 export function describe(i: Instance): string {
   return `${i.mcVersion} · ${LOADER_LABEL[i.loader]}`

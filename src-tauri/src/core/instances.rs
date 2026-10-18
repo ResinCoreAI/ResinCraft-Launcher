@@ -14,6 +14,20 @@ fn meta_file(id: &str) -> PathBuf {
     paths::instance_dir(id).join("instance.json")
 }
 
+/// A custom icon (picked from a screenshot) is kept next to instance.json. `icon_url` carries it as a data URL,
+/// since the webview can't load files from disk (the CSP allows `data:` images).
+pub fn icon_file(id: &str) -> PathBuf {
+    paths::instance_dir(id).join("icon.png")
+}
+
+pub fn banner_file(id: &str) -> PathBuf {
+    paths::instance_dir(id).join("banner.jpg")
+}
+
+pub fn is_custom_icon(url: &str) -> bool {
+    url.starts_with("data:")
+}
+
 pub async fn list() -> Result<Vec<Instance>> {
     let root = paths::instances();
     tokio::fs::create_dir_all(&root).await?;
@@ -60,6 +74,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         loader_version,
         color,
         icon_url: None,
+        pack_icon_url: None,
         created_at: now_ms(),
         last_played: None,
         playtime: 0,
@@ -69,6 +84,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         modpack: None,
         pending_downloads: None,
         group: data.group.map(|g| g.trim().to_string()).filter(|g| !g.is_empty()),
+        banner_url: None,
     };
     extra(&mut inst);
     tokio::fs::create_dir_all(paths::game_dir(&id)).await?;
@@ -96,6 +112,28 @@ pub async fn update(id: &str, patch: Value) -> Result<Instance> {
     Ok(inst)
 }
 
+/// Shows `url` (a data URL of icon.png) as the instance's icon; a modpack's own icon is kept for [`reset_icon`].
+pub async fn set_custom_icon(id: &str, url: String) -> Result<Instance> {
+    let mut inst = get(id).await?;
+    if let Some(pack) = inst.icon_url.take().filter(|u| !is_custom_icon(u)) {
+        inst.pack_icon_url = Some(pack);
+    }
+    inst.icon_url = Some(url);
+    save(&inst).await?;
+    Ok(inst)
+}
+
+/// Drops the custom icon: back to the modpack's icon, or the generated block art.
+pub async fn reset_icon(id: &str) -> Result<Instance> {
+    let mut inst = get(id).await?;
+    inst.icon_url = inst.pack_icon_url.take();
+    save(&inst).await?;
+    match tokio::fs::remove_file(icon_file(id)).await {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+        _ => Ok(inst),
+    }
+}
+
 pub async fn duplicate(id: &str) -> Result<Instance> {
     let src = get(id).await?;
     let new = NewInstance {
@@ -112,6 +150,8 @@ pub async fn duplicate(id: &str) -> Result<Instance> {
         i.java_path = s.java_path;
         i.jvm_args = s.jvm_args;
         i.icon_url = s.icon_url;
+        i.pack_icon_url = s.pack_icon_url;
+        i.banner_url = s.banner_url;
         i.modpack = s.modpack;
     })
     .await?;

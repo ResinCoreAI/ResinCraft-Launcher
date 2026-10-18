@@ -110,6 +110,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             screenshots::remove_screenshot(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()
         }
+        "screenshots:setIcon" => json(screenshots::set_as_icon(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
 
         _ => bail!("Unknown request: {channel}"),
     }

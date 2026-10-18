@@ -10,10 +10,12 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::dupes::{dedupe_pack, dep_facts, skipped_text, Guard, ModFacts};
 use super::index::{
     discard_instance, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, parse_date_ms, read_zip_text, remove_project_files,
     safe_name, save_index, ContentIndex, IndexEntry,
 };
+use super::jarmeta::RemoteFile;
 use crate::core::ctx::http;
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
@@ -99,6 +101,8 @@ struct CfName {
 #[serde(rename_all = "camelCase", default)]
 struct CfLinks {
     website_url: String,
+    source_url: Option<String>,
+    issues_url: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -126,11 +130,21 @@ struct CfMod {
     categories: Vec<CfName>,
     #[serde(default)]
     links: CfLinks,
+    /// The newest file per game version and loader.
+    #[serde(default)]
+    latest_files: Vec<CfFile>,
 }
 
 impl CfMod {
     fn icon(&self) -> Option<String> {
         self.logo.as_ref().map(|l| l.thumbnail_url.clone()).filter(|u| !u.is_empty())
+    }
+
+    /// What identifies this mod on other sites: names, links and the hashes of `file` plus its recent files.
+    fn facts(&self, file: Option<&CfFile>) -> ModFacts {
+        let links = [&self.links.source_url, &self.links.issues_url].into_iter().flatten().filter(|l| !l.is_empty()).cloned().collect();
+        let sha1s = file.into_iter().chain(&self.latest_files).filter_map(CfFile::sha1).collect();
+        dep_facts(prefixed(self.id), &self.name, &self.slug, self.authors.iter().map(|a| a.name.clone()).collect(), links, sha1s)
     }
 }
 
@@ -442,57 +456,13 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
     if kind == ContentKind::Mod && inst.loader == LoaderType::Vanilla {
         bail_tr!("curseforge.vanillaInstance", "{name} is a vanilla instance. Mods need a mod loader; create a modded instance first.", name = inst.name);
     }
-    let root = cf_id(project_id);
-    let file_id: Option<u64> = version_id.and_then(|v| v.parse().ok());
+    let project_id = project_id.to_string();
     Task::run(tr!("curseforge.installing", "Installing from CurseForge"), Some(inst.id.clone()), move |task| async move {
         let mut idx = load_index(&inst.id).await;
-        let mut installed: HashSet<String> = idx.values().map(|e| e.project_id.clone()).collect();
+        let mut guard = Guard::open(&inst, kind, &idx).await;
         let mut blocked: Vec<PendingDownload> = Vec::new();
-        // Depth-first over (mod, pinned file, is a dependency).
-        let mut stack: Vec<(u64, Option<u64>, bool)> = vec![(root, file_id, false)];
-        let result: Result<()> = async {
-            while let Some((mod_id, fid, is_dep)) = stack.pop() {
-                if is_dep && installed.contains(&prefixed(mod_id)) {
-                    continue;
-                }
-                let m: CfMod = cf(&format!("/mods/{mod_id}"), None).await?;
-                task.update(tr!("content.installingItem", "Installing {name}…", name = m.name), None);
-                let f = match fid {
-                    Some(fid) => Some(cf::<CfFile>(&format!("/mods/{mod_id}/files/{fid}"), None).await?),
-                    None => files(mod_id, Some(&inst), Some(kind)).await?.into_iter().next(),
-                };
-                let Some(f) = f else {
-                    if kind == ContentKind::Mod {
-                        bail_tr!(
-                            "curseforge.noFileWithLoader",
-                            "{name} has no file for Minecraft {mc} with {loader}",
-                            name = m.name,
-                            mc = inst.mc_version,
-                            loader = inst.loader.as_str()
-                        );
-                    }
-                    bail_tr!("curseforge.noFile", "{name} has no file for Minecraft {mc}", name = m.name, mc = inst.mc_version);
-                };
-                if let Err(e) = install_file(&inst, kind, &m, &f, &mut idx).await {
-                    // A blocked dependency shouldn't stop the main install; list it for the user instead.
-                    match e.downcast::<BlockedDownloadError>() {
-                        Ok(b) if is_dep => blocked.push(b.pending),
-                        Ok(b) => return Err(b.text().into()),
-                        Err(e) => return Err(e),
-                    }
-                }
-                installed.insert(prefixed(m.id));
-                let deps: Vec<_> = f
-                    .dependencies
-                    .iter()
-                    .filter(|d| d.relation_type == REQUIRED_DEPENDENCY && !installed.contains(&prefixed(d.mod_id)))
-                    .map(|d| (d.mod_id, None, true))
-                    .collect();
-                stack.extend(deps.into_iter().rev());
-            }
-            Ok(())
-        }
-        .await;
+        let result = install_into(&inst, &task, &mut idx, &mut guard, &project_id, kind, version_id, &mut blocked).await;
+        guard.save().await;
         save_index(&inst.id, &idx).await?;
         if !blocked.is_empty() {
             add_pending(&inst.id, blocked).await?;
@@ -502,7 +472,76 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
     .await
 }
 
-async fn add_pending(instance_id: &str, list: Vec<PendingDownload>) -> Result<()> {
+/// Installs a mod and the required dependencies the instance doesn't have yet, recording them in `idx`.
+/// A dependency the instance already has from Modrinth (see `guard`) is skipped rather than installed twice;
+/// one whose author blocks third-party downloads is added to `blocked` for the user to fetch by hand.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn install_into(
+    inst: &Instance,
+    task: &Task,
+    idx: &mut ContentIndex,
+    guard: &mut Guard,
+    project_id: &str,
+    kind: ContentKind,
+    version_id: Option<String>,
+    blocked: &mut Vec<PendingDownload>,
+) -> Result<()> {
+    let mut installed: HashSet<String> = idx.values().map(|e| e.project_id.clone()).collect();
+    let file_id: Option<u64> = version_id.and_then(|v| v.parse().ok());
+    // Depth-first over (mod, pinned file, is a dependency).
+    let mut stack: Vec<(u64, Option<u64>, bool)> = vec![(cf_id(project_id), file_id, false)];
+    while let Some((mod_id, fid, is_dep)) = stack.pop() {
+        if is_dep && installed.contains(&prefixed(mod_id)) {
+            continue;
+        }
+        let m: CfMod = cf(&format!("/mods/{mod_id}"), None).await?;
+        task.update(tr!("content.installingItem", "Installing {name}…", name = m.name), None);
+        let f = match fid {
+            Some(fid) => Some(cf::<CfFile>(&format!("/mods/{mod_id}/files/{fid}"), None).await?),
+            None => files(mod_id, Some(inst), Some(kind)).await?.into_iter().next(),
+        };
+        let Some(f) = f else {
+            if kind == ContentKind::Mod {
+                bail_tr!(
+                    "curseforge.noFileWithLoader",
+                    "{name} has no file for Minecraft {mc} with {loader}",
+                    name = m.name,
+                    mc = inst.mc_version,
+                    loader = inst.loader.as_str()
+                );
+            }
+            bail_tr!("curseforge.noFile", "{name} has no file for Minecraft {mc}", name = m.name, mc = inst.mc_version);
+        };
+        let mut facts = m.facts(Some(&f));
+        if is_dep {
+            if let Some((copy, _)) = guard.copy_of(&mut facts).await {
+                task.update(skipped_text(&m.name, &copy), None);
+                installed.insert(prefixed(m.id));
+                continue;
+            }
+        }
+        if let Err(e) = install_file(inst, kind, &m, &f, idx).await {
+            // A blocked dependency shouldn't stop the main install; list it for the user instead.
+            match e.downcast::<BlockedDownloadError>() {
+                Ok(b) if is_dep => blocked.push(b.pending),
+                Ok(b) => return Err(b.text().into()),
+                Err(e) => return Err(e),
+            }
+        }
+        installed.insert(prefixed(m.id));
+        guard.add(facts);
+        let deps: Vec<_> = f
+            .dependencies
+            .iter()
+            .filter(|d| d.relation_type == REQUIRED_DEPENDENCY && !installed.contains(&prefixed(d.mod_id)))
+            .map(|d| (d.mod_id, None, true))
+            .collect();
+        stack.extend(deps.into_iter().rev());
+    }
+    Ok(())
+}
+
+pub(crate) async fn add_pending(instance_id: &str, list: Vec<PendingDownload>) -> Result<()> {
     let inst = instances::get(instance_id).await?;
     let mut merged = inst.pending_downloads.unwrap_or_default();
     for p in list {
@@ -632,7 +671,32 @@ pub async fn identify(inst: &Instance, kind: ContentKind, filenames: &[String]) 
     save_index(&inst.id, &idx).await
 }
 
-/// Finds the CurseForge project/file for each local file by fingerprint (used by modpack export).
+/// The file installing `project_id` into `inst` would download (file `version_id`, else the newest compatible one).
+/// None for a file whose author blocks downloads outside CurseForge.
+pub(crate) async fn planned_file(inst: &Instance, project_id: &str, kind: ContentKind, version_id: Option<&str>) -> Result<Option<RemoteFile>> {
+    let mod_id = cf_id(project_id);
+    let f = match version_id.and_then(|v| v.parse::<u64>().ok()) {
+        Some(fid) => Some(cf::<CfFile>(&format!("/mods/{mod_id}/files/{fid}"), None).await?),
+        None => files(mod_id, Some(inst), Some(kind)).await?.into_iter().next(),
+    };
+    Ok(f.and_then(|f| f.url().map(|u| RemoteFile { url: u.to_string(), size: f.file_length })))
+}
+
+/// Names, slugs, authors, links and recent file hashes of CurseForge mods, for spotting the same mod on Modrinth.
+/// Returns nothing without an API key.
+pub(crate) async fn facts(ids: &[String]) -> Result<Vec<ModFacts>> {
+    if ids.is_empty() || !has_key().await {
+        return Ok(vec![]);
+    }
+    let mut out = Vec::new();
+    for chunk in ids.chunks(500) {
+        let mods: Vec<CfMod> = cf("/mods", Some(json!({ "modIds": chunk.iter().map(|i| cf_id(i)).collect::<Vec<_>>() }))).await?;
+        out.extend(mods.iter().map(|m| m.facts(None)));
+    }
+    Ok(out)
+}
+
+/// Finds the CurseForge project/file for each local file by fingerprint (used by modpack export and duplicate checks).
 /// Returns an empty map without an API key.
 pub async fn lookup_files(files: Vec<PathBuf>) -> Result<HashMap<PathBuf, (u64, u64)>> {
     let mut out = HashMap::new();
@@ -829,5 +893,9 @@ async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task:
     }
     let (archive, dir2) = (archive.to_path_buf(), dir.clone());
     tokio::task::spawn_blocking(move || extract_overrides(&archive, &[prefix], &dir2)).await??;
+    // The overrides may hold another copy of a listed mod.
+    let class = |f: &CfFile| mod_list.iter().find(|m| m.id == f.mod_id).and_then(|m| m.class_id).unwrap_or(class_of(ContentKind::Mod));
+    let listed: Vec<String> = file_list.iter().filter(|f| f.url().is_some() && folder_of_class(class(f)) == "mods").map(|f| f.file_name.clone()).collect();
+    dedupe_pack(inst, task, &listed).await;
     Ok(pending)
 }

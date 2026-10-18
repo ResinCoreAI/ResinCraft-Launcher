@@ -1,29 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Blocks,
   Calendar,
   Check,
   ChevronDown,
+  ChevronUp,
   Download,
   ExternalLink,
   Heart,
   Image,
   KeyRound,
+  Link,
   ListChecks,
   Loader2,
   Package,
   Repeat,
   Search,
   Sparkles,
+  SquareCheck,
   X
 } from 'lucide-react'
-import type { ContentItem, ContentKind, ContentSource, Instance, LoaderType, McVersion, ProjectHit, SortMode } from '@shared/types'
+import type { ContentFileRef, ContentItem, ContentKind, ContentSource, Instance, LoaderType, McVersion, ModPick, ProjectHit, SortMode } from '@shared/types'
 import { api } from '../api'
-import { Empty, InstanceTile, Modal, Segmented } from '../components/ui'
+import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, useCopy, type ContextEntry } from '../components/ui'
 import VersionPicker from '../components/VersionPicker'
+import { applyChoices, buildRows, byHand, DuplicatesDialog, packDupesNote, preferredChoice, type DupAnswer, type DupChoice, type DupRow } from '../components/DuplicatesDialog'
 import { useStore } from '../store'
 import { compact, describe, timeAgo } from '../util'
-import { currentLanguage, rich, t, type Key } from '../i18n'
+import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
 
 const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.ReactNode }[] = [
   { value: 'mod', labelKey: 'discover.kind.mod', searchKey: 'discover.search.mod', icon: <Blocks size={15} /> },
@@ -132,8 +136,13 @@ function savedSource(): ContentSource {
 
 type InstallState = 'busy' | 'done'
 
+/** What to install after duplicates are sorted out, and which installed files other sites' copies replace. */
+type InstallPlan = { picks: ProjectHit[]; replace: ContentFileRef[] }
+
+const toPick = (h: ProjectHit, versionId?: string): ModPick => ({ id: h.id, kind: h.kind, title: h.title, author: h.author, slug: h.slug, versionId })
+
 export default function Discover({ initialKind, instanceId }: { initialKind?: ContentKind; instanceId?: string }) {
-  const { instances, go, toast, refreshInstances, info } = useStore()
+  const { instances, go, toast, refreshInstances, info, settings, updateSettings } = useStore()
   const target = instances.find((i) => i.id === instanceId)
   const [source, setSourceState] = useState<ContentSource>(() => {
     const s = savedSource()
@@ -170,6 +179,10 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
   const [selected, setSelected] = useState<Map<string, ProjectHit>>(new Map())
   const [picking, setPicking] = useState<ProjectHit[]>()
   const [choosing, setChoosing] = useState<{ hit: ProjectHit; inst?: Instance; current?: ContentItem }>()
+  const [asking, setAsking] = useState<{ rows: DupRow[]; inst: Instance; total: number; answer: (a: DupAnswer | null) => void }>()
+  const [showSelection, setShowSelection] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const selectBar = useRef<HTMLDivElement>(null)
   const canSelect = kind !== 'modpack'
 
   useEffect(() => {
@@ -181,8 +194,22 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
     return () => clearTimeout(t)
   }, [query])
 
-  // Selections only make sense within one content type.
-  useEffect(() => setSelected(new Map()), [kind, source])
+  // The selection survives switching sites and content types: each pick installs from its own site.
+  useEffect(() => {
+    if (selected.size === 0) setShowSelection(false)
+  }, [selected.size])
+  useEffect(() => {
+    if (!showSelection) return
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !selectBar.current?.contains(e.target as Node)) setShowSelection(false)
+    }
+    window.addEventListener('mousedown', close)
+    window.addEventListener('keydown', close)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('keydown', close)
+    }
+  }, [showSelection])
 
   // When browsing for a specific instance, know what it already has.
   const loadInstalled = useCallback(async () => {
@@ -230,27 +257,27 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
     }
   }
 
-  /** Installs one project; returns whether it worked. `quiet` skips the per-item success toast (batch installs). */
-  const install = async (hit: ProjectHit, inst?: Instance, versionId?: string, quiet = false): Promise<boolean> => {
+  /**
+   * Installs one project; returns whether it worked. `from` is where the burst of blocks starts (the button or row
+   * that started it).
+   */
+  const install = async (hit: ProjectHit, inst?: Instance, versionId?: string, from?: Element): Promise<boolean> => {
     const into = inst ?? target
     if (hit.kind !== 'modpack' && !into) {
       setPicking([hit])
       return false
     }
+    if (hit.kind !== 'modpack') return installPicks([hit], into!, versionId, from)
     const mark = (state?: InstallState) => setInstalling((s) => ({ ...s, [hit.id]: state }))
     mark('busy')
     try {
-      if (hit.kind === 'modpack') {
-        const created = await api.content.installModpack(hit.id, versionId)
-        await refreshInstances()
-        toast(t('discover.toast.modpackReady', { name: created.name }))
-        go({ page: 'instance', id: created.id })
-        return true
-      }
-      await api.content.install(into!.id, hit.id, hit.kind, versionId)
-      if (!quiet) toast(t('discover.toast.installed', { title: hit.title, instance: into!.name }))
-      mark('done')
-      if (into!.id === target?.id) await loadInstalled()
+      const created = await api.content.installModpack(hit.id, versionId)
+      await refreshInstances()
+      toast(t('discover.toast.modpackReady', { name: created.name }))
+      const dupes = packDupesNote(created)
+      if (dupes) toast(dupes, 'info')
+      celebrate()
+      go({ page: 'instance', id: created.id })
       return true
     } catch (e) {
       toast(t('discover.toast.installFailed', { title: hit.title, error: (e as Error).message }), 'error')
@@ -259,17 +286,120 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
     }
   }
 
-  const installMany = async (list: ProjectHit[], inst: Instance) => {
-    setSelected(new Map())
-    let ok = 0
-    for (const h of list) if (await install(h, inst, undefined, true)) ok++
-    toast(
-      ok === list.length
-        ? t('discover.toast.installedMany', { count: ok, instance: inst.name })
-        : t('discover.toast.installedSome', { done: ok, count: list.length, instance: inst.name }),
-      ok === list.length ? 'success' : 'info'
-    )
+  /**
+   * Sorts out mods that would end up twice (picked from two sites, or already in the instance from the other one):
+   * asks, or follows the preferred site from Settings. Null when the user cancels.
+   */
+  const resolveDuplicates = async (list: ProjectHit[], inst: Instance, versionId?: string): Promise<InstallPlan | null> => {
+    // Best effort: offline, the check finds nothing and the install goes ahead as before.
+    setChecking(true)
+    const picks = list.map((h) => toPick(h, versionId))
+    const check = await api.content
+      .duplicates(inst.id, picks)
+      .catch(() => undefined)
+      .finally(() => setChecking(false))
+    const rows = check ? buildRows(list, check) : []
+    if (rows.length === 0) return { picks: list, replace: [] }
+    const pref = settings?.preferredModSource ?? 'ask'
+    // A preferred site settles one site against the other; a jar added by hand is the player's own, so ask about it.
+    const ask = pref === 'ask' ? rows : rows.filter(byHand)
+    const auto = rows.filter((r) => !ask.includes(r))
+    let choices: Record<string, DupChoice> = Object.fromEntries(auto.map((r) => [r.key, preferredChoice(r, pref)]))
+    if (ask.length) {
+      const total = list.length - applyChoices(auto, choices).drop.size
+      const answer = await new Promise<DupAnswer | null>((resolve) => setAsking({ rows: ask, inst, total, answer: resolve }))
+      setAsking(undefined)
+      if (!answer) return null
+      choices = { ...choices, ...answer.choices }
+      if (answer.always) void updateSettings({ preferredModSource: answer.always })
+    }
+    if (auto.length) toast(t('discover.dupes.auto', { count: auto.length, source: SOURCES.find((s) => s.value === pref)?.label ?? pref }), 'info')
+    const { drop, replace } = applyChoices(rows, choices)
+    return { picks: list.filter((h) => !drop.has(h.id)), replace }
   }
+
+  /**
+   * Installs mods, resource packs or shaders into `inst` in one task, each from its own site, after sorting out
+   * duplicates. `onStart` runs once the user hasn't cancelled. Returns whether everything worked.
+   */
+  const installPicks = async (list: ProjectHit[], inst: Instance, versionId?: string, from?: Element, onStart?: () => void): Promise<boolean> => {
+    const mark = (state: InstallState | undefined, hits: ProjectHit[]) =>
+      setInstalling((s) => ({ ...s, ...Object.fromEntries(hits.map((h) => [h.id, state])) }))
+    mark('busy', list)
+    const plan = await resolveDuplicates(list, inst, versionId)
+    if (!plan) {
+      mark(undefined, list)
+      return false
+    }
+    onStart?.()
+    const skipped = list.filter((h) => !plan.picks.includes(h))
+    mark(undefined, skipped)
+    if (plan.picks.length === 0 && plan.replace.length === 0) return true
+    try {
+      const picks = plan.picks.map((h) => toPick(h, versionId))
+      const r = await api.content.installMany(inst.id, picks, plan.replace)
+      const failed = new Map(r.failed.map((f) => [f.id, engineError(f.error).message]))
+      for (const h of plan.picks) {
+        const error = failed.get(h.id)
+        mark(error ? undefined : 'done', [h])
+        if (error) toast(t('discover.toast.installFailed', { title: h.title, error }), 'error')
+      }
+      const ok = r.installed.length
+      if (plan.picks.length === 1) {
+        if (ok) toast(t('discover.toast.installed', { title: plan.picks[0].title, instance: inst.name }))
+      } else if (plan.picks.length > 1) {
+        toast(
+          ok === plan.picks.length
+            ? t('discover.toast.installedMany', { count: ok, instance: inst.name })
+            : t('discover.toast.installedSome', { done: ok, count: plan.picks.length, instance: inst.name }),
+          ok === plan.picks.length ? 'success' : 'info'
+        )
+      }
+      if (ok) celebrate(from)
+      if (inst.id === target?.id) await loadInstalled()
+      return failed.size === 0
+    } catch (e) {
+      toast((e as Error).message, 'error')
+      mark(undefined, plan.picks)
+      return false
+    }
+  }
+
+  const installMany = (list: ProjectHit[], inst: Instance) => installPicks(list, inst, undefined, undefined, () => setSelected(new Map()))
+
+  const copy = useCopy()
+  const resultMenu = (h: ProjectHit, row: Element): ContextEntry[] => {
+    const have = installed.get(h.id)
+    const state = installing[h.id]
+    const busy = state === 'busy'
+    return [
+      !have && state !== 'done'
+        ? {
+            label:
+              h.kind === 'modpack'
+                ? t('discover.result.installPack')
+                : target
+                  ? t('menu.discover.installInto', { instance: target.name })
+                  : t('common.install'),
+            icon: <Download />,
+            disabled: busy,
+            onSelect: () => void install(h, undefined, undefined, row)
+          }
+        : null,
+      have
+        ? { label: t('discover.result.changeVersion'), icon: <Repeat />, onSelect: () => chooseVersion(h) }
+        : { label: t('menu.discover.installVersion'), icon: <ChevronDown />, disabled: busy, onSelect: () => chooseVersion(h) },
+      canSelect && !have && !busy
+        ? { label: t(selected.has(h.id) ? 'menu.discover.deselect' : 'menu.discover.select'), icon: <SquareCheck />, onSelect: () => toggleSelect(h) }
+        : null,
+      '-',
+      { label: t('discover.result.openOn', { source: sourceInfo.label }), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(h.url) },
+      { label: t('menu.copyLink'), icon: <Link />, onSelect: () => void copy(h.url) }
+    ]
+  }
+
+  /** The selection grouped by site, in the toolbar's order. */
+  const bySite = SOURCES.map((s) => [s, [...selected.values()].filter((h) => h.source === s.value)] as const).filter(([, list]) => list.length > 0)
 
   const toggleSelect = (h: ProjectHit) =>
     setSelected((s) => {
@@ -414,7 +544,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
             const isSelected = selected.has(h.id)
             const state = installing[h.id]
             return (
-              <div key={h.id} className={`result ${isSelected ? 'selected' : ''}`}>
+              <div key={h.id} className={`result ${isSelected ? 'selected' : ''}`} onContextMenu={(e) => openContextMenu(e, resultMenu(h, e.currentTarget))}>
                 {canSelect && (
                   <button
                     className={`check ${isSelected ? 'on' : ''}`}
@@ -472,7 +602,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
                     <>
                       <button
                         className="btn primary sm"
-                        onClick={() => void install(h)}
+                        onClick={(e) => void install(h, undefined, undefined, e.currentTarget)}
                         disabled={state === 'busy'}
                         title={t('discover.result.installLatestHint')}
                       >
@@ -504,22 +634,67 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
       )}
 
       {selected.size > 0 && (
-        <div className="select-bar">
+        <div className="select-bar" ref={selectBar}>
           <ListChecks size={18} />
-          <span>{rich('discover.selection.count', { b: (s) => <b>{s}</b> }, { count: selected.size })}</span>
+          <button
+            className="select-count"
+            aria-expanded={showSelection}
+            title={bySite.map(([s, list]) => t('discover.selection.bySource', { source: s.label, count: list.length })).join('\n')}
+            onClick={() => setShowSelection((v) => !v)}
+          >
+            <span>{rich('discover.selection.count', { b: (s) => <b>{s}</b> }, { count: selected.size })}</span>
+            {bySite.length > 1 && (
+              <span className="select-sites" aria-hidden>
+                {bySite.map(([s, list]) => (
+                  <span key={s.value}>
+                    <span className="source-dot" style={{ background: s.color }} />
+                    {list.length}
+                  </span>
+                ))}
+              </span>
+            )}
+            <ChevronUp className="chev" aria-label={t('discover.selection.show')} />
+          </button>
           <button className="btn ghost sm" onClick={() => setSelected(new Map())}>
             {t('discover.selection.clear')}
           </button>
-          <button className="btn primary sm" onClick={() => (target ? void installMany([...selected.values()], target) : setPicking([...selected.values()]))}>
-            <Download />{' '}
-            {selected.size === 1
-              ? target
-                ? t('discover.selection.installOneInto', { instance: target.name })
-                : t('discover.selection.installOne')
-              : target
-                ? t('discover.selection.installAllInto', { count: selected.size, instance: target.name })
-                : t('discover.selection.installAll', { count: selected.size })}
+          <button
+            className="btn primary sm"
+            disabled={[...selected.keys()].some((id) => installing[id] === 'busy')}
+            onClick={() => (target ? void installMany([...selected.values()], target) : setPicking([...selected.values()]))}
+          >
+            {[...selected.keys()].some((id) => installing[id] === 'busy') ? <Loader2 className="spin" /> : <Download />}{' '}
+            {checking
+              ? t('discover.dupes.checking')
+              : selected.size === 1
+                ? target
+                  ? t('discover.selection.installOneInto', { instance: target.name })
+                  : t('discover.selection.installOne')
+                : target
+                  ? t('discover.selection.installAllInto', { count: selected.size, instance: target.name })
+                  : t('discover.selection.installAll', { count: selected.size })}
           </button>
+          {showSelection && (
+            <div className="select-pop">
+              {bySite.map(([s, list]) => (
+                <div key={s.value}>
+                  <h4>
+                    <span className="source-dot" style={{ background: s.color }} /> {s.label}
+                    <b>{list.length}</b>
+                  </h4>
+                  {list.map((h) => (
+                    <div key={h.id} className="select-item">
+                      <span className="thumb">{h.iconUrl ? <img src={h.iconUrl} alt="" /> : <Blocks />}</span>
+                      <span className="ellipsis">{h.title}</span>
+                      <button className="btn ghost icon sm" aria-label={t('discover.selection.remove', { title: h.title })} onClick={() => toggleSelect(h)}>
+                        <X />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -531,6 +706,8 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
           onChooseVersion={(inst) => setChoosing({ hit: picking[0], inst })}
         />
       )}
+
+      {asking && <DuplicatesDialog rows={asking.rows} instance={asking.inst} total={asking.total} sites={SOURCES} onAnswer={asking.answer} />}
 
       {choosing && (
         <VersionPicker

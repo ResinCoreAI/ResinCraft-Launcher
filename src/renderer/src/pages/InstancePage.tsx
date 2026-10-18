@@ -17,20 +17,24 @@ import {
   PackageOpen,
   Plus,
   RefreshCw,
+  Repeat,
   ScrollText,
   Search,
   Settings2,
   Sparkles,
   Timer,
+  ToggleLeft,
+  ToggleRight,
   Trash2
 } from 'lucide-react'
-import type { ContentItem, ContentKind, Instance, JavaInstall } from '@shared/types'
+import type { ContentItem, ContentKind, Instance, InstanceImage, JavaInstall } from '@shared/types'
 import { api } from '../api'
-import { ConfirmModal, Empty, InstanceTile, PlayButton, Segmented, Switch } from '../components/ui'
+import { ConfirmModal, Empty, fromKeyboard, InstanceTile, openContextMenu, PlayButton, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useStore } from '../store'
-import { bytes, COLORS, describe, fixed, playtime, timeAgo } from '../util'
+import { bytes, COLORS, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
 import { t } from '../i18n'
 import ExportModal from '../components/ExportModal'
+import { BannerPicker, IconPicker } from '../components/ImagePicker'
 import VersionPicker from '../components/VersionPicker'
 import { DeleteInstance } from './Library'
 import { Camera, Earth, FolderTree, NotebookPen, Server } from 'lucide-react'
@@ -67,7 +71,12 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
 
   return (
     <div className="page">
-      <div className="ihead">
+      {inst.bannerUrl && (
+        <div className="ibanner" aria-hidden="true">
+          <img src={inst.bannerUrl} alt="" />
+        </div>
+      )}
+      <div className={`ihead ${inst.bannerUrl ? 'on-banner' : ''}`}>
         <InstanceTile inst={inst} />
         <div className="grow">
           <h1>{inst.name}</h1>
@@ -154,16 +163,25 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
 type Kind = Exclude<ContentKind, 'modpack'>
 const KINDS: Kind[] = ['mod', 'resourcepack', 'shader']
 const KIND_FOLDER: Record<Kind, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
+/** Identifies a file across enabling and disabling (which adds or drops ".disabled"). */
+const fileKey = (m: ContentItem) => m.filename.replace(/\.disabled$/, '')
 
 function ContentTab({ inst }: { inst: Instance }) {
   const { go, toast } = useStore()
+  const copy = useCopy()
   const [kind, setKind] = useState<Kind>(inst.loader === 'vanilla' ? 'resourcepack' : 'mod')
   const [items, setItems] = useState<ContentItem[]>()
   const [q, setQ] = useState('')
   const [checking, setChecking] = useState(false)
   const [updating, setUpdating] = useState<string>()
-  const [removing, setRemoving] = useState<ContentItem>()
+  const [removing, setRemoving] = useState<ContentItem[]>()
   const [changingVersion, setChangingVersion] = useState<ContentItem>()
+  // Rows picked with click / Ctrl+click / Shift+click; the right-click menu acts on all of them.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const anchor = useRef<string>(undefined)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => setSelected(new Set()), [kind])
 
   const load = useCallback(async () => {
     try {
@@ -212,6 +230,128 @@ function ContentTab({ inst }: { inst: Instance }) {
         : t('instance.content.updatedMany', { count: list.length })
     )
     await load()
+  }
+
+  const nameOf = (m: ContentItem) => m.title ?? m.filename.replace(/\.(jar|zip)(\.disabled)?$/, '')
+  const picked = () => shown.filter((m) => selected.has(fileKey(m)))
+
+  /** Turns each file on or off (only the ones not already that way). */
+  const setEnabled = async (list: ContentItem[], enabled: boolean) => {
+    try {
+      for (const m of list) if (m.enabled !== enabled) await api.content.toggle(inst.id, kind, m.filename)
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+    await load()
+  }
+
+  /** Checks every mod (that's how the engine does it), then reports on the picked ones. */
+  const checkPicked = async (list: ContentItem[]) => {
+    setChecking(true)
+    try {
+      const res = await api.content.checkUpdates(inst.id)
+      setItems(res)
+      const keys = new Set(list.map(fileKey))
+      const found = res.filter((m) => keys.has(fileKey(m)) && m.update).length
+      if (found) toast(t('instance.content.updatesAvailable', { count: found }), 'info')
+      else toast(list.length === 1 ? t('menu.content.upToDate', { name: nameOf(list[0]) }) : t('instance.content.upToDate'), 'info')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const clickRow = (e: React.MouseEvent, m: ContentItem) => {
+    if ((e.target as HTMLElement).closest('button, a, input')) return
+    // Keep the keyboard on the list (Delete, Ctrl+A, Esc, Shift+F10).
+    listRef.current?.focus({ preventScroll: true })
+    const k = fileKey(m)
+    if (e.shiftKey && anchor.current) {
+      const a = shown.findIndex((x) => fileKey(x) === anchor.current)
+      const b = shown.findIndex((x) => fileKey(x) === k)
+      if (a >= 0 && b >= 0) return setSelected(new Set(shown.slice(Math.min(a, b), Math.max(a, b) + 1).map(fileKey)))
+    }
+    anchor.current = k
+    if (e.ctrlKey || e.metaKey) {
+      const next = new Set(selected)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      return setSelected(next)
+    }
+    setSelected(selected.size === 1 && selected.has(k) ? new Set() : new Set([k]))
+  }
+
+  const menuFor = (list: ContentItem[]): ContextEntry[] => {
+    const one = list.length === 1 ? list[0] : undefined
+    const on = list.filter((m) => m.enabled)
+    const off = list.filter((m) => !m.enabled)
+    const outdated = list.filter((m) => m.update)
+    const page = one && projectUrl(one.projectId)
+    return [
+      one
+        ? { label: t(one.enabled ? 'instance.content.disable' : 'instance.content.enable'), icon: one.enabled ? <ToggleLeft /> : <ToggleRight />, onSelect: () => void setEnabled([one], !one.enabled) }
+        : null,
+      !one && off.length ? { label: t('menu.content.enableMany', { count: off.length }), icon: <ToggleRight />, onSelect: () => void setEnabled(off, true) } : null,
+      !one && on.length ? { label: t('menu.content.disableMany', { count: on.length }), icon: <ToggleLeft />, onSelect: () => void setEnabled(on, false) } : null,
+      one?.projectId ? { label: t('menu.content.changeVersion'), icon: <Repeat />, onSelect: () => setChangingVersion(one) } : null,
+      outdated.length
+        ? {
+            label: one?.update ? t('instance.content.updateTo', { version: one.update.versionNumber }) : t('menu.content.updateMany', { count: outdated.length }),
+            icon: <ArrowUpCircle />,
+            disabled: !!updating,
+            onSelect: () => void update(outdated)
+          }
+        : kind === 'mod' && list.some((m) => m.projectId)
+          ? { label: t('menu.content.checkUpdate'), icon: <RefreshCw />, disabled: checking, onSelect: () => void checkPicked(list) }
+          : null,
+      '-',
+      page ? { label: t('menu.openProjectPage'), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(page) } : null,
+      one
+        ? {
+            label: t('files.showInExplorer'),
+            icon: <FolderOpen />,
+            onSelect: () => void api.files.reveal({ kind: 'instance', id: inst.id }, `${KIND_FOLDER[kind]}/${one.filename}`).catch((e) => toast(e.message, 'error'))
+          }
+        : { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id, KIND_FOLDER[kind]) },
+      {
+        label: one ? t('menu.copyFileName') : t('menu.copyFileNames', { count: list.length }),
+        icon: <Copy />,
+        onSelect: () => void copy(list.map((m) => m.filename).join('\n'))
+      },
+      '-',
+      { label: t('common.remove'), icon: <Trash2 />, danger: true, shortcut: 'Del', onSelect: () => setRemoving(list) }
+    ]
+  }
+
+  const rowMenu = (e: React.MouseEvent, m: ContentItem) => {
+    // Right-clicking outside the selection picks just that row, like Explorer.
+    let list = picked()
+    if (!selected.has(fileKey(m))) {
+      anchor.current = fileKey(m)
+      setSelected(new Set([fileKey(m)]))
+      list = [m]
+    }
+    openContextMenu(e, menuFor(list), list.length > 1 ? t('menu.selected', { count: list.length }) : undefined)
+  }
+
+  // Shift+F10 / the Menu key with the list itself focused: the menu for the selection, under its first row.
+  const listMenu = (e: React.MouseEvent) => {
+    const list = picked()
+    if (!fromKeyboard(e) || !list.length || (e.target as HTMLElement).closest('.list-row')) return
+    e.preventDefault()
+    const r = listRef.current?.querySelector('.list-row.selected')?.getBoundingClientRect()
+    openContextMenu({ x: (r?.left ?? e.clientX) + 36, y: r?.bottom ?? e.clientY, keyboard: true, origin: listRef.current }, menuFor(list), list.length > 1 ? t('menu.selected', { count: list.length }) : undefined)
+  }
+
+  const onListKey = (e: React.KeyboardEvent) => {
+    if ((e.target as HTMLElement).closest('input')) return
+    const k = e.key.toLowerCase()
+    if (k === 'escape' && selected.size) setSelected(new Set())
+    else if (k === 'delete' && selected.size) setRemoving(picked())
+    else if ((e.ctrlKey || e.metaKey) && k === 'a') setSelected(new Set(shown.map(fileKey)))
+    else return
+    e.preventDefault()
   }
 
   return (
@@ -270,9 +410,15 @@ function ContentTab({ inst }: { inst: Instance }) {
           {kind === 'shader' ? t('instance.content.shaderHint') : t('instance.content.emptyHint')}
         </Empty>
       ) : (
-        <div className="list">
+        <div className="list" ref={listRef} tabIndex={-1} aria-multiselectable onKeyDown={onListKey} onContextMenu={listMenu}>
           {shown.map((m) => (
-            <div key={m.filename} className={`list-row ${m.enabled ? '' : 'off'}`}>
+            <div
+              key={m.filename}
+              className={`list-row ${m.enabled ? '' : 'off'} ${selected.has(fileKey(m)) ? 'selected' : ''}`}
+              aria-selected={selected.has(fileKey(m))}
+              onClick={(e) => clickRow(e, m)}
+              onContextMenu={(e) => rowMenu(e, m)}
+            >
               <div className="ico">{m.iconUrl ? <img src={m.iconUrl} alt="" /> : <Blocks />}</div>
               <div className="grow">
                 <div className="title ellipsis">
@@ -318,13 +464,14 @@ function ContentTab({ inst }: { inst: Instance }) {
                   }
                 }}
               />
-              <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving(m)}>
+              <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving([m])}>
                 <Trash2 />
               </button>
             </div>
           ))}
         </div>
       )}
+      {selected.size > 1 && <p className="hint" style={{ marginTop: 8 }}>{t('menu.selected', { count: selected.size })}</p>}
 
       {changingVersion?.projectId && (
         <VersionPicker
@@ -348,17 +495,23 @@ function ContentTab({ inst }: { inst: Instance }) {
 
       {removing && (
         <ConfirmModal
-          title={t('instance.content.removeTitle', { name: removing.title ?? removing.filename })}
+          title={
+            removing.length === 1
+              ? t('instance.content.removeTitle', { name: removing[0].title ?? removing[0].filename })
+              : t('menu.content.removeTitle', { count: removing.length })
+          }
           body={t('instance.content.removeBody')}
           confirm={t('common.remove')}
           onClose={() => setRemoving(undefined)}
           onConfirm={async () => {
             try {
-              await api.content.remove(inst.id, kind, removing.filename)
-              await load()
+              for (const m of removing) await api.content.remove(inst.id, kind, m.filename)
+              if (removing.length > 1) toast(t('menu.content.removed', { count: removing.length }))
             } catch (e) {
               toast((e as Error).message, 'error')
             }
+            setSelected(new Set())
+            await load()
           }}
         />
       )}
@@ -495,6 +648,16 @@ function SettingsTab({ inst }: { inst: Instance }) {
     void api.java.list().then(setJavas)
   }, [])
 
+  const setImage = async (kind: InstanceImage, dataUrl: string | null) => {
+    try {
+      await api.instances.setImage(inst.id, kind, dataUrl)
+      await refreshInstances()
+      toast(t(dataUrl ? 'art.saved' : 'art.removed'))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
   const save = async (patch: Parameters<typeof api.instances.update>[1]) => {
     try {
       await api.instances.update(inst.id, patch)
@@ -538,6 +701,24 @@ function SettingsTab({ inst }: { inst: Instance }) {
                 />
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>{t('art.appearance')}</h3>
+        <div className="card">
+          <div className="setting">
+            <div className="text">
+              <b>{t('art.icon')}</b>
+              <span>{t('art.iconHint')}</span>
+            </div>
+            <div className="control">
+              <IconPicker inst={inst} onChange={(url) => void setImage('icon', url)} onError={(m) => toast(m, 'error')} size={64} />
+            </div>
+          </div>
+          <div className="setting stack">
+            <BannerPicker value={inst.bannerUrl} onChange={(url) => void setImage('banner', url)} onError={(m) => toast(m, 'error')} />
           </div>
         </div>
       </div>

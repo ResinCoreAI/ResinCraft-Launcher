@@ -1,5 +1,6 @@
 import { Check, Clock, Compass, Gamepad2, Layers, Plus, Sparkles, Timer } from 'lucide-react'
-import { InstanceCard } from './Library'
+import type { Instance } from '@shared/types'
+import { InstanceCard, useInstanceMenu } from './Library'
 import { InstanceTile, Logo, PlayButton } from '../components/ui'
 import { useStore } from '../store'
 import { describe, greeting, playtime, timeAgo } from '../util'
@@ -76,32 +77,7 @@ export default function Home() {
         </div>
       </div>
 
-      {featured && (
-        <section className="hero">
-          <InstanceTile inst={featured} className="hero-art" />
-          <div>
-            <div className="eyebrow">{featured.lastPlayed ? t('home.hero.continue') : t('home.hero.start')}</div>
-            <h1>{featured.name}</h1>
-            <div className="meta">
-              <span>
-                <Gamepad2 /> {describe(featured)}
-              </span>
-              <span>
-                <Timer /> {playtime(featured.playtime)}
-              </span>
-              <span>
-                <Clock /> {featured.lastPlayed ? t('home.hero.played', { when: timeAgo(featured.lastPlayed, true) }) : t('home.hero.notPlayed')}
-              </span>
-            </div>
-            <div className="row">
-              <PlayButton inst={featured} size="lg" />
-              <button className="btn lg" onClick={() => go({ page: 'instance', id: featured.id })}>
-                {t('home.hero.manage')}
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
+      {featured && <Hero featured={featured} />}
 
       <div className="stats" style={{ marginTop: 16 }}>
         <div className="stat">
@@ -126,6 +102,41 @@ export default function Home() {
 
       <InstanceRow />
     </div>
+  )
+}
+
+/** The instance you played last, front and centre; right-click it for the same menu as its card. */
+function Hero({ featured }: { featured: Instance }) {
+  const { go } = useStore()
+  const menu = useInstanceMenu(featured)
+  return (
+    <>
+      <section className="hero" onContextMenu={menu.open}>
+        <InstanceTile inst={featured} className="hero-art" />
+        <div>
+          <div className="eyebrow">{featured.lastPlayed ? t('home.hero.continue') : t('home.hero.start')}</div>
+          <h1>{featured.name}</h1>
+          <div className="meta">
+            <span>
+              <Gamepad2 /> {describe(featured)}
+            </span>
+            <span>
+              <Timer /> {playtime(featured.playtime)}
+            </span>
+            <span>
+              <Clock /> {featured.lastPlayed ? t('home.hero.played', { when: timeAgo(featured.lastPlayed, true) }) : t('home.hero.notPlayed')}
+            </span>
+          </div>
+          <div className="row">
+            <PlayButton inst={featured} size="lg" />
+            <button className="btn lg" onClick={() => go({ page: 'instance', id: featured.id })}>
+              {t('home.hero.manage')}
+            </button>
+          </div>
+        </div>
+      </section>
+      {menu.dialogs}
+    </>
   )
 }
 
