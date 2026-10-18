@@ -1,0 +1,15 @@
+{
+  "version": "0.3.0",
+  "notes": "Download the installer below. Windows may warn that the publisher is unverified until releases are code-signed. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.",
+  "pub_date": "2026-10-18T09:00:29.648Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGZsR3AvMFVoOGFnbzY2eDAwdEpzSnlaZTdOeEkzdFVNZEtPZEZaODJUOW9PTXMxUWswTys1bFBiWGNvdlhlR0JMLzN1RDBkSkljd2htakR5N1k5a1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzE0MDI2CWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8wLjMuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4zLjAKNFJmMWxWU3kzNEg2RWxzc2FKRk9iKzNkV3RXUzk5SmxOMDVLNitHSkRiMGw5NFlMYndsQ1dyWms1Z3pBYzNFZDN3cExGWDZwbHFFaGU4bDEyaHlNQ0E9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v0.3.0/ResinCraft.Launcher_0.3.0_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGZsR3AvMFVoOGFnbzY2eDAwdEpzSnlaZTdOeEkzdFVNZEtPZEZaODJUOW9PTXMxUWswTys1bFBiWGNvdlhlR0JMLzN1RDBkSkljd2htakR5N1k5a1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzE0MDI2CWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8wLjMuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4zLjAKNFJmMWxWU3kzNEg2RWxzc2FKRk9iKzNkV3RXUzk5SmxOMDVLNitHSkRiMGw5NFlMYndsQ1dyWms1Z3pBYzNFZDN3cExGWDZwbHFFaGU4bDEyaHlNQ0E9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v0.3.0/ResinCraft.Launcher_0.3.0_x64-setup.exe"
+    }
+  }
+}
