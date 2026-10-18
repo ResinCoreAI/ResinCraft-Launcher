@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "ResinCraft Launcher: a modern Minecraft: Java Edition launcher by Puirkle"
 authors = ["Puirkle"]
 license = "MIT"
-repository = "https://github.com/Puirkle/ResinCraft-Launcher"
+repository = "https://github.com/ResinCoreAI/ResinCraft-Launcher"
 edition = "2021"
 rust-version = "1.85"
 

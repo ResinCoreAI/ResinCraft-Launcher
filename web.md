@@ -21,8 +21,8 @@ You are building the public website for **ResinCraft Launcher**, a desktop Minec
 
 - **Current version:** `v0.1.0`, released 2026-10-18.
 - **Platform:** Windows 10/11, 64-bit. Installer: `ResinCraft.Launcher_0.1.0_x64-setup.exe`, about 5 MB.
-- **Download link:** always point to `https://github.com/Puirkle/ResinCraft-Launcher/releases/latest`, never to a versioned file, so the site doesn't need editing on each release.
-- **Source code:** `https://github.com/Puirkle/ResinCraft-Launcher`, **MIT licence**, free.
+- **Download link:** always point to `https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest`, never to a versioned file, so the site doesn't need editing on each release.
+- **Source code:** `https://github.com/ResinCoreAI/ResinCraft-Launcher`, **MIT licence**, free.
 - **Built with:** Tauri 2 and Rust, with a React interface. It's a small native app, not an Electron bundle; you may mention the ~5 MB installer as a plain fact.
 - **Windows SmartScreen:** releases aren't code-signed yet, so Windows shows "Windows protected your PC / unknown publisher" on first run. Say so honestly next to the download, with the fix: "More info → Run anyway".
 - Never invent download counts, stars or user numbers.
@@ -258,7 +258,7 @@ Use `<details>`/`<summary>` and answer like a person, in 1–3 sentences each.
 
 ### 7.8 Footer (one statement, then one line)
 - A single closing sentence in the display face, left-aligned. For example, "Made by Puirkle for people who keep too many modpacks." `<<PUIRKLE_TO_CONFIRM>>`
-- One line of inline links: Privacy · Terms · Contact (`<<CONTACT_EMAIL_OR_URL>>`) · Source (`https://github.com/Puirkle/ResinCraft-Launcher`) · © 2026 Puirkle.
+- One line of inline links: Privacy · Terms · Contact (`<<CONTACT_EMAIL_OR_URL>>`) · Source (`https://github.com/ResinCoreAI/ResinCraft-Launcher`) · © 2026 Puirkle.
 - The mandatory line, verbatim, in `--ink-faint`: **"NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT."**
 - No social icon row and no link columns.
 
