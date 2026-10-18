@@ -5,9 +5,10 @@
 //! passive mode with `/UPDATE`: it replaces the program files only, so everything in %APPDATA%\ResinCraft
 //! Launcher (instances, accounts, settings) stays, and it starts the new version when it's done.
 //!
-//! Where updates come from (tauri.conf.json `plugins.updater.endpoints`): latest.json of the newest published
-//! GitHub release. Drafts are skipped, so publishing a release's draft is what offers it to players. Test builds
-//! point elsewhere with `tauri build --config` (see README, "Updates").
+//! Where updates come from (tauri.conf.json `plugins.updater.endpoints`): latest.json on the repository's `updates`
+//! branch, which .github/workflows/publish-update.yml writes when a release is published, so publishing a release's
+//! draft is what offers it to players. (Launcher 0.3.0 read the newest release's own latest.json instead.) Test
+//! builds point elsewhere with `tauri build --config` (see README, "Updates").
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;

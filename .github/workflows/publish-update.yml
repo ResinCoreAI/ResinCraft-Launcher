@@ -1,0 +1,92 @@
+# Offers a published release to installed copies. When a draft made by release.yml is published, this copies the
+# release's latest.json to the `updates` branch, which is where the in-app updater looks
+# (tauri.conf.json `plugins.updater.endpoints`). Publishing the draft is still what sends the update out.
+#
+# Afterwards the release shows only the installer: the .sig is removed by release.yml (its text is inside
+# latest.json), and latest.json is removed here, except on releases up to KEEP_RELEASE_JSON_UNTIL. Launcher 0.3.0
+# only knows the old address, the newest release's own latest.json, so the release that updates it must keep it.
+name: Publish update
+
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release to offer, e.g. v0.3.1 (it must be the latest release)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: updates-branch
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      KEEP_RELEASE_JSON_UNTIL: '0.3.1'
+    steps:
+      - name: Copy latest.json to the updates branch
+        run: |
+          set -euo pipefail
+          latest=$(gh release view --json tagName -q .tagName)
+          if [ "$latest" != "$TAG" ]; then
+            echo "::notice::$TAG isn't the latest release ($latest), so the updates branch is left alone."
+            exit 0
+          fi
+          version=${TAG#v}
+
+          git init -q branch
+          cd branch
+          git config user.name Puirkle
+          git config user.email 100525881+Puirkle@users.noreply.github.com
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git"
+          if git fetch -q --depth 1 origin updates; then git checkout -q -B updates FETCH_HEAD; else git checkout -q --orphan updates; fi
+
+          if gh release download "$TAG" -p latest.json -O ../latest.json; then
+            # Never offer a file that doesn't match its release: right version, signed, installer of this tag.
+            jq -e --arg v "$version" --arg tag "$TAG" '
+              .version == $v and (.platforms | length > 0) and
+              all(.platforms[]; (.signature | length > 0) and (.url | contains("/releases/download/" + $tag + "/")))
+            ' ../latest.json > /dev/null || { echo "::error::latest.json of $TAG doesn't match the release."; exit 1; }
+            cp ../latest.json latest.json
+            cat > README.md <<'EOF'
+          # Updates
+
+          `latest.json` tells installed copies of ResinCraft Launcher which version is the newest and where its signed
+          installer is. It is written by `.github/workflows/publish-update.yml` on `main` when a release is published.
+          EOF
+            git add latest.json README.md
+            if git diff --cached --quiet; then
+              echo "The updates branch already offers $version."
+            else
+              git commit -q -m "Offer $version"
+              git push -q origin updates
+              echo "::notice::Installed copies are now offered $version."
+            fi
+          elif [ -f latest.json ] && [ "$(jq -r .version latest.json)" = "$version" ]; then
+            echo "latest.json was already moved from $TAG; the updates branch offers $version."
+          else
+            echo "::error::$TAG has no latest.json (release.yml attaches it)."
+            exit 1
+          fi
+
+      - name: Tidy the release
+        run: |
+          set -euo pipefail
+          latest=$(gh release view --json tagName -q .tagName)
+          [ "$latest" = "$TAG" ] || exit 0
+          version=${TAG#v}
+          newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]; }
+          gh release view "$TAG" --json assets -q '.assets[].name' | while read -r name; do
+            case "$name" in
+              *.sig) gh release delete-asset "$TAG" "$name" -y ;;
+              latest.json) if newer "$version" "$KEEP_RELEASE_JSON_UNTIL"; then gh release delete-asset "$TAG" "$name" -y; fi ;;
+            esac
+          done

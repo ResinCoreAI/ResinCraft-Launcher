@@ -4,9 +4,10 @@
 # (see src-tauri/build.rs); they are never stored in the code.
 #
 # Updates: TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD sign the installer, which is also the
-# update file (setup.exe + setup.exe.sig), and latest.json is attached for the in-app updater. The release stays a
-# draft until it is published by hand; the updater reads /releases/latest/download/latest.json, which skips drafts,
-# so publishing the draft is what offers the update to players (README, "Updates").
+# update file. Its signature goes into latest.json, which waits on the draft; the separate .sig is removed. The
+# release stays a draft until it is published by hand, and publishing it runs publish-update.yml, which moves
+# latest.json to the `updates` branch where installed copies look. So publishing is what offers the update
+# (README, "Updates").
 name: Release
 
 on:
@@ -57,3 +58,14 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
+      # Its text is inside latest.json, which is all the updater reads, so the release doesn't need the .sig.
+      - name: Remove the .sig file from the draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --json assets -q '.assets[].name | select(endswith(".sig"))' | while read -r name; do
+            gh release delete-asset "$TAG" "$name" -y
+          done
