@@ -51,3 +51,54 @@
   font-size: 13px;
   white-space: nowrap;
 }
+
+/* Relay session banner above the server console: warning (Continue), paused/off, ended (Start again). */
+.relay-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  animation: relay-banner-in 0.25s var(--ease);
+}
+.relay-banner > svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+.relay-banner .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.relay-banner .grow span {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.relay-banner .admin-msg {
+  color: var(--text);
+  font-style: normal;
+}
+.relay-banner.warn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.relay-banner.warn > svg {
+  color: var(--accent);
+}
+.relay-banner.paused > svg {
+  color: var(--data);
+}
+.relay-banner.ended > svg {
+  color: var(--danger);
+}
+@keyframes relay-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

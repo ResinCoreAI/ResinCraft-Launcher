@@ -509,7 +509,7 @@ fn resin_failed(e: &anyhow::Error) -> ResinNet {
 async fn open_resin(id: &str) -> Result<()> {
     let Ok(meta) = store::get(id).await else { return Ok(()) };
     let status_id = id.to_string();
-    let opened = relay::open(id, meta.port, move |s| on_resin_status(&status_id, s)).await?;
+    let opened = relay::open(id, meta.port, meta.tunnel == TunnelMode::Resin, move |s| on_resin_status(&status_id, s)).await?;
     if !is_running(id) || net(id).is_none() {
         opened.task.abort();
         return Ok(());
@@ -519,9 +519,40 @@ async fn open_resin(id: &str) -> Result<()> {
             old.abort();
         }
     });
-    let resin = ResinNet { name: Some(opened.name), used_bytes: opened.usage.bytes, limit_bytes: opened.limits.monthly_bytes, ..ResinNet::default() };
+    let resin = ResinNet {
+        name: Some(opened.name),
+        used_bytes: opened.usage.bytes,
+        limit_bytes: opened.limits.monthly_bytes,
+        ends_at: opened.secs_left.map(ends_at),
+        paused: opened.paused.as_ref().map(|(_, m)| m.clone().unwrap_or_default()),
+        off: opened.paused.as_ref().is_some_and(|(off, _)| *off),
+        ..ResinNet::default()
+    };
     set_net(id, Some(ServerNet { resin: Some(resin), ..net_state("open", Some(opened.address), None, Some("resin")) }));
     Ok(())
+}
+
+/// Flashes the launcher in the taskbar (when it isn't in front) so the host sees a relay warning.
+fn attention() {
+    use tauri::Manager;
+    if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window("main")) {
+        let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
+    }
+}
+
+/// Another full ResinCraft Relay session (the Continue button, or `continue` typed in the console).
+pub fn relay_continue(id: &str) -> Result<()> {
+    relay::continue_session(id)
+}
+
+/// Starts sharing again after the relay session ended (the "Start again" button).
+pub async fn relay_restart(id: &str) {
+    refresh_internet(id).await;
+}
+
+/// Local Unix ms when a relay session with `secs_left` ends.
+fn ends_at(secs_left: u64) -> i64 {
+    crate::core::fsutil::now_ms() + secs_left as i64 * 1000
 }
 
 /// Updates from a running ResinCraft Relay tunnel: traffic, reconnecting, back online, or given up.
@@ -541,10 +572,50 @@ fn on_resin_status(id: &str, status: relay::Status) {
             }
             resin.reconnecting = true;
         }
-        relay::Status::Online { address, usage } => {
+        relay::Status::Online { address, usage, secs_left } => {
             resin.reconnecting = false;
             resin.used_bytes = usage.bytes;
+            resin.ends_at = secs_left.map(ends_at);
+            resin.warning = None;
+            resin.paused = None;
+            resin.off = false;
             n.address = Some(address);
+        }
+        relay::Status::Warning { secs_left } => {
+            let first = resin.warning.is_none();
+            let minutes = secs_left.div_ceil(60).max(1);
+            resin.warning = Some(minutes as u32);
+            resin.ends_at = Some(ends_at(secs_left));
+            if first {
+                // Players can't be shown a disconnect reason through the relay, so warn them in chat now.
+                let plural = if minutes == 1 { "" } else { "s" };
+                if let Ok(tx) = sender(id) {
+                    let _ = tx.send(format!("say ResinCraft Relay closes in {minutes} minute{plural} unless the host continues."));
+                }
+                attention();
+            }
+        }
+        relay::Status::Extended { secs_left, continues } => {
+            resin.warning = None;
+            resin.ends_at = Some(ends_at(secs_left));
+            resin.continues = continues;
+        }
+        relay::Status::Paused { message, off, .. } => {
+            resin.paused = Some(message.unwrap_or_default());
+            resin.off = off;
+        }
+        relay::Status::Resumed => {
+            resin.paused = None;
+            resin.off = false;
+        }
+        relay::Status::SessionEnded => {
+            let name = resin.name.clone();
+            let e = crate::err_tr!("hostRelay.sessionEnded", "The ResinCraft Relay session ended.");
+            n = ServerNet {
+                error_text: text_of(&e).cloned(),
+                resin: Some(ResinNet { name, ended: true, ..ResinNet::default() }),
+                ..net_state("failed", None, Some(e.to_string()), None)
+            };
         }
         relay::Status::Failed(e) => {
             eprintln!("[server] ResinCraft Relay stopped: {e:#}");
@@ -557,8 +628,8 @@ fn on_resin_status(id: &str, status: relay::Status) {
 /// Makes a running server reachable from the internet the way its settings say (TunnelMode): the router
 /// (UPnP, a direct connection; the lease is renewed while it runs), ResinCraft Relay (a stable name, needs a
 /// Microsoft account), playit.gg (a stable address), or the bore relay (no setup at all), which is also the
-/// fallback when the others fail. Automatic tries the router, then ResinCraft Relay if a Microsoft account is
-/// signed in, then playit.gg if this launcher is already linked to it (never a claim page there), then bore.
+/// fallback when the others fail. Automatic tries the router, then playit.gg if this launcher is already linked
+/// to it (never a claim page there), then ResinCraft Relay if a Microsoft account is signed in, then bore.
 async fn open_internet(id: String) {
     let Ok(meta) = store::get(&id).await else { return };
     let port = meta.port;
@@ -596,22 +667,9 @@ async fn open_internet(id: String) {
                 return;
             }
             Err(router_err) => {
-                // ResinCraft Relay next, when a Microsoft account is signed in.
-                if relay::usable(&meta).await {
-                    match open_resin(&id).await {
-                        Ok(()) => return,
-                        Err(_) if !is_running(&id) || net(&id).is_none() => return,
-                        Err(e) => {
-                            eprintln!("[server] ResinCraft Relay didn't work: {e:#}");
-                            resin_note = Some(resin_failed(&e));
-                        }
-                    }
-                } else if relay::settings().is_some() {
-                    resin_hint = true;
-                }
                 if playit::linked().await {
-                    // Linked already, so no claim page. If playit.gg asks to link again (the agent was removed
-                    // there), give up on it at once and use the relay instead of waiting for the browser.
+                    // playit.gg first after the router (the owner's choice). Linked already, so no claim page. If
+                    // playit.gg asks to link again (the agent was removed there), give up on it at once and move on.
                     let needs_claim = Arc::new(std::sync::atomic::AtomicBool::new(false));
                     let (flag, wanted_id) = (needs_claim.clone(), id.clone());
                     let wanted_flag = needs_claim.clone();
@@ -638,12 +696,25 @@ async fn open_internet(id: String) {
                         }
                         Err(_) if !is_running(&id) || net(&id).is_none() => return,
                         Err(e) => {
-                            eprintln!("[server] playit.gg didn't work, using the relay: {e:#}");
+                            eprintln!("[server] playit.gg didn't work, trying the next way: {e:#}");
                             playit_hint = needs_claim.load(std::sync::atomic::Ordering::Relaxed);
                         }
                     }
                 } else {
                     playit_hint = true;
+                }
+                // Then ResinCraft Relay, when a Microsoft account is signed in.
+                if relay::usable(&meta).await {
+                    match open_resin(&id).await {
+                        Ok(()) => return,
+                        Err(_) if !is_running(&id) || net(&id).is_none() => return,
+                        Err(e) => {
+                            eprintln!("[server] ResinCraft Relay didn't work: {e:#}");
+                            resin_note = Some(resin_failed(&e));
+                        }
+                    }
+                } else if relay::settings().is_some() {
+                    resin_hint = true;
                 }
                 Some(router_err)
             }
@@ -767,6 +838,14 @@ pub fn command(id: &str, cmd: &str) -> Result<()> {
     }
     if cmd.contains(['\n', '\r']) {
         bail!("A command must be a single line");
+    }
+    let warned = net(id).and_then(|n| n.resin).is_some_and(|r| r.warning.is_some());
+    if warned && cmd.eq_ignore_ascii_case("continue") {
+        relay::continue_session(id)?;
+        let note = LogLine { text: "> continue  (sent to ResinCraft Relay: the session goes on, it wasn't typed into the server)".into(), level: "info" };
+        with(|w| w.logs.entry(id.to_string()).or_default().push_back(note.clone()));
+        emit("serverLog", ServerLogEvent { server_id: id.to_string(), lines: vec![note] });
+        return Ok(());
     }
     sender(id)?.send(cmd.to_string()).map_err(|_| anyhow!("The server isn't accepting commands"))?;
     let echo = LogLine { text: format!("> {cmd}"), level: "debug" };

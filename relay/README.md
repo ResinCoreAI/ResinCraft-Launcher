@@ -164,7 +164,10 @@ Open `https://rscraft.resincore.tech:7443` and sign in with the admin password. 
 forward it over SSH: `ssh -L 7443:127.0.0.1:7443 you@rscraft.resincore.tech`, then open
 `https://localhost:7443` (the browser will warn that the certificate is for rscraft.resincore.tech).
 
-- **Live tunnels**: address, Minecraft account and UUID, online since, players, traffic in and out; **Kick**
+- **Service switch** (sidebar): **On**, **Paused** (no new tunnels; running ones finish their session) or **Off**
+  (every tunnel closes now), with an optional message that launchers show. Kept across restarts.
+- **Live tunnels**: address, Minecraft account and UUID, online since, players, traffic in and out, session time
+  left and how often it was continued; **Extend** gives another session, **End now** ends it, **Kick**
   disconnects a server (its launcher doesn't reconnect by itself).
 - **Names**: search; rename or release names; reserve or unreserve words.
 - **Bans**: ban or unban a Minecraft UUID or an IP / CIDR range, with a reason and an optional duration in hours.
@@ -186,6 +189,19 @@ Security:
 - Every admin action is logged with a timestamp.
 - The page is served with a strict Content-Security-Policy. Mojang and Microsoft tokens never reach the
   relay's storage, so nothing can show them.
+
+## Relay sessions and the on/off switch
+
+- A session lasts `session_minutes` (default 120; 0 = no limit). At each of `session_warn_minutes` (default 10 and
+  1 minutes before the end) the host's launcher shows a banner with **Continue** in the server's Console tab, a
+  toast, flashes in the taskbar, and tells the players in chat once. **Continue**, or typing `continue` in the
+  console, gives another full session (it can't be stacked in advance).
+- Without Continue the tunnel and its player connections close when the time runs out. For 15 minutes afterwards
+  the Minecraft server list says "The host's relay session ended", and the launcher offers **Start again**.
+- **Paused**/**Off**: launchers on Automatic move on to the next way of sharing (bore.pub); a server set to the relay
+  by hand waits and reconnects by itself when the relay is on again. The server list shows the admin's message.
+- **Launcher 0.3.0** speaks the older protocol: it works, but its hosts get no warnings or Continue, so their
+  sessions just end. Set `session_minutes = 0` until your players are on 0.3.1 or later.
 
 ## Day to day
 

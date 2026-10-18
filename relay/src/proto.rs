@@ -8,11 +8,18 @@
 //! A session goes: `hello` → `welcome`, then `login` (a Minecraft access token, checked once with Mojang) or
 //! `resume` (the relay's own session token from an earlier login) → `authed`, then `check` / `reserve` /
 //! `release` for the name picker, or `online` to bring a name online. `ping` keeps the connection alive.
+//!
+//! Protocol 2 (launcher 0.4) adds the session time limit (`session_warning`, `session_extended`, `continue`)
+//! and the admin's on/off switch (`service`). The relay still serves protocol 1 launchers; it just never sends
+//! them those messages (new error codes reach them as `unknown`, which they retry).
 
 use serde::{Deserialize, Serialize};
 
-/// Bumped when a change would break older launchers; the relay answers older versions with `version`.
-pub const PROTOCOL_VERSION: u32 = 1;
+/// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
+/// with `version`.
+pub const PROTOCOL_VERSION: u32 = 2;
+/// The oldest launcher protocol the relay still serves (launcher 0.3).
+pub const MIN_PROTOCOL_VERSION: u32 = 1;
 /// Longest control line either side accepts.
 pub const MAX_LINE: usize = 16 * 1024;
 /// ALPN id on the agent port's TLS.
@@ -40,6 +47,8 @@ pub enum AgentMsg {
     Release { name: String },
     /// Bring a name online on this connection (reserving it first when it's free).
     Online { name: String },
+    /// Keep the session going for another full session (after a `session_warning`). Protocol 2.
+    Continue,
     Ping { seq: u64 },
 }
 
@@ -64,7 +73,26 @@ pub enum RelayMsg {
     },
     Reserved { name: String, address: String },
     Released { name: String },
-    Online { name: String, address: String, limits: Limits, usage: Usage },
+    Online {
+        name: String,
+        address: String,
+        limits: Limits,
+        usage: Usage,
+        /// Seconds until the session ends (None: no time limit).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        secs_left: Option<u64>,
+    },
+    /// The session ends soon unless the agent sends `continue`. Protocol 2.
+    SessionWarning { secs_left: u64 },
+    /// The session was extended (by `continue`, or by the relay's admin). Protocol 2.
+    SessionExtended { secs_left: u64, continues: u32 },
+    /// The admin switched the relay on, paused it (running tunnels go on until their session ends) or off.
+    /// Protocol 2.
+    Service {
+        state: ServiceState,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
     /// Sent now and then while online.
     Usage { usage: Usage },
     Pong { seq: u64 },
@@ -101,6 +129,12 @@ pub enum ErrorCode {
     Kicked,
     /// The relay's admin released or renamed this name.
     Released,
+    /// The relay's admin paused it: no new tunnels for now (the message says why). Try again later.
+    Paused,
+    /// The relay's admin switched it off (the message says why). Try again later.
+    ServiceOff,
+    /// The tunnel's session time ran out without a `continue`.
+    SessionEnded,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -110,8 +144,29 @@ pub enum ErrorCode {
 impl ErrorCode {
     /// Whether reconnecting later could help (a dropped connection, a restart) or not (a ban, a taken name).
     pub fn retryable(self) -> bool {
-        matches!(self, ErrorCode::Unavailable | ErrorCode::ShuttingDown | ErrorCode::Internal | ErrorCode::RateLimited | ErrorCode::Unknown)
+        matches!(
+            self,
+            ErrorCode::Unavailable
+                | ErrorCode::ShuttingDown
+                | ErrorCode::Internal
+                | ErrorCode::RateLimited
+                | ErrorCode::Paused
+                | ErrorCode::ServiceOff
+                | ErrorCode::Unknown
+        )
     }
+}
+
+/// The admin's switch.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ServiceState {
+    #[default]
+    On,
+    /// No new tunnels; running ones go on until their session ends.
+    Paused,
+    /// No tunnels at all; running ones were closed.
+    Off,
 }
 
 /// What one account may use.
@@ -125,6 +180,9 @@ pub struct Limits {
     pub connections: u32,
     /// Traffic per calendar month (UTC), both directions; 0 = unlimited.
     pub monthly_bytes: u64,
+    /// How long a session lasts before it needs a `continue`; 0 = no limit.
+    #[serde(default)]
+    pub session_secs: u64,
 }
 
 /// The account's use of the relay this month.
@@ -281,5 +339,12 @@ mod tests {
         let down: RelayMsg = serde_json::from_str(r#"{"t":"error","code":"something_new","message":"x"}"#).unwrap();
         assert_eq!(down, RelayMsg::Error { code: ErrorCode::Unknown, message: "x".into() });
         assert!(!ErrorCode::NameTaken.retryable() && ErrorCode::ShuttingDown.retryable());
+        assert!(ErrorCode::Paused.retryable() && ErrorCode::ServiceOff.retryable() && !ErrorCode::SessionEnded.retryable());
+        // Fields protocol 1 launchers don't know are skipped by them, and default when missing.
+        let old: RelayMsg = serde_json::from_str(r#"{"t":"online","name":"a","address":"a.b","limits":{"tunnels":1,"names":1,"connections":1,"monthly_bytes":0},"usage":{"month":"2026-10","bytes":0,"connections":0}}"#).unwrap();
+        assert!(matches!(old, RelayMsg::Online { secs_left: None, limits: Limits { session_secs: 0, .. }, .. }));
+        assert_eq!(serde_json::to_string(&AgentMsg::Continue).unwrap(), r#"{"t":"continue"}"#);
+        let svc = RelayMsg::Service { state: ServiceState::Paused, message: Some("Maintenance until 20:00".into()) };
+        assert_eq!(serde_json::from_str::<RelayMsg>(&serde_json::to_string(&svc).unwrap()).unwrap(), svc);
     }
 }

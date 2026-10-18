@@ -57,7 +57,9 @@ export async function updateInstance(id: string, patch: InstancePatch | Partial<
   const current = await getInstance(id)
   // `group: null` moves the instance back to Ungrouped.
   const group = patch.group === null ? undefined : (patch.group ?? current.group)
-  return saveInstance({ ...current, ...patch, id, group })
+  // `null` clears a setting.
+  const clean = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v === null ? undefined : v])) as Partial<Instance>
+  return saveInstance({ ...current, ...clean, id, group })
 }
 
 export async function duplicateInstance(id: string): Promise<Instance> {

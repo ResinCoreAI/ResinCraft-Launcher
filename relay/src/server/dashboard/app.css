@@ -389,6 +389,43 @@ td.actions button + button {
   font-style: normal;
 }
 
+/* The relay's on/off switch in the sidebar */
+.service {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.service-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.service-head span {
+  color: var(--faint);
+  font-size: 12px;
+}
+.service p {
+  margin: 0;
+}
+.small {
+  font-size: 12px;
+}
+.service-buttons {
+  display: flex;
+  gap: 4px;
+}
+.service-buttons button {
+  flex: 1;
+}
+.service-buttons button.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.warn {
+  color: var(--warn);
+}
+
 /* Toast */
 #toast {
   position: fixed;

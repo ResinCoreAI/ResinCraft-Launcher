@@ -18,7 +18,8 @@ use super::auth::{self, ProfileError};
 use super::metrics::Metrics;
 use super::{Account, Kick, Relay, Tunnel};
 use crate::agent::{yamux_config, Io};
-use crate::proto::{self, now_secs, AgentMsg, ErrorCode, RelayMsg, MAX_LINE, PING_SECS, PROTOCOL_VERSION};
+use super::session::{SessionClock, Tick};
+use crate::proto::{self, now_secs, AgentMsg, ErrorCode, RelayMsg, MAX_LINE, MIN_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION};
 
 /// Control messages one connection may send per minute.
 const MESSAGES_PER_MINUTE: u32 = 240;
@@ -71,6 +72,8 @@ pub(crate) async fn serve(relay: Arc<Relay>, sock: TcpStream, peer: SocketAddr, 
             bytes_in: Arc::new(AtomicU64::new(0)),
             bytes_out: Arc::new(AtomicU64::new(0)),
             budget: (MESSAGES_PER_MINUTE, tokio::time::Instant::now()),
+            version: PROTOCOL_VERSION,
+            clock: None,
         };
         agent.run(ctrl).await;
         if let Some(name) = agent.online.take() {
@@ -100,15 +103,26 @@ struct Agent {
     bytes_in: Arc<AtomicU64>,
     bytes_out: Arc<AtomicU64>,
     budget: (u32, tokio::time::Instant),
+    /// The launcher's protocol: only 2 and later hear about session warnings and the admin's switch.
+    version: u32,
+    /// The session time of the name online on this connection.
+    clock: Option<Arc<SessionClock>>,
 }
 
 enum Step {
     Reply(RelayMsg),
+    /// Nothing to answer right away (the loop sends what follows).
+    Quiet,
     Close(RelayMsg),
 }
 
 fn error(code: ErrorCode) -> RelayMsg {
     RelayMsg::Error { code, message: message(code).to_string() }
+}
+
+/// An error with the admin's own words when there are some (paused, off).
+fn error_with(code: ErrorCode, text: Option<String>) -> RelayMsg {
+    RelayMsg::Error { code, message: text.unwrap_or_else(|| message(code).to_string()) }
 }
 
 /// English text for each code (the launcher shows its own, translated wording).
@@ -131,6 +145,9 @@ pub(crate) fn message(code: ErrorCode) -> &'static str {
         ErrorCode::Replaced => "this name came online somewhere else",
         ErrorCode::Kicked => "the relay's admin disconnected this server",
         ErrorCode::Released => "the relay's admin released or renamed this name",
+        ErrorCode::Paused => "the relay's admin paused it for now",
+        ErrorCode::ServiceOff => "the relay's admin switched it off for now",
+        ErrorCode::SessionEnded => "the host's relay session ended",
         ErrorCode::ShuttingDown => "the relay is restarting",
         ErrorCode::Internal | ErrorCode::Unknown => "the relay ran into a problem",
     }
@@ -151,8 +168,9 @@ impl Agent {
 
         let Ok(Some(Ok(line))) = tokio::time::timeout(Duration::from_secs(10), lines.next()).await else { return };
         match serde_json::from_str::<AgentMsg>(&line) {
-            Ok(AgentMsg::Hello { version, client }) if version == PROTOCOL_VERSION => {
-                debug!(client = %client.chars().take(64).collect::<String>(), "launcher connected");
+            Ok(AgentMsg::Hello { version, client }) if (MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION).contains(&version) => {
+                debug!(client = %client.chars().take(64).collect::<String>(), version, "launcher connected");
+                self.version = version;
                 let welcome = RelayMsg::Welcome { version: PROTOCOL_VERSION, base_domain: self.relay.cfg.base_domain.clone() };
                 if send(&mut w, &welcome).await.is_err() {
                     return;
@@ -176,9 +194,12 @@ impl Agent {
         let mut deadline = tokio::time::Instant::now() + silence;
         let mut usage = tokio::time::interval(Duration::from_secs(60));
         usage.tick().await;
+        let mut tick = tokio::time::interval(Duration::from_secs(1));
+        let mut service = self.relay.service_rx();
         let kick = self.kick.clone();
         loop {
-            let reply = tokio::select! {
+            let clock = self.clock.clone();
+            let reply: Option<RelayMsg> = tokio::select! {
                 line = lines.next() => {
                     deadline = tokio::time::Instant::now() + silence;
                     let Some(Ok(line)) = line else { return };
@@ -191,7 +212,8 @@ impl Agent {
                         return;
                     };
                     match self.handle(msg).await {
-                        Step::Reply(m) => m,
+                        Step::Reply(m) => Some(m),
+                        Step::Quiet => None,
                         Step::Close(m) => {
                             let _ = send(&mut w, &m).await;
                             return;
@@ -199,10 +221,41 @@ impl Agent {
                     }
                 }
                 _ = usage.tick(), if self.online.is_some() => {
-                    RelayMsg::Usage { usage: self.usage() }
+                    Some(RelayMsg::Usage { usage: self.usage() })
                 }
-                reason = kick.wait() => {
-                    let _ = send(&mut w, &error(reason)).await;
+                _ = tick.tick(), if clock.is_some() => {
+                    let limits = self.relay.limits_now();
+                    let c = clock.as_ref().expect("guarded");
+                    match c.tick(now_secs(), &limits.warn_secs(), limits.session_secs() > 0) {
+                        Tick::Nothing => None,
+                        Tick::Warn(secs_left) => (self.version >= 2).then_some(RelayMsg::SessionWarning { secs_left }),
+                        Tick::Ended => {
+                            if let Some(name) = &self.online {
+                                self.relay.mark_ended(name);
+                                info!(name = %name, "relay session ended");
+                                self.relay.event("session", format!("{name}'s relay session ended"), None);
+                            }
+                            let _ = send(&mut w, &error(ErrorCode::SessionEnded)).await;
+                            return;
+                        }
+                    }
+                }
+                _ = async { match &clock { Some(c) => c.changed.notified().await, None => std::future::pending().await } } => {
+                    let c = clock.as_ref().expect("only with a clock");
+                    match c.secs_left(now_secs()) {
+                        Some(secs_left) if self.version >= 2 => Some(RelayMsg::SessionExtended { secs_left, continues: c.continues() }),
+                        _ => None,
+                    }
+                }
+                changed = service.changed() => {
+                    if changed.is_err() {
+                        return;
+                    }
+                    let (state, message) = service.borrow_and_update().clone();
+                    (self.version >= 2).then_some(RelayMsg::Service { state, message })
+                }
+                (reason, text) = kick.wait() => {
+                    let _ = send(&mut w, &error_with(reason, text)).await;
                     return;
                 }
                 _ = shutdown.changed() => {
@@ -214,8 +267,10 @@ impl Agent {
                     return;
                 }
             };
-            if send(&mut w, &reply).await.is_err() {
-                return;
+            if let Some(reply) = reply {
+                if send(&mut w, &reply).await.is_err() {
+                    return;
+                }
             }
         }
     }
@@ -243,6 +298,17 @@ impl Agent {
         match msg {
             AgentMsg::Hello { .. } => Step::Close(error(ErrorCode::BadRequest)),
             AgentMsg::Ping { seq } => Step::Reply(RelayMsg::Pong { seq }),
+            AgentMsg::Continue => {
+                let (Some(clock), Some(name)) = (self.clock.clone(), self.online.clone()) else { return Step::Reply(error(ErrorCode::BadRequest)) };
+                let limits = relay.limits_now();
+                if clock.continue_session(now_secs(), limits.session_secs(), &limits.warn_secs()).is_some() {
+                    let who = self.account.as_ref().map(|a| a.name.clone()).unwrap_or_default();
+                    info!(name = %name, continues = clock.continues(), "relay session continued");
+                    relay.event("continue", format!("{who} continued {name} ({} so far)", clock.continues()), None);
+                }
+                // The clock's change notice sends the new time.
+                Step::Quiet
+            }
             AgentMsg::Login { minecraft_token } => {
                 if self.account.is_some() {
                     return Step::Reply(error(ErrorCode::BadRequest));
@@ -322,7 +388,9 @@ impl Agent {
                         if self.online.is_some() {
                             return Step::Reply(error(ErrorCode::BadRequest));
                         }
+                        let clock = Arc::new(SessionClock::new(now_secs(), relay.limits_now().session_secs()));
                         let tunnel = Tunnel {
+                            clock: clock.clone(),
                             owner: acc.uuid.clone(),
                             owner_name: acc.name.clone(),
                             agent: self.id,
@@ -338,8 +406,11 @@ impl Agent {
                                 info!(name = %name, account = %acc.name, "tunnel online");
                                 relay.event("online", format!("{name} came online ({})", acc.name), Some(self.peer.ip()));
                                 self.online = Some(name.clone());
-                                Step::Reply(RelayMsg::Online { address: proto::address(&name, base), name, limits: relay.limits(), usage: self.usage() })
+                                let secs_left = clock.secs_left(now_secs());
+                                self.clock = Some(clock);
+                                Step::Reply(RelayMsg::Online { address: proto::address(&name, base), name, limits: relay.limits(), usage: self.usage(), secs_left })
                             }
+                            Err(code @ (ErrorCode::Paused | ErrorCode::ServiceOff)) => Step::Reply(error_with(code, Some(relay.service_message()))),
                             Err(code) => Step::Reply(error(code)),
                         }
                     }

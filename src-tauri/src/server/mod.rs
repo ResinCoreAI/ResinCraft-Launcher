@@ -95,6 +95,14 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             runtime::command(&args.get::<String>(0)?, &args.get::<String>(1)?)?;
             done()
         }
+        "server:relayContinue" => {
+            runtime::relay_continue(&args.get::<String>(0)?)?;
+            done()
+        }
+        "server:relayRestart" => {
+            runtime::relay_restart(&args.get::<String>(0)?).await;
+            done()
+        }
         "server:log" => json(runtime::log(&args.get::<String>(0)?)),
         "server:launchArgs" => json(runtime::launch_args(&store::get(&args.get::<String>(0)?).await?)?),
         "server:properties" => json(properties::read(&store::dir(&args.get::<String>(0)?)?).await),

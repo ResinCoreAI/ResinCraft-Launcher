@@ -35,7 +35,7 @@ import FileManager from '../components/FileManager'
 import ServerAddons from '../components/ServerAddons'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
-import { RelayNotes, RelaySettings, useRelayInfo } from '../components/ServerRelay'
+import { RelayNotes, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
 import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useStore } from '../store'
 import { bytes, fixed, serverPath, timeAgo } from '../util'
@@ -577,6 +577,7 @@ function ConsoleTab({ s }: { s: ServerInfo }) {
   return (
     <>
       <ConnectCard s={s} />
+      <RelaySessionBanner s={s} />
       <div className="toolbar">
         <div className="search">
           <Search />

@@ -1,8 +1,8 @@
 // ResinCraft Relay for a hosted server: the name friends type (name.rscraft.resincore.tech), checked and reserved on
 // the relay from Settings → Internet access, and the lines the Connect card shows about it.
-import { useEffect, useState } from 'react'
-import { CircleCheck, CircleX, Loader2, RefreshCw, Users } from 'lucide-react'
-import type { RelayInfo, ServerInfo } from '@shared/types'
+import { useEffect, useRef, useState } from 'react'
+import { CircleCheck, CirclePause, CircleX, Loader2, RefreshCw, RotateCcw, Timer, TimerOff, Users } from 'lucide-react'
+import type { RelayInfo, ServerEvent, ServerInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes, fixed } from '../util'
@@ -163,11 +163,140 @@ export function RelayNotes({ s }: { s: ServerInfo }) {
         {resin.limitBytes > 0 && (
           <span className="hint">{t('servers.connect.resinUsage', { used: traffic(resin.usedBytes), limit: traffic(resin.limitBytes) })}</span>
         )}
+        <SessionLeft endsAt={resin.endsAt} continues={resin.continues ?? 0} />
       </>
     )
   }
   if (net.via !== 'relay') return null
   if (resin?.error) return <span className="hint bad">{t('servers.connect.resinInstead', { error: tx(resin.error) })}</span>
   if (net.resinHint && domain) return <span className="hint">{t('servers.connect.resinHint', { domain })}</span>
+  return null
+}
+
+/** Re-renders every `ms` so countdowns stay current. */
+function useNow(ms: number): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), ms)
+    return () => clearInterval(timer)
+  }, [ms])
+  return now
+}
+
+/** "1 h 35 min" / "12 min" / "under a minute". */
+function timeLeft(ms: number): string {
+  const minutes = Math.max(0, Math.ceil(ms / 60_000))
+  if (ms < 60_000) return t('servers.relaySession.underMinute')
+  if (minutes < 60) return t('servers.relaySession.minutes', { minutes })
+  return t('servers.relaySession.hoursMinutes', { hours: Math.floor(minutes / 60), minutes: minutes % 60 })
+}
+
+/** "Relay session: 1 h 35 min left · continued twice" under the relay address. */
+function SessionLeft({ endsAt, continues }: { endsAt?: number; continues: number }) {
+  // The tick only re-renders; read the clock now so a just-extended session isn't counted from a stale time.
+  useNow(30_000)
+  if (!endsAt) return null
+  return (
+    <span className="hint">
+      <Timer /> {t('servers.relaySession.left', { time: timeLeft(endsAt - Date.now()) })}
+      {continues > 0 && <> · {t('servers.relaySession.continuedTimes', { count: continues })}</>}
+    </span>
+  )
+}
+
+/**
+ * The relay's time limit and admin switch, shown above the server console: minutes left with Continue,
+ * the admin's pause or switch-off message, or the ended session with Start again.
+ */
+export function RelaySessionBanner({ s }: { s: ServerInfo }) {
+  const { toast } = useStore()
+  const [busy, setBusy] = useState(false)
+  const now = useNow(1000)
+  const net = s.net
+  const resin = net?.resin
+  if (!net || !resin) return null
+
+  const act = async (run: () => Promise<void>, done?: string) => {
+    setBusy(true)
+    try {
+      await run()
+      if (done) toast(done, 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (net.state === 'failed' && resin.ended) {
+    return (
+      <div className="relay-banner ended" role="status">
+        <TimerOff />
+        <div className="grow">
+          <b>{t('servers.relaySession.ended')}</b>
+          <span>{t('servers.relaySession.endedHint')}</span>
+        </div>
+        <button className="btn primary" disabled={busy} onClick={() => void act(() => api.server.relayRestart(s.id))}>
+          {busy ? <Loader2 className="spin" /> : <RotateCcw />} {t('servers.relaySession.startAgain')}
+        </button>
+      </div>
+    )
+  }
+  if (net.via !== 'resin') return null
+
+  if (resin.paused !== undefined) {
+    return (
+      <div className="relay-banner paused" role="status">
+        <CirclePause />
+        <div className="grow">
+          <b>{t(resin.off ? 'servers.relaySession.off' : 'servers.relaySession.paused')}</b>
+          {resin.paused && <span className="admin-msg">“{resin.paused}”</span>}
+          <span>{t(resin.off ? 'servers.relaySession.offHint' : 'servers.relaySession.pausedHint')}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (resin.warning !== undefined) {
+    const ms = (resin.endsAt ?? now + resin.warning * 60_000) - now
+    return (
+      <div className="relay-banner warn" role="alert">
+        <Timer />
+        <div className="grow">
+          <b>{t('servers.relaySession.warning', { time: timeLeft(ms) })}</b>
+          <span>{t('servers.relaySession.warningHint')}</span>
+        </div>
+        <button className="btn primary" disabled={busy} onClick={() => void act(() => api.server.relayContinue(s.id), t('servers.relaySession.continued'))}>
+          {busy ? <Loader2 className="spin" /> : <RefreshCw />} {t('servers.relaySession.continue')}
+        </button>
+      </div>
+    )
+  }
+  return null
+}
+
+/** App-wide: a toast when a hosted server's relay session is about to end or has ended, whatever page is open. */
+export function RelayWatcher() {
+  const { toast } = useStore()
+  const seen = useRef(new Map<string, string>())
+  useEffect(
+    () =>
+      api.on.server(async (e: ServerEvent) => {
+        const resin = e.net?.resin
+        const key = resin?.warning !== undefined ? `warn:${resin.warning}` : resin?.ended ? 'ended' : ''
+        if (seen.current.get(e.serverId) === key) return
+        seen.current.set(e.serverId, key)
+        if (!key) return
+        const name = await api.server
+          .get(e.serverId)
+          .then((s) => s.name)
+          .catch(() => e.serverId)
+        toast(
+          resin?.ended ? t('servers.relaySession.endedToast', { server: name }) : t('servers.relaySession.warningToast', { server: name, minutes: resin!.warning! }),
+          resin?.ended ? 'error' : 'info'
+        )
+      }),
+    [toast]
+  )
   return null
 }

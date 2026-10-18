@@ -67,7 +67,13 @@ export interface NewInstance {
   group?: string
 }
 
-export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'memoryMb' | 'javaPath' | 'jvmArgs' | 'loaderVersion' | 'pendingDownloads'>> & {
+export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVersion' | 'pendingDownloads'>> & {
+  /** `null` goes back to the launcher default (undefined would be dropped on the way to the engine). */
+  memoryMb?: number | null
+  /** `null` goes back to automatic Java. */
+  javaPath?: string | null
+  /** `null` clears the extra JVM arguments. */
+  jvmArgs?: string | null
   /** `null` moves the instance back to Ungrouped. */
   group?: string | null
 }
@@ -481,6 +487,17 @@ export interface ResinNet {
   limitBytes: number
   /** Why ResinCraft Relay wasn't used (another route took over). */
   error?: EngineText
+  /** When the relay session ends (Unix ms, this PC's clock); absent: no time limit. */
+  endsAt?: number
+  /** Minutes left at the last warning, until the host continues (the Console banner shows it). */
+  warning?: number
+  /** How often this session was continued. */
+  continues?: number
+  /** The relay's admin paused it (or, with `off`, switched it off): their message, possibly empty. */
+  paused?: string
+  off?: boolean
+  /** The session time ran out; the host can start it again. */
+  ended?: boolean
 }
 
 /** The ResinCraft Relay part of a server's Settings. */
@@ -879,6 +896,10 @@ export interface ResinApi {
     relayCheck(id: string, name: string): Promise<RelayNameCheck>
     /** Reserves a name for the server (freeing its old one) and saves it. */
     relayName(id: string, name: string): Promise<ServerInfo>
+    /** Another full relay session before the current one ends (same as typing `continue` in the console). */
+    relayContinue(id: string): Promise<void>
+    /** Shares the server again after its relay session ended. */
+    relayRestart(id: string): Promise<void>
     /** The server's own domain: records for its current route and the last DNS check. */
     domain(id: string): Promise<DomainInfo>
     /** Checks the domain against a public DNS resolver now. */

@@ -24,6 +24,19 @@ pub struct Data {
     /// Settings changed in the admin dashboard; they win over relay.toml until reset there.
     #[serde(default)]
     pub overrides: Overrides,
+    /// The admin's on/off switch.
+    #[serde(default)]
+    pub service: ServiceSetting,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ServiceSetting {
+    pub state: crate::proto::ServiceState,
+    /// Shown to launchers ("Maintenance until 20:00").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub since: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

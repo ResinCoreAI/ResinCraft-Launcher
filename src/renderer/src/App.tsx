@@ -5,6 +5,7 @@ import { Avatar, BlockArt, ContextMenuHost, Dock, Logo } from './components/ui'
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
 import { UpdateBanner } from './components/Updates'
+import { RelayWatcher } from './components/ServerRelay'
 import { isTauri } from './api'
 import NewInstanceModal from './components/NewInstanceModal'
 import Accounts from './pages/Accounts'
@@ -136,6 +137,7 @@ export default function App() {
       {newInstanceOpen && <NewInstanceModal onClose={() => setNewInstanceOpen(false)} />}
       <Dock />
       <UpdateBanner />
+      <RelayWatcher />
       <ContextMenuHost />
       <DropImport />
       {isTauri && <WindowControls />}

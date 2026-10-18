@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import type { ContentFileRef, ContentItem, ContentKind, ContentSource, Instance, LoaderType, McVersion, ModPick, ProjectHit, SortMode } from '@shared/types'
 import { api } from '../api'
+import { AutoLoadMore } from '../components/AutoLoadMore'
 import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, useCopy, type ContextEntry } from '../components/ui'
 import VersionPicker from '../components/VersionPicker'
 import { applyChoices, buildRows, byHand, DuplicatesDialog, packDupesNote, preferredChoice, type DupAnswer, type DupChoice, type DupRow } from '../components/DuplicatesDialog'
@@ -626,9 +627,7 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
             )
           })}
           {hits.length < total && (
-            <button className="btn" style={{ alignSelf: 'center', marginTop: 8 }} onClick={more} disabled={loadingMore}>
-              {loadingMore && <Loader2 className="spin" />} {t('discover.loadMore')}
-            </button>
+            <AutoLoadMore onLoad={more} loading={loadingMore} count={hits.length} label={t('discover.loadMore')} style={{ alignSelf: 'center', marginTop: 8 }} />
           )}
         </div>
       )}

@@ -158,7 +158,9 @@ export function mockApi(): ResinApi {
       },
       update: async (id, p) => {
         // `group: null` means Ungrouped.
-        instances = instances.map((i) => (i.id === id ? { ...i, ...p, group: p.group === null ? undefined : (p.group ?? i.group) } : i))
+        // `null` removes a setting, like the engine does.
+        const clean = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === null ? undefined : v])) as Partial<Instance>
+        instances = instances.map((i) => (i.id === id ? { ...i, ...clean, group: p.group === null ? undefined : (p.group ?? i.group) } : i))
         return instances.find((i) => i.id === id)!
       },
       duplicate: async (id) => instances.find((i) => i.id === id)!,
@@ -207,8 +209,15 @@ export function mockApi(): ResinApi {
     },
     content: {
       search: (q) => {
-        const list = q.source === 'curseforge' ? mockCurseForgeHits(now) : hits.map((h) => ({ ...h, source: q.source ?? 'modrinth' }))
-        return wait({ hits: list.map((h) => ({ ...h, kind: q.kind })), total: list.length, offset: 0 }, 400)
+        const base = q.source === 'curseforge' ? mockCurseForgeHits(now) : hits.map((h) => ({ ...h, source: q.source ?? 'modrinth' }))
+        // Pages like the real sources do, so scrolling down loads more: the samples repeat up to 48 results.
+        const all = Array.from({ length: Math.max(base.length, 48) }, (_, i) => {
+          const h = base[i % base.length]
+          return i < base.length ? h : { ...h, id: `${h.id}-${i}`, slug: `${h.slug}-${i}`, title: `${h.title} ${Math.floor(i / base.length) + 1}` }
+        })
+        const offset = q.offset ?? 0
+        const page = all.slice(offset, offset + (q.limit ?? 20))
+        return wait({ hits: page.map((h) => ({ ...h, kind: q.kind })), total: all.length, offset }, 400)
       },
       versions: () =>
         wait(

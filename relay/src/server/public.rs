@@ -15,7 +15,7 @@ use tracing::{debug, info};
 use super::metrics::Metrics;
 use super::{Relay, Tunnel};
 use crate::handshake::{self, Handshake, Parsed};
-use crate::proto::{self, now_secs, DataHeader};
+use crate::proto::{self, now_secs, DataHeader, ServiceState};
 
 /// How much traffic is counted locally before it's added to the account (and the cap checked).
 const FLUSH_BYTES: u64 = 256 * 1024;
@@ -69,7 +69,16 @@ pub(crate) async fn serve(relay: Arc<Relay>, mut sock: TcpStream, peer: SocketAd
     };
     let address = proto::address(&name, base);
     let Some(tunnel) = relay.tunnel(&name) else {
-        let why = if relay.is_reserved(&name) { Why::Offline(address) } else { Why::Free(address) };
+        let reserved = relay.is_reserved(&name);
+        let why = if relay.recently_ended(&name) {
+            Why::Ended(address)
+        } else if reserved && relay.service().0 != ServiceState::On {
+            Why::Paused(address, relay.service_message())
+        } else if reserved {
+            Why::Offline(address)
+        } else {
+            Why::Free(address)
+        };
         return answer(&relay, sock, buf, used, &hs, why).await;
     };
     if relay.over_quota(&tunnel.owner) {
@@ -148,6 +157,10 @@ enum Why {
     Offline(String),
     Quota(String),
     Busy(String),
+    /// The host's session time ran out a little while ago.
+    Ended(String),
+    /// The relay's admin paused it or switched it off (with their message).
+    Paused(String, String),
 }
 
 impl Why {
@@ -158,6 +171,8 @@ impl Why {
             Why::Offline(address) => ("This server is offline", format!("{address} · Ask the host to start it in ResinCraft Launcher.")),
             Why::Quota(address) => ("This server reached its relay limit for this month", format!("{address} · The host's ResinCraft Relay traffic resets on the 1st.")),
             Why::Busy(address) => ("This server is busy", format!("{address} · Too many players are connecting right now. Try again in a moment.")),
+            Why::Ended(address) => ("The host's relay session ended", format!("{address} · Ask the host to continue it in ResinCraft Launcher.")),
+            Why::Paused(address, message) => ("ResinCraft Relay is paused", format!("{address} · {message}")),
         }
     }
 }

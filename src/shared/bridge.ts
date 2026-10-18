@@ -133,6 +133,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       relayInfo: fn('server:relayInfo'),
       relayCheck: fn('server:relayCheck'),
       relayName: fn('server:relayName'),
+      relayContinue: fn('server:relayContinue'),
+      relayRestart: fn('server:relayRestart'),
       domain: fn('server:domain'),
       checkDns: fn('server:checkDns'),
       setDnsToken: fn('server:setDnsToken'),

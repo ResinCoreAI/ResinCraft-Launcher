@@ -10,6 +10,7 @@ pub mod dns;
 pub(crate) mod http;
 pub mod metrics;
 mod public;
+pub mod session;
 pub mod store;
 mod tls;
 
@@ -32,29 +33,37 @@ use config::LimitsConfig;
 use metrics::Metrics;
 use store::{BanEntry, NameEntry, SessionEntry, Store};
 
-use crate::proto::{self, check_name, month_of, now_secs, ErrorCode, Limits, Usage};
+use crate::proto::{self, check_name, month_of, now_secs, ErrorCode, Limits, ServiceState, Usage};
+use session::SessionClock;
 
-/// How a tunnel was told to go away.
+/// How a tunnel was told to go away (with the admin's message, for paused/off).
 pub(crate) struct Kick {
     notify: Notify,
-    reason: Mutex<ErrorCode>,
+    reason: Mutex<(ErrorCode, Option<String>)>,
 }
 
 impl Kick {
     pub fn new() -> Arc<Kick> {
-        Arc::new(Kick { notify: Notify::new(), reason: Mutex::new(ErrorCode::Replaced) })
+        Arc::new(Kick { notify: Notify::new(), reason: Mutex::new((ErrorCode::Replaced, None)) })
     }
 
     pub fn kick(&self, reason: ErrorCode) {
-        *self.reason.lock().unwrap() = reason;
+        self.kick_with(reason, None);
+    }
+
+    pub fn kick_with(&self, reason: ErrorCode, message: Option<String>) {
+        *self.reason.lock().unwrap() = (reason, message);
         self.notify.notify_one();
     }
 
-    pub async fn wait(&self) -> ErrorCode {
+    pub async fn wait(&self) -> (ErrorCode, Option<String>) {
         self.notify.notified().await;
-        *self.reason.lock().unwrap()
+        self.reason.lock().unwrap().clone()
     }
 }
+
+/// How long the relay answers "the host's relay session ended" for a name after its session ran out.
+const ENDED_NOTICE_SECS: u64 = 15 * 60;
 
 /// A name that is online: where to open player streams.
 #[derive(Clone)]
@@ -70,6 +79,8 @@ pub(crate) struct Tunnel {
     pub bytes_out: Arc<AtomicU64>,
     pub kick: Arc<Kick>,
     pub since: u64,
+    /// Its session time (Continue / Extend move it).
+    pub clock: Arc<SessionClock>,
 }
 
 /// One line of the dashboard's events log. Player and launcher IP addresses appear here (and at debug log
@@ -101,6 +112,10 @@ pub struct Relay {
     limits: RwLock<LimitsConfig>,
     reserved: RwLock<Vec<String>>,
     events: Mutex<VecDeque<Event>>,
+    /// Names whose session ran out lately (name → when), for the server list's "session ended" answer.
+    recent_ends: Mutex<HashMap<String, u64>>,
+    /// The admin's switch, for agents that should hear when it changes.
+    service: watch::Sender<(ServiceState, Option<String>)>,
     pub started: u64,
     pub(crate) dashboard: dashboard::State,
     tunnels: Mutex<HashMap<String, Tunnel>>,
@@ -180,7 +195,10 @@ impl Relay {
         let http = reqwest::Client::builder().user_agent(concat!("ResinCraft-Relay/", env!("CARGO_PKG_VERSION"))).build()?;
         let (shutdown, _) = watch::channel(false);
         let (limits, reserved) = store.read(|d| (d.overrides.limits.clone(), d.overrides.reserved_names.clone()));
+        let service = store.read(|d| (d.service.state, d.service.message.clone()));
         Ok(Relay {
+            recent_ends: Mutex::new(HashMap::new()),
+            service: watch::channel(service).0,
             limits: RwLock::new(limits.unwrap_or_else(|| cfg.limits.clone())),
             reserved: RwLock::new(reserved.unwrap_or_else(|| cfg.auth.reserved_names.clone())),
             events: Mutex::new(VecDeque::new()),
@@ -235,6 +253,60 @@ impl Relay {
         });
         *self.reserved.write().unwrap() = names.clone().unwrap_or_else(|| self.cfg.auth.reserved_names.clone());
         self.store.write(|d| d.overrides.reserved_names = names);
+    }
+
+    /// The admin's switch and message.
+    pub fn service(&self) -> (ServiceState, Option<String>) {
+        self.service.borrow().clone()
+    }
+
+    pub(crate) fn service_rx(&self) -> watch::Receiver<(ServiceState, Option<String>)> {
+        self.service.subscribe()
+    }
+
+    /// Flips the switch. Off closes every tunnel now; Paused lets running ones go on until their session ends.
+    pub fn set_service(&self, state: ServiceState, message: Option<String>) {
+        let message = message.map(|m| m.trim().chars().take(200).collect::<String>()).filter(|m| !m.is_empty());
+        let now = now_secs();
+        self.store.write(|d| d.service = store::ServiceSetting { state, message: message.clone(), since: now });
+        self.service.send_replace((state, message.clone()));
+        if state == ServiceState::Off {
+            for t in self.tunnels.lock().unwrap().values() {
+                t.kick.kick_with(ErrorCode::ServiceOff, message.clone());
+            }
+        }
+    }
+
+    /// The text launchers get for a paused or switched-off relay.
+    pub fn service_message(&self) -> String {
+        self.service().1.unwrap_or_else(|| "Try again later.".into())
+    }
+
+    /// Remembers that `name`'s session ran out (the server list says so for a while).
+    pub(crate) fn mark_ended(&self, name: &str) {
+        let now = now_secs();
+        let mut m = self.recent_ends.lock().unwrap();
+        m.retain(|_, at| now.saturating_sub(*at) < ENDED_NOTICE_SECS);
+        m.insert(name.to_string(), now);
+    }
+
+    pub fn recently_ended(&self, name: &str) -> bool {
+        self.recent_ends.lock().unwrap().get(name).is_some_and(|at| now_secs().saturating_sub(*at) < ENDED_NOTICE_SECS)
+    }
+
+    /// The admin's Extend: another full session for the tunnel online under `name`. Returns the seconds left.
+    pub fn admin_extend(&self, name: &str) -> Option<u64> {
+        let clock = self.tunnels.lock().unwrap().get(name).map(|t| t.clock.clone())?;
+        clock.extend(now_secs(), self.limits_now().session_secs())
+    }
+
+    /// The admin's End now: closes the tunnel as if its time ran out.
+    pub fn admin_end(&self, name: &str) -> bool {
+        let ok = self.kick_name(name, ErrorCode::SessionEnded);
+        if ok {
+            self.mark_ended(name);
+        }
+        ok
     }
 
     /// Adds a line to the events log.
@@ -324,7 +396,13 @@ impl Relay {
 
     pub fn limits(&self) -> Limits {
         let l = self.limits_now();
-        Limits { tunnels: l.tunnels_per_account, names: l.names_per_account, connections: l.connections_per_tunnel, monthly_bytes: l.monthly_bytes() }
+        Limits {
+            tunnels: l.tunnels_per_account,
+            names: l.names_per_account,
+            connections: l.connections_per_tunnel,
+            monthly_bytes: l.monthly_bytes(),
+            session_secs: l.session_secs(),
+        }
     }
 
     /// This month's traffic of an account.
@@ -431,6 +509,11 @@ impl Relay {
 
     /// Brings `name` online for `tunnel.owner`; a tunnel already online under that name is replaced.
     pub(crate) fn go_online(&self, acc: &Account, name: &str, tunnel: Tunnel) -> Result<(), ErrorCode> {
+        match self.service().0 {
+            ServiceState::On => {}
+            ServiceState::Paused => return Err(ErrorCode::Paused),
+            ServiceState::Off => return Err(ErrorCode::ServiceOff),
+        }
         // The limits first, so a refused attempt doesn't leave a new reservation behind.
         check_name(name, &self.reserved_names())?;
         if self.over_quota(&acc.uuid) {

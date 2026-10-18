@@ -8,6 +8,7 @@ import type {
   PlayerListKind,
   PropEntry,
   ResinApi,
+  ResinNet,
   ServerAddon,
   ServerAddonHit,
   ServerAddonVersion,
@@ -145,6 +146,20 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
   ]
 
   const find = (id: string) => servers.find((s) => s.id === id)!
+  /** Session fields for a mock relay tunnel; ?relay=warn|paused|off previews those states. */
+  const previewSession = (): Partial<ResinNet> => {
+    const mode = new URLSearchParams(location.search).get('relay')
+    if (mode === 'warn') return { endsAt: Date.now() + 10 * 60_000, warning: 10, continues: 0 }
+    if (mode === 'paused') return { endsAt: Date.now() + 95 * 60_000, continues: 1, paused: 'Maintenance until 20:00' }
+    if (mode === 'off') return { off: true, paused: 'Moving to a new server tonight' }
+    return { endsAt: Date.now() + 2 * 3600_000, continues: 0 }
+  }
+  const continueSession = (id: string) => {
+    const net = find(id).net
+    if (!net?.resin) return
+    patch(id, { net: { ...net, resin: { ...net.resin, warning: undefined, endsAt: Date.now() + 2 * 3600_000, continues: (net.resin.continues ?? 0) + 1 } } })
+    fire(id)
+  }
   const patch = (id: string, p: Partial<ServerInfo>) => (servers = servers.map((s) => (s.id === id ? { ...s, ...p } : s)))
   const fire = (id: string) => {
     const s = find(id)
@@ -227,7 +242,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
           state: 'open',
           address: `${relayName}.${RELAY_DOMAIN}`,
           via: 'resin',
-          resin: { name: relayName, usedBytes: 2_400_000_000, limitBytes: 100_000_000_000 }
+          resin: { name: relayName, usedBytes: 2_400_000_000, limitBytes: 100_000_000_000, ...previewSession() }
         }
         if (!cur.relayName && (cur.tunnel === 'resin' || (cur.tunnel === 'auto' && cur.port % 2 === 0))) patch(id, { relayName, relayAccount: PUIRKLE })
         const net: ServerNet =
@@ -243,6 +258,13 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
                   : { state: 'open', address: `${PUBLIC_IP}:${cur.port}`, via: cur.tunnel === 'manual' ? 'manual' : 'router' }
         // The sample domain checks out on the direct route.
         if (cur.domain && net.via !== 'relay') net.domainOk = net.via !== 'playit'
+        // ?relay=ended shows a finished session.
+        if (net.via === 'resin' && new URLSearchParams(location.search).get('relay') === 'ended') {
+          patch(id, { net: { state: 'failed', error: 'The ResinCraft Relay session ended.', resin: { name: relayName, usedBytes: 0, limitBytes: 0, ended: true } } })
+          fire(id)
+          return
+        }
+        if (net.via === 'resin' && net.resin?.warning) say(id, `[${ts()}] [Server thread/INFO]: [Server] ResinCraft Relay closes in ${net.resin.warning} minutes unless the host continues.`)
         patch(id, { net })
         fire(id)
       })
@@ -272,6 +294,12 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       fire(id)
     },
     command: async (id, cmd) => {
+      const net = find(id).net
+      if (cmd.trim().toLowerCase() === 'continue' && net?.resin?.warning) {
+        say(id, '> continue  (sent to ResinCraft Relay: the session goes on, it wasn\'t typed into the server)', 'info')
+        continueSession(id)
+        return
+      }
       say(id, `> ${cmd}`, 'debug')
       const players = find(id).players
       if (cmd.trim() === 'list') say(id, `[${ts()}] [Server thread/INFO]: There are ${players.length} of a max of 20 players online: ${players.join(', ')}`)
@@ -356,6 +384,19 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
         return { name, available: false, mine: false, reason: { key: 'hostRelay.nameTaken', text: `"${name}" belongs to another player. Pick another name.`, params: { name } } }
       }
       return { name, available: true, mine: name === find(id).relayName }
+    },
+    relayContinue: async (id) => {
+      if (!find(id).net?.resin?.warning) throw new Error("This server isn't online through ResinCraft Relay right now.")
+      continueSession(id)
+    },
+    relayRestart: async (id) => {
+      const cur = find(id)
+      const name = cur.relayName ?? suggestRelayName(cur.name)
+      patch(id, { net: { state: 'opening' } })
+      fire(id)
+      await wait(null, 700)
+      patch(id, { net: { state: 'open', address: `${name}.${RELAY_DOMAIN}`, via: 'resin', resin: { name, usedBytes: 2_400_000_000, limitBytes: 100_000_000_000, endsAt: Date.now() + 2 * 3600_000, continues: 0 } } })
+      fire(id)
     },
     relayName: async (id, name) => {
       await wait(null, 600)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Check, Download, ExternalLink, Loader2, Puzzle, Search } from 'lucide-react'
 import type { AddonSource, ServerAddonHit, ServerInfo } from '@shared/types'
 import { api } from '../api'
+import { AutoLoadMore } from './AutoLoadMore'
 import { useStore } from '../store'
 import { compact } from '../util'
 import { t } from '../i18n'
@@ -174,11 +175,7 @@ export default function AddonBrowser({
             </div>
           )
         })}
-        {hits && hits.length < total && (
-          <button className="btn" disabled={more} onClick={loadMore}>
-            {more && <Loader2 className="spin" />} {t('servers.addons.loadMore')}
-          </button>
-        )}
+        {hits && hits.length < total && <AutoLoadMore onLoad={loadMore} loading={more} count={hits.length} label={t('servers.addons.loadMore')} />}
       </div>
     </Modal>
   )

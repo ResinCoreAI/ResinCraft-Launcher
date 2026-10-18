@@ -6,10 +6,11 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use resincraft_relay::agent::{AgentConfig, Connection, Credentials};
+use resincraft_relay::agent::{AgentConfig, AgentError, Command, Connection, Credentials, Event};
 use resincraft_relay::handshake::{client_handshake, packet, read_varint};
-use resincraft_relay::proto::ErrorCode;
-use resincraft_relay::server::config::{AuthConfig, CustomDomainConfig, DashboardConfig};
+use resincraft_relay::proto::{ErrorCode, ServiceState};
+use resincraft_relay::server::config::{AuthConfig, CustomDomainConfig, DashboardConfig, LimitsConfig};
+use tokio::sync::mpsc;
 use resincraft_relay::server::{dashboard, Config, Server};
 use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -73,6 +74,10 @@ struct Relay {
 }
 
 async fn start(tag: &str, allow_ips: Vec<String>) -> Relay {
+    start_limits(tag, allow_ips, LimitsConfig::default()).await
+}
+
+async fn start_limits(tag: &str, allow_ips: Vec<String>, limits: LimitsConfig) -> Relay {
     let dir = std::env::temp_dir().join(format!("resincraft-relay-dash-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let defaults = Config::default();
@@ -85,6 +90,7 @@ async fn start(tag: &str, allow_ips: Vec<String>) -> Relay {
         auth: AuthConfig { profile_url: fake_mojang().await, ..defaults.auth.clone() },
         custom_domains: CustomDomainConfig { enabled: false, ..defaults.custom_domains.clone() },
         dashboard: DashboardConfig { listen: Some("127.0.0.1:0".into()), password_hash: dashboard::hash_password(PASSWORD).unwrap(), allow_ips, session_hours: 12 },
+        limits,
         drain_secs: 1,
         ..defaults
     };
@@ -326,4 +332,140 @@ async fn admin_actions_take_effect() {
     }
     let overview = get(d, &auth, "/api/overview").await;
     assert_eq!(overview["baseDomain"], BASE);
+}
+
+/// A launcher signed in as Alice; `name` online, serving with a command channel and its events collected.
+struct Live {
+    commands: mpsc::UnboundedSender<Command>,
+    events: mpsc::UnboundedReceiver<Event>,
+    serving: tokio::task::JoinHandle<AgentError>,
+    secs_left: Option<u64>,
+}
+
+async fn alice_live(relay: &Relay, name: &str, mc: SocketAddr) -> Result<Live, AgentError> {
+    let mut conn = Connection::connect(&AgentConfig { url: relay.agent_url.clone(), extra_roots_pem: None, client: "test".into() }).await?;
+    conn.auth(Credentials::Minecraft("token-alice".into())).await?;
+    let online = conn.online(name).await?;
+    let (commands, mut rx) = mpsc::unbounded_channel();
+    let (ev_tx, events) = mpsc::unbounded_channel();
+    let serving = tokio::spawn(async move {
+        conn.serve_with(mc, move |e| {
+            let _ = ev_tx.send(e);
+        }, &mut rx)
+        .await
+    });
+    Ok(Live { commands, events, serving, secs_left: online.secs_left })
+}
+
+/// The next event that isn't a traffic report.
+async fn next_event(live: &mut Live, wait: Duration) -> Event {
+    loop {
+        match tokio::time::timeout(wait, live.events.recv()).await.expect("an event in time").expect("events open") {
+            Event::Usage(_) => continue,
+            e => return e,
+        }
+    }
+}
+
+/// The server list text the relay answers for `host`.
+async fn motd(relay: SocketAddr, host: &str) -> String {
+    let mut sock = TcpStream::connect(relay).await.unwrap();
+    let mut out = client_handshake(767, host, 25565, 1);
+    out.extend_from_slice(&packet(0, &[]));
+    sock.write_all(&out).await.unwrap();
+    let mut buf = vec![0u8; 8192];
+    let n = tokio::time::timeout(Duration::from_secs(5), sock.read(&mut buf)).await.unwrap().unwrap();
+    String::from_utf8_lossy(&buf[..n]).to_string()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn service_switch_refuses_new_tunnels_and_stops_running_ones() {
+    let relay = start("service", vec![]).await;
+    let d = relay.dash;
+    let mc = fake_minecraft().await;
+    let auth = sign_in(d).await;
+    let mut live = alice_live(&relay, "alice-smp", mc).await.unwrap();
+
+    // Paused: the running tunnel goes on (and hears about it), new ones are refused with the admin's words.
+    let r = post(d, &auth, "/api/service", json!({ "state": "paused", "message": "Maintenance until 20:00" })).await;
+    assert_eq!((r.status, r.body["state"].as_str()), (200, Some("paused")));
+    assert_eq!(next_event(&mut live, Duration::from_secs(5)).await, Event::Service { state: ServiceState::Paused, message: Some("Maintenance until 20:00".into()) });
+    assert_eq!(ping(relay.public, &format!("alice-smp.{BASE}")).await, Some(0), "running tunnels keep forwarding");
+    let mut other = Connection::connect(&AgentConfig { url: relay.agent_url.clone(), extra_roots_pem: None, client: "test".into() }).await.unwrap();
+    other.auth(Credentials::Minecraft("token-alice".into())).await.unwrap();
+    assert_eq!(other.online("alice-two").await.unwrap_err(), AgentError::Refused(ErrorCode::Paused, "Maintenance until 20:00".into()));
+    other.reserve("alice-old", None).await.unwrap();
+    assert!(motd(relay.public, &format!("alice-old.{BASE}")).await.contains("ResinCraft Relay is paused"));
+    assert!(get(d, &auth, "/api/overview").await["service"]["state"] == "paused");
+
+    // Off: the running tunnel is closed at once, with the message.
+    assert_eq!(post(d, &auth, "/api/service", json!({ "state": "off", "message": "Maintenance until 20:00" })).await.status, 200);
+    let ended = tokio::time::timeout(Duration::from_secs(5), live.serving).await.unwrap().unwrap();
+    assert_eq!(ended, AgentError::Refused(ErrorCode::ServiceOff, "Maintenance until 20:00".into()));
+    assert!(ended.retryable(), "launchers keep trying, so they come back when it's on again");
+    assert_eq!(get(d, &auth, "/api/tunnels").await.as_array().unwrap().len(), 0);
+    assert_eq!(post(d, &auth, "/api/service", json!({ "state": "sideways" })).await.status, 400);
+
+    // On again: tunnels work.
+    assert_eq!(post(d, &auth, "/api/service", json!({ "state": "on" })).await.status, 200);
+    let back = alice_live(&relay, "alice-smp", mc).await.unwrap();
+    assert_eq!(ping(relay.public, &format!("alice-smp.{BASE}")).await, Some(0));
+    back.serving.abort();
+    let events = get(d, &auth, "/api/events").await.to_string();
+    for what in ["paused the relay", "switched the relay off (1 tunnels closed)", "switched the relay on", "Maintenance until 20:00"] {
+        assert!(events.contains(what), "events lack {what}: {events}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn session_limit_warns_continues_and_ends() {
+    // A 3-second session, warned 2 seconds before the end.
+    let limits = LimitsConfig { session_minutes: 0.05, session_warn_minutes: vec![2.0 / 60.0], ..LimitsConfig::default() };
+    let relay = start_limits("session", vec![], limits).await;
+    let d = relay.dash;
+    let mc = fake_minecraft().await;
+    let auth = sign_in(d).await;
+    let host = format!("alice-smp.{BASE}");
+
+    let mut live = alice_live(&relay, "alice-smp", mc).await.unwrap();
+    assert_eq!(live.secs_left, Some(3));
+    let Event::Warning { secs_left } = next_event(&mut live, Duration::from_secs(5)).await else { panic!("expected a warning") };
+    assert!(secs_left <= 2, "{secs_left}");
+    live.commands.send(Command::Continue).unwrap();
+    let Event::Extended { secs_left, continues } = next_event(&mut live, Duration::from_secs(5)).await else { panic!("expected the extension") };
+    assert_eq!(continues, 1);
+    assert!((3..=5).contains(&secs_left), "another session, capped at one session plus the warning window: {secs_left}");
+    let t = get(d, &auth, "/api/tunnels").await;
+    assert_eq!(t[0]["continues"], 1);
+    assert!(t[0]["secsLeft"].as_u64().is_some());
+
+    // The admin's Extend reaches the launcher too.
+    assert_eq!(post(d, &auth, "/api/tunnels/extend", json!({ "name": "alice-smp" })).await.status, 200);
+    loop {
+        match next_event(&mut live, Duration::from_secs(5)).await {
+            Event::Extended { continues, .. } => {
+                assert_eq!(continues, 2);
+                break;
+            }
+            Event::Warning { .. } => continue,
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    // Without another Continue, the session ends and the server list says so.
+    let ended = tokio::time::timeout(Duration::from_secs(15), live.serving).await.expect("the session ends").unwrap();
+    assert_eq!(ended.code(), Some(ErrorCode::SessionEnded));
+    assert!(!ended.retryable());
+    assert!(motd(relay.public, &host).await.contains("The host's relay session ended"));
+
+    // End now from the dashboard.
+    let again = alice_live(&relay, "alice-smp", mc).await.unwrap();
+    assert_eq!(post(d, &auth, "/api/tunnels/end", json!({ "name": "alice-smp" })).await.status, 200);
+    let ended = tokio::time::timeout(Duration::from_secs(5), again.serving).await.unwrap().unwrap();
+    assert_eq!(ended.code(), Some(ErrorCode::SessionEnded));
+
+    let events = get(d, &auth, "/api/events").await.to_string();
+    for what in ["continued alice-smp (1 so far)", "extended alice-smp's session", "alice-smp's relay session ended", "ended alice-smp's session"] {
+        assert!(events.contains(what), "events lack {what}: {events}");
+    }
 }

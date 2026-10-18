@@ -642,6 +642,13 @@ function SettingsTab({ inst }: { inst: Instance }) {
   const [deleting, setDeleting] = useState(false)
   const [javas, setJavas] = useState<JavaInstall[]>()
   const [jvm, setJvm] = useState(inst.jvmArgs ?? '')
+  // The memory slider's value while dragging (null: show the saved value).
+  const [mem, setMem] = useState<number | null>(null)
+  const commitMem = () => {
+    if (mem === null) return
+    if (mem !== inst.memoryMb) void save({ memoryMb: mem }).then(() => setMem(null))
+    else setMem(null)
+  }
   const maxMem = Math.max(4096, Math.floor(((info?.totalMemMb ?? 8192) * 0.75) / 512) * 512)
 
   useEffect(() => {
@@ -733,7 +740,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
             </div>
             <Switch
               on={inst.memoryMb != null}
-              onChange={(v) => void save({ memoryMb: v ? (settings?.memoryMb ?? 4096) : undefined })}
+              onChange={(v) => void save({ memoryMb: v ? (settings?.memoryMb ?? 4096) : null })}
               label={t('instance.settings.customMemory')}
             />
           </div>
@@ -741,16 +748,20 @@ function SettingsTab({ inst }: { inst: Instance }) {
             <div className="setting stack">
               <div className="row">
                 <span className="grow muted">{t('instance.settings.maxMemory')}</span>
-                <span className="mem-value">{t('common.size.gb', { n: fixed(inst.memoryMb / 1024, 1) })}</span>
+                <span className="mem-value">{t('common.size.gb', { n: fixed((mem ?? inst.memoryMb) / 1024, 1) })}</span>
               </div>
               <input
                 type="range"
                 min={1024}
                 max={maxMem}
                 step={512}
-                defaultValue={inst.memoryMb}
-                onMouseUp={(e) => void save({ memoryMb: Number((e.target as HTMLInputElement).value) })}
-                onKeyUp={(e) => void save({ memoryMb: Number((e.target as HTMLInputElement).value) })}
+                value={mem ?? inst.memoryMb}
+                aria-label={t('instance.settings.maxMemory')}
+                // The number follows the slider while dragging; it's saved when you let go (mouse, touch or keys).
+                onChange={(e) => setMem(Number(e.target.value))}
+                onPointerUp={commitMem}
+                onKeyUp={commitMem}
+                onBlur={commitMem}
               />
             </div>
           )}
@@ -760,7 +771,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
               <span>{t('instance.settings.javaHint', { version: inst.mcVersion })}</span>
             </div>
             <div className="control">
-              <select className="select" value={inst.javaPath ?? ''} onChange={(e) => void save({ javaPath: e.target.value || undefined })}>
+              <select className="select" value={inst.javaPath ?? ''} onChange={(e) => void save({ javaPath: e.target.value || null })}>
                 <option value="">{t('instance.settings.javaAuto')}</option>
                 {javas?.map((j) => (
                   <option key={j.path} value={j.path}>
@@ -783,7 +794,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
               value={jvm}
               placeholder={settings?.jvmArgs || '-XX:+UseG1GC'}
               onChange={(e) => setJvm(e.target.value)}
-              onBlur={() => jvm !== (inst.jvmArgs ?? '') && void save({ jvmArgs: jvm || undefined })}
+              onBlur={() => jvm !== (inst.jvmArgs ?? '') && void save({ jvmArgs: jvm || null })}
             />
           </div>
         </div>

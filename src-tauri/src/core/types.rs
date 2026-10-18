@@ -717,6 +717,21 @@ pub struct ResinNet {
     /// Why ResinCraft Relay wasn't used (another route took over).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<Text>,
+    /// Local time (Unix ms) when the relay session ends (None: no limit).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ends_at: Option<i64>,
+    /// Minutes left at the last warning, until the host continues (the Console banner shows it).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<u32>,
+    pub continues: u32,
+    /// The relay's admin paused it or switched it off: their message (empty: none given).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paused: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub off: bool,
+    /// The session time ran out (the card offers to start it again).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub ended: bool,
 }
 
 /// The ResinCraft Relay part of a server's Settings, before asking the relay anything.

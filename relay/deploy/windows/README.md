@@ -81,7 +81,12 @@ check. After editing it: `Restart-Service ResinCraftRelay`.
 
 Open **https://rscraft.resincore.tech:7443** and sign in with the admin password.
 
-- **Live tunnels**: who's online, since when, players and traffic; **Kick** disconnects a server.
+- **Service switch** (sidebar): **On**, **Paused** (no new tunnels; running ones finish their session) or **Off**
+  (every tunnel closes now), with an optional message players' launchers show.
+- **Live tunnels**: who's online, since when, players, traffic, session time left and how often it was continued;
+  **Extend**, **End now** and **Kick**.
+- **Sessions**: 2 hours by default (`session_minutes` in Settings or `relay.toml`, 0 = no limit). Hosts get a
+  Continue banner 10 and 1 minutes before the end. Launcher 0.3.0 can't show it, so use 0 until hosts update.
 - **Names**: search, rename or release names; reserve words nobody may take.
 - **Bans**: ban a Minecraft account (UUID) or an IP / CIDR range, with a reason and an optional duration.
 - **Usage**: this month's traffic per account against the cap.

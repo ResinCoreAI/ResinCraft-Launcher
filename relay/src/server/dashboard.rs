@@ -28,7 +28,7 @@ use tracing::{info, warn};
 use super::config::LimitsConfig;
 use super::http::{read_request, write_response, Request, Response};
 use super::{ip_matches, same_secret, Relay};
-use crate::proto::{self, month_of, now_secs, ErrorCode};
+use crate::proto::{self, month_of, now_secs, ErrorCode, ServiceState};
 
 const COOKIE: &str = "rc_session";
 const LOGIN_TOKEN_SECS: u64 = 600;
@@ -277,6 +277,7 @@ async fn route(relay: &Relay, req: &Request, ip: IpAddr, secure: bool) -> Respon
         ("GET", "/api/usage") => usage(relay),
         ("GET", "/api/settings") => settings(relay),
         ("GET", "/api/events") => Response::ok(json!(relay.events())),
+        ("GET", "/api/service") => Response::ok(service_json(relay)),
         ("POST", path) => action(relay, path, &input, ip),
         _ => Response::error("404 Not Found", "not found"),
     }
@@ -376,7 +377,15 @@ fn overview(relay: &Relay) -> Response {
         "forwardedTotal": m.player_forwarded_total.load(Ordering::Relaxed),
         "offlineAnswered": m.offline_status_total.load(Ordering::Relaxed) + m.offline_login_total.load(Ordering::Relaxed),
         "signInFailures": m.login_failures_total.load(Ordering::Relaxed),
+        "service": service_json(relay),
+        "sessionMinutes": relay.limits_now().session_minutes,
     }))
+}
+
+fn service_json(relay: &Relay) -> Value {
+    let (state, message) = relay.service();
+    let since = relay.store.read(|d| d.service.since);
+    json!({ "state": state, "message": message, "since": since })
 }
 
 fn tunnels(relay: &Relay) -> Response {
@@ -393,6 +402,8 @@ fn tunnels(relay: &Relay) -> Response {
                 "players": t.conns.load(Ordering::Relaxed),
                 "bytesIn": t.bytes_in.load(Ordering::Relaxed),
                 "bytesOut": t.bytes_out.load(Ordering::Relaxed),
+                "secsLeft": t.clock.secs_left(now_secs()).filter(|_| relay.limits_now().session_secs() > 0),
+                "continues": t.clock.continues(),
             })
         })
         .collect();
@@ -484,6 +495,41 @@ fn audit(relay: &Relay, kind: &'static str, what: String, ip: IpAddr) {
 
 fn action(relay: &Relay, path: &str, input: &Value, ip: IpAddr) -> Response {
     match path {
+        "/api/service" => {
+            let state: ServiceState = match input.get("state").cloned().map(serde_json::from_value) {
+                Some(Ok(s)) => s,
+                _ => return Response::error("400 Bad Request", "state must be on, paused or off"),
+            };
+            let message = text(input, "message");
+            let tunnels = relay.tunnels_online();
+            relay.set_service(state, message.clone());
+            let what = match state {
+                ServiceState::On => "switched the relay on".to_string(),
+                ServiceState::Paused => format!("paused the relay (no new tunnels; {tunnels} running go on until their session ends)"),
+                ServiceState::Off => format!("switched the relay off ({tunnels} tunnels closed)"),
+            };
+            let note = message.map(|m| format!(": \"{m}\"")).unwrap_or_default();
+            audit(relay, "service", format!("{what}{note}"), ip);
+            Response::ok(service_json(relay))
+        }
+        "/api/tunnels/extend" => {
+            let Some(name) = text(input, "name") else { return Response::error("400 Bad Request", "which name?") };
+            match relay.admin_extend(&name) {
+                Some(left) => {
+                    audit(relay, "session", format!("extended {name}'s session ({} min left)", left / 60), ip);
+                    Response::ok(json!({ "ok": true, "secsLeft": left }))
+                }
+                None => Response::error("404 Not Found", "that name isn't online, or sessions have no time limit"),
+            }
+        }
+        "/api/tunnels/end" => {
+            let Some(name) = text(input, "name") else { return Response::error("400 Bad Request", "which name?") };
+            if !relay.admin_end(&name) {
+                return Response::error("404 Not Found", "that name isn't online");
+            }
+            audit(relay, "session", format!("ended {name}'s session"), ip);
+            Response::ok(json!({ "ok": true }))
+        }
         "/api/tunnels/kick" => {
             let Some(name) = text(input, "name") else { return Response::error("400 Bad Request", "which name?") };
             if !relay.kick_name(&name, ErrorCode::Kicked) {
@@ -562,7 +608,13 @@ fn action(relay: &Relay, path: &str, input: &Value, ip: IpAddr) -> Response {
                 Ok(l) => l,
                 Err(_) => return Response::error("400 Bad Request", "a limit has the wrong type (whole numbers; GB may have decimals)"),
             };
-            if limits.tunnels_per_account == 0 || limits.names_per_account == 0 || limits.session_days == 0 || limits.monthly_gb_per_account < 0.0 {
+            if limits.tunnels_per_account == 0
+                || limits.names_per_account == 0
+                || limits.session_days == 0
+                || limits.monthly_gb_per_account < 0.0
+                || limits.session_minutes < 0.0
+                || limits.session_warn_minutes.iter().any(|m| *m < 0.0)
+            {
                 return Response::error("400 Bad Request", "tunnels, names and session days must be at least 1, and the cap can't be negative");
             }
             relay.set_limits(Some(limits));

@@ -15,6 +15,11 @@ export default {
   'library.sort.name': 'Name',
   'library.sort.version': 'Game version',
   'library.sort.playtime': 'Play time',
+  'library.sort.custom': "Custom order",
+  'library.order.switched': "Sorted by your own order. Drag cards between each other to arrange them.",
+  'library.group.moveUp': "Move up",
+  'library.group.moveDown': "Move down",
+  'library.group.reorder': "Drag to move {name}",
   'library.noMatch.title': 'Nothing matches',
   'library.noMatch.body': 'Try a different search.',
   'library.card.running': 'Running',
@@ -43,6 +48,6 @@ export default {
   'library.group.create': "New group",
   'library.group.createTitle': "Create a group",
   'library.group.empty': "Drag instances here",
-  'library.group.dragHint': "Tip: drag an instance onto a group to move it.",
+  'library.group.dragHint': "Tip: drag an instance onto a group to move it, or between cards to change the order. Drag a group by its handle to reorder groups.",
   'library.group.created': "Created group {name}"
 }

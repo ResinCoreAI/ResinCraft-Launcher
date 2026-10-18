@@ -9,12 +9,13 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::Result;
-use resincraft_relay::agent::{AgentConfig, AgentError, Connection, Credentials, Event};
-use resincraft_relay::proto::{self, ErrorCode, Limits, Usage};
+use resincraft_relay::agent::{AgentConfig, AgentError, Command, Connection, Credentials, Event};
+use resincraft_relay::proto::{self, ErrorCode, Limits, ServiceState, Usage};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use crate::core::fsutil::{read_json, write_json};
@@ -66,6 +67,14 @@ pub async fn usable(meta: &ServerMeta) -> bool {
     settings().is_some() && accounts::microsoft_account(meta.relay_account.as_deref()).await.is_some()
 }
 
+/// The relay admin's own words that came with an error.
+fn admin_message(e: &AgentError) -> String {
+    match e {
+        AgentError::Refused(_, msg) if !msg.is_empty() => msg.clone(),
+        _ => "-".into(),
+    }
+}
+
 /// Turns the relay's answer into what the player is told.
 pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
     let Some(code) = e.code() else {
@@ -89,6 +98,9 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ErrorCode::Version => err_tr!("hostRelay.outdated", "This ResinCraft Launcher is too old for ResinCraft Relay. Update the launcher."),
         ErrorCode::Replaced => err_tr!("hostRelay.replaced", "{name} came online somewhere else, so it stopped here.", name = name),
         ErrorCode::ShuttingDown => err_tr!("hostRelay.restarting", "ResinCraft Relay is restarting."),
+        ErrorCode::Paused => err_tr!("hostRelay.paused", "ResinCraft Relay is paused by its admin: {message}", message = admin_message(e)),
+        ErrorCode::ServiceOff => err_tr!("hostRelay.off", "ResinCraft Relay is switched off by its admin: {message}", message = admin_message(e)),
+        ErrorCode::SessionEnded => err_tr!("hostRelay.sessionEnded", "The ResinCraft Relay session ended."),
         // Rarer ones (the relay's admin kicked the server or released its name…): the relay's own words.
         _ => {
             let why = match e {
@@ -195,11 +207,22 @@ async fn pick_name(conn: &mut Connection, server_name: &str) -> Result<String, F
 
 /// What the card shows while the tunnel runs.
 pub enum Status {
-    /// Back online after reconnecting.
-    Online { address: String, usage: Usage },
+    /// Back online after reconnecting (or after the relay was paused).
+    Online { address: String, usage: Usage, secs_left: Option<u64> },
     Usage(Usage),
+    /// The session ends in `secs_left` seconds unless the host continues.
+    Warning { secs_left: u64 },
+    /// Continued (by the host, or the relay's admin extended it).
+    Extended { secs_left: u64, continues: u32 },
+    /// The relay's admin paused it or switched it off. `running`: this tunnel goes on until its session ends;
+    /// otherwise the launcher waits and comes back by itself when it's on again.
+    Paused { message: Option<String>, off: bool, running: bool },
+    /// The admin switched it back on while this tunnel kept running.
+    Resumed,
     /// The connection dropped; trying again.
     Reconnecting,
+    /// The session time ran out (the host can start it again).
+    SessionEnded,
     /// Gave up (a ban, the name taken over elsewhere, the monthly cap…).
     Failed(anyhow::Error),
 }
@@ -209,13 +232,42 @@ pub struct Opened {
     pub address: String,
     pub limits: Limits,
     pub usage: Usage,
+    pub secs_left: Option<u64>,
+    /// The relay is paused or off right now: (off, admin's message). The task waits for it to come back.
+    pub paused: Option<(bool, Option<String>)>,
     /// Aborting it closes the tunnel.
     pub task: JoinHandle<()>,
 }
 
+/// While paused or off, how often to look whether the relay is back.
+const PAUSED_RETRY_SECS: u64 = 60;
+
+/// Continue requests for the running tunnels, by server id.
+static COMMANDS: Mutex<Option<HashMap<String, mpsc::UnboundedSender<Command>>>> = Mutex::new(None);
+
+fn paused_of(e: &AgentError) -> Option<(bool, Option<String>)> {
+    match e {
+        AgentError::Refused(ErrorCode::Paused, msg) => Some((false, Some(msg.clone()).filter(|m| !m.is_empty()))),
+        AgentError::Refused(ErrorCode::ServiceOff, msg) => Some((true, Some(msg.clone()).filter(|m| !m.is_empty()))),
+        _ => None,
+    }
+}
+
+/// Another full relay session for a server whose session is about to end (the Continue button, or `continue`
+/// typed in its console).
+pub fn continue_session(id: &str) -> Result<()> {
+    let sent = COMMANDS.lock().unwrap().as_ref().and_then(|m| m.get(id)).is_some_and(|tx| tx.send(Command::Continue).is_ok());
+    if sent {
+        Ok(())
+    } else {
+        Err(err_tr!("hostRelay.notOnline", "This server isn't online through ResinCraft Relay right now."))
+    }
+}
+
 /// Brings the server's name online (choosing one first if it has none) and keeps it online, reconnecting
-/// when the connection drops, until the task is aborted.
-pub async fn open(id: &str, local_port: u16, on_status: impl Fn(Status) + Send + Sync + 'static) -> Result<Opened> {
+/// when the connection drops, until the task is aborted. With `wait_if_paused` (the server is set to ResinCraft
+/// Relay by hand), a paused or switched-off relay isn't an error: the task waits and comes back by itself.
+pub async fn open(id: &str, local_port: u16, wait_if_paused: bool, on_status: impl Fn(Status) + Send + Sync + 'static) -> Result<Opened> {
     let s = settings().ok_or_else(not_configured)?;
     let meta = store::get(id).await?;
     let account = accounts::microsoft_account(meta.relay_account.as_deref()).await.ok_or_else(needs_microsoft)?;
@@ -227,33 +279,70 @@ pub async fn open(id: &str, local_port: u16, on_status: impl Fn(Status) + Send +
         Some(n) => n,
         None => pick_name(&mut conn, &meta.name).await.map_err(|f| f.into_error(&wanted))?,
     };
-    let online = conn.online(&name).await.map_err(|e| describe(&e, &proto::address(&name, &conn.base_domain)))?;
+    let address = proto::address(&name, &conn.base_domain);
+    let (online, paused) = match conn.online(&name).await {
+        Ok(on) => (Some(on), None),
+        Err(e) => match paused_of(&e).filter(|_| wait_if_paused) {
+            Some(p) => {
+                // Keep the name while waiting (reserving still works while the relay is paused).
+                let _ = conn.reserve(&name, None).await;
+                (None, Some(p))
+            }
+            None => return Err(describe(&e, &address)),
+        },
+    };
     if meta.relay_name.as_deref() != Some(name.as_str()) || meta.relay_account.as_deref() != Some(account.uuid.as_str()) {
         let mut m = store::get(id).await?;
         m.relay_name = Some(name.clone());
         m.relay_account = Some(account.uuid.clone());
         store::save(&m).await?;
     }
+    let (tx, mut commands) = mpsc::unbounded_channel();
+    COMMANDS.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.to_string(), tx);
     let on_status = Arc::new(on_status);
     let local = SocketAddr::from(([127, 0, 0, 1], local_port));
-    let (address, task_name) = (online.address.clone(), name.clone());
+    let opened_online = online.clone();
+    let task_name = name.clone();
+    let task_address = address.clone();
     let task = tokio::spawn(async move {
-        let mut conn = conn;
-        let address = proto::address(&task_name, &conn.base_domain);
+        let address = task_address;
+        let mut current = online.is_some().then_some(conn);
+        let mut wait = PAUSED_RETRY_SECS;
         loop {
-            let status = on_status.clone();
-            let ended = conn.serve(local, move |Event::Usage(u)| status(Status::Usage(u))).await;
-            if !ended.retryable() {
-                on_status(Status::Failed(describe(&ended, &address)));
-                return;
+            if let Some(conn) = current.take() {
+                let status = on_status.clone();
+                let ended = conn
+                    .serve_with(
+                        local,
+                        move |e| match e {
+                            Event::Usage(u) => status(Status::Usage(u)),
+                            Event::Warning { secs_left } => status(Status::Warning { secs_left }),
+                            Event::Extended { secs_left, continues } => status(Status::Extended { secs_left, continues }),
+                            Event::Service { state: ServiceState::On, .. } => status(Status::Resumed),
+                            Event::Service { state, message } => status(Status::Paused { message, off: state == ServiceState::Off, running: true }),
+                        },
+                        &mut commands,
+                    )
+                    .await;
+                if ended.code() == Some(ErrorCode::SessionEnded) {
+                    on_status(Status::SessionEnded);
+                    return;
+                }
+                if let Some((off, message)) = paused_of(&ended) {
+                    on_status(Status::Paused { message, off, running: false });
+                    wait = PAUSED_RETRY_SECS;
+                } else if !ended.retryable() {
+                    on_status(Status::Failed(describe(&ended, &address)));
+                    return;
+                } else {
+                    eprintln!("[relay] {address}: {ended}; reconnecting");
+                    on_status(Status::Reconnecting);
+                    // A restart says when to come back (a few seconds); otherwise back off up to a minute.
+                    wait = if ended.code() == Some(ErrorCode::ShuttingDown) { 3 } else { 1 };
+                }
             }
-            eprintln!("[relay] {address}: {ended}; reconnecting");
-            on_status(Status::Reconnecting);
-            // A restart says when to come back (a few seconds); otherwise back off up to a minute.
-            let mut wait = if ended.code() == Some(ErrorCode::ShuttingDown) { 3 } else { 1 };
-            conn = loop {
+            loop {
                 tokio::time::sleep(Duration::from_secs(wait)).await;
-                wait = (wait * 2).min(60);
                 let attempt = async {
                     let mut c = connect(&s, &account).await?;
                     let on = c.online(&task_name).await.map_err(Failure::Relay)?;
@@ -261,19 +350,26 @@ pub async fn open(id: &str, local_port: u16, on_status: impl Fn(Status) + Send +
                 };
                 match attempt.await {
                     Ok((c, on)) => {
-                        on_status(Status::Online { address: on.address, usage: on.usage });
-                        break c;
+                        on_status(Status::Online { address: on.address, usage: on.usage, secs_left: on.secs_left });
+                        current = Some(c);
+                        break;
                     }
-                    Err(f) if f.retryable() => continue,
+                    Err(Failure::Relay(e)) if paused_of(&e).is_some() => {
+                        let (off, message) = paused_of(&e).unwrap_or_default();
+                        on_status(Status::Paused { message, off, running: false });
+                        wait = PAUSED_RETRY_SECS;
+                    }
+                    Err(f) if f.retryable() => wait = (wait * 2).min(60),
                     Err(f) => {
                         on_status(Status::Failed(f.into_error(&address)));
                         return;
                     }
                 }
-            };
+            }
         }
     });
-    Ok(Opened { name, address, limits: online.limits, usage: online.usage, task })
+    let (limits, usage, secs_left) = opened_online.map(|o| (o.limits, o.usage, o.secs_left)).unwrap_or_default();
+    Ok(Opened { name, address, limits, usage, secs_left, paused, task })
 }
 
 // ---------- The name picker ----------

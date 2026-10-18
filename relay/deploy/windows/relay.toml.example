@@ -41,6 +41,8 @@ connections_per_tunnel = 64     # players on one server at once
 connections_per_ip = 16         # players from one IP at once
 agents_per_ip = 16              # launchers from one IP at once
 monthly_gb_per_account = 100    # traffic per account per month (UTC), both ways; 0 = unlimited
+session_minutes = 120          # a relay session lasts this long; the host presses Continue for another. 0 = no limit
+session_warn_minutes = [10, 1] # when the host's launcher warns (Console banner, toast, in-game chat)
 handshake_timeout_secs = 5
 idle_timeout_secs = 300
 logins_per_ip_per_hour = 20

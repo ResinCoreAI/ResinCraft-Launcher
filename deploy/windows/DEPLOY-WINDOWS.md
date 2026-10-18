@@ -67,7 +67,9 @@ If the website host is proxied by Cloudflare, you can skip this and use Cloudfla
 ## 6. Admin dashboard
 
 Open `https://rscraft.resincore.tech:7443` and sign in with the admin password from step 5. Five wrong passwords lock that IP out for 15 minutes. To allow only your own IPs, set `allow_ips` in `relay.toml`.
-- **Live tunnels:** see who's online, and kick tunnels.
+- **Service switch:** On, Paused or Off, with a message for players' launchers (for maintenance).
+- **Live tunnels:** see who's online and each session's time left; extend, end or kick tunnels.
+- **Sessions:** 2 hours by default; hosts press Continue for more. Set it to 0 (no limit) while players are still on launcher 0.3.0, which can't show the Continue button.
 - **Names and bans:** release or rename names, and ban accounts or IPs.
 - **Usage and limits:** check bandwidth and change limits.
 - **Events log.**

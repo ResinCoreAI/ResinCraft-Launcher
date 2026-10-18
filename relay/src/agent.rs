@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{AgentMsg, DataHeader, ErrorCode, Limits, RelayMsg, Usage, ALPN, MAX_LINE, PING_SECS, PROTOCOL_VERSION};
+use crate::proto::{AgentMsg, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, MAX_LINE, PING_SECS, PROTOCOL_VERSION};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -121,12 +121,27 @@ pub struct Online {
     pub address: String,
     pub limits: Limits,
     pub usage: Usage,
+    /// Seconds until the session ends (None: no time limit).
+    pub secs_left: Option<u64>,
 }
 
 /// Something that happened while serving.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     Usage(Usage),
+    /// The session ends in `secs_left` seconds unless the host continues ([`Command::Continue`]).
+    Warning { secs_left: u64 },
+    /// The session was extended (the host continued, or the relay's admin extended it).
+    Extended { secs_left: u64, continues: u32 },
+    /// The relay's admin flipped the switch (paused: this tunnel goes on until its session ends).
+    Service { state: ServiceState, message: Option<String> },
+}
+
+/// What the launcher can ask for while serving.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Command {
+    /// Another full session (after a warning).
+    Continue,
 }
 
 enum Target {
@@ -283,7 +298,11 @@ impl Connection {
             let line = tokio::time::timeout(REPLY_TIMEOUT, self.lines.next()).await.map_err(|_| net("the relay didn't answer"))?;
             let msg = parse_line(line)?;
             match msg {
-                RelayMsg::Usage { .. } | RelayMsg::Pong { .. } => continue,
+                RelayMsg::Usage { .. }
+                | RelayMsg::Pong { .. }
+                | RelayMsg::Service { .. }
+                | RelayMsg::SessionWarning { .. }
+                | RelayMsg::SessionExtended { .. } => continue,
                 RelayMsg::Error { code, message } => return Err(AgentError::Refused(code, message)),
                 RelayMsg::Shutdown { .. } => return Err(AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into())),
                 other => return Ok(other),
@@ -332,14 +351,26 @@ impl Connection {
     pub async fn online(&mut self, name: &str) -> Result<Online, AgentError> {
         self.send(&AgentMsg::Online { name: name.to_string() }).await?;
         match self.recv().await? {
-            RelayMsg::Online { name, address, limits, usage } => Ok(Online { name, address, limits, usage }),
+            RelayMsg::Online { name, address, limits, usage, secs_left } => Ok(Online { name, address, limits, usage, secs_left }),
             other => Err(unexpected(&other)),
         }
     }
 
     /// Joins every player the relay sends to the server at `local`, until the connection ends; returns why it
     /// ended (always an error: the relay restarting, the connection dropping, the name taken over elsewhere…).
-    pub async fn serve(mut self, local: SocketAddr, mut on_event: impl FnMut(Event) + Send) -> AgentError {
+    pub async fn serve(self, local: SocketAddr, on_event: impl FnMut(Event) + Send) -> AgentError {
+        let (_keep, mut commands) = mpsc::unbounded_channel();
+        self.serve_with(local, on_event, &mut commands).await
+    }
+
+    /// Like [`Connection::serve`], also sending what arrives on `commands` (Continue) to the relay.
+    pub async fn serve_with(
+        mut self,
+        local: SocketAddr,
+        mut on_event: impl FnMut(Event) + Send,
+        commands: &mut mpsc::UnboundedReceiver<Command>,
+    ) -> AgentError {
+        let mut commands_open = true;
         let mut ping = tokio::time::interval(Duration::from_secs(PING_SECS));
         ping.tick().await;
         let silence = Duration::from_secs(PING_SECS * 3);
@@ -352,6 +383,9 @@ impl Connection {
                     deadline = tokio::time::Instant::now() + silence;
                     match parse_line(line) {
                         Ok(RelayMsg::Usage { usage }) => on_event(Event::Usage(usage)),
+                        Ok(RelayMsg::SessionWarning { secs_left }) => on_event(Event::Warning { secs_left }),
+                        Ok(RelayMsg::SessionExtended { secs_left, continues }) => on_event(Event::Extended { secs_left, continues }),
+                        Ok(RelayMsg::Service { state, message }) => on_event(Event::Service { state, message }),
                         Ok(RelayMsg::Pong { .. }) => {}
                         Ok(RelayMsg::Error { code, message }) => return AgentError::Refused(code, message),
                         Ok(RelayMsg::Shutdown { .. }) => return AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into()),
@@ -364,6 +398,14 @@ impl Connection {
                         tokio::spawn(forward(stream, local));
                     }
                     None => return net("the relay connection dropped"),
+                },
+                cmd = commands.recv(), if commands_open => match cmd {
+                    Some(Command::Continue) => {
+                        if let Err(e) = self.send(&AgentMsg::Continue).await {
+                            return e;
+                        }
+                    }
+                    None => commands_open = false,
                 },
                 _ = ping.tick() => {
                     self.seq += 1;

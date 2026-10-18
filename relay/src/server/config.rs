@@ -72,6 +72,11 @@ pub struct LimitsConfig {
     pub session_days: u64,
     /// Players still sending their handshake, across the whole relay.
     pub max_pending_handshakes: usize,
+    /// A tunnel's session length; the host presses Continue (or types `continue` in the console) for another.
+    /// 0 = no limit.
+    pub session_minutes: f64,
+    /// When to warn the host before the session ends (minutes left).
+    pub session_warn_minutes: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -168,6 +173,8 @@ impl Default for LimitsConfig {
             name_expiry_days: 180,
             session_days: 30,
             max_pending_handshakes: 2048,
+            session_minutes: 120.0,
+            session_warn_minutes: vec![10.0, 1.0],
         }
     }
 }
@@ -185,6 +192,23 @@ impl Default for CustomDomainConfig {
 }
 
 impl LimitsConfig {
+    /// The session length in seconds (0: no limit).
+    pub fn session_secs(&self) -> u64 {
+        if self.session_minutes <= 0.0 {
+            0
+        } else {
+            ((self.session_minutes * 60.0).round() as u64).max(1)
+        }
+    }
+
+    /// The warning times in seconds before the end, largest first.
+    pub fn warn_secs(&self) -> Vec<u64> {
+        let mut v: Vec<u64> = self.session_warn_minutes.iter().filter(|m| **m > 0.0).map(|m| ((m * 60.0).round() as u64).max(1)).collect();
+        v.sort_unstable_by(|a, b| b.cmp(a));
+        v.dedup();
+        v
+    }
+
     pub fn monthly_bytes(&self) -> u64 {
         if self.monthly_gb_per_account <= 0.0 {
             0
@@ -233,6 +257,9 @@ impl Config {
         }
         if !matches!(self.log_format.as_str(), "text" | "json") {
             bail!("log_format must be \"text\" or \"json\"");
+        }
+        if self.limits.session_minutes < 0.0 || self.limits.session_warn_minutes.iter().any(|m| *m < 0.0) {
+            bail!("session_minutes and session_warn_minutes can't be negative");
         }
         if self.limits.tunnels_per_account == 0 || self.limits.names_per_account == 0 {
             bail!("tunnels_per_account and names_per_account must be at least 1");

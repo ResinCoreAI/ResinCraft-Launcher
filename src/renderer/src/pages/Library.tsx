@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   ChevronRight,
   ClipboardCopy,
@@ -8,6 +10,7 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
+  GripVertical,
   ImagePlus,
   Layers,
   Loader2,
@@ -32,7 +35,8 @@ import { useInstanceTask, useStore } from '../store'
 import { COLOR_NAMES, COLORS, describe, hasCustomIcon, instancePath, playtime } from '../util'
 import { t } from '../i18n'
 
-type Sort = 'recent' | 'name' | 'version' | 'playtime'
+type Sort = 'recent' | 'name' | 'version' | 'playtime' | 'custom'
+const SORTS: Sort[] = ['recent', 'name', 'version', 'playtime', 'custom']
 
 /** What's being dragged and where the pointer is. */
 interface DragState {
@@ -45,15 +49,31 @@ interface DragState {
   width: number
   /** Group under the pointer ('' = Ungrouped), or null when over nothing droppable. */
   over: string | null
+  /** The card under the pointer, and whether the dragged one would go after it (else before). */
+  target: { id: string; after: boolean } | null
+}
+
+/** A group header being dragged to a new place among the groups. */
+interface GroupDrag {
+  name: string
+  /** The group it would land next to, and on which side. */
+  over: string | null
+  after: boolean
 }
 
 export default function Library() {
   const { instances, setNewInstanceOpen, refreshInstances, toast, go } = useStore()
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState<Sort>('recent')
+  const [sort, setSortState] = useState<Sort>(loadSort)
+  const setSort = (next: Sort) => {
+    setSortState(next)
+    saveSort(next)
+  }
+  const order = useInstanceOrder()
   const [importing, setImporting] = useState(false)
   const [creating, setCreating] = useState(false)
   const [drag, setDrag] = useState<DragState | null>(null)
+  const [groupDrag, setGroupDrag] = useState<GroupDrag | null>(null)
   const [landed, setLanded] = useState<string | null>(null)
   const names = useGroupNames()
 
@@ -63,10 +83,11 @@ export default function Library() {
       recent: (a, b) => (b.lastPlayed ?? b.createdAt) - (a.lastPlayed ?? a.createdAt),
       name: (a, b) => a.name.localeCompare(b.name),
       version: (a, b) => b.mcVersion.localeCompare(a.mcVersion, undefined, { numeric: true }),
-      playtime: (a, b) => b.playtime - a.playtime
+      playtime: (a, b) => b.playtime - a.playtime,
+      custom: byOrder(order)
     }
     return list.sort(cmp[sort])
-  }, [instances, q, sort])
+  }, [instances, q, sort, order])
 
   // Groups (like Prism): Ungrouped first, then the saved groups in order. Headers appear once any group exists.
   const grouped = names.length > 0
@@ -94,7 +115,7 @@ export default function Library() {
 
   const startDrag = useCallback((inst: Instance, e: PointerEvent, card: HTMLElement) => {
     const r = card.getBoundingClientRect()
-    setDrag({ inst, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, width: r.width, over: null })
+    setDrag({ inst, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, width: r.width, over: null, target: null })
   }, [])
 
   useEffect(() => {
@@ -115,18 +136,40 @@ export default function Library() {
     raf = requestAnimationFrame(autoscroll)
 
     const move = (e: PointerEvent) => {
-      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-group]')
-      const over = el ? (el.dataset.group ?? null) : null
-      setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over } : d))
+      const hit = document.elementFromPoint(e.clientX, e.clientY)
+      const el = hit?.closest<HTMLElement>('[data-group]')
+      const over = el ? (el.dataset.group ?? null) : grouped ? null : ''
+      // Over another card: left half drops before it, right half after it.
+      const cardEl = hit?.closest<HTMLElement>('.icard[data-id]')
+      const id = cardEl?.dataset.id
+      let target: DragState['target'] = null
+      if (cardEl && id && id !== dragRef.current?.inst.id) {
+        const r = cardEl.getBoundingClientRect()
+        target = { id, after: e.clientX > r.left + r.width / 2 }
+      }
+      setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over, target } : d))
     }
     const up = async () => {
       const d = dragRef.current
       setDrag(null)
       if (!d || d.over === null) return
       const from = d.inst.group?.trim() ?? ''
-      if (d.over === from) return
+      const moved = d.over !== from
+      if (!moved && !d.target) return
       try {
-        await api.instances.update(d.inst.id, { group: d.over || null })
+        // Dropped next to a card: save that spot as the custom order and show the Library in it.
+        if (d.target) {
+          const base = [...instances].sort(sort === 'custom' ? byOrder(order) : sortCompare(sort)).map((i) => i.id)
+          const ids = base.filter((id) => id !== d.inst.id)
+          const at = ids.indexOf(d.target.id)
+          ids.splice(at < 0 ? ids.length : at + (d.target.after ? 1 : 0), 0, d.inst.id)
+          setInstanceOrder(ids)
+          if (sort !== 'custom') {
+            setSort('custom')
+            toast(t('library.order.switched'), 'info')
+          }
+        }
+        if (moved) await api.instances.update(d.inst.id, { group: d.over || null })
         await refreshInstances()
         setLanded(d.inst.id)
         setTimeout(() => setLanded((l) => (l === d.inst.id ? null : l)), 900)
@@ -152,6 +195,43 @@ export default function Library() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!drag])
 
+  const groupDragRef = useRef<GroupDrag | null>(null)
+  groupDragRef.current = groupDrag
+
+  useEffect(() => {
+    if (!groupDrag) return
+    const move = (e: PointerEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-group]')
+      const name = el?.dataset.group
+      if (el === null || el === undefined || name === undefined) return setGroupDrag((g) => (g ? { ...g, over: null } : g))
+      const r = el.getBoundingClientRect()
+      // Ungrouped stays first: hovering it means "before the first group".
+      const after = name === '' ? false : e.clientY > r.top + r.height / 2
+      setGroupDrag((g) => (g ? { ...g, over: name === '' ? (names[0] ?? null) : name, after: name === '' ? false : after } : g))
+    }
+    const up = () => {
+      const g = groupDragRef.current
+      setGroupDrag(null)
+      if (!g || g.over === null || g.over === g.name) return
+      const list = names.filter((n) => n !== g.name)
+      const at = list.indexOf(g.over)
+      list.splice(at < 0 ? list.length : at + (g.after ? 1 : 0), 0, g.name)
+      setSavedGroups(list)
+    }
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setGroupDrag(null)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
+    window.addEventListener('keydown', key)
+    document.body.classList.add('dragging')
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('keydown', key)
+      document.body.classList.remove('dragging')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!groupDrag])
+
   const importPack = async (from?: Element) => {
     setImporting(true)
     try {
@@ -172,7 +252,16 @@ export default function Library() {
   }
 
   const card = (i: Instance, index: number) => (
-    <InstanceCard key={i.id} inst={i} withMenu index={index} onDragStart={startDrag} dragging={drag?.inst.id === i.id} landed={landed === i.id} />
+    <InstanceCard
+      key={i.id}
+      inst={i}
+      withMenu
+      index={index}
+      onDragStart={startDrag}
+      dragging={drag?.inst.id === i.id}
+      landed={landed === i.id}
+      dropSide={drag?.target?.id === i.id ? (drag.target.after ? 'after' : 'before') : undefined}
+    />
   )
 
   // Right-clicking empty space in the Library.
@@ -224,10 +313,11 @@ export default function Library() {
               <input className="input" placeholder={t('library.search')} value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <select className="select" value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t('library.sort.label')}>
-              <option value="recent">{t('library.sort.recent')}</option>
-              <option value="name">{t('library.sort.name')}</option>
-              <option value="version">{t('library.sort.version')}</option>
-              <option value="playtime">{t('library.sort.playtime')}</option>
+              {SORTS.map((v) => (
+                <option key={v} value={v}>
+                  {t(`library.sort.${v}`)}
+                </option>
+              ))}
             </select>
             <button className="btn" onClick={() => setCreating(true)}>
               <FolderPlus /> {t('library.group.create')}
@@ -240,9 +330,22 @@ export default function Library() {
               <section
                 key={name || '~ungrouped'}
                 data-group={name}
-                className={`inst-group ${drag ? 'droppable' : ''} ${drag?.over === name && (drag.inst.group?.trim() ?? '') !== name ? 'drop-target' : ''}`}
+                className={[
+                  'inst-group',
+                  drag ? 'droppable' : '',
+                  drag?.over === name && (drag.inst.group?.trim() ?? '') !== name && !drag.target ? 'drop-target' : '',
+                  groupDrag?.name === name ? 'group-dragging' : '',
+                  groupDrag && groupDrag.over === name && groupDrag.name !== name ? (groupDrag.after ? 'group-drop-after' : 'group-drop-before') : ''
+                ].join(' ')}
               >
-                <GroupHeader name={name} count={list.length} collapsed={collapsed.has(name)} onToggle={() => toggle(name)} />
+                <GroupHeader
+                  name={name}
+                  count={list.length}
+                  collapsed={collapsed.has(name)}
+                  onToggle={() => toggle(name)}
+                  order={names}
+                  onGripDown={name ? () => setGroupDrag({ name, over: null, after: false }) : undefined}
+                />
                 <Collapsible open={!collapsed.has(name)}>
                   {list.length > 0 ? <div className="grid">{list.map(card)}</div> : <div className="group-empty">{t('library.group.empty')}</div>}
                 </Collapsible>
@@ -321,7 +424,8 @@ export function InstanceCard({
   index = 0,
   onDragStart,
   dragging,
-  landed
+  landed,
+  dropSide
 }: {
   inst: Instance
   withMenu?: boolean
@@ -330,6 +434,8 @@ export function InstanceCard({
   onDragStart?: (inst: Instance, e: PointerEvent, card: HTMLElement) => void
   dragging?: boolean
   landed?: boolean
+  /** Another card is being dragged over this one: where it would land. */
+  dropSide?: 'before' | 'after'
 }) {
   const { go, games, play, stop } = useStore()
   const task = useInstanceTask(inst.id)
@@ -362,7 +468,8 @@ export function InstanceCard({
     <>
       <div
         ref={ref}
-        className={`icard ${dragging ? 'is-dragging' : ''} ${landed ? 'landed' : ''}`}
+        data-id={inst.id}
+        className={`icard ${dragging ? 'is-dragging' : ''} ${landed ? 'landed' : ''} ${dropSide ? `drop-${dropSide}` : ''}`}
         style={{ '--i': Math.min(index, 12) } as CSSProperties}
         role="button"
         tabIndex={0}
@@ -570,6 +677,71 @@ export function DeleteInstance({ inst, onClose, onDeleted }: { inst: Instance; o
 
 // ---------- Groups ----------
 
+const SORT_KEY = 'resincraft.library.sort'
+const ORDER_KEY = 'resincraft.library.order'
+
+function loadSort(): Sort {
+  try {
+    const v = localStorage.getItem(SORT_KEY) as Sort | null
+    return v && SORTS.includes(v) ? v : 'recent'
+  } catch {
+    return 'recent'
+  }
+}
+
+function saveSort(v: Sort) {
+  try {
+    localStorage.setItem(SORT_KEY, v)
+  } catch {
+    // storage unavailable: the choice lasts until the launcher closes
+  }
+}
+
+function sortCompare(sort: Exclude<Sort, 'custom'>): (a: Instance, b: Instance) => number {
+  return {
+    recent: (a: Instance, b: Instance) => (b.lastPlayed ?? b.createdAt) - (a.lastPlayed ?? a.createdAt),
+    name: (a: Instance, b: Instance) => a.name.localeCompare(b.name),
+    version: (a: Instance, b: Instance) => b.mcVersion.localeCompare(a.mcVersion, undefined, { numeric: true }),
+    playtime: (a: Instance, b: Instance) => b.playtime - a.playtime
+  }[sort]
+}
+
+// The player's own order of instances (ids), set by dragging cards between each other. Instances that aren't
+// in it yet (new ones) come after, oldest first, so a new instance lands at the end.
+let instanceOrder: string[] = (() => {
+  try {
+    return (JSON.parse(localStorage.getItem(ORDER_KEY) ?? '[]') as string[]).filter((id) => typeof id === 'string')
+  } catch {
+    return []
+  }
+})()
+const orderListeners = new Set<() => void>()
+
+function setInstanceOrder(next: string[]) {
+  instanceOrder = next
+  try {
+    localStorage.setItem(ORDER_KEY, JSON.stringify(next))
+  } catch {
+    // storage unavailable
+  }
+  orderListeners.forEach((f) => f())
+}
+
+function useInstanceOrder(): string[] {
+  return useSyncExternalStore(
+    (cb) => {
+      orderListeners.add(cb)
+      return () => orderListeners.delete(cb)
+    },
+    () => instanceOrder
+  )
+}
+
+function byOrder(order: string[]): (a: Instance, b: Instance) => number {
+  const pos = new Map(order.map((id, i) => [id, i]))
+  return (a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity) || a.createdAt - b.createdAt
+}
+
 const COLLAPSED_KEY = 'resincraft.library.collapsedGroups'
 const GROUPS_KEY = 'resincraft.library.groups'
 
@@ -642,19 +814,60 @@ async function moveGroup(instances: Instance[], from: string, to: string | null)
   for (const i of instances.filter((x) => (x.group?.trim() ?? '') === from)) await api.instances.update(i.id, { group: to })
 }
 
-function GroupHeader({ name, count, collapsed, onToggle }: { name: string; count: number; collapsed: boolean; onToggle: () => void }) {
+function GroupHeader({
+  name,
+  count,
+  collapsed,
+  onToggle,
+  order,
+  onGripDown
+}: {
+  name: string
+  count: number
+  collapsed: boolean
+  onToggle: () => void
+  /** Every group, in their current order (for Move up / Move down). */
+  order: string[]
+  onGripDown?: () => void
+}) {
   const { instances, refreshInstances, toast } = useStore()
   const [renaming, setRenaming] = useState(false)
   const [removing, setRemoving] = useState(false)
   const label = name || t('library.group.ungrouped')
+  const at = order.indexOf(name)
+  const shift = (by: -1 | 1) => {
+    const list = [...order]
+    list.splice(at, 1)
+    list.splice(at + by, 0, name)
+    setSavedGroups(list)
+  }
   const items = (): ContextEntry[] => [
     { label: t(collapsed ? 'menu.group.expand' : 'menu.group.collapse'), icon: <ChevronRight />, onSelect: onToggle },
+    name ? '-' : null,
+    name ? { label: t('library.group.moveUp'), icon: <ArrowUp />, disabled: at <= 0, onSelect: () => shift(-1) } : null,
+    name ? { label: t('library.group.moveDown'), icon: <ArrowDown />, disabled: at < 0 || at >= order.length - 1, onSelect: () => shift(1) } : null,
     name ? '-' : null,
     name ? { label: t('library.group.rename'), icon: <Pencil />, onSelect: () => setRenaming(true) } : null,
     name ? { label: t('library.group.remove'), icon: <Trash2 />, danger: true, onSelect: () => setRemoving(true) } : null
   ]
   return (
     <div className="group-head" onContextMenu={(e) => openContextMenu(e, items())}>
+      {onGripDown && (
+        <span
+          className="group-grip"
+          role="button"
+          tabIndex={-1}
+          title={t('library.group.reorder', { name: label })}
+          aria-label={t('library.group.reorder', { name: label })}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return
+            e.preventDefault()
+            onGripDown()
+          }}
+        >
+          <GripVertical />
+        </span>
+      )}
       <button
         className={`group-toggle ${collapsed ? '' : 'open'}`}
         onClick={onToggle}

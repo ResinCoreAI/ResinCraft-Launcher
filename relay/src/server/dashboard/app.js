@@ -49,6 +49,14 @@ function when(unix) {
   return unix ? new Date(unix * 1000).toLocaleString() : '–'
 }
 
+function left(secs) {
+  if (secs == null) return 'no limit'
+  if (secs <= 0) return 'ending'
+  const hr = Math.floor(secs / 3600)
+  const m = Math.ceil((secs % 3600) / 60)
+  return hr ? `${hr}h ${m}m` : `${m}m`
+}
+
 function duration(secs) {
   const d = Math.floor(secs / 86400)
   const hr = Math.floor((secs % 86400) / 3600)
@@ -188,6 +196,7 @@ function shell() {
         {},
         h('div', { class: 'brand' }, h('img', { src: '/favicon.svg', alt: '' }), h('div', {}, h('b', {}, 'ResinCraft Relay'), h('span', {}, `${state.baseDomain} · v${state.version}`))),
         nav,
+        h('div', { id: 'service', class: 'service card' }),
         h('button', { class: 'ghost', onclick: () => act('/api/logout', {}).then(start) }, 'Sign out')
       ),
       main
@@ -195,7 +204,48 @@ function shell() {
   )
   clearInterval(state.timer)
   render()
+  renderService()
   if (state.tab === 'live' || state.tab === 'events') state.timer = setInterval(() => render(true), 5000)
+}
+
+const SERVICE = {
+  on: ['On', 'ok', 'Tunnels come and go as usual.'],
+  paused: ['Paused', 'warn', 'No new tunnels; running ones go on until their session ends.'],
+  off: ['Off', 'bad', 'No tunnels at all.']
+}
+
+async function renderService() {
+  const box = document.getElementById('service')
+  if (!box) return
+  let svc
+  try {
+    svc = await api('/api/service')
+  } catch {
+    return
+  }
+  const [label, cls, hint] = SERVICE[svc.state] || SERVICE.on
+  const message = h('input', { placeholder: 'Message for hosts (optional)', value: svc.message || '', maxlength: 200 })
+  const flip = (next) => async () => {
+    if (next === 'off' && !confirm('Switch the relay off? Every tunnel closes now, and their players are dropped.')) return
+    try {
+      await api('/api/service', { state: next, message: message.value.trim() })
+      toast(`Relay ${SERVICE[next][0].toLowerCase()}`)
+      renderService()
+      render(true)
+    } catch (e) {
+      toast(e.message, true)
+    }
+  }
+  box.replaceChildren(
+    h('div', { class: 'service-head' }, h('span', {}, 'Relay'), h('b', { class: cls }, label)),
+    h('p', { class: 'muted small' }, hint, svc.since ? ` Since ${ago(svc.since)}.` : ''),
+    message,
+    h(
+      'div',
+      { class: 'service-buttons' },
+      ['on', 'paused', 'off'].map((st) => h('button', { class: `sm${st === svc.state ? ' on' : ''}`, onclick: flip(st) }, st === 'on' ? 'On' : st === 'paused' ? 'Pause' : 'Off'))
+    )
+  )
 }
 
 async function render(quiet) {
@@ -235,6 +285,7 @@ async function live() {
     h(
       'div',
       { class: 'stats' },
+      stat('Relay', (SERVICE[o.service.state] || SERVICE.on)[0], (SERVICE[o.service.state] || SERVICE.on)[1]),
       stat('Tunnels online', o.tunnels, 'ok'),
       stat('Players', o.players),
       stat('Launchers connected', o.launchers),
@@ -245,7 +296,7 @@ async function live() {
     section(
       'Live tunnels',
       table(
-        ['Address', 'Minecraft account', 'Online since', 'Players', 'In / out', ''],
+        ['Address', 'Minecraft account', 'Online since', 'Time left', 'Players', 'In / out', ''],
         list.map((t) =>
           h(
             'tr',
@@ -253,11 +304,16 @@ async function live() {
             h('td', {}, h('span', { class: 'mono data' }, t.address)),
             h('td', {}, h('div', {}, t.ownerName), h('div', { class: 'mono faint' }, t.owner)),
             h('td', { title: when(t.since) }, ago(t.since)),
+            h('td', { class: 'num' }, h('span', { class: t.secsLeft != null && t.secsLeft <= 600 ? 'warn' : 'data' }, left(t.secsLeft)), t.continues ? h('div', { class: 'faint' }, `continued ×${t.continues}`) : null),
             h('td', { class: 'num' }, t.players),
             h('td', { class: 'num' }, `${bytes(t.bytesIn)} / ${bytes(t.bytesOut)}`),
             h(
               'td',
               { class: 'actions' },
+              t.secsLeft != null ? h('button', { class: 'sm', onclick: () => act('/api/tunnels/extend', { name: t.name }, `Extended ${t.name}`) }, 'Extend') : null,
+              t.secsLeft != null
+                ? h('button', { class: 'sm', onclick: () => confirm(`End ${t.address}'s session now? Its players are dropped; the host can start it again.`) && act('/api/tunnels/end', { name: t.name }, `Ended ${t.name}'s session`) }, 'End now')
+                : null,
               h('button', { class: 'danger sm', onclick: () => confirm(`Disconnect ${t.address}? Its players are dropped and the host's launcher won't reconnect by itself.`) && act('/api/tunnels/kick', { name: t.name }, `Disconnected ${t.name}`) }, 'Kick')
             )
           )
@@ -438,17 +494,21 @@ const LIMITS = [
   ['logins_per_ip_per_hour', 'Sign-ins per IP per hour', 1],
   ['name_expiry_days', 'Free unused names after (days)', 1],
   ['session_days', 'Launcher sessions last (days)', 1],
-  ['max_pending_handshakes', 'Pending handshakes (after a restart)', 1]
+  ['max_pending_handshakes', 'Pending handshakes (after a restart)', 1],
+  ['session_minutes', 'Session length (minutes, 0 = no limit)', 0]
 ]
 
 async function settings() {
   const d = await api('/api/settings')
   const inputs = {}
   const rows = LIMITS.map(([key, label, min]) => {
-    inputs[key] = h('input', { type: 'number', min, step: key === 'monthly_gb_per_account' ? 'any' : 1, value: d.limits[key] })
+    inputs[key] = h('input', { type: 'number', min, step: key === 'monthly_gb_per_account' || key === 'session_minutes' ? 'any' : 1, value: d.limits[key] })
     const changed = d.limits[key] !== d.fileLimits[key]
     return h('label', { class: 'field' }, h('span', {}, label, changed ? h('em', {}, ` (relay.toml: ${d.fileLimits[key]})`) : null), inputs[key])
   })
+  const warn = h('input', { value: d.limits.session_warn_minutes.join(', '), placeholder: '10, 1' })
+  const warnChanged = d.limits.session_warn_minutes.join(',') !== d.fileLimits.session_warn_minutes.join(',')
+  rows.push(h('label', { class: 'field' }, h('span', {}, 'Warn the host before the end (minutes left, comma-separated)', warnChanged ? h('em', {}, ` (relay.toml: ${d.fileLimits.session_warn_minutes.join(', ')})`) : null), warn))
   return h(
     'div',
     {},
@@ -463,6 +523,10 @@ async function settings() {
             e.preventDefault()
             const limits = {}
             for (const [key] of LIMITS) limits[key] = Number(inputs[key].value)
+            limits.session_warn_minutes = warn.value
+              .split(',')
+              .map((x) => Number(x.trim()))
+              .filter((x) => x > 0)
             act('/api/settings', { limits }, 'Limits saved')
           }
         },

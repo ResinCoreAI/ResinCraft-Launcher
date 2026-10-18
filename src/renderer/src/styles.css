@@ -2468,3 +2468,68 @@ body.dragging * {
   margin-top: -52px;
   box-shadow: 0 0 0 4px var(--surface);
 }
+
+/* ---------- Library: custom order and group reordering ---------- */
+
+/* Where a dragged card would land: a bar on the left (before) or right (after) of the card under it. */
+.icard.drop-before::before,
+.icard.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  z-index: 3;
+  animation: drop-bar-in 0.15s var(--ease);
+}
+.icard.drop-before::before {
+  left: -9px;
+}
+.icard.drop-after::after {
+  right: -9px;
+}
+@keyframes drop-bar-in {
+  from {
+    transform: scaleY(0.4);
+    opacity: 0;
+  }
+}
+
+/* The grip that drags a whole group. */
+.group-grip {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 26px;
+  margin-right: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0.55;
+  transition: opacity 0.15s var(--ease), color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.group-grip svg {
+  width: 16px;
+  height: 16px;
+}
+.group-head:hover .group-grip,
+.group-grip:focus-visible {
+  opacity: 1;
+}
+.group-grip:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.inst-group.group-dragging {
+  opacity: 0.55;
+}
+/* Where a dragged group would land: a line above or below the group under the pointer. */
+.inst-group.group-drop-before {
+  box-shadow: 0 -3px 0 0 var(--accent);
+}
+.inst-group.group-drop-after {
+  box-shadow: 0 3px 0 0 var(--accent);
+}
