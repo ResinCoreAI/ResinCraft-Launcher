@@ -467,3 +467,95 @@
     border-bottom: 0;
   }
 }
+
+/* Connect card: the raw address under the player's own domain. */
+.sv-address.sm {
+  padding: 2px 6px;
+  font-size: 12px;
+}
+.sv-connect .hint.sv-raw {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Settings: the player's own domain (DNS records, check results). */
+.sv-domain .hint.warn {
+  color: var(--warning);
+}
+.sv-domain .hint svg,
+.sv-dns-check svg,
+a svg.inline {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+.sv-dns-records {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sv-dns-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sv-dns-row .chip {
+  min-width: 46px;
+  justify-content: center;
+}
+.sv-dns-arrow {
+  color: var(--text-dim);
+}
+.sv-dns-srv {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sv-dns-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.sv-dns-copy svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  opacity: 0.7;
+}
+.sv-dns-copy:hover {
+  border-color: var(--accent);
+}
+.sv-dns-check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sv-dns-check > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.sv-dns-check > div > span {
+  display: flex;
+  flex-direction: column;
+}
+.sv-dns-check .ok > svg {
+  color: var(--success);
+}
+.sv-dns-check .bad > svg {
+  color: var(--danger);
+}

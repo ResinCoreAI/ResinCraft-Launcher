@@ -358,7 +358,7 @@ export interface ScreenshotInfo {
 
 export type ServerKind = 'vanilla' | 'paper' | 'purpur' | 'folia' | 'spigot' | 'fabric' | 'quilt' | 'forge' | 'neoforge'
 /** 'auto': the router (UPnP), else the relay. 'playit': playit.gg, else the relay. 'relay': always the relay. */
-export type ServerTunnel = 'auto' | 'playit' | 'relay'
+export type ServerTunnel = 'auto' | 'playit' | 'relay' | 'manual'
 export type ServerState = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed'
 
 /** Internet access for a running server: the port opened on the router automatically (UPnP). */
@@ -368,9 +368,48 @@ export interface ServerNet {
   address?: string
   error?: string
   /** 'router': port opened with UPnP (direct). 'playit': playit.gg (stable address). 'relay': a bore relay (no setup). */
-  via?: 'router' | 'playit' | 'relay'
+  via?: 'router' | 'playit' | 'relay' | 'manual'
   /** While opening through playit.gg the first time: the page where the player links ResinCraft. */
   claimUrl?: string
+  /** Whether the server's own domain points at this address (absent: no domain, or not checked yet). */
+  domainOk?: boolean
+  /** Automatic fell back to the relay because playit.gg isn't linked yet: suggest linking it. */
+  playitHint?: boolean
+}
+
+/** A DNS record the player should have for their own domain. */
+export interface DnsRecord {
+  kind: 'A' | 'AAAA' | 'SRV'
+  /** Full name, e.g. "play.example.com" or "_minecraft._tcp.play.example.com". */
+  name: string
+  /** A/AAAA: the IP. SRV: the target host. */
+  value: string
+  port?: number
+  priority?: number
+  weight?: number
+}
+
+export interface DnsCheck {
+  at: number
+  ok: boolean
+  /** The public resolver that answered. */
+  resolver: string
+  records: { record: DnsRecord; ok: boolean; found: string[] }[]
+  error?: EngineText
+}
+
+/** The server's own domain: the records for its current route, the last check and Cloudflare automation. */
+export interface DomainInfo {
+  domain?: string
+  route: 'direct' | 'playit' | 'relay' | 'none'
+  records: DnsRecord[]
+  /** Direct route: a hosts-file line players can use on their own device instead of DNS. */
+  hostsLine?: string
+  /** playit.gg on a guest account: the address may change. */
+  playitGuest: boolean
+  check?: DnsCheck
+  cloudflareToken: boolean
+  cloudflareStatus?: EngineText
 }
 
 /** A hosted server: server.json plus live state. */
@@ -400,6 +439,9 @@ export interface ServerInfo {
   /** A bore relay instead of bore.pub ("host" or "host:port"), and its secret. */
   relayHost?: string
   relaySecret?: string
+  /** The player's own domain for this server (normalised), and Cloudflare DNS automation. */
+  domain?: string
+  dnsAuto: boolean
   eulaAccepted: boolean
   state: ServerState
   players: string[]
@@ -430,7 +472,7 @@ export interface ServerCreated {
 }
 
 export type ServerPatch = Partial<
-  Pick<ServerInfo, 'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'tunnel' | 'relayHost' | 'relaySecret'>
+  Pick<ServerInfo, 'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'tunnel' | 'relayHost' | 'relaySecret' | 'domain' | 'dnsAuto'>
 >
 
 export interface ServerEvent {
@@ -480,6 +522,43 @@ export interface ServerAddonHit {
 export interface ServerAddonResult {
   hits: ServerAddonHit[]
   total: number
+}
+
+// ---------- File manager ----------
+
+/** Whose files: an instance's game folder or a hosted server's folder. */
+export interface FileRoot {
+  kind: 'instance' | 'server'
+  id: string
+}
+
+export interface FileEntry {
+  name: string
+  /** Relative to the root, `/`-separated. */
+  path: string
+  dir: boolean
+  /** Bytes; 0 for folders. */
+  size: number
+  modified: number
+  /** How many entries a folder holds. */
+  items?: number
+  /** A symlink or junction. */
+  link?: boolean
+}
+
+export interface TextFile extends FileEntry {
+  /** 'text' comes with `text`; binary and too-large files only have their details. */
+  kind: 'text' | 'binary' | 'tooLarge'
+  text?: string
+  /** Starts with a UTF-8 byte order mark (pass it back when saving to keep it). */
+  bom?: boolean
+}
+
+export interface WriteTextOptions {
+  /** A new file: fails if the name is taken. */
+  create?: boolean
+  expectModified?: number
+  bom?: boolean
 }
 
 /** The API exposed to the renderer as `window.resin`. */
@@ -615,8 +694,33 @@ export interface ResinApi {
     addonToggle(id: string, filename: string): Promise<void>
     addonRemove(id: string, filename: string): Promise<void>
     network(): Promise<{ lanIp: string | null }>
+    /** The server's own domain: records for its current route and the last DNS check. */
+    domain(id: string): Promise<DomainInfo>
+    /** Checks the domain against a public DNS resolver now. */
+    checkDns(id: string): Promise<DomainInfo>
+    /** Saves (or with null, removes) the Cloudflare API token for automatic DNS updates. */
+    setDnsToken(id: string, token: string | null): Promise<DomainInfo>
     /** Launches an instance and joins this server (quick play on 1.20+, --server before). */
     play(id: string, instanceId: string): Promise<void>
+  }
+  /** The file manager. Every path is relative to the root, `/`-separated; "" is the root itself. */
+  files: {
+    list(root: FileRoot, dir: string): Promise<FileEntry[]>
+    readText(root: FileRoot, path: string): Promise<TextFile>
+    /** Saves atomically. `expectModified` makes it fail if the file changed on disk since it was opened. */
+    writeText(root: FileRoot, path: string, text: string, options?: WriteTextOptions): Promise<FileEntry>
+    mkdir(root: FileRoot, path: string): Promise<FileEntry>
+    rename(root: FileRoot, path: string, newName: string): Promise<FileEntry>
+    /** Moves entries into the folder `dest`; returns their new paths. Never overwrites. */
+    move(root: FileRoot, paths: string[], dest: string): Promise<string[]>
+    /** Copies entries into `dest` (a taken name gets " (2)"); returns the new paths. */
+    copy(root: FileRoot, paths: string[], dest: string): Promise<string[]>
+    /** Copies files from elsewhere on the computer (absolute paths, e.g. dropped on the window) into `dest`. */
+    import(root: FileRoot, dest: string, sources: string[]): Promise<string[]>
+    /** Moves entries to the Recycle Bin. */
+    trash(root: FileRoot, paths: string[]): Promise<void>
+    /** Opens a folder in Explorer / Finder, or shows a file selected in its folder. */
+    reveal(root: FileRoot, path: string): Promise<void>
   }
   on: {
     task(cb: (t: TaskInfo) => void): () => void

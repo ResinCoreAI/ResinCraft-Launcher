@@ -85,12 +85,31 @@ fn emit_state(id: &str, code: Option<i32>) {
 }
 
 fn set_net(id: &str, n: Option<ServerNet>) {
+    let open = n.as_ref().is_some_and(|n| n.state == "open");
     with(|w| {
         if let Some(p) = w.procs.get_mut(id) {
             p.net = n;
         }
     });
     emit_state(id, None);
+    if open {
+        // Re-check (and with Cloudflare, update) the server's own domain for this address.
+        tokio::spawn(super::domain::on_open(id.to_string()));
+    }
+}
+
+/// Whether the server's own domain points at its current address (see domain.rs).
+pub fn set_domain_ok(id: &str, ok: Option<bool>) {
+    let changed = with(|w| match w.procs.get_mut(id).and_then(|p| p.net.as_mut()) {
+        Some(n) if n.domain_ok != ok => {
+            n.domain_ok = ok;
+            true
+        }
+        _ => false,
+    });
+    if changed {
+        emit_state(id, None);
+    }
 }
 
 // ---------- Log patterns ----------
@@ -463,17 +482,29 @@ fn make_link(link: &std::path::Path, target: &std::path::Path) -> std::io::Resul
 }
 
 fn net_state(state: &'static str, address: Option<String>, error: Option<String>, via: Option<&'static str>) -> ServerNet {
-    ServerNet { state, address, error, via, claim_url: None }
+    ServerNet { state, address, error, via, claim_url: None, domain_ok: None, playit_hint: false }
 }
 
 /// Makes a running server reachable from the internet the way its settings say (TunnelMode): the router
 /// (UPnP, a direct connection; the lease is renewed while it runs), playit.gg (a stable address), or the bore
-/// relay (no setup at all), which is also the fallback when the other two fail.
+/// relay (no setup at all), which is also the fallback when the other two fail. Automatic tries the router,
+/// then playit.gg if this launcher is already linked to it (never a claim page there), then the relay.
 async fn open_internet(id: String) {
     let Ok(meta) = store::get(&id).await else { return };
     let port = meta.port;
     set_net(&id, Some(net_state("opening", None, None, None)));
+    // Automatic only: playit.gg isn't linked, so the relay's card suggests linking it.
+    let mut playit_hint = false;
     let earlier_err = match meta.tunnel {
+        // The player forwarded the port themselves: share the public IP with that port.
+        TunnelMode::Manual => {
+            match network::public_ipv4().await {
+                Ok(ip) if is_running(&id) => set_net(&id, Some(net_state("open", Some(format!("{ip}:{port}")), None, Some("manual")))),
+                Ok(_) => {}
+                Err(e) => set_net(&id, Some(net_state("failed", None, Some(format!("{e}.")), None))),
+            }
+            return;
+        }
         TunnelMode::Auto => match network::open_port(port, meta.name.clone()).await {
             Ok(address) => {
                 if !is_running(&id) {
@@ -490,7 +521,45 @@ async fn open_internet(id: String) {
                 }
                 return;
             }
-            Err(e) => Some(e),
+            Err(router_err) => {
+                if playit::linked().await {
+                    // Linked already, so no claim page. If playit.gg asks to link again (the agent was removed
+                    // there), give up on it at once and use the relay instead of waiting for the browser.
+                    let needs_claim = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    let (flag, wanted_id) = (needs_claim.clone(), id.clone());
+                    let wanted_flag = needs_claim.clone();
+                    let opened = playit::open(
+                        &id,
+                        port,
+                        &meta.name,
+                        move |_| flag.store(true, std::sync::atomic::Ordering::Relaxed),
+                        move || {
+                            !wanted_flag.load(std::sync::atomic::Ordering::Relaxed)
+                                && is_running(&wanted_id)
+                                && net(&wanted_id).is_some_and(|n| n.state == "opening")
+                        },
+                    )
+                    .await;
+                    match opened {
+                        Ok(address) if is_running(&id) => {
+                            set_net(&id, Some(net_state("open", Some(address), None, Some("playit"))));
+                            return;
+                        }
+                        Ok(_) => {
+                            playit::close(&id).await;
+                            return;
+                        }
+                        Err(_) if !is_running(&id) || net(&id).is_none() => return,
+                        Err(e) => {
+                            eprintln!("[server] playit.gg didn't work, using the relay: {e:#}");
+                            playit_hint = needs_claim.load(std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
+                } else {
+                    playit_hint = true;
+                }
+                Some(router_err)
+            }
         },
         TunnelMode::Playit => {
             let (claim_id, wanted_id) = (id.clone(), id.clone());
@@ -541,7 +610,7 @@ async fn open_internet(id: String) {
             });
             // When playit.gg was chosen, say why the relay is used instead.
             let why = earlier_err.filter(|_| meta.tunnel == TunnelMode::Playit).map(|e| format!("{e}."));
-            set_net(&id, Some(net_state("open", Some(t.address), why, Some("relay"))));
+            set_net(&id, Some(ServerNet { playit_hint, ..net_state("open", Some(t.address), why, Some("relay")) }));
         }
         Err(e) => {
             let msg = match earlier_err {

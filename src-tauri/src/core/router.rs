@@ -40,6 +40,7 @@ pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
         ("versions" | "java", _) => crate::game::handle(channel, args).await,
         ("content", _) => crate::content::handle(channel, args).await,
         ("server", _) => crate::server::handle(channel, args).await,
+        ("files", _) => crate::files::handle(channel, args).await,
         ("accounts" | "notes" | "worlds" | "servers" | "screenshots", _) => crate::player::handle(channel, args).await,
         _ => bail!("Unknown request: {channel}"),
     }

@@ -115,7 +115,22 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       addonToggle: fn('server:addonToggle'),
       addonRemove: fn('server:addonRemove'),
       network: fn('server:network'),
+      domain: fn('server:domain'),
+      checkDns: fn('server:checkDns'),
+      setDnsToken: fn('server:setDnsToken'),
       play: fn('server:play')
+    },
+    files: {
+      list: fn('files:list'),
+      readText: fn('files:readText'),
+      writeText: fn('files:writeText'),
+      mkdir: fn('files:mkdir'),
+      rename: fn('files:rename'),
+      move: fn('files:move'),
+      copy: fn('files:copy'),
+      import: fn('files:import'),
+      trash: fn('files:trash'),
+      reveal: fn('files:reveal')
     },
     on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog') }
   } as ResinApi

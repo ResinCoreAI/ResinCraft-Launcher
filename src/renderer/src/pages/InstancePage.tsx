@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowUpCircle,
   Blocks,
@@ -33,16 +33,19 @@ import { t } from '../i18n'
 import ExportModal from '../components/ExportModal'
 import VersionPicker from '../components/VersionPicker'
 import { DeleteInstance } from './Library'
-import { Camera, Earth, NotebookPen, Server } from 'lucide-react'
+import { Camera, Earth, FolderTree, NotebookPen, Server } from 'lucide-react'
 import NotesTab from '../components/NotesTab'
 import ScreenshotsTab from '../components/ScreenshotsTab'
 import ServersTab from '../components/ServersTab'
 import WorldsTab from '../components/WorldsTab'
 
-type Tab = 'content' | 'worlds' | 'servers' | 'screenshots' | 'notes' | 'logs' | 'settings'
+// Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
+const FileManager = lazy(() => import('../components/FileManager'))
+
+type Tab = 'content' | 'worlds' | 'servers' | 'screenshots' | 'notes' | 'files' | 'logs' | 'settings'
 
 export default function InstancePage({ id, tab: initialTab }: { id: string; tab?: Tab }) {
-  const { instances, go } = useStore()
+  const { instances, go, games } = useStore()
   const inst = instances.find((i) => i.id === id)
   const [tab, setTab] = useState<Tab>(initialTab ?? 'content')
   const [exporting, setExporting] = useState(false)
@@ -115,6 +118,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <button className={tab === 'notes' ? 'on' : ''} onClick={() => setTab('notes')}>
           <NotebookPen /> {t('instance.tab.notes')}
         </button>
+        <button className={tab === 'files' ? 'on' : ''} onClick={() => setTab('files')}>
+          <FolderTree /> {t('files.tab')}
+        </button>
         <button className={tab === 'logs' ? 'on' : ''} onClick={() => setTab('logs')}>
           <ScrollText /> {t('instance.tab.logs')}
         </button>
@@ -129,6 +135,15 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
       {tab === 'servers' && <ServersTab inst={inst} />}
       {tab === 'screenshots' && <ScreenshotsTab inst={inst} />}
       {tab === 'notes' && <NotesTab inst={inst} />}
+      {tab === 'files' && (
+        <Suspense fallback={null}>
+          <FileManager
+            root={{ kind: 'instance', id: inst.id }}
+            rootLabel={t('files.root.instance')}
+            running={games[inst.id] === 'running' || games[inst.id] === 'preparing'}
+          />
+        </Suspense>
+      )}
       {tab === 'settings' && <SettingsTab inst={inst} />}
     </div>
   )

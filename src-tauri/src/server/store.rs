@@ -90,6 +90,8 @@ pub async fn update(id: &str, patch: Value) -> Result<ServerMeta> {
             "tunnel" => m.tunnel = serde_json::from_value(v).map_err(|_| anyhow!("Unknown way to share the server"))?,
             "relayHost" => m.relay_host = text(&v),
             "relaySecret" => m.relay_secret = text(&v),
+            "domain" => m.domain = text(&v).map(|d| super::domain::normalize(&d)).transpose()?,
+            "dnsAuto" => m.dns_auto = v.as_bool().unwrap_or(m.dns_auto),
             _ => {}
         }
     }

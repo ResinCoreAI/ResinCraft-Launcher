@@ -8,15 +8,24 @@ You are building the public website for **ResinCraft Launcher**, a desktop Minec
 
 ## 1. Why the site exists
 
-1. **Mojang app review (urgent).** Mojang must approve the launcher's Azure app before players can sign in. Their form asks for an *"Associated website or domain"*, and reviewers will open this site. It must clearly show:
+1. **Mojang app review.** Mojang must approve the launcher's Azure app before Microsoft sign-in works for everyone. Their form asks for an *"Associated website or domain"*, and reviewers will open this site. It must clearly show:
    - what ResinCraft is and who makes it
    - that players sign in with their **own Microsoft account** on Microsoft's website (device-code flow)
    - that **only people who own Minecraft can play**
    - a **privacy policy**
    - that it is **not an official Minecraft product**
-2. **Home for the launcher later**: downloads, changelog, docs.
+   Review status: `<<MOJANG_REVIEW_STATUS>>`.
+2. **Home for the launcher**: download, source code, changelog, FAQ.
 
-The launcher **is not publicly downloadable yet**. Say "Not released yet" plainly. Never show a fake download button or claim a release exists.
+### Release facts (real, use exactly)
+
+- **Current version:** `v0.1.0`, released 2026-10-18.
+- **Platform:** Windows 10/11, 64-bit. Installer: `ResinCraft.Launcher_0.1.0_x64-setup.exe`, about 5 MB.
+- **Download link:** always point to `https://github.com/Puirkle/ResinCraft-Launcher/releases/latest`, never to a versioned file, so the site doesn't need editing on each release.
+- **Source code:** `https://github.com/Puirkle/ResinCraft-Launcher`, **MIT licence**, free.
+- **Built with:** Tauri 2 and Rust, with a React interface. It's a small native app, not an Electron bundle; you may mention the ~5 MB installer as a plain fact.
+- **Windows SmartScreen:** releases aren't code-signed yet, so Windows shows "Windows protected your PC / unknown publisher" on first run. Say so honestly next to the download, with the fix: "More info → Run anyway".
+- Never invent download counts, stars or user numbers.
 
 ---
 
@@ -40,7 +49,7 @@ The launcher **is not publicly downloadable yet**. Say "Not released yet" plainl
 
 ### Logo (SVG, use as-is)
 
-A purple resin drop holding a green Minecraft-style block. The block's dark right face carries a pixel "R" whose leg ends in a small drop. All flat colours, no gradients. Use it as-is; don't redraw it, recolour it, or add effects. The file is also in the launcher repo at `resources/logo.svg`.
+A purple resin drop holding a green Minecraft-style block. The block's dark right face carries a pixel "R" whose leg ends in a small drop. All flat colours, no gradients. Use it as-is; don't redraw it, recolour it, or add effects. The file is also in the launcher repo at `resources/logo.svg`, and ready-made web files are in `resources/website/assets/`: `logo.svg`, `logo-512.png`, `favicon.ico`, `apple-touch-icon.png`.
 
 Colours used in the mark: drop `#8b46ff`, block top `#4aff86`, block left `#1bc866`, block right `#3a178c`, pixels `#4aff86`. These sit alongside the UI tokens below; they're for the logo only.
 
@@ -169,28 +178,31 @@ Don't ship any of these:
 ## 7. Landing page (`/`), section by section
 
 ### 7.1 Header (edge-aligned, minimal)
-Logo plus the "ResinCraft" wordmark on the left. On the right, **three plain text links**: Tour · Sign-in & safety · FAQ, plus a small text "Not released yet" status with a `--ink-faint` dot. No pill CTA button. The header is not sticky. On mobile, the links collapse to a plain "Menu" text button that opens a simple full-width list.
+Logo plus the "ResinCraft" wordmark on the left. On the right, **three plain text links**: Tour · Sign-in & safety · FAQ, plus a small mono status `v0.1.0` (version in `--cyan`) with a `--green` dot, linking to the latest release. No pill CTA button. The header is not sticky. On mobile, the links collapse to a plain "Menu" text button that opens a simple full-width list.
 
 ### 7.2 Hero (left-aligned, content-height)
 - **Headline, ≤ 7 words, solid ink, one word underlined in `--purple`.** Options, or write a better plain one:
   - "Every modpack in its own place."
   - "Your Minecraft installs, kept tidy."
   - "Modded Minecraft without the folder mess."
-- **One paragraph (2–3 sentences):** "ResinCraft is a desktop launcher for Minecraft: Java Edition. Each setup gets its own instance with its own mods, worlds and Java. Find mods on Modrinth, CurseForge and FTB, pick the version you want, and press Play."
-- **Status line** in mono: `v0.1 · in development · Windows first`, with versions in `--cyan`.
-- **Actions:** a text link "Take the tour ↓" and a text link "Read how sign-in works". No primary button, because there's nothing to download yet. When downloads exist, a single solid purple "Download for Windows" button replaces the first link.
-- **Visual:** the real **Home** screenshot, large, starting beside or below the text and running off the right edge. This is the one element allowed to fade in on load.
+- **One paragraph (2–3 sentences):** "ResinCraft is a free, open-source launcher for Minecraft: Java Edition. Each setup gets its own instance with its own mods, worlds and Java. Find mods and modpacks on Modrinth, CurseForge, FTB, ATLauncher and Technic, pick the version you want, and press Play."
+- **Status line** in mono: `v0.1.0 · Windows 10/11 · MIT licence`, with the version in `--cyan`.
+- **Actions:** one solid purple **"Download for Windows"** button (links to the latest release, see §1), then a text link "Source on GitHub" and a text link "Take the tour ↓". Under the button, one `--ink-faint` line: "About 5 MB. Windows may say "unknown publisher" the first time: choose More info → Run anyway."
+- **Visual:** the real **Home** screenshot (`hero.webp`), large, starting beside or below the text and running off the right edge. This is the one element allowed to fade in on load.
 
 ### 7.3 The tour (the core of the page)
-Four or five real screenshots, each paired with a short caption block. **Vary the layout:** one full-width, then two side by side at unequal widths (about 60/40), then one with the text on the right. Each caption is a short heading plus 1–3 sentences, plus optional **callouts**: thin 1px `--rule` lines from the caption to a spot on the screenshot, ending in a small mono label. That makes it read like annotated documentation, not marketing.
+Five to seven real screenshots, each paired with a short caption block. **Vary the layout:** one full-width, then two side by side at unequal widths (about 60/40), then one with the text on the right. Each caption is a short heading plus 1–3 sentences, plus optional **callouts**: thin 1px `--rule` lines from the caption to a spot on the screenshot, ending in a small mono label. That makes it read like annotated documentation, not marketing.
 
 | Screen | Heading idea | What to say |
 |---|---|---|
-| Library | "One instance per setup" | Separate folders for each version or modpack; colour each one, duplicate it, or send it to the Recycle Bin (it's recoverable). |
-| Discover | "Modrinth, CurseForge and FTB in one search" | Switch source, search mods, modpacks, resource packs and shaders, filtered to the instance's game version and loader. |
+| Library | "One instance per setup" | Separate folders for each version or modpack. Sort them into groups by dragging cards between them; colour, duplicate, or send an instance to the Recycle Bin (it's recoverable). |
+| Discover | "Five sources, one search" | Modrinth, CurseForge, FTB, ATLauncher and Technic. Search mods, modpacks, resource packs and shaders, filtered to the instance's game version and loader. |
 | Version picker | "Pick the exact version" | Install the latest with one click, or open the list and choose a specific release, beta or alpha. Tick several mods to install them together. |
 | Instance → Content | "Change your mind later" | Switch any mod to another version, newer or older; toggle it off; check for updates. Dependencies come along automatically. |
-| Logs | "See what the game is doing" | Live log, colour-coded, filterable, one-click copy for bug reports. |
+| Servers | "Host a server for friends" | Make a Vanilla, Paper, Purpur, Folia, Spigot, Fabric, Quilt, Forge or NeoForge server, turn a modpack or one of your instances into a server, and install plugins from Modrinth, Hangar, SpigotMC and CurseForge. It starts with tuned Java flags, and friends can join over the internet through your router or playit.gg. |
+| Accounts | "Your skin, cape and name" | Several Microsoft accounts plus offline profiles. Upload a skin, pick a cape you own, change your Minecraft name, all inside the launcher. |
+
+Instance pages also have Worlds, Screenshots, Servers (the in-game server list) and Notes tabs; mention them in one line under the Content shot rather than giving each a screenshot.
 
 ### 7.4 Sign-in and safety (important for Mojang reviewers)
 This content is genuinely ordinal, so numbered steps are appropriate here (and only here). Lay them out as a vertical list with large mono numerals in `--ink-faint`:
@@ -199,33 +211,54 @@ This content is genuinely ordinal, so numbered steps are appropriate here (and o
 3. Enter the code and sign in **on Microsoft's site**. Your password never goes into ResinCraft.
 4. ResinCraft checks with Microsoft, Xbox and Minecraft services that the account **owns Minecraft: Java Edition**. Then you can play.
 
-Then two short plain paragraphs: tokens are encrypted with the operating system's secure storage and only sent to Microsoft and Mojang; and offline profiles unlock only after you've added an account that owns the game.
+Then two short plain paragraphs: sign-in tokens are encrypted on your PC with Windows' built-in data protection (tied to your Windows user) and only sent to Microsoft, Xbox and Minecraft services; and offline profiles (singleplayer, LAN and offline-mode servers only) unlock only after you've added a Microsoft account that owns the game.
 
 ### 7.5 What works today / not done yet
 Two plain typographic lists side by side (stacked on mobile), no cards. A `--green` dot marks each "works" item; an `--ink-faint` dash marks each "not yet" item.
 
-**Works today:** instances for every Minecraft version (all releases and snapshots, back to the alphas) · Fabric and Quilt · Discover across Modrinth, CurseForge and FTB · choose any mod version, install several at once, switch versions later · automatic dependencies · update checks for Modrinth and CurseForge mods · recognises mods you dropped in by hand · Modrinth `.mrpack`, CurseForge and FTB modpacks · files a CurseForge author won't let other launchers download are listed for you to fetch by hand · Java found or downloaded automatically (Eclipse Temurin) · Microsoft sign-in with encrypted tokens and multiple accounts · live game log, crash notice, play-time per instance · memory, Java and JVM settings per instance.
+**Works today (v0.1.0):**
+- **Instances:** every Minecraft version (all releases and snapshots, back to the alphas); groups with drag-and-drop; memory, Java and JVM settings per instance; Java found or downloaded automatically (Eclipse Temurin).
+- **Loaders:** Fabric, Quilt, Forge and NeoForge.
+- **Mods and modpacks:**
+  - Discover across Modrinth, CurseForge, FTB, ATLauncher and Technic;
+  - choose any mod version, install several at once, switch versions later, with automatic dependencies;
+  - update checks for Modrinth and CurseForge mods; mods you dropped in by hand are recognised;
+  - files a CurseForge author won't let other launchers download are listed for you to fetch by hand.
+- **Import and export:** import Modrinth `.mrpack`, CurseForge, FTB, ATLauncher and Technic modpacks; export an instance as `.mrpack` or a CurseForge `.zip`.
+- **Per instance:** Worlds, Screenshots, the in-game server list, and Notes.
+- **Accounts:** Microsoft sign-in with encrypted tokens and multiple accounts; offline profiles; skin upload, cape choice and name change.
+- **Server hosting:** vanilla, plugin and modded servers; servers made from modpacks or instances; a plugin and mod browser; optimised startup flags; internet access through your router (UPnP), playit.gg, or the bore.pub relay.
+- **Game and app:** live game log, crash notice, play time per instance; the interface in 16 languages.
 
-**Not done yet:** Forge and NeoForge (in progress; most FTB and many CurseForge packs need these) · public downloads · macOS and Linux builds · world, screenshot and server-list management · modpack export · skin changer · launcher auto-update.
+**Not done yet:**
+- macOS and Linux builds;
+- code-signed releases (hence the SmartScreen warning);
+- launcher auto-update;
+- a built-in file manager and editor for instances and servers (in progress).
+
+Keep these lists in sync with the release notes; don't add items that aren't in a release.
 
 ### 7.6 Changelog teaser (optional, only with real data)
-If the owner gives you real dated entries, show the latest 2–3 as `date · version · one line` in mono, plus a link to `/changelog`. **Do not invent entries or dates.** If there's no data, leave this section out.
+The only real entry so far is `2026-10-18 · v0.1.0 · First public release`. Show it in mono with a link to the GitHub releases page, or to `/changelog` if you build one. **Do not invent other entries or dates.**
 
 ### 7.7 FAQ (plain, conversational)
 Use `<details>`/`<summary>` and answer like a person, in 1–3 sentences each.
-- *Is it free?* `<<CONFIRM_PRICING>>`
+- *Is it free?* Yes. It's free and open source under the MIT licence; the code is on GitHub.
 - *Do I need to own Minecraft?* Yes. You sign in with the Microsoft account that owns Minecraft: Java Edition.
-- *Is signing in safe?* You sign in on Microsoft's own website with a code; ResinCraft never sees your password, and it stores sign-in tokens encrypted on your computer.
-- *Where do mods come from?* Modrinth, CurseForge and FTB. Downloads are checked against the checksums those sites publish.
+- *Is signing in safe?* You sign in on Microsoft's own website with a code. ResinCraft never sees your password, and it stores sign-in tokens encrypted on your computer.
+- *Why does Windows warn me when I install it?* The installer isn't code-signed yet, which costs money every year. Choose "More info", then "Run anyway". The source and the build are public on GitHub, so you can check what it does.
+- *Where do mods come from?* Modrinth, CurseForge, FTB, ATLauncher and Technic. Downloads are checked against the checksums those sites publish.
 - *Why do some CurseForge mods need a manual download?* Some authors only allow downloads from the CurseForge website. ResinCraft lists those files with a link and the folder they go in.
-- *Does it run Forge modpacks?* Not yet. Forge and NeoForge support is being built; Fabric and Quilt work now.
-- *Which systems?* Windows first. macOS and Linux later.
+- *Does it run Forge modpacks?* Yes: Forge, NeoForge, Fabric and Quilt all work.
+- *Can I host a server for my friends?* Yes. ResinCraft can make and run a server on your PC, including from a modpack. Friends join over your network, or over the internet if your router allows it or through a free playit.gg link.
+- *Which systems?* Windows 10 and 11 for now. macOS and Linux later.
+- *Which languages?* English plus 15 others, including German, Spanish, French, Japanese, Korean, Portuguese (Brazil), Russian, Thai, Vietnamese and Chinese.
 - *Is it made by Mojang or Microsoft?* No. It's an independent project by Puirkle.
 - *Is it based on Prism Launcher?* Its feature list is inspired by Prism Launcher, which is open source, but ResinCraft is written from scratch and contains none of Prism's code.
 
 ### 7.8 Footer (one statement, then one line)
 - A single closing sentence in the display face, left-aligned. For example, "Made by Puirkle for people who keep too many modpacks." `<<PUIRKLE_TO_CONFIRM>>`
-- One line of inline links: Privacy · Terms · Contact (`<<CONTACT_EMAIL_OR_URL>>`) · Source (`<<GITHUB_URL_OR_REMOVE>>`) · © `<<YEAR>>` Puirkle.
+- One line of inline links: Privacy · Terms · Contact (`<<CONTACT_EMAIL_OR_URL>>`) · Source (`https://github.com/Puirkle/ResinCraft-Launcher`) · © 2026 Puirkle.
 - The mandatory line, verbatim, in `--ink-faint`: **"NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT."**
 - No social icon row and no link columns.
 
@@ -233,13 +266,24 @@ Use `<details>`/`<summary>` and answer like a person, in 1–3 sentences each.
 
 ## 8. Screenshots (the main visual content)
 
-The site depends on **real** screenshots of the launcher. Expected files, as 2× PNG or WebP at 16:10, dark theme:
-`/assets/shots/home.webp`, `library.webp`, `discover.webp`, `version-picker.webp`, `content.webp`, `logs.webp`.
+Real screenshots already exist in the launcher repo, in **`resources/website/assets/`**. Copy them into the site's `/assets/`:
+
+| File | Size | Use |
+|---|---|---|
+| `hero.webp` (+ `hero.png` fallback, `hero@1x.webp`) | 2880×1800 | hero (Home screen) |
+| `shots/library.webp` (+ `@1x`) | 2880×1800 | tour: Library |
+| `shots/discover.webp` (+ `@1x`) | 2880×1800 | tour: Discover |
+| `shots/version-picker.webp` (+ `@1x`) | 2880×1800 | tour: Version picker |
+| `shots/content.webp` (+ `@1x`) | 2880×1800 | tour: Instance → Content |
+| `shots/home.webp` (+ `@1x`) | 2880×1800 | spare Home shot |
+
+Serve the 2× file through `srcset` with the `@1x` version for normal screens, and set `width`/`height` attributes (16:10) so nothing shifts while loading.
+
+**Still missing:** `shots/servers.webp` and `shots/accounts.webp`. They also predate the Library groups, so `library.webp` should be retaken. Until the real files exist, render each missing slot as a `--paper-2` box with the faint block-grid and the label `screenshot: <name>` in mono `--ink-faint`, at the correct aspect ratio. It should look clearly like a placeholder. Never generate or draw a fake UI.
 
 - Wrap each in `<figure>` with a 1px `--rule` border, 4px radius (plus the optional notched corner), and a `<figcaption>` in `--ink-faint`.
 - Use `loading="lazy"` on all except the hero shot, which gets `fetchpriority="high"`.
-- **Until the real files exist,** render each slot as a `--paper-2` box with the faint block-grid and the label `screenshot: <name>` in mono `--ink-faint`, at the correct aspect ratio. It should look clearly like a placeholder. Never generate or draw a fake UI.
-- How the owner captures them: run `npm run dev` in the ResinCraft repo. The app window (or http://localhost:5173 in a browser, which uses sample data) shows every screen.
+- How the owner captures more: in the ResinCraft repo, `npm run build:web && npx electron scripts/screenshots.cjs` renders every screen with sample data at 2× into `resources/screenshots/`. Alternatively, `npm run dev:web` serves the same sample-data UI at http://localhost:1420.
 
 ---
 
@@ -248,18 +292,35 @@ The site depends on **real** screenshots of the launcher. Expected files, as 2×
 Title "Privacy policy". Last updated `<<DATE>>`. Plain language, short paragraphs.
 
 - **Who:** ResinCraft Launcher is made by Puirkle. Contact: `<<CONTACT_EMAIL_OR_URL>>`.
-- **This website:** no cookies, analytics or trackers. `<<IF HOSTED ON GITHUB PAGES / CLOUDFLARE: "Our host may keep standard server logs.">>`
+- **This website:** no cookies, analytics or trackers. `<<IF HOSTED ON GITHUB PAGES / CLOUDFLARE: "Our host may keep standard server logs.">>` Downloads are served by GitHub, whose privacy policy applies.
 - **The launcher runs on your computer.** Puirkle runs no servers for it and receives none of your data. There's no telemetry.
-- **Microsoft sign-in:** you sign in on Microsoft's website with a device code; ResinCraft never sees your password. It receives sign-in tokens from Microsoft, Xbox Live and Minecraft services, keeps them **only on your computer**, encrypted with your operating system's secure storage, and sends them **only** to those services to sign you in and start the game.
-- **Stored locally:** your Minecraft username, UUID and skin address, so the launcher can show who's signed in.
-- **Services the launcher contacts directly from your computer:** Microsoft and Xbox Live (sign-in); Mojang and Minecraft services (game files and profile); Modrinth, CurseForge and Feed The Beast (searching and downloading mods and modpacks); the Fabric and Quilt metadata servers (mod loaders); Eclipse Adoptium (Java downloads). Their own privacy policies apply.
-- **CurseForge key:** if you add a CurseForge API key in Settings, it's stored on your computer and sent only to CurseForge.
-- **Deleting your data:** remove accounts in the launcher, or delete its data folder (Windows: `%APPDATA%\ResinCraft Launcher`).
+- **Microsoft sign-in:** you sign in on Microsoft's website with a device code; ResinCraft never sees your password. It receives sign-in tokens from Microsoft, Xbox Live and Minecraft services, keeps them **only on your computer**, encrypted with Windows' data protection, and sends them **only** to those services to sign you in, start the game, and change your skin, cape or name when you ask it to.
+- **Stored locally:** your Minecraft username, UUID and skin, so the launcher can show who's signed in. Offline profiles store only the name you type.
+- **Services the launcher contacts directly from your computer:**
+  - **Sign-in, profile, skins and capes:** Microsoft and Xbox Live; Mojang and Minecraft services, which also serve the game files.
+  - **Mods and modpacks:** Modrinth, CurseForge, Feed The Beast, ATLauncher and Technic.
+  - **Mod loaders:** Fabric, Quilt, Forge and NeoForge.
+  - **Java downloads:** Eclipse Adoptium.
+  - **Server software and plugins (server hosting only):** PaperMC (Paper, Folia and Hangar), Purpur, SpigotMC (and its BuildTools sources) and Spiget.
+  - Their own privacy policies apply.
+- **Hosting a server (only if you use it):**
+  - If you make a server public, ResinCraft first asks your router to open its port (UPnP). If that doesn't work, it shares the server through **playit.gg** once you've linked a playit.gg account, and as a last resort through the public **bore.pub** relay. You can also pick one of these by hand, or use your own relay.
+  - Players who join see the address you share. Traffic through playit.gg or a relay passes through that service.
+  - ResinCraft closes the port again when the server stops.
+  - **Your own domain (optional):** if you enter a domain for a server, ResinCraft checks its DNS records by asking public DNS resolvers (Cloudflare 1.1.1.1, or Google 8.8.8.8 as a fallback). These lookups contain only the domain name.
+  - **Cloudflare automation (optional, off by default):** if you turn it on and paste a Cloudflare API token, ResinCraft sends that token only to Cloudflare's API, to update your domain's records when your address changes. The token is stored encrypted on your PC.
+- **CurseForge:** ResinCraft uses its own CurseForge API key, built into the app; you don't need one.
+- **Deleting your data:** remove accounts in the launcher, or delete its data folder (`%APPDATA%\ResinCraft Launcher`). Uninstalling the launcher leaves that folder so your worlds aren't lost; delete it yourself if you want everything gone.
 - **Children:** sign-in follows Microsoft's account and family rules.
 - **Changes** are posted on this page.
 
 ## 10. Terms (`/terms`): short base text
-Provided as is, without warranty. You need a legitimate copy of Minecraft: Java Edition; ResinCraft doesn't provide or unlock the game. Minecraft is governed by the Minecraft EULA and Microsoft's terms. Mods and modpacks belong to their authors and come under their own licences. Don't use ResinCraft to break Mojang's or Microsoft's rules. Contact: `<<CONTACT_EMAIL_OR_URL>>`. Mandatory disclaimer line from §7.8.
+- ResinCraft is provided as is, without warranty, under the MIT licence.
+- You need a legitimate copy of Minecraft: Java Edition; ResinCraft doesn't provide or unlock the game. Minecraft is governed by the Minecraft EULA and Microsoft's terms. Servers you host must follow the Minecraft EULA too.
+- Mods, modpacks and plugins belong to their authors and come under their own licences.
+- Don't use ResinCraft to break Mojang's or Microsoft's rules.
+- Contact: `<<CONTACT_EMAIL_OR_URL>>`.
+- Include the mandatory disclaimer line from §7.8.
 
 ### Minecraft brand rules (apply everywhere)
 No Minecraft, Mojang or Microsoft logos, fonts, artwork or official screenshots. Don't make "Minecraft" the biggest word on any page. Writing "for Minecraft: Java Edition" in plain text is fine. Never imply endorsement or partnership.
@@ -274,7 +335,7 @@ No Minecraft, Mojang or Microsoft logos, fonts, artwork or official screenshots.
 - [ ] No icon-card grid; features are told through screenshots and plain lists.
 - [ ] No eyebrow labels, except the numbered sign-in steps.
 - [ ] Header is the minimal three-link version; footer is a statement plus one line.
-- [ ] Copy contains none of the banned words in §6; nothing is invented (no stats, testimonials or dates).
+- [ ] Copy contains none of the banned words in §6; nothing is invented (no stats, testimonials, download counts or dates).
 - [ ] Headings are roman (never italic), solid colour, sentence case.
 - [ ] Every colour and font comes from a token; there's no raw hex outside `:root`.
 - [ ] Purple only on clickable things, cyan only on technical data, green only on status.
@@ -282,12 +343,12 @@ No Minecraft, Mojang or Microsoft logos, fonts, artwork or official screenshots.
 
 **Facts and rules:**
 - [ ] The mandatory Mojang disclaimer is on every page, verbatim.
-- [ ] No fake download; the status says "Not released yet".
-- [ ] Feature claims match §7.5; Forge/NeoForge are listed as not done yet.
-- [ ] Sign-in steps (§7.4) and the privacy policy (§9) are present.
+- [ ] The download button points to `/releases/latest` on GitHub, and the SmartScreen note sits next to it.
+- [ ] Feature claims match §7.5; the file manager and macOS/Linux are listed as not done yet.
+- [ ] Sign-in steps (§7.4) and the privacy policy (§9), including the server-hosting part, are present.
 
 **Technical:**
 - [ ] No horizontal scroll at 320, 375, 768, 1280 and 1920px; no button or nav label wraps onto two lines.
-- [ ] No requests to other domains (fonts are self-hosted).
+- [ ] No runtime requests to other domains (fonts and images are self-hosted; links to GitHub are fine).
 - [ ] Lighthouse Accessibility and Best Practices are both 95 or above.
 - [ ] Every `<<PLACEHOLDER>>` is still visible and listed in your final reply.

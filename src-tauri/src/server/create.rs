@@ -93,6 +93,8 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         tunnel: Default::default(),
         relay_host: None,
         relay_secret: None,
+        domain: None,
+        dns_auto: false,
     };
     tokio::fs::create_dir_all(&dir).await?;
     store::save(&meta).await?;

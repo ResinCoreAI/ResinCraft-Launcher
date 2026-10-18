@@ -1,12 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
-import { PackageOpen } from 'lucide-react'
+import { FolderInput, PackageOpen } from 'lucide-react'
 import { api, isTauri } from '../api'
 import { useStore } from '../store'
 import { t } from '../i18n'
 
 const PACK = /\.(mrpack|zip)$/i
 
-/** Drop a .mrpack or CurseForge .zip anywhere on the window to import it. */
+/** A part of the UI that takes dropped files instead of the modpack import (the File manager's open folder). */
+export interface DropTarget {
+  /** Shown on the overlay, e.g. "Copy into config". */
+  label: string
+  onDrop: (paths: string[]) => void
+}
+
+let target: DropTarget | null = null
+
+/** While mounted, files dropped on the window go to `drop` instead of being imported as a modpack. */
+export function useDropTarget(drop: DropTarget | null): void {
+  useEffect(() => {
+    if (!drop) return
+    target = drop
+    return () => {
+      if (target === drop) target = null
+    }
+  }, [drop])
+}
+
+/** Drop a .mrpack or CurseForge .zip anywhere on the window to import it (or files into the File manager). */
 export default function DropImport() {
   const { refreshInstances, toast, go } = useStore()
   const [over, setOver] = useState(false)
@@ -41,7 +61,8 @@ export default function DropImport() {
           else if (p.type === 'leave') setOver(false)
           else if (p.type === 'drop') {
             setOver(false)
-            if (p.paths[0]) void importPath(p.paths[0])
+            if (target) target.onDrop(p.paths)
+            else if (p.paths[0]) void importPath(p.paths[0])
           }
         })
         .then((u) => (cancelled ? u() : (off = u)))
@@ -75,6 +96,18 @@ export default function DropImport() {
       e.preventDefault()
       depth = 0
       setOver(false)
+      if (target) {
+        const paths = [...(e.dataTransfer?.files ?? [])].map((f) => {
+          try {
+            return api.app.pathForFile(f)
+          } catch {
+            return ''
+          }
+        })
+        if (paths.length && paths.every(Boolean)) target.onDrop(paths)
+        else toast(t('drop.noPath'), 'error')
+        return
+      }
       const file = e.dataTransfer?.files[0]
       if (!file) return
       if (!PACK.test(file.name)) return toast(t('drop.wrongType'), 'info')
@@ -100,6 +133,16 @@ export default function DropImport() {
   }, [importPath, toast])
 
   if (!over) return null
+  if (target)
+    return (
+      <div className="drop-overlay" aria-hidden>
+        <div className="drop-card">
+          <FolderInput size={28} />
+          <b>{target.label}</b>
+          <span>{t('files.drop.hint')}</span>
+        </div>
+      </div>
+    )
   return (
     <div className="drop-overlay" aria-hidden>
       <div className="drop-card">

@@ -76,6 +76,17 @@ struct Agent {
 }
 
 static AGENT: Mutex<Option<Agent>> = Mutex::const_new(None);
+/// The linked playit account is a guest account (not claimed with an email): its tunnels may not last.
+static GUEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn is_guest() -> bool {
+    GUEST.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn note_account(data: &AgentRunDataV1) {
+    let guest = data.permissions.account_status == playit_api_client::api::AccountStatus::Guest;
+    GUEST.store(guest, std::sync::atomic::Ordering::Relaxed);
+}
 /// One claim at a time: a second server that starts meanwhile waits for it and then uses the same link.
 static CLAIM: Mutex<()> = Mutex::const_new(());
 
@@ -156,6 +167,7 @@ async fn agent(on_claim: &(dyn Fn(String) + Send + Sync), wanted: &(dyn Fn() -> 
     };
     let lookup = Arc::new(OriginLookup::default());
     lookup.update_from_run_data(&data).await;
+    note_account(&data);
     let settings = PlayitAgentSettings { api_url: API_BASE.into(), secret_key: key, tcp_settings: TcpSettings::default(), udp_settings: UdpSettings::default() };
     let runner = PlayitAgent::new(settings, lookup.clone()).await.map_err(|e| anyhow!("Couldn't connect to playit.gg ({e:?})"))?;
     let cancel = runner.cancellation_token();
@@ -232,6 +244,7 @@ pub async fn open(
         loop {
             let data = api.v1_agents_rundata().await.map_err(|e| anyhow!("playit.gg didn't answer: {e}"))?;
             lookup.update_from_run_data(&data).await;
+            note_account(&data);
             if let Some(t) = data.tunnels.iter().find(|t| t.id == tunnel) {
                 if let Some(why) = &t.disabled_reason {
                     bail!("playit.gg disabled the tunnel: {why}");

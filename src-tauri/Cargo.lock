@@ -3544,6 +3544,7 @@ dependencies = [
  "futures",
  "hex",
  "hmac",
+ "idna",
  "igd-next",
  "image",
  "md-5",

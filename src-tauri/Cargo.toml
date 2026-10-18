@@ -48,6 +48,8 @@ playit-agent-core = { git = "https://github.com/playit-cloud/playit-agent", rev 
 playit-api-client = { git = "https://github.com/playit-cloud/playit-agent", rev = "633d650869a9cdb2c906efa9effc58aa8b7725a3" }
 hmac = "0.12"
 tokio-util = "0.7"
+# Internationalised domain names (to punycode) for a hosted server's own domain.
+idna = "1"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns"] }

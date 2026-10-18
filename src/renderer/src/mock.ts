@@ -4,6 +4,7 @@ import { mockInstanceTabs } from './mock-instance-tabs'
 import { mockEngine } from './mock-engine'
 import { mockProfile } from './mock-profile'
 import { mockServers } from './mock-servers'
+import { mockFiles } from './mock-files'
 
 export function mockApi(): ResinApi {
   const servers = mockServers()
@@ -243,6 +244,7 @@ export function mockApi(): ResinApi {
     },
     ...mockInstanceTabs(),
     server: servers.server,
+    ...mockFiles(),
     on: { task: mockEngine.onTask, game: noop, log: noop, login: noop, server: servers.onServer, serverLog: servers.onServerLog }
   }
 }

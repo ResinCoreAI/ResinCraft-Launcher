@@ -3,7 +3,9 @@
 //! the player lists, install plugins and mods, back up worlds, and open the port on the router so friends
 //! can join. Servers live in `<dataDir>/servers/<id>/`.
 
+pub mod cloudflare;
 pub mod create;
+pub mod domain;
 pub mod installers;
 pub mod network;
 pub mod playit;
@@ -43,6 +45,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             }
             if (meta.tunnel, &meta.relay_host, &meta.relay_secret) != (before.tunnel, &before.relay_host, &before.relay_secret) {
                 runtime::refresh_internet(&id).await;
+            } else if (&meta.domain, meta.dns_auto) != (&before.domain, before.dns_auto) {
+                domain::forget(&id);
+                runtime::set_domain_ok(&id, None);
+                tokio::spawn(domain::on_open(id.clone()));
             }
             json(store::info(meta).await)
         }
@@ -54,6 +60,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             store::get(&id).await?;
             runtime::forget_link(&id);
             shell::trash(&store::dir(&id)?).await?;
+            let _ = cloudflare::set_token(&id, None).await;
             done()
         }
         "server:openFolder" => {
@@ -123,6 +130,17 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:addonRemove" => {
             plugins::remove(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()
+        }
+        "server:domain" => json(domain::info(&args.get::<String>(0)?).await?),
+        "server:checkDns" => json(domain::check_now(&args.get::<String>(0)?).await?),
+        "server:setDnsToken" => {
+            let id: String = args.get(0)?;
+            store::get(&id).await?;
+            cloudflare::set_token(&id, args.get::<Option<String>>(1)?).await?;
+            if runtime::net(&id).is_some_and(|n| n.state == "open") {
+                tokio::spawn(domain::on_open(id.clone()));
+            }
+            json(domain::info(&id).await?)
         }
         "server:network" => json(json!({ "lanIp": network::lan_ip().map(|ip| ip.to_string()) })),
         "server:play" => {

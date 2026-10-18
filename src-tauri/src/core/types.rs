@@ -627,6 +627,12 @@ pub struct ServerMeta {
     /// The secret of that relay (`bore server --secret`), if it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relay_secret: Option<String>,
+    /// The player's own domain for this server (normalised: lowercase ASCII/punycode, no scheme or port).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
+    /// Keep the domain's DNS records up to date through the Cloudflare API (token kept apart, sealed).
+    #[serde(default)]
+    pub dns_auto: bool,
 }
 
 /// How a public server reaches the internet. The relay (bore.pub or `relay_host`) is always the last resort.
@@ -640,6 +646,8 @@ pub enum TunnelMode {
     Playit,
     /// Always the relay.
     Relay,
+    /// The player forwarded the port on the router themselves: share the public IP and port directly.
+    Manual,
 }
 
 /// Internet access for a running server (UPnP).
@@ -659,6 +667,75 @@ pub struct ServerNet {
     /// While opening through playit.gg for the first time: the page where the player links this launcher.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_url: Option<String>,
+    /// Whether the server's own domain points at this address (None: no domain, or not checked yet).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_ok: Option<bool>,
+    /// Automatic fell back to the relay because playit.gg isn't linked yet: suggest linking it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub playit_hint: bool,
+}
+
+/// A DNS record the player should have for their domain.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DnsRecord {
+    /// "A" | "AAAA" | "SRV"
+    pub kind: &'static str,
+    /// The full record name, e.g. "play.example.com" or "_minecraft._tcp.play.example.com".
+    pub name: String,
+    /// A/AAAA: the IP address. SRV: the target host.
+    pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weight: Option<u16>,
+}
+
+/// One record of a DNS check: what was found against what's expected.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DnsRecordCheck {
+    pub record: DnsRecord,
+    pub ok: bool,
+    /// What the public resolver returned for that name and type ("1.2.3.4", "0 5 25566 host.example.com").
+    pub found: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DnsCheck {
+    pub at: i64,
+    pub ok: bool,
+    /// The public resolver that answered ("1.1.1.1" or "8.8.8.8").
+    pub resolver: String,
+    pub records: Vec<DnsRecordCheck>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Text>,
+}
+
+/// The server's own domain as the Settings tab shows it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
+    /// How the server is reached right now: "direct" | "playit" | "relay" | "none" (not running or no address).
+    pub route: &'static str,
+    pub records: Vec<DnsRecord>,
+    /// Direct route only: the line players can put in their own device's hosts file instead of DNS.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosts_line: Option<String>,
+    /// playit.gg on a guest (unclaimed) account: the address may change.
+    pub playit_guest: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub check: Option<DnsCheck>,
+    /// A Cloudflare API token is saved for this server.
+    pub cloudflare_token: bool,
+    /// What the last automatic Cloudflare update did (or why it failed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cloudflare_status: Option<Text>,
 }
 
 /// A server as the UI sees it: its metadata plus live state.

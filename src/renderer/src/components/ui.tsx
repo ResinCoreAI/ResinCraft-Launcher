@@ -310,6 +310,33 @@ export function ConfirmModal({
   )
 }
 
+/**
+ * A task's progress bar. Installs run in stages (pack files, libraries, assets), each counting 0→100%
+ * with short "working…" gaps between them. The bar keeps the last value through those gaps instead of
+ * flipping to the sweeping animation, and a new stage restarts it without sliding backwards.
+ */
+function TaskBar({ progress }: { progress?: number | null }) {
+  const last = useRef<number | null>(null)
+  const stage = useRef(0)
+  if (progress != null) {
+    if (last.current != null && progress < last.current - 0.02) stage.current++
+    last.current = progress
+  }
+  const shown = progress ?? last.current
+  if (shown == null) {
+    return (
+      <div className="bar indeterminate">
+        <i />
+      </div>
+    )
+  }
+  return (
+    <div className="bar">
+      <i key={stage.current} style={{ width: `${shown * 100}%` }} />
+    </div>
+  )
+}
+
 export function Dock() {
   const { tasks, toasts, dismiss } = useStore()
   const icons = { success: <CheckCircle2 />, error: <AlertTriangle />, info: <Info /> }
@@ -329,11 +356,7 @@ export function Dock() {
             {task.progress != null && task.state === 'running' && <span className="faint">{Math.round(task.progress * 100)}%</span>}
           </div>
           <div className="detail ellipsis">{task.state === 'error' ? tx(task.errorText, task.error) : tx(task.detailText, task.detail) || t('common.working')}</div>
-          {task.state === 'running' && (
-            <div className={`bar ${task.progress == null ? 'indeterminate' : ''}`}>
-              <i style={{ width: `${(task.progress ?? 0) * 100}%` }} />
-            </div>
-          )}
+          {task.state === 'running' && <TaskBar progress={task.progress} />}
         </div>
       ))}
       {toasts.map((toast) => (

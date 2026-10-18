@@ -7,10 +7,12 @@
 //! - `content`: Modrinth / CurseForge / FTB / ATLauncher / Technic, modpack import & export
 //! - `player`: accounts, worlds, servers, screenshots, notes
 //! - `server`: hosting Minecraft servers on this computer
+//! - `files`: the file manager and text editor for instance and server folders
 
 pub mod app_cmds;
 pub mod content;
 pub mod core;
+pub mod files;
 pub mod game;
 pub mod player;
 pub mod server;

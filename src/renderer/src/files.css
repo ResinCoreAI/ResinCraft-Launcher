@@ -1,0 +1,351 @@
+/* File manager and text editor (components/FileManager.tsx, CodeEditor.tsx). Theme variables only. */
+
+:root {
+  /* Syntax colours for the editor: muted, so the file reads as data, not decoration. */
+  --syn-key: #22d3ee;
+  --syn-string: #e3c58a;
+  --syn-number: #f59e6b;
+  --syn-atom: #f38ba8;
+  --syn-keyword: #b8a4f5;
+  --syn-comment: #6f6a86;
+}
+:root[data-theme='light'] {
+  --syn-key: #0e7490;
+  --syn-string: #8a5a00;
+  --syn-number: #c2410c;
+  --syn-atom: #be185d;
+  --syn-keyword: #6d28d9;
+  --syn-comment: #8a85a3;
+}
+
+.fm {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.fm-bar {
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
+}
+.fm-filter {
+  width: 200px;
+  flex: none;
+}
+
+/* Breadcrumb: each folder is also a drop target while dragging. */
+.fm-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+}
+.fm-crumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.fm-crumb > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--text-faint);
+}
+.fm-crumbs button,
+.fm-crumbs b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-dim);
+  font: 500 13px var(--font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.fm-crumbs button {
+  cursor: pointer;
+}
+.fm-crumbs button:hover {
+  color: var(--accent);
+}
+.fm-crumbs b {
+  color: var(--text);
+  font-weight: 600;
+}
+.fm-crumbs button svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.fm-crumbs .drop {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* The list: name · size · modified. */
+.fm-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  outline: none;
+  user-select: none;
+  min-height: 160px;
+}
+.fm-list:focus-visible {
+  border-color: var(--accent);
+}
+.fm-head,
+.fm-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 110px 130px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+}
+.fm-head {
+  height: 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.fm-head button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: 600 11.5px var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+}
+.fm-head button:hover,
+.fm-head button.on {
+  color: var(--text);
+}
+.fm-head button svg {
+  width: 12px;
+  height: 12px;
+}
+.fm-row {
+  height: 34px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  cursor: default;
+}
+.fm-row:last-child {
+  border-bottom: 0;
+}
+.fm-row:hover {
+  background: var(--surface-2);
+}
+.fm-row.on {
+  background: var(--accent-soft);
+}
+.fm-row.on .fm-name {
+  color: var(--text);
+}
+.fm-row.cut,
+.fm-row.lifted {
+  opacity: 0.5;
+}
+.fm-row.drop {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.fm-row.up .fm-name {
+  color: var(--text-faint);
+  font-family: var(--mono);
+}
+.fm-ico {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+.fm-ico svg {
+  width: 16px;
+  height: 16px;
+}
+.fm-ico.dir {
+  color: var(--data);
+}
+.fm-name {
+  color: var(--text-dim);
+}
+.fm-size,
+.fm-time {
+  color: var(--text-faint);
+  font: 12px var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fm-size {
+  color: var(--data);
+}
+.fm-rename {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+.fm-empty {
+  display: grid;
+  place-items: center;
+  padding: 36px;
+  color: var(--text-faint);
+}
+.fm-list .empty {
+  padding: 36px 20px;
+}
+.fm-callout {
+  margin: 10px;
+}
+.fm-editor .fm-callout {
+  margin: 0 0 10px;
+}
+.fm-hint {
+  margin-top: 8px;
+}
+.fm-error {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.fm-menu {
+  position: fixed;
+  right: auto;
+  min-width: 210px;
+  z-index: 250;
+}
+.fm-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.fm-menu button:disabled:hover {
+  background: none;
+}
+
+.fm-ghost {
+  padding: 6px 11px;
+  font: 500 12.5px var(--font);
+  color: var(--text);
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: none;
+}
+
+/* Editor */
+.fm-dirty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 12px;
+  color: var(--warning);
+}
+.fm-dirty i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.fm-code-wrap {
+  height: max(380px, calc(100vh - 330px));
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  overflow: hidden;
+  background: var(--bg);
+  /* CodeMirror's panels use z-index 300; keep them under modals and menus. */
+  isolation: isolate;
+}
+.fm-code {
+  height: 100%;
+}
+.fm-status {
+  display: flex;
+  gap: 16px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--surface);
+  color: var(--text-faint);
+  font: 11.5px var(--mono);
+}
+
+/* Binary or too-large file */
+.fm-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: center;
+}
+.fm-info-ico {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+.fm-info-ico svg {
+  width: 24px;
+  height: 24px;
+}
+.fm-info h3 {
+  font: 600 16px var(--font-display);
+  word-break: break-all;
+}
+.fm-info p {
+  max-width: 460px;
+  font-size: 13px;
+}
+.fm-info dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 16px;
+  margin: 6px 0 10px;
+  font-size: 12.5px;
+  text-align: left;
+}
+.fm-info dt {
+  color: var(--text-faint);
+}
+.fm-info dd {
+  margin: 0;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+@media (max-width: 760px) {
+  .fm-head,
+  .fm-row {
+    grid-template-columns: 22px minmax(0, 1fr) 90px;
+  }
+  .fm-time {
+    display: none;
+  }
+  .fm-head button:last-child {
+    display: none;
+  }
+}

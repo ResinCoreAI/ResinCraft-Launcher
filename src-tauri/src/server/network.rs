@@ -76,6 +76,17 @@ pub async fn close_port(port: u16) {
     .await;
 }
 
+/// This network's public IPv4 address, as Cloudflare's trace page (also reachable as 1.0.0.1) sees it.
+pub async fn public_ipv4() -> Result<Ipv4Addr> {
+    for url in ["https://1.1.1.1/cdn-cgi/trace", "https://1.0.0.1/cdn-cgi/trace"] {
+        let Ok(text) = crate::core::net::fetch_text(url).await else { continue };
+        if let Some(ip) = text.lines().find_map(|l| l.strip_prefix("ip=")).and_then(|ip| ip.trim().parse().ok()) {
+            return Ok(ip);
+        }
+    }
+    Err(crate::err_tr!("hostNet.noPublicIp", "Couldn't find this network's public IP address. Check the internet connection"))
+}
+
 /// True if nothing on this computer is listening on `port` yet.
 pub fn port_free(port: u16) -> bool {
     std::net::TcpListener::bind(("0.0.0.0", port)).is_ok()

@@ -7,6 +7,7 @@ import {
   Eraser,
   ExternalLink,
   FolderOpen,
+  FolderTree,
   Gamepad2,
   Globe,
   Home as HomeIcon,
@@ -29,7 +30,9 @@ import {
 import type { ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { api } from '../api'
 import AddonBrowser, { ADDON_SOURCE_LABEL } from '../components/AddonBrowser'
+import FileManager from '../components/FileManager'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
+import { DomainAddress, DomainSettings } from '../components/ServerDomain'
 import { BlockArt, ConfirmModal, Empty, Modal, Segmented, Switch } from '../components/ui'
 import { useStore } from '../store'
 import { bytes, fixed, timeAgo } from '../util'
@@ -41,7 +44,7 @@ const MAX_LOG = 3000
 const isPluginServer = (s: ServerInfo) => ['paper', 'purpur', 'folia', 'spigot'].includes(s.type)
 const live = (s: ServerInfo) => s.state === 'starting' || s.state === 'running' || s.state === 'stopping'
 
-type Tab = 'console' | 'players' | 'addons' | 'properties' | 'settings'
+type Tab = 'console' | 'players' | 'addons' | 'properties' | 'files' | 'settings'
 
 export default function Servers({ id, fromInstance }: { id?: string; fromInstance?: string }) {
   const { go, toast } = useStore()
@@ -276,6 +279,7 @@ function ServerDetail({
     { id: 'players', icon: <Users />, label: t('servers.tab.players') },
     { id: 'addons', icon: <Puzzle />, label: t(isPluginServer(s) ? 'servers.tab.plugins' : 'servers.tab.mods'), hidden: s.type === 'vanilla' },
     { id: 'properties', icon: <SlidersHorizontal />, label: t('servers.tab.properties') },
+    { id: 'files', icon: <FolderTree />, label: t('files.tab') },
     { id: 'settings', icon: <Settings2 />, label: t('servers.tab.settings') }
   ]
   return (
@@ -319,6 +323,7 @@ function ServerDetail({
       {tab === 'players' && <PlayersTab s={s} />}
       {tab === 'addons' && <AddonsTab s={s} />}
       {tab === 'properties' && <PropertiesTab s={s} />}
+      {tab === 'files' && <FileManager root={{ kind: 'server', id: s.id }} rootLabel={t('files.root.server')} running={live(s)} />}
       {tab === 'settings' && <SettingsTab s={s} reload={reload} onDeleted={() => go({ page: 'servers' })} />}
     </>
   )
@@ -346,11 +351,11 @@ function useServerLog(id: string): [LogLine[], () => void] {
   return [lines, () => setLines([])]
 }
 
-function CopyAddress({ value }: { value: string }) {
+function CopyAddress({ value, small }: { value: string; small?: boolean }) {
   const { toast } = useStore()
   return (
     <button
-      className="sv-address"
+      className={small ? 'sv-address sm' : 'sv-address'}
       title={t('servers.connect.copy')}
       onClick={async () => {
         await navigator.clipboard.writeText(value)
@@ -431,15 +436,18 @@ function ConnectCard({ s }: { s: ServerInfo }) {
           <span className="hint">{t('servers.connect.internetOff')}</span>
         ) : net?.state === 'open' && net.address ? (
           <>
-            <CopyAddress value={net.address} />
+            <DomainAddress s={s} address={net.address} copy={(v, small) => <CopyAddress value={v} small={small} />} />
             <span className="hint ok">
               {net.via === 'relay'
                 ? t('servers.connect.internetRelay', { host: net.address.replace(/:\d+$/, '') })
                 : net.via === 'playit'
                   ? t('servers.connect.internetPlayit')
-                  : t('servers.connect.internetOpen')}
+                  : net.via === 'manual'
+                    ? t('servers.connect.internetManual')
+                    : t('servers.connect.internetOpen')}
             </span>
             {net.via === 'relay' && net.error && <span className="hint bad">{t('servers.connect.relayInstead', { error: net.error })}</span>}
+            {net.via === 'relay' && net.playitHint && <span className="hint">{t('servers.connect.playitHint')}</span>}
           </>
         ) : net?.state === 'opening' && net.claimUrl ? (
           <>
@@ -994,7 +1002,7 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
 
 // ---------- Settings ----------
 
-const TUNNELS: ServerTunnel[] = ['auto', 'playit', 'relay']
+const TUNNELS: ServerTunnel[] = ['auto', 'playit', 'relay', 'manual']
 
 function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Promise<void>; onDeleted: () => void }) {
   const { info, toast } = useStore()
@@ -1176,6 +1184,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               </div>
             </div>
           )}
+          <DomainSettings s={s} save={save} />
           <div className="setting stack">
             <span className="hint">{rich('servers.settings.publicHelp', { b: (x) => <b>{x}</b> })}</span>
           </div>

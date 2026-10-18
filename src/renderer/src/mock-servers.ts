@@ -2,6 +2,9 @@
 // console commands, players joining, and the router port opening.
 import type {
   ContentItem,
+  DnsCheck,
+  DnsRecord,
+  DomainInfo,
   LogLine,
   PlayerListKind,
   PropEntry,
@@ -10,7 +13,8 @@ import type {
   ServerEvent,
   ServerInfo,
   ServerListEntry,
-  ServerLogEvent
+  ServerLogEvent,
+  ServerNet
 } from '@shared/types'
 
 type Listener<T> = (e: T) => void
@@ -18,12 +22,46 @@ type Listener<T> = (e: T) => void
 export function mockServers(): { server: ResinApi['server']; onServer: ResinApi['on']['server']; onServerLog: ResinApi['on']['serverLog'] } {
   const now = Date.now()
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
-  const base = { launch: { jar: 'server.jar' }, public: true, optimizedFlags: true, tunnel: 'auto' as const, players: [] as string[], state: 'stopped' as const, eulaAccepted: true }
+  const base = { launch: { jar: 'server.jar' }, public: true, optimizedFlags: true, tunnel: 'auto' as const, dnsAuto: false, players: [] as string[], state: 'stopped' as const, eulaAccepted: true }
+  const PUBLIC_IP = '203.0.113.7'
+  const checks: Record<string, DnsCheck | undefined> = {}
+  const cfTokens: Record<string, boolean> = {}
+  /** Mirrors domain.rs: the records the server's domain needs for its current route. */
+  const domainInfo = (id: string): DomainInfo => {
+    const s = find(id)
+    const net = s.net?.state === 'open' ? s.net : undefined
+    const route: DomainInfo['route'] = !net ? 'none' : net.via === 'playit' ? 'playit' : net.via === 'relay' ? 'relay' : 'direct'
+    const d = s.domain
+    const srv = (value: string, port: number): DnsRecord => ({ kind: 'SRV', name: `_minecraft._tcp.${d}`, value, port, priority: 0, weight: 5 })
+    const records: DnsRecord[] = !d
+      ? []
+      : route === 'direct'
+        ? [{ kind: 'A', name: d, value: PUBLIC_IP }, ...(s.port !== 25565 ? [srv(d, s.port)] : [])]
+        : route === 'playit'
+          ? [srv('tidy-fern.ply.gg', 41982)]
+          : []
+    return {
+      domain: d,
+      route,
+      records,
+      hostsLine: d && route === 'direct' ? `${PUBLIC_IP} ${d}` : undefined,
+      playitGuest: route === 'playit',
+      check: checks[id]?.records.length && records.every((r) => checks[id]!.records.some((c) => JSON.stringify(c.record) === JSON.stringify(r))) ? checks[id] : undefined,
+      cloudflareToken: !!cfTokens[id],
+      cloudflareStatus:
+        s.dnsAuto && route !== 'none'
+          ? cfTokens[id]
+            ? { key: 'hostDomain.cfUpToDate', text: 'Cloudflare: the records were already up to date.' }
+            : { key: 'hostDomain.cfNoToken', text: 'Cloudflare: no API token saved yet.' }
+          : undefined
+    }
+  }
   let servers: ServerInfo[] = [
     {
       ...base,
       id: 'smp',
       name: 'Friends SMP',
+      domain: 'play.example.com',
       type: 'paper',
       mcVersion: '1.21.1',
       loaderVersion: '133',
@@ -155,8 +193,20 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
         fire(id)
       })
       later(id, 3800, () => {
-        if (find(id).state !== 'running' || !find(id).public) return
-        patch(id, { net: { state: 'open', address: 'bore.pub:41234', via: 'relay' } })
+        const cur = find(id)
+        if (cur.state !== 'running' || !cur.public) return
+        const net: ServerNet =
+          cur.tunnel === 'playit'
+            ? { state: 'open', address: 'tidy-fern.joinmc.link', via: 'playit' }
+            : cur.tunnel === 'relay'
+              ? { state: 'open', address: 'bore.pub:41234', via: 'relay' }
+              : cur.tunnel === 'auto' && cur.port % 2 === 0
+                ? // A router without UPnP and no playit.gg link yet: the relay, with a hint to link playit.gg.
+                  { state: 'open', address: 'bore.pub:41234', via: 'relay', playitHint: true }
+              : { state: 'open', address: `${PUBLIC_IP}:${cur.port}`, via: cur.tunnel === 'manual' ? 'manual' : 'router' }
+        // The sample domain checks out on the direct route.
+        if (cur.domain && net.via !== 'relay') net.domainOk = net.via !== 'playit'
+        patch(id, { net })
         fire(id)
       })
       later(id, 6000, () => {
@@ -235,6 +285,30 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       )),
     addonRemove: async (_id, filename) => void (addons = addons.filter((a) => a.filename !== filename)),
     network: async () => ({ lanIp: '192.168.1.42' }),
+    domain: async (id) => domainInfo(id),
+    checkDns: async (id) => {
+      const info = domainInfo(id)
+      if (!info.records.length) return info
+      await wait(null, 900)
+      const ok = find(id).net?.via !== 'playit'
+      checks[id] = {
+        at: Date.now(),
+        ok,
+        resolver: '1.1.1.1',
+        records: info.records.map((record) => ({
+          record,
+          ok,
+          found: ok ? [record.kind === 'SRV' ? `0 5 ${record.port} ${record.value}` : record.value] : []
+        }))
+      }
+      patch(id, { net: { ...find(id).net!, domainOk: ok } })
+      fire(id)
+      return domainInfo(id)
+    },
+    setDnsToken: async (id, token) => {
+      cfTokens[id] = !!token
+      return domainInfo(id)
+    },
     play: () => wait(undefined, 1200)
   }
 

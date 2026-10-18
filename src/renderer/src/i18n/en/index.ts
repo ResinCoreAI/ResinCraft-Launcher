@@ -5,6 +5,7 @@ import app from './app'
 import common from './common'
 import discover from './discover'
 import engine from './engine'
+import files from './files'
 import home from './home'
 import instance from './instance'
 import library from './library'
@@ -12,5 +13,5 @@ import servers from './servers'
 import settings from './settings'
 import tabs from './tabs'
 
-const en = { ...common, ...app, ...accounts, ...settings, ...home, ...library, ...discover, ...instance, ...tabs, ...servers, ...engine }
+const en = { ...common, ...app, ...accounts, ...settings, ...home, ...library, ...discover, ...instance, ...tabs, ...files, ...servers, ...engine }
 export default en
