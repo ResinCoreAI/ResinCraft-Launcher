@@ -225,7 +225,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': 'Perguntar sempre',
   'settings.preferredSource.reset': 'Redefinir “Não perguntar de novo”',
   'settings.preferredSource.resetDone': 'O ResinCraft vai perguntar de novo quando um mod estiver nos dois sites',
-  'settings.about.credit': 'Feito por Puirkle. Os recursos são inspirados no Prism Launcher; todo o código é original.',
+  'settings.about.credit': 'Feito por Puirkle. Gratuito e de código aberto.',
   'settings.about.dataFolder': 'Pasta de dados: {path}',
 
   // home
@@ -597,8 +597,8 @@ const dict: Dict = {
   'export.subtitle': 'Compartilhe esta instância como um arquivo de modpack que qualquer pessoa pode importar.',
   'export.run': 'Exportar…',
   'export.format': 'Formato',
-  'export.mrpackHint': 'Funciona no ResinCraft, no Prism, no app do Modrinth e na maioria dos outros launchers.',
-  'export.curseforgeHint': 'Funciona no app do CurseForge, no ResinCraft e no Prism.',
+  'export.mrpackHint': 'Funciona no ResinCraft, no app do Modrinth e na maioria dos outros launchers.',
+  'export.curseforgeHint': 'Funciona no app do CurseForge, no ResinCraft e na maioria dos outros launchers.',
   'export.curseforgeOffline': 'Esta versão não consegue procurar mods no CurseForge, então eles serão copiados para o pack.',
   'export.packName': 'Nome do pack',
   'export.version': 'Versão',

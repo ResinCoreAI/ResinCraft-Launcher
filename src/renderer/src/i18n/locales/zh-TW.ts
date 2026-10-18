@@ -221,7 +221,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': '每次詢問',
   'settings.preferredSource.reset': '重設「不再詢問」',
   'settings.preferredSource.resetDone': '模組同時在兩個網站上時，ResinCraft 會再次詢問',
-  'settings.about.credit': '由 Puirkle 製作。功能設計受到 Prism Launcher 啟發，所有程式碼皆為原創。',
+  'settings.about.credit': '由 Puirkle 製作。免費且開源。',
   'settings.about.dataFolder': '資料位置：{path}',
 
   // home
@@ -568,8 +568,8 @@ const dict: Dict = {
   'export.subtitle': '將此實例分享為任何人都能匯入的模組包檔案。',
   'export.run': '匯出…',
   'export.format': '格式',
-  'export.mrpackHint': '適用於 ResinCraft、Prism、Modrinth App 和大多數其他啟動器。',
-  'export.curseforgeHint': '適用於 CurseForge 應用程式、ResinCraft 和 Prism。',
+  'export.mrpackHint': '適用於 ResinCraft、Modrinth App 和大多數其他啟動器。',
+  'export.curseforgeHint': '適用於 CurseForge 應用程式、ResinCraft 和大多數其他啟動器。',
   'export.curseforgeOffline': '此版本無法在 CurseForge 上查詢模組，因此這些模組會直接複製到模組包中。',
   'export.packName': '模組包名稱',
   'export.version': '版本',

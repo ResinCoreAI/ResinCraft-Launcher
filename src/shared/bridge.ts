@@ -6,7 +6,7 @@ export type Call = (channel: string, args: unknown[]) => Promise<unknown>
 export type Subscribe = (event: string) => (cb: (payload: never) => void) => () => void
 
 /**
- * Builds the `window.resin` API from a transport. Electron (ipcRenderer) and Tauri (invoke) both use this,
+ * Builds the engine API from a transport (Tauri's invoke, or the browser preview's mock),
  * so the channel names live in exactly one place.
  */
 export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) => string): ResinApi {

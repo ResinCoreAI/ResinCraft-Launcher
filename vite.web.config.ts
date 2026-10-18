@@ -1,4 +1,4 @@
-// Builds the React UI as a plain web app for the Tauri shell (Electron uses electron.vite.config.ts).
+// Builds the React UI as a plain web app: the Tauri app's front end, and the browser preview (npm run dev:web).
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'

@@ -39,7 +39,7 @@ pub enum Tag {
     LongArray(Vec<i64>),
 }
 
-/// An ordered map, like the JS `Map` the Electron build used: setting an existing key keeps its position.
+/// An ordered map: setting an existing key keeps its position, so files are rewritten in their original order.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Compound(Vec<(String, Tag)>);
 

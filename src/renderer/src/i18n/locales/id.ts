@@ -221,7 +221,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': 'Selalu tanya',
   'settings.preferredSource.reset': 'Atur ulang “Jangan tanya lagi”',
   'settings.preferredSource.resetDone': 'ResinCraft akan bertanya lagi jika mod ada di kedua situs',
-  'settings.about.credit': 'Dibuat oleh Puirkle. Fiturnya terinspirasi dari Prism Launcher; semua kodenya asli.',
+  'settings.about.credit': 'Dibuat oleh Puirkle. Gratis dan sumber terbuka.',
   'settings.about.dataFolder': 'Folder data: {path}',
 
   // home
@@ -574,8 +574,8 @@ const dict: Dict = {
   'export.subtitle': 'Bagikan instalasi ini sebagai file modpack yang bisa diimpor siapa saja.',
   'export.run': 'Ekspor…',
   'export.format': 'Format',
-  'export.mrpackHint': 'Berfungsi di ResinCraft, Prism, Modrinth App, dan sebagian besar launcher lain.',
-  'export.curseforgeHint': 'Berfungsi di aplikasi CurseForge, ResinCraft, dan Prism.',
+  'export.mrpackHint': 'Berfungsi di ResinCraft, Modrinth App, dan sebagian besar launcher lain.',
+  'export.curseforgeHint': 'Berfungsi di aplikasi CurseForge, ResinCraft, dan sebagian besar launcher lain.',
   'export.curseforgeOffline': 'Build ini tidak bisa mencari mod di CurseForge, jadi mod akan disalin ke dalam paket.',
   'export.packName': 'Nama paket',
   'export.version': 'Versi',

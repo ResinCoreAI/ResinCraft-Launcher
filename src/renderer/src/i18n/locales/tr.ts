@@ -221,7 +221,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': 'Her seferinde sor',
   'settings.preferredSource.reset': '“Bir daha sorma” ayarını sıfırla',
   'settings.preferredSource.resetDone': 'Bir mod iki sitede de olduğunda ResinCraft yeniden soracak',
-  'settings.about.credit': "Puirkle tarafından yapıldı. Özellikleri Prism Launcher'dan ilham alır; tüm kod özgündür.",
+  'settings.about.credit': 'Puirkle tarafından yapıldı. Ücretsiz ve açık kaynak.',
   'settings.about.dataFolder': 'Veri klasörü: {path}',
 
   // home
@@ -580,8 +580,8 @@ const dict: Dict = {
   'export.subtitle': 'Bu kurulumu herkesin içe aktarabileceği bir mod paketi dosyası olarak paylaş.',
   'export.run': 'Dışa aktar…',
   'export.format': 'Biçim',
-  'export.mrpackHint': 'ResinCraft, Prism, Modrinth App ve diğer çoğu başlatıcıda çalışır.',
-  'export.curseforgeHint': "CurseForge uygulamasında, ResinCraft'ta ve Prism'de çalışır.",
+  'export.mrpackHint': 'ResinCraft, Modrinth App ve diğer çoğu başlatıcıda çalışır.',
+  'export.curseforgeHint': "CurseForge uygulamasında, ResinCraft'ta ve diğer çoğu başlatıcıda çalışır.",
   'export.curseforgeOffline': "Bu sürüm CurseForge'da mod arayamıyor, bu yüzden modlar bunun yerine pakete kopyalanacak.",
   'export.packName': 'Paket adı',
   'export.version': 'Sürüm',

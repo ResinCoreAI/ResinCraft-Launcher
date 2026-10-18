@@ -89,7 +89,7 @@ export default function Library() {
     return list.sort(cmp[sort])
   }, [instances, q, sort, order])
 
-  // Groups (like Prism): Ungrouped first, then the saved groups in order. Headers appear once any group exists.
+  // Groups: Ungrouped first, then the saved groups in order. Headers appear once any group exists.
   const grouped = names.length > 0
   const sections = useMemo(() => {
     const byGroup = (g: string) => shown.filter((i) => (i.group?.trim() ?? '') === g)

@@ -2,57 +2,42 @@
 
 A modern, friendly Minecraft: Java Edition launcher by **Puirkle**.
 
-ResinCraft's feature set is modelled on [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher), but it's a from-scratch implementation: no Prism code is used. It's built with Electron, React and TypeScript, and it talks directly to the public Mojang, Microsoft, Fabric, Quilt, Modrinth and Adoptium APIs.
+A small native app built with Tauri 2 and Rust, with a React interface. It talks directly to the public Mojang, Microsoft, Fabric, Quilt, Forge, NeoForge, Modrinth, CurseForge and Adoptium APIs. No telemetry and no ResinCraft account.
 
 ## Features
 
 | | |
 |---|---|
-| **Instances** | Separate installs per version/modpack, each with its own mods, worlds and settings. Colour themes, duplicate, open folder, delete to Recycle Bin. |
+| **Instances** | Separate installs per version or modpack, each with its own mods, worlds, Java, memory and JVM arguments. Groups, your own order (drag to arrange), icons, banners and colours. Duplicate, open folder, delete to the Recycle Bin. |
 | **Any version** | Every release and snapshot from Mojang's manifest, back to the classic alphas (legacy asset layouts handled). |
-| **Mod loaders** | Fabric and Quilt, with loader version picker. Forge/NeoForge are on the roadmap. |
-| **Discover** | Search Modrinth for mods, modpacks, resource packs and shaders, filtered to the instance's version and loader. |
-| **Smart installs** | Required dependencies are installed automatically; existing copies are replaced on update. |
+| **Mod loaders** | Fabric, Quilt, Forge and NeoForge, with a loader version picker. |
+| **Discover** | Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher and Technic, filtered to the instance's version and loader. |
+| **Smart installs** | Pick any version, install several at once, required dependencies added automatically, duplicate-mod check across sources. |
 | **Mod management** | Enable/disable, remove, recognise hand-added jars by hash, check for and apply updates (one or all). |
-| **Modpacks** | One-click Modrinth modpack install, plus `.mrpack` import (with zip-slip and download-host checks). |
+| **Modpacks** | Import Modrinth `.mrpack`, CurseForge, FTB, ATLauncher and Technic packs; export an instance as `.mrpack` or a CurseForge `.zip`. |
 | **Java** | Auto-detects installed Javas (including the official launcher's runtimes), picks the right major version per game, and downloads Eclipse Temurin when none fits. |
-| **Accounts** | Microsoft sign-in via device code (no password ever enters the app), tokens encrypted with OS secure storage, automatic refresh, skin avatars, multiple accounts. Offline profiles are available once a Microsoft account is added. |
+| **Accounts** | Microsoft sign-in via device code (no password ever enters the app), tokens encrypted with Windows' data protection, skins, capes and name changes, multiple accounts. Offline profiles for singleplayer and LAN, no Microsoft account needed. |
+| **Server hosting** | Vanilla, Paper, Purpur, Folia, Spigot, Fabric, Quilt, Forge and NeoForge servers, or a server from a modpack. Console, players, plugin and mod manager with updates, optimised startup flags. Friends join through the router, playit.gg, ResinCraft Relay (`<name>.rscraft.resincore.tech`) or bore.pub, or your own domain. |
+| **Files** | A file manager and editor on every instance and server. |
 | **Play** | Download progress, live colour-coded log console with filter/copy, crash notice, play-time tracking, minimize/hide launcher while playing. |
-| **Settings** | Memory slider, JVM args, window size, Java selection, parallel downloads, dark/light/system theme. Instances can override memory, Java and JVM args. |
+| **Updates** | Signed in-app updates from GitHub releases. |
+| **Languages** | English and 15 more, including the engine's error messages. |
 
 ## Getting started
 
-ResinCraft is moving from Electron to **Tauri 2 + Rust** (branch `tauri`). The React UI is shared: it talks to the engine through `window.resin`, built from one channel map in `src/shared/bridge.ts`, so it runs unchanged on either shell.
-
-### Tauri (new)
-
-Needs Rust (stable, MSVC on Windows) and, on Windows, the Visual Studio C++ Build Tools. WebView2 ships with Windows 10/11.
-
-```bash
-npm install
-npm run dev:tauri
-```
-
-- `npm run dev:tauri` starts the UI on Vite (port 1420) and the Rust engine in `src-tauri/`, with hot reload for the UI.
-- `npm run build:tauri` builds a release installer (NSIS) into `src-tauri/target/release/bundle/`.
-- Engine layout: `src-tauri/src/core` (context, events/tasks, downloads, paths, settings, instances, IPC router), `game` (versions, loaders, Java, launching), `content` (Modrinth, CurseForge, FTB, ATLauncher, Technic, import/export), `player` (accounts, worlds, servers, screenshots, notes).
-- Headless checks: `cargo run --example smoke -- 1.21.1 fabric`, `cargo run --example check_content`, `cargo run --example check_player` (run inside `src-tauri/`).
-- ResinCraft Relay (`relay/`, friends join hosted servers as `<name>.rscraft.resincore.tech`): `cargo test` inside `relay/`, and `cargo run --example check_relay` inside `src-tauri/` runs the relay locally with a real vanilla server and a headless Minecraft client. Deployment: [relay/README.md](relay/README.md).
-
-### Electron (current release build)
+Needs Node.js 24, Rust (stable, MSVC on Windows) and, on Windows, the Visual Studio C++ Build Tools. WebView2 ships with Windows 10/11.
 
 ```bash
 npm install
 npm run dev
 ```
 
-- `npm run dev` starts the app with hot reload. In dev mode all game data lives in `.dev-data/` inside the project, so testing never touches a real install. The Tauri build uses the same folder.
-- `npm run build` creates a production build in `out/`. `npm start` runs it.
-- `npm run dist` packages an installer with electron-builder (output in `dist/`).
-- `npm run typecheck` / `npm run format`.
-- `npm run smoke -- [version] [vanilla|fabric|quilt]` runs a headless end-to-end check: it creates a throwaway instance, downloads everything, boots Minecraft with an offline profile and stops it once the game reports the user is set.
-
-Opening the Vite URL (http://localhost:5173) in a normal browser shows the UI with a mock backend, which is handy for design work.
+- `npm run dev` starts the UI on Vite (port 1420) and the Rust engine in `src-tauri/`, with hot reload for the UI. Dev builds keep all game data in `.dev-data/` inside the project, so testing never touches a real install.
+- `npm run build` builds a release installer (NSIS) into `src-tauri/target/release/bundle/`.
+- `npm run dev:web` serves the UI alone at http://localhost:1420 with a mock engine and sample data, which is handy for design work.
+- `npm run typecheck` / `npm run format`. Translations: `npx tsx tools/check-i18n.ts` and `npx tsx tools/engine-strings.ts --check`.
+- Headless engine checks (inside `src-tauri/`): `cargo run --example smoke -- 1.21.1 fabric` creates a throwaway instance, downloads everything and boots Minecraft with an offline profile; also `check_content`, `check_player` and `check_server`.
+- ResinCraft Relay (`relay/`, friends join hosted servers as `<name>.rscraft.resincore.tech`): `cargo test` inside `relay/`, and `cargo run --example check_relay` inside `src-tauri/` runs the relay locally with a real vanilla server and a headless Minecraft client. Deployment: [relay/README.md](relay/README.md).
 
 ## Microsoft sign-in setup (required once)
 
@@ -70,28 +55,24 @@ Minecraft only accepts sign-ins from Azure apps that Mojang has approved. ResinC
 
 ```
 src/
-  shared/types.ts      Types + the IPC contract (ResinApi) shared by every layer
-  main/                Electron main process: the launcher engine
-    index.ts           Window, security, IPC wiring
-    mojang.ts          Version manifest, rules, libraries, natives, assets
-    loaders.ts         Fabric / Quilt meta + profile merging
-    launch.ts          Prepare → build arguments → spawn Java → stream logs
-    java.ts            Java discovery and Temurin downloads
-    accounts.ts        Microsoft → Xbox → XSTS → Minecraft auth, offline profiles
-    modrinth.ts        Search, installs, dependencies, updates, .mrpack
-    net.ts             Verified, retrying, parallel downloads
-  preload/index.ts     contextBridge → window.resin
-  renderer/src/        React UI (pages/, components/, store.tsx, styles.css)
-scripts/smoke.ts       Headless launch test
+  shared/types.ts      Types + the engine API (ResinApi) the UI uses
+  shared/bridge.ts     The channel map: every API call and the engine channel it goes to
+  renderer/src/        React UI (pages/, components/, i18n/, styles.css)
+    tauri-api.ts       Talks to the Rust engine
+    mock.ts            Stands in for the engine in a plain browser (npm run dev:web)
+src-tauri/             Tauri app and the Rust engine
+  src/core             Context, events and tasks, downloads, paths, settings, instances, IPC router
+  src/game             Versions, loaders, Java, launching
+  src/content          Modrinth, CurseForge, FTB, ATLauncher, Technic, import/export
+  src/player           Accounts, worlds, servers list, screenshots, notes
+  src/server           Server hosting, tunnels, the relay client
+  src/files            File manager and editor
+  examples/            Headless checks
+relay/                 ResinCraft Relay
+site/                  Website (Next.js)
+deploy/windows/        Windows Server deploy for the website and the relay
+tools/                 Translation checks
 ```
-
-## Roadmap
-
-- Forge and NeoForge (installer processors)
-- CurseForge content (needs an API key)
-- World, screenshot and server-list management
-- Modpack export (`.mrpack`)
-- Skin changer
 
 ## Updates
 

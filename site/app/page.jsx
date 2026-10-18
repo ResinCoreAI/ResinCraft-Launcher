@@ -85,7 +85,7 @@ const FAQ = [
       In <span className="mono">%APPDATA%\ResinCraft Launcher</span>. Uninstalling leaves that folder, so your worlds aren't lost.
     </>,
   ],
-  ['Is it made by Mojang or Microsoft?', "No. ResinCraft is an independent project by Puirkle. Its feature list was inspired by Prism Launcher, but it's written from scratch."],
+  ['Is it made by Mojang or Microsoft?', 'No. ResinCraft is an independent project by Puirkle, written from scratch.'],
 ]
 
 function SectionHead({ kicker, title, children }) {

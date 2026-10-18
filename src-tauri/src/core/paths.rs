@@ -1,11 +1,11 @@
-//! Where everything lives on disk. Same layout as the Electron build, so both can share a data folder.
+//! Where everything lives on disk. The layout hasn't changed since launcher 0.1, so old data folders keep working.
 
 use std::path::PathBuf;
 
 use super::ctx::ctx;
 
-/// Development builds keep data in `ResinCraft/.dev-data` (same as Electron's `npm run dev`);
-/// release builds use `%APPDATA%\ResinCraft Launcher`, which is what the Electron release used too.
+/// Development builds keep data in `ResinCraft/.dev-data`;
+/// release builds use `%APPDATA%\ResinCraft Launcher`.
 /// A build made with `RESINCRAFT_DATA_FOLDER` set uses that folder name instead (only for the updater's
 /// end-to-end test, so test installs never touch real instances and accounts).
 pub fn default_data_dir(config_dir: Option<PathBuf>) -> PathBuf {

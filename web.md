@@ -31,7 +31,7 @@ You are building the public website for **ResinCraft Launcher**, a desktop Minec
 | Platform | Windows 10/11, 64-bit. macOS and Linux are **not** available yet. |
 | Installer | `ResinCraft.Launcher_<version>_x64-setup.exe`, about 5 MB, installs per user (no admin rights) |
 | "Download" link | Resolve the newest installer from the GitHub API (§7). Fallback, and the no-JS `href`: `https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest` |
-| Built with | Tauri 2 and Rust, with a React interface. It's a small native app, not an Electron bundle. |
+| Built with | Tauri 2 and Rust, with a React interface. It's a small native app. |
 | Code signing | Not signed yet, so Windows SmartScreen shows "Windows protected your PC". Say so next to the downloads, with the fix: **More info → Run anyway**. |
 | Contact | `puirkle@resincore.ai` (the address already published on qr.puirkle.net) |
 | Copyright line | `© 2026 ResinCore · ResinCraft Launcher` (same pattern as the QR site) |
@@ -236,7 +236,7 @@ A purple resin drop holding a green Minecraft-style block. The block's dark righ
 - **Does it run Forge modpacks?** Yes: Forge, NeoForge, Fabric and Quilt all work, for both playing and hosting servers.
 - **Can I host a server for friends?** Yes, see §6.5.
 - **Where are my files kept?** `%APPDATA%\ResinCraft Launcher`. Uninstalling leaves that folder, so your worlds aren't lost.
-- **Is it made by Mojang or Microsoft?** No. ResinCraft is an independent project by Puirkle. Its feature list was inspired by Prism Launcher, but it's written from scratch and contains none of Prism's code.
+- **Is it made by Mojang or Microsoft?** No. ResinCraft is an independent project by Puirkle, written from scratch.
 
 ---
 
@@ -359,7 +359,7 @@ These are real, 2880×1800 (16:10) screenshots, each with an `@1x` 1440px versio
 
 **Still missing:** Servers (with Console), Players, Plugins, the Files tab with the editor, Accounts (skin/cape), the update banner, and a right-click menu. Until they exist, leave those slots out, or use a clearly labelled placeholder box. Never draw a fake UI.
 
-Capture more with `npm run build:web && npx electron scripts/screenshots.cjs`, which renders every screen with sample data at 2× into `resources/screenshots/`. Alternatively, open `npm run dev:web` at http://localhost:1420.
+Capture more from the browser preview: `npm run dev:web` opens every screen with sample data at http://localhost:1420. Take them at 2× (1440 × 900 window, device scale 2).
 
 ---
 

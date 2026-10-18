@@ -70,4 +70,4 @@ Any static host works too (Cloudflare Pages: build command `npm run build`, outp
 | `lib/site.js` | Repo, email, relay example address, disclaimer |
 | `public/assets/` | Logo, favicons, screenshots, `og.png` |
 
-New screenshots: run `npm run build:web && npx electron scripts/screenshots.cjs` in the launcher repo, then convert them to WebP (2880 px and a 1440 px `@1x`) into `public/assets/shots/`.
+New screenshots: run `npm run dev:web` in the launcher repo and capture http://localhost:1420 at 2×, then convert them to WebP (2880 px and a 1440 px `@1x`) into `public/assets/shots/`.

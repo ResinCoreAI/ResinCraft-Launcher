@@ -2119,7 +2119,7 @@ button.stat b {
   color: #fff;
 }
 
-/* ---------- Library groups (like Prism) ---------- */
+/* ---------- Library groups ---------- */
 
 .inst-group + .inst-group {
   margin-top: 6px;

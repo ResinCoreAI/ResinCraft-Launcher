@@ -1,5 +1,5 @@
 //! The single `ipc(channel, args)` entry point the UI calls, routed to each feature group.
-//! Channel names are the same as the Electron build (see src/shared/bridge.ts).
+//! Channel names match the UI's API (see src/shared/bridge.ts).
 
 use anyhow::{bail, Context, Result};
 use serde::de::DeserializeOwned;

@@ -5,15 +5,11 @@
   "description": "A modern, friendly Minecraft launcher by Puirkle",
   "author": "Puirkle",
   "private": true,
-  "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "start": "electron-vite preview",
+    "dev": "tauri dev",
+    "build": "tauri build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "dist": "electron-vite build && electron-builder",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/*.ts\"",
-    "smoke": "tsx scripts/smoke.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tools/*.ts\"",
     "dev:web": "vite --config vite.web.config.ts",
     "build:web": "vite build --config vite.web.config.ts",
     "tauri": "tauri",
@@ -21,8 +17,7 @@
     "build:tauri": "tauri build"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.12.4",
-    "adm-zip": "^0.6.1"
+    "@tauri-apps/api": "^2.12.4"
   },
   "devDependencies": {
     "@codemirror/commands": "^6.11.1",
@@ -36,14 +31,10 @@
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@lezer/highlight": "^1.2.5",
     "@tauri-apps/cli": "^2.12.3",
-    "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "electron": "^44.9.0",
-    "electron-builder": "^26.15.3",
-    "electron-vite": "^6.0.0",
     "lucide-react": "^1.59.0",
     "prettier": "^3.9.10",
     "react": "^19.3.1",

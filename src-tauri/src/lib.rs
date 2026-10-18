@@ -1,7 +1,7 @@
 //! ResinCraft Launcher: Tauri shell + Rust engine.
 //!
-//! The React UI talks to the engine through one command, `ipc(channel, args)`, using the same channel
-//! names as the Electron build. Feature groups:
+//! The React UI talks to the engine through one command, `ipc(channel, args)`, with the channel names
+//! from src/shared/bridge.ts. Feature groups:
 //! - `app_cmds`: app, settings, instance CRUD
 //! - `game`: Minecraft versions, mod loaders, Java, launching
 //! - `content`: Modrinth / CurseForge / FTB / ATLauncher / Technic, modpack import & export

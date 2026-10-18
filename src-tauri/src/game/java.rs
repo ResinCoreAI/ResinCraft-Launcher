@@ -1,4 +1,4 @@
-//! Finding Java installs and downloading Eclipse Temurin. Port of `src/main/java.ts`.
+//! Finding Java installs and downloading Eclipse Temurin.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};

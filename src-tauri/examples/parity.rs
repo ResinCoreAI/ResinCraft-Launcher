@@ -1,5 +1,5 @@
-//! Parity check, Rust side: the same read-only requests as scripts/parity-ts.ts, sent through the real
-//! IPC router, printed as JSON.   cargo run --example parity -- <instanceId> > rust.json
+//! Read-only engine requests for one instance, sent through the real IPC router and printed as JSON
+//! (handy for comparing two builds).   cargo run --example parity -- <instanceId> > rust.json
 use resincraft_lib::core::{ctx, paths, router, Args};
 use serde_json::{json, Map, Value};
 

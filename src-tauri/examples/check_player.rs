@@ -293,7 +293,7 @@ async fn accounts_child(dir: PathBuf) {
 
     check_err("accounts: no account → sign in first", accounts::get_launch_auth().await, "Sign in with your Microsoft account");
 
-    // An account written by the Electron build (safeStorage tokens), with an extra field to keep.
+    // An account written by launcher 0.1 ("enc:" tokens), with an extra field to keep.
     let legacy = serde_json::json!([{
         "id": "legacy-1", "type": "msa", "username": "OldMsaUser", "uuid": "0123456789abcdef0123456789abcdef",
         "active": true, "refreshToken": "enc:djEwAAAA", "mcToken": "enc:djEwBBBB", "mcTokenExpires": 4102444800000i64,
@@ -301,8 +301,8 @@ async fn accounts_child(dir: PathBuf) {
     }]);
     std::fs::write(paths::accounts_file(), serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
     let list = accounts::list_accounts().await.unwrap();
-    check("accounts: Electron-era account still listed", list.len() == 1 && list[0].username == "OldMsaUser" && list[0].active, format!("{list:?}"));
-    check_err("accounts: Electron-era tokens → sign in again", accounts::get_launch_auth().await, "Please sign in to OldMsaUser again");
+    check("accounts: 0.1-era account still listed", list.len() == 1 && list[0].username == "OldMsaUser" && list[0].active, format!("{list:?}"));
+    check_err("accounts: 0.1-era tokens → sign in again", accounts::get_launch_auth().await, "Please sign in to OldMsaUser again");
 
     check_err("accounts: bad offline name rejected", accounts::add_offline_account("no spaces!").await, "Usernames are 3–16");
     let off = accounts::add_offline_account("  Steve_Test ").await;
@@ -326,7 +326,7 @@ async fn accounts_child(dir: PathBuf) {
         let list = accounts::list_accounts().await.unwrap();
         check("accounts: remove re-activates another", list.len() == 1 && list[0].active, format!("{list:?}"));
     }
-    // File format: same keys as Electron; unknown fields survive a rewrite.
+    // File format: same keys as launcher 0.1; unknown fields survive a rewrite.
     accounts::add_offline_account("Alex_Test").await.unwrap();
     std::fs::write(paths::accounts_file(), serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
     accounts::add_offline_account("Alex_Test").await.unwrap();

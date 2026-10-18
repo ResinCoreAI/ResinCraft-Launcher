@@ -140,7 +140,7 @@ pub struct Instance {
     pub modpack: Option<ModpackRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending_downloads: Option<Vec<PendingDownload>>,
-    /// Library group (like Prism's instance groups); None = Ungrouped.
+    /// Library group; None = Ungrouped.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
     /// A data URL of banner.jpg (16:9), shown on Library cards and the instance page.

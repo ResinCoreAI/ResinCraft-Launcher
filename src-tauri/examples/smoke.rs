@@ -2,7 +2,6 @@
 //!   cargo run --example smoke -- [mcVersion] [vanilla|fabric|quilt|forge|neoforge] [loaderVersion]
 //! Creates a throwaway instance, downloads everything, boots the game with an offline profile and
 //! stops it as soon as Minecraft reports the user is set (or, for Forge/NeoForge, that LWJGL is up).
-//! Port of `scripts/smoke.ts`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

@@ -1,5 +1,4 @@
 //! Mojang's version manifest, version JSONs, OS rules, libraries, client jar, logging config and assets.
-//! Port of `src/main/mojang.ts`; same on-disk layout.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

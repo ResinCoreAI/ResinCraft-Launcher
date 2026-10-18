@@ -1,4 +1,4 @@
-//! Fabric / Quilt / Forge / NeoForge version lists and version resolution. Port of `src/main/loaders.ts`
+//! Fabric / Quilt / Forge / NeoForge version lists and version resolution
 //! (the Forge/NeoForge installer itself lives in `forge.rs`).
 
 use std::cmp::Ordering;

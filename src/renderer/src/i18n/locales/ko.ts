@@ -221,7 +221,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': '매번 묻기',
   'settings.preferredSource.reset': '“다시 묻지 않기” 초기화',
   'settings.preferredSource.resetDone': '모드가 두 사이트에 모두 있으면 ResinCraft가 다시 물어봐요',
-  'settings.about.credit': 'Puirkle이 만들었어요. 기능 구성은 Prism Launcher에서 영감을 받았으며, 모든 코드는 직접 작성했어요.',
+  'settings.about.credit': 'Puirkle이 만들었어요. 무료 오픈 소스예요.',
   'settings.about.dataFolder': '데이터 폴더: {path}',
 
   // home
@@ -568,8 +568,8 @@ const dict: Dict = {
   'export.subtitle': '이 인스턴스를 누구나 가져올 수 있는 모드팩 파일로 공유하세요.',
   'export.run': '내보내기…',
   'export.format': '형식',
-  'export.mrpackHint': 'ResinCraft, Prism, Modrinth App 등 대부분의 런처에서 사용할 수 있어요.',
-  'export.curseforgeHint': 'CurseForge 앱, ResinCraft, Prism에서 사용할 수 있어요.',
+  'export.mrpackHint': 'ResinCraft, Modrinth App 등 대부분의 런처에서 사용할 수 있어요.',
+  'export.curseforgeHint': 'CurseForge 앱, ResinCraft 등 대부분의 런처에서 사용할 수 있어요.',
   'export.curseforgeOffline': '이 빌드는 CurseForge에서 모드를 조회할 수 없어서 대신 팩에 복사해요.',
   'export.packName': '팩 이름',
   'export.version': '버전',

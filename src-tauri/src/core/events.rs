@@ -20,7 +20,7 @@ pub fn set_sink(f: impl Fn(&str, Value) + Send + Sync + 'static) {
     let _ = SINK.set(Box::new(f));
 }
 
-/// Sends `payload` to the UI as `resin:<channel>`, the same events the Electron build sends.
+/// Sends `payload` to the UI as `resin:<channel>`.
 pub fn emit<S: Serialize + Clone>(channel: &str, payload: S) {
     if let Some(app) = ctx::app() {
         let _ = app.emit(&format!("resin:{channel}"), payload);

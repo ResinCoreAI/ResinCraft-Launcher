@@ -35,7 +35,7 @@ pub struct LaunchAuth {
     pub xuid: Option<String>,
 }
 
-/// One entry of accounts.json (same format as the Electron build).
+/// One entry of accounts.json (same format since launcher 0.1).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredAccount {
@@ -52,7 +52,7 @@ struct StoredAccount {
     skin_url: Option<String>,
     #[serde(default)]
     active: bool,
-    /// Sealed: "dpapi:…" (Windows), "raw:…", or "enc:…" (Electron's safeStorage; unreadable here).
+    /// Sealed: "dpapi:…" (Windows), "raw:…", or "enc:…" (launcher 0.1; unreadable here).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     refresh_token: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -70,7 +70,7 @@ struct StoredAccount {
 
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
-/// Raised when a token was sealed by the Electron build's safeStorage, which we can't open.
+/// Raised when a token was sealed by launcher 0.1, which this version can't open.
 #[derive(Debug)]
 struct SignedOut;
 impl std::fmt::Display for SignedOut {
@@ -121,7 +121,7 @@ pub fn seal(s: &str) -> String {
     format!("raw:{}", B64.encode(s.as_bytes()))
 }
 
-/// Opens a sealed token. Tokens sealed by the Electron build ("enc:") fail with a sign-in-again error.
+/// Opens a sealed token. Tokens sealed by launcher 0.1 ("enc:") fail with a sign-in-again error.
 pub fn unseal(s: Option<&str>) -> Result<String> {
     let Some(s) = s.filter(|s| !s.is_empty()) else { return Ok(String::new()) };
     if s.starts_with("enc:") {
@@ -529,7 +529,7 @@ pub async fn get_launch_auth() -> Result<LaunchAuth> {
 
 /// Opens a Microsoft account's Minecraft token, refreshing it first when it's about to expire (or when `force`d).
 async fn fresh_token(mut acc: StoredAccount, force: bool) -> Result<(StoredAccount, String)> {
-    // Tokens sealed by the Electron build can't be opened here: the account is effectively signed out.
+    // Tokens sealed by launcher 0.1 can't be opened here: the account is effectively signed out.
     if is_unreadable(acc.mc_token.as_deref()) || is_unreadable(acc.refresh_token.as_deref()) {
         return Err(sign_in_again(&acc));
     }

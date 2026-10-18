@@ -1,5 +1,5 @@
 //! Forge & NeoForge installation: installer download, install_profile.json + version.json, processors run
-//! with Java, and a cached merged version JSON. Port of the installer half of `src/main/loaders.ts`.
+//! with Java, and a cached merged version JSON.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;

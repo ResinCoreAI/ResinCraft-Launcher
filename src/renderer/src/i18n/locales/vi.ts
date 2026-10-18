@@ -221,7 +221,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': 'Luôn hỏi',
   'settings.preferredSource.reset': 'Đặt lại “Không hỏi lại”',
   'settings.preferredSource.resetDone': 'ResinCraft sẽ hỏi lại khi một mod có trên cả hai trang',
-  'settings.about.credit': 'Do Puirkle phát triển. Bộ tính năng lấy cảm hứng từ Prism Launcher; toàn bộ mã nguồn là nguyên bản.',
+  'settings.about.credit': 'Do Puirkle phát triển. Miễn phí và mã nguồn mở.',
   'settings.about.dataFolder': 'Thư mục dữ liệu: {path}',
 
   // home
@@ -573,8 +573,8 @@ const dict: Dict = {
   'export.subtitle': 'Chia sẻ bản cài đặt này dưới dạng tệp gói mod mà ai cũng có thể nhập.',
   'export.run': 'Xuất…',
   'export.format': 'Định dạng',
-  'export.mrpackHint': 'Dùng được trong ResinCraft, Prism, Modrinth App và hầu hết launcher khác.',
-  'export.curseforgeHint': 'Dùng được trong ứng dụng CurseForge, ResinCraft và Prism.',
+  'export.mrpackHint': 'Dùng được trong ResinCraft, Modrinth App và hầu hết launcher khác.',
+  'export.curseforgeHint': 'Dùng được trong ứng dụng CurseForge, ResinCraft và hầu hết launcher khác.',
   'export.curseforgeOffline': 'Bản dựng này không tra cứu được mod trên CurseForge, nên các mod sẽ được sao chép vào gói.',
   'export.packName': 'Tên gói',
   'export.version': 'Phiên bản',

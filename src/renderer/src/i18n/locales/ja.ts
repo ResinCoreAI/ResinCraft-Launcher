@@ -221,7 +221,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': '毎回確認する',
   'settings.preferredSource.reset': '「今後は確認しない」をリセット',
   'settings.preferredSource.resetDone': 'Modが両方のサイトにあるとき、ResinCraftは再び確認します',
-  'settings.about.credit': 'Puirkle製。機能はPrism Launcherを参考にしていますが、コードはすべてオリジナルです。',
+  'settings.about.credit': 'Puirkle製。無料のオープンソースです。',
   'settings.about.dataFolder': 'データフォルダー：{path}',
 
   // home
@@ -571,8 +571,8 @@ const dict: Dict = {
   'export.subtitle': 'このインスタンスを、誰でもインポートできるModパックファイルとして共有します。',
   'export.run': 'エクスポート…',
   'export.format': '形式',
-  'export.mrpackHint': 'ResinCraft、Prism、Modrinth Appをはじめ、ほとんどのランチャーで使えます。',
-  'export.curseforgeHint': 'CurseForgeアプリ、ResinCraft、Prismで使えます。',
+  'export.mrpackHint': 'ResinCraft、Modrinth Appをはじめ、ほとんどのランチャーで使えます。',
+  'export.curseforgeHint': 'CurseForgeアプリ、ResinCraftをはじめ、ほとんどのランチャーで使えます。',
   'export.curseforgeOffline': 'このビルドではCurseForgeでModを照会できないため、代わりにパックにコピーされます。',
   'export.packName': 'パック名',
   'export.version': 'バージョン',

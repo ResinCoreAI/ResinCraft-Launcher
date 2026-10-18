@@ -31,7 +31,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             shell::reveal(std::path::Path::new(&args.get::<String>(0)?))?;
             done()
         }
-        // Electron recoloured its native title-bar buttons; Tauri draws its own controls in the UI.
+        // Kept for older front ends: the window controls are drawn in the UI, so there's nothing to recolour.
         "app:setTitleBar" => done(),
 
         "settings:get" => json(settings::redacted(settings::get().await)),

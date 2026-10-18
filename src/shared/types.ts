@@ -50,7 +50,7 @@ export interface Instance {
   jvmArgs?: string
   modpack?: { projectId?: string; versionId?: string; name: string }
   pendingDownloads?: PendingDownload[]
-  /** Library group (like Prism's instance groups); none = Ungrouped. */
+  /** Library group; none = Ungrouped. */
   group?: string
   /** A data URL of the 16:9 banner (banner.jpg), shown on Library cards and the instance page. */
   bannerUrl?: string

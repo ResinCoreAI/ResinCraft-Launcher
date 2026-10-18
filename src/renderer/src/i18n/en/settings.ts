@@ -51,6 +51,6 @@ export default {
   'settings.preferredSource.ask': 'Ask every time',
   'settings.preferredSource.reset': 'Reset “Don’t ask again”',
   'settings.preferredSource.resetDone': 'ResinCraft will ask again when a mod is on both sites',
-  'settings.about.credit': 'Made by Puirkle. Its feature set is inspired by Prism Launcher; all code is original.',
+  'settings.about.credit': 'Made by Puirkle. Free and open source.',
   'settings.about.dataFolder': 'Data folder: {path}'
 }

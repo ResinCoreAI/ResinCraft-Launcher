@@ -1,5 +1,4 @@
 //! Preparing (downloads, natives, Java), building the command line, running the game and streaming its log.
-//! Port of `src/main/launch.ts`.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;

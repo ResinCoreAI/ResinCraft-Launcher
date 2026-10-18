@@ -221,7 +221,7 @@ const dict: Dict = {
   'settings.preferredSource.ask': 'ถามทุกครั้ง',
   'settings.preferredSource.reset': 'รีเซ็ต “ไม่ต้องถามอีก”',
   'settings.preferredSource.resetDone': 'ResinCraft จะถามอีกครั้งเมื่อม็อดมีทั้งสองเว็บ',
-  'settings.about.credit': 'สร้างโดย Puirkle ฟีเจอร์ต่าง ๆ ได้แรงบันดาลใจจาก Prism Launcher แต่โค้ดทั้งหมดเขียนขึ้นเอง',
+  'settings.about.credit': 'สร้างโดย Puirkle ใช้ฟรีและเป็นโอเพนซอร์ส',
   'settings.about.dataFolder': 'โฟลเดอร์ข้อมูล: {path}',
 
   // home
@@ -568,8 +568,8 @@ const dict: Dict = {
   'export.subtitle': 'แชร์อินสแตนซ์นี้เป็นไฟล์ม็อดแพ็กที่ใครก็นำเข้าได้',
   'export.run': 'ส่งออก…',
   'export.format': 'รูปแบบ',
-  'export.mrpackHint': 'ใช้ได้ใน ResinCraft, Prism, Modrinth App และลันเชอร์อื่น ๆ ส่วนใหญ่',
-  'export.curseforgeHint': 'ใช้ได้ในแอป CurseForge, ResinCraft และ Prism',
+  'export.mrpackHint': 'ใช้ได้ใน ResinCraft, Modrinth App และลันเชอร์อื่น ๆ ส่วนใหญ่',
+  'export.curseforgeHint': 'ใช้ได้ในแอป CurseForge, ResinCraft และลันเชอร์อื่น ๆ ส่วนใหญ่',
   'export.curseforgeOffline': 'บิลด์นี้ค้นหาม็อดบน CurseForge ไม่ได้ จึงจะคัดลอกม็อดลงในแพ็กแทน',
   'export.packName': 'ชื่อแพ็ก',
   'export.version': 'เวอร์ชัน',

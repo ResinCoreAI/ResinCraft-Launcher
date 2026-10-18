@@ -78,7 +78,7 @@ export default function DropImport() {
     }
   }, [importPath])
 
-  // Electron (and plain browsers): HTML5 drag events; the preload turns the File into a path.
+  // The browser preview: HTML5 drag events (the mock engine stands in for real file paths).
   useEffect(() => {
     if (isTauri) return
     let depth = 0

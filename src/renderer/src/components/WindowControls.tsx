@@ -4,7 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { t } from '../i18n'
 
 /**
- * Minimise / maximise / close for the frameless Tauri window. (Electron draws native buttons
+ * Minimise / maximise / close for the frameless Tauri window. (Windows' own buttons are hidden,
  * over the title bar instead, so this only renders under Tauri.)
  */
 export default function WindowControls() {
