@@ -90,7 +90,7 @@ set -a; . ./updater.local.env; set +a; export TAURI_SIGNING_PRIVATE_KEY="$PWD/up
 **Releasing an update.**
 
 1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
-2. Push a tag (`git tag v0.3.1 && git push origin v0.3.1`). CI makes a draft release with `ResinCraft.Launcher_<version>_x64-setup.exe` and `latest.json`.
+2. Push a tag (`git tag v0.4.0 && git push origin v0.4.0`). CI makes a draft release with `ResinCraft.Launcher_<version>_x64-setup.exe` and `latest.json`.
 3. Publish the draft on GitHub. That is the rollout: **Publish update** copies `latest.json` to the `updates` branch, and players get the update at their next check (start, or within 6 hours). If that workflow fails, re-run it from the Actions tab (Run workflow, with the tag).
 
 **Testing an update locally.** Build an older and a newer copy under a separate name, so the test never touches a real install or its data (`RESINCRAFT_DATA_FOLDER` is read at build time):
