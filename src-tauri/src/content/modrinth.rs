@@ -10,8 +10,7 @@ use serde_json::{json, Value};
 
 use super::dupes::{dedupe_pack, dep_facts, skipped_text, Guard, ModFacts};
 use super::index::{
-    discard_instance, display_cmp, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, read_zip_text,
-    remove_project_files, safe_name, save_index, ContentIndex, IndexEntry,
+    discard_instance, display_cmp, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, read_zip_text, remove_project_files, safe_name, save_index, ContentIndex, IndexEntry, InstanceGuard,
 };
 use super::jarmeta::RemoteFile;
 use crate::core::events::Task;
@@ -589,7 +588,10 @@ pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
             i.modpack = Some(modpack);
         })
         .await?;
-        match fill_pack(&inst, &pack, &file, &task).await {
+        let guard = InstanceGuard::new(&inst.id);
+        let filled = fill_pack(&inst, &pack, &file, &task).await;
+        guard.keep();
+        match filled {
             Ok(()) => Ok(inst),
             Err(e) => {
                 // Don't leave a half-installed instance behind.

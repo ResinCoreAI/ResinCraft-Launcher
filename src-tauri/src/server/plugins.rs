@@ -81,10 +81,12 @@ fn areas(kind: ServerKind) -> Vec<Option<&'static str>> {
 /// The sources that make sense for a server type, in the order the UI offers them.
 fn sources_for(kind: ServerKind) -> Vec<&'static str> {
     match kind {
-        ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf => vec!["modrinth", "hangar", "spigot", "bukkit", "github"],
-        ServerKind::Spigot => vec!["modrinth", "spigot", "bukkit", "github"],
+        ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf => vec!["modrinth", "hangar", "spigot", "bukkit", "github", "geysermc"],
+        ServerKind::Spigot => vec!["modrinth", "spigot", "bukkit", "github", "geysermc"],
         ServerKind::Vanilla | ServerKind::Bedrock => Vec::new(),
-        _ => vec!["modrinth", "curseforge", "github"],
+        // Geyser has no Forge build.
+        ServerKind::Forge => vec!["modrinth", "curseforge", "github"],
+        _ => vec!["modrinth", "curseforge", "github", "geysermc"],
     }
 }
 
@@ -343,6 +345,7 @@ pub async fn search(id: &str, query: &str, source: &str, offset: usize, area: Op
         "spigot" => spiget_search(query, offset).await,
         "curseforge" | "bukkit" => cf_search(&meta, query, offset).await,
         "github" => gh_search(&meta, query, offset).await,
+        "geysermc" => Ok(geyser_search(&meta, query, offset)),
         _ => bail!("Unknown source: {source}"),
     }
 }
@@ -368,6 +371,10 @@ async fn install_into(meta: &ServerMeta, folder: &Path, pid: &str, version_id: O
     } else if let Some(cid) = pid.strip_prefix("cf:") {
         cf_install(meta, folder, cid, version_id, idx, task).await
     } else if pid.starts_with(github::PREFIX) || pid.starts_with("geysermc:") {
+        // Geyser and Floodgate for Fabric need Fabric API.
+        if pid.starts_with("geysermc:") && geyser_platform(meta).ok() == Some("fabric") && !idx.values().any(|e| e.project_id == FABRIC_API) {
+            mr_install(meta, folder, FABRIC_API, None, idx, task).await?;
+        }
         task.update(format!("Installing {}…", pid.rsplit([':', '/']).next().unwrap_or(pid)), None);
         let r = resolve(meta, pid, version_id.as_deref()).await?;
         let dest = safe_join(folder, &r.filename)?;
@@ -1113,6 +1120,37 @@ struct GeyserBuild {
     time: String,
     #[serde(default)]
     downloads: HashMap<String, GeyserDownload>,
+}
+
+/// GeyserMC's own downloads as search results: Geyser and Floodgate (Modrinth lists Geyser as a mod and doesn't
+/// have Floodgate's plugin build, so a plugin search there misses them).
+fn geyser_search(meta: &ServerMeta, query: &str, offset: usize) -> ServerAddonResult {
+    if offset > 0 || geyser_platform(meta).is_err() {
+        return ServerAddonResult { hits: Vec::new(), total: 0 };
+    }
+    let q = query.trim().to_lowercase();
+    let wanted = |words: &[&str]| q.is_empty() || words.iter().any(|w| w.contains(q.as_str()) || q.contains(w));
+    let mut hits = Vec::new();
+    for (project, words, about) in [
+        ("geyser", &["geyser", "bedrock", "crossplay"][..], "Lets Bedrock Edition players join this Java server."),
+        ("floodgate", &["floodgate", "bedrock", "geyser"][..], "Lets Bedrock players join with no Java account (works with Geyser)."),
+    ] {
+        if wanted(words) {
+            hits.push(ServerAddonHit {
+                id: format!("geysermc:{project}"),
+                url: format!("https://geysermc.org/download?project={project}"),
+                title: geyser_title(project).to_string(),
+                description: about.to_string(),
+                icon_url: Some(geyser_icon(project).to_string()),
+                author: "GeyserMC".into(),
+                downloads: 0,
+                stars: None,
+                source: "geysermc",
+                external: false,
+            });
+        }
+    }
+    ServerAddonResult { total: hits.len() as u64, hits }
 }
 
 /// The newest build of "geyser" or "floodgate".

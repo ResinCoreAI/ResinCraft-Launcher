@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, Check, CheckCircle2, ChevronRight, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
+import { AlertTriangle, Ban, Check, CheckCircle2, ChevronRight, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
 import type { AccountView, Instance } from '@shared/types'
+import { api } from '../api'
 import { useInstanceTask, useStore } from '../store'
 import { t, tx } from '../i18n'
 
@@ -883,6 +884,25 @@ function TaskBar({ progress }: { progress?: number | null }) {
   )
 }
 
+/** The dock's Cancel: stops the task (once; the engine reports "cancelled" when it has). */
+function CancelTask({ id }: { id: string }) {
+  const [asked, setAsked] = useState(false)
+  return (
+    <button
+      className="task-cancel"
+      disabled={asked}
+      title={t('app.task.cancel')}
+      aria-label={t('app.task.cancel')}
+      onClick={() => {
+        setAsked(true)
+        void api.app.cancelTask(id).catch(() => setAsked(false))
+      }}
+    >
+      {asked ? <Loader2 className="spin" size={13} /> : <X size={14} />}
+    </button>
+  )
+}
+
 export function Dock() {
   const { tasks, toasts, dismiss } = useStore()
   const icons = { success: <CheckCircle2 />, error: <AlertTriangle />, info: <Info /> }
@@ -895,14 +915,21 @@ export function Dock() {
               <AlertTriangle style={{ color: 'var(--danger)' }} />
             ) : task.state === 'done' ? (
               <CheckCircle2 className="pop" style={{ color: 'var(--success)' }} />
+            ) : task.state === 'cancelled' ? (
+              <Ban className="faint" />
             ) : (
               <Loader2 className="spin" />
             )}
             <span className="grow ellipsis">{tx(task.titleText, task.title)}</span>
             {task.progress != null && task.state === 'running' && <span className="faint">{Math.round(task.progress * 100)}%</span>}
+            {task.state === 'running' && task.cancellable && <CancelTask id={task.id} />}
           </div>
           <div className="detail ellipsis">
-            {task.state === 'error' ? tx(task.errorText, task.error) : tx(task.detailText, task.detail) || t('common.working')}
+            {task.state === 'error'
+              ? tx(task.errorText, task.error)
+              : task.state === 'cancelled'
+                ? t('app.task.cancelled')
+                : tx(task.detailText, task.detail) || t('common.working')}
           </div>
           {task.state === 'running' && <TaskBar progress={task.progress} />}
         </div>

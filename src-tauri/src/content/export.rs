@@ -304,7 +304,7 @@ async fn build_curseforge(inst: &Instance, opts: &ExportOptions, files: Vec<Loca
 pub async fn export_modpack(instance_id: &str, opts: ExportOptions, dest: &Path) -> Result<ExportResult> {
     let inst = instances::get(instance_id).await?;
     let dest = dest.to_path_buf();
-    Task::run(tr!("export.exporting", "Exporting {name}", name = opts.name), Some(instance_id.to_string()), move |task| async move {
+    Task::run_to_end(tr!("export.exporting", "Exporting {name}", name = opts.name), Some(instance_id.to_string()), move |task| async move {
         task.update(tr!("export.readingMods", "Reading mods…"), None);
         let i2 = inst.clone();
         let (files, skipped_disabled) = tokio::task::spawn_blocking(move || content_files(&i2)).await??;

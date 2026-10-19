@@ -310,7 +310,7 @@ pub struct TaskInfo {
     pub detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub progress: Option<f64>,
-    /// "running" | "done" | "error"
+    /// "running" | "done" | "error" | "cancelled"
     pub state: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -323,6 +323,9 @@ pub struct TaskInfo {
     pub detail_text: Option<Text>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_text: Option<Text>,
+    /// The dock offers Cancel.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cancellable: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

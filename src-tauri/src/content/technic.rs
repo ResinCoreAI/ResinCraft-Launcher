@@ -13,7 +13,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::dupes::dedupe_pack;
-use super::index::{discard_instance, extract_where, lenient_u64, lenient_u64_zero, natural_cmp, open_zip, safe_name, Zip};
+use super::index::{discard_instance, extract_where, lenient_u64, lenient_u64_zero, natural_cmp, open_zip, safe_name, InstanceGuard, Zip};
 use crate::core::events::Task;
 use crate::core::instances;
 use crate::core::net::{download_all, fetch_json, DownloadItem, Hash};
@@ -394,6 +394,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             i.modpack = Some(modpack);
         })
         .await?;
+        let guard = InstanceGuard::new(&inst.id);
         let dir = paths::game_dir(&inst.id);
         task.update(tr!("technic.unpacking", "Unpacking modpack…"), None);
         let unpacked = tokio::task::spawn_blocking(move || -> Result<()> {
@@ -412,6 +413,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         }
         // Two of the pack's zips may carry the same mod; Technic lists none of them as such.
         dedupe_pack(&inst, &task, &[]).await;
+        guard.keep();
         instances::get(&inst.id).await
     })
     .await;

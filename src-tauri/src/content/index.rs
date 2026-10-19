@@ -225,6 +225,27 @@ pub async fn discard_instance(id: &str) {
     let _ = tokio::fs::remove_dir_all(paths::instance_dir(id)).await;
 }
 
+/// Removes a half-installed modpack instance when its install is cancelled (the work is dropped, so the install's
+/// own error handling never runs). `keep` once the instance is complete.
+pub struct InstanceGuard(Option<String>);
+
+impl InstanceGuard {
+    pub fn new(id: &str) -> InstanceGuard {
+        InstanceGuard(Some(id.to_string()))
+    }
+    pub fn keep(mut self) {
+        self.0 = None;
+    }
+}
+
+impl Drop for InstanceGuard {
+    fn drop(&mut self) {
+        if let Some(id) = self.0.take() {
+            tokio::spawn(async move { discard_instance(&id).await });
+        }
+    }
+}
+
 /// A file name from remote data, refused if it would escape its folder.
 pub fn safe_name<'a>(name: &'a str) -> Result<&'a str> {
     if name.is_empty() || name.contains(['/', '\\']) || name == "." || name == ".." {

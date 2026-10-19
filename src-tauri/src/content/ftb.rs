@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::dupes::dedupe_pack;
-use super::index::{discard_instance, iso_from_secs, parse_loader, safe_name};
+use super::index::{discard_instance, iso_from_secs, parse_loader, safe_name, InstanceGuard};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
@@ -234,6 +234,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             i.modpack = Some(modpack);
         })
         .await?;
+        let guard = InstanceGuard::new(&inst.id);
         let result: Result<Instance> = async {
             let dir = paths::game_dir(&inst.id);
             let mut items = Vec::new();
@@ -271,6 +272,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             instances::get(&inst.id).await
         }
         .await;
+        guard.keep();
         if result.is_err() {
             discard_instance(&inst.id).await;
         }

@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::dupes::dedupe_pack;
-use super::index::{discard_instance, encode_uri, extract_where, iso_from_secs, lenient_u64, open_zip, safe_name};
+use super::index::{discard_instance, encode_uri, extract_where, iso_from_secs, lenient_u64, open_zip, safe_name, InstanceGuard};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
@@ -329,6 +329,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             i.modpack = Some(modpack);
         })
         .await?;
+        let guard = InstanceGuard::new(&inst.id);
         let tmp = paths::instance_dir(&inst.id).join(".atl-download");
         let result: Result<Instance> = async {
             let dir = paths::game_dir(&inst.id);
@@ -392,6 +393,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             instances::get(&inst.id).await
         }
         .await;
+        guard.keep();
         if result.is_err() {
             discard_instance(&inst.id).await;
         }

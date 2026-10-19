@@ -12,8 +12,7 @@ use serde_json::{json, Value};
 
 use super::dupes::{dedupe_pack, dep_facts, skipped_text, Guard, ModFacts};
 use super::index::{
-    discard_instance, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, parse_date_ms, read_zip_text, remove_project_files,
-    safe_name, save_index, ContentIndex, IndexEntry,
+    discard_instance, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, parse_date_ms, read_zip_text, remove_project_files, safe_name, save_index, ContentIndex, IndexEntry, InstanceGuard,
 };
 use super::jarmeta::RemoteFile;
 use crate::core::ctx::http;
@@ -826,6 +825,7 @@ pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance
             i.modpack = Some(modpack);
         })
         .await?;
+        let guard = InstanceGuard::new(&inst.id);
         let result: Result<Instance> = async {
             let pending = fill_pack(&inst, &manifest, &archive, &task).await?;
             if !pending.is_empty() {
@@ -834,6 +834,7 @@ pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance
             instances::get(&inst.id).await
         }
         .await;
+        guard.keep();
         if result.is_err() {
             discard_instance(&inst.id).await;
         }

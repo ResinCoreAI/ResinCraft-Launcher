@@ -10,6 +10,7 @@ pub mod github;
 pub mod index;
 pub mod jarmeta;
 pub mod links;
+pub mod lists;
 pub mod modrinth;
 pub mod sources;
 pub mod technic;
@@ -36,6 +37,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             sources::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?, args.get(3)?).await?;
             done()
         }
+        "content:exportList" => json(lists::export_list(&args.get::<String>(0)?, args.get::<ContentKind>(1)?).await?),
+        "content:importList" => json(lists::import_list(&args.get::<String>(0)?, args.get::<ContentKind>(1)?, args.get(2)?).await?),
         "content:installFromLink" => {
             links::install_link(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?).await?;
             done()

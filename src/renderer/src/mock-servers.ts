@@ -335,9 +335,9 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
   const sourcesOf = (id: string, area?: string): AddonSource[] => {
     const type = find(id).type
     if (type === 'vanilla' || type === 'bedrock') return []
-    if (PLUGIN_TYPES.includes(type)) return ['modrinth', 'hangar', 'spigot', 'bukkit', 'github']
-    if (type === 'arclight' && area !== 'mods') return ['modrinth', 'spigot', 'bukkit', 'github']
-    return ['modrinth', 'curseforge', 'github']
+    if (PLUGIN_TYPES.includes(type)) return ['modrinth', 'hangar', 'spigot', 'bukkit', 'github', 'geysermc']
+    if (type === 'arclight' && area !== 'mods') return ['modrinth', 'spigot', 'bukkit', 'github', 'geysermc']
+    return type === 'forge' ? ['modrinth', 'curseforge', 'github'] : ['modrinth', 'curseforge', 'github', 'geysermc']
   }
   const listOf = (area?: string) => (area === 'mods' ? modAddons : addons)
   const setList = (area: string | undefined, f: (l: ServerAddon[]) => ServerAddon[]) => {
@@ -360,6 +360,15 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
                 ? ['26.3', '26.2', '26.1.2', '1.21.11', '1.21.8', '1.21.4']
                 : ['1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20.4', '1.20.1', '1.19.4', '1.18.2']
       ),
+    // The preview asks Modrinth itself (its API allows that from a browser).
+    softwareIcons: async () => {
+      try {
+        const tags = (await (await fetch('https://api.modrinth.com/v2/tag/loader')).json()) as { name: string; icon: string }[]
+        return Object.fromEntries(tags.filter((t) => t.icon?.trim().startsWith('<svg')).map((t) => [t.name, t.icon]))
+      } catch {
+        return {}
+      }
+    },
     builds: (type, mc) =>
       wait(
         type !== 'arclight'
@@ -546,6 +555,30 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     addonSources: async (id, area) => sourcesOf(id, area),
     addons: (_id, area) => wait(listOf(area)),
     addonSearch: (_id, _q, source, offset = 0, area) => {
+      if (source === 'geysermc') {
+        const q = _q.trim().toLowerCase()
+        const geyser: ServerAddonHit[] = [
+          {
+            id: 'geysermc:geyser',
+            title: 'Geyser',
+            description: 'Lets Bedrock Edition players join this Java server.',
+            author: 'GeyserMC',
+            downloads: 0,
+            source,
+            url: 'https://geysermc.org/download'
+          },
+          {
+            id: 'geysermc:floodgate',
+            title: 'Floodgate',
+            description: 'Lets Bedrock players join with no Java account (works with Geyser).',
+            author: 'GeyserMC',
+            downloads: 0,
+            source,
+            url: 'https://geysermc.org/download'
+          }
+        ].filter((h) => !q || ['geyser', 'floodgate', 'bedrock'].some((w) => w.includes(q) || q.includes(w)))
+        return wait({ hits: offset > 0 ? [] : geyser, total: geyser.length }, 200)
+      }
       const mods = area === 'mods' || ['fabric', 'quilt', 'forge', 'neoforge'].includes(find(_id).type)
       const page = mods
         ? [

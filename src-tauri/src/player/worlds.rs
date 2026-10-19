@@ -197,7 +197,7 @@ pub async fn backup_world(id: &str, folder: &str) -> Result<String> {
     let backups = game_subdir(id, "backups").await?;
     let target = backups.join(unique_name(&backups, &format!("{}_{folder}", stamp()), ".zip").await);
     let folder = folder.to_string();
-    Task::run(tr!("worlds.backingUp", "Backing up {folder}", folder = folder), Some(id.to_string()), |t| async move {
+    Task::run_to_end(tr!("worlds.backingUp", "Backing up {folder}", folder = folder), Some(id.to_string()), |t| async move {
         t.update(tr!("worlds.compressing", "Compressing files…"), None);
         let tmp = PathBuf::from(format!("{}.part", target.display()));
         let (tmp2, t2) = (tmp.clone(), t.clone());
@@ -279,7 +279,7 @@ pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
         .collect();
     let zp = zip_path.to_path_buf();
 
-    Task::run(tr!("worlds.importing", "Importing {folder}", folder = folder), Some(id.to_string()), |t| async move {
+    Task::run_to_end(tr!("worlds.importing", "Importing {folder}", folder = folder), Some(id.to_string()), |t| async move {
         tokio::fs::create_dir(&dest).await?;
         let d = dest.clone();
         let res = tokio::task::spawn_blocking(move || -> Result<()> {

@@ -132,6 +132,89 @@
 }
 
 /* ---------- Create ---------- */
+/* Software tiles: the logo beside the name and description. */
+.sv-type:has(.sv-logo) {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+.sv-type-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sv-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 1px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.sv-logo svg {
+  width: 17px;
+  height: 17px;
+}
+.sv-logo-mask {
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+}
+.sv-type:hover .sv-logo {
+  color: var(--text);
+}
+.sv-type.on .sv-logo {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-logo {
+    transition: none;
+  }
+}
+
+/* Create a server, page 2: the software picked on page 1. */
+.sv-picked {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sv-picked .sv-type {
+  flex: 1;
+  pointer-events: none;
+}
+.sv-type .sv-type-go {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.sv-type:hover .sv-type-go,
+.sv-type:focus-visible .sv-type-go {
+  opacity: 0.7;
+  transform: translateX(2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-type .sv-type-go {
+    transition: none;
+  }
+}
 .sv-types {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

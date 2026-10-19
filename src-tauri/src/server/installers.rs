@@ -114,6 +114,26 @@ pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
     Ok(list)
 }
 
+/// Server software logos: Modrinth's loader icons (SVG), by loader name. Fetched once per run; empty when offline
+/// (the UI has its own icons then).
+pub async fn software_icons() -> HashMap<String, String> {
+    static ICONS: tokio::sync::OnceCell<HashMap<String, String>> = tokio::sync::OnceCell::const_new();
+    #[derive(Deserialize)]
+    struct Tag {
+        name: String,
+        #[serde(default)]
+        icon: String,
+    }
+    let wanted = ["vanilla", "paper", "purpur", "folia", "spigot", "fabric", "quilt", "forge", "neoforge", "geyser"];
+    let got = ICONS
+        .get_or_try_init(|| async {
+            let tags: Vec<Tag> = fetch_json("https://api.modrinth.com/v2/tag/loader").await?;
+            Ok::<_, anyhow::Error>(tags.into_iter().filter(|t| wanted.contains(&t.name.as_str()) && t.icon.trim_start().starts_with("<svg")).map(|t| (t.name, t.icon)).collect())
+        })
+        .await;
+    got.cloned().unwrap_or_default()
+}
+
 /// The builds a server type offers for a Minecraft version, when there's a choice to make: Arclight comes for
 /// Forge, NeoForge or Fabric. Empty for the other types (they take the newest build).
 pub async fn builds(kind: ServerKind, mc: &str) -> Result<Vec<ServerBuild>> {

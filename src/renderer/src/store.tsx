@@ -64,6 +64,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), [])
   const toast = useCallback(
     (text: string, kind: Toast['kind'] = 'success') => {
+      // A cancelled task already says so in the dock; its "Cancelled" error (alone, or after "{title}: ") needs no
+      // second message.
+      const cancelled = t('engine.task.cancelled')
+      if (kind === 'error' && (text === cancelled || text.endsWith(`: ${cancelled}`) || text.endsWith(`：${cancelled}`))) return
       const id = ++toastId.current
       setToasts((t) => [...t.slice(-3), { id, kind, text }])
       setTimeout(() => dismiss(id), kind === 'error' ? 9000 : 4000)

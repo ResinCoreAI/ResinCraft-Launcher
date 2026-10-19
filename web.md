@@ -266,6 +266,8 @@ Status labels: **[0.2.0]** is in the published v0.2.0. **[next]** is built or be
 - **Kinds:** mods, modpacks, resource packs and shaders, filtered to the instance's game version and loader.
 - **Versions and installing:** install the newest or **pick any version**; tick several to install them together; switch versions later, newer or older; dependencies are added automatically.
 - **Mod management:** update checks for Modrinth and CurseForge mods; toggle mods on and off; mods dropped in by hand are recognised; downloads are checked against the sites' published hashes.
+- **Lists** `[next]`: export an instance's mods, resource packs or shaders as a list file, and install everything on a list into another instance (the same versions when the game and loader match).
+- **Cancel** `[next]`: every download and install can be cancelled from its card; a half-installed modpack is removed.
 - **Modpacks:** import Modrinth `.mrpack`, CurseForge, FTB, ATLauncher and Technic packs; **export** an instance as `.mrpack` or a CurseForge `.zip`.
 - Files a CurseForge author doesn't allow other launchers to download are listed with a link and the folder they belong in.
 - **Mod loaders:** Fabric, Quilt, Forge and NeoForge.

@@ -145,6 +145,7 @@ export function mockApi(): ResinApi {
         }),
       openExternal: async (u) => void window.open(u),
       setTitleBar: async () => {},
+      cancelTask: async (id) => mockEngine.cancelTask(id),
       showItem: async () => {},
       pathForFile: (f: File) => f.name
     },
@@ -265,6 +266,10 @@ export function mockApi(): ResinApi {
           }))
         ),
       install: () => wait(undefined, 800),
+      exportList: (_i, kind) =>
+        wait(`C:\\Users\\you\\Downloads\\cozy-survival ${kind === 'mod' ? 'mods' : kind === 'shader' ? 'shaders' : 'resource-packs'}.json`, 500),
+      importList: (_i, kind) =>
+        wait({ kind, installed: ['Sodium', 'Lithium', 'Iris Shaders'], skipped: ['Fabric API'], missing: ['handmade-test'], failed: [] }, 1500),
       installFromLink: async (_i, url) => {
         await wait(undefined, 900)
         if (!/^https?:\/\//.test(url)) throw new Error("That isn't a web address")
@@ -281,7 +286,10 @@ export function mockApi(): ResinApi {
         ),
       update: () => wait(undefined, 500),
       changeVersion: () => wait(undefined, 700),
-      installModpack: () => wait(instances[0], 1000),
+      installModpack: async () => {
+        await mockEngine.download({ key: 'modpack.installing', text: 'Installing TerraFirmaGreg-Modern', params: { name: 'TerraFirmaGreg-Modern' } })
+        return instances[0]
+      },
       importModpack: async () => null,
       importModpackFile: () => wait(instances[0], 900),
       exportPreview: () =>

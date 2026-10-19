@@ -99,7 +99,10 @@ export default function AddonBrowser({
 
   /** One page from every usable site, interleaved; `fresh` starts over. */
   const searchAll = async (fresh: boolean): Promise<{ hits: ServerAddonHit[]; failed: Partial<Record<AddonSource, string>> }> => {
-    const from = usable.filter((s) => fresh || (cursor.current[s] && cursor.current[s]!.next < cursor.current[s]!.total))
+    // GeyserMC's own downloads (Geyser, Floodgate) lead: they're the official copies.
+    const from = usable
+      .filter((s) => fresh || (cursor.current[s] && cursor.current[s]!.next < cursor.current[s]!.total))
+      .sort((a, b) => Number(b === 'geysermc') - Number(a === 'geysermc'))
     const settled = await Promise.allSettled(from.map((s) => api.server.addonSearch(server.id, query, s, fresh ? 0 : (cursor.current[s]?.next ?? 0), area)))
     const lists: ServerAddonHit[][] = []
     const why: Partial<Record<AddonSource, string>> = {}
@@ -285,11 +288,11 @@ export default function AddonBrowser({
                         <span title={t('servers.addons.stars')}>
                           <Star /> {compact(h.stars)}
                         </span>
-                      ) : (
+                      ) : h.downloads > 0 ? (
                         <span>
                           <Download /> {compact(h.downloads)}
                         </span>
-                      )}
+                      ) : null}
                       <span className={`sv-src ${h.source}`}>{ADDON_SOURCE_LABEL[h.source]}</span>
                       {h.also && (
                         <span className="faint">{t('servers.addons.alsoOn', { sources: h.also.map((a) => ADDON_SOURCE_LABEL[a.source]).join(', ') })}</span>

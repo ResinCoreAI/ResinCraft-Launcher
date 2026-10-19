@@ -1974,6 +1974,26 @@ button.stat b {
   font: 500 12px var(--mono);
   color: var(--data);
 }
+.task .top .task-cancel {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -3px -4px -3px 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+}
+.task .top .task-cancel svg {
+  color: inherit;
+}
+.task .top .task-cancel:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.task .top .task-cancel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .task .detail {
   font-size: 12px;
   color: var(--text-dim);

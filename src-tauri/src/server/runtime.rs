@@ -1143,7 +1143,7 @@ pub async fn backup(id: &str) -> Result<String> {
         let stamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
         let target = backups.join(unique_name(&backups, &format!("{stamp}_{level}"), ".zip").await);
         let t2 = target.clone();
-        Task::run(format!("Backing up {}", meta.name), Some(id.to_string()), |t| async move {
+        Task::run_to_end(format!("Backing up {}", meta.name), Some(id.to_string()), |t| async move {
             t.update("Compressing the world…", None);
             zip_worlds(dir, vec![world], t2).await
         })
@@ -1171,7 +1171,7 @@ pub async fn backup(id: &str) -> Result<String> {
     let stamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     let target = backups.join(unique_name(&backups, &format!("{stamp}_{level}"), ".zip").await);
 
-    let result = Task::run(format!("Backing up {}", meta.name), Some(id.to_string()), |t| {
+    let result = Task::run_to_end(format!("Backing up {}", meta.name), Some(id.to_string()), |t| {
         let (dir, target) = (dir.clone(), target.clone());
         async move {
             t.update("Compressing the world…", None);

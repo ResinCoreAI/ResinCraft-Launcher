@@ -9,7 +9,10 @@ import {
   Clock,
   Copy,
   Eraser,
+  FileDown,
+  FileUp,
   FolderOpen,
+  ListChecks,
   Gamepad2,
   Image,
   Loader2,
@@ -32,7 +35,7 @@ import { api } from '../api'
 import { ConfirmModal, Empty, fromKeyboard, InstanceTile, openContextMenu, PlayButton, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useStore } from '../store'
 import { bytes, COLORS, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
-import { t } from '../i18n'
+import { engineError, t } from '../i18n'
 import ExportModal from '../components/ExportModal'
 import { BannerPicker, IconPicker } from '../components/ImagePicker'
 import VersionPicker from '../components/VersionPicker'
@@ -173,6 +176,7 @@ function ContentTab({ inst }: { inst: Instance }) {
   const [items, setItems] = useState<ContentItem[]>()
   const [q, setQ] = useState('')
   const [checking, setChecking] = useState(false)
+  const [listing, setListing] = useState(false)
   const [updating, setUpdating] = useState<string>()
   const [removing, setRemoving] = useState<ContentItem[]>()
   const [changingVersion, setChangingVersion] = useState<ContentItem>()
@@ -230,6 +234,35 @@ function ContentTab({ inst }: { inst: Instance }) {
         : t('instance.content.updatedMany', { count: list.length })
     )
     await load()
+  }
+
+  /** Saves what's in this tab as a list file. */
+  const exportList = async () => {
+    try {
+      const path = await api.content.exportList(inst.id, kind)
+      if (path) toast(t('instance.content.list.saved', { file: path.split(/[\\/]/).pop() ?? path }))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
+  /** Installs everything a list file names that isn't here yet. */
+  const importList = async () => {
+    setListing(true)
+    try {
+      const r = await api.content.importList(inst.id, kind)
+      if (!r) return
+      const done = t('instance.content.list.result', { count: r.installed.length })
+      toast(r.skipped.length ? `${done} · ${t('instance.content.list.skipped', { count: r.skipped.length })}` : done, r.failed.length ? 'info' : 'success')
+      if (r.missing.length) toast(t('instance.content.list.missing', { count: r.missing.length, names: r.missing.slice(0, 6).join(', ') }), 'info')
+      for (const f of r.failed.slice(0, 3)) toast(t('instance.content.updateFailed', { name: f.title, error: engineError(f.error).message }), 'error')
+      if (r.kind && r.kind !== kind && KINDS.includes(r.kind as Kind)) setKind(r.kind as Kind)
+      else await load()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setListing(false)
+    }
   }
 
   const nameOf = (m: ContentItem) => m.title ?? m.filename.replace(/\.(jar|zip)(\.disabled)?$/, '')
@@ -290,14 +323,24 @@ function ContentTab({ inst }: { inst: Instance }) {
     const page = one && projectUrl(one.projectId)
     return [
       one
-        ? { label: t(one.enabled ? 'instance.content.disable' : 'instance.content.enable'), icon: one.enabled ? <ToggleLeft /> : <ToggleRight />, onSelect: () => void setEnabled([one], !one.enabled) }
+        ? {
+            label: t(one.enabled ? 'instance.content.disable' : 'instance.content.enable'),
+            icon: one.enabled ? <ToggleLeft /> : <ToggleRight />,
+            onSelect: () => void setEnabled([one], !one.enabled)
+          }
         : null,
-      !one && off.length ? { label: t('menu.content.enableMany', { count: off.length }), icon: <ToggleRight />, onSelect: () => void setEnabled(off, true) } : null,
-      !one && on.length ? { label: t('menu.content.disableMany', { count: on.length }), icon: <ToggleLeft />, onSelect: () => void setEnabled(on, false) } : null,
+      !one && off.length
+        ? { label: t('menu.content.enableMany', { count: off.length }), icon: <ToggleRight />, onSelect: () => void setEnabled(off, true) }
+        : null,
+      !one && on.length
+        ? { label: t('menu.content.disableMany', { count: on.length }), icon: <ToggleLeft />, onSelect: () => void setEnabled(on, false) }
+        : null,
       one?.projectId ? { label: t('menu.content.changeVersion'), icon: <Repeat />, onSelect: () => setChangingVersion(one) } : null,
       outdated.length
         ? {
-            label: one?.update ? t('instance.content.updateTo', { version: one.update.versionNumber }) : t('menu.content.updateMany', { count: outdated.length }),
+            label: one?.update
+              ? t('instance.content.updateTo', { version: one.update.versionNumber })
+              : t('menu.content.updateMany', { count: outdated.length }),
             icon: <ArrowUpCircle />,
             disabled: !!updating,
             onSelect: () => void update(outdated)
@@ -311,7 +354,8 @@ function ContentTab({ inst }: { inst: Instance }) {
         ? {
             label: t('files.showInExplorer'),
             icon: <FolderOpen />,
-            onSelect: () => void api.files.reveal({ kind: 'instance', id: inst.id }, `${KIND_FOLDER[kind]}/${one.filename}`).catch((e) => toast(e.message, 'error'))
+            onSelect: () =>
+              void api.files.reveal({ kind: 'instance', id: inst.id }, `${KIND_FOLDER[kind]}/${one.filename}`).catch((e) => toast(e.message, 'error'))
           }
         : { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id, KIND_FOLDER[kind]) },
       {
@@ -341,7 +385,11 @@ function ContentTab({ inst }: { inst: Instance }) {
     if (!fromKeyboard(e) || !list.length || (e.target as HTMLElement).closest('.list-row')) return
     e.preventDefault()
     const r = listRef.current?.querySelector('.list-row.selected')?.getBoundingClientRect()
-    openContextMenu({ x: (r?.left ?? e.clientX) + 36, y: r?.bottom ?? e.clientY, keyboard: true, origin: listRef.current }, menuFor(list), list.length > 1 ? t('menu.selected', { count: list.length }) : undefined)
+    openContextMenu(
+      { x: (r?.left ?? e.clientX) + 36, y: r?.bottom ?? e.clientY, keyboard: true, origin: listRef.current },
+      menuFor(list),
+      list.length > 1 ? t('menu.selected', { count: list.length }) : undefined
+    )
   }
 
   const onListKey = (e: React.KeyboardEvent) => {
@@ -378,6 +426,19 @@ function ContentTab({ inst }: { inst: Instance }) {
         )}
         <button className="btn icon" title={t('common.openFolder')} onClick={() => void api.instances.openFolder(inst.id, KIND_FOLDER[kind])}>
           <FolderOpen />
+        </button>
+        <button
+          className="btn"
+          disabled={listing || (kind === 'mod' && inst.loader === 'vanilla')}
+          aria-haspopup="menu"
+          onClick={(e) =>
+            openContextMenu(e, [
+              { label: t('instance.content.list.export'), icon: <FileDown />, disabled: !items?.length, onSelect: () => void exportList() },
+              { label: t('instance.content.list.import'), icon: <FileUp />, onSelect: () => void importList() }
+            ])
+          }
+        >
+          {listing ? <Loader2 className="spin" /> : <ListChecks />} {t('instance.content.list.menu')} <ChevronDown />
         </button>
         <button
           className="btn primary"
@@ -471,7 +532,11 @@ function ContentTab({ inst }: { inst: Instance }) {
           ))}
         </div>
       )}
-      {selected.size > 1 && <p className="hint" style={{ marginTop: 8 }}>{t('menu.selected', { count: selected.size })}</p>}
+      {selected.size > 1 && (
+        <p className="hint" style={{ marginTop: 8 }}>
+          {t('menu.selected', { count: selected.size })}
+        </p>
+      )}
 
       {changingVersion?.projectId && (
         <VersionPicker

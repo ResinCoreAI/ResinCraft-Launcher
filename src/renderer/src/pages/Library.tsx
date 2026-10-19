@@ -30,7 +30,19 @@ import type { Instance, InstancePatch } from '@shared/types'
 import { api } from '../api'
 import ExportModal from '../components/ExportModal'
 import { packDupesNote } from '../components/DuplicatesDialog'
-import { celebrate, ConfirmModal, Empty, InstanceTile, Modal, MoreButton, openContextMenu, tilt, useCopy, type ContextEntry, type ContextItem } from '../components/ui'
+import {
+  celebrate,
+  ConfirmModal,
+  Empty,
+  InstanceTile,
+  Modal,
+  MoreButton,
+  openContextMenu,
+  tilt,
+  useCopy,
+  type ContextEntry,
+  type ContextItem
+} from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
 import { COLOR_NAMES, COLORS, describe, hasCustomIcon, instancePath, playtime } from '../util'
 import { t } from '../i18n'
@@ -89,14 +101,16 @@ export default function Library() {
     return list.sort(cmp[sort])
   }, [instances, q, sort, order])
 
-  // Groups: Ungrouped first, then the saved groups in order. Headers appear once any group exists.
+  // Groups in the player's order, Ungrouped ('') among them wherever it was put. Headers appear once any group exists.
   const grouped = names.length > 0
+  const ungroupedAt = useUngroupedAt()
+  const sectionOrder = useMemo(() => withUngrouped(names, ungroupedAt), [names, ungroupedAt])
   const sections = useMemo(() => {
     const byGroup = (g: string) => shown.filter((i) => (i.group?.trim() ?? '') === g)
-    const all: [string, Instance[]][] = [['', byGroup('')], ...names.map((g): [string, Instance[]] => [g, byGroup(g)])]
+    const all: [string, Instance[]][] = sectionOrder.map((g): [string, Instance[]] => [g, byGroup(g)])
     // While searching, only show groups with matches; otherwise keep empty groups visible as drop targets.
     return all.filter(([g, list]) => list.length > 0 || (!q && (g !== '' || !!drag)))
-  }, [shown, names, q, drag])
+  }, [shown, sectionOrder, q, drag])
 
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const toggle = (name: string) =>
@@ -205,18 +219,17 @@ export default function Library() {
       const name = el?.dataset.group
       if (el === null || el === undefined || name === undefined) return setGroupDrag((g) => (g ? { ...g, over: null } : g))
       const r = el.getBoundingClientRect()
-      // Ungrouped stays first: hovering it means "before the first group".
-      const after = name === '' ? false : e.clientY > r.top + r.height / 2
-      setGroupDrag((g) => (g ? { ...g, over: name === '' ? (names[0] ?? null) : name, after: name === '' ? false : after } : g))
+      const after = e.clientY > r.top + r.height / 2
+      setGroupDrag((g) => (g ? { ...g, over: name, after } : g))
     }
     const up = () => {
       const g = groupDragRef.current
       setGroupDrag(null)
       if (!g || g.over === null || g.over === g.name) return
-      const list = names.filter((n) => n !== g.name)
+      const list = sectionOrder.filter((n) => n !== g.name)
       const at = list.indexOf(g.over)
       list.splice(at < 0 ? list.length : at + (g.after ? 1 : 0), 0, g.name)
-      setSavedGroups(list)
+      setGroupOrder(list)
     }
     const key = (e: KeyboardEvent) => e.key === 'Escape' && setGroupDrag(null)
     window.addEventListener('pointermove', move)
@@ -343,8 +356,8 @@ export default function Library() {
                   count={list.length}
                   collapsed={collapsed.has(name)}
                   onToggle={() => toggle(name)}
-                  order={names}
-                  onGripDown={name ? () => setGroupDrag({ name, over: null, after: false }) : undefined}
+                  order={sectionOrder}
+                  onGripDown={() => setGroupDrag({ name, over: null, after: false })}
                 />
                 <Collapsible open={!collapsed.has(name)}>
                   {list.length > 0 ? <div className="grid">{list.map(card)}</div> : <div className="group-empty">{t('library.group.empty')}</div>}
@@ -572,7 +585,12 @@ export function useInstanceMenu(inst: Instance) {
     return [
       state === 'running'
         ? { label: t('common.stop'), icon: <Square />, onSelect: () => void stop(inst.id) }
-        : { label: t(state === 'preparing' ? 'common.preparing' : 'common.play'), icon: <Play />, disabled: state === 'preparing', onSelect: () => void play(inst.id) },
+        : {
+            label: t(state === 'preparing' ? 'common.preparing' : 'common.play'),
+            icon: <Play />,
+            disabled: state === 'preparing',
+            onSelect: () => void play(inst.id)
+          },
       { label: t('menu.open'), icon: <ArrowUpRight />, shortcut: 'Enter', onSelect: () => go({ page: 'instance', id: inst.id }) },
       { label: t('menu.instance.settings'), icon: <Settings2 />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
       '-',
@@ -782,6 +800,45 @@ function setSavedGroups(next: string[]) {
   groupListeners.forEach((f) => f())
 }
 
+// Where Ungrouped sits among the groups (it isn't a group, so it has no place in the saved list).
+const UNGROUPED_AT_KEY = 'resincraft.library.ungroupedAt'
+let ungroupedAt: number = (() => {
+  try {
+    const n = Number(localStorage.getItem(UNGROUPED_AT_KEY) ?? 0)
+    return Number.isInteger(n) && n >= 0 ? n : 0
+  } catch {
+    return 0
+  }
+})()
+
+function useUngroupedAt(): number {
+  return useSyncExternalStore(
+    (cb) => {
+      groupListeners.add(cb)
+      return () => groupListeners.delete(cb)
+    },
+    () => ungroupedAt
+  )
+}
+
+/** The section order: the groups, with Ungrouped ('') at its place. */
+function withUngrouped(names: string[], at: number): string[] {
+  const list = [...names]
+  list.splice(Math.min(at, list.length), 0, '')
+  return list
+}
+
+/** Saves a new section order (groups and Ungrouped). */
+function setGroupOrder(list: string[]) {
+  ungroupedAt = Math.max(0, list.indexOf(''))
+  try {
+    localStorage.setItem(UNGROUPED_AT_KEY, String(ungroupedAt))
+  } catch {
+    // storage unavailable
+  }
+  setSavedGroups(list.filter((g) => g !== ''))
+}
+
 function addSavedGroup(name: string) {
   const n = name.trim()
   if (n && !savedGroups.includes(n)) setSavedGroups([...savedGroups, n])
@@ -826,7 +883,7 @@ function GroupHeader({
   count: number
   collapsed: boolean
   onToggle: () => void
-  /** Every group, in their current order (for Move up / Move down). */
+  /** Every section, Ungrouped ('') included, in their current order (for Move up / Move down). */
   order: string[]
   onGripDown?: () => void
 }) {
@@ -839,13 +896,13 @@ function GroupHeader({
     const list = [...order]
     list.splice(at, 1)
     list.splice(at + by, 0, name)
-    setSavedGroups(list)
+    setGroupOrder(list)
   }
   const items = (): ContextEntry[] => [
     { label: t(collapsed ? 'menu.group.expand' : 'menu.group.collapse'), icon: <ChevronRight />, onSelect: onToggle },
-    name ? '-' : null,
-    name ? { label: t('library.group.moveUp'), icon: <ArrowUp />, disabled: at <= 0, onSelect: () => shift(-1) } : null,
-    name ? { label: t('library.group.moveDown'), icon: <ArrowDown />, disabled: at < 0 || at >= order.length - 1, onSelect: () => shift(1) } : null,
+    '-',
+    { label: t('library.group.moveUp'), icon: <ArrowUp />, disabled: at <= 0, onSelect: () => shift(-1) },
+    { label: t('library.group.moveDown'), icon: <ArrowDown />, disabled: at < 0 || at >= order.length - 1, onSelect: () => shift(1) },
     name ? '-' : null,
     name ? { label: t('library.group.rename'), icon: <Pencil />, onSelect: () => setRenaming(true) } : null,
     name ? { label: t('library.group.remove'), icon: <Trash2 />, danger: true, onSelect: () => setRemoving(true) } : null
@@ -879,7 +936,7 @@ function GroupHeader({
         <span className="group-count">{count}</span>
       </button>
       <span className="group-line" />
-      {name && <MoreButton items={items} className="card-more" />}
+      <MoreButton items={items} className="card-more" />
       {renaming && (
         <NameModal
           title={t('library.group.rename')}

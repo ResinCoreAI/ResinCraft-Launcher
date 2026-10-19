@@ -30,7 +30,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
-      KEEP_RELEASE_JSON_UNTIL: '0.3.1'
+      # 0.3.1 came out just before 0.4.0, so 0.3.0 copies that skipped it still need this address.
+      KEEP_RELEASE_JSON_UNTIL: '0.4.0'
     steps:
       - name: Copy latest.json to the updates branch
         run: |

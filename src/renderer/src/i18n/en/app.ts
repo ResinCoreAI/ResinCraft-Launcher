@@ -3,6 +3,8 @@ export default {
   'nav.home': 'Home',
   'nav.library': 'Library',
   'nav.bedrock': 'Bedrock',
+  'app.task.cancel': 'Cancel',
+  'app.task.cancelled': 'Cancelled',
   'nav.discover': 'Discover',
   'nav.accounts': 'Accounts',
   'nav.settings': 'Settings',

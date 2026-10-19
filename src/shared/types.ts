@@ -228,19 +228,33 @@ export interface AppInfo {
   curseforge: boolean
 }
 
+/** What installing a content list did. */
+export interface ListImport {
+  /** The list's kind (a list of shaders installs shaders, whatever tab it was opened from). */
+  kind?: ContentKind
+  installed: string[]
+  /** Already in the instance. */
+  skipped: string[]
+  /** Added by hand where the list came from: nothing to download them from. */
+  missing: string[]
+  failed: { title: string; error: unknown }[]
+}
+
 export interface TaskInfo {
   id: string
   title: string
   detail?: string
   /** 0..1, or undefined for indeterminate. */
   progress?: number
-  state: 'running' | 'done' | 'error'
+  state: 'running' | 'done' | 'error' | 'cancelled'
   error?: string
   instanceId?: string
   /** `title`, `detail` and `error` in a form the UI can translate (absent for plain text). */
   titleText?: EngineText
   detailText?: EngineText
   errorText?: EngineText
+  /** The dock offers Cancel (downloads and installs; not zip work that can't stop halfway). */
+  cancellable?: boolean
 }
 
 export interface GameEvent {
@@ -811,6 +825,8 @@ export interface ResinApi {
     /** Absolute path of a file dropped onto the window (synchronous, preload-side). */
     pathForFile(file: File): string
     setTitleBar(bg: string, fg: string): Promise<void>
+    /** Stops a running task: its downloads stop and anything half-made is removed. False if it already ended. */
+    cancelTask(id: string): Promise<boolean>
   }
   settings: {
     get(): Promise<Settings>
@@ -882,6 +898,10 @@ export interface ResinApi {
     install(instanceId: string, projectId: string, kind: ContentKind, versionId?: string): Promise<void>
     /** Installs what a link points to (a Modrinth, CurseForge or GitHub page, or a .jar) into an instance. */
     installFromLink(instanceId: string, url: string, kind: ContentKind): Promise<void>
+    /** Saves the instance's mods (or resource packs, or shaders) as a list file; null if the dialog was cancelled. */
+    exportList(instanceId: string, kind: ContentKind): Promise<string | null>
+    /** Installs a list file (asks for it without `path`); null if the dialog was cancelled. */
+    importList(instanceId: string, kind: ContentKind, path?: string): Promise<ListImport | null>
     /** Which picks are the same mod from two sites, and which the instance already has from another site. */
     duplicates(instanceId: string, picks: ModPick[]): Promise<DuplicateCheck>
     /** Installs picks in one task, each from its own site, after moving `replace` to the Recycle Bin. */
@@ -938,6 +958,8 @@ export interface ResinApi {
     get(id: string): Promise<ServerInfo>
     /** Minecraft versions a type has its own list of (Paper, Leaf, Arclight… and Bedrock's server versions). */
     versions(type: ServerKind): Promise<string[]>
+    /** Server software logos (SVG markup) by loader name, from Modrinth; empty when offline. */
+    softwareIcons(): Promise<Record<string, string>>
     /** Builds to choose from for a type and version (Arclight: per mod loader); empty for the others. */
     builds(type: ServerKind, mcVersion: string): Promise<ServerBuild[]>
     create(data: NewServer): Promise<ServerCreated>

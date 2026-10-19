@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Blocks, FileArchive, Layers, Loader2, Package, Search, Server } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Blocks, ChevronLeft, ChevronRight, Combine, FileArchive, FlaskConical, Layers, Leaf, Loader2, Package, Search, Server, Smartphone } from 'lucide-react'
 import type {
   ContentSource,
   Instance,
@@ -37,6 +37,59 @@ export const SERVER_LABEL: Record<ServerKind, string> = {
 
 /** A tile in the picker: a server type, or "snapshot" (a vanilla server on a snapshot). */
 type Pick = ServerKind | 'snapshot'
+
+/** Logos: Modrinth's loader icons where there is one, else one of ours. */
+const MODRINTH_ICON: Partial<Record<Pick, string>> = {
+  vanilla: 'vanilla',
+  paper: 'paper',
+  purpur: 'purpur',
+  folia: 'folia',
+  spigot: 'spigot',
+  fabric: 'fabric',
+  quilt: 'quilt',
+  forge: 'forge',
+  neoforge: 'neoforge'
+}
+const OWN_ICON: Partial<Record<Pick, ReactNode>> = {
+  snapshot: <FlaskConical />,
+  leaf: <Leaf />,
+  arclight: <Combine />,
+  bedrock: <Smartphone />
+}
+let iconCache: Promise<Record<string, string>> | undefined
+
+/** Modrinth's icons as CSS masks (so they take the tile's colour), loaded once. */
+function useSoftwareIcons(): Record<string, string> {
+  const [icons, setIcons] = useState<Record<string, string>>({})
+  useEffect(() => {
+    iconCache ??= api.server.softwareIcons().catch(() => ({}))
+    let live = true
+    void iconCache.then((raw) => {
+      if (!live) return
+      const masks: Record<string, string> = {}
+      for (const [name, svg] of Object.entries(raw)) {
+        // As an image, an SVG needs its namespaces declared; some of these leave them out.
+        let full = svg.includes('xmlns=') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+        if (full.includes('xlink:') && !full.includes('xmlns:xlink')) full = full.replace('<svg', '<svg xmlns:xlink="http://www.w3.org/1999/xlink"')
+        masks[name] = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(full)}")`
+      }
+      setIcons(masks)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+  return icons
+}
+
+function SoftwareLogo({ kind, icons }: { kind: Pick; icons: Record<string, string> }) {
+  const mask = MODRINTH_ICON[kind] && icons[MODRINTH_ICON[kind]!]
+  return (
+    <span className="sv-logo" aria-hidden>
+      {mask ? <span className="sv-logo-mask" style={{ maskImage: mask, WebkitMaskImage: mask }} /> : (OWN_ICON[kind] ?? <Server />)}
+    </span>
+  )
+}
 const pickLabel = (k: Pick) => (k === 'snapshot' ? 'Snapshot' : SERVER_LABEL[k])
 
 const GROUPS: { title: Key; types: Pick[] }[] = [
@@ -73,7 +126,9 @@ export default function NewServerModal({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
-  // Server software
+  // Server software: first the software (tiles), then its versions.
+  const [step, setStep] = useState<'pick' | 'details'>('pick')
+  const icons = useSoftwareIcons()
   const [kind, setKind] = useState<Pick>('paper')
   const serverKind: ServerKind = kind === 'snapshot' ? 'vanilla' : kind
   const [versions, setVersions] = useState<string[]>()
@@ -240,49 +295,104 @@ export default function NewServerModal({
       footer={
         <>
           {busy && <span className="hint grow">{t('servers.create.working')}</span>}
-          <button className="btn ghost" onClick={onClose}>
-            {t('common.cancel')}
-          </button>
-          <button className="btn primary" disabled={!ready || busy} onClick={create}>
-            {busy && <Loader2 className="spin" />} {mode === 'file' ? t('servers.create.chooseAndCreate') : t('servers.create.create')}
-          </button>
+          {mode === 'software' && step === 'pick' ? (
+            <>
+              <span className="hint grow">{t('servers.create.pickHint')}</span>
+              <button className="btn ghost" onClick={onClose}>
+                {t('common.cancel')}
+              </button>
+            </>
+          ) : (
+            <>
+              {mode === 'software' ? (
+                <button className="btn ghost" disabled={busy} onClick={() => setStep('pick')}>
+                  <ChevronLeft /> {t('common.back')}
+                </button>
+              ) : (
+                <button className="btn ghost" onClick={onClose}>
+                  {t('common.cancel')}
+                </button>
+              )}
+              <button className="btn primary" disabled={!ready || busy} onClick={create}>
+                {busy && <Loader2 className="spin" />} {mode === 'file' ? t('servers.create.chooseAndCreate') : t('servers.create.create')}
+              </button>
+            </>
+          )}
         </>
       }
     >
-      <Segmented<Mode>
-        value={mode}
-        onChange={(m) => {
-          setMode(m)
-          setError(undefined)
-        }}
-        options={[
-          { value: 'software', label: t('servers.create.mode.software') },
-          { value: 'modpack', label: t('servers.create.mode.modpack') },
-          { value: 'instance', label: t('servers.create.mode.instance') },
-          { value: 'file', label: t('servers.create.mode.file') }
-        ]}
-      />
+      {!(mode === 'software' && step === 'details') && (
+        <Segmented<Mode>
+          value={mode}
+          onChange={(m) => {
+            setMode(m)
+            setError(undefined)
+          }}
+          options={[
+            { value: 'software', label: t('servers.create.mode.software') },
+            { value: 'modpack', label: t('servers.create.mode.modpack') },
+            { value: 'instance', label: t('servers.create.mode.instance') },
+            { value: 'file', label: t('servers.create.mode.file') }
+          ]}
+        />
+      )}
 
-      <div className="field">
-        <label htmlFor="srv-name">{t('servers.create.name')}</label>
-        <input id="srv-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
-
-      {mode === 'software' && (
-        <>
+      {mode === 'software' && step === 'pick' && (
+        <div className="sv-pick-page">
           {GROUPS.map((g) => (
             <div className="field" key={g.title}>
               <label>{t(g.title)}</label>
               <div className="sv-types">
                 {g.types.map((k) => (
-                  <button key={k} className={`sv-type ${k === kind ? 'on' : ''}`} onClick={() => setKind(k)}>
-                    <b>{pickLabel(k)}</b>
-                    <span>{t(`servers.type.${k}` as Key)}</span>
+                  <button
+                    key={k}
+                    className={`sv-type ${k === kind ? 'on' : ''}`}
+                    onClick={() => {
+                      setKind(k)
+                      setFilter('')
+                      setError(undefined)
+                      setStep('details')
+                    }}
+                  >
+                    <SoftwareLogo kind={k} icons={icons} />
+                    <span className="sv-type-text">
+                      <b>
+                        {pickLabel(k)} <ChevronRight className="sv-type-go" />
+                      </b>
+                      <span>{t(`servers.type.${k}` as Key)}</span>
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {mode === 'software' && step === 'details' && (
+        <div className="sv-picked">
+          <div className="sv-type on static">
+            <SoftwareLogo kind={kind} icons={icons} />
+            <span className="sv-type-text">
+              <b>{pickLabel(kind)}</b>
+              <span>{t(`servers.type.${kind}` as Key)}</span>
+            </span>
+          </div>
+          <button className="btn sm" onClick={() => setStep('pick')}>
+            {t('servers.create.change')}
+          </button>
+        </div>
+      )}
+
+      {!(mode === 'software' && step === 'pick') && (
+        <div className="field">
+          <label htmlFor="srv-name">{t('servers.create.name')}</label>
+          <input id="srv-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+      )}
+
+      {mode === 'software' && step === 'details' && (
+        <>
           {kind === 'spigot' && <div className="callout">{t('servers.create.spigotSlow')}</div>}
           {(kind === 'forge' || kind === 'neoforge') && <div className="callout">{t('servers.create.forgeSlow')}</div>}
           {kind === 'snapshot' && <div className="callout">{t('servers.create.snapshotHint')}</div>}

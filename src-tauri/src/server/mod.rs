@@ -34,6 +34,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:get" => json(store::info(store::get(&args.get::<String>(0)?).await?).await),
         "server:versions" => json(installers::software_versions(args.get::<ServerKind>(0)?).await?),
+        "server:softwareIcons" => json(installers::software_icons().await),
         "server:builds" => json(installers::builds(args.get::<ServerKind>(0)?, &args.get::<String>(1)?).await?),
         "server:create" => json(create::create(args.get::<NewServer>(0)?).await?),
         "server:update" => {

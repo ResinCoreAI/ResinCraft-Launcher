@@ -42,6 +42,16 @@ export default {
   'instance.content.updatedMany': { one: 'Updated {count} mod', other: 'Updated {count} mods' },
   'instance.content.updateAll': 'Update all ({count})',
   'instance.content.checkUpdates': 'Check for updates',
+  'instance.content.list.menu': 'List',
+  'instance.content.list.export': 'Export list…',
+  'instance.content.list.import': 'Install from a list…',
+  'instance.content.list.saved': 'Saved the list as {file}',
+  'instance.content.list.result': { one: 'Installed {count} item from the list', other: 'Installed {count} items from the list' },
+  'instance.content.list.skipped': { one: '{count} was already here', other: '{count} were already here' },
+  'instance.content.list.missing': {
+    one: "{count} item on the list was added by hand, so it can't be downloaded: {names}",
+    other: "{count} items on the list were added by hand, so they can't be downloaded: {names}"
+  },
   'instance.content.updateTo': 'Update to {version}',
   'instance.content.changeVersion': 'Change version',
   'instance.content.version': 'Version',
