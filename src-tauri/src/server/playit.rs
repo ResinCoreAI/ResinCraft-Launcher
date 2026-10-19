@@ -17,7 +17,7 @@ use playit_agent_core::playit_agent::{PlayitAgent, PlayitAgentSettings};
 use playit_api_client::api::{
     AccountTunnelOriginCreate, AgentOrigin, AgentRunDataV1, AgentTunnelAttr, AgentTunnelConfig, ApiError, ApiErrorNoFail,
     ApiResponseError, ClaimAgentType, ClaimSetupError, ClaimSetupResponse, ReqClaimExchange, ReqClaimSetup, ReqTunnelsConfigV1,
-    ReqTunnelsCreateV1, TunnelPortDetails, TunnelType,
+    AssignedAgentCreate, PortType, ReqTunnelsCreate, ReqTunnelsCreateV1, TunnelOriginCreate, TunnelPortDetails, TunnelType,
 };
 use playit_api_client::PlayitApi;
 use serde::{Deserialize, Serialize};
@@ -196,6 +196,48 @@ fn local_port(data: &AgentRunDataV1, tunnel: uuid::Uuid) -> Option<u16> {
     t.agent_config.fields.iter().find(|f| f.name == "local_port").and_then(|f| f.value.parse().ok())
 }
 
+/// Creates a tunnel for this agent. playit.gg has changed what its create call accepts (the v1 call answered
+/// "failed to parse body" from October 2026), so each request shape it has offered is tried in turn: the v1 call,
+/// then the older call with the game's tunnel type, then a plain TCP / UDP tunnel, which the game works through too.
+/// When all are refused, the error lists every answer.
+async fn create_tunnel(api: &PlayitApi, agent_id: uuid::Uuid, port: u16, bedrock: bool, label: &str) -> Result<uuid::Uuid> {
+    let game = if bedrock { TunnelType::MinecraftBedrock } else { TunnelType::MinecraftJava };
+    let port_type = if bedrock { PortType::Udp } else { PortType::Tcp };
+    let mut refused: Vec<String> = Vec::new();
+
+    let v1 = ReqTunnelsCreateV1 {
+        ports: TunnelPortDetails::TunnelType(game),
+        origin: AccountTunnelOriginCreate::Agent(AgentOrigin { agent_id: Some(agent_id), config: tunnel_config(port) }),
+        enabled: true,
+        alloc: None,
+        name: Some(label.to_string()),
+        firewall_id: None,
+    };
+    match api.v1_tunnels_create(v1).await {
+        Ok(c) => return Ok(c.id),
+        Err(e) => refused.push(format!("v1: {e}")),
+    }
+    let older = |tunnel_type: Option<TunnelType>| ReqTunnelsCreate {
+        name: Some(label.to_string()),
+        tunnel_type,
+        port_type,
+        port_count: 1,
+        origin: TunnelOriginCreate::Agent(AssignedAgentCreate { agent_id, local_ip: std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST), local_port: Some(port) }),
+        enabled: true,
+        alloc: None,
+        firewall_id: None,
+        proxy_protocol: None,
+    };
+    for (what, tunnel_type) in [("game", Some(game)), ("plain", None)] {
+        match api.tunnels_create(older(tunnel_type)).await {
+            Ok(c) => return Ok(c.id),
+            Err(e) => refused.push(format!("{what}: {e}")),
+        }
+    }
+    eprintln!("[playit] every tunnel request was refused: {}", refused.join(" | "));
+    bail!("playit.gg didn't create a tunnel ({})", refused.join("; "))
+}
+
 /// Shares the server listening on `port` through playit.gg and returns its public address. `bedrock` makes a
 /// Bedrock (UDP) tunnel instead of a Java one. `id` keys the saved tunnel: the server's id, or "<id>#bedrock" for
 /// Geyser next to a Java server.
@@ -228,18 +270,10 @@ pub async fn open(
             }
             None => {
                 let label: String = format!("ResinCraft {name}").chars().filter(|c| c.is_ascii_graphic() || *c == ' ').take(40).collect();
-                let req = ReqTunnelsCreateV1 {
-                    ports: TunnelPortDetails::TunnelType(if bedrock { TunnelType::MinecraftBedrock } else { TunnelType::MinecraftJava }),
-                    origin: AccountTunnelOriginCreate::Agent(AgentOrigin { agent_id: Some(agent_id), config: tunnel_config(port) }),
-                    enabled: true,
-                    alloc: None,
-                    name: Some(label.trim().to_string()),
-                    firewall_id: None,
-                };
-                let created = api.v1_tunnels_create(req).await.map_err(|e| anyhow!("playit.gg didn't create a tunnel: {e}"))?;
-                saved.tunnels.insert(id.to_string(), created.id.to_string());
+                let created = create_tunnel(&api, agent_id, port, bedrock, label.trim()).await?;
+                saved.tunnels.insert(id.to_string(), created.to_string());
                 save(&saved).await?;
-                created.id
+                created
             }
         };
         // A new tunnel takes a moment to get its address.
