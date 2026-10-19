@@ -398,6 +398,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
         ...(data.type === 'bedrock' ? { launch: { exe: 'bedrock_server.exe' } } : {}),
         createdAt: Date.now(),
         eulaAccepted: false,
+        tunnel: 'playit',
         ...(data.source ? { modpack: { name: data.name || 'Modpack' } } : {})
       }
       await wait(null, 1500)

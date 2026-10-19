@@ -297,7 +297,7 @@ Status labels: **[0.2.0]** is in the published v0.2.0. **[next]** is built or be
 - **Optimised startup flags** (Aikar's G1GC set), on by default. The full command is visible in Settings.
 - **Friends joining over the internet ("How friends connect"):**
   - **Automatic:** first the router (UPnP, which opens the port and closes it again when the server stops), then **playit.gg** if it's linked, and the **bore.pub** relay as a last resort. Without a playit link, the server card suggests linking it. (In v0.1.0 Automatic was router → bore.pub.)
-  - **playit.gg:** a free address that never changes, once linked to a free (even guest) playit account.
+  - **playit.gg:** a free address that never changes, once linked to a free (even guest) playit account. New servers start on playit.gg `[next]`; Automatic and the other ways are a click away in the server's Settings.
   - **Relay:** bore.pub, or the player's own bore relay.
   - **"Port forwarded myself"** mode, for people who set up their router by hand.
 - **Your own domain:**

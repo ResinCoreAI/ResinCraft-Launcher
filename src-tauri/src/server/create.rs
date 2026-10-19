@@ -18,7 +18,7 @@ use crate::core::net::{download_all, download_file, fetch_json, hash_file, post_
 use crate::core::settings::{self, total_memory_mb};
 use crate::core::types::{
     source_of, ContentSource, Instance, LoaderType, ModpackRef, NewServer, PendingDownload, ServerCreated, ServerKind, ServerLaunch, ServerMeta,
-    ServerSource,
+    ServerSource, TunnelMode,
 };
 use crate::core::{instances, paths, shell};
 
@@ -91,7 +91,8 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         launch: ServerLaunch::default(),
         public: true,
         optimized_flags: true,
-        tunnel: Default::default(),
+        // New servers share through playit.gg: an address that never changes, with no router setup.
+        tunnel: TunnelMode::Playit,
         relay_host: None,
         relay_secret: None,
         domain: None,
