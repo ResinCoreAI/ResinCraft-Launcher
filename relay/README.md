@@ -7,7 +7,8 @@ They install nothing, and the host forwards no ports.
  Minecraft ──TCP 25565──▶ ResinCraft Relay (server) ◀──TLS 7000 (yamux)── ResinCraft Launcher ──▶ local server
  "smp.rscraft.resincore.tech"  reads the handshake,       one connection,      on the host's PC
                                routes by name             a stream per player
-                               admin dashboard: HTTPS 7443
+                               admin dashboard: https://rscraft.resincore.tech/admin
+ Minecraft Bedrock ──UDP 19200-19299──▶ (one port per Bedrock server, datagrams framed on a stream)
 ```
 
 - **Players** connect to port 25565. The relay reads the Minecraft handshake (the server address the player
@@ -38,13 +39,14 @@ Either way you need:
 | DNS record | Type | Value | Notes |
 |---|---|---|---|
 | `*.rscraft.resincore.tech` | A (+ AAAA) | server IP | **DNS only** (grey cloud on Cloudflare): players' raw Minecraft traffic |
-| `rscraft.resincore.tech` | A (+ AAAA) | server IP | **DNS only**: the launcher (7000) and the dashboard (7443); the certificate's name. The wildcard doesn't cover the bare name |
+| `rscraft.resincore.tech` | A (+ AAAA) | server IP | **DNS only**: the launcher (7000) and the dashboard (443, `/admin`); the certificate's name. The wildcard doesn't cover the bare name |
 
 | Port | For | Firewall |
 |---|---|---|
 | TCP 25565 | Players | open |
 | TCP 7000 | Launchers (TLS) | open |
-| TCP 7443 | Admin dashboard (HTTPS) | open, or closed if it listens on 127.0.0.1 |
+| UDP 19200-19299 | Bedrock players (`bedrock_ports`) | open |
+| TCP 443 | Admin dashboard (HTTPS, `/admin`) | open, or closed if it listens on 127.0.0.1 |
 | TCP 7001 | /healthz, /metrics, bearer-token admin API | closed (127.0.0.1 only) |
 
 And the launcher build has to know the relay (in `keys.local.env` or the release build's environment):
@@ -123,7 +125,8 @@ sudo RENEWED_LINEAGE=/etc/letsencrypt/live/rscraft.resincore.tech /etc/letsencry
 ```bash
 sudo ufw allow 25565/tcp
 sudo ufw allow 7000/tcp
-sudo ufw allow 7443/tcp      # unless the dashboard listens on 127.0.0.1
+sudo ufw allow 443/tcp       # unless the dashboard listens on 127.0.0.1
+sudo ufw allow 19200:19299/udp  # Bedrock servers
 ```
 
 ### Docker
@@ -141,7 +144,7 @@ docker compose up -d
 docker compose logs -f
 ```
 
-Compose publishes 25565, 7000 and 7443, and the local admin port on the host's 127.0.0.1 only. Point the certbot
+Compose publishes 25565, 7000, 443 and the Bedrock range (UDP), and the local admin port on the host's 127.0.0.1 only. Point the certbot
 deploy hook's `DEST` at `config/tls` (with `OWNER=65532`).
 
 ### systemd
@@ -160,9 +163,9 @@ journalctl -u resincraft-relay -f
 
 ## The admin dashboard
 
-Open `https://rscraft.resincore.tech:7443` and sign in with the admin password. If it listens on 127.0.0.1,
+Open `https://rscraft.resincore.tech/admin` and sign in with the admin password. If it listens on 127.0.0.1,
 forward it over SSH: `ssh -L 7443:127.0.0.1:7443 you@rscraft.resincore.tech`, then open
-`https://localhost:7443` (the browser will warn that the certificate is for rscraft.resincore.tech).
+`https://localhost:7443/admin` (the browser will warn that the certificate is for rscraft.resincore.tech).
 
 - **Service switch** (sidebar): **On**, **Paused** (no new tunnels; running ones finish their session) or **Off**
   (every tunnel closes now), with an optional message that launchers show. Kept across restarts.

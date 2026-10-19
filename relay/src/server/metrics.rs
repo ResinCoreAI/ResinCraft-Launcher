@@ -48,6 +48,8 @@ metrics! {
     rejected_banned_total: counter = "Connections refused because of a ban.",
     rejected_limit_total: counter = "Connections refused by a per-IP or global limit.",
     custom_domain_lookups_total: counter = "Handshakes routed through a CNAME lookup.",
+    bedrock_sessions_total: counter = "Bedrock players (UDP addresses) forwarded to a tunnel.",
+    bedrock_dropped_total: counter = "Bedrock packets dropped: not the start of a connection, a ban, a limit or no stream.",
     bytes_to_host_total: counter = "Bytes forwarded from players to hosts.",
     bytes_to_player_total: counter = "Bytes forwarded from hosts to players.",
     agent_connections_active: gauge = "Launchers connected to the agent port.",

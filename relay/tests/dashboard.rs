@@ -181,7 +181,14 @@ async fn sign_in_csrf_and_sessions() {
     let relay = start("auth", vec![]).await;
     let d = relay.dash;
 
-    let page = call(d, "GET", "/", &[], None).await;
+    // It lives at /admin/: the bare addresses send the browser there.
+    for bare in ["/", "/admin"] {
+        let moved = call(d, "GET", bare, &[], None).await;
+        assert_eq!((moved.status, moved.headers["location"].as_str()), (308, "/admin/"), "{bare}");
+    }
+    assert_eq!(call(d, "GET", "/admin/app.js", &[], None).await.status, 200);
+    assert_eq!(call(d, "GET", "/admin/api/tunnels", &[], None).await.status, 401);
+    let page = call(d, "GET", "/admin/", &[], None).await;
     assert_eq!(page.status, 200);
     assert!(page.headers["content-security-policy"].contains("script-src 'self'"));
     assert_eq!(page.headers["x-frame-options"], "DENY");

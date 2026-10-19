@@ -1102,7 +1102,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': '토큰 삭제',
   'servers.domain.tokenHelp': '"Edit zone DNS" 템플릿(Zone → DNS → Edit)으로 토큰을 만드세요. 이 컴퓨터에 암호화되어 저장됩니다.',
   'servers.domain.tokenCreate': 'API 토큰 만들기',
-  'servers.settings.tunnelHint.auto': "ResinCraft는 먼저 공유기에 포트를 열어 달라고 요청해요(UPnP, 가장 빠름). 안 되면 연결해 둔 경우 playit.gg를, 그다음 Microsoft 계정으로 로그인했다면 ResinCraft Relay(2시간 세션, 연장 가능)를, 마지막으로 시작할 때마다 주소가 바뀌는 무료 bore 릴레이를 사용해요.",
+  'servers.settings.tunnelHint.auto': "Microsoft 계정에 로그인되어 있으면 먼저 ResinCraft Relay(바뀌지 않는 주소)를, 다음으로 연결해 둔 playit.gg를, 그다음 라우터(UPnP)를, 그래도 안 되면 시작할 때마다 주소가 바뀌는 무료 bore 릴레이를 사용합니다.",
   'servers.connect.playitHint': '바뀌지 않는 주소를 원하면 playit.gg를 연결하세요(설정 → 친구 접속 방식).',
 
   // Server plugin manager

@@ -1098,7 +1098,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': '删除令牌',
   'servers.domain.tokenHelp': '请用“Edit zone DNS”模板（Zone → DNS → Edit）创建令牌。令牌会加密保存在这台电脑上。',
   'servers.domain.tokenCreate': '创建 API 令牌',
-  'servers.settings.tunnelHint.auto': "ResinCraft 会先请路由器打开端口（UPnP，最快）。不行的话，若已关联则使用 playit.gg，再在登录 Microsoft 账户时使用 ResinCraft Relay（每次 2 小时，可续期），最后使用免费的 bore 中继（每次启动地址都会变）。",
+  'servers.settings.tunnelHint.auto': "登录了 Microsoft 账号时先用 ResinCraft Relay（地址永不改变），然后是已关联的 playit.gg，再是路由器（UPnP），都不行就用免费的 bore 中继，其地址每次启动都会变化。",
   'servers.connect.playitHint': '关联 playit.gg（设置 → 朋友的连接方式），即可获得永不改变的地址。',
 
   // Server plugin manager

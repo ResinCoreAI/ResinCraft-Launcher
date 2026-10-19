@@ -1100,7 +1100,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': 'ลบโทเค็น',
   'servers.domain.tokenHelp': 'สร้างโทเค็นจากเทมเพลต "Edit zone DNS" (Zone → DNS → Edit) โทเค็นจะถูกเก็บแบบเข้ารหัสในคอมพิวเตอร์เครื่องนี้',
   'servers.domain.tokenCreate': 'สร้างโทเค็น API',
-  'servers.settings.tunnelHint.auto': "ResinCraft จะขอให้เราเตอร์เปิดพอร์ตก่อน (UPnP) ซึ่งเร็วที่สุด ถ้าไม่ได้ จะใช้ playit.gg เมื่อคุณเชื่อมต่อแล้ว ต่อด้วย ResinCraft Relay เมื่อลงชื่อเข้าใช้บัญชี Microsoft (เซสชันละ 2 ชั่วโมง ต่อเวลาได้) สุดท้ายคือรีเลย์ bore ฟรี ซึ่งที่อยู่จะเปลี่ยนทุกครั้งที่เริ่ม",
+  'servers.settings.tunnelHint.auto': "ใช้ ResinCraft Relay ก่อนเมื่อลงชื่อเข้าใช้บัญชี Microsoft (ที่อยู่ไม่เปลี่ยนเลย) ต่อด้วย playit.gg เมื่อเชื่อมต่อแล้ว ต่อด้วยเราเตอร์ (UPnP) สุดท้ายคือรีเลย์ bore ฟรี ซึ่งที่อยู่จะเปลี่ยนทุกครั้งที่เริ่ม",
   'servers.connect.playitHint': 'เชื่อม playit.gg (การตั้งค่า → วิธีที่เพื่อนเชื่อมต่อ) เพื่อให้ได้ที่อยู่ที่ไม่เปลี่ยนเลย',
 
   // Server plugin manager

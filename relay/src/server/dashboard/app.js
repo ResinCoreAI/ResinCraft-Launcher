@@ -75,7 +75,7 @@ function toast(text, bad) {
 
 async function api(path, body) {
   const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': state.csrf || '' }, body: JSON.stringify(body) }
-  const r = await fetch(path, { credentials: 'same-origin', ...opts })
+  const r = await fetch(`/admin${path}`, { credentials: 'same-origin', ...opts })
   const data = await r.json().catch(() => ({}))
   if (r.status === 401 && path !== '/api/login') {
     state.csrf = null
@@ -301,7 +301,7 @@ async function live() {
           h(
             'tr',
             {},
-            h('td', {}, h('span', { class: 'mono data' }, t.address)),
+            h('td', {}, h('span', { class: 'mono data' }, t.bedrockPort ? `${t.address}:${t.bedrockPort}` : t.address), t.bedrockPort ? h('div', { class: 'faint' }, 'Bedrock') : null),
             h('td', {}, h('div', {}, t.ownerName), h('div', { class: 'mono faint' }, t.owner)),
             h('td', { title: when(t.since) }, ago(t.since)),
             h('td', { class: 'num' }, h('span', { class: t.secsLeft != null && t.secsLeft <= 600 ? 'warn' : 'data' }, left(t.secsLeft)), t.continues ? h('div', { class: 'faint' }, `continued ×${t.continues}`) : null),

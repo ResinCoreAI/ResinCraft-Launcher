@@ -44,7 +44,7 @@ if (Get-ScheduledTask -TaskName 'ResinCraft Relay' -ErrorAction SilentlyContinue
 }
 
 Step 'Removing the firewall rules'
-foreach ($name in 'ResinCraftRelay-Players', 'ResinCraftRelay-Agent', 'ResinCraftRelay-Dashboard') {
+foreach ($name in 'ResinCraftRelay-Players', 'ResinCraftRelay-Agent', 'ResinCraftRelay-Bedrock', 'ResinCraftRelay-Dashboard') {
   if (Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue) {
     Remove-NetFirewallRule -Name $name
     Ok "Removed $name."

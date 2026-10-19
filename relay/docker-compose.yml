@@ -11,7 +11,8 @@ services:
     ports:
       - "25565:25565"          # players (Minecraft)
       - "7000:7000"            # launchers (TLS)
-      - "7443:7443"            # admin dashboard (HTTPS); drop this line to keep it unreachable from outside
+      - "443:443"              # admin dashboard (https://<base_domain>/admin); drop this line to keep it unreachable
+      - "19200-19299:19200-19299/udp"  # Bedrock servers (bedrock_ports)
       - "127.0.0.1:7001:7001"  # /healthz, /metrics (this machine only)
     volumes:
       - ./config:/etc/resincraft-relay   # relay.toml (set-admin-password writes into it) and tls/

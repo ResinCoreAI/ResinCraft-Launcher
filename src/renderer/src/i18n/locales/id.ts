@@ -1112,7 +1112,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': 'Hapus token',
   'servers.domain.tokenHelp': 'Buat token dari templat "Edit zone DNS" (Zone → DNS → Edit). Token disimpan terenkripsi di komputer ini.',
   'servers.domain.tokenCreate': 'Buat token API',
-  'servers.settings.tunnelHint.auto': "ResinCraft meminta router membuka port (UPnP), cara tercepat. Kalau tidak bisa, playit.gg dipakai setelah kamu menautkannya, lalu ResinCraft Relay jika akun Microsoft sudah masuk (sesi 2 jam yang bisa dilanjutkan), atau relay bore gratis yang alamatnya berubah setiap kali dimulai.",
+  'servers.settings.tunnelHint.auto': "Pertama ResinCraft Relay jika akun Microsoft sudah masuk (alamat yang tidak pernah berubah), lalu playit.gg setelah kamu menautkannya, lalu router kamu (UPnP), jika tidak relay bore gratis yang alamatnya berubah setiap kali dimulai.",
   'servers.connect.playitHint': 'Hubungkan playit.gg (Pengaturan → Cara teman terhubung) untuk alamat yang tidak pernah berubah.',
 
   // Server plugin manager

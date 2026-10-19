@@ -102,6 +102,9 @@ function Port-Of([string]$pattern, [int]$fallback) {
 }
 $playerPort = Port-Of '^\s*public_listen\s*=\s*\[\s*"[^"]*:(\d+)"' 25565
 $agentPort = Port-Of '^\s*agent_listen\s*=\s*\[\s*"[^"]*:(\d+)"' 7000
+# Bedrock servers' UDP ports ("19200-19299"; missing: the relay's default; "": none).
+$bedrockMatch = [regex]::Match($text, '(?m)^\s*bedrock_ports\s*=\s*"([^"]*)"')
+$bedrockPorts = if ($bedrockMatch.Success) { $bedrockMatch.Groups[1].Value.Trim() } else { '19200-19299' }
 $dashSection = [regex]::Match($text, '(?ms)^\s*\[dashboard\](.*?)(^\s*\[|\z)').Groups[1].Value
 $dashMatch = [regex]::Match($dashSection, '(?m)^\s*listen\s*=\s*"([^"]*):(\d+)"')
 $dashPort = if ($dashMatch.Success) { [int]$dashMatch.Groups[2].Value } else { $null }
@@ -148,6 +151,17 @@ foreach ($r in $rules) {
     New-NetFirewallRule -Name $r.Name -DisplayName $r.Display -Direction Inbound -Protocol TCP -LocalPort $r.Port -Action Allow -Profile Any | Out-Null
     Ok "$($r.Display): TCP $($r.Port)"
   }
+}
+if ($bedrockPorts) {
+  $existing = Get-NetFirewallRule -Name 'ResinCraftRelay-Bedrock' -ErrorAction SilentlyContinue
+  if ($existing) {
+    Set-NetFirewallRule -Name 'ResinCraftRelay-Bedrock' -LocalPort $bedrockPorts | Out-Null
+  } else {
+    New-NetFirewallRule -Name 'ResinCraftRelay-Bedrock' -DisplayName 'ResinCraft Relay: Bedrock players' -Direction Inbound -Protocol UDP -LocalPort $bedrockPorts -Action Allow -Profile Any | Out-Null
+  }
+  Ok "ResinCraft Relay: Bedrock players: UDP $bedrockPorts"
+} else {
+  Remove-NetFirewallRule -Name 'ResinCraftRelay-Bedrock' -ErrorAction SilentlyContinue
 }
 if ($dashPort -and -not $dashPublic) {
   Remove-NetFirewallRule -Name 'ResinCraftRelay-Dashboard' -ErrorAction SilentlyContinue
@@ -215,6 +229,7 @@ Write-Host ''
 Write-Host 'ResinCraft Relay' -ForegroundColor Green
 Write-Host "  Players join      <name>.$domain (port $playerPort)"
 Write-Host "  Launchers connect tls://$($domain):$agentPort"
-if ($dashPort) { Write-Host "  Admin dashboard   https://$($domain):$dashPort" }
+if ($bedrockPorts) { Write-Host "  Bedrock players   <name>.$domain, UDP port from $bedrockPorts" }
+if ($dashPort -eq 443) { Write-Host "  Admin dashboard   https://$domain/admin" } elseif ($dashPort) { Write-Host "  Admin dashboard   https://$($domain):$dashPort/admin" }
 Write-Host "  Folder            $InstallDir (relay.toml, data\, certs\, logs\)"
 Write-Host "  Service           Get-Service $ServiceName  |  Restart-Service $ServiceName"

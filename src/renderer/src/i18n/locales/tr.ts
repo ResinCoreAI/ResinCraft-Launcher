@@ -1122,7 +1122,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': 'Belirteci kaldır',
   'servers.domain.tokenHelp': '"Edit zone DNS" şablonundan (Zone → DNS → Edit) bir belirteç oluşturun. Bu bilgisayarda şifrelenmiş olarak saklanır.',
   'servers.domain.tokenCreate': 'API belirteci oluştur',
-  'servers.settings.tunnelHint.auto': "ResinCraft önce yönlendiriciden portu açmasını ister (UPnP), en hızlı yol. Olmazsa bağladıysan playit.gg'yi, ardından bir Microsoft hesabıyla giriş yaptıysan ResinCraft Relay'i (uzatabileceğin 2 saatlik oturumlar), en son da adresi her başlatmada değişen ücretsiz bore aktarıcısını kullanır.",
+  'servers.settings.tunnelHint.auto': "Önce bir Microsoft hesabı açıksa ResinCraft Relay (hiç değişmeyen bir adres), sonra bağladıysan playit.gg, sonra yönlendiricin (UPnP), olmazsa her başlatmada adresi değişen ücretsiz bore aktarıcısı kullanılır.",
   'servers.connect.playitHint': 'Hiç değişmeyen bir adres için playit.gg\'yi bağlayın (Ayarlar → Arkadaşlar nasıl bağlanır).',
 
   // Server plugin manager

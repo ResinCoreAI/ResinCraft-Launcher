@@ -14,6 +14,10 @@ pub struct Config {
     pub public_listen: Vec<String>,
     /// Where launchers connect.
     pub agent_listen: Vec<String>,
+    /// UDP ports handed to Bedrock servers, one per name online: "19200-19299". Empty: no Bedrock tunnels.
+    pub bedrock_ports: String,
+    /// The address those ports listen on.
+    pub bedrock_ip: String,
     /// /healthz, /metrics and the admin API. Keep it on localhost.
     pub admin_listen: Option<String>,
     /// Name reservations, sessions, bans and traffic counters.
@@ -140,6 +144,8 @@ impl Default for Config {
             base_domain: "rscraft.resincore.tech".into(),
             public_listen: vec!["0.0.0.0:25565".into()],
             agent_listen: vec!["0.0.0.0:7000".into()],
+            bedrock_ports: "19200-19299".into(),
+            bedrock_ip: "0.0.0.0".into(),
             admin_listen: Some("127.0.0.1:7001".into()),
             data_file: PathBuf::from("data/relay.json"),
             log_format: "text".into(),
@@ -219,6 +225,17 @@ impl LimitsConfig {
 }
 
 impl Config {
+    /// The Bedrock port range (None: switched off).
+    pub fn bedrock_range(&self) -> Option<std::ops::RangeInclusive<u16>> {
+        let text = self.bedrock_ports.trim();
+        if text.is_empty() {
+            return None;
+        }
+        let (a, b) = text.split_once('-').unwrap_or((text, text));
+        let (a, b) = (a.trim().parse::<u16>().ok()?, b.trim().parse::<u16>().ok()?);
+        (a > 0 && a <= b).then_some(a..=b)
+    }
+
     pub fn load(path: &Path) -> Result<Config> {
         let text = std::fs::read_to_string(path).with_context(|| format!("couldn't read {}", path.display()))?;
         let mut cfg: Config = toml::from_str(&text).with_context(|| format!("{} isn't valid", path.display()))?;
@@ -261,6 +278,12 @@ impl Config {
         if self.limits.session_minutes < 0.0 || self.limits.session_warn_minutes.iter().any(|m| *m < 0.0) {
             bail!("session_minutes and session_warn_minutes can't be negative");
         }
+        if !self.bedrock_ports.trim().is_empty() && self.bedrock_range().is_none() {
+            bail!("bedrock_ports must be a range like \"19200-19299\" (or \"\" for no Bedrock tunnels)");
+        }
+        if self.bedrock_ip.trim().parse::<std::net::IpAddr>().is_err() {
+            bail!("bedrock_ip must be an IP address like 0.0.0.0");
+        }
         if self.limits.tunnels_per_account == 0 || self.limits.names_per_account == 0 {
             bail!("tunnels_per_account and names_per_account must be at least 1");
         }
@@ -295,7 +318,8 @@ mod tests {
         assert_eq!(cfg.base_domain, "rscraft.resincore.tech");
         assert_eq!(cfg.limits.monthly_bytes(), 100_000_000_000);
         assert!(cfg.tls.is_some());
-        assert_eq!(cfg.dashboard.listen.as_deref(), Some("0.0.0.0:7443"));
+        assert_eq!(cfg.dashboard.listen.as_deref(), Some("0.0.0.0:443"));
+        assert_eq!(cfg.bedrock_range(), Some(19200..=19299));
     }
 
     #[test]
@@ -308,9 +332,10 @@ mod tests {
         assert_eq!(cfg.base_domain, "rscraft.resincore.tech");
         assert_eq!(cfg.data_file, dir.join("data/relay.json"));
         assert_eq!(cfg.log_file.as_deref(), Some(dir.join("logs/relay.log").as_path()));
+        assert_eq!(cfg.bedrock_range(), Some(19200..=19299));
         let tls = cfg.tls.unwrap();
         assert_eq!((tls.cert, tls.key), (dir.join("certs/relay-chain.pem"), dir.join("certs/relay-key.pem")));
-        assert_eq!(cfg.dashboard.listen.as_deref(), Some("0.0.0.0:7443"));
+        assert_eq!(cfg.dashboard.listen.as_deref(), Some("0.0.0.0:443"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -326,6 +351,15 @@ mod tests {
         assert!(open.validate().is_err());
         let mut local: Config = toml::from_str("[dashboard]\nlisten = \"127.0.0.1:7443\"").unwrap();
         assert!(local.validate().is_ok());
+        for bad in ["19300-19200", "abc", "0-10", "19200-70000"] {
+            let mut c: Config = toml::from_str(&format!("bedrock_ports = \"{bad}\"")).unwrap();
+            assert!(c.validate().is_err(), "{bad}");
+        }
+        let mut off: Config = toml::from_str("bedrock_ports = \"\"").unwrap();
+        assert!(off.validate().is_ok() && off.bedrock_range().is_none());
+        let mut one: Config = toml::from_str("bedrock_ports = \"19200\"").unwrap();
+        assert!(one.validate().is_ok() && one.bedrock_range() == Some(19200..=19200));
+        assert_eq!(Config::default().bedrock_range(), Some(19200..=19299));
         let mut bad_ip: Config = toml::from_str("[dashboard]\nallow_ips = [\"nope\"]").unwrap();
         assert!(bad_ip.validate().is_err());
     }

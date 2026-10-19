@@ -1157,7 +1157,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': 'Supprimer le jeton',
   'servers.domain.tokenHelp': 'Créez un jeton avec le modèle « Edit zone DNS » (Zone → DNS → Edit). Il est stocké chiffré sur cet ordinateur.',
   'servers.domain.tokenCreate': 'Créer un jeton d’API',
-  'servers.settings.tunnelHint.auto': "ResinCraft demande à votre routeur d’ouvrir le port (UPnP), le moyen le plus rapide. Sinon, playit.gg est utilisé une fois lié, puis ResinCraft Relay si un compte Microsoft est connecté (sessions de 2 heures prolongeables), et à défaut le relais gratuit bore, dont l’adresse change à chaque démarrage.",
+  'servers.settings.tunnelHint.auto': "D'abord ResinCraft Relay quand un compte Microsoft est connecté (une adresse qui ne change jamais), puis playit.gg une fois lié, puis ton routeur (UPnP), sinon le relais bore gratuit, dont l'adresse change à chaque démarrage.",
   'servers.connect.playitHint': 'Associez playit.gg (Réglages → Comment vos amis se connectent) pour une adresse qui ne change jamais.',
 
   // Server plugin manager

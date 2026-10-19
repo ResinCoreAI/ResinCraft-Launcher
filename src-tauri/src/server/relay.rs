@@ -101,6 +101,10 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ErrorCode::Paused => err_tr!("hostRelay.paused", "ResinCraft Relay is paused by its admin: {message}", message = admin_message(e)),
         ErrorCode::ServiceOff => err_tr!("hostRelay.off", "ResinCraft Relay is switched off by its admin: {message}", message = admin_message(e)),
         ErrorCode::SessionEnded => err_tr!("hostRelay.sessionEnded", "The ResinCraft Relay session ended."),
+        ErrorCode::BedrockUnavailable => err_tr!(
+            "hostRelay.noBedrock",
+            "ResinCraft Relay can't carry Bedrock servers right now (it has no free Bedrock ports, or hasn't been updated for them yet)."
+        ),
         // Rarer ones (the relay's admin kicked the server or released its name…): the relay's own words.
         _ => {
             let why = match e {
@@ -264,10 +268,34 @@ pub fn continue_session(id: &str) -> Result<()> {
     }
 }
 
+/// Brings the name online on `conn`: a Bedrock server gets a UDP port of its own on the relay.
+async fn go_online(conn: &mut Connection, name: &str, bedrock: bool) -> Result<resincraft_relay::agent::Online, AgentError> {
+    if bedrock {
+        conn.online_bedrock(name).await
+    } else {
+        conn.online(name).await
+    }
+}
+
+/// The address players type: "name.rscraft.resincore.tech", with the port for a Bedrock server.
+fn shown_address(address: &str, bedrock_port: Option<u16>) -> String {
+    match bedrock_port {
+        Some(port) => format!("{address}:{port}"),
+        None => address.to_string(),
+    }
+}
+
 /// Brings the server's name online (choosing one first if it has none) and keeps it online, reconnecting
 /// when the connection drops, until the task is aborted. With `wait_if_paused` (the server is set to ResinCraft
 /// Relay by hand), a paused or switched-off relay isn't an error: the task waits and comes back by itself.
-pub async fn open(id: &str, local_port: u16, wait_if_paused: bool, on_status: impl Fn(Status) + Send + Sync + 'static) -> Result<Opened> {
+/// `bedrock`: a Bedrock server (UDP), reached on its own port of the relay.
+pub async fn open(
+    id: &str,
+    local_port: u16,
+    wait_if_paused: bool,
+    bedrock: bool,
+    on_status: impl Fn(Status) + Send + Sync + 'static,
+) -> Result<Opened> {
     let s = settings().ok_or_else(not_configured)?;
     let meta = store::get(id).await?;
     let account = accounts::microsoft_account(meta.relay_account.as_deref()).await.ok_or_else(needs_microsoft)?;
@@ -280,7 +308,7 @@ pub async fn open(id: &str, local_port: u16, wait_if_paused: bool, on_status: im
         None => pick_name(&mut conn, &meta.name).await.map_err(|f| f.into_error(&wanted))?,
     };
     let address = proto::address(&name, &conn.base_domain);
-    let (online, paused) = match conn.online(&name).await {
+    let (online, paused) = match go_online(&mut conn, &name, bedrock).await {
         Ok(on) => (Some(on), None),
         Err(e) => match paused_of(&e).filter(|_| wait_if_paused) {
             Some(p) => {
@@ -345,12 +373,12 @@ pub async fn open(id: &str, local_port: u16, wait_if_paused: bool, on_status: im
                 tokio::time::sleep(Duration::from_secs(wait)).await;
                 let attempt = async {
                     let mut c = connect(&s, &account).await?;
-                    let on = c.online(&task_name).await.map_err(Failure::Relay)?;
+                    let on = go_online(&mut c, &task_name, bedrock).await.map_err(Failure::Relay)?;
                     Ok::<_, Failure>((c, on))
                 };
                 match attempt.await {
                     Ok((c, on)) => {
-                        on_status(Status::Online { address: on.address, usage: on.usage, secs_left: on.secs_left });
+                        on_status(Status::Online { address: shown_address(&on.address, on.bedrock_port), usage: on.usage, secs_left: on.secs_left });
                         current = Some(c);
                         break;
                     }
@@ -368,6 +396,7 @@ pub async fn open(id: &str, local_port: u16, wait_if_paused: bool, on_status: im
             }
         }
     });
+    let address = shown_address(&address, opened_online.as_ref().and_then(|o| o.bedrock_port));
     let (limits, usage, secs_left) = opened_online.map(|o| (o.limits, o.usage, o.secs_left)).unwrap_or_default();
     Ok(Opened { name, address, limits, usage, secs_left, paused, task })
 }

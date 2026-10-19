@@ -119,6 +119,7 @@ export default {
   'engine.hostRelay.nameReserved': '"{name}" is reserved. Pick another name.',
   'engine.hostRelay.nameTaken': '"{name}" belongs to another player. Pick another name.',
   'engine.hostRelay.needsMicrosoft': "ResinCraft Relay needs a Microsoft account that owns Minecraft. Sign in with Microsoft in Accounts (offline profiles can't use it).",
+  'engine.hostRelay.noBedrock': "ResinCraft Relay can't carry Bedrock servers right now (it has no free Bedrock ports, or hasn't been updated for them yet).",
   'engine.hostRelay.notConfigured': "This build of ResinCraft Launcher doesn't include ResinCraft Relay.",
   'engine.hostRelay.notOnline': "This server isn't online through ResinCraft Relay right now.",
   'engine.hostRelay.notOwned': "This Microsoft account doesn't own Minecraft: Java Edition, which ResinCraft Relay needs.",

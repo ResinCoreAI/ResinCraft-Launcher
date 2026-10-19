@@ -393,3 +393,88 @@ fn varint_helpers_round_trip() {
     write_varint(&mut v, 300);
     assert_eq!(read_packet(&packet(5, &v), 64).unwrap().unwrap().0, 5);
 }
+
+/// A Bedrock server stand-in: answers every datagram with "echo:" + it, from its own UDP port.
+async fn fake_bedrock() -> SocketAddr {
+    let sock = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let addr = sock.local_addr().unwrap();
+    tokio::spawn(async move {
+        let mut buf = [0u8; 2048];
+        loop {
+            let Ok((n, from)) = sock.recv_from(&mut buf).await else { continue };
+            let mut reply = b"echo:".to_vec();
+            reply.extend_from_slice(&buf[..n]);
+            reply.extend_from_slice(format!("|{}", from.port()).as_bytes());
+            let _ = sock.send_to(&reply, from).await;
+        }
+    });
+    addr
+}
+
+/// Sends `packet` from `sock` to the relay's Bedrock port; the answer, if one comes within a second.
+async fn bedrock_call(sock: &tokio::net::UdpSocket, port: u16, packet: &[u8]) -> Option<String> {
+    sock.send_to(packet, ("127.0.0.1", port)).await.unwrap();
+    let mut buf = [0u8; 2048];
+    let (n, _) = tokio::time::timeout(Duration::from_secs(2), sock.recv_from(&mut buf)).await.ok()?.ok()?;
+    Some(String::from_utf8_lossy(&buf[..n]).into_owned())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn bedrock_players_reach_the_host_over_udp() {
+    let mut cfg = config("bedrock").await;
+    cfg.bedrock_ip = "127.0.0.1".into();
+    cfg.bedrock_ports = "39251-39254".into();
+    let relay = start(cfg).await;
+    let server = fake_bedrock().await;
+
+    let mut conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    assert!(conn.relay_version >= 3);
+    conn.auth(Credentials::Minecraft("token-alice".into())).await.unwrap();
+    let online = conn.online_bedrock("alice-be").await.unwrap();
+    let port = online.bedrock_port.expect("a Bedrock port");
+    assert!((39251..=39254).contains(&port), "{port}");
+    assert_eq!(online.address, format!("alice-be.{BASE}"));
+    let serving = tokio::spawn(conn.serve(server, |_| {}));
+
+    // A Java player typing the name is told it's a Bedrock server.
+    let java = ping(relay.public, &format!("alice-be.{BASE}")).await;
+    assert!(description(&java).contains("Bedrock"), "{java}");
+
+    // Two players: an unconnected ping and an open-connection request each reach the server, from different
+    // local ports (so the server tells them apart), and the answers come back to the right player.
+    let p1 = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let p2 = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let a = bedrock_call(&p1, port, b"\x01ping-one").await.expect("an answer for player 1");
+    let b = bedrock_call(&p2, port, b"\x05open-two").await.expect("an answer for player 2");
+    assert!(a.starts_with("echo:\x01ping-one|") && b.starts_with("echo:\x05open-two|"), "{a} / {b}");
+    assert_ne!(a.rsplit('|').next(), b.rsplit('|').next());
+    // Later packets from player 1 go the same way (any packet type once the address is known).
+    let again = bedrock_call(&p1, port, b"\x84data").await.unwrap();
+    assert_eq!(again.rsplit('|').next(), a.rsplit('|').next());
+    // A stray packet from an unknown address opens nothing.
+    let p3 = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    assert_eq!(bedrock_call(&p3, port, b"\x84stray").await, None);
+
+    // Coming back online on a new connection keeps the same port.
+    serving.abort();
+    let mut conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    conn.auth(Credentials::Minecraft("token-alice".into())).await.unwrap();
+    assert_eq!(conn.online_bedrock("alice-be").await.unwrap().bedrock_port, Some(port));
+    // Another name gets another port.
+    let mut bob = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    bob.auth(Credentials::Minecraft("token-bob".into())).await.unwrap();
+    let other = bob.online_bedrock("bob-be").await.unwrap().bedrock_port.unwrap();
+    assert_ne!(other, port);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bedrock_off_when_no_ports_are_configured() {
+    let mut cfg = config("bedrock-off").await;
+    cfg.bedrock_ports = String::new();
+    let relay = start(cfg).await;
+    let mut conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    conn.auth(Credentials::Minecraft("token-alice".into())).await.unwrap();
+    assert_eq!(conn.online_bedrock("no-ports").await.unwrap_err().code(), Some(ErrorCode::BedrockUnavailable));
+    // Java tunnels still work.
+    conn.online("no-ports").await.unwrap();
+}

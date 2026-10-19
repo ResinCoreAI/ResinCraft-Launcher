@@ -81,6 +81,9 @@ pub(crate) async fn serve(relay: Arc<Relay>, mut sock: TcpStream, peer: SocketAd
         };
         return answer(&relay, sock, buf, used, &hs, why).await;
     };
+    if let Some(port) = tunnel.bedrock_port {
+        return answer(&relay, sock, buf, used, &hs, Why::Bedrock(address, port)).await;
+    }
     if relay.over_quota(&tunnel.owner) {
         return answer(&relay, sock, buf, used, &hs, Why::Quota(address)).await;
     }
@@ -96,7 +99,7 @@ pub(crate) async fn serve(relay: Arc<Relay>, mut sock: TcpStream, peer: SocketAd
             return answer(&relay, sock, buf, used, &hs, Why::Offline(address)).await;
         }
     };
-    let mut first = serde_json::to_vec(&DataHeader { peer: Some(peer.to_string()) }).unwrap_or_default();
+    let mut first = serde_json::to_vec(&DataHeader { peer: Some(peer.to_string()), udp: false }).unwrap_or_default();
     first.push(b'\n');
     first.extend_from_slice(&buf);
     if stream.write_all(&first).await.is_err() {
@@ -116,10 +119,10 @@ pub(crate) async fn serve(relay: Arc<Relay>, mut sock: TcpStream, peer: SocketAd
 }
 
 /// A player's place in a tunnel's connection count.
-struct Slot(u32, Arc<std::sync::atomic::AtomicU32>);
+pub(super) struct Slot(pub(super) u32, Arc<std::sync::atomic::AtomicU32>);
 
 impl Slot {
-    fn take(t: &Tunnel) -> Slot {
+    pub(super) fn take(t: &Tunnel) -> Slot {
         Slot(t.conns.fetch_add(1, Ordering::Relaxed) + 1, t.conns.clone())
     }
 }
@@ -161,6 +164,8 @@ enum Why {
     Ended(String),
     /// The relay's admin paused it or switched it off (with their message).
     Paused(String, String),
+    /// A Bedrock server: it's on its own UDP port, not this one.
+    Bedrock(String, u16),
 }
 
 impl Why {
@@ -173,6 +178,7 @@ impl Why {
             Why::Busy(address) => ("This server is busy", format!("{address} · Too many players are connecting right now. Try again in a moment.")),
             Why::Ended(address) => ("The host's relay session ended", format!("{address} · Ask the host to continue it in ResinCraft Launcher.")),
             Why::Paused(address, message) => ("ResinCraft Relay is paused", format!("{address} · {message}")),
+            Why::Bedrock(address, port) => ("This is a Bedrock server", format!("Join {address} port {port} from Minecraft for Windows, phones or consoles.")),
         }
     }
 }
@@ -230,7 +236,7 @@ async fn finish(mut sock: TcpStream) {
 }
 
 /// Counts a connection's traffic against the host's account and watches for idling or the cap.
-struct Meter<'a> {
+pub(super) struct Meter<'a> {
     relay: &'a Relay,
     owner: &'a str,
     pending: AtomicU64,
@@ -239,9 +245,13 @@ struct Meter<'a> {
     stop: Notify,
 }
 
-impl Meter<'_> {
+impl<'a> Meter<'a> {
+    pub(super) fn new(relay: &'a Relay, owner: &'a str) -> Meter<'a> {
+        Meter { relay, owner, pending: AtomicU64::new(0), last: AtomicU64::new(now_secs()), over: AtomicBool::new(false), stop: Notify::new() }
+    }
+
     /// Counts `n` bytes; false once the account is over its cap.
-    fn add(&self, n: u64) -> bool {
+    pub(super) fn add(&self, n: u64) -> bool {
         self.last.store(now_secs(), Ordering::Relaxed);
         if self.pending.fetch_add(n, Ordering::Relaxed) + n >= FLUSH_BYTES {
             let p = self.pending.swap(0, Ordering::Relaxed);
@@ -253,7 +263,7 @@ impl Meter<'_> {
         !self.over.load(Ordering::Relaxed)
     }
 
-    fn flush(&self) {
+    pub(super) fn flush(&self) {
         let p = self.pending.swap(0, Ordering::Relaxed);
         if p > 0 {
             self.relay.add_usage(self.owner, p);
@@ -297,14 +307,7 @@ async fn pump<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(r: &mut R, w: &mut W,
 }
 
 async fn splice(relay: &Relay, player: TcpStream, host: StreamHandle, tunnel: &Tunnel, already_sent: u64) {
-    let meter = Meter {
-        relay,
-        owner: &tunnel.owner,
-        pending: AtomicU64::new(0),
-        last: AtomicU64::new(now_secs()),
-        over: AtomicBool::new(false),
-        stop: Notify::new(),
-    };
+    let meter = Meter::new(relay, &tunnel.owner);
     // The handshake (and whatever came with it) went out before the pumps started.
     relay.metrics.bytes_to_host_total.fetch_add(already_sent, Ordering::Relaxed);
     tunnel.bytes_in.fetch_add(already_sent, Ordering::Relaxed);

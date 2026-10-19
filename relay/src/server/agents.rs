@@ -15,6 +15,7 @@ use tokio_yamux::{Session, StreamHandle};
 use tracing::{debug, info, warn};
 
 use super::auth::{self, ProfileError};
+use super::bedrock;
 use super::metrics::Metrics;
 use super::{Account, Kick, Relay, Tunnel};
 use crate::agent::{yamux_config, Io};
@@ -74,8 +75,12 @@ pub(crate) async fn serve(relay: Arc<Relay>, sock: TcpStream, peer: SocketAddr, 
             budget: (MESSAGES_PER_MINUTE, tokio::time::Instant::now()),
             version: PROTOCOL_VERSION,
             clock: None,
+            bedrock: None,
         };
         agent.run(ctrl).await;
+        if let Some(port) = agent.bedrock.take() {
+            port.abort();
+        }
         if let Some(name) = agent.online.take() {
             relay.go_offline(&name, agent.id);
             info!(name = %name, "tunnel offline");
@@ -107,6 +112,8 @@ struct Agent {
     version: u32,
     /// The session time of the name online on this connection.
     clock: Option<Arc<SessionClock>>,
+    /// A Bedrock server's UDP port (closed when the connection ends).
+    bedrock: Option<tokio::task::JoinHandle<()>>,
 }
 
 enum Step {
@@ -148,6 +155,7 @@ pub(crate) fn message(code: ErrorCode) -> &'static str {
         ErrorCode::Paused => "the relay's admin paused it for now",
         ErrorCode::ServiceOff => "the relay's admin switched it off for now",
         ErrorCode::SessionEnded => "the host's relay session ended",
+        ErrorCode::BedrockUnavailable => "this relay has no free Bedrock ports right now",
         ErrorCode::ShuttingDown => "the relay is restarting",
         ErrorCode::Internal | ErrorCode::Unknown => "the relay ran into a problem",
     }
@@ -384,10 +392,19 @@ impl Agent {
                         Ok(()) => Step::Reply(RelayMsg::Released { name }),
                         Err(code) => Step::Reply(error(code)),
                     },
-                    AgentMsg::Online { name } => {
+                    AgentMsg::Online { name, bedrock } => {
                         if self.online.is_some() {
                             return Step::Reply(error(ErrorCode::BadRequest));
                         }
+                        let udp = if bedrock {
+                            match relay.bind_bedrock(&name).await {
+                                Ok(bound) => Some(bound),
+                                Err(code) => return Step::Reply(error(code)),
+                            }
+                        } else {
+                            None
+                        };
+                        let bedrock_port = udp.as_ref().map(|(port, _)| *port);
                         let clock = Arc::new(SessionClock::new(now_secs(), relay.limits_now().session_secs()));
                         let tunnel = Tunnel {
                             clock: clock.clone(),
@@ -400,15 +417,28 @@ impl Agent {
                             bytes_out: self.bytes_out.clone(),
                             kick: self.kick.clone(),
                             since: now_secs(),
+                            bedrock_port,
                         };
-                        match relay.go_online(&acc, &name, tunnel) {
+                        match relay.go_online(&acc, &name, tunnel.clone()) {
                             Ok(()) => {
-                                info!(name = %name, account = %acc.name, "tunnel online");
-                                relay.event("online", format!("{name} came online ({})", acc.name), Some(self.peer.ip()));
+                                info!(name = %name, account = %acc.name, bedrock_port, "tunnel online");
+                                let what = bedrock_port.map(|p| format!(", Bedrock on port {p}")).unwrap_or_default();
+                                relay.event("online", format!("{name} came online ({}{what})", acc.name), Some(self.peer.ip()));
+                                if let Some((port, sock)) = udp {
+                                    relay.remember_bedrock_port(&name, port);
+                                    self.bedrock = Some(tokio::spawn(bedrock::serve(relay.clone(), sock, name.clone(), tunnel)));
+                                }
                                 self.online = Some(name.clone());
                                 let secs_left = clock.secs_left(now_secs());
                                 self.clock = Some(clock);
-                                Step::Reply(RelayMsg::Online { address: proto::address(&name, base), name, limits: relay.limits(), usage: self.usage(), secs_left })
+                                Step::Reply(RelayMsg::Online {
+                                    address: proto::address(&name, base),
+                                    name,
+                                    limits: relay.limits(),
+                                    usage: self.usage(),
+                                    secs_left,
+                                    bedrock_port,
+                                })
                             }
                             Err(code @ (ErrorCode::Paused | ErrorCode::ServiceOff)) => Step::Reply(error_with(code, Some(relay.service_message()))),
                             Err(code) => Step::Reply(error(code)),

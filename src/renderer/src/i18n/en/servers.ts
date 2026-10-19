@@ -130,11 +130,14 @@ export default {
   'servers.connect.playitHint': 'Link playit.gg (Settings → How friends connect) for an address that never changes.',
   'servers.connect.openBedrock': 'Open Minecraft',
   'servers.connect.forwardHintUdp': 'Instead, you can forward UDP port {port} to {ip} in your router settings.',
-  'servers.connect.playitHintBedrock': 'Without help from the router, Bedrock servers need playit.gg: choose it under Settings → How friends connect.',
+  'servers.connect.playitHintBedrock':
+    'Without help from the router, Bedrock servers need playit.gg or ResinCraft Relay: choose one under Settings → How friends connect.',
   'servers.connect.internetManual': 'Shared directly through the port you forwarded. Share this address with friends.',
   'servers.connect.orRaw': 'Or:',
   'servers.connect.domainMismatch': "{domain} doesn't point to this server any more. Check DNS in Settings.",
   'servers.connect.internetResin': 'Shared through ResinCraft Relay. This address stays the same every time.',
+  'servers.connect.internetResinBedrock':
+    'Shared through ResinCraft Relay. Friends on Bedrock add it under Servers → Add server, with the port after the colon. It stays the same every time.',
   'servers.connect.resinReconnecting': "Reconnecting to ResinCraft Relay… Until it's back, friends see the server as offline.",
   'servers.connect.resinUsage': 'Relay traffic this month: {used} of {limit}.',
   'servers.connect.resinInstead': "ResinCraft Relay didn't work, so the bore relay is used for now: {error}",
@@ -333,9 +336,9 @@ export default {
   'servers.settings.tunnel.playit': 'playit.gg',
   'servers.settings.tunnel.relay': 'bore relay',
   'servers.settings.tunnelHint.auto':
-    "ResinCraft asks your router to open the port (UPnP), the fastest way. If it can't, playit.gg is used once you've linked it, then ResinCraft Relay when a Microsoft account is signed in (2-hour sessions you can continue), else the free bore relay, whose address changes every start.",
+    "ResinCraft Relay first when a Microsoft account is signed in (an address that never changes), then playit.gg once you've linked it, then your router (UPnP), else the free bore relay, whose address changes every start.",
   'servers.settings.tunnelHint.playit':
-    "Free and made for Minecraft: friends get an address like name.joinmc.link that stays the same. The first start asks you to link ResinCraft to a playit.gg account in the browser (a guest account is enough). If playit.gg doesn't work, the relay is used.",
+    'When a Microsoft account is signed in, ResinCraft Relay is tried first. Otherwise playit.gg: free and made for Minecraft, friends get an address like name.joinmc.link that stays the same. The first start asks you to link ResinCraft to a playit.gg account in the browser (a guest account is enough). If neither works, the bore relay is used.',
   'servers.settings.tunnelHint.relay': "Skips the router. Use this when the router gives an address friends can't reach. The address changes every start.",
   'servers.settings.relayHost': 'Relay server',
   'servers.settings.relayHostHint': 'Leave empty for bore.pub. A bore server closer to you (for example one you run with "bore server") means less delay.',

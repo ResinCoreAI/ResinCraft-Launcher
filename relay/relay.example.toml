@@ -7,6 +7,10 @@ base_domain = "rscraft.resincore.tech"
 public_listen = ["0.0.0.0:25565"]
 # Where ResinCraft Launcher connects (TLS when [tls] is set).
 agent_listen = ["0.0.0.0:7000"]
+# Bedrock servers: each one online gets a UDP port of its own from this range (players add
+# <name>.<base_domain> with that port). Open the range for UDP in the firewall. "" turns Bedrock tunnels off.
+bedrock_ports = "19200-19299"
+bedrock_ip = "0.0.0.0"
 # /healthz, /metrics and the admin API. Keep it on localhost (or a private network).
 admin_listen = "127.0.0.1:7001"
 
@@ -32,7 +36,7 @@ key = "/etc/letsencrypt/live/rscraft.resincore.tech/privkey.pem"
 # The admin dashboard: live tunnels, names, bans, usage, limits and events, on its own HTTPS port with the
 # [tls] certificate. Set the password with `resincraft-relay --config relay.toml set-admin-password`.
 [dashboard]
-listen = "0.0.0.0:7443"         # "127.0.0.1:7443" to reach it only through an SSH tunnel
+listen = "0.0.0.0:443"          # https://<base_domain>/admin ("127.0.0.1:7443": only through an SSH tunnel)
 password_hash = ""              # written by set-admin-password
 allow_ips = []                  # optional: only these IPs / CIDR ranges may open it
 session_hours = 12

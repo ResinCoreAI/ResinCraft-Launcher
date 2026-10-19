@@ -1126,7 +1126,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': 'Token entfernen',
   'servers.domain.tokenHelp': 'Erstelle ein Token mit der Vorlage „Edit zone DNS“ (Zone → DNS → Edit). Es wird verschlüsselt auf diesem Computer gespeichert.',
   'servers.domain.tokenCreate': 'API-Token erstellen',
-  'servers.settings.tunnelHint.auto': "ResinCraft bittet deinen Router, den Port zu öffnen (UPnP), der schnellste Weg. Klappt das nicht, wird playit.gg genutzt, sobald du es verknüpft hast, dann ResinCraft Relay, wenn ein Microsoft-Konto angemeldet ist (2-Stunden-Sitzungen, die du verlängern kannst), sonst das kostenlose bore-Relay, dessen Adresse sich bei jedem Start ändert.",
+  'servers.settings.tunnelHint.auto': "Zuerst ResinCraft Relay, wenn ein Microsoft-Konto angemeldet ist (eine Adresse, die sich nie ändert), dann playit.gg, sobald du es verknüpft hast, dann dein Router (UPnP), sonst das kostenlose bore-Relay, dessen Adresse sich bei jedem Start ändert.",
   'servers.connect.playitHint': 'Verknüpfe playit.gg (Einstellungen → Wie Freunde sich verbinden) für eine Adresse, die sich nie ändert.',
 
   // Server plugin manager

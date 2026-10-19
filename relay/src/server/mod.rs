@@ -4,6 +4,7 @@
 pub mod admin;
 mod agents;
 pub mod auth;
+mod bedrock;
 pub mod config;
 pub mod dashboard;
 pub mod dns;
@@ -81,6 +82,8 @@ pub(crate) struct Tunnel {
     pub since: u64,
     /// Its session time (Continue / Extend move it).
     pub clock: Arc<SessionClock>,
+    /// A Bedrock server: its UDP port on the relay (players reach it there, not through the Java port).
+    pub bedrock_port: Option<u16>,
 }
 
 /// One line of the dashboard's events log. Player and launcher IP addresses appear here (and at debug log
@@ -479,7 +482,7 @@ impl Relay {
                     if owned >= limit {
                         return Err(ErrorCode::TooManyNames);
                     }
-                    d.names.insert(name.to_string(), NameEntry { owner: acc.uuid.clone(), owner_name: acc.name.clone(), created: now, last_used: now });
+                    d.names.insert(name.to_string(), NameEntry { owner: acc.uuid.clone(), owner_name: acc.name.clone(), created: now, last_used: now, bedrock_port: None });
                 }
             }
             let old = release.filter(|r| *r != name && d.names.get(*r).is_some_and(|e| e.owner == acc.uuid));

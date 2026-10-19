@@ -10,6 +10,10 @@ public_listen = ["0.0.0.0:25565"]
 # ResinCraft Launcher connects here (TLS). The launcher is built with
 # RESINCRAFT_RELAY_URL=tls://rscraft.resincore.tech:7000 and RESINCRAFT_RELAY_DOMAIN=rscraft.resincore.tech.
 agent_listen = ["0.0.0.0:7000"]
+# Bedrock servers: each one online gets a UDP port of its own from this range (players add
+# <name>.rscraft.resincore.tech with that port). install-relay.ps1 opens the range for UDP. "" turns them off.
+bedrock_ports = "19200-19299"
+bedrock_ip = "0.0.0.0"
 # /healthz and /metrics for this machine only (no firewall rule needed).
 admin_listen = "127.0.0.1:7001"
 
@@ -29,7 +33,7 @@ key = "certs/relay-key.pem"
 # install-relay.ps1 asks for the password; to change it later:
 #   C:\ResinCraft\relay\resincraft-relay.exe --config C:\ResinCraft\relay\relay.toml set-admin-password
 [dashboard]
-listen = "0.0.0.0:7443"         # "127.0.0.1:7443": only from this server (Remote Desktop) or an SSH tunnel
+listen = "0.0.0.0:443"          # https://rscraft.resincore.tech/admin ("127.0.0.1:7443": only from this server)
 password_hash = ""              # written by set-admin-password
 allow_ips = []                  # optional: e.g. ["203.0.113.7", "198.51.100.0/24"]
 session_hours = 12

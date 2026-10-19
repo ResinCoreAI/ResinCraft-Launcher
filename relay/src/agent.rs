@@ -8,13 +8,16 @@ use std::time::Duration;
 
 use futures::StreamExt;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, UdpSocket};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{AgentMsg, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, MAX_LINE, PING_SECS, PROTOCOL_VERSION};
+use crate::proto::{
+    self, AgentMsg, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS,
+    PROTOCOL_VERSION,
+};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -123,6 +126,8 @@ pub struct Online {
     pub usage: Usage,
     /// Seconds until the session ends (None: no time limit).
     pub secs_left: Option<u64>,
+    /// A Bedrock tunnel's UDP port on the relay (players add `address` with this port).
+    pub bedrock_port: Option<u16>,
 }
 
 /// Something that happened while serving.
@@ -209,6 +214,8 @@ pub struct Connection {
     driver: JoinHandle<()>,
     /// The relay's base domain ("rscraft.resincore.tech").
     pub base_domain: String,
+    /// The relay's protocol version (3 and later can carry Bedrock servers).
+    pub relay_version: u32,
     seq: u64,
 }
 
@@ -275,11 +282,15 @@ impl Connection {
             inbound: rx,
             driver,
             base_domain: String::new(),
+            relay_version: 0,
             seq: 0,
         };
         conn.send(&AgentMsg::Hello { version: PROTOCOL_VERSION, client: client.to_string() }).await?;
         match conn.recv().await? {
-            RelayMsg::Welcome { base_domain, .. } => conn.base_domain = base_domain,
+            RelayMsg::Welcome { base_domain, version } => {
+                conn.base_domain = base_domain;
+                conn.relay_version = version;
+            }
             other => return Err(unexpected(&other)),
         }
         Ok(conn)
@@ -349,9 +360,26 @@ impl Connection {
 
     /// Brings `name` online on this connection. Then call [`Connection::serve`].
     pub async fn online(&mut self, name: &str) -> Result<Online, AgentError> {
-        self.send(&AgentMsg::Online { name: name.to_string() }).await?;
+        self.online_as(name, false).await
+    }
+
+    /// Brings `name` online as a Bedrock server: the relay gives it a UDP port of its own. Then call
+    /// [`Connection::serve`] with the Bedrock server's UDP address.
+    pub async fn online_bedrock(&mut self, name: &str) -> Result<Online, AgentError> {
+        if self.relay_version < BEDROCK_PROTOCOL_VERSION {
+            return Err(AgentError::Refused(ErrorCode::BedrockUnavailable, "this relay doesn't carry Bedrock servers yet".into()));
+        }
+        let online = self.online_as(name, true).await?;
+        if online.bedrock_port.is_none() {
+            return Err(AgentError::Protocol("the relay brought the name online without a Bedrock port".into()));
+        }
+        Ok(online)
+    }
+
+    async fn online_as(&mut self, name: &str, bedrock: bool) -> Result<Online, AgentError> {
+        self.send(&AgentMsg::Online { name: name.to_string(), bedrock }).await?;
         match self.recv().await? {
-            RelayMsg::Online { name, address, limits, usage, secs_left } => Ok(Online { name, address, limits, usage, secs_left }),
+            RelayMsg::Online { name, address, limits, usage, secs_left, bedrock_port } => Ok(Online { name, address, limits, usage, secs_left, bedrock_port }),
             other => Err(unexpected(&other)),
         }
     }
@@ -440,7 +468,10 @@ async fn forward(stream: StreamHandle, local: SocketAddr) {
     if !matches!(header, Ok(Ok(n)) if n > 0 && line.ends_with(b"\n")) {
         return;
     }
-    let _header: DataHeader = serde_json::from_slice(&line).unwrap_or_default();
+    let header: DataHeader = serde_json::from_slice(&line).unwrap_or_default();
+    if header.udp {
+        return forward_udp(stream, local).await;
+    }
     let Ok(mut server) = TcpStream::connect(local).await else {
         // Nothing listens locally (the server is restarting): the player gets disconnected.
         let _ = stream.get_mut().shutdown().await;
@@ -448,6 +479,46 @@ async fn forward(stream: StreamHandle, local: SocketAddr) {
     };
     let _ = server.set_nodelay(true);
     let _ = tokio::io::copy_bidirectional(&mut stream, &mut server).await;
+}
+
+/// One Bedrock player: datagrams from the stream go to the local server from a socket of their own (so the
+/// server tells players apart by port), and its answers go back as frames.
+async fn forward_udp(stream: BufReader<StreamHandle>, local: SocketAddr) {
+    let any: SocketAddr = if local.is_ipv4() { ([127, 0, 0, 1], 0).into() } else { (std::net::Ipv6Addr::LOCALHOST, 0).into() };
+    let Ok(sock) = UdpSocket::bind(any).await else { return };
+    if sock.connect(local).await.is_err() {
+        return;
+    }
+    let (mut from_relay, mut to_relay) = tokio::io::split(stream);
+    let up = async {
+        let mut packet = Vec::with_capacity(1600);
+        while let Ok(true) = proto::read_datagram(&mut from_relay, &mut packet).await {
+            // Nothing listening yet (the server is starting): the player's client tries again.
+            let _ = sock.send(&packet).await;
+        }
+    };
+    let down = async {
+        let mut buf = vec![0u8; 65_536];
+        let mut frame = Vec::with_capacity(1600);
+        loop {
+            let n = match sock.recv(&mut buf).await {
+                Ok(n) => n,
+                // Windows reports "port unreachable" from an earlier send here.
+                Err(e) if matches!(e.kind(), std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionRefused) => continue,
+                Err(_) => break,
+            };
+            frame.clear();
+            proto::write_datagram(&mut frame, &buf[..n]);
+            if to_relay.write_all(&frame).await.is_err() {
+                break;
+            }
+        }
+    };
+    // The relay closes the stream when the player goes quiet.
+    tokio::select! {
+        _ = up => {}
+        _ = down => {}
+    }
 }
 
 #[cfg(test)]

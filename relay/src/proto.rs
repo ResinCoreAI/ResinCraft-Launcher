@@ -12,12 +12,18 @@
 //! Protocol 2 (launcher 0.4) adds the session time limit (`session_warning`, `session_extended`, `continue`)
 //! and the admin's on/off switch (`service`). The relay still serves protocol 1 launchers; it just never sends
 //! them those messages (new error codes reach them as `unknown`, which they retry).
+//!
+//! Protocol 3 (launcher 0.5) adds Bedrock servers: `online` with `bedrock: true` gives the name a UDP port of
+//! its own on the relay (`bedrock_port` in the answer). Each player's address gets a stream whose header says
+//! `udp: true`; datagrams travel on it as [`write_datagram`] frames (a 2-byte big-endian length, then the bytes).
 
 use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
+/// The first protocol with Bedrock (UDP) tunnels.
+pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
 pub const MIN_PROTOCOL_VERSION: u32 = 1;
 /// Longest control line either side accepts.
@@ -45,8 +51,13 @@ pub enum AgentMsg {
         release: Option<String>,
     },
     Release { name: String },
-    /// Bring a name online on this connection (reserving it first when it's free).
-    Online { name: String },
+    /// Bring a name online on this connection (reserving it first when it's free). `bedrock`: a Bedrock server,
+    /// reached on a UDP port of its own (protocol 3).
+    Online {
+        name: String,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        bedrock: bool,
+    },
     /// Keep the session going for another full session (after a `session_warning`). Protocol 2.
     Continue,
     Ping { seq: u64 },
@@ -81,6 +92,9 @@ pub enum RelayMsg {
         /// Seconds until the session ends (None: no time limit).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         secs_left: Option<u64>,
+        /// A Bedrock tunnel's UDP port on the relay (players add `address` with this port). Protocol 3.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        bedrock_port: Option<u16>,
     },
     /// The session ends soon unless the agent sends `continue`. Protocol 2.
     SessionWarning { secs_left: u64 },
@@ -135,6 +149,8 @@ pub enum ErrorCode {
     ServiceOff,
     /// The tunnel's session time ran out without a `continue`.
     SessionEnded,
+    /// The relay has no Bedrock ports (switched off in its config, or all in use). Protocol 3.
+    BedrockUnavailable,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -201,6 +217,33 @@ pub struct DataHeader {
     /// The player's address as the relay sees it (for a PROXY-protocol-aware server later; not logged).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub peer: Option<String>,
+    /// A Bedrock player: the stream carries datagrams ([`write_datagram`] frames), not a byte stream.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub udp: bool,
+}
+
+/// Largest datagram a frame carries (a UDP payload never is bigger).
+pub const MAX_DATAGRAM: usize = 65_507;
+
+/// Appends one datagram as a frame: its length (2 bytes, big-endian), then the bytes.
+pub fn write_datagram(out: &mut Vec<u8>, datagram: &[u8]) {
+    let len = datagram.len().min(MAX_DATAGRAM);
+    out.extend_from_slice(&(len as u16).to_be_bytes());
+    out.extend_from_slice(&datagram[..len]);
+}
+
+/// Reads one frame into `buf` (resized to the datagram); Ok(false) at a clean end of the stream.
+pub async fn read_datagram<R: tokio::io::AsyncRead + Unpin>(r: &mut R, buf: &mut Vec<u8>) -> std::io::Result<bool> {
+    use tokio::io::AsyncReadExt;
+    let mut len = [0u8; 2];
+    match r.read_exact(&mut len).await {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
+        Err(e) => return Err(e),
+    }
+    buf.resize(u16::from_be_bytes(len) as usize, 0);
+    r.read_exact(buf).await?;
+    Ok(true)
 }
 
 // ---------- Names ----------
@@ -342,7 +385,12 @@ mod tests {
         assert!(ErrorCode::Paused.retryable() && ErrorCode::ServiceOff.retryable() && !ErrorCode::SessionEnded.retryable());
         // Fields protocol 1 launchers don't know are skipped by them, and default when missing.
         let old: RelayMsg = serde_json::from_str(r#"{"t":"online","name":"a","address":"a.b","limits":{"tunnels":1,"names":1,"connections":1,"monthly_bytes":0},"usage":{"month":"2026-10","bytes":0,"connections":0}}"#).unwrap();
-        assert!(matches!(old, RelayMsg::Online { secs_left: None, limits: Limits { session_secs: 0, .. }, .. }));
+        assert!(matches!(old, RelayMsg::Online { secs_left: None, bedrock_port: None, limits: Limits { session_secs: 0, .. }, .. }));
+        // A Java tunnel's `online` looks the same as in protocol 2; older relays ignore `bedrock`.
+        assert_eq!(serde_json::to_string(&AgentMsg::Online { name: "a".into(), bedrock: false }).unwrap(), r#"{"t":"online","name":"a"}"#);
+        assert_eq!(serde_json::from_str::<AgentMsg>(r#"{"t":"online","name":"a"}"#).unwrap(), AgentMsg::Online { name: "a".into(), bedrock: false });
+        assert_eq!(serde_json::to_string(&DataHeader { peer: None, udp: true }).unwrap(), r#"{"udp":true}"#);
+        assert_eq!(serde_json::from_str::<DataHeader>("{}").unwrap(), DataHeader::default());
         assert_eq!(serde_json::to_string(&AgentMsg::Continue).unwrap(), r#"{"t":"continue"}"#);
         let svc = RelayMsg::Service { state: ServiceState::Paused, message: Some("Maintenance until 20:00".into()) };
         assert_eq!(serde_json::from_str::<RelayMsg>(&serde_json::to_string(&svc).unwrap()).unwrap(), svc);

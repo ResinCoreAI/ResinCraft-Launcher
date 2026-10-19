@@ -18,12 +18,15 @@ Run the scripts in **PowerShell as Administrator**. If Windows blocks them: `Unb
 |---|---|---|
 | TCP 25565 | Players (Minecraft) | Everyone |
 | TCP 7000 | ResinCraft Launcher (TLS) | Everyone |
-| TCP 7443 | Admin dashboard (HTTPS) | Everyone, or nobody if you keep it local (see below) |
+| UDP 19200-19299 | Bedrock players (one port per Bedrock server online) | Everyone |
+| TCP 443 | Admin dashboard (HTTPS, `/admin`) | Everyone, or nobody if you keep it local (see below) |
 | TCP 7001 | Health check and metrics | This server only (no firewall rule) |
 | TCP 80 | win-acme's certificate check (shared with IIS) | Everyone |
 
-`install-relay.ps1` opens Windows Firewall for 25565, 7000 and 7443. If your hosting provider has its own
-firewall, open them there too. Nothing else on the server may use 25565.
+`install-relay.ps1` opens Windows Firewall for 25565, 7000, the Bedrock range (UDP) and the dashboard port. If
+your hosting provider has its own firewall, open them there too. Nothing else on the server may use 25565 or
+the Bedrock range. If IIS already serves HTTPS on 443, keep the dashboard on another port, for example
+`listen = "0.0.0.0:7443"` (then it's `https://rscraft.resincore.tech:7443/admin`).
 
 ## 1. DNS
 
@@ -79,7 +82,9 @@ check. After editing it: `Restart-Service ResinCraftRelay`.
 
 ## 4. Admin dashboard
 
-Open **https://rscraft.resincore.tech:7443** and sign in with the admin password.
+Open **https://rscraft.resincore.tech/admin** and sign in with the admin password. (An older `relay.toml` with
+`listen = "0.0.0.0:7443"` keeps working at `https://rscraft.resincore.tech:7443/admin`; change it to
+`0.0.0.0:443` and run the install script again for the short address.)
 
 - **Service switch** (sidebar): **On**, **Paused** (no new tunnels; running ones finish their session) or **Off**
   (every tunnel closes now), with an optional message players' launchers show.
@@ -105,10 +110,19 @@ C:\ResinCraft\relay\resincraft-relay.exe --config C:\ResinCraft\relay\relay.toml
 No restart is needed.
 
 **Keep it private** (optional): in `relay.toml` set `[dashboard] listen = "127.0.0.1:7443"` and run the install
-script again (it removes the firewall rule). Then open `https://localhost:7443` on the server over Remote
+script again (it removes the firewall rule). Then open `https://localhost:7443/admin` on the server over Remote
 Desktop (the browser warns that the certificate is for rscraft.resincore.tech; that's expected), or forward it
 over SSH from your PC with `ssh -L 7443:127.0.0.1:7443 admin@rscraft.resincore.tech` and open
-`https://localhost:7443`. Alternatively keep it public and list your own addresses in `allow_ips`.
+`https://localhost:7443/admin`. Alternatively keep it public and list your own addresses in `allow_ips`.
+
+## Bedrock servers
+
+Launcher 0.4.2 and later can share Bedrock servers through the relay too. Each Bedrock server online gets a
+UDP port of its own from `bedrock_ports` (`19200-19299` by default; the same name gets the same port next
+time when it's free). Players add `<name>.rscraft.resincore.tech` with that port under Servers → Add server;
+the launcher shows the full address. A Java player who types a Bedrock server's name is told to use Bedrock.
+`bedrock_ports = ""` turns Bedrock tunnels off. An `relay.toml` from before has no `bedrock_ports` line and
+gets the default range: run the install script again so it opens the range in the firewall.
 
 ## 5. The launcher
 

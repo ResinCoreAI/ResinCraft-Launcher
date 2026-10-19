@@ -1107,7 +1107,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': 'トークンを削除',
   'servers.domain.tokenHelp': '「Edit zone DNS」テンプレート（Zone → DNS → Edit）でトークンを作成してください。このコンピューターに暗号化して保存されます。',
   'servers.domain.tokenCreate': 'API トークンを作成',
-  'servers.settings.tunnelHint.auto': "ResinCraft はまずルーターにポートを開くよう頼みます（UPnP・最速）。無理な場合は、連携済みなら playit.gg、次に Microsoft アカウントでサインインしていれば ResinCraft Relay（2 時間のセッション・延長可）、最後に無料の bore リレー（起動ごとにアドレスが変わります）を使います。",
+  'servers.settings.tunnelHint.auto': "Microsoft アカウントでサインインしていれば、まず ResinCraft Relay（変わらないアドレス）を使います。次に連携済みなら playit.gg、次にルーター（UPnP）、それもだめなら無料の bore リレー（起動のたびにアドレスが変わります）を使います。",
   'servers.connect.playitHint': '変わらないアドレスにするには playit.gg と連携してください（設定 → フレンドの接続方法）。',
 
   // Server plugin manager

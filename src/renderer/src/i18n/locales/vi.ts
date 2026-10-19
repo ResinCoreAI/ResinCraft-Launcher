@@ -1108,7 +1108,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': 'Xóa token',
   'servers.domain.tokenHelp': 'Tạo token từ mẫu "Edit zone DNS" (Zone → DNS → Edit). Token được lưu mã hóa trên máy tính này.',
   'servers.domain.tokenCreate': 'Tạo token API',
-  'servers.settings.tunnelHint.auto': "ResinCraft nhờ router mở cổng trước (UPnP), cách nhanh nhất. Nếu không được, sẽ dùng playit.gg khi bạn đã liên kết, sau đó là ResinCraft Relay nếu đã đăng nhập tài khoản Microsoft (phiên 2 giờ, có thể gia hạn), cuối cùng là relay bore miễn phí với địa chỉ đổi mỗi lần khởi động.",
+  'servers.settings.tunnelHint.auto': "Trước tiên là ResinCraft Relay khi đã đăng nhập tài khoản Microsoft (địa chỉ không bao giờ đổi), sau đó playit.gg khi bạn đã liên kết, rồi đến router (UPnP), nếu không thì dùng relay bore miễn phí, có địa chỉ thay đổi mỗi lần khởi động.",
   'servers.connect.playitHint': 'Liên kết playit.gg (Cài đặt → Cách bạn bè kết nối) để có địa chỉ không bao giờ đổi.',
 
   // Server plugin manager

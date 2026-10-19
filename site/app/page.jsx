@@ -15,12 +15,12 @@ const FEATURES = [
   ['search', 'Five sources, one search', 'Modrinth, CurseForge, FTB, ATLauncher and Technic: mods, modpacks, resource packs and shaders, filtered to your game version.'],
   ['history', 'Pick the exact version', 'Install the newest with one click or choose any release, beta or alpha, and switch later. Dependencies come along on their own.'],
   ['package', 'Modpacks in and out', 'Import Modrinth, CurseForge, FTB, ATLauncher and Technic packs. Share yours as a .mrpack or a CurseForge zip.'],
-  ['server', 'Host a server', 'Vanilla, Paper, Purpur, Folia, Spigot, Fabric, Quilt, Forge or NeoForge, or turn a modpack into a server. Tuned Java flags included.'],
+  ['server', 'Host a server', 'Vanilla, snapshots, Paper, Purpur, Folia, Leaf, Spigot, Fabric, Quilt, Forge, NeoForge, Arclight or Bedrock, or turn a modpack into a server. Tuned Java flags included.'],
   [
     'globe',
     'Friends join from anywhere',
     <>
-      Your server gets an address like <span className="mono">{RELAY_EXAMPLE}</span>. No port forwarding, nothing for friends to install.
+      Your server gets an address like <span className="mono">{RELAY_EXAMPLE}</span>, Java or Bedrock. No port forwarding, nothing for friends to install.
     </>,
   ],
   ['puzzle', 'Plugins, managed like mods', 'Plugins from Modrinth, Hangar, SpigotMC and CurseForge, with a version picker, update checks and Update all.'],
@@ -36,14 +36,14 @@ const FEATURES = [
 ]
 
 const ROUTES = [
-  ['Your router', 'ResinCraft asks it to open the port. The fastest way, when the router allows it.'],
   [
     'ResinCraft Relay',
     <>
-      Otherwise friends type <span className="mono">{RELAY_EXAMPLE}</span>. Just sign in with Microsoft.
+      First choice: friends type <span className="mono">{RELAY_EXAMPLE}</span>, Java or Bedrock. Just sign in with Microsoft in the launcher; there's nothing to register.
     </>,
   ],
-  ['playit.gg', "A free address that stays the same, if you've linked it."],
+  ['playit.gg', 'Second: a free address that stays the same.'],
+  ['Your router', 'ResinCraft asks it to open the port, when the router allows it.'],
   ['bore.pub', 'The last resort, so the server can still be reached.'],
 ]
 
@@ -63,8 +63,8 @@ const FAQ = [
   [
     'How do my friends join my server?',
     <>
-      ResinCraft first asks your router to open the port. If it can't, your server gets an address like <span className="mono">{RELAY_EXAMPLE}</span> through the
-      ResinCraft Relay. Friends type that into Minecraft; they don't need to install anything.
+      With a Microsoft account signed in, your server gets an address like <span className="mono">{RELAY_EXAMPLE}</span> through ResinCraft Relay. Friends type that
+      into Minecraft (Bedrock players add it with the port the launcher shows); they don't need to install anything. Without the relay, playit.gg or your router is used.
     </>,
   ],
   [

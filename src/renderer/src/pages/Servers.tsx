@@ -544,7 +544,7 @@ function ConnectCard({ s }: { s: ServerInfo }) {
             <DomainAddress s={s} address={net.address} copy={(v, small) => <CopyAddress value={v} small={small} />} />
             <span className="hint ok">
               {net.via === 'resin'
-                ? t('servers.connect.internetResin')
+                ? t(isBedrock(s) ? 'servers.connect.internetResinBedrock' : 'servers.connect.internetResin')
                 : net.via === 'relay'
                   ? t('servers.connect.internetRelay', { host: net.address.replace(/:\d+$/, '') })
                   : net.via === 'playit'
@@ -1198,16 +1198,14 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               value={s.tunnel}
               onChange={(v) => v !== s.tunnel && void save({ tunnel: v })}
               // ResinCraft Relay only in builds that have one (still shown if it's the current choice). Bedrock talks UDP,
-              // which only the router and playit.gg carry.
-              options={TUNNELS.filter((v) =>
-                isBedrock(s) ? ['auto', 'playit', 'manual'].includes(v) || v === s.tunnel : v !== 'resin' || relay?.available || s.tunnel === 'resin'
-              ).map((v) => ({
+              // which the bore relay can't carry.
+              options={TUNNELS.filter((v) => (v === s.tunnel ? true : v === 'resin' ? !!relay?.available : !isBedrock(s) || v !== 'relay')).map((v) => ({
                 value: v,
                 label: t(`servers.settings.tunnel.${v}`)
               }))}
             />
           </div>
-          {!isBedrock(s) && (s.tunnel === 'auto' || s.tunnel === 'resin') && <RelaySettings s={s} info={relay} reload={reload} />}
+          {(s.tunnel === 'auto' || s.tunnel === 'resin') && <RelaySettings s={s} info={relay} reload={reload} />}
           {!isBedrock(s) && (
             <div className="setting">
               <div className="text">

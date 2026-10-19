@@ -56,6 +56,9 @@ pub struct NameEntry {
     pub owner_name: String,
     pub created: u64,
     pub last_used: u64,
+    /// The relay's UDP port this name had as a Bedrock server (it gets the same one next time when it's free).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bedrock_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,7 +168,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let store = Store::load(&path).unwrap();
         store.write(|d| {
-            d.names.insert("smp".into(), NameEntry { owner: "u".into(), owner_name: "P".into(), created: 1, last_used: 2 });
+            d.names.insert("smp".into(), NameEntry { owner: "u".into(), owner_name: "P".into(), created: 1, last_used: 2, bedrock_port: None });
         });
         store.save().await.unwrap();
         let again = Store::load(&path).unwrap();

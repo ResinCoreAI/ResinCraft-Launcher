@@ -11,6 +11,6 @@ RUN cargo build --release --locked --bin resincraft-relay
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /src/target/release/resincraft-relay /usr/local/bin/resincraft-relay
 COPY relay.example.toml /usr/share/resincraft-relay/relay.example.toml
-EXPOSE 25565 7000 7443
+EXPOSE 25565 7000 443 19200-19299/udp
 ENTRYPOINT ["/usr/local/bin/resincraft-relay", "--config", "/etc/resincraft-relay/relay.toml"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["/usr/local/bin/resincraft-relay", "--config", "/etc/resincraft-relay/relay.toml", "health"]

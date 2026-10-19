@@ -561,7 +561,7 @@ fn resin_failed(e: &anyhow::Error) -> ResinNet {
 async fn open_resin(id: &str) -> Result<()> {
     let Ok(meta) = store::get(id).await else { return Ok(()) };
     let status_id = id.to_string();
-    let opened = relay::open(id, meta.port, meta.tunnel == TunnelMode::Resin, move |s| on_resin_status(&status_id, s)).await?;
+    let opened = relay::open(id, meta.port, meta.tunnel == TunnelMode::Resin, meta.kind.bedrock(), move |s| on_resin_status(&status_id, s)).await?;
     if !is_running(id) || net(id).is_none() {
         opened.task.abort();
         return Ok(());
@@ -680,8 +680,9 @@ fn on_resin_status(id: &str, status: relay::Status) {
 /// Makes a running server reachable from the internet the way its settings say (TunnelMode): the router
 /// (UPnP, a direct connection; the lease is renewed while it runs), ResinCraft Relay (a stable name, needs a
 /// Microsoft account), playit.gg (a stable address), or the bore relay (no setup at all), which is also the
-/// fallback when the others fail. Automatic tries the router, then playit.gg if this launcher is already linked
-/// to it (never a claim page there), then ResinCraft Relay if a Microsoft account is signed in, then bore.
+/// fallback when the others fail. Automatic and playit.gg try ResinCraft Relay first when a Microsoft account is
+/// signed in; then Automatic tries playit.gg if this launcher is already linked to it (never a claim page there),
+/// then the router, then bore.
 async fn open_internet(id: String) {
     let Ok(meta) = store::get(&id).await else { return };
     if meta.kind.bedrock() {
@@ -702,7 +703,34 @@ async fn renew_mapping(id: &str, udp: bool, port: u16, name: &str, in_use: impl 
     }
 }
 
-/// Bedrock servers talk UDP, which ResinCraft Relay and bore can't carry: the router (UPnP), else playit.gg.
+/// How trying ResinCraft Relay first went.
+enum ResinFirst {
+    /// Online through it (or the server stopped meanwhile): nothing more to do.
+    Done,
+    Failed(ResinNet),
+    /// The relay could be used, but no Microsoft account is signed in.
+    NoAccount,
+    /// This build has no relay.
+    Unavailable,
+}
+
+/// Tries ResinCraft Relay before the other ways.
+async fn resin_first(id: &str, meta: &ServerMeta) -> ResinFirst {
+    if !relay::usable(meta).await {
+        return if relay::settings().is_some() { ResinFirst::NoAccount } else { ResinFirst::Unavailable };
+    }
+    match open_resin(id).await {
+        Ok(()) => ResinFirst::Done,
+        Err(_) if !is_running(id) || net(id).is_none() => ResinFirst::Done,
+        Err(e) => {
+            eprintln!("[server] ResinCraft Relay didn't work, trying the next way: {e:#}");
+            ResinFirst::Failed(resin_failed(&e))
+        }
+    }
+}
+
+/// Bedrock servers talk UDP, which bore can't carry: the router (UPnP), then playit.gg (when linked, or chosen),
+/// then ResinCraft Relay (a port of its own on the relay). Set to ResinCraft Relay, only the relay is used.
 async fn open_bedrock(id: String, meta: ServerMeta) {
     let port = meta.port;
     set_net(&id, Some(net_state("opening", None, None, None)));
@@ -714,8 +742,28 @@ async fn open_bedrock(id: String, meta: ServerMeta) {
         }
         return;
     }
+    if meta.tunnel == TunnelMode::Resin {
+        if let Err(e) = open_resin(&id).await {
+            if is_running(&id) && net(&id).is_some() {
+                set_net(&id, Some(ServerNet { resin: Some(resin_failed(&e)), ..net_state("failed", None, Some(format!("{e}")), None) }));
+            }
+        }
+        return;
+    }
+    // ResinCraft Relay first whenever it can be used, then playit.gg, then the router.
+    let mut resin_note = None;
+    let mut resin_hint = false;
+    if matches!(meta.tunnel, TunnelMode::Auto | TunnelMode::Playit) {
+        match resin_first(&id, &meta).await {
+            ResinFirst::Done => return,
+            ResinFirst::Failed(note) => resin_note = Some(note),
+            ResinFirst::NoAccount => resin_hint = true,
+            ResinFirst::Unavailable => {}
+        }
+    }
     let mut first_err = None;
-    if meta.tunnel != TunnelMode::Playit {
+    let linked = playit::linked().await;
+    if meta.tunnel != TunnelMode::Playit && !linked {
         match network::open_udp(port, meta.name.clone()).await {
             Ok(address) => {
                 if !is_running(&id) {
@@ -730,7 +778,7 @@ async fn open_bedrock(id: String, meta: ServerMeta) {
             Err(e) => first_err = Some(e),
         }
     }
-    if meta.tunnel == TunnelMode::Playit || playit::linked().await {
+    if meta.tunnel == TunnelMode::Playit || linked {
         let (claim_id, wanted_id) = (id.clone(), id.clone());
         let opened = playit::open(
             &id,
@@ -754,8 +802,21 @@ async fn open_bedrock(id: String, meta: ServerMeta) {
             Err(e) => first_err = Some(first_err.map(|f| anyhow!("{f} {e}")).unwrap_or(e)),
         }
     }
+    // Linked to playit.gg but it didn't work: the router as the last way.
+    if meta.tunnel != TunnelMode::Playit && linked && first_err.is_some() {
+        if let Ok(address) = network::open_udp(port, meta.name.clone()).await {
+            if !is_running(&id) {
+                network::close_udp(port).await;
+                return;
+            }
+            set_net(&id, Some(net_state("open", Some(address), None, Some("router"))));
+            let check = id.clone();
+            renew_mapping(&id, true, port, &meta.name, move || net(&check).map(|n| n.via) == Some(Some("router"))).await;
+            return;
+        }
+    }
     let msg = first_err.map(|e| format!("{e}.")).unwrap_or_default();
-    set_net(&id, Some(ServerNet { playit_hint: !playit::linked().await, ..net_state("failed", None, Some(msg), None) }));
+    set_net(&id, Some(ServerNet { playit_hint: !playit::linked().await, resin: resin_note, resin_hint, ..net_state("failed", None, Some(msg), None) }));
 }
 
 /// Geyser next to a Java server: opens its UDP port for Bedrock players (the router, else playit.gg once
@@ -805,6 +866,15 @@ async fn open_java(id: String, meta: ServerMeta) {
     let mut resin_hint = false;
     // Why ResinCraft Relay wasn't used, when it was tried.
     let mut resin_note: Option<ResinNet> = None;
+    // ResinCraft Relay first whenever it can be used (a Microsoft account is signed in), then playit.gg.
+    if matches!(meta.tunnel, TunnelMode::Auto | TunnelMode::Playit) {
+        match resin_first(&id, &meta).await {
+            ResinFirst::Done => return,
+            ResinFirst::Failed(note) => resin_note = Some(note),
+            ResinFirst::NoAccount => resin_hint = true,
+            ResinFirst::Unavailable => {}
+        }
+    }
     let earlier_err = match meta.tunnel {
         // The player forwarded the port themselves: share the public IP with that port.
         TunnelMode::Manual => {
@@ -815,76 +885,62 @@ async fn open_java(id: String, meta: ServerMeta) {
             }
             return;
         }
-        TunnelMode::Auto => match network::open_port(port, meta.name.clone()).await {
-            Ok(address) => {
-                if !is_running(&id) {
-                    network::close_port(port).await;
+        TunnelMode::Auto => {
+            // playit.gg second (ResinCraft Relay was tried above), when linked already, so no claim page. If playit.gg
+            // asks to link again (the agent was removed there), give up on it at once and move on.
+            if playit::linked().await {
+                let needs_claim = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let (flag, wanted_id) = (needs_claim.clone(), id.clone());
+                let wanted_flag = needs_claim.clone();
+                let opened = playit::open(
+                    &id,
+                    port,
+                    &meta.name,
+                    false,
+                    move |_| flag.store(true, std::sync::atomic::Ordering::Relaxed),
+                    move || {
+                        !wanted_flag.load(std::sync::atomic::Ordering::Relaxed) && is_running(&wanted_id) && net(&wanted_id).is_some_and(|n| n.state == "opening")
+                    },
+                )
+                .await;
+                match opened {
+                    Ok(address) if is_running(&id) => {
+                        set_net(&id, Some(net_state("open", Some(address), None, Some("playit"))));
+                        return;
+                    }
+                    Ok(_) => {
+                        playit::close(&id).await;
+                        return;
+                    }
+                    Err(_) if !is_running(&id) || net(&id).is_none() => return,
+                    Err(e) => {
+                        eprintln!("[server] playit.gg didn't work, trying the next way: {e:#}");
+                        playit_hint = needs_claim.load(std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+            } else {
+                playit_hint = true;
+            }
+            // Then the router (UPnP).
+            match network::open_port(port, meta.name.clone()).await {
+                Ok(address) => {
+                    if !is_running(&id) {
+                        network::close_port(port).await;
+                        return;
+                    }
+                    set_net(&id, Some(net_state("open", Some(address), None, Some("router"))));
+                    loop {
+                        tokio::time::sleep(Duration::from_secs(network::LEASE_SECS as u64 / 2)).await;
+                        if !is_running(&id) || net(&id).map(|n| n.via) != Some(Some("router")) {
+                            break;
+                        }
+                        let _ = network::open_port(port, meta.name.clone()).await;
+                    }
                     return;
                 }
-                set_net(&id, Some(net_state("open", Some(address), None, Some("router"))));
-                loop {
-                    tokio::time::sleep(Duration::from_secs(network::LEASE_SECS as u64 / 2)).await;
-                    if !is_running(&id) || net(&id).map(|n| n.via) != Some(Some("router")) {
-                        break;
-                    }
-                    let _ = network::open_port(port, meta.name.clone()).await;
-                }
-                return;
+                Err(router_err) => Some(router_err),
             }
-            Err(router_err) => {
-                if playit::linked().await {
-                    // playit.gg first after the router (the owner's choice). Linked already, so no claim page. If
-                    // playit.gg asks to link again (the agent was removed there), give up on it at once and move on.
-                    let needs_claim = Arc::new(std::sync::atomic::AtomicBool::new(false));
-                    let (flag, wanted_id) = (needs_claim.clone(), id.clone());
-                    let wanted_flag = needs_claim.clone();
-                    let opened = playit::open(
-                        &id,
-                        port,
-                        &meta.name,
-                        false,
-                        move |_| flag.store(true, std::sync::atomic::Ordering::Relaxed),
-                        move || {
-                            !wanted_flag.load(std::sync::atomic::Ordering::Relaxed)
-                                && is_running(&wanted_id)
-                                && net(&wanted_id).is_some_and(|n| n.state == "opening")
-                        },
-                    )
-                    .await;
-                    match opened {
-                        Ok(address) if is_running(&id) => {
-                            set_net(&id, Some(net_state("open", Some(address), None, Some("playit"))));
-                            return;
-                        }
-                        Ok(_) => {
-                            playit::close(&id).await;
-                            return;
-                        }
-                        Err(_) if !is_running(&id) || net(&id).is_none() => return,
-                        Err(e) => {
-                            eprintln!("[server] playit.gg didn't work, trying the next way: {e:#}");
-                            playit_hint = needs_claim.load(std::sync::atomic::Ordering::Relaxed);
-                        }
-                    }
-                } else {
-                    playit_hint = true;
-                }
-                // Then ResinCraft Relay, when a Microsoft account is signed in.
-                if relay::usable(&meta).await {
-                    match open_resin(&id).await {
-                        Ok(()) => return,
-                        Err(_) if !is_running(&id) || net(&id).is_none() => return,
-                        Err(e) => {
-                            eprintln!("[server] ResinCraft Relay didn't work: {e:#}");
-                            resin_note = Some(resin_failed(&e));
-                        }
-                    }
-                } else if relay::settings().is_some() {
-                    resin_hint = true;
-                }
-                Some(router_err)
-            }
-        },
+        }
         TunnelMode::Playit => {
             let (claim_id, wanted_id) = (id.clone(), id.clone());
             let opened = playit::open(

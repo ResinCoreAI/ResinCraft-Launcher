@@ -1098,7 +1098,7 @@ const dict: Dict = {
   'servers.domain.tokenRemove': '移除權杖',
   'servers.domain.tokenHelp': '請用「Edit zone DNS」範本（Zone → DNS → Edit）建立權杖。權杖會加密儲存在這台電腦上。',
   'servers.domain.tokenCreate': '建立 API 權杖',
-  'servers.settings.tunnelHint.auto': "ResinCraft 會先請路由器開啟連接埠（UPnP，最快）。不行的話，若已連結則使用 playit.gg，再於登入 Microsoft 帳戶時使用 ResinCraft Relay（每次 2 小時，可延長），最後使用免費的 bore 中繼（每次啟動位址都會改變）。",
+  'servers.settings.tunnelHint.auto': "登入 Microsoft 帳號時先用 ResinCraft Relay（位址永不改變），接著是已連結的 playit.gg，再來是路由器（UPnP），都不行就用免費的 bore 中繼，其位址每次啟動都會改變。",
   'servers.connect.playitHint': '連結 playit.gg（設定 → 朋友的連線方式），即可取得永不改變的位址。',
 
   // Server plugin manager

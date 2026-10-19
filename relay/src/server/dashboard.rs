@@ -232,9 +232,21 @@ fn same_origin(req: &Request, secure: bool) -> bool {
     }
 }
 
+/// Where the dashboard lives: https://<base_domain>/admin/ (with the dashboard on port 443).
+pub const PREFIX: &str = "/admin";
+
+/// The path inside the dashboard: "/admin/api/tunnels" → "/api/tunnels" (paths without the prefix work too).
+fn inner_path(path: &str) -> &str {
+    path.strip_prefix(PREFIX).filter(|rest| rest.starts_with('/')).unwrap_or(path)
+}
+
 async fn route(relay: &Relay, req: &Request, ip: IpAddr, secure: bool) -> Response {
     let get = req.method == "GET";
-    match (req.method.as_str(), req.path.as_str()) {
+    if get && (req.path == "/" || req.path == PREFIX) {
+        return Response::new("308 Permanent Redirect", "text/plain; charset=utf-8", "").header("Location", format!("{PREFIX}/"));
+    }
+    let path = inner_path(&req.path);
+    match (req.method.as_str(), path) {
         ("GET", "/") | ("GET", "/index.html") => return Response::new("200 OK", "text/html; charset=utf-8", INDEX_HTML),
         ("GET", "/app.js") => return Response::new("200 OK", "text/javascript; charset=utf-8", APP_JS),
         ("GET", "/app.css") => return Response::new("200 OK", "text/css; charset=utf-8", APP_CSS),
@@ -263,7 +275,7 @@ async fn route(relay: &Relay, req: &Request, ip: IpAddr, secure: bool) -> Respon
         return Response::error("403 Forbidden", "missing or wrong CSRF token: reload the page");
     }
     let input = req.json();
-    match (req.method.as_str(), req.path.as_str()) {
+    match (req.method.as_str(), path) {
         ("POST", "/api/logout") => {
             if let Some(d) = token_digest {
                 relay.dashboard.sessions.lock().unwrap().remove(&d);
@@ -404,6 +416,7 @@ fn tunnels(relay: &Relay) -> Response {
                 "bytesOut": t.bytes_out.load(Ordering::Relaxed),
                 "secsLeft": t.clock.secs_left(now_secs()).filter(|_| relay.limits_now().session_secs() > 0),
                 "continues": t.clock.continues(),
+                "bedrockPort": t.bedrock_port,
             })
         })
         .collect();
@@ -635,6 +648,14 @@ fn action(relay: &Relay, path: &str, input: &Value, ip: IpAddr) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn serves_under_admin() {
+        assert_eq!(inner_path("/admin/"), "/");
+        assert_eq!(inner_path("/admin/api/tunnels"), "/api/tunnels");
+        assert_eq!(inner_path("/api/tunnels"), "/api/tunnels");
+        assert_eq!(inner_path("/administrator"), "/administrator");
+    }
 
     #[test]
     fn hashes_and_checks_passwords() {
