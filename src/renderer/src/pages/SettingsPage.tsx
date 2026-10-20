@@ -8,6 +8,9 @@ import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { fixed } from '../util'
 
+/** Mojang's usage guidelines ask for this line word for word, so it isn't translated. */
+const DISCLAIMER = 'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
+
 const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'appearance', label: 'settings.nav.appearance', icon: <Palette size={16} /> },
   { id: 'game', label: 'settings.nav.game', icon: <Gamepad2 size={16} /> },
@@ -339,6 +342,9 @@ export default function SettingsPage() {
                 <div className="muted">{t('settings.about.credit')}</div>
                 <div className="hint mono ellipsis" style={{ marginTop: 6 }}>
                   {t('settings.about.dataFolder', { path: info?.dataDir ?? '' })}
+                </div>
+                <div className="hint" lang="en" style={{ marginTop: 6 }}>
+                  {DISCLAIMER}
                 </div>
               </div>
             </div>

@@ -53,7 +53,10 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: ResinCraft Launcher ${{ github.ref_name }}
-          releaseBody: Download the installer below. Windows may warn that the publisher is unverified until releases are code-signed. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.
+          releaseBody: |
+            Download the installer below. Windows may warn that the publisher is unverified until releases are code-signed. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.
+
+            NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true

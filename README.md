@@ -4,6 +4,8 @@ A modern, friendly Minecraft: Java Edition launcher by **Puirkle**.
 
 A small native app built with Tauri 2 and Rust, with a React interface. It talks directly to the public Mojang, Microsoft, Fabric, Quilt, Forge, NeoForge, Modrinth, CurseForge and Adoptium APIs. No telemetry and no ResinCraft account.
 
+> NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+
 ## Features
 
 | | |
