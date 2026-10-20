@@ -571,6 +571,10 @@ const dict: Dict = {
   'instance.pending.stop': "중지",
   'instance.pending.added': "추가됨",
   'instance.pending.allAdded': "모든 파일을 제자리에 넣었습니다.",
+  'instance.pending.lookingIn': "찾는 위치:",
+  'instance.pending.downloadsFolder': "다운로드",
+  'instance.pending.addWatchFolder': "폴더 추가",
+  'instance.pending.stopWatching': "여기서 그만 찾기",
 
   'instance.logs.filter': '로그 필터…',
   'instance.logs.warnings': '경고',

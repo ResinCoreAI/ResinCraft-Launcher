@@ -571,6 +571,10 @@ const dict: Dict = {
   'instance.pending.stop': "หยุด",
   'instance.pending.added': "เพิ่มแล้ว",
   'instance.pending.allAdded': "วางไฟล์ครบทุกไฟล์แล้ว",
+  'instance.pending.lookingIn': "หาใน:",
+  'instance.pending.downloadsFolder': "ดาวน์โหลด",
+  'instance.pending.addWatchFolder': "เพิ่มโฟลเดอร์ที่จะดู",
+  'instance.pending.stopWatching': "เลิกหาในโฟลเดอร์นี้",
 
   'instance.logs.filter': 'กรองล็อก…',
   'instance.logs.warnings': 'คำเตือน',

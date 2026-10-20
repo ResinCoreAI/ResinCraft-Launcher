@@ -12,6 +12,7 @@ import {
   FileDown,
   FileUp,
   FolderOpen,
+  FolderPlus,
   Hammer,
   ListChecks,
   Gamepad2,
@@ -618,7 +619,8 @@ const PENDING_LOOK_MS = 2000
  * finds each one in Downloads and puts it in place. It never downloads them itself.
  */
 function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void }) {
-  const { refreshInstances, toast } = useStore()
+  const { refreshInstances, toast, settings, updateSettings } = useStore()
+  const watch = settings?.watchFolders ?? []
   const list = useMemo(() => inst.pendingDownloads ?? [], [inst.pendingDownloads])
   // Added while this card was open (they leave `list`), shown ticked.
   const [added, setAdded] = useState<string[]>([])
@@ -691,6 +693,33 @@ function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void
               <Download /> {t('instance.pending.downloadAll')}
             </button>
           )}
+        </div>
+        <div className="row wrap hint" style={{ gap: 6, marginBottom: 10 }}>
+          <span>{t('instance.pending.lookingIn')}</span>
+          <span className="chip">{t('instance.pending.downloadsFolder')}</span>
+          {watch.map((d) => (
+            <span key={d} className="chip" title={d}>
+              <span className="ellipsis mono" style={{ maxWidth: 260 }}>
+                {d}
+              </span>
+              <button
+                className="x"
+                title={t('instance.pending.stopWatching')}
+                onClick={() => void updateSettings({ watchFolders: watch.filter((w) => w !== d) })}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <button
+            className="btn sm ghost"
+            onClick={async () => {
+              const list = await api.instances.addWatchFolder()
+              if (list) await updateSettings({ watchFolders: list })
+            }}
+          >
+            <FolderPlus /> {t('instance.pending.addWatchFolder')}
+          </button>
         </div>
         <div className="pending-list">
           {list.map((p) => (

@@ -574,6 +574,10 @@ const dict: Dict = {
   'instance.pending.stop': "停止",
   'instance.pending.added': "追加済み",
   'instance.pending.allAdded': "すべてのファイルを配置しました。",
+  'instance.pending.lookingIn': "探す場所:",
+  'instance.pending.downloadsFolder': "ダウンロード",
+  'instance.pending.addWatchFolder': "フォルダーを追加",
+  'instance.pending.stopWatching': "ここを探すのをやめる",
 
   'instance.logs.filter': 'ログを絞り込み…',
   'instance.logs.warnings': '警告',

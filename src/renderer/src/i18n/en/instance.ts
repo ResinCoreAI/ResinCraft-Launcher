@@ -72,6 +72,10 @@ export default {
   'instance.pending.stop': "Stop",
   'instance.pending.added': "Added",
   'instance.pending.allAdded': "All the files are in place.",
+  'instance.pending.stopWatching': "Stop looking here",
+  'instance.pending.addWatchFolder': "Add watch folder",
+  'instance.pending.downloadsFolder': "Downloads",
+  'instance.pending.lookingIn': "Looks in:",
 
   // Logs tab
   'instance.logs.filter': 'Filter log…',

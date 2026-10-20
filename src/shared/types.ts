@@ -250,6 +250,8 @@ export interface Settings {
   autoUpdate: boolean
   /** Which site wins when a mod is on both Modrinth and CurseForge ('ask' shows the duplicate dialog). */
   preferredModSource: ModSourcePreference
+  /** Folders besides Downloads where Download all looks for files. */
+  watchFolders: string[]
 }
 
 export type ModSourcePreference = 'ask' | 'modrinth' | 'curseforge'
@@ -947,6 +949,8 @@ export interface ResinApi {
     update(id: string, patch: InstancePatch): Promise<Instance>
     /** Puts the manual downloads that arrived in the Downloads folder into the instance. */
     collectPending(id: string): Promise<PendingCollected>
+    /** Asks for another folder for Download all to look in; the updated list, or null if cancelled. */
+    addWatchFolder(): Promise<string[] | null>
     duplicate(id: string): Promise<Instance>
     /** Drops a custom icon (see screenshots.setIcon): back to the modpack's icon, or the generated block art. */
     resetIcon(id: string): Promise<Instance>

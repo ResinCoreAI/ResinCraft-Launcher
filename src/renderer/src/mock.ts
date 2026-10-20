@@ -82,7 +82,8 @@ export function mockApi(): ResinApi {
     concurrency: 16,
     showSnapshots: false,
     autoUpdate: false,
-    preferredModSource: 'ask'
+    preferredModSource: 'ask',
+    watchFolders: []
   }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },
@@ -196,6 +197,10 @@ export function mockApi(): ResinApi {
         if (p.ownPack && !packContent.has(id)) packContent.set(id, [])
         instances = instances.map((i) => (i.id === id ? { ...i, ...clean, group: p.group === null ? undefined : (p.group ?? i.group) } : i))
         return instances.find((i) => i.id === id)!
+      },
+      addWatchFolder: async () => {
+        settings = { ...settings, watchFolders: [...settings.watchFolders, 'D:\\Mods\\Browser downloads'] }
+        return settings.watchFolders
       },
       collectPending: async (id) => {
         const list = instances.find((i) => i.id === id)?.pendingDownloads ?? []

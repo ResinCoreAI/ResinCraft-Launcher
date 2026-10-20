@@ -617,6 +617,10 @@ const dict: Dict = {
   'instance.pending.stop': "Стоп",
   'instance.pending.added': "Добавлен",
   'instance.pending.allAdded': "Все файлы на месте.",
+  'instance.pending.lookingIn': "Ищет в:",
+  'instance.pending.downloadsFolder': "Загрузки",
+  'instance.pending.addWatchFolder': "Добавить папку",
+  'instance.pending.stopWatching': "Больше не искать здесь",
 
   'instance.logs.filter': 'Фильтр лога…',
   'instance.logs.warnings': 'Предупреждения',

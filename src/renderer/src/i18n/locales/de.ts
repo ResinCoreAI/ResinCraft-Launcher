@@ -578,6 +578,10 @@ const dict: Dict = {
   'instance.pending.stop': "Stopp",
   'instance.pending.added': "Hinzugefügt",
   'instance.pending.allAdded': "Alle Dateien sind an ihrem Platz.",
+  'instance.pending.lookingIn': "Sucht in:",
+  'instance.pending.downloadsFolder': "Downloads",
+  'instance.pending.addWatchFolder': "Ordner hinzufügen",
+  'instance.pending.stopWatching': "Hier nicht mehr suchen",
 
   'instance.logs.filter': 'Log filtern…',
   'instance.logs.warnings': 'Warnungen',

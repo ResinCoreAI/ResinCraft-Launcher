@@ -33,6 +33,8 @@ pub struct Settings {
     /// When the same mod is on Modrinth and CurseForge: "ask" | "modrinth" | "curseforge" (Settings → Downloads,
     /// or "Don't ask again" in the duplicate dialog).
     pub preferred_mod_source: String,
+    /// Folders besides Downloads where files for Download all are looked for (a browser that saves elsewhere).
+    pub watch_folders: Vec<String>,
 }
 
 pub fn total_memory_mb() -> u64 {
@@ -61,6 +63,7 @@ impl Default for Settings {
             show_snapshots: false,
             auto_update: false,
             preferred_mod_source: "ask".into(),
+            watch_folders: Vec::new(),
         }
     }
 }

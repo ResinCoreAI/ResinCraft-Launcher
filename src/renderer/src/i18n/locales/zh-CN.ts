@@ -571,6 +571,10 @@ const dict: Dict = {
   'instance.pending.stop': "停止",
   'instance.pending.added': "已添加",
   'instance.pending.allAdded': "所有文件都已就位。",
+  'instance.pending.lookingIn': "查找位置：",
+  'instance.pending.downloadsFolder': "下载",
+  'instance.pending.addWatchFolder': "添加监视文件夹",
+  'instance.pending.stopWatching': "不再在此查找",
 
   'instance.logs.filter': '筛选日志…',
   'instance.logs.warnings': '警告',

@@ -69,6 +69,13 @@ pub async fn pick_file(title: &str, filters: &[Filter<'_>]) -> Result<Option<Pat
     Ok(picked.and_then(|p| p.into_path().ok()))
 }
 
+/// Asks the user to pick a folder. None if cancelled.
+pub async fn pick_folder(title: &str) -> Result<Option<PathBuf>> {
+    let dialog = app()?.dialog().file().set_title(title);
+    let picked = tokio::task::spawn_blocking(move || dialog.blocking_pick_folder()).await?;
+    Ok(picked.and_then(|p| p.into_path().ok()))
+}
+
 /// Asks where to save a file. None if cancelled.
 pub async fn save_file(title: &str, default_path: &Path, filters: &[Filter<'_>]) -> Result<Option<PathBuf>> {
     let mut dialog = app()?.dialog().file().set_title(title);

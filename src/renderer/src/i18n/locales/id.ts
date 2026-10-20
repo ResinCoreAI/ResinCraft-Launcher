@@ -573,6 +573,10 @@ const dict: Dict = {
   'instance.pending.stop': "Berhenti",
   'instance.pending.added': "Ditambahkan",
   'instance.pending.allAdded': "Semua file sudah di tempatnya.",
+  'instance.pending.lookingIn': "Mencari di:",
+  'instance.pending.downloadsFolder': "Unduhan",
+  'instance.pending.addWatchFolder': "Tambah folder",
+  'instance.pending.stopWatching': "Berhenti mencari di sini",
 
   'instance.logs.filter': 'Saring log…',
   'instance.logs.warnings': 'Peringatan',

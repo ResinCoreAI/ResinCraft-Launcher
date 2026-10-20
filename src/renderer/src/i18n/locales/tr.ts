@@ -577,6 +577,10 @@ const dict: Dict = {
   'instance.pending.stop': "Durdur",
   'instance.pending.added': "Eklendi",
   'instance.pending.allAdded': "Tüm dosyalar yerinde.",
+  'instance.pending.lookingIn': "Baktığı yerler:",
+  'instance.pending.downloadsFolder': "İndirilenler",
+  'instance.pending.addWatchFolder': "Klasör ekle",
+  'instance.pending.stopWatching': "Burada aramayı bırak",
 
   'instance.logs.filter': 'Günlüğü filtrele…',
   'instance.logs.warnings': 'Uyarılar',

@@ -572,6 +572,10 @@ const dict: Dict = {
   'instance.pending.stop': "Dừng",
   'instance.pending.added': "Đã thêm",
   'instance.pending.allAdded': "Tất cả tệp đã vào đúng chỗ.",
+  'instance.pending.lookingIn': "Tìm trong:",
+  'instance.pending.downloadsFolder': "Tải xuống",
+  'instance.pending.addWatchFolder': "Thêm thư mục",
+  'instance.pending.stopWatching': "Ngừng tìm ở đây",
 
   'instance.logs.filter': 'Lọc nhật ký…',
   'instance.logs.warnings': 'Cảnh báo',

@@ -46,6 +46,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       create: fn('instances:create'),
       update: fn('instances:update'),
       collectPending: fn('instances:collectPending'),
+      addWatchFolder: fn('instances:addWatchFolder'),
       duplicate: fn('instances:duplicate'),
       resetIcon: fn('instances:resetIcon'),
       setImage: fn('instances:setImage'),

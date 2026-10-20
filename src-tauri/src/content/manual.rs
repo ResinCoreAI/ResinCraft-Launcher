@@ -13,7 +13,7 @@ use super::index::{index_key, load_index, safe_name, save_index, IndexEntry};
 use crate::core::fsutil::safe_join;
 use crate::core::net::{hash_file, HashAlgo};
 use crate::core::types::{ContentKind, PendingDownload};
-use crate::core::{instances, paths, shell};
+use crate::core::{instances, paths, settings, shell};
 
 /// What one look found.
 #[derive(Debug, Clone, Default, Serialize)]
@@ -75,6 +75,19 @@ fn kind_of_folder(folder: &str) -> ContentKind {
     }
 }
 
+/// Asks for a folder to watch too (besides Downloads) and saves it. The updated list; None if cancelled.
+pub async fn add_watch_folder() -> Result<Option<Vec<String>>> {
+    let title = crate::tr!("manual.watchFolder", "Choose a folder where your browser saves downloads").to_string();
+    let Some(dir) = shell::pick_folder(&title).await? else { return Ok(None) };
+    let dir = dir.to_string_lossy().to_string();
+    let mut list = settings::get().await.watch_folders;
+    if !list.iter().any(|d| d.eq_ignore_ascii_case(&dir)) {
+        list.push(dir);
+    }
+    settings::set(json!({ "watchFolders": list.clone() })).await?;
+    Ok(Some(list))
+}
+
 /// Looks for the instance's missing files (kept copies first, then Downloads) and puts the ones it finds in place.
 pub async fn collect(instance_id: &str) -> Result<Collected> {
     let inst = instances::get(instance_id).await?;
@@ -84,7 +97,9 @@ pub async fn collect(instance_id: &str) -> Result<Collected> {
     }
     let game = paths::game_dir(instance_id);
     let kept = kept_dir();
-    let dirs = [kept.clone(), shell::downloads_dir()];
+    // Kept copies first, then Downloads, then the player's own watch folders.
+    let mut dirs = vec![kept.clone(), shell::downloads_dir()];
+    dirs.extend(settings::get().await.watch_folders.iter().map(PathBuf::from).filter(|d| !d.as_os_str().is_empty()));
     let listed: Vec<(PathBuf, Vec<String>)> = {
         let mut v = Vec::new();
         for d in dirs {

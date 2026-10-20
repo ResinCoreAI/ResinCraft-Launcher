@@ -623,6 +623,10 @@ const dict: Dict = {
   'instance.pending.stop': "Zatrzymaj",
   'instance.pending.added': "Dodano",
   'instance.pending.allAdded': "Wszystkie pliki są na miejscu.",
+  'instance.pending.lookingIn': "Szuka w:",
+  'instance.pending.downloadsFolder': "Pobrane",
+  'instance.pending.addWatchFolder': "Dodaj folder",
+  'instance.pending.stopWatching': "Przestań tu szukać",
 
   'instance.logs.filter': 'Filtruj log…',
   'instance.logs.warnings': 'Ostrzeżenia',
