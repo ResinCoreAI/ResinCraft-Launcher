@@ -29,6 +29,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       status: fn('bedrock:status'),
       play: fn('bedrock:play'),
       get: fn('bedrock:get'),
+      update: fn('bedrock:update'),
       openFolder: fn('bedrock:openFolder')
     },
     update: {

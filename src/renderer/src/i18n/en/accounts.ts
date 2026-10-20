@@ -1,7 +1,7 @@
 // Accounts page, Microsoft sign-in, offline profiles, and the Manage view (skin, cape, name).
 export default {
   'accounts.title': 'Accounts',
-  'accounts.subtitle': 'Sign in with the Microsoft account that owns Minecraft: Java Edition.',
+  'accounts.subtitle': "Sign in with your Microsoft account. One without Minecraft: Java Edition becomes a Bedrock profile.",
   'accounts.offlineProfile': 'Offline profile',
   'accounts.signIn': 'Sign in with Microsoft',
   'accounts.noMicrosoft': "<b>Microsoft sign-in isn't available in this build.</b> You can still add an offline profile to try things out.",
@@ -9,6 +9,7 @@ export default {
   'accounts.empty.body': "Your password never touches ResinCraft. You sign in on Microsoft's own website.",
   'accounts.kind.msa': 'Microsoft account',
   'accounts.kind.offline': 'Offline profile: singleplayer & offline-mode servers only',
+  'accounts.kind.bedrock': "Bedrock profile: this account has no Java Edition, so it plays Bedrock only",
   'accounts.active': 'Active',
   'accounts.use': 'Use this account',
   'accounts.manage': 'Manage',

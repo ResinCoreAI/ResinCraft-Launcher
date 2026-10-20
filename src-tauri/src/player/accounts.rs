@@ -41,7 +41,7 @@ pub struct LaunchAuth {
 struct StoredAccount {
     #[serde(default)]
     id: String,
-    /// "msa" | "offline"
+    /// "msa" | "bedrock" (a Microsoft account without Java Edition, named after its gamertag) | "offline"
     #[serde(rename = "type", default)]
     kind: String,
     #[serde(default)]
@@ -251,6 +251,9 @@ struct XuiClaim {
     uhs: String,
     #[serde(default)]
     xid: Option<String>,
+    /// The Xbox gamertag (only in tokens for http://xboxlive.com).
+    #[serde(default)]
+    gtg: Option<String>,
 }
 #[derive(Deserialize)]
 struct DisplayClaims {
@@ -281,6 +284,8 @@ struct Profile {
 }
 
 struct McLoginResult {
+    /// Owns Minecraft: Java Edition; false makes a Bedrock profile.
+    java: bool,
     username: String,
     uuid: String,
     skin_url: Option<String>,
@@ -334,11 +339,24 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
 
     let profile: Profile = match send_json(http().get("https://api.minecraftservices.com/minecraft/profile").bearer_auth(&mc.access_token)).await {
         Ok(p) => p,
-        Err(e) if status_of(&e) == Some(404) => bail_tr!("accounts.noMinecraft", "This Microsoft account doesn't own Minecraft: Java Edition."),
+        // No Java Edition: a Bedrock profile, named after the Xbox gamertag.
+        Err(e) if status_of(&e) == Some(404) => {
+            let (gamertag, xuid) = xbox_identity(&xbl.token).await?;
+            return Ok(McLoginResult {
+                java: false,
+                username: gamertag,
+                uuid: xuid.clone(),
+                skin_url: None,
+                mc_token: mc.access_token,
+                mc_token_expires: now_ms() + mc.expires_in * 1000,
+                xuid: Some(xuid),
+            });
+        }
         Err(e) => return Err(e),
     };
 
     Ok(McLoginResult {
+        java: true,
         username: profile.name,
         uuid: profile.id,
         skin_url: profile.skins.into_iter().find(|s| s.state == "ACTIVE").map(|s| https_texture(&s.url)),
@@ -346,6 +364,26 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
         mc_token_expires: now_ms() + mc.expires_in * 1000,
         xuid: claim.xid.clone(),
     })
+}
+
+/// The Xbox gamertag and XUID, from an XSTS token for Xbox Live itself.
+async fn xbox_identity(xbl_token: &str) -> Result<(String, String)> {
+    let xsts: XboxToken = send_json(http().post("https://xsts.auth.xboxlive.com/xsts/authorize").json(&json!({
+        "Properties": { "SandboxId": "RETAIL", "UserTokens": [xbl_token] },
+        "RelyingParty": "http://xboxlive.com",
+        "TokenType": "JWT"
+    })))
+    .await
+    .map_err(|e| err_tr!("accounts.xbox.failed", "Xbox sign-in failed: {error}", error = e.to_string()))?;
+    let claim = xsts.display_claims.xui.into_iter().next();
+    let xuid = claim.as_ref().and_then(|c| c.xid.clone()).ok_or_else(|| err_tr!("accounts.xbox.failed", "Xbox sign-in failed: {error}", error = "no Xbox user ID"))?;
+    let gamertag = claim.and_then(|c| c.gtg).filter(|g| !g.trim().is_empty()).unwrap_or_else(|| format!("Xbox {}", &xuid[xuid.len().saturating_sub(4)..]));
+    Ok((gamertag, xuid))
+}
+
+/// "msa" for an account with Java Edition, "bedrock" for one without.
+fn kind_of(mc: &McLoginResult) -> String {
+    if mc.java { "msa" } else { "bedrock" }.into()
 }
 
 /// The running device-code poller's cancel flag.
@@ -428,7 +466,7 @@ async fn poll_device_code(client: &str, device_code: &str, interval_s: u64, expi
         }
         let acc = upsert(StoredAccount {
             id: uuid::Uuid::new_v4().to_string(),
-            kind: "msa".into(),
+            kind: kind_of(&mc),
             username: mc.username,
             uuid: mc.uuid,
             skin_url: mc.skin_url,
@@ -464,7 +502,9 @@ async fn refresh(acc: &StoredAccount) -> Result<StoredAccount> {
         );
     };
     let mc = minecraft_login(access).await?;
+    // A Bedrock profile becomes a Java one once the account owns Java Edition.
     let updated = StoredAccount {
+        kind: kind_of(&mc),
         username: mc.username,
         uuid: mc.uuid,
         skin_url: mc.skin_url,
@@ -523,6 +563,15 @@ pub async fn get_launch_auth() -> Result<LaunchAuth> {
     if acc.kind == "offline" {
         return Ok(LaunchAuth { username: acc.username, uuid: acc.uuid, access_token: "0".into(), user_type: "legacy", xuid: None });
     }
+    // Signing in again notices a Java Edition bought since; still none, and Java can't start.
+    let acc = if acc.kind == "bedrock" { refresh(&acc).await? } else { acc };
+    if acc.kind == "bedrock" {
+        bail_tr!(
+            "accounts.bedrockOnly",
+            "{name} is a Bedrock profile: this Microsoft account doesn't own Minecraft: Java Edition. Play Bedrock from the Bedrock page, or switch to another account in Accounts.",
+            name = acc.username
+        );
+    }
     let (acc, access_token) = fresh_token(acc, false).await?;
     Ok(LaunchAuth { username: acc.username, uuid: acc.uuid, access_token, user_type: "msa", xuid: acc.xuid })
 }
@@ -575,6 +624,9 @@ pub(super) async fn minecraft_token(id: &str, force: bool) -> Result<String> {
     let Some(acc) = load().await.into_iter().find(|a| a.id == id) else {
         bail_tr!("accounts.gone", "This account isn't signed in any more. It may have been removed.");
     };
+    if acc.kind == "bedrock" {
+        bail_tr!("accounts.bedrockNoProfile", "Bedrock profiles have no Java Edition skin, cape or name to change. Change your Bedrock look in the game.");
+    }
     if acc.kind != "msa" {
         bail_tr!("accounts.offlineNoProfile", "Offline profiles can't change skins, capes or names. Sign in with Microsoft to do that.");
     }

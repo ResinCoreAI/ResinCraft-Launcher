@@ -75,6 +75,7 @@ const dict: Dict = {
   'app.clickToSignIn': '點選以登入',
   'app.microsoftAccount': 'Microsoft 帳戶',
   'app.offlineProfile': '離線帳戶',
+  'app.bedrockProfile': "Bedrock 檔案",
   'app.crashed': '遊戲意外關閉（結束代碼 {code}）。詳情請查看「日誌」分頁。',
   'drop.title': '放開以匯入',
   'drop.formats': 'Modrinth .mrpack 或 CurseForge .zip',
@@ -85,7 +86,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': '帳戶',
-  'accounts.subtitle': '使用擁有 Minecraft: Java Edition 的 Microsoft 帳戶登入。',
+  'accounts.subtitle': "使用你的 Microsoft 帳號登入。沒有 Minecraft: Java 版的帳號會成為 Bedrock 檔案。",
   'accounts.offlineProfile': '離線帳戶',
   'accounts.signIn': '使用 Microsoft 登入',
   'accounts.noMicrosoft': '<b>此版本不支援 Microsoft 登入。</b>你仍然可以新增離線帳戶來體驗看看。',
@@ -93,6 +94,7 @@ const dict: Dict = {
   'accounts.empty.body': '你會在 Microsoft 官方網站上登入，ResinCraft 永遠不會接觸到你的密碼。',
   'accounts.kind.msa': 'Microsoft 帳戶',
   'accounts.kind.offline': '離線帳戶：僅限單人遊戲和離線模式伺服器',
+  'accounts.kind.bedrock': "Bedrock 檔案：此帳號沒有 Java 版，只能玩基岩版",
   'accounts.active': '使用中',
   'accounts.use': '使用此帳戶',
   'accounts.manage': '管理',
@@ -1266,6 +1268,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "未安裝",
   'bedrock.play': "開始遊戲",
   'bedrock.get': "從 Microsoft Store 取得",
+  'bedrock.update': "檢查更新",
+  'bedrock.installing': "請在 Microsoft Store 視窗中完成安裝，完成後此頁面會自動更新。",
   'bedrock.openFolder': "世界資料夾",
   'bedrock.worlds': "世界",
   'bedrock.played': "{when}玩過",

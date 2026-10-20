@@ -102,7 +102,7 @@ export function Avatar({ account, size = 32 }: { account?: AccountView; size?: n
   if (!account?.skinUrl)
     return (
       <div className="avatar" style={{ width: size, height: size }} title={account?.username}>
-        <BlockArt seed={account?.username ?? '?'} color={account?.type === 'offline' ? '#a8a3bd' : '#b26bff'} />
+        <BlockArt seed={account?.username ?? '?'} color={account?.type === 'offline' ? '#a8a3bd' : account?.type === 'bedrock' ? '#39ff88' : '#b26bff'} />
       </div>
     )
   const layer = (x: number) => `${-x * size}px ${-size}px`

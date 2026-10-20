@@ -50,7 +50,11 @@ export function mockApi(): ResinApi {
       playtime: 9_000
     }
   ]
-  let accounts: AccountView[] = [{ id: 'a1', type: 'msa', username: 'Puirkle', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', active: true }]
+  let accounts: AccountView[] = [
+    { id: 'a1', type: 'msa', username: 'Puirkle', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', active: true },
+    // A Microsoft account without Java Edition.
+    { id: 'a2', type: 'bedrock', username: 'PuirkleBE', uuid: '2535412345678901', active: false }
+  ]
   let settings: Settings = {
     theme: 'dark',
     language: 'system',
@@ -339,6 +343,7 @@ export function mockApi(): ResinApi {
         ),
       play: () => wait(undefined, 300),
       get: () => wait(undefined, 300),
+      update: () => wait(undefined, 300),
       openFolder: () => wait(undefined, 100)
     },
     ...mockFiles(),

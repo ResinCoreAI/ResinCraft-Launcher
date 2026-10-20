@@ -75,6 +75,7 @@ const dict: Dict = {
   'app.clickToSignIn': 'Nhấn để đăng nhập',
   'app.microsoftAccount': 'Tài khoản Microsoft',
   'app.offlineProfile': 'Hồ sơ ngoại tuyến',
+  'app.bedrockProfile': "Hồ sơ Bedrock",
   'app.crashed': 'Trò chơi đã đóng bất ngờ (mã thoát {code}). Xem thẻ Nhật ký để biết chi tiết.',
   'drop.title': 'Thả để nhập',
   'drop.formats': '.mrpack của Modrinth hoặc .zip của CurseForge',
@@ -85,7 +86,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': 'Tài khoản',
-  'accounts.subtitle': 'Đăng nhập bằng tài khoản Microsoft sở hữu Minecraft: Java Edition.',
+  'accounts.subtitle': "Đăng nhập bằng tài khoản Microsoft của bạn. Tài khoản không có Minecraft: Java Edition sẽ thành hồ sơ Bedrock.",
   'accounts.offlineProfile': 'Hồ sơ ngoại tuyến',
   'accounts.signIn': 'Đăng nhập bằng Microsoft',
   'accounts.noMicrosoft': '<b>Bản dựng này không hỗ trợ đăng nhập Microsoft.</b> Bạn vẫn có thể thêm hồ sơ ngoại tuyến để dùng thử.',
@@ -93,6 +94,7 @@ const dict: Dict = {
   'accounts.empty.body': 'Mật khẩu của bạn không bao giờ đi qua ResinCraft. Bạn đăng nhập ngay trên trang web của Microsoft.',
   'accounts.kind.msa': 'Tài khoản Microsoft',
   'accounts.kind.offline': 'Hồ sơ ngoại tuyến: chỉ chơi đơn & máy chủ chế độ ngoại tuyến',
+  'accounts.kind.bedrock': "Hồ sơ Bedrock: tài khoản này không có Java Edition nên chỉ chơi được Bedrock",
   'accounts.active': 'Đang dùng',
   'accounts.use': 'Dùng tài khoản này',
   'accounts.manage': 'Quản lý',
@@ -1276,6 +1278,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "Chưa cài",
   'bedrock.play': "Chơi",
   'bedrock.get': "Tải từ Microsoft Store",
+  'bedrock.update': "Kiểm tra cập nhật",
+  'bedrock.installing': "Hoàn tất cài đặt trong cửa sổ Microsoft Store. Trang này sẽ tự nhận biết khi xong.",
   'bedrock.openFolder': "Thư mục thế giới",
   'bedrock.worlds': "Thế giới",
   'bedrock.played': "Đã chơi {when}",

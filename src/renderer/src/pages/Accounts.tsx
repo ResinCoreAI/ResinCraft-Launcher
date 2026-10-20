@@ -84,7 +84,7 @@ export default function Accounts() {
               <Avatar account={a} size={44} />
               <div className="grow">
                 <div className="title">{a.username}</div>
-                <div className="file">{t(a.type === 'msa' ? 'accounts.kind.msa' : 'accounts.kind.offline')}</div>
+                <div className="file">{t(`accounts.kind.${a.type}`)}</div>
               </div>
               {a.type === 'msa' && (
                 <button className="btn sm" onClick={() => setManaging(a)}>

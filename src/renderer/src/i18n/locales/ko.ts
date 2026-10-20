@@ -75,6 +75,7 @@ const dict: Dict = {
   'app.clickToSignIn': '클릭해서 로그인',
   'app.microsoftAccount': 'Microsoft 계정',
   'app.offlineProfile': '오프라인 프로필',
+  'app.bedrockProfile': "Bedrock 프로필",
   'app.crashed': '게임이 예기치 않게 종료됐어요(종료 코드 {code}). 자세한 내용은 로그 탭에서 확인하세요.',
   'drop.title': '놓아서 가져오기',
   'drop.formats': 'Modrinth .mrpack 또는 CurseForge .zip',
@@ -85,7 +86,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': '계정',
-  'accounts.subtitle': 'Minecraft: Java Edition을 소유한 Microsoft 계정으로 로그인하세요.',
+  'accounts.subtitle': "Microsoft 계정으로 로그인하세요. Minecraft: Java Edition이 없는 계정은 Bedrock 프로필이 됩니다.",
   'accounts.offlineProfile': '오프라인 프로필',
   'accounts.signIn': 'Microsoft로 로그인',
   'accounts.noMicrosoft': '<b>이 빌드에서는 Microsoft 로그인을 사용할 수 없어요.</b> 오프라인 프로필을 추가해서 체험해 볼 수는 있어요.',
@@ -93,6 +94,7 @@ const dict: Dict = {
   'accounts.empty.body': '비밀번호는 ResinCraft를 거치지 않아요. Microsoft 공식 웹사이트에서 직접 로그인해요.',
   'accounts.kind.msa': 'Microsoft 계정',
   'accounts.kind.offline': '오프라인 프로필: 싱글플레이 및 오프라인 모드 서버 전용',
+  'accounts.kind.bedrock': "Bedrock 프로필: 이 계정에는 Java Edition이 없어 Bedrock만 플레이합니다",
   'accounts.active': '사용 중',
   'accounts.use': '이 계정 사용',
   'accounts.manage': '관리',
@@ -1270,6 +1272,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "설치 안 됨",
   'bedrock.play': "플레이",
   'bedrock.get': "Microsoft Store에서 받기",
+  'bedrock.update': "업데이트 확인",
+  'bedrock.installing': "Microsoft Store 창에서 설치를 마치세요. 끝나면 이 페이지가 알아챕니다.",
   'bedrock.openFolder': "월드 폴더",
   'bedrock.worlds': "월드",
   'bedrock.played': "{when} 플레이함",

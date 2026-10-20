@@ -75,6 +75,7 @@ const dict: Dict = {
   'app.clickToSignIn': 'คลิกเพื่อลงชื่อเข้าใช้',
   'app.microsoftAccount': 'บัญชี Microsoft',
   'app.offlineProfile': 'โปรไฟล์ออฟไลน์',
+  'app.bedrockProfile': "โปรไฟล์ Bedrock",
   'app.crashed': 'เกมปิดตัวลงโดยไม่คาดคิด (รหัสออก {code}) ดูรายละเอียดได้ที่แท็บล็อก',
   'drop.title': 'วางเพื่อนำเข้า',
   'drop.formats': 'Modrinth .mrpack หรือ CurseForge .zip',
@@ -85,7 +86,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': 'บัญชี',
-  'accounts.subtitle': 'ลงชื่อเข้าใช้ด้วยบัญชี Microsoft ที่เป็นเจ้าของ Minecraft: Java Edition',
+  'accounts.subtitle': "ลงชื่อเข้าใช้ด้วยบัญชี Microsoft ของคุณ บัญชีที่ไม่มี Minecraft: Java Edition จะเป็นโปรไฟล์ Bedrock",
   'accounts.offlineProfile': 'โปรไฟล์ออฟไลน์',
   'accounts.signIn': 'ลงชื่อเข้าใช้ด้วย Microsoft',
   'accounts.noMicrosoft': '<b>บิลด์นี้ไม่รองรับการลงชื่อเข้าใช้ด้วย Microsoft</b> แต่คุณยังเพิ่มโปรไฟล์ออฟไลน์เพื่อลองใช้งานได้',
@@ -93,6 +94,7 @@ const dict: Dict = {
   'accounts.empty.body': 'ResinCraft จะไม่เห็นรหัสผ่านของคุณเลย เพราะคุณจะลงชื่อเข้าใช้บนเว็บไซต์ของ Microsoft เอง',
   'accounts.kind.msa': 'บัญชี Microsoft',
   'accounts.kind.offline': 'โปรไฟล์ออฟไลน์: ใช้ได้เฉพาะผู้เล่นคนเดียวและเซิร์ฟเวอร์โหมดออฟไลน์',
+  'accounts.kind.bedrock': "โปรไฟล์ Bedrock: บัญชีนี้ไม่มี Java Edition จึงเล่นได้เฉพาะ Bedrock",
   'accounts.active': 'ใช้งานอยู่',
   'accounts.use': 'ใช้บัญชีนี้',
   'accounts.manage': 'จัดการ',
@@ -1268,6 +1270,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "ยังไม่ได้ติดตั้ง",
   'bedrock.play': "เล่น",
   'bedrock.get': "รับจาก Microsoft Store",
+  'bedrock.update': "ตรวจหาอัปเดต",
+  'bedrock.installing': "ติดตั้งให้เสร็จในหน้าต่าง Microsoft Store หน้านี้จะรู้เองเมื่อเสร็จ",
   'bedrock.openFolder': "โฟลเดอร์โลก",
   'bedrock.worlds': "โลก",
   'bedrock.played': "เล่นเมื่อ {when}",

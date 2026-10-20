@@ -75,6 +75,7 @@ const dict: Dict = {
   'app.clickToSignIn': 'Giriş yapmak için tıkla',
   'app.microsoftAccount': 'Microsoft hesabı',
   'app.offlineProfile': 'Çevrimdışı profil',
+  'app.bedrockProfile': "Bedrock profili",
   'app.crashed': 'Oyun beklenmedik şekilde kapandı (çıkış kodu {code}). Ayrıntılar için Günlükler sekmesine bak.',
   'drop.title': 'İçe aktarmak için bırak',
   'drop.formats': 'Modrinth .mrpack veya CurseForge .zip',
@@ -85,7 +86,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': 'Hesaplar',
-  'accounts.subtitle': "Minecraft: Java Edition'a sahip olan Microsoft hesabınla giriş yap.",
+  'accounts.subtitle': "Microsoft hesabınla giriş yap. Minecraft: Java Edition'ı olmayan bir hesap Bedrock profili olur.",
   'accounts.offlineProfile': 'Çevrimdışı profil',
   'accounts.signIn': 'Microsoft ile giriş yap',
   'accounts.noMicrosoft': '<b>Bu sürümde Microsoft ile giriş kullanılamıyor.</b> Yine de denemek için çevrimdışı bir profil ekleyebilirsin.',
@@ -93,6 +94,7 @@ const dict: Dict = {
   'accounts.empty.body': "Şifren ResinCraft'a asla ulaşmaz. Girişi Microsoft'un kendi web sitesinde yaparsın.",
   'accounts.kind.msa': 'Microsoft hesabı',
   'accounts.kind.offline': 'Çevrimdışı profil: yalnızca tek oyunculu ve çevrimdışı mod sunucuları',
+  'accounts.kind.bedrock': "Bedrock profili: bu hesapta Java Edition yok, bu yüzden yalnızca Bedrock oynar",
   'accounts.active': 'Etkin',
   'accounts.use': 'Bu hesabı kullan',
   'accounts.manage': 'Yönet',
@@ -1290,6 +1292,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "Kurulu değil",
   'bedrock.play': "Oyna",
   'bedrock.get': "Microsoft Store'dan al",
+  'bedrock.update': "Güncellemeleri denetle",
+  'bedrock.installing': "Kurulumu Microsoft Store penceresinde tamamla. Bitince bu sayfa fark eder.",
   'bedrock.openFolder': "Dünyalar klasörü",
   'bedrock.worlds': "Dünyalar",
   'bedrock.played': "Oynandı: {when}",

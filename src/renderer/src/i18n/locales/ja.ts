@@ -75,6 +75,7 @@ const dict: Dict = {
   'app.clickToSignIn': 'クリックしてサインイン',
   'app.microsoftAccount': 'Microsoftアカウント',
   'app.offlineProfile': 'オフラインプロフィール',
+  'app.bedrockProfile': "Bedrock プロフィール",
   'app.crashed': 'ゲームが予期せず終了しました（終了コード {code}）。詳しくは「ログ」タブを確認してください。',
   'drop.title': 'ドロップしてインポート',
   'drop.formats': 'Modrinthの.mrpackまたはCurseForgeの.zip',
@@ -85,7 +86,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': 'アカウント',
-  'accounts.subtitle': 'Minecraft: Java Editionを所有しているMicrosoftアカウントでサインインしてください。',
+  'accounts.subtitle': "Microsoft アカウントでサインインしてください。Minecraft: Java Edition を持っていないアカウントは Bedrock プロフィールになります。",
   'accounts.offlineProfile': 'オフラインプロフィール',
   'accounts.signIn': 'Microsoftでサインイン',
   'accounts.noMicrosoft': '<b>このビルドではMicrosoftサインインを利用できません。</b>お試し用にオフラインプロフィールを追加することはできます。',
@@ -93,6 +94,7 @@ const dict: Dict = {
   'accounts.empty.body': 'パスワードがResinCraftに渡ることはありません。サインインはMicrosoftの公式サイトで行います。',
   'accounts.kind.msa': 'Microsoftアカウント',
   'accounts.kind.offline': 'オフラインプロフィール：シングルプレイとオフラインモードのサーバーのみ',
+  'accounts.kind.bedrock': "Bedrock プロフィール：このアカウントは Java Edition を持っていないため、Bedrock のみ遊べます",
   'accounts.active': '使用中',
   'accounts.use': 'このアカウントを使う',
   'accounts.manage': '管理',
@@ -1275,6 +1277,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "未インストール",
   'bedrock.play': "プレイ",
   'bedrock.get': "Microsoft Store で入手",
+  'bedrock.update': "アップデートを確認",
+  'bedrock.installing': "Microsoft Store のウィンドウでインストールを完了してください。完了するとこのページに反映されます。",
   'bedrock.openFolder': "ワールドのフォルダー",
   'bedrock.worlds': "ワールド",
   'bedrock.played': "{when}にプレイ",

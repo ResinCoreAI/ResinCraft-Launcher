@@ -16,6 +16,7 @@ export default {
   'app.clickToSignIn': 'Click to sign in',
   'app.microsoftAccount': 'Microsoft account',
   'app.offlineProfile': 'Offline profile',
+  'app.bedrockProfile': "Bedrock profile",
   'app.crashed': 'The game closed unexpectedly (exit code {code}). Check the Logs tab for details.',
   'drop.title': 'Drop to import',
   'drop.formats': 'Modrinth .mrpack or CurseForge .zip',

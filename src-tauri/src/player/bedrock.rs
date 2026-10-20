@@ -1,7 +1,8 @@
 //! `bedrock:*`: Minecraft Bedrock Edition (Minecraft for Windows, and Minecraft Preview) as installed from the
 //! Microsoft Store or the Xbox app. ResinCraft finds the installed version and the worlds, opens the game, and
-//! opens the Store page to get it. Windows only lets the Store install and update these apps, so ResinCraft can't
-//! switch them to another version: Preview is the way to try the next update.
+//! opens the Store's install window to get it or its updates page to update it. Only the Store (or the Xbox app)
+//! may install these paid apps (winget's Store source doesn't carry them either), so ResinCraft can't download
+//! them itself or switch them to another version: Preview is the way to try the next update.
 
 use std::path::{Path, PathBuf};
 
@@ -36,11 +37,11 @@ impl Edition {
             Edition::Preview => "minecraft-preview:",
         }
     }
-    /// Its Microsoft Store page.
+    /// The Microsoft Store's compact install window for it (the "mini" product page).
     fn store(self) -> &'static str {
         match self {
-            Edition::Release => "ms-windows-store://pdp/?productid=9NBLGGH2JHXJ",
-            Edition::Preview => "ms-windows-store://pdp/?productid=9P5X4QVLC2XR",
+            Edition::Release => "ms-windows-store://pdp/?productid=9NBLGGH2JHXJ&mode=mini",
+            Edition::Preview => "ms-windows-store://pdp/?productid=9P5X4QVLC2XR&mode=mini",
         }
     }
     /// Where the game keeps its data: `%APPDATA%\Minecraft Bedrock` (and the older app-package folder).
@@ -213,6 +214,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "bedrock:get" => {
             shell::open_url(args.get::<Edition>(0)?.store())?;
+            done()
+        }
+        // The Store's Downloads and updates page, which updates every Store app (Minecraft included).
+        "bedrock:update" => {
+            shell::open_url("ms-windows-store://downloadsandupdates")?;
             done()
         }
         "bedrock:openFolder" => {

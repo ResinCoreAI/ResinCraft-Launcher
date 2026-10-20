@@ -1,6 +1,6 @@
 import { ChevronRight, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Smartphone, Users } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
-import type { Instance } from '@shared/types'
+import type { AccountView, Instance } from '@shared/types'
 import { Avatar, BlockArt, ContextMenuHost, Dock, Logo } from './components/ui'
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
@@ -30,6 +30,9 @@ const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'accounts', label: 'nav.accounts', icon: <Users /> },
   { page: 'settings', label: 'nav.settings', icon: <SettingsIcon /> }
 ]
+
+/** The sidebar's line under the account name. */
+const ACCOUNT_KIND: Record<AccountView['type'], Key> = { msa: 'app.microsoftAccount', bedrock: 'app.bedrockProfile', offline: 'app.offlineProfile' }
 
 const TITLES: Record<Route['page'], Key> = {
   home: 'nav.home',
@@ -101,7 +104,7 @@ export default function App() {
           <Avatar account={activeAccount} size={34} />
           <div className="who">
             <b>{activeAccount?.username ?? t('app.notSignedIn')}</b>
-            <span>{t(activeAccount ? (activeAccount.type === 'msa' ? 'app.microsoftAccount' : 'app.offlineProfile') : 'app.clickToSignIn')}</span>
+            <span>{t(activeAccount ? ACCOUNT_KIND[activeAccount.type] : 'app.clickToSignIn')}</span>
           </div>
         </button>
       </aside>

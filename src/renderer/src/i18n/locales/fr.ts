@@ -76,6 +76,7 @@ const dict: Dict = {
   'app.clickToSignIn': 'Cliquez pour vous connecter',
   'app.microsoftAccount': 'Compte Microsoft',
   'app.offlineProfile': 'Profil hors ligne',
+  'app.bedrockProfile': "Profil Bedrock",
   'app.crashed': 'Le jeu s’est fermé de manière inattendue (code de sortie {code}). Consultez l’onglet Journaux pour plus de détails.',
   'drop.title': 'Déposez pour importer',
   'drop.formats': '.mrpack Modrinth ou .zip CurseForge',
@@ -86,7 +87,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': 'Comptes',
-  'accounts.subtitle': 'Connectez-vous avec le compte Microsoft qui possède Minecraft: Java Edition.',
+  'accounts.subtitle': "Connectez-vous avec votre compte Microsoft. Un compte sans Minecraft: Java Edition devient un profil Bedrock.",
   'accounts.offlineProfile': 'Profil hors ligne',
   'accounts.signIn': 'Se connecter avec Microsoft',
   'accounts.noMicrosoft':
@@ -95,6 +96,7 @@ const dict: Dict = {
   'accounts.empty.body': 'Votre mot de passe ne passe jamais par ResinCraft. Vous vous connectez directement sur le site de Microsoft.',
   'accounts.kind.msa': 'Compte Microsoft',
   'accounts.kind.offline': 'Profil hors ligne : solo et serveurs en mode hors ligne uniquement',
+  'accounts.kind.bedrock': "Profil Bedrock : ce compte n'a pas Java Edition, il ne joue donc qu'à Bedrock",
   'accounts.active': 'Actif',
   'accounts.use': 'Utiliser ce compte',
   'accounts.manage': 'Gérer',
@@ -1325,6 +1327,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "Non installé",
   'bedrock.play': "Jouer",
   'bedrock.get': "L’obtenir sur le Microsoft Store",
+  'bedrock.update': "Rechercher des mises à jour",
+  'bedrock.installing': "Termine l'installation dans la fenêtre du Microsoft Store. Cette page le remarque une fois terminé.",
   'bedrock.openFolder': "Dossier des mondes",
   'bedrock.worlds': "Mondes",
   'bedrock.played': "Joué {when}",

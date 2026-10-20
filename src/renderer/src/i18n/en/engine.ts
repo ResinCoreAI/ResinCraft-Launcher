@@ -3,6 +3,8 @@
 export default {
   'engine.accounts.badResponse': 'Unexpected response from Microsoft sign-in',
   'engine.accounts.badUsername': 'Usernames are 3–16 characters: letters, numbers and _',
+  'engine.accounts.bedrockNoProfile': 'Bedrock profiles have no Java Edition skin, cape or name to change. Change your Bedrock look in the game.',
+  'engine.accounts.bedrockOnly': "{name} is a Bedrock profile: this Microsoft account doesn't own Minecraft: Java Edition. Play Bedrock from the Bedrock page, or switch to another account in Accounts.",
   'engine.accounts.clientRejected': "Minecraft rejected this app's Client ID. New Azure apps must be approved by Mojang before they can sign in to Minecraft.",
   'engine.accounts.codeExpired': 'The sign-in code expired. Please try again.',
   'engine.accounts.gone': "This account isn't signed in any more. It may have been removed.",

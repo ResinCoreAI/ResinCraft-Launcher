@@ -75,6 +75,7 @@ const dict: Dict = {
   'app.clickToSignIn': 'Klik untuk masuk',
   'app.microsoftAccount': 'Akun Microsoft',
   'app.offlineProfile': 'Profil offline',
+  'app.bedrockProfile': "Profil Bedrock",
   'app.crashed': 'Game tertutup secara tak terduga (kode keluar {code}). Lihat tab Log untuk detailnya.',
   'drop.title': 'Lepaskan untuk mengimpor',
   'drop.formats': '.mrpack Modrinth atau .zip CurseForge',
@@ -85,7 +86,7 @@ const dict: Dict = {
 
   // accounts
   'accounts.title': 'Akun',
-  'accounts.subtitle': 'Masuk dengan akun Microsoft yang memiliki Minecraft: Java Edition.',
+  'accounts.subtitle': "Masuk dengan akun Microsoft kamu. Akun tanpa Minecraft: Java Edition menjadi profil Bedrock.",
   'accounts.offlineProfile': 'Profil offline',
   'accounts.signIn': 'Masuk dengan Microsoft',
   'accounts.noMicrosoft': '<b>Masuk dengan Microsoft tidak tersedia di build ini.</b> Anda tetap bisa menambahkan profil offline untuk mencoba-coba.',
@@ -93,6 +94,7 @@ const dict: Dict = {
   'accounts.empty.body': 'Kata sandi Anda tidak pernah melewati ResinCraft. Anda masuk langsung di situs web Microsoft.',
   'accounts.kind.msa': 'Akun Microsoft',
   'accounts.kind.offline': 'Profil offline: hanya pemain tunggal & server mode offline',
+  'accounts.kind.bedrock': "Profil Bedrock: akun ini tidak punya Java Edition, jadi hanya bisa main Bedrock",
   'accounts.active': 'Aktif',
   'accounts.use': 'Gunakan akun ini',
   'accounts.manage': 'Kelola',
@@ -1280,6 +1282,8 @@ const dict: Dict = {
   'bedrock.notInstalled': "Belum terpasang",
   'bedrock.play': "Main",
   'bedrock.get': "Dapatkan dari Microsoft Store",
+  'bedrock.update': "Periksa pembaruan",
+  'bedrock.installing': "Selesaikan pemasangan di jendela Microsoft Store. Halaman ini akan tahu saat selesai.",
   'bedrock.openFolder': "Folder dunia",
   'bedrock.worlds': "Dunia",
   'bedrock.played': "Dimainkan {when}",

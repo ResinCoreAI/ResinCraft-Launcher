@@ -92,7 +92,8 @@ export interface LoaderVersion {
 
 export interface AccountView {
   id: string
-  type: 'msa' | 'offline'
+  /** bedrock: a Microsoft account without Java Edition (named after its gamertag; can't start Java). */
+  type: 'msa' | 'bedrock' | 'offline'
   username: string
   uuid: string
   skinUrl?: string
@@ -837,8 +838,10 @@ export interface ResinApi {
     status(): Promise<BedrockStatus>
     /** Opens the game. */
     play(edition: BedrockEditionKind): Promise<void>
-    /** Opens its Microsoft Store page. */
+    /** Opens the Microsoft Store's install window for it. */
     get(edition: BedrockEditionKind): Promise<void>
+    /** Opens the Microsoft Store's Downloads and updates page. */
+    update(): Promise<void>
     /** Opens a world's folder, or the edition's worlds folder. */
     openFolder(edition: BedrockEditionKind, worldId?: string): Promise<void>
   }
