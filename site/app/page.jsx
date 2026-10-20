@@ -5,7 +5,7 @@ import { GITHUB, RELAY_EXAMPLE } from '@/lib/site'
 
 const STATS = [
   ['5', 'Mod & modpack sources'],
-  ['9', 'Server types'],
+  ['13', 'Server types'],
   ['4', 'Mod loaders'],
   ['16', 'Languages'],
 ]
@@ -14,7 +14,12 @@ const FEATURES = [
   ['layers', 'Instances & groups', 'Every version or modpack gets its own folder, Java and settings. Sort them into groups by dragging cards.'],
   ['search', 'Five sources, one search', 'Modrinth, CurseForge, FTB, ATLauncher and Technic: mods, modpacks, resource packs and shaders, filtered to your game version.'],
   ['history', 'Pick the exact version', 'Install the newest with one click or choose any release, beta or alpha, and switch later. Dependencies come along on their own.'],
-  ['package', 'Modpacks in and out', 'Import Modrinth, CurseForge, FTB, ATLauncher and Technic packs. Share yours as a .mrpack or a CurseForge zip.'],
+  [
+    'package',
+    'Modpacks in and out',
+    "Import Modrinth, CurseForge, FTB, ATLauncher and Technic packs. Files only CurseForge's website may hand out? Download all opens each page in your browser and ResinCraft puts every file in place. Share your own pack as a .mrpack or a CurseForge zip.",
+  ],
+  ['sparkles', 'OptiFine or Sodium', 'Add OptiFine to an instance: download it from optifine.net and ResinCraft sets it up. Or go open source with Sodium and Iris in one click.'],
   ['server', 'Host a server', 'Vanilla, snapshots, Paper, Purpur, Folia, Leaf, Spigot, Fabric, Quilt, Forge, NeoForge, Arclight or Bedrock, or turn a modpack into a server. Tuned Java flags included.'],
   [
     'globe',
@@ -22,6 +27,11 @@ const FEATURES = [
     <>
       Your server gets an address like <span className="mono">{RELAY_EXAMPLE}</span>, Java or Bedrock. No port forwarding, nothing for friends to install.
     </>,
+  ],
+  [
+    'phone',
+    'Bedrock too',
+    'Play Minecraft for Windows, install or update it from the Microsoft Store, and host Bedrock servers. A Microsoft account without Java Edition signs in as a Bedrock profile.',
   ],
   ['puzzle', 'Plugins, managed like mods', 'Plugins from Modrinth, Hangar, SpigotMC and CurseForge, with a version picker, update checks and Update all.'],
   ['folder', 'Files & editor', 'Browse any instance or server folder and edit configs with syntax highlighting. Deleted files go to the Recycle Bin.'],
@@ -57,7 +67,7 @@ const FAQ = [
   ['Is ResinCraft free?', "Yes. It's free and open source under the MIT licence, and the code is on GitHub."],
   [
     'Do I need to own Minecraft?',
-    'To play online, yes: you sign in with the Microsoft account that owns Minecraft: Java Edition. Offline profiles work for singleplayer, LAN and offline-mode servers.',
+    'To play Java online, yes: you sign in with the Microsoft account that owns Minecraft: Java Edition. An account with only Bedrock becomes a Bedrock profile for the Bedrock page and Bedrock servers. Offline profiles work for singleplayer, LAN and offline-mode servers.',
   ],
   ['Is signing in safe?', "You sign in on Microsoft's own website with a short code, so ResinCraft never sees your password. Sign-in tokens are stored encrypted on your PC."],
   [
@@ -84,6 +94,10 @@ const FAQ = [
     <>
       In <span className="mono">%APPDATA%\ResinCraft Launcher</span>. Uninstalling leaves that folder, so your worlds aren't lost.
     </>,
+  ],
+  [
+    'I found a bug. Where do I report it?',
+    'In the launcher, open Settings → About and choose Report an issue. It opens a new GitHub issue with your launcher version filled in.',
   ],
   ['Is it made by Mojang or Microsoft?', 'No. ResinCraft is an independent project by Puirkle, written from scratch.'],
 ]
