@@ -1,0 +1,38 @@
+// Settings → Storage: where instances and game files are kept (components/Storage.tsx).
+export default {
+  'storage.nav': 'Storage',
+  'storage.lead':
+    "Where your instances, hosted servers and the files Minecraft shares between them are kept. Settings and accounts always stay in the launcher's own folder.",
+  'storage.where': 'Where instances are kept',
+  'storage.default': 'Default',
+  'storage.free': '{free} free on {drive}',
+  'storage.missing': "This folder can't be found. If it's on a drive you unplugged, plug it back in and restart ResinCraft.",
+  'storage.movingNow': 'Moving to {path}… You can follow it, or cancel, in the task list.',
+  'storage.open': 'Open',
+  'storage.change': 'Change…',
+  'storage.what':
+    "These move together: your instances with their worlds and mods, your hosted servers, and the shared libraries, assets and Java. A game needs all of them, so they're kept on one drive.",
+  'storage.moved': 'Your instances are now kept in {path}',
+  'storage.switched': 'New instances will be kept in {path}',
+  'storage.leftovers': "Some old files were in use and stayed in {path}. They're copies: you can delete them.",
+  'storage.dialog.title': 'Where should instances be kept?',
+  'storage.pickTitle': 'Where should ResinCraft keep your instances?',
+  'storage.dialog.subtitle': 'Pick a drive, or any folder. A drive with lots of free space is best: modpacks grow.',
+  'storage.dialog.lookingForDrives': 'Looking for drives…',
+  'storage.dialog.default': "The launcher's own folder (default)",
+  'storage.dialog.other': 'Or type a folder',
+  'storage.dialog.checking': 'Checking the folder…',
+  'storage.dialog.moveTitle': 'Move my instances there',
+  'storage.dialog.moveSameDrive': 'Same drive: the folders are only renamed, which takes a moment.',
+  'storage.dialog.moveCopy': '{size} to copy; {free} free there. If you cancel, or something goes wrong, everything stays where it is now.',
+  'storage.dialog.emptyTitle': 'Start empty there',
+  'storage.dialog.emptyHint': "Your current instances stay in {path} and come back when you switch back. Minecraft's shared files download again as needed.",
+  'storage.dialog.nothingToMove': "There's nothing to move yet: new instances will be made there.",
+  'storage.dialog.backToDefault': 'This is the default folder, where ResinCraft keeps everything unless you choose otherwise.',
+  'storage.dialog.move': 'Move instances',
+  'storage.dialog.use': 'Use this folder',
+  'storage.drive.named': '{label} ({drive})',
+  'storage.drive.now': 'Now',
+  'storage.drive.removable': 'Removable',
+  'storage.drive.free': '{free} free of {total}'
+}

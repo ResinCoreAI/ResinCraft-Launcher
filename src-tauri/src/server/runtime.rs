@@ -244,6 +244,7 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
 /// Starts a server. Returns once Java is running; the server is watched in the background and reports
 /// through "server" / "serverLog" events.
 pub async fn start(id: &str) -> Result<()> {
+    crate::core::storage::ensure_not_moving()?;
     if is_running(id) {
         bail!("This server is already running");
     }

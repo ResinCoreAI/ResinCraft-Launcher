@@ -25,6 +25,11 @@ pub fn cancel(id: &str) -> bool {
     token.map(|t| t.cancel()).is_some()
 }
 
+/// How many cancellable tasks (downloads, installs, imports…) are running.
+pub fn running_tasks() -> usize {
+    CANCELS.lock().unwrap().as_ref().map_or(0, |m| m.len())
+}
+
 /// The error a cancelled task's work ends with; callers clean up as for any other error.
 pub fn cancelled_error() -> anyhow::Error {
     crate::err_tr!("task.cancelled", "Cancelled")

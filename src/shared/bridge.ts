@@ -25,6 +25,13 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       pathForFile
     },
     settings: { get: fn('settings:get'), set: fn('settings:set') },
+    storage: {
+      info: fn('storage:info'),
+      drives: fn('storage:drives'),
+      check: fn('storage:check'),
+      pick: fn('storage:pick'),
+      change: fn('storage:change')
+    },
     bedrock: {
       status: fn('bedrock:status'),
       play: fn('bedrock:play'),

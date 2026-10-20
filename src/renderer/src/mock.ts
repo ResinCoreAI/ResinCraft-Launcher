@@ -7,6 +7,7 @@ import { mockServers } from './mock-servers'
 import { mockFiles } from './mock-files'
 import { mockUpdate } from './mock-update'
 import { mockMigrate } from './mock-migrate'
+import { mockStorage } from './mock-storage'
 import { mockRuns } from './mock-runs'
 import { mockQuickJoin } from './mock-quickjoin'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
@@ -185,6 +186,7 @@ export function mockApi(): ResinApi {
     settings: { get: () => wait(settings, 0), set: async (p) => (settings = { ...settings, ...p }) },
     update: updates.update,
     versions: {
+    storage: mockStorage(),
       list: () => wait(versions),
       loaders: () =>
         wait([

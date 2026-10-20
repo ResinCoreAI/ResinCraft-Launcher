@@ -1,4 +1,4 @@
-//! Hosted servers on disk: `<dataDir>/servers/<id>/` is the server's own folder (its working directory),
+//! Hosted servers on disk: `<games folder>/servers/<id>/` is the server's own folder (its working directory),
 //! with ResinCraft's metadata in `server.json` next to the server files.
 
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ use crate::core::types::{ServerInfo, ServerMeta};
 use super::runtime;
 
 pub fn root() -> PathBuf {
-    paths::root().join("servers")
+    paths::servers()
 }
 
 /// A server's folder. Ids come from the UI, so only a single plain folder name is accepted.

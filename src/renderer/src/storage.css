@@ -1,0 +1,82 @@
+/* Settings → Storage (components/Storage.tsx). */
+
+.storage-chip {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.storage-folder {
+  margin: 2px 0;
+  font-size: 12.5px;
+}
+
+.storage-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--warning);
+  font-size: 13px;
+}
+.storage-warn svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.storage-what {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.storage-what svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.storage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.storage-free {
+  flex: none;
+  text-align: right;
+}
+
+/* How full the drive is. */
+.storage-bar {
+  height: 4px;
+  margin-top: 6px;
+  max-width: 240px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.storage-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.storage-bar span.full {
+  background: var(--danger);
+}
+
+.storage-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.storage-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  min-height: 22px;
+}
+
+.java-row.disabled {
+  cursor: default;
+  opacity: 0.6;
+}

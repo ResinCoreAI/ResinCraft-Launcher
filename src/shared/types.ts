@@ -992,6 +992,57 @@ export interface ResinApi {
   }
   settings: {
     get(): Promise<Settings>
+/** Where instances, hosted servers and the shared game files are kept (Settings → Storage). */
+export interface StorageInfo {
+  folder: string
+  /** The launcher's own folder (settings, accounts), which is also the default games folder. */
+  defaultFolder: string
+  isDefault: boolean
+  /** The drive holding the folder, e.g. "D:\\". */
+  drive: string
+  freeBytes?: number
+  totalBytes?: number
+  /** The folder can't be found (an unplugged drive). */
+  missing: boolean
+  moving: boolean
+}
+
+/** A drive on this PC, suggested as a place for the games folder. */
+export interface StorageDrive {
+  root: string
+  label: string
+  /** `<drive>\ResinCraft`, or the current folder when it is on this drive. */
+  suggestion: string
+  freeBytes: number
+  totalBytes: number
+  removable: boolean
+  current: boolean
+}
+
+/** What the engine thinks of a folder before the player confirms a change. */
+export interface StorageCheck {
+  folder: string
+  /** The folder can't be used at all. */
+  problem?: EngineText
+  /** The current instances can't be moved there (starting empty may still work). */
+  moveProblem?: EngineText
+  /** Nothing can change right now (a game is running…). */
+  blocked?: EngineText
+  /** Bytes to copy; 0 on the same drive (folders are only renamed). */
+  needBytes: number
+  freeBytes?: number
+  sameDrive: boolean
+  isDefault: boolean
+  /** There is something to move. */
+  hasFiles: boolean
+}
+
+export interface StorageChange {
+  info: StorageInfo
+  /** Old copies that couldn't be removed (a file in use) are left in this folder. */
+  leftovers?: string
+}
+
     set(patch: Partial<Settings>): Promise<Settings>
   }
   /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
@@ -1008,6 +1059,16 @@ export interface ResinApi {
   }
   /** ResinCraft's own updates. */
   update: {
+  /** Where instances and game files are kept, and moving them (Settings → Storage). */
+  storage: {
+    info(): Promise<StorageInfo>
+    drives(): Promise<StorageDrive[]>
+    check(folder: string): Promise<StorageCheck>
+    /** The folder picker, titled `title`; null if cancelled. */
+    pick(title?: string): Promise<string | null>
+    /** Switches to `folder`. `move` (default true): bring the current instances along as a cancellable task. */
+    change(folder: string, move?: boolean): Promise<StorageChange>
+  }
     status(): Promise<UpdateStatus>
     /** Asks the update server; network problems come back as `error`, not as a rejection. */
     check(): Promise<UpdateStatus>

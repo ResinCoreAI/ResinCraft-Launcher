@@ -16,6 +16,7 @@ import migrate from './migrate'
 import quickjoin from './quickjoin'
 import servers from './servers'
 import settings from './settings'
+import storage from './storage'
 import tabs from './tabs'
 import updates from './updates'
 
@@ -24,6 +25,7 @@ const en = {
   ...app,
   ...accounts,
   ...settings,
+  ...storage,
   ...home,
   ...library,
   ...bedrock,

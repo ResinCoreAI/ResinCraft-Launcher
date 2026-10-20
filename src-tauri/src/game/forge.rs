@@ -191,7 +191,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
         ("SIDE".into(), "client".into()),
         ("MINECRAFT_JAR".into(), path_str(&client.dest)),
         ("MINECRAFT_VERSION".into(), mc.to_string()),
-        ("ROOT".into(), path_str(&paths::root())),
+        ("ROOT".into(), path_str(&paths::games())),
         ("INSTALLER".into(), path_str(installer)),
         ("LIBRARY_DIR".into(), path_str(&paths::libraries())),
     ]);

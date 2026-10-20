@@ -62,7 +62,7 @@ resincraft-relay = { path = "../relay", default-features = false, features = ["a
 resincraft-relay = { path = "../relay" }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns"] }
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns", "Win32_Storage_FileSystem"] }
 
 [profile.release]
 codegen-units = 1
