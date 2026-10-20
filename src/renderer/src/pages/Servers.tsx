@@ -8,6 +8,7 @@ import {
   Crown,
   Eraser,
   ExternalLink,
+  FolderInput,
   FolderOpen,
   FolderTree,
   Gamepad2,
@@ -38,6 +39,7 @@ import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../comp
 import FileManager from '../components/FileManager'
 import ServerAddons from '../components/ServerAddons'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
+import MigrateModal from '../components/MigrateModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
 import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
@@ -60,6 +62,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
   const { go, toast } = useStore()
   const [servers, setServers] = useState<ServerInfo[]>()
   const [creating, setCreating] = useState(!!fromInstance)
+  const [importing, setImporting] = useState(false)
   const [created, setCreated] = useState<ServerCreated>()
   const [eulaFor, setEulaFor] = useState<ServerInfo>()
 
@@ -120,7 +123,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
           <ServerDetail key={server.id} server={server} reload={load} onStart={start} onStop={stop} />
         ) : null
       ) : (
-        <ServerList servers={servers} onCreate={() => setCreating(true)} onStart={start} onStop={stop} reload={load} />
+        <ServerList servers={servers} onCreate={() => setCreating(true)} onImport={() => setImporting(true)} onStart={start} onStop={stop} reload={load} />
       )}
 
       {creating && (
@@ -137,6 +140,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
         />
       )}
       {created && <CreatedSummary result={created} onClose={() => setCreated(undefined)} />}
+      {importing && <MigrateModal servers onClose={() => setImporting(false)} onImported={() => void load()} />}
       {eulaFor && (
         <EulaModal
           server={eulaFor}
@@ -214,12 +218,14 @@ async function restart(s: ServerInfo, onStart: (s: ServerInfo) => void, onStop: 
 function ServerList({
   servers,
   onCreate,
+  onImport,
   onStart,
   onStop,
   reload
 }: {
   servers?: ServerInfo[]
   onCreate: () => void
+  onImport: () => void
   onStart: (s: ServerInfo) => void
   onStop: (s: ServerInfo) => void
   reload: () => Promise<void>
@@ -256,6 +262,9 @@ function ServerList({
           <p>{t('servers.subtitle')}</p>
         </div>
         <div className="spacer" />
+        <button className="btn lg" onClick={onImport}>
+          <FolderInput /> {t('migrate.serverButton')}
+        </button>
         <button className="btn primary lg" onClick={onCreate}>
           <Plus /> {t('servers.create.button')}
         </button>
@@ -271,9 +280,14 @@ function ServerList({
           icon={<Server />}
           title={t('servers.empty.title')}
           action={
-            <button className="btn primary" onClick={onCreate}>
-              <Plus /> {t('servers.create.button')}
-            </button>
+            <div className="row" style={{ justifyContent: 'center' }}>
+              <button className="btn primary" onClick={onCreate}>
+                <Plus /> {t('servers.create.button')}
+              </button>
+              <button className="btn" onClick={onImport}>
+                <FolderInput /> {t('migrate.serverButton')}
+              </button>
+            </div>
           }
         >
           {t('servers.empty.body')}

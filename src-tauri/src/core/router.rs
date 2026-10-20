@@ -41,6 +41,7 @@ pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
         ("optifine", _) => crate::game::optifine::handle(channel, args).await,
         ("content", _) => crate::content::handle(channel, args).await,
         ("server", _) => crate::server::handle(channel, args).await,
+        ("migrate", _) => crate::migrate::handle(channel, args).await,
         ("files", _) => crate::files::handle(channel, args).await,
         ("update", _) => crate::updater::handle(channel, args).await,
         ("accounts" | "skins" | "notes" | "worlds" | "servers" | "screenshots", _) => crate::player::handle(channel, args).await,

@@ -15,6 +15,7 @@ pub mod content;
 pub mod core;
 pub mod files;
 pub mod game;
+pub mod migrate;
 pub mod player;
 pub mod server;
 pub mod updater;

@@ -12,6 +12,7 @@ import home from './home'
 import instance from './instance'
 import library from './library'
 import menu from './menu'
+import migrate from './migrate'
 import servers from './servers'
 import settings from './settings'
 import tabs from './tabs'
@@ -31,6 +32,7 @@ const en = {
   ...tabs,
   ...files,
   ...menu,
+  ...migrate,
   ...servers,
   ...updates,
   ...engine

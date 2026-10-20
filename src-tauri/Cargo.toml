@@ -41,6 +41,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 quick-xml = "0.37"
+# Reads the Modrinth App's profile database (app.db) for "Move from another launcher".
+rusqlite = { version = "0.32", features = ["bundled"] }
 # UPnP port mapping so friends can join a hosted server without manual port forwarding.
 igd-next = "0.17"
 # Stable public addresses for hosted servers through playit.gg (BSD-2-Clause agent), and bore relay auth.

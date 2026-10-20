@@ -20,6 +20,11 @@ export const mockEngine = {
     return true
   },
 
+  /** Whether the dock's Cancel was pressed for this task. */
+  wasCancelled(id: string): boolean {
+    return cancelled.has(id)
+  },
+
   /** A cancellable download task, like a modpack install: progress over a few seconds. */
   async download(title: EngineText): Promise<void> {
     const task: TaskInfo = { id: `dl-${Date.now()}`, title: title.text, titleText: title, state: 'running', cancellable: true }

@@ -1,4 +1,5 @@
 // Types shared by the main process, preload bridge and renderer UI.
+import type { MigrateApi } from './migrate'
 
 export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge'
 export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack'
@@ -1189,6 +1190,8 @@ export interface ResinApi {
     /** Opens a folder in Explorer / Finder, or shows a file selected in its folder. */
     reveal(root: FileRoot, path: string): Promise<void>
   }
+  /** Move from another launcher: find and copy other launchers' instances and server folders. */
+  migrate: MigrateApi
   on: {
     task(cb: (t: TaskInfo) => void): () => void
     game(cb: (e: GameEvent) => void): () => void

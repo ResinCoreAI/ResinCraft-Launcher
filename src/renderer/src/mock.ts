@@ -6,6 +6,7 @@ import { mockProfile } from './mock-profile'
 import { mockServers } from './mock-servers'
 import { mockFiles } from './mock-files'
 import { mockUpdate } from './mock-update'
+import { mockMigrate } from './mock-migrate'
 import { mockRuns } from './mock-runs'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
 
@@ -420,6 +421,9 @@ export function mockApi(): ResinApi {
       openFolder: () => wait(undefined, 100)
     },
     ...mockFiles(),
+    ...mockMigrate((inst) => {
+      instances = [inst, ...instances]
+    }),
     on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, update: updates.onUpdate }
   }
 }

@@ -184,6 +184,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       trash: fn('files:trash'),
       reveal: fn('files:reveal')
     },
+    migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
     on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), update: on('update') }
   } as ResinApi
 }

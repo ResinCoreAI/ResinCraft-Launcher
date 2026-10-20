@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import {
   ArrowDown,
+  ArrowLeftRight,
   ArrowUp,
   ArrowUpRight,
   ChevronRight,
@@ -30,6 +31,7 @@ import { createPortal } from 'react-dom'
 import type { Instance, InstancePatch } from '@shared/types'
 import { api } from '../api'
 import ExportModal from '../components/ExportModal'
+import MigrateModal from '../components/MigrateModal'
 import { packDupesNote } from '../components/DuplicatesDialog'
 import {
   celebrate,
@@ -248,6 +250,8 @@ export default function Library() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!groupDrag])
 
+  const [migrating, setMigrating] = useState(false)
+
   const importPack = async (from?: Element) => {
     setImporting(true)
     try {
@@ -285,6 +289,7 @@ export default function Library() {
     openContextMenu(e, [
       { label: t('library.newInstance'), icon: <Plus />, onSelect: () => setNewInstanceOpen(true) },
       { label: t('library.importModpack'), icon: <FileDown />, disabled: importing, onSelect: () => void importPack() },
+      { label: t('migrate.button'), icon: <ArrowLeftRight />, onSelect: () => setMigrating(true) },
       instances.length > 0 && { label: t('library.group.create'), icon: <FolderPlus />, onSelect: () => setCreating(true) }
     ])
 
@@ -296,6 +301,9 @@ export default function Library() {
           <p>{t('library.subtitle')}</p>
         </div>
         <div className="spacer" />
+        <button className="btn" onClick={() => setMigrating(true)}>
+          <ArrowLeftRight /> {t('migrate.button')}
+        </button>
         <button className="btn" onClick={(e) => void importPack(e.currentTarget)} disabled={importing}>
           {importing ? <Loader2 className="spin" /> : <FileDown />} {t('library.importModpack')}
         </button>
@@ -315,6 +323,9 @@ export default function Library() {
               </button>
               <button className="btn" onClick={() => go({ page: 'discover', kind: 'modpack' })}>
                 {t('library.empty.browse')}
+              </button>
+              <button className="btn" onClick={() => setMigrating(true)}>
+                <ArrowLeftRight /> {t('migrate.button')}
               </button>
             </div>
           }
@@ -394,6 +405,7 @@ export default function Library() {
           }}
         />
       )}
+      {migrating && <MigrateModal onClose={() => setMigrating(false)} onImported={() => void refreshInstances()} />}
     </div>
   )
 }

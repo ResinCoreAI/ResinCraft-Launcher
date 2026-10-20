@@ -1,0 +1,189 @@
+/* Move from another launcher (components/MigrateModal.tsx). */
+
+.mg-scanning {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 0;
+  color: var(--text-dim);
+}
+.mg-scanning svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mg-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mg-sources[aria-busy='true'] .mg-item,
+.mg-sources[aria-busy='true'] .mg-head {
+  cursor: default;
+}
+
+.mg-source {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.mg-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+}
+.mg-head .mono {
+  font-size: 11.5px;
+}
+
+.mg-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.12s var(--ease);
+}
+.mg-item:last-child {
+  border-bottom: 0;
+}
+.mg-item:hover {
+  background: var(--surface-2);
+}
+.mg-item.on {
+  color: var(--text);
+}
+.mg-item.off {
+  cursor: default;
+  opacity: 0.75;
+}
+.mg-head input,
+.mg-item input {
+  accent-color: var(--accent);
+  margin: 0;
+  flex: none;
+}
+
+.mg-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.mg-icon img,
+.mg-icon .block-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.mg-item .name {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.mg-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.mg-sub.warn {
+  align-items: center;
+  gap: 6px;
+  color: var(--warning);
+}
+.mg-sub.warn svg {
+  width: 13px;
+  height: 13px;
+}
+.mg-size {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.mg-size.measuring {
+  width: 44px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  animation: mg-pulse 1.2s var(--ease) infinite alternate;
+}
+@keyframes mg-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mg-size.measuring {
+    animation: none;
+  }
+}
+
+.mg-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mg-results > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.mg-results > li > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.mg-results > li.ok > svg {
+  color: var(--success);
+}
+.mg-results > li.failed > svg {
+  color: var(--danger);
+}
+.mg-skipped {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.mg-skipped summary {
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.mg-skipped ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  max-height: 180px;
+  overflow: auto;
+}
+.mg-skipped .mono {
+  font-size: 11.5px;
+  word-break: break-all;
+}
+
+@media (max-width: 560px) {
+  .mg-head .mono {
+    display: none;
+  }
+}
