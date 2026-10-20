@@ -1,15 +1,15 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "notes": "Download the installer below. Windows may warn that the publisher is unverified until releases are code-signed. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.\n\nNOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
-  "pub_date": "2026-10-20T04:53:37.683Z",
+  "pub_date": "2026-10-20T12:13:41.250Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSFZyR1d0V1FRV0VKSzkrTU90ZFoxL0Q0ZU9kNVVmNkdycXRJc3ZrcXZDZEx0dUpvMFkybGJjd0VZbC8zSVVOblFhNjJ3TFg1SG9vRDh2VU1vY2wwdFE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDcyMDE0CWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjAuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjIKSk1oSzF3QW54Wjh6dUF5Wjlhdm9ZR2hpNXdCNTZWaXVtbjJVVWlGanZhZ1FQdG9odW9pNVRpeUZCcTVqSFRvRE81SDltUCt6ck9tcEVLR1VBNUxaQ3c9PQo=",
-      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.0.2/ResinCraft.Launcher_1.0.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGRySW12YkxsVm1yRkN6UDNseEZBQXBnYmY4djlvUWo1UW9KeFVnV0dWaUNSa0grbG45eC9JblpEQUpNOWd0ZEVDdFFyV3RZZS9vMVcvUS9waVE0Q1FFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDk4NDE3CWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjAuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjMKTmRERkNkcFc0YVIwMFpNL0RTYjF5Nk9JZ0UreXU4d2tPNGZJWGNnSi9JMSs0QkFNVEpmSGlGOTdub29DZVZLOWd0c1lsUGF2aFZiYnE3ZXZ3Y1REQnc9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.0.3/ResinCraft.Launcher_1.0.3_x64-setup.exe"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSFZyR1d0V1FRV0VKSzkrTU90ZFoxL0Q0ZU9kNVVmNkdycXRJc3ZrcXZDZEx0dUpvMFkybGJjd0VZbC8zSVVOblFhNjJ3TFg1SG9vRDh2VU1vY2wwdFE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDcyMDE0CWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjAuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjIKSk1oSzF3QW54Wjh6dUF5Wjlhdm9ZR2hpNXdCNTZWaXVtbjJVVWlGanZhZ1FQdG9odW9pNVRpeUZCcTVqSFRvRE81SDltUCt6ck9tcEVLR1VBNUxaQ3c9PQo=",
-      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.0.2/ResinCraft.Launcher_1.0.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGRySW12YkxsVm1yRkN6UDNseEZBQXBnYmY4djlvUWo1UW9KeFVnV0dWaUNSa0grbG45eC9JblpEQUpNOWd0ZEVDdFFyV3RZZS9vMVcvUS9waVE0Q1FFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDk4NDE3CWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjAuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjMKTmRERkNkcFc0YVIwMFpNL0RTYjF5Nk9JZ0UreXU4d2tPNGZJWGNnSi9JMSs0QkFNVEpmSGlGOTdub29DZVZLOWd0c1lsUGF2aFZiYnE3ZXZ3Y1REQnc9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.0.3/ResinCraft.Launcher_1.0.3_x64-setup.exe"
     }
   }
 }
