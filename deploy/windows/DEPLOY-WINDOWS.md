@@ -81,13 +81,13 @@ To keep the dashboard private, set its address to `127.0.0.1` in `relay.toml` an
 The launcher learns the relay's address when it's built. Before building the next release, add these two values to `keys.local.env` (for local builds) and as GitHub repository secrets (for releases), the same way as the other keys:
 
 ```
-RESINCRAFT_RELAY_URL=tls://rscraft.resincore.tech:7000
+RESINCRAFT_RELAY_URL=tls://relay.rscraft.resincore.tech:7000
 RESINCRAFT_RELAY_DOMAIN=rscraft.resincore.tech
 ```
 
 Set the GitHub secrets by piping the value in, never with `gh secret set -f`, which mangles `$` characters:
 ```powershell
-'tls://rscraft.resincore.tech:7000' | gh secret set RESINCRAFT_RELAY_URL -R ResinCoreAI/ResinCraft-Launcher
+'tls://relay.rscraft.resincore.tech:7000' | gh secret set RESINCRAFT_RELAY_URL -R ResinCoreAI/ResinCraft-Launcher
 ```
 ```powershell
 'rscraft.resincore.tech' | gh secret set RESINCRAFT_RELAY_DOMAIN -R ResinCoreAI/ResinCraft-Launcher

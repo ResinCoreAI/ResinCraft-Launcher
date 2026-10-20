@@ -52,7 +52,7 @@ Either way you need:
 And the launcher build has to know the relay (in `keys.local.env` or the release build's environment):
 
 ```
-RESINCRAFT_RELAY_URL=tls://rscraft.resincore.tech:7000
+RESINCRAFT_RELAY_URL=tls://relay.rscraft.resincore.tech:7000
 RESINCRAFT_RELAY_DOMAIN=rscraft.resincore.tech
 ```
 

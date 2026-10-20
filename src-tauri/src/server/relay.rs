@@ -30,7 +30,7 @@ use super::store;
 /// Where the relay is.
 #[derive(Debug, Clone)]
 pub struct Settings {
-    /// "tls://rscraft.resincore.tech:7000"
+    /// "tls://relay.rscraft.resincore.tech:7000"
     pub url: String,
     /// "rscraft.resincore.tech"
     pub domain: String,

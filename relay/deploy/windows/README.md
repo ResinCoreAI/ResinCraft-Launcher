@@ -35,12 +35,13 @@ At the DNS provider for `resincore.tech`:
 | Name | Type | Value | Proxy (Cloudflare) |
 |---|---|---|---|
 | `*.rscraft` | A | the server's IPv4 | **DNS only** (grey cloud) |
-| `rscraft` | A | the server's IPv4 | **DNS only** (grey cloud) |
+| `rscraft` | A | the server's IPv4 | Proxied (orange) is fine: only the dashboard uses it |
 
-Add matching AAAA records if the server has IPv6. Both must be **DNS only**: the relay carries raw Minecraft
-and TLS traffic, which Cloudflare's proxy can't. `*.rscraft` covers every player address
-(`name.rscraft.resincore.tech`). The bare `rscraft.resincore.tech` is where the launcher and the dashboard
-connect, and the name on the certificate; the wildcard doesn't cover it, so it needs its own record.
+Add matching AAAA records if the server has IPv6. `*.rscraft` must be **DNS only**: the relay carries raw
+Minecraft and TLS traffic, which Cloudflare's proxy can't. It covers every player address
+(`name.rscraft.resincore.tech`) and **`relay.rscraft.resincore.tech`, where the launcher connects** (port 7000)
+and the name on the certificate. Don't point the launcher at the bare `rscraft.resincore.tech`: behind
+Cloudflare's proxy, port 7000 doesn't get through. ("relay" is a reserved name, so no player can take it.)
 
 Check from any PC: `nslookup test.rscraft.resincore.tech 1.1.1.1` and `nslookup rscraft.resincore.tech 1.1.1.1`
 should both show the server's address.
@@ -54,7 +55,7 @@ The launcher only connects to a relay with a valid certificate, and the dashboar
 2. In PowerShell as Administrator:
 
    ```powershell
-   C:\win-acme\wacs.exe --source manual --host rscraft.resincore.tech --validation selfhosting --store pemfiles --pemfilespath C:\ResinCraft\relay\certs --pemfilesname relay --installation none --accepttos --emailaddress you@example.com
+   C:\win-acme\wacs.exe --source manual --host relay.rscraft.resincore.tech --validation selfhosting --store pemfiles --pemfilespath C:\ResinCraft\relay\certs --pemfilesname relay --installation none --accepttos --emailaddress you@example.com
    ```
 
    (Use your own email address; Let's Encrypt writes to it if renewals fail.)
@@ -130,7 +131,7 @@ ResinCraft Launcher finds this relay through two values compiled in at build tim
 environment variables in the release build):
 
 ```
-RESINCRAFT_RELAY_URL=tls://rscraft.resincore.tech:7000
+RESINCRAFT_RELAY_URL=tls://relay.rscraft.resincore.tech:7000
 RESINCRAFT_RELAY_DOMAIN=rscraft.resincore.tech
 ```
 
