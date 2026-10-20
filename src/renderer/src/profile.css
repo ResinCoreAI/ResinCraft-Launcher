@@ -162,6 +162,118 @@
   flex-wrap: wrap;
 }
 
+/* Skin library and Find skins: small cards with a front view and quick actions. */
+.pm-lib-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+.pm-lib-empty {
+  padding: 18px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.pm-skins {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.pm-skins.tall {
+  max-height: none;
+  overflow: visible;
+}
+.pm-more {
+  align-self: center;
+}
+.pm-skin {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 8px;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.pm-skin.wearing {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.pm-skin-art {
+  display: grid;
+  place-items: center;
+  height: 108px;
+  padding: 6px 0;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.pm-skin-art:hover {
+  border-color: var(--border-strong);
+}
+.pm-skin-art.on {
+  border-color: var(--accent);
+}
+.pm-skin-name {
+  font: 600 12.5px/1.3 var(--font);
+  color: var(--text);
+}
+.pm-skin .input {
+  height: 26px;
+  padding: 0 6px;
+  font-size: 12.5px;
+}
+.pm-skin-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 11px/1.2 var(--font);
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pm-skin-tag svg {
+  flex: none;
+}
+.pm-skin-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+}
+.pm-skin-actions > .btn.primary,
+.pm-skin-actions > .btn.danger {
+  flex: 1;
+  justify-content: center;
+}
+.pm-skin-actions > .pm-ok {
+  flex: 1;
+  justify-content: center;
+  min-height: 26px;
+}
+.pm-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.pm-search > svg {
+  position: absolute;
+  left: 10px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.pm-search > .input {
+  padding-left: 32px;
+}
+
 @media (max-width: 760px) {
   .pm {
     grid-template-columns: minmax(0, 1fr);

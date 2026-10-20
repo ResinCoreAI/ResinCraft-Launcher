@@ -202,7 +202,7 @@ fn png_size(bytes: &[u8]) -> Option<(u32, u32)> {
 }
 
 /// Decodes and checks an uploaded skin: base64 (or a data: URL) of a 64×64 or 64×32 PNG.
-fn decode_skin_png(data: &str) -> Result<Vec<u8>> {
+pub(super) fn decode_skin_png(data: &str) -> Result<Vec<u8>> {
     let b64 = data.split_once(";base64,").map_or(data, |(_, rest)| rest).trim();
     let bytes = base64::engine::general_purpose::STANDARD.decode(b64).map_err(|_| err_tr!("profile.skin.unreadable", "That file couldn't be read as an image."))?;
     if bytes.len() > MAX_PNG {
@@ -288,11 +288,13 @@ pub async fn get_profile(account_id: &str) -> Result<PlayerProfile> {
 pub async fn set_skin(account_id: &str, upload: &SkinUpload) -> Result<PlayerProfile> {
     let boundary = format!("ResinCraft{}", uuid::Uuid::new_v4().simple());
     let req = skin_request(upload, &boundary)?;
+    super::skins::remember_current(account_id).await;
     after_change(account_id, send(account_id, &req).await?).await
 }
 
 pub async fn reset_skin(account_id: &str) -> Result<PlayerProfile> {
     let req = Req::new(Op::Skin, Method::DELETE, format!("{API}/skins/active"));
+    super::skins::remember_current(account_id).await;
     after_change(account_id, send(account_id, &req).await?).await
 }
 

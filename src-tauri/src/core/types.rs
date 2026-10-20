@@ -296,6 +296,46 @@ pub struct SkinUpload {
     pub url: Option<String>,
 }
 
+/// A skin in the launcher's skin library (Accounts → Manage → Skin).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedSkin {
+    pub id: String,
+    pub name: String,
+    /// "classic" | "slim"
+    pub variant: String,
+    /// "upload" | "player" | "online" | "history"
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
+    pub added_at: i64,
+    /// data: URL of the PNG.
+    pub preview: String,
+}
+
+/// A skin found online (MineSkin's gallery) or on a player, not saved yet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnlineSkin {
+    pub id: String,
+    pub name: String,
+    /// The texture on textures.minecraft.net.
+    pub url: String,
+    /// "classic" | "slim"; None when the source didn't say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant: Option<String>,
+    /// "player" | "mineskin"
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnlineSkinPage {
+    pub skins: Vec<OnlineSkin>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginEvent {

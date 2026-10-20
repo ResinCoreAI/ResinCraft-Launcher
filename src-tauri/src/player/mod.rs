@@ -9,6 +9,7 @@ pub mod notes;
 pub mod profile;
 pub mod screenshots;
 pub mod servers;
+pub mod skins;
 pub mod worlds;
 
 use std::path::PathBuf;
@@ -18,7 +19,7 @@ use anyhow::{bail, Result};
 use serde_json::Value;
 
 use crate::core::router::{done, json};
-use crate::core::types::{ServerEntry, SkinUpload};
+use crate::core::types::{OnlineSkin, ServerEntry, SkinUpload};
 use crate::core::{shell, Args};
 
 pub async fn handle(channel: &str, args: Args) -> Result<Value> {
@@ -45,6 +46,21 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "accounts:hideCape" => json(profile::hide_cape(&args.get::<String>(0)?).await?),
         "accounts:nameAvailable" => json(profile::name_available(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "accounts:changeName" => json(profile::change_name(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+
+        "skins:list" => json(skins::list().await?),
+        "skins:importPng" => json(skins::import_png(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?),
+        "skins:update" => {
+            let (id, name, variant): (String, Option<String>, Option<String>) = (args.get(0)?, args.get(1)?, args.get(2)?);
+            json(skins::update(&id, name.as_deref(), variant.as_deref()).await?)
+        }
+        "skins:remove" => {
+            skins::remove(&args.get::<String>(0)?).await?;
+            done()
+        }
+        "skins:apply" => json(skins::apply(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "skins:lookupPlayer" => json(skins::lookup_player(&args.get::<String>(0)?).await?),
+        "skins:search" => json(skins::search(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
+        "skins:saveOnline" => json(skins::save_online(&args.get::<OnlineSkin>(0)?).await?),
 
         "notes:get" => json(notes::get_notes(&args.get::<String>(0)?).await?),
         "notes:set" => {

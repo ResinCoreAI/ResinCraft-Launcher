@@ -158,6 +158,36 @@ export interface SkinUpload {
 
 export type NameStatus = 'available' | 'taken' | 'not_allowed' | 'invalid'
 
+/** A skin in the launcher's skin library: shared by every account, kept in the data folder. */
+export interface SavedSkin {
+  id: string
+  name: string
+  variant: SkinVariant
+  /** history = an account's previous skin, saved automatically before it was replaced. */
+  source: 'upload' | 'player' | 'online' | 'history'
+  /** The player name, or `mineskin:<id>`, it came from. */
+  origin?: string
+  addedAt: number
+  /** data: URL of the PNG. */
+  preview: string
+}
+
+/** A skin found on a player (Mojang) or in MineSkin's public gallery, not saved yet. */
+export interface OnlineSkin {
+  id: string
+  /** Empty when the uploader didn't name it. */
+  name: string
+  url: string
+  variant?: SkinVariant
+  source: 'player' | 'mineskin'
+}
+
+export interface OnlineSkinPage {
+  skins: OnlineSkin[]
+  /** Cursor for the next page. */
+  next?: string
+}
+
 export interface LoginEvent {
   state: 'success' | 'error'
   account?: AccountView
@@ -926,6 +956,21 @@ export interface ResinApi {
     hideCape(id: string): Promise<PlayerProfile>
     nameAvailable(id: string, name: string): Promise<NameStatus>
     changeName(id: string, name: string): Promise<PlayerProfile>
+  }
+  skins: {
+    /** The skin library, newest first. */
+    list(): Promise<SavedSkin[]>
+    /** Saves a PNG (base64 or data: URL), checked to be a 64×64 or 64×32 skin. The same image is never saved twice. */
+    importPng(png: string, name: string, variant: SkinVariant): Promise<SavedSkin>
+    update(id: string, name?: string, variant?: SkinVariant): Promise<SavedSkin>
+    remove(id: string): Promise<void>
+    /** Wears a library skin on a Microsoft account; the skin it replaces is saved to the library first. */
+    apply(accountId: string, id: string): Promise<PlayerProfile>
+    /** A Java player's current skin, by name (Mojang's public API). */
+    lookupPlayer(name: string): Promise<OnlineSkin>
+    /** MineSkin's public gallery; an empty query lists the newest. */
+    search(query: string, after?: string): Promise<OnlineSkinPage>
+    saveOnline(skin: OnlineSkin): Promise<SavedSkin>
   }
   java: {
     list(): Promise<JavaInstall[]>

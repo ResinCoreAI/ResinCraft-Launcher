@@ -86,6 +86,11 @@ pub async fn curseforge_key() -> String {
     key_or_builtin(&get().await.curseforge_key, option_env!("RESINCRAFT_CURSEFORGE_KEY"), "RESINCRAFT_CURSEFORGE_KEY")
 }
 
+/// MineSkin API key for the online skin search ("" if this build has none; the search still works, with lower limits).
+pub fn mineskin_key() -> String {
+    key_or_builtin("", option_env!("RESINCRAFT_MINESKIN_KEY"), "RESINCRAFT_MINESKIN_KEY")
+}
+
 /// Settings as the UI may see them: the service keys never leave the engine.
 pub fn redacted(mut s: Settings) -> Settings {
     s.ms_client_id.clear();

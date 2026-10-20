@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, CircleSlash, Link2, Loader2, RotateCcw, Upload, X } from 'lucide-react'
-import type { AccountView, NameStatus, PlayerProfile, SkinUpload, SkinVariant } from '@shared/types'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AlertTriangle, Check, CircleSlash, Link2, Loader2, RotateCcw, X } from 'lucide-react'
+import type { AccountView, NameStatus, OnlineSkin, PlayerProfile, SavedSkin, SkinUpload, SkinVariant } from '@shared/types'
 import { api } from '../api'
 import { currentLanguage, t } from '../i18n'
 import { useStore } from '../store'
-import { CapeView, readSkinFile, SkinView, useImage } from './SkinPreview'
+import { FindSkins, MySkins, type Peek } from './SkinLibrary'
+import { CapeView, SkinView, useImage } from './SkinPreview'
 import { Modal, Segmented } from './ui'
 import '../profile.css'
 
-type Tab = 'skin' | 'cape' | 'name'
+type Tab = 'skin' | 'find' | 'cape' | 'name'
 const NAME = /^[A-Za-z0-9_]{3,16}$/
 const COOLDOWN_DAYS = 30
 
@@ -27,6 +28,21 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
   // A skin the user picked but hasn't applied yet, shown in the preview.
   const [pending, setPending] = useState<{ upload: Omit<SkinUpload, 'variant'>; preview?: string; label: string }>()
   const [variant, setVariant] = useState<SkinVariant>('classic')
+  // The launcher's skin library, a skin being looked at, and the library skin this window last put on.
+  const [library, setLibrary] = useState<SavedSkin[]>()
+  const [libraryError, setLibraryError] = useState<string>()
+  const [peek, setPeek] = useState<Peek>()
+  const [wearing, setWearing] = useState<string>()
+
+  const reloadLibrary = () =>
+    api.skins.list().then(
+      (l) => {
+        setLibrary(l)
+        setLibraryError(undefined)
+      },
+      (e) => setLibraryError((e as Error).message)
+    )
+  useEffect(() => void reloadLibrary(), [])
 
   const load = () => {
     setError(undefined)
@@ -48,7 +64,9 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
       const next = await call()
       setProfile((old) => ({ ...next, nameChange: next.nameChange ?? old?.nameChange }))
       // Keep an arm style the user is still choosing unless this change was to the skin itself.
-      if (what === 'skin' || what === 'reset') setVariant(next.skin?.variant ?? 'classic')
+      if (what === 'skin' || what === 'reset' || what.startsWith('use:')) setVariant(next.skin?.variant ?? 'classic')
+      // The skin that was replaced is now in the library as a previous skin.
+      if (what !== 'cape' && what !== 'name') void reloadLibrary()
       await refreshAccounts()
       toast(done(next))
       return true
@@ -60,9 +78,45 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
     }
   }
 
+  /** Wears a library skin. */
+  const useSaved = async (s: SavedSkin) => {
+    if (await run(`use:${s.id}`, () => api.skins.apply(account.id, s.id), () => t('profile.lib.nowWearing', { name: s.name }))) {
+      setWearing(s.id)
+      setPeek(undefined)
+      setPending(undefined)
+    }
+  }
+  /** Saves an online skin to the library; undefined if that failed (the error is shown as a toast). */
+  const saveOnline = async (s: OnlineSkin) => {
+    try {
+      const saved = await api.skins.saveOnline(s)
+      await reloadLibrary()
+      toast(t('profile.lib.saved', { name: saved.name }))
+      return saved
+    } catch (e) {
+      toast((e as Error).message, 'error')
+      return undefined
+    }
+  }
+  const useOnline = async (s: OnlineSkin) => {
+    setBusy(`use:${s.url}`)
+    let saved: SavedSkin
+    try {
+      saved = await api.skins.saveOnline(s)
+    } catch (e) {
+      toast((e as Error).message, 'error')
+      setBusy(undefined)
+      return
+    }
+    if (await run(`use:${s.url}`, () => api.skins.apply(account.id, saved.id), () => t('profile.lib.nowWearing', { name: saved.name }))) {
+      setWearing(saved.id)
+      setPeek(undefined)
+    }
+  }
+
   const cape = profile?.capes.find((c) => c.active)
-  const skinUrl = pending ? pending.preview : profile?.skin?.url
-  const showVariant = variant
+  const skinUrl = peek ? peek.url : pending ? pending.preview : profile?.skin?.url
+  const showVariant = peek ? peek.variant : variant
 
   return (
     <Modal title={t('profile.title', { name: profile?.name ?? account.username })} subtitle={t('profile.subtitle')} onClose={onClose} wide>
@@ -94,19 +148,26 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
             </div>
             <b className="pm-name">{profile.name}</b>
             <span className="hint">
-              {pending
+              {peek || pending
                 ? t('profile.preview')
                 : profile.skin
                   ? t(profile.skin.variant === 'slim' ? 'profile.skin.slim' : 'profile.skin.classic')
                   : t('profile.defaultSkin')}
-              {cape && !pending && ` · ${cape.alias}`}
+              {cape && !pending && !peek && ` · ${cape.alias}`}
             </span>
           </div>
 
           <div className="pm-panel">
             <div className="tabs pm-tabs">
-              {(['skin', 'cape', 'name'] as const).map((id) => (
-                <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
+              {(['skin', 'find', 'cape', 'name'] as const).map((id) => (
+                <button
+                  key={id}
+                  className={tab === id ? 'on' : ''}
+                  onClick={() => {
+                    setTab(id)
+                    setPeek(undefined)
+                  }}
+                >
                   {t(`profile.tab.${id}`)}
                 </button>
               ))}
@@ -114,6 +175,19 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
 
             {tab === 'skin' && (
               <SkinTab
+                library={
+                  <MySkins
+                    library={library}
+                    error={libraryError}
+                    reload={reloadLibrary}
+                    busy={busy}
+                    wearing={wearing}
+                    peek={peek}
+                    setPeek={setPeek}
+                    use={useSaved}
+                    toast={toast}
+                  />
+                }
                 profile={profile}
                 variant={variant}
                 setVariant={setVariant}
@@ -133,6 +207,8 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
                 }
               />
             )}
+
+            {tab === 'find' && <FindSkins busy={busy} peek={peek} setPeek={setPeek} save={saveOnline} use={useOnline} />}
 
             {tab === 'cape' && (
               <div className="pm-section">
@@ -201,6 +277,7 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
 }
 
 function SkinTab({
+  library,
   profile,
   variant,
   setVariant,
@@ -210,6 +287,7 @@ function SkinTab({
   apply,
   reset
 }: {
+  library: ReactNode
   profile: PlayerProfile
   variant: SkinVariant
   setVariant: (v: SkinVariant) => void
@@ -219,55 +297,20 @@ function SkinTab({
   apply: () => Promise<void>
   reset: () => void
 }) {
-  const file = useRef<HTMLInputElement>(null)
   const [link, setLink] = useState('')
-  const [fileError, setFileError] = useState<string>()
   const linkPreview = useImage(pending?.upload.url && pending.preview ? pending.preview : undefined)
   // Something to apply: a new file or link, or a different arm style for the current skin.
   const changed = !!pending || (!!profile.skin && variant !== profile.skin.variant)
 
-  const pick = async (f: File) => {
-    setFileError(undefined)
-    const r = await readSkinFile(f)
-    if ('dataUrl' in r) setPending({ upload: { png: r.dataUrl }, preview: r.dataUrl, label: f.name })
-    else setFileError(r.error === 'size' ? t('profile.skin.badSize', { width: r.width ?? 0, height: r.height ?? 0 }) : t('profile.skin.badType'))
-  }
-
   const useLink = () => {
     const url = link.trim()
     if (!url) return
-    setFileError(undefined)
     setPending({ upload: { url }, preview: url, label: url })
   }
 
   return (
     <div className="pm-section">
-      <div className="field">
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          <button className="btn" onClick={() => file.current?.click()} disabled={!!busy}>
-            <Upload /> {t('profile.skin.upload')}
-          </button>
-          <span className="hint grow">{t('profile.skin.uploadHint')}</span>
-        </div>
-        <input
-          ref={file}
-          type="file"
-          accept="image/png"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            e.target.value = ''
-            if (f) void pick(f)
-          }}
-        />
-        {fileError && <span className="pm-error">{fileError}</span>}
-        {pending && (
-          <span className="hint ellipsis" title={pending.label}>
-            {t('profile.skin.picked', { file: pending.label })}
-          </span>
-        )}
-        {pending?.upload.url && linkPreview.failed && <span className="pm-warn">{t('profile.skin.linkFailed')}</span>}
-      </div>
+      {library}
 
       <div className="field">
         <label htmlFor="pm-link">{t('profile.skin.fromLink')}</label>
@@ -285,6 +328,12 @@ function SkinTab({
             <Link2 /> {t('common.apply')}
           </button>
         </div>
+        {pending && (
+          <span className="hint ellipsis" title={pending.label}>
+            {t('profile.skin.picked', { file: pending.label })}
+          </span>
+        )}
+        {pending?.upload.url && linkPreview.failed && <span className="pm-warn">{t('profile.skin.linkFailed')}</span>}
       </div>
 
       <div className="field">

@@ -70,6 +70,16 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       nameAvailable: fn('accounts:nameAvailable'),
       changeName: fn('accounts:changeName')
     },
+    skins: {
+      list: fn('skins:list'),
+      importPng: fn('skins:importPng'),
+      update: fn('skins:update'),
+      remove: fn('skins:remove'),
+      apply: fn('skins:apply'),
+      lookupPlayer: fn('skins:lookupPlayer'),
+      search: fn('skins:search'),
+      saveOnline: fn('skins:saveOnline')
+    },
     java: { list: fn('java:list'), browse: fn('java:browse') },
     content: {
       search: fn('content:search'),

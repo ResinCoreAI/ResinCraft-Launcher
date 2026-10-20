@@ -63,6 +63,10 @@ export function mockApi(): ResinApi {
     // A Microsoft account without Java Edition.
     { id: 'a2', type: 'bedrock', username: 'PuirkleBE', uuid: '2535412345678901', active: false }
   ]
+  const profileMock = mockProfile(
+    () => accounts,
+    (list) => (accounts = list)
+  )
   let settings: Settings = {
     theme: 'dark',
     language: 'system',
@@ -232,11 +236,9 @@ export function mockApi(): ResinApi {
       },
       setActive: async (id) => void (accounts = accounts.map((a) => ({ ...a, active: a.id === id }))),
       remove: async (id) => void (accounts = accounts.filter((a) => a.id !== id)),
-      ...mockProfile(
-        () => accounts,
-        (list) => (accounts = list)
-      )
+      ...profileMock.accounts
     },
+    skins: profileMock.skins,
     java: {
       list: () =>
         wait([

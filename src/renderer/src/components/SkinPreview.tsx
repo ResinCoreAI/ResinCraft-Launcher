@@ -170,3 +170,35 @@ export function readSkinFile(file: File): Promise<{ dataUrl: string } | { error:
     reader.readAsDataURL(file)
   })
 }
+
+/**
+ * Guesses the arm style of a 64×64 skin: slim skins leave the outer pixel column of each arm empty
+ * (the same check Minecraft-style viewers use). Legacy 64×32 skins are always classic.
+ */
+export function guessVariant(dataUrl: string): Promise<SkinVariant> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onerror = () => resolve('classic')
+    img.onload = () => {
+      if (img.naturalWidth !== 64 || img.naturalHeight !== 64) return resolve('classic')
+      const c = document.createElement('canvas')
+      c.width = c.height = 64
+      const g = c.getContext('2d')
+      if (!g) return resolve('classic')
+      g.drawImage(img, 0, 0)
+      const empty = ([x, y, w, h]: Rect) => {
+        const d = g.getImageData(x, y, w, h).data
+        for (let i = 3; i < d.length; i += 4) if (d[i] !== 0) return false
+        return true
+      }
+      const regions: Rect[] = [
+        [50, 16, 2, 4],
+        [54, 20, 2, 12],
+        [42, 48, 2, 4],
+        [46, 52, 2, 12]
+      ]
+      resolve(regions.every(empty) ? 'slim' : 'classic')
+    }
+    img.src = dataUrl
+  })
+}
