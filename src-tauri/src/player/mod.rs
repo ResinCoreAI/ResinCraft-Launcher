@@ -26,6 +26,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
     match channel {
         "accounts:list" => json(accounts::list_accounts().await?),
         "accounts:beginMicrosoft" => json(accounts::begin_microsoft_login().await?),
+        "accounts:beginMicrosoftWindow" => json(accounts::begin_microsoft_window_login().await?),
         "accounts:cancelMicrosoft" => {
             accounts::cancel_microsoft_login();
             done()

@@ -228,6 +228,8 @@ export function mockApi(): ResinApi {
     accounts: {
       list: () => wait(accounts, 0),
       beginMicrosoft: () => wait({ userCode: 'RC7-4KQ2', verificationUri: 'https://microsoft.com/link', expiresIn: 900 }),
+      // The preview can't open Microsoft's window; it shows the waiting state.
+      beginMicrosoftWindow: () => wait(true, 300),
       cancelMicrosoft: async () => {},
       addOffline: async (username) => {
         const a: AccountView = { id: username, type: 'offline', username, uuid: '0', active: false }

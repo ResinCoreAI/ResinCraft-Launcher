@@ -944,6 +944,8 @@ export interface ResinApi {
   accounts: {
     list(): Promise<AccountView[]>
     beginMicrosoft(): Promise<DeviceCode>
+    /** Opens Microsoft's sign-in in a private window that asks which account to use; false: not allowed for this app, use the code. */
+    beginMicrosoftWindow(): Promise<boolean>
     cancelMicrosoft(): Promise<void>
     addOffline(username: string): Promise<AccountView>
     setActive(id: string): Promise<void>

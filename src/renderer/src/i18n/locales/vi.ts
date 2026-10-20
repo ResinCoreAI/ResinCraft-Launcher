@@ -111,6 +111,9 @@ const dict: Dict = {
   'accounts.login.open': 'Sao chép mã & mở trình duyệt',
   'accounts.login.opening': 'Đã sao chép! Đang mở trình duyệt…',
   'accounts.login.waiting': 'Đang chờ bạn hoàn tất trên trình duyệt…',
+  'accounts.login.tryAgain': "Thử lại",
+  'accounts.login.useCode': "Dùng mã thay thế",
+  'accounts.login.window': "Hoàn tất đăng nhập trong cửa sổ Microsoft. Cửa sổ sẽ hỏi bạn dùng tài khoản nào.",
   'accounts.login.welcome': 'Chào mừng, {name}!',
 
   'accounts.offline.title': 'Thêm hồ sơ ngoại tuyến',

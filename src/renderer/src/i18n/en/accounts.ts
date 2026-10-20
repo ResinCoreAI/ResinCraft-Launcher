@@ -26,6 +26,9 @@ export default {
   'accounts.login.open': 'Copy code & open browser',
   'accounts.login.opening': 'Copied! Opening browser…',
   'accounts.login.waiting': 'Waiting for you to finish in the browser…',
+  'accounts.login.tryAgain': "Try again",
+  'accounts.login.useCode': "Use a code instead",
+  'accounts.login.window': "Finish signing in in the Microsoft window. It asks which account to use.",
   'accounts.login.welcome': 'Welcome, {name}!',
 
   'accounts.offline.title': 'Add offline profile',

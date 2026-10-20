@@ -139,11 +139,36 @@ export default function Accounts() {
   )
 }
 
+/**
+ * Microsoft sign-in. First choice: Microsoft's page in a private ResinCraft window, which always asks which
+ * account to use. The code sign-in (microsoft.com/link in the browser) is the backup, and what this build uses
+ * when its app registration doesn't allow the window.
+ */
 function MicrosoftLogin({ onClose }: { onClose: () => void }) {
   const { refreshAccounts, toast } = useStore()
+  const [mode, setMode] = useState<'starting' | 'window' | 'code'>('starting')
   const [code, setCode] = useState<DeviceCode>()
   const [error, setError] = useState<string>()
   const [copied, setCopied] = useState(false)
+
+  const useCode = async () => {
+    setError(undefined)
+    setCode(undefined)
+    setMode('code')
+    await api.accounts.cancelMicrosoft()
+    api.accounts.beginMicrosoft().then(setCode, (e) => setError((e as Error).message))
+  }
+
+  const useWindow = async () => {
+    setError(undefined)
+    setMode('starting')
+    try {
+      if (await api.accounts.beginMicrosoftWindow()) setMode('window')
+      else await useCode()
+    } catch {
+      await useCode()
+    }
+  }
 
   useEffect(() => {
     const off = api.on.login(async (e) => {
@@ -153,7 +178,7 @@ function MicrosoftLogin({ onClose }: { onClose: () => void }) {
         onClose()
       } else setError(tx(e.errorText, e.error))
     })
-    api.accounts.beginMicrosoft().then(setCode, (e) => setError((e as Error).message))
+    void useWindow()
     return () => {
       off()
       void api.accounts.cancelMicrosoft()
@@ -170,10 +195,31 @@ function MicrosoftLogin({ onClose }: { onClose: () => void }) {
   return (
     <Modal title={t('accounts.login.title')} subtitle={t('accounts.login.subtitle')} onClose={onClose}>
       {error ? (
-        <div className="callout danger">
-          <Info />
-          <div>{error}</div>
-        </div>
+        <>
+          <div className="callout danger">
+            <Info />
+            <div>{error}</div>
+          </div>
+          <div className="row" style={{ justifyContent: 'center', gap: 8 }}>
+            <button className="btn primary" onClick={() => void (mode === 'code' ? useCode() : useWindow())}>
+              {t('accounts.login.tryAgain')}
+            </button>
+            {mode !== 'code' && (
+              <button className="btn" onClick={() => void useCode()}>
+                {t('accounts.login.useCode')}
+              </button>
+            )}
+          </div>
+        </>
+      ) : mode === 'window' ? (
+        <>
+          <div className="row muted" style={{ justifyContent: 'center', gap: 8, textAlign: 'center' }}>
+            <Loader2 className="spin" size={14} /> {t('accounts.login.window')}
+          </div>
+          <button className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => void useCode()}>
+            {t('accounts.login.useCode')}
+          </button>
+        </>
       ) : !code ? (
         <div className="empty" style={{ padding: 30 }}>
           <Loader2 className="spin" />

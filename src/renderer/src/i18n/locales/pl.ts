@@ -111,6 +111,9 @@ const dict: Dict = {
   'accounts.login.open': 'Kopiuj kod i otwórz przeglądarkę',
   'accounts.login.opening': 'Skopiowano! Otwieranie przeglądarki…',
   'accounts.login.waiting': 'Czekam, aż dokończysz logowanie w przeglądarce…',
+  'accounts.login.tryAgain': "Spróbuj ponownie",
+  'accounts.login.useCode': "Użyj kodu",
+  'accounts.login.window': "Dokończ logowanie w oknie Microsoft. Zapyta, którego konta użyć.",
   'accounts.login.welcome': 'Witaj, {name}!',
 
   'accounts.offline.title': 'Dodaj profil offline',

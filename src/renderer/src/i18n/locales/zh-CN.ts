@@ -111,6 +111,9 @@ const dict: Dict = {
   'accounts.login.open': '复制代码并打开浏览器',
   'accounts.login.opening': '已复制！正在打开浏览器…',
   'accounts.login.waiting': '正在等待你在浏览器中完成登录…',
+  'accounts.login.tryAgain': "重试",
+  'accounts.login.useCode': "改用代码登录",
+  'accounts.login.window': "请在 Microsoft 窗口中完成登录，它会让你选择要使用的账号。",
   'accounts.login.welcome': '欢迎，{name}！',
 
   'accounts.offline.title': '添加离线账户',

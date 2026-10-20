@@ -111,6 +111,9 @@ const dict: Dict = {
   'accounts.login.open': 'Kodu kopyala ve tarayıcıyı aç',
   'accounts.login.opening': 'Kopyalandı! Tarayıcı açılıyor…',
   'accounts.login.waiting': 'Tarayıcıda işlemi bitirmen bekleniyor…',
+  'accounts.login.tryAgain': "Tekrar dene",
+  'accounts.login.useCode': "Bunun yerine kod kullan",
+  'accounts.login.window': "Girişi Microsoft penceresinde tamamla. Hangi hesabı kullanacağını sorar.",
   'accounts.login.welcome': 'Hoş geldin, {name}!',
 
   'accounts.offline.title': 'Çevrimdışı profil ekle',

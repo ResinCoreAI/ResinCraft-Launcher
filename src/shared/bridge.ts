@@ -58,6 +58,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
     accounts: {
       list: fn('accounts:list'),
       beginMicrosoft: fn('accounts:beginMicrosoft'),
+      beginMicrosoftWindow: fn('accounts:beginMicrosoftWindow'),
       cancelMicrosoft: fn('accounts:cancelMicrosoft'),
       addOffline: fn('accounts:addOffline'),
       setActive: fn('accounts:setActive'),

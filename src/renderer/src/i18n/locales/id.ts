@@ -111,6 +111,9 @@ const dict: Dict = {
   'accounts.login.open': 'Salin kode & buka browser',
   'accounts.login.opening': 'Disalin! Membuka browser…',
   'accounts.login.waiting': 'Menunggu Anda selesai di browser…',
+  'accounts.login.tryAgain': "Coba lagi",
+  'accounts.login.useCode': "Pakai kode saja",
+  'accounts.login.window': "Selesaikan masuk di jendela Microsoft. Di sana kamu memilih akun yang dipakai.",
   'accounts.login.welcome': 'Selamat datang, {name}!',
 
   'accounts.offline.title': 'Tambah profil offline',

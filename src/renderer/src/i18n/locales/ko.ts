@@ -111,6 +111,9 @@ const dict: Dict = {
   'accounts.login.open': '코드 복사 후 브라우저 열기',
   'accounts.login.opening': '복사했어요! 브라우저를 여는 중…',
   'accounts.login.waiting': '브라우저에서 로그인을 마칠 때까지 기다리는 중…',
+  'accounts.login.tryAgain': "다시 시도",
+  'accounts.login.useCode': "코드로 로그인",
+  'accounts.login.window': "Microsoft 창에서 로그인을 마치세요. 사용할 계정을 고를 수 있습니다.",
   'accounts.login.welcome': '환영해요, {name}님!',
 
   'accounts.offline.title': '오프라인 프로필 추가',

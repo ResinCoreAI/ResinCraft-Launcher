@@ -11,6 +11,8 @@ export default {
   'engine.accounts.loginCancelled': 'Sign-in was cancelled in the browser.',
   'engine.accounts.loginFailed': 'Microsoft sign-in failed',
   'engine.accounts.loginNoStart': 'Microsoft sign-in could not start',
+  'engine.accounts.loginWindow': 'Sign in with Microsoft',
+  'engine.accounts.loginWindowClosed': 'The sign-in window was closed before you finished.',
   'engine.accounts.noClientId': "Microsoft sign-in isn't set up in this build of ResinCraft.",
   'engine.accounts.noMinecraft': "This Microsoft account doesn't own Minecraft: Java Edition.",
   'engine.accounts.offlineNoProfile': "Offline profiles can't change skins, capes or names. Sign in with Microsoft to do that.",

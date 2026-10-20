@@ -413,14 +413,7 @@ pub async fn begin_microsoft_login() -> Result<DeviceCode> {
         if abort.load(Ordering::SeqCst) {
             return;
         }
-        match result {
-            Ok(Some(acc)) => emit("login", LoginEvent { state: "success", account: Some(view(&acc)), error: None, error_text: None }),
-            Ok(None) => {}
-            Err(e) => {
-                let error_text = crate::core::text::text_of(&e).cloned();
-                emit("login", LoginEvent { state: "error", account: None, error: Some(e.to_string()), error_text })
-            }
-        }
+        report_login(result);
     });
 
     Ok(DeviceCode {
@@ -453,40 +446,201 @@ async fn poll_device_code(client: &str, device_code: &str, interval_s: u64, expi
             Some("authorization_declined") => bail_tr!("accounts.loginCancelled", "Sign-in was cancelled in the browser."),
             _ => {}
         }
-        let access = s(&tok, "access_token").filter(|t| !t.is_empty());
-        let Some(access) = access.filter(|_| tok.get("error").map_or(true, Value::is_null)) else {
-            match s(&tok, "error_description") {
-                Some(desc) => bail!("{desc}"),
-                None => bail_tr!("accounts.loginFailed", "Microsoft sign-in failed"),
-            }
-        };
-        let mc = minecraft_login(access).await?;
-        if abort.load(Ordering::SeqCst) {
-            return Ok(None);
-        }
-        let acc = upsert(StoredAccount {
-            id: uuid::Uuid::new_v4().to_string(),
-            kind: kind_of(&mc),
-            username: mc.username,
-            uuid: mc.uuid,
-            skin_url: mc.skin_url,
-            active: true,
-            refresh_token: Some(seal(s(&tok, "refresh_token").unwrap_or_default())),
-            mc_token: Some(seal(&mc.mc_token)),
-            mc_token_expires: Some(mc.mc_token_expires),
-            xuid: mc.xuid,
-            extra: Map::new(),
-        })
-        .await?;
-        return Ok(Some(acc));
+        return finish_login(&tok, abort).await;
     }
     bail_tr!("accounts.codeExpired", "The sign-in code expired. Please try again.")
+}
+
+/// Microsoft's answer with tokens -> Xbox -> Minecraft -> a saved account. Ok(None) means cancelled meanwhile.
+async fn finish_login(tok: &Value, abort: &AtomicBool) -> Result<Option<StoredAccount>> {
+    let access = s(tok, "access_token").filter(|t| !t.is_empty());
+    let Some(access) = access.filter(|_| tok.get("error").map_or(true, Value::is_null)) else {
+        match s(tok, "error_description") {
+            Some(desc) => bail!("{desc}"),
+            None => bail_tr!("accounts.loginFailed", "Microsoft sign-in failed"),
+        }
+    };
+    let mc = minecraft_login(access).await?;
+    if abort.load(Ordering::SeqCst) {
+        return Ok(None);
+    }
+    let acc = upsert(StoredAccount {
+        id: uuid::Uuid::new_v4().to_string(),
+        kind: kind_of(&mc),
+        username: mc.username,
+        uuid: mc.uuid,
+        skin_url: mc.skin_url,
+        active: true,
+        refresh_token: Some(seal(s(tok, "refresh_token").unwrap_or_default())),
+        mc_token: Some(seal(&mc.mc_token)),
+        mc_token_expires: Some(mc.mc_token_expires),
+        xuid: mc.xuid,
+        extra: Map::new(),
+    })
+    .await?;
+    Ok(Some(acc))
+}
+
+/// Tells the Accounts page how a sign-in ended (nothing when it was cancelled).
+fn report_login(result: Result<Option<StoredAccount>>) {
+    match result {
+        Ok(Some(acc)) => emit("login", LoginEvent { state: "success", account: Some(view(&acc)), error: None, error_text: None }),
+        Ok(None) => {}
+        Err(e) => {
+            let error_text = crate::core::text::text_of(&e).cloned();
+            emit("login", LoginEvent { state: "error", account: None, error: Some(e.to_string()), error_text })
+        }
+    }
+}
+
+// ---------- Sign-in window ----------
+
+/// Microsoft's redirect address for desktop apps. The Azure app registration lists it under Authentication ->
+/// "Mobile and desktop applications"; Microsoft only sends the sign-in back to an address listed there.
+const NATIVE_REDIRECT: &str = "https://login.microsoftonline.com/common/oauth2/nativeclient";
+const LOGIN_WINDOW: &str = "microsoft-login";
+
+/// A one-time PKCE pair: the secret this sign-in keeps, and its SHA-256 that goes to Microsoft first.
+fn pkce() -> (String, String) {
+    use sha2::{Digest, Sha256};
+    let verifier = format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple());
+    let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
+    (verifier, challenge)
+}
+
+/// The authorize page: always shows Microsoft's account picker (`prompt=select_account`).
+fn authorize_url(client: &str, challenge: &str, state: &str) -> String {
+    let enc = |v: &str| urlencoding::encode(v).into_owned();
+    format!(
+        "{MS_BASE}/authorize?client_id={}&response_type=code&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&prompt=select_account&state={}",
+        enc(client),
+        enc(NATIVE_REDIRECT),
+        enc(SCOPE),
+        enc(challenge),
+        enc(state)
+    )
+}
+
+/// What came back to the redirect address: the code, or Microsoft's reason.
+fn redirect_result(url: &str, state: &str) -> Result<String> {
+    let query = url.split_once('?').map(|(_, q)| q).unwrap_or_default();
+    let get = |key: &str| {
+        query.split('&').find_map(|kv| {
+            let (k, v) = kv.split_once('=').unwrap_or((kv, ""));
+            (k == key).then(|| urlencoding::decode(&v.replace('+', " ")).map(|c| c.into_owned()).unwrap_or_default())
+        })
+    };
+    if let Some(err) = get("error") {
+        if err == "access_denied" {
+            bail_tr!("accounts.loginCancelled", "Sign-in was cancelled in the browser.");
+        }
+        let desc = get("error_description").unwrap_or(err);
+        bail!("{desc}");
+    }
+    if get("state").as_deref() != Some(state) {
+        bail_tr!("accounts.loginFailed", "Microsoft sign-in failed");
+    }
+    get("code").filter(|c| !c.is_empty()).ok_or_else(|| err_tr!("accounts.loginFailed", "Microsoft sign-in failed"))
+}
+
+/// Whether Microsoft accepts the redirect address for this app: it has to be listed in the Azure app registration
+/// (Authentication -> Mobile and desktop applications). Unsure (offline, an unexpected page) counts as yes.
+async fn redirect_accepted(url: &str) -> bool {
+    let Ok(res) = http().get(url).send().await else { return true };
+    let Ok(body) = res.text().await else { return true };
+    !(body.contains("redirect_uri&#39; is not valid") || body.contains("redirect_uri' is not valid"))
+}
+
+fn close_login_window() {
+    use tauri::Manager;
+    if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window(LOGIN_WINDOW)) {
+        let _ = w.close();
+    }
+}
+
+/// Signs in on Microsoft's own page, in a private ResinCraft window (no saved browser sign-in, so Microsoft asks
+/// which account to use). The result arrives later as a `login` event, like the code sign-in. Ok(false): this
+/// app's registration doesn't allow the window yet, so the caller uses the code sign-in instead.
+pub async fn begin_microsoft_window_login() -> Result<bool> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder, WindowEvent};
+    let abort = Arc::new(AtomicBool::new(false));
+    if let Some(old) = LOGIN_ABORT.lock().unwrap().replace(abort.clone()) {
+        old.store(true, Ordering::SeqCst);
+    }
+    close_login_window();
+    let client = client_id().await?;
+    let (verifier, challenge) = pkce();
+    let state = uuid::Uuid::new_v4().simple().to_string();
+    let url = authorize_url(&client, &challenge, &state);
+    if !redirect_accepted(&url).await {
+        return Ok(false);
+    }
+    let app = crate::core::ctx::app().ok_or_else(|| anyhow::anyhow!("Not available without the app window"))?;
+
+    // The first answer wins: the redirect (code or error), or the window being closed.
+    let (tx, rx) = tokio::sync::oneshot::channel::<Option<Result<String>>>();
+    let tx = Arc::new(Mutex::new(Some(tx)));
+    let nav_tx = tx.clone();
+    let window = WebviewWindowBuilder::new(app, LOGIN_WINDOW, WebviewUrl::External(url.parse()?))
+        .title(crate::tr!("accounts.loginWindow", "Sign in with Microsoft").to_string())
+        .inner_size(500.0, 680.0)
+        .center()
+        .incognito(true)
+        .on_navigation(move |u| {
+            if !u.as_str().starts_with(NATIVE_REDIRECT) {
+                return true;
+            }
+            if let Some(tx) = nav_tx.lock().unwrap().take() {
+                let _ = tx.send(Some(redirect_result(u.as_str(), &state)));
+            }
+            false
+        })
+        .build()?;
+    window.on_window_event(move |e| {
+        if matches!(e, WindowEvent::Destroyed) {
+            if let Some(tx) = tx.lock().unwrap().take() {
+                let _ = tx.send(None);
+            }
+        }
+    });
+
+    tokio::spawn(async move {
+        let result = async {
+            let code = match rx.await {
+                Ok(Some(code)) => code?,
+                // Closed before finishing.
+                _ if abort.load(Ordering::SeqCst) => return Ok(None),
+                _ => bail_tr!("accounts.loginWindowClosed", "The sign-in window was closed before you finished."),
+            };
+            close_login_window();
+            let tok = ms_form(
+                "token",
+                &[
+                    ("grant_type", "authorization_code"),
+                    ("client_id", &client),
+                    ("code", &code),
+                    ("redirect_uri", NATIVE_REDIRECT),
+                    ("code_verifier", &verifier),
+                    ("scope", SCOPE),
+                ],
+            )
+            .await?;
+            finish_login(&tok, &abort).await
+        }
+        .await;
+        close_login_window();
+        if !abort.load(Ordering::SeqCst) {
+            report_login(result);
+        }
+    });
+    Ok(true)
 }
 
 pub fn cancel_microsoft_login() {
     if let Some(abort) = LOGIN_ABORT.lock().unwrap().as_ref() {
         abort.store(true, Ordering::SeqCst);
     }
+    close_login_window();
 }
 
 async fn refresh(acc: &StoredAccount) -> Result<StoredAccount> {
@@ -650,5 +804,41 @@ pub(super) fn https_texture(url: &str) -> String {
     match url.strip_prefix("http://") {
         Some(rest) if rest.starts_with("textures.minecraft.net/") => format!("https://{rest}"),
         _ => url.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pkce_pair_is_well_formed() {
+        use sha2::{Digest, Sha256};
+        let (verifier, challenge) = pkce();
+        assert_eq!(verifier.len(), 64);
+        assert!(verifier.bytes().all(|b| b.is_ascii_alphanumeric()));
+        assert_eq!(challenge, base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes())));
+        assert_ne!(pkce().0, verifier);
+    }
+
+    #[test]
+    fn authorize_url_asks_for_an_account() {
+        let url = authorize_url("abc-123", "CHAL", "st8");
+        assert!(url.starts_with("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=abc-123&"));
+        assert!(url.contains("prompt=select_account") && url.contains("code_challenge=CHAL") && url.contains("state=st8"));
+        assert!(url.contains("redirect_uri=https%3A%2F%2Flogin.microsoftonline.com%2Fcommon%2Foauth2%2Fnativeclient"));
+        assert!(url.contains("scope=XboxLive.signin%20offline_access"));
+    }
+
+    #[test]
+    fn reads_the_redirect() {
+        let base = NATIVE_REDIRECT;
+        assert_eq!(redirect_result(&format!("{base}?code=M.C1_abc&state=s1"), "s1").unwrap(), "M.C1_abc");
+        // Another sign-in's answer (wrong state) and an empty code are refused.
+        assert!(redirect_result(&format!("{base}?code=x&state=other"), "s1").is_err());
+        assert!(redirect_result(&format!("{base}?code=&state=s1"), "s1").is_err());
+        let err = redirect_result(&format!("{base}?error=server_error&error_description=Try+again%21&state=s1"), "s1").unwrap_err();
+        assert_eq!(err.to_string(), "Try again!");
+        assert!(redirect_result(&format!("{base}?error=access_denied&state=s1"), "s1").is_err());
     }
 }
