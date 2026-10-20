@@ -54,7 +54,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       openFolder: fn('instances:openFolder'),
       launch: fn('instances:launch'),
       kill: fn('instances:kill'),
-      running: fn('instances:running')
+      running: fn('instances:running'),
+      runs: fn('instances:runs')
     },
     accounts: {
       list: fn('accounts:list'),

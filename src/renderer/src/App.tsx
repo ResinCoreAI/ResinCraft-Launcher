@@ -1,7 +1,7 @@
-import { ChevronRight, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Smartphone, Users } from 'lucide-react'
+import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Smartphone, Users } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
-import { Avatar, BlockArt, ContextMenuHost, Dock, Logo } from './components/ui'
+import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
 import { UpdateBanner } from './components/Updates'
@@ -61,8 +61,23 @@ function RecentItem({ inst, active, running }: { inst: Instance; active: boolean
   )
 }
 
+/** The sidebar account chip's menu: switch the active account right here, or go manage them. */
+function accountMenu(accounts: AccountView[], pick: (a: AccountView) => void, manage: () => void): ContextEntry[] {
+  return [
+    ...accounts.map((a) => ({
+      label: a.username,
+      icon: <Avatar account={a} size={22} />,
+      hint: t(ACCOUNT_KIND_SHORT[a.type]),
+      checked: a.active,
+      onSelect: () => !a.active && pick(a)
+    })),
+    '-',
+    { label: t('account.manage'), icon: <Users />, onSelect: manage }
+  ]
+}
+
 export default function App() {
-  const { route, go, instances, games, activeAccount, newInstanceOpen, setNewInstanceOpen } = useStore()
+  const { route, go, instances, games, accounts, activeAccount, switchAccount, toast, newInstanceOpen, setNewInstanceOpen } = useStore()
   const current = route.page === 'instance' ? 'library' : route.page
   const instance = route.page === 'instance' ? instances.find((i) => i.id === route.id) : undefined
   const recent = instances.filter((i) => i.lastPlayed || games[i.id]).slice(0, 6)
@@ -100,12 +115,29 @@ export default function App() {
           ))}
         </div>
 
-        <button className="account-chip" onClick={() => go({ page: 'accounts' })}>
+        <button
+          className="account-chip"
+          title={accounts.length ? t('account.switch') : undefined}
+          aria-haspopup={accounts.length ? 'menu' : undefined}
+          onClick={(e) => {
+            if (!accounts.length) return go({ page: 'accounts' })
+            // Opens upward from the chip's top-left (it sits at the bottom of the sidebar).
+            const r = e.currentTarget.getBoundingClientRect()
+            const pick = (a: AccountView) =>
+              void switchAccount(a.id).then((ok) => ok && toast(t('account.switched', { name: a.username }), 'info'))
+            openContextMenu(
+              { x: r.left, y: r.top - 4, keyboard: e.detail === 0, origin: e.currentTarget },
+              accountMenu(accounts, pick, () => go({ page: 'accounts' })),
+              t('account.switch')
+            )
+          }}
+        >
           <Avatar account={activeAccount} size={34} />
           <div className="who">
             <b>{activeAccount?.username ?? t('app.notSignedIn')}</b>
             <span>{t(activeAccount ? ACCOUNT_KIND[activeAccount.type] : 'app.clickToSignIn')}</span>
           </div>
+          {accounts.length > 0 && <ChevronsUpDown className="chip-caret" />}
         </button>
       </aside>
 

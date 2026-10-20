@@ -23,7 +23,8 @@ import {
   Search,
   Settings2,
   Square,
-  Trash2
+  Trash2,
+  UserRound
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import type { Instance, InstancePatch } from '@shared/types'
@@ -38,6 +39,7 @@ import {
   Modal,
   MoreButton,
   openContextMenu,
+  playAsEntries,
   tilt,
   useCopy,
   type ContextEntry,
@@ -546,7 +548,7 @@ export function InstanceCard({
  * sidebar). Render `dialogs` beside the element, not inside it: events from a dialog bubble up the React tree.
  */
 export function useInstanceMenu(inst: Instance) {
-  const { go, games, play, stop, refreshInstances, toast, info } = useStore()
+  const { go, games, runs, accounts, play, stop, refreshInstances, toast, info } = useStore()
   const names = useGroupNames()
   const copy = useCopy()
   const [dialog, setDialog] = useState<'delete' | 'rename' | 'newGroup' | 'export'>()
@@ -593,6 +595,12 @@ export function useInstanceMenu(inst: Instance) {
             disabled: state === 'preparing',
             onSelect: () => void play(inst.id)
           },
+      // Pick who plays this time; while it runs, another account can join it.
+      accounts.length > 1 && {
+        label: t(state === 'running' || state === 'preparing' ? 'play.alsoPlayAs' : 'play.playAs'),
+        icon: <UserRound />,
+        items: playAsEntries(inst, accounts, runs[inst.id] ?? [], (id, accountId) => void play(id, accountId))
+      },
       { label: t('menu.open'), icon: <ArrowUpRight />, shortcut: 'Enter', onSelect: () => go({ page: 'instance', id: inst.id }) },
       { label: t('menu.instance.settings'), icon: <Settings2 />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
       '-',

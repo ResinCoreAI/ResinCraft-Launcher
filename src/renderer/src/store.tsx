@@ -15,6 +15,16 @@ export type Route =
 
 export type GameState = GameEvent['state']
 
+/** One start of an instance (an instance can run once per account at a time). Ended runs stay for their log. */
+export interface Run {
+  runId: string
+  accountId: string
+  username: string
+  state: GameState
+}
+
+export const isLive = (r: Run) => r.state === 'running' || r.state === 'preparing'
+
 export interface Toast {
   id: number
   kind: 'success' | 'error' | 'info'
@@ -32,11 +42,19 @@ interface Store {
   accounts: AccountView[]
   activeAccount?: AccountView
   refreshAccounts: () => Promise<void>
+  /** Makes an account the active one (the sidebar's switcher). */
+  switchAccount: (id: string) => Promise<boolean>
+  /** Per instance: running if any run is, else preparing if one is, else how the last run ended. */
   games: Record<string, GameState>
-  play: (id: string) => Promise<void>
-  stop: (id: string) => Promise<void>
+  /** Per instance: its runs, first run first. */
+  runs: Record<string, Run[]>
+  /** `accountId`: play once as that account instead of the active one. */
+  play: (id: string, accountId?: string) => Promise<void>
+  /** `runId`: stop only that run; otherwise every run of the instance. */
+  stop: (id: string, runId?: string) => Promise<void>
+  /** Per run id (the first run's id is the instance id). */
   logs: Record<string, LogLine[]>
-  clearLogs: (id: string) => void
+  clearLogs: (runId: string) => void
   tasks: TaskInfo[]
   toasts: Toast[]
   toast: (text: string, kind?: Toast['kind']) => void
@@ -54,7 +72,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>()
   const [instances, setInstances] = useState<Instance[]>([])
   const [accounts, setAccounts] = useState<AccountView[]>([])
-  const [games, setGames] = useState<Record<string, GameState>>({})
+  const [runs, setRuns] = useState<Record<string, Run[]>>({})
+  // Play pressed, no "preparing" from the engine yet (it may be refreshing the account's token first).
+  const [starting, setStarting] = useState<Record<string, number>>({})
   const [logs, setLogs] = useState<Record<string, LogLine[]>>({})
   const [tasks, setTasks] = useState<TaskInfo[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -84,7 +104,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void api.settings.get().then(setSettings)
     void refreshInstances()
     void refreshAccounts()
-    void api.instances.running().then((ids) => setGames(Object.fromEntries(ids.map((id) => [id, 'running' as const]))))
+    void api.instances.runs().then((list) => {
+      const next: Record<string, Run[]> = {}
+      for (const { instanceId, ...r } of list) (next[instanceId] ??= []).push(r)
+      setRuns(next)
+    })
 
     const offs = [
       api.on.task((t) => {
@@ -92,14 +116,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (t.state !== 'running') setTimeout(() => setTasks((list) => list.filter((x) => x.id !== t.id)), t.state === 'error' ? 8000 : 1500)
       }),
       api.on.game((e) => {
-        setGames((g) => ({ ...g, [e.instanceId]: e.state }))
+        const run: Run = { runId: e.runId, accountId: e.accountId, username: e.username, state: e.state }
+        setRuns((all) => {
+          const list = all[e.instanceId] ?? []
+          const at = list.findIndex((r) => r.runId === e.runId)
+          const next = at < 0 ? [...list, run].sort((a, b) => runOrder(a.runId) - runOrder(b.runId)) : list.map((r, i) => (i === at ? run : r))
+          return { ...all, [e.instanceId]: next }
+        })
+        // A new start of this run slot begins with an empty log.
+        if (e.state === 'preparing') setLogs((l) => ({ ...l, [e.runId]: [] }))
         if (e.state === 'stopped' || e.state === 'crashed') void refreshInstances()
         if (e.state === 'crashed') toast(t('app.crashed', { code: e.code ?? '?' }), 'error')
       }),
       api.on.log((e) =>
         setLogs((l) => {
-          const next = [...(l[e.instanceId] ?? []), ...e.lines]
-          return { ...l, [e.instanceId]: next.length > MAX_LOG ? next.slice(-MAX_LOG) : next }
+          const id = e.runId ?? e.instanceId
+          const next = [...(l[id] ?? []), ...e.lines]
+          return { ...l, [id]: next.length > MAX_LOG ? next.slice(-MAX_LOG) : next }
         })
       )
     ]
@@ -122,24 +155,50 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [settings?.theme])
 
   const play = useCallback(
-    async (id: string) => {
-      setLogs((l) => ({ ...l, [id]: [] }))
-      setGames((g) => ({ ...g, [id]: 'preparing' }))
+    async (id: string, accountId?: string) => {
+      const bump = (n: number) => setStarting((s) => ({ ...s, [id]: Math.max(0, (s[id] ?? 0) + n) }))
+      bump(1)
       try {
-        await api.instances.launch(id)
+        await api.instances.launch(id, accountId)
       } catch (e) {
-        setGames((g) => ({ ...g, [id]: 'stopped' }))
         toast((e as Error).message, 'error')
         // Missing account is the most common first-run problem; take the user straight there.
         const { key, message } = e as EngineError
-        if (key ? key.startsWith('accounts.') : /sign in|account/i.test(message)) setRoute({ page: 'accounts' })
+        if (key ? key.startsWith('accounts.') && key !== 'accounts.bedrockOnly' : /sign in|account/i.test(message)) setRoute({ page: 'accounts' })
+      } finally {
+        bump(-1)
       }
     },
     [toast]
   )
 
-  const stop = useCallback(async (id: string) => api.instances.kill(id), [])
-  const clearLogs = useCallback((id: string) => setLogs((l) => ({ ...l, [id]: [] })), [])
+  const stop = useCallback(async (id: string, runId?: string) => api.instances.kill(id, runId), [])
+  const clearLogs = useCallback((runId: string) => setLogs((l) => ({ ...l, [runId]: [] })), [])
+
+  const switchAccount = useCallback(
+    async (id: string) => {
+      try {
+        await api.accounts.setActive(id)
+        await refreshAccounts()
+        return true
+      } catch (e) {
+        toast((e as Error).message, 'error')
+        return false
+      }
+    },
+    [refreshAccounts, toast]
+  )
+
+  const games = useMemo(() => {
+    const out: Record<string, GameState> = {}
+    for (const [id, list] of Object.entries(runs)) {
+      if (list.some((r) => r.state === 'running')) out[id] = 'running'
+      else if (list.some((r) => r.state === 'preparing')) out[id] = 'preparing'
+      else if (list.length) out[id] = list.some((r) => r.state === 'crashed') ? 'crashed' : 'stopped'
+    }
+    for (const [id, n] of Object.entries(starting)) if (n > 0 && out[id] !== 'running') out[id] = 'preparing'
+    return out
+  }, [runs, starting])
 
   const go = useCallback((r: Route) => {
     setRoute(r)
@@ -158,7 +217,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       accounts,
       activeAccount: accounts.find((a) => a.active) ?? accounts[0],
       refreshAccounts,
+      switchAccount,
       games,
+      runs,
       play,
       stop,
       logs,
@@ -180,7 +241,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       refreshInstances,
       accounts,
       refreshAccounts,
+      switchAccount,
       games,
+      runs,
       play,
       stop,
       logs,
@@ -194,6 +257,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+
+/** Run 1 is the instance id; later runs end in `~2`, `~3`… */
+function runOrder(runId: string): number {
+  const m = /~(\d+)$/.exec(runId)
+  return m ? Number(m[1]) : 1
 }
 
 export function useStore(): Store {

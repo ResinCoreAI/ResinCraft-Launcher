@@ -36,7 +36,7 @@ import {
 import type { ContentItem, ContentKind, Instance, InstanceImage, JavaInstall } from '@shared/types'
 import { api } from '../api'
 import { ConfirmModal, Empty, fromKeyboard, InstanceTile, openContextMenu, PlayButton, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
-import { useStore } from '../store'
+import { isLive, useStore } from '../store'
 import { bytes, COLORS, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
 import { engineError, t } from '../i18n'
 import ExportModal from '../components/ExportModal'
@@ -780,8 +780,13 @@ function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void
 // ---------- Logs ----------
 
 function LogsTab({ inst }: { inst: Instance }) {
-  const { logs, clearLogs, toast, games } = useStore()
-  const lines = logs[inst.id] ?? []
+  const { logs, clearLogs, toast, games, runs } = useStore()
+  // Each run (one per account playing at once) has its own log; run 1's id is the instance id.
+  const mine = runs[inst.id] ?? []
+  const [picked, setPicked] = useState<string>()
+  const runId = picked && mine.some((r) => r.runId === picked) ? picked : (mine.find(isLive)?.runId ?? mine[0]?.runId ?? inst.id)
+  const lines = logs[runId] ?? []
+  const together = mine.filter(isLive).length > 1
   const [filter, setFilter] = useState('')
   const [level, setLevel] = useState<'all' | 'warn' | 'error'>('all')
   const [follow, setFollow] = useState(true)
@@ -803,6 +808,16 @@ function LogsTab({ inst }: { inst: Instance }) {
 
   return (
     <>
+      {mine.length > 1 && (
+        <div className="toolbar log-runs">
+          <Segmented
+            value={runId}
+            onChange={setPicked}
+            options={mine.map((r) => ({ value: r.runId, label: isLive(r) ? r.username : t('instance.logs.runEnded', { name: r.username }) }))}
+          />
+          {together && <span className="hint">{t('instance.logs.together')}</span>}
+        </div>
+      )}
       <div className="toolbar">
         <div className="search">
           <Search />
@@ -829,7 +844,7 @@ function LogsTab({ inst }: { inst: Instance }) {
         >
           <Copy />
         </button>
-        <button className="btn icon" title={t('instance.logs.clear')} onClick={() => clearLogs(inst.id)}>
+        <button className="btn icon" title={t('instance.logs.clear')} onClick={() => clearLogs(runId)}>
           <Eraser />
         </button>
         <button className="btn icon" title={t('instance.logs.openFolder')} onClick={() => void api.instances.openFolder(inst.id, 'logs')}>

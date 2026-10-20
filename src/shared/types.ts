@@ -330,9 +330,25 @@ export interface TaskInfo {
 
 export interface GameEvent {
   instanceId: string
+  /**
+   * One start of the instance. An instance can run several times at once with different accounts; the first run's
+   * id is the instance id, later ones `{instanceId}~2`…
+   */
+  runId: string
+  accountId: string
+  username: string
   state: 'preparing' | 'running' | 'stopped' | 'crashed'
   code?: number | null
   message?: string
+}
+
+/** A game being prepared or running (instances.runs). */
+export interface RunView {
+  instanceId: string
+  runId: string
+  accountId: string
+  username: string
+  state: 'preparing' | 'running'
 }
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
@@ -344,6 +360,7 @@ export interface LogLine {
 
 export interface LogEvent {
   instanceId: string
+  runId: string
   lines: LogLine[]
 }
 
@@ -958,9 +975,12 @@ export interface ResinApi {
     setImage(id: string, kind: InstanceImage, dataUrl: string | null): Promise<Instance>
     remove(id: string): Promise<void>
     openFolder(id: string, sub?: string): Promise<void>
-    launch(id: string): Promise<void>
-    kill(id: string): Promise<void>
+    /** `accountId`: play this once as that account; the active account stays as it is. */
+    launch(id: string, accountId?: string): Promise<void>
+    /** `runId`: stop only that run; without it, every run of the instance stops. */
+    kill(id: string, runId?: string): Promise<void>
     running(): Promise<string[]>
+    runs(): Promise<RunView[]>
   }
   accounts: {
     list(): Promise<AccountView[]>

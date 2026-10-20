@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, Ban, Check, CheckCircle2, ChevronRight, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
+import { AlertTriangle, Ban, Check, CheckCircle2, ChevronDown, ChevronRight, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
 import type { AccountView, Instance } from '@shared/types'
 import { api } from '../api'
-import { useInstanceTask, useStore } from '../store'
-import { t, tx } from '../i18n'
+import { isLive, useInstanceTask, useStore, type Run } from '../store'
+import { t, tx, type Key } from '../i18n'
 
 /** The ResinCraft mark: a resin drop holding a block, with a pixel "R" on its side. Same art as resources/logo.svg. */
 export function Logo({ className }: { className?: string }) {
@@ -121,27 +121,83 @@ export function Avatar({ account, size = 32 }: { account?: AccountView; size?: n
   )
 }
 
+/** What kind of account it is, in account pickers. */
+export const ACCOUNT_KIND_SHORT: Record<AccountView['type'], Key> = { msa: 'account.kind.java', bedrock: 'account.kind.bedrock', offline: 'account.kind.offline' }
+
+/**
+ * "Play as" rows for an instance: every account, playing it this time only (the active account stays as it is).
+ * Bedrock profiles and accounts already playing this instance are greyed out with the reason.
+ */
+export function playAsEntries(inst: Instance, accounts: AccountView[], runs: Run[], play: (id: string, accountId?: string) => void): ContextEntry[] {
+  return accounts.map((a): ContextItem => {
+    const playing = runs.some((r) => isLive(r) && r.accountId === a.id)
+    const reason = a.type === 'bedrock' ? t('play.bedrockCantPlay') : playing ? t('play.playingNow') : undefined
+    const kind = t(ACCOUNT_KIND_SHORT[a.type])
+    return {
+      label: a.username,
+      icon: <Avatar account={a} size={22} />,
+      hint: reason ?? (a.active ? t('play.activeHint', { kind }) : kind),
+      disabled: !!reason,
+      onSelect: () => play(inst.id, a.id)
+    }
+  })
+}
+
+/** The Play button's ▾ menu: pick who plays (another account can join a running instance), stop one of several runs. */
+function playMenu(inst: Instance, store: ReturnType<typeof useStore>): ContextEntry[] {
+  const runs = (store.runs[inst.id] ?? []).filter(isLive)
+  const running = runs.filter((r) => r.state === 'running')
+  return [
+    ...playAsEntries(inst, store.accounts, runs, (id, accountId) => void store.play(id, accountId)),
+    running.length > 1 && '-',
+    ...(running.length > 1
+      ? running.map((r): ContextItem => ({ label: t('play.stopRun', { name: r.username }), icon: <Square />, danger: true, onSelect: () => void store.stop(inst.id, r.runId) }))
+      : [])
+  ]
+}
+
 export function PlayButton({ inst, size = '' }: { inst: Instance; size?: 'lg' | 'sm' | '' }) {
-  const { games, play, stop } = useStore()
+  const store = useStore()
+  const { games, play, stop, accounts } = store
   const task = useInstanceTask(inst.id)
   const state = games[inst.id]
+  const several = (store.runs[inst.id] ?? []).filter((r) => r.state === 'running').length > 1
+  let main: ReactNode
   if (state === 'running')
-    return (
-      <button className={`btn play-btn running ${size}`} onClick={() => void stop(inst.id)} title={t('common.forceStop')}>
+    main = (
+      <button className={`btn play-btn running ${size}`} onClick={() => void stop(inst.id)} title={several ? t('play.stopAllHint') : t('common.forceStop')}>
         <Square /> {t('common.stop')}
       </button>
     )
-  if (state === 'preparing')
-    return (
+  else if (state === 'preparing')
+    main = (
       // "launch" plays a one-off squash-and-pop as the button flips from Play to Preparing.
       <button className={`btn primary play-btn launch ${size}`} disabled>
         <Loader2 className="spin" /> {task?.progress != null ? <span className="pct">{Math.round(task.progress * 100)}%</span> : t('common.preparing')}
       </button>
     )
+  else
+    main = (
+      <button className={`btn primary play-btn ${size}`} onClick={() => void play(inst.id)}>
+        <Play fill="currentColor" /> {t('common.play')}
+      </button>
+    )
+  // With one account there's nobody else to pick.
+  if (accounts.length < 2) return main
+  const live = state === 'running' || state === 'preparing'
   return (
-    <button className={`btn primary play-btn ${size}`} onClick={() => void play(inst.id)}>
-      <Play fill="currentColor" /> {t('common.play')}
-    </button>
+    <div className="split-btn">
+      {main}
+      <button
+        className={`btn play-caret ${state === 'running' ? 'running' : 'primary'} ${size}`}
+        title={t('play.chooseAccount')}
+        aria-label={t('play.chooseAccount')}
+        aria-haspopup="menu"
+        onClick={(e) => openMenuBelow(e.currentTarget, playMenu(inst, store), e.detail === 0, t(live ? 'play.alsoPlayAs' : 'play.playAs'))}
+      >
+        <ChevronDown />
+      </button>
+    </div>
   )
 }
 
@@ -251,6 +307,8 @@ export interface ContextItem {
   shortcut?: string
   /** For a pick-one list (group, colour): true marks the current choice. */
   checked?: boolean
+  /** A second, smaller line under the label (what it is, or why it's disabled). */
+  hint?: string
   items?: ContextEntry[]
 }
 
@@ -656,7 +714,10 @@ function MenuPanel({
               onClick={() => activate(i, false)}
             >
               <span className="ctx-ico">{it.icon}</span>
-              <span className="ctx-label">{it.label}</span>
+              <span className="ctx-label">
+                {it.label}
+                {it.hint && <small className="ctx-hint">{it.hint}</small>}
+              </span>
               {it.shortcut && <kbd className="ctx-key">{it.shortcut}</kbd>}
               {it.checked && <Check className="ctx-check" />}
               {it.items && <ChevronRight className="ctx-arrow" />}

@@ -17,7 +17,7 @@ use crate::core::instances;
 use crate::core::net::{download_all, DownloadItem};
 use crate::core::paths;
 use crate::core::settings::Settings;
-use crate::core::types::{GameEvent, Instance, LoaderType, LogEvent, LogLine};
+use crate::core::types::{GameEvent, Instance, LoaderType, LogEvent, LogLine, RunView};
 use crate::player::accounts::LaunchAuth;
 use crate::{bail_tr, err_tr, tr};
 
@@ -28,27 +28,123 @@ use super::mojang::{asset_items, plain,client_jar, logging_config, materialize_l
 const LAUNCHER_NAME: &str = "ResinCraft";
 const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Running games: instance id → a sender that asks the watcher to stop the game.
-static RUNNING: Mutex<Option<HashMap<String, mpsc::UnboundedSender<()>>>> = Mutex::new(None);
+/// One start of an instance. An instance can run more than once at a time, each with a different account (two
+/// players on one PC); runs are numbered from 1 and run 1's id is the instance id, so a single run looks as before.
+struct Run {
+    slot: u32,
+    account_id: String,
+    username: String,
+    /// Asks the watcher to stop the game; `None` while still preparing.
+    kill: Option<mpsc::UnboundedSender<()>>,
+}
 
-fn running<R>(f: impl FnOnce(&mut HashMap<String, mpsc::UnboundedSender<()>>) -> R) -> R {
+/// Instance id → its runs (preparing or running).
+static RUNNING: Mutex<Option<HashMap<String, Vec<Run>>>> = Mutex::new(None);
+
+fn running<R>(f: impl FnOnce(&mut HashMap<String, Vec<Run>>) -> R) -> R {
     f(RUNNING.lock().unwrap().get_or_insert_with(HashMap::new))
 }
 
-pub fn running_instances() -> Vec<String> {
-    running(|m| m.keys().cloned().collect())
+fn run_id(instance: &str, slot: u32) -> String {
+    if slot == 1 {
+        instance.to_string()
+    } else {
+        format!("{instance}~{slot}")
+    }
 }
 
-pub fn kill_instance(id: &str) {
+/// Instances with a game process running (not just preparing).
+pub fn running_instances() -> Vec<String> {
+    running(|m| m.iter().filter(|(_, runs)| runs.iter().any(|r| r.kill.is_some())).map(|(id, _)| id.clone()).collect())
+}
+
+/// Every run, preparing or running (the UI reads this after a reload).
+pub fn runs() -> Vec<RunView> {
     running(|m| {
-        if let Some(tx) = m.get(id) {
-            let _ = tx.send(());
+        let mut out: Vec<RunView> = m
+            .iter()
+            .flat_map(|(id, runs)| {
+                runs.iter().map(|r| RunView {
+                    instance_id: id.clone(),
+                    run_id: run_id(id, r.slot),
+                    account_id: r.account_id.clone(),
+                    username: r.username.clone(),
+                    state: if r.kill.is_some() { "running" } else { "preparing" },
+                })
+            })
+            .collect();
+        out.sort_by(|a, b| a.run_id.cmp(&b.run_id));
+        out
+    })
+}
+
+/// Stops every run of an instance, or only `run` (a run id) when given.
+pub fn kill_instance(id: &str, run: Option<&str>) {
+    running(|m| {
+        for r in m.get(id).into_iter().flatten() {
+            if run.is_none_or(|want| want == run_id(id, r.slot)) {
+                if let Some(tx) = &r.kill {
+                    let _ = tx.send(());
+                }
+            }
         }
     });
 }
 
-fn game_event(id: &str, state: &'static str, code: Option<i32>, message: Option<String>) {
-    emit("game", GameEvent { instance_id: id.to_string(), state, code, message });
+/// Takes the lowest free run slot for `auth`'s account, or fails if that account is already playing the instance.
+fn reserve(id: &str, auth: &LaunchAuth) -> Result<u32> {
+    running(|m| {
+        let runs = m.entry(id.to_string()).or_default();
+        if let Some(r) = runs.iter().find(|r| r.account_id == auth.account_id) {
+            bail_tr!("launch.alreadyRunningAs", "{name} is already playing this instance. Pick another account to play it a second time.", name = r.username);
+        }
+        let slot = (1..).find(|n| !runs.iter().any(|r| r.slot == *n)).unwrap_or(1);
+        runs.push(Run { slot, account_id: auth.account_id.clone(), username: auth.username.clone(), kill: None });
+        Ok(slot)
+    })
+}
+
+fn release(id: &str, slot: u32) {
+    running(|m| {
+        if let Some(runs) = m.get_mut(id) {
+            runs.retain(|r| r.slot != slot);
+            if runs.is_empty() {
+                m.remove(id);
+            }
+        }
+    });
+}
+
+/// Where a run unpacks native libraries. Run 1 uses the instance's own folder; later runs get their own, because
+/// re-unpacking would delete DLLs the first game has loaded (Windows refuses, and the second launch fails).
+fn natives_for(id: &str, slot: u32) -> PathBuf {
+    if slot == 1 {
+        paths::natives_dir(id)
+    } else {
+        paths::cache().join("natives").join(format!("{id}-{slot}"))
+    }
+}
+
+struct RunInfo {
+    instance_id: String,
+    run_id: String,
+    account_id: String,
+    username: String,
+}
+
+fn game_event(run: &RunInfo, state: &'static str, code: Option<i32>, message: Option<String>) {
+    emit(
+        "game",
+        GameEvent {
+            instance_id: run.instance_id.clone(),
+            run_id: run.run_id.clone(),
+            account_id: run.account_id.clone(),
+            username: run.username.clone(),
+            state,
+            code,
+            message,
+        },
+    );
 }
 
 fn delimiter() -> &'static str {
@@ -69,6 +165,7 @@ struct Prepared {
     game_assets: PathBuf,
     asset_index: String,
     log_argument: Option<String>,
+    natives: PathBuf,
 }
 
 fn non_empty(s: Option<&str>) -> Option<String> {
@@ -105,7 +202,7 @@ async fn download_checked(items: Vec<DownloadItem>, concurrency: usize, progress
     download_all(remote, concurrency, progress).await
 }
 
-async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Result<Prepared> {
+async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &Arc<Task>) -> Result<Prepared> {
     task.update(tr!("launch.readingVersion", "Reading version info…"), None);
     let picker: JavaPicker = {
         let (inst, settings, task) = (inst.clone(), settings.clone(), task.clone());
@@ -132,7 +229,6 @@ async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Resu
     let game_assets = materialize_legacy_assets(&assets.index, &assets.id, &paths::game_dir(&inst.id)).await?;
 
     task.update(tr!("launch.unpackingNatives", "Unpacking natives…"), None);
-    let natives = paths::natives_dir(&inst.id);
     let _ = tokio::fs::remove_dir_all(&natives).await;
     tokio::fs::create_dir_all(&natives).await?;
     let extract: Vec<(PathBuf, Vec<String>)> = libraries.iter().filter(|l| l.extract).map(|l| (l.item.dest.clone(), l.exclude.clone())).collect();
@@ -181,6 +277,7 @@ async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Resu
         asset_index: assets.id,
         log_argument: logging.map(|l| l.argument.replacen("${path}", &plain(&l.item.dest), 1)),
         version,
+        natives,
     })
 }
 
@@ -231,7 +328,7 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
         ("assets_root", plain(&p.assets_dir)),
         ("game_assets", plain(&p.game_assets)),
         ("assets_index_name", p.asset_index.clone()),
-        ("natives_directory", plain(&paths::natives_dir(&inst.id))),
+        ("natives_directory", plain(&p.natives)),
         ("library_directory", plain(&paths::libraries())),
         ("classpath_separator", delimiter().into()),
         ("classpath", cp.join(delimiter())),
@@ -440,37 +537,44 @@ pub async fn launch_instance(id: &str, settings: &Settings, auth: LaunchAuth, ho
 }
 
 /// Like `launch_instance`, joining `server` ("host:port") once the game is up.
+/// The instance can already be running with other accounts; each run gets its own log and state (see `Run`).
 pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth, hooks: LaunchHooks, server: Option<&str>) -> Result<()> {
-    if running(|m| m.contains_key(id)) {
-        bail_tr!("launch.alreadyRunning", "This instance is already running");
-    }
     let inst = instances::get(id).await?;
-    game_event(id, "preparing", None, None);
+    let slot = reserve(id, &auth)?;
+    let run = RunInfo { instance_id: id.to_string(), run_id: run_id(id, slot), account_id: auth.account_id.clone(), username: auth.username.clone() };
+    game_event(&run, "preparing", None, None);
 
-    let prepared = match Task::run(tr!("launch.preparing", "Preparing {name}", name = inst.name), Some(id.to_string()), |t| {
-        let (inst, settings) = (inst.clone(), settings.clone());
-        async move { prepare(&inst, &settings, &t).await }
+    let title = if slot == 1 {
+        tr!("launch.preparing", "Preparing {name}", name = inst.name)
+    } else {
+        tr!("launch.preparingAs", "Preparing {name} for {player}", name = inst.name, player = auth.username)
+    };
+    let natives = natives_for(id, slot);
+    let prepared = Task::run(title, Some(id.to_string()), |t| {
+        let (inst, settings, natives) = (inst.clone(), settings.clone(), natives.clone());
+        async move { prepare(&inst, &settings, natives, &t).await }
     })
     .await
-    {
+    .and_then(|p| build_args(&inst, settings, &p, &auth, server).map(|args| (p, args)));
+    let (prepared, args) = match prepared {
         Ok(p) => p,
         Err(e) => {
-            game_event(id, "stopped", None, None);
+            release(id, slot);
+            game_event(&run, "stopped", None, None);
             return Err(e);
         }
     };
 
-    let args = build_args(&inst, settings, &prepared, &auth, server)?;
     let shown: Vec<&str> = args.iter().map(|a| if *a == auth.access_token { "<access token hidden>" } else { a.as_str() }).collect();
 
     // Batch log lines so a chatty game doesn't flood IPC.
     let pending: Arc<Mutex<Vec<LogLine>>> = Arc::new(Mutex::new(Vec::new()));
     let flush = {
-        let (pending, id) = (pending.clone(), id.to_string());
+        let (pending, id, run_id) = (pending.clone(), id.to_string(), run.run_id.clone());
         move || {
             let lines = std::mem::take(&mut *pending.lock().unwrap());
             if !lines.is_empty() {
-                emit("log", LogEvent { instance_id: id.clone(), lines });
+                emit("log", LogEvent { instance_id: id.clone(), run_id: run_id.clone(), lines });
             }
         }
     };
@@ -479,6 +583,9 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         move |l: LogLine| pending.lock().unwrap().push(l)
     };
     push(LogLine { text: format!("ResinCraft is launching {} (Minecraft {}{})", inst.name, inst.mc_version, loader_label(&inst)), level: "info" });
+    if slot > 1 {
+        push(LogLine { text: format!("Playing as {} alongside another run of this instance (run {slot})", auth.username), level: "info" });
+    }
     push(LogLine { text: format!("Java: {}", prepared.java), level: "info" });
     push(LogLine { text: format!("Command: {}", shown.join(" ")), level: "debug" });
 
@@ -494,12 +601,17 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         Ok(c) => c,
         Err(e) => {
             flush();
-            game_event(id, "stopped", None, Some(e.to_string()));
+            release(id, slot);
+            game_event(&run, "stopped", None, Some(e.to_string()));
             bail_tr!("launch.javaStartFailed", "Couldn't start Java ({java}): {error}", java = prepared.java, error = e.to_string());
         }
     };
     let (kill_tx, mut kill_rx) = mpsc::unbounded_channel::<()>();
-    running(|m| m.insert(id.to_string(), kill_tx));
+    running(|m| {
+        if let Some(r) = m.get_mut(id).and_then(|runs| runs.iter_mut().find(|r| r.slot == slot)) {
+            r.kill = Some(kill_tx);
+        }
+    });
     let started = Instant::now();
 
     // Readers: stdout as-is, stderr with "info" promoted to "warn".
@@ -543,7 +655,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         })
     };
 
-    game_event(id, "running", None, None);
+    game_event(&run, "running", None, None);
     if let Some(f) = hooks.on_started {
         f();
     }
@@ -562,7 +674,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
                 }
             }
         };
-        running(|m| m.remove(&id));
+        release(&id, slot);
         // Let the readers drain what's left in the pipes.
         for r in readers {
             let _ = tokio::time::timeout(Duration::from_secs(5), r).await;
@@ -582,7 +694,10 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         let playtime = instances::get(&id).await.map(|i| i.playtime).unwrap_or(inst.playtime);
         let _ = instances::update(&id, json!({ "playtime": playtime + secs })).await;
         let code = if signal { None } else { code };
-        game_event(&id, if crashed { "crashed" } else { "stopped" }, code, None);
+        game_event(&run, if crashed { "crashed" } else { "stopped" }, code, None);
+        if slot > 1 {
+            let _ = tokio::fs::remove_dir_all(natives_for(&id, slot)).await;
+        }
         if let Some(f) = on_exit {
             f(code);
         }
@@ -599,4 +714,31 @@ fn terminate(child: &mut tokio::process::Child) {
         }
     }
     let _ = child.start_kill();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn auth(id: &str, name: &str) -> LaunchAuth {
+        LaunchAuth { account_id: id.into(), username: name.into(), uuid: String::new(), access_token: "0".into(), user_type: "legacy", xuid: None }
+    }
+
+    #[test]
+    fn runs_take_free_slots_one_per_account() {
+        let inst = "test-runs-slots";
+        assert_eq!(reserve(inst, &auth("a", "Alex")).unwrap(), 1);
+        assert!(reserve(inst, &auth("a", "Alex")).is_err(), "the same account can't play one instance twice");
+        assert_eq!(reserve(inst, &auth("b", "Steve")).unwrap(), 2);
+        assert_eq!(run_id(inst, 1), inst);
+        assert_eq!(run_id(inst, 2), format!("{inst}~2"));
+        // Still preparing: listed as runs, but not as a running game.
+        assert_eq!(runs().iter().filter(|r| r.instance_id == inst).count(), 2);
+        assert!(!running_instances().contains(&inst.to_string()));
+        release(inst, 1);
+        assert_eq!(reserve(inst, &auth("c", "Kai")).unwrap(), 1, "a freed slot is reused");
+        release(inst, 1);
+        release(inst, 2);
+        assert!(runs().iter().all(|r| r.instance_id != inst));
+    }
 }

@@ -282,6 +282,15 @@ h3 {
 .account-chip:hover {
   border-color: var(--border-strong);
 }
+.account-chip .chip-caret {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--text-faint);
+}
+.account-chip:hover .chip-caret {
+  color: var(--text-dim);
+}
 .account-chip .who {
   min-width: 0;
   flex: 1;
@@ -517,6 +526,40 @@ h2.section .link {
 .play-btn .pct {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
+}
+/* Play plus a ▾ that picks who plays (shown with two or more accounts). */
+.split-btn {
+  display: inline-flex;
+  flex: none;
+}
+.split-btn > .play-btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.play-caret {
+  padding: 0 7px;
+  margin-left: 1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.play-caret.lg {
+  padding: 0 10px;
+}
+.play-caret.primary {
+  background: var(--play);
+  border-color: var(--play);
+  color: var(--play-fg);
+}
+.play-caret.primary:hover {
+  background: var(--play-hover);
+  border-color: var(--play-hover);
+}
+.play-caret.running {
+  background: var(--surface-2);
+  color: var(--success);
+}
+.play-caret.running:hover {
+  background: var(--surface-3);
 }
 
 .input,
@@ -1109,6 +1152,10 @@ button.stat b {
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+/* The Logs tab's "whose log" switcher, when an instance ran with more than one account. */
+.toolbar.log-runs {
+  margin-bottom: 10px;
 }
 .toolbar .select {
   width: auto;

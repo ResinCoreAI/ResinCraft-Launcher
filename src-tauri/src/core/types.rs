@@ -427,6 +427,10 @@ pub struct TaskInfo {
 #[serde(rename_all = "camelCase")]
 pub struct GameEvent {
     pub instance_id: String,
+    /// One start of the instance: the instance id for the first, `{id}~2`… for more at once (other accounts).
+    pub run_id: String,
+    pub account_id: String,
+    pub username: String,
     /// "preparing" | "running" | "stopped" | "crashed"
     pub state: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -446,7 +450,20 @@ pub struct LogLine {
 #[serde(rename_all = "camelCase")]
 pub struct LogEvent {
     pub instance_id: String,
+    pub run_id: String,
     pub lines: Vec<LogLine>,
+}
+
+/// A game being prepared or running (`instances:runs`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunView {
+    pub instance_id: String,
+    pub run_id: String,
+    pub account_id: String,
+    pub username: String,
+    /// "preparing" | "running"
+    pub state: &'static str,
 }
 
 #[derive(Debug, Clone, Deserialize)]

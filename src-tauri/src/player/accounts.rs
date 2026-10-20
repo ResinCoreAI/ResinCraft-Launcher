@@ -1,6 +1,6 @@
 //! Microsoft and offline accounts.
 //! Microsoft sign-in: device-code flow → Xbox Live → XSTS → Minecraft services.
-//! Interface used by `game::launch`: keep `LaunchAuth` and `get_launch_auth` signatures stable.
+//! Interface used by `game::launch`: keep `LaunchAuth`, `get_launch_auth` and `launch_auth_for` signatures stable.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -26,6 +26,8 @@ const SCOPE: &str = "XboxLive.signin offline_access";
 /// What the game needs to start as a player.
 #[derive(Debug, Clone)]
 pub struct LaunchAuth {
+    /// The accounts.json entry this came from.
+    pub account_id: String,
     pub username: String,
     /// Dashed or undashed UUID.
     pub uuid: String,
@@ -710,12 +712,24 @@ pub async fn add_offline_account(username: &str) -> Result<AccountView> {
 
 /// The active account's credentials, refreshing the Minecraft token if it's about to expire.
 pub async fn get_launch_auth() -> Result<LaunchAuth> {
+    launch_auth_for(None).await
+}
+
+/// Credentials for one account (`None`: the active one). Picking an account here doesn't make it the active one.
+pub async fn launch_auth_for(id: Option<&str>) -> Result<LaunchAuth> {
     let list = load().await;
-    let Some(acc) = list.iter().find(|a| a.active).or_else(|| list.first()).cloned() else {
+    let picked = match id {
+        Some(id) => list.iter().find(|a| a.id == id),
+        None => list.iter().find(|a| a.active).or_else(|| list.first()),
+    };
+    let Some(acc) = picked.cloned() else {
+        if id.is_some() {
+            bail_tr!("accounts.gone", "This account isn't signed in any more. It may have been removed.");
+        }
         bail_tr!("accounts.signInFirst", "Sign in with your Microsoft account before playing.");
     };
     if acc.kind == "offline" {
-        return Ok(LaunchAuth { username: acc.username, uuid: acc.uuid, access_token: "0".into(), user_type: "legacy", xuid: None });
+        return Ok(LaunchAuth { account_id: acc.id, username: acc.username, uuid: acc.uuid, access_token: "0".into(), user_type: "legacy", xuid: None });
     }
     // Signing in again notices a Java Edition bought since; still none, and Java can't start.
     let acc = if acc.kind == "bedrock" { refresh(&acc).await? } else { acc };
@@ -727,7 +741,7 @@ pub async fn get_launch_auth() -> Result<LaunchAuth> {
         );
     }
     let (acc, access_token) = fresh_token(acc, false).await?;
-    Ok(LaunchAuth { username: acc.username, uuid: acc.uuid, access_token, user_type: "msa", xuid: acc.xuid })
+    Ok(LaunchAuth { account_id: acc.id, username: acc.username, uuid: acc.uuid, access_token, user_type: "msa", xuid: acc.xuid })
 }
 
 /// Opens a Microsoft account's Minecraft token, refreshing it first when it's about to expire (or when `force`d).

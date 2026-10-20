@@ -88,6 +88,9 @@ export default {
   'instance.logs.openFolder': 'Open logs folder',
   'instance.logs.waiting': 'Waiting for the game to say something…',
   'instance.logs.idle': 'Press Play and the game log streams here live.',
+  'instance.logs.runEnded': '{name} (ended)',
+  'instance.logs.together':
+    "Both games share this instance's folder: settings and server lists are saved by whichever closes last, and a singleplayer world opens in only one of them at a time.",
 
   // Settings tab
   'instance.settings.general': 'General',

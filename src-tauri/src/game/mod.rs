@@ -1,4 +1,4 @@
-//! Minecraft versions, mod loaders, Java and launching (`versions:*`, `java:*`, `instances:launch|kill|running`).
+//! Minecraft versions, mod loaders, Java and launching (`versions:*`, `java:*`, `instances:launch|kill|running|runs`).
 
 pub mod forge;
 pub mod java;
@@ -31,15 +31,18 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(picked.map(|p| p.to_string_lossy().into_owned()))
         }
 
+        // (instance id, account id?): the account plays this once without becoming the active one.
         "instances:launch" => {
-            launch(&args.get::<String>(0)?, None).await?;
+            launch_as(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref(), None).await?;
             done()
         }
+        // (instance id, run id?): without a run id, every run of the instance stops.
         "instances:kill" => {
-            launch::kill_instance(&args.get::<String>(0)?);
+            launch::kill_instance(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref());
             done()
         }
         "instances:running" => json(running_ids()),
+        "instances:runs" => json(launch::runs()),
 
         _ => bail!("Unknown request: {channel}"),
     }
@@ -48,8 +51,13 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
 /// Launches an instance with the player's account and the "on launch" window behaviour from Settings.
 /// `server` ("host:port") joins that server once the game is up.
 pub async fn launch(id: &str, server: Option<String>) -> Result<()> {
+    launch_as(id, None, server).await
+}
+
+/// Like `launch`, with a given account instead of the active one.
+pub async fn launch_as(id: &str, account: Option<&str>, server: Option<String>) -> Result<()> {
     let settings = settings::get().await;
-    let auth = crate::player::accounts::get_launch_auth().await?;
+    let auth = crate::player::accounts::launch_auth_for(account).await?;
     let mode = settings.on_launch.clone();
     let exit_mode = mode.clone();
     let hooks = launch::LaunchHooks {

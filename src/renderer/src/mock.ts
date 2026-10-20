@@ -6,6 +6,7 @@ import { mockProfile } from './mock-profile'
 import { mockServers } from './mock-servers'
 import { mockFiles } from './mock-files'
 import { mockUpdate } from './mock-update'
+import { mockRuns } from './mock-runs'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
 
 export function mockApi(): ResinApi {
@@ -61,8 +62,14 @@ export function mockApi(): ResinApi {
   let accounts: AccountView[] = [
     { id: 'a1', type: 'msa', username: 'Puirkle', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', active: true },
     // A Microsoft account without Java Edition.
-    { id: 'a2', type: 'bedrock', username: 'PuirkleBE', uuid: '2535412345678901', active: false }
+    { id: 'a2', type: 'bedrock', username: 'PuirkleBE', uuid: '2535412345678901', active: false },
+    // A second player on the same PC.
+    { id: 'a3', type: 'offline', username: 'Sprout', uuid: '7c1e2a40-3d1b-3f5e-9a3c-5b8d2e7f4a10', active: false }
   ]
+  const runs = mockRuns(
+    () => instances,
+    () => accounts
+  )
   const profileMock = mockProfile(
     () => accounts,
     (list) => (accounts = list)
@@ -226,13 +233,10 @@ export function mockApi(): ResinApi {
       },
       remove: async (id) => void (instances = instances.filter((i) => i.id !== id)),
       openFolder: async () => {},
-      launch: (id) =>
-        mockEngine.launch(
-          instances.find((i) => i.id === id),
-          accounts.length > 0
-        ),
-      kill: async () => {},
-      running: () => wait([])
+      launch: runs.launch,
+      kill: runs.kill,
+      running: runs.running,
+      runs: runs.runs
     },
     accounts: {
       list: () => wait(accounts, 0),
@@ -416,6 +420,6 @@ export function mockApi(): ResinApi {
       openFolder: () => wait(undefined, 100)
     },
     ...mockFiles(),
-    on: { task: mockEngine.onTask, game: noop, log: noop, login: noop, server: servers.onServer, serverLog: servers.onServerLog, update: updates.onUpdate }
+    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, update: updates.onUpdate }
   }
 }
