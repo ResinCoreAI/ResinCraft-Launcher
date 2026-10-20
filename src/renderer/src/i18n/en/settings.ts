@@ -52,5 +52,6 @@ export default {
   'settings.preferredSource.reset': 'Reset “Don’t ask again”',
   'settings.preferredSource.resetDone': 'ResinCraft will ask again when a mod is on both sites',
   'settings.about.credit': 'Made by Puirkle. Free and open source.',
-  'settings.about.dataFolder': 'Data folder: {path}'
+  'settings.about.dataFolder': 'Data folder: {path}',
+  'settings.about.report': "Report an issue"
 }

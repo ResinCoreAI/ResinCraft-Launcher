@@ -229,6 +229,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': '모드가 두 사이트에 모두 있으면 ResinCraft가 다시 물어봐요',
   'settings.about.credit': 'Puirkle이 만들었어요. 무료 오픈 소스예요.',
   'settings.about.dataFolder': '데이터 폴더: {path}',
+  'settings.about.report': "문제 신고",
 
   // home
   'home.welcome.title': 'ResinCraft에 오신 것을 환영해요',

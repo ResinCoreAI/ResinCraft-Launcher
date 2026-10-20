@@ -229,6 +229,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': 'ResinCraft sẽ hỏi lại khi một mod có trên cả hai trang',
   'settings.about.credit': 'Do Puirkle phát triển. Miễn phí và mã nguồn mở.',
   'settings.about.dataFolder': 'Thư mục dữ liệu: {path}',
+  'settings.about.report': "Báo lỗi",
 
   // home
   'home.welcome.title': 'Chào mừng đến với ResinCraft',

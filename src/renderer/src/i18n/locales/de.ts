@@ -233,6 +233,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': 'ResinCraft fragt wieder, wenn ein Mod auf beiden Seiten ist',
   'settings.about.credit': 'Entwickelt von Puirkle. Kostenlos und quelloffen.',
   'settings.about.dataFolder': 'Datenordner: {path}',
+  'settings.about.report': "Problem melden",
 
   // home
   'home.welcome.title': 'Willkommen bei ResinCraft',

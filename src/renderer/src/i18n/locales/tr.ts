@@ -229,6 +229,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': 'Bir mod iki sitede de olduğunda ResinCraft yeniden soracak',
   'settings.about.credit': 'Puirkle tarafından yapıldı. Ücretsiz ve açık kaynak.',
   'settings.about.dataFolder': 'Veri klasörü: {path}',
+  'settings.about.report': "Sorun bildir",
 
   // home
   'home.welcome.title': "ResinCraft'a hoş geldin",

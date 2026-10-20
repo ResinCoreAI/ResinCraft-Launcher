@@ -209,16 +209,16 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
     match channel {
         "bedrock:status" => json(status().await?),
         "bedrock:play" => {
-            shell::open_url(args.get::<Edition>(0)?.protocol())?;
+            shell::open_app_link(args.get::<Edition>(0)?.protocol())?;
             done()
         }
         "bedrock:get" => {
-            shell::open_url(args.get::<Edition>(0)?.store())?;
+            shell::open_app_link(args.get::<Edition>(0)?.store())?;
             done()
         }
         // The Store's Downloads and updates page, which updates every Store app (Minecraft included).
         "bedrock:update" => {
-            shell::open_url("ms-windows-store://downloadsandupdates")?;
+            shell::open_app_link("ms-windows-store://downloadsandupdates")?;
             done()
         }
         "bedrock:openFolder" => {

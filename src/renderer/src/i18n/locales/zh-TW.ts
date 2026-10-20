@@ -229,6 +229,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': '模組同時在兩個網站上時，ResinCraft 會再次詢問',
   'settings.about.credit': '由 Puirkle 製作。免費且開源。',
   'settings.about.dataFolder': '資料位置：{path}',
+  'settings.about.report': "回報問題",
 
   // home
   'home.welcome.title': '歡迎使用 ResinCraft',

@@ -229,6 +229,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': 'Modが両方のサイトにあるとき、ResinCraftは再び確認します',
   'settings.about.credit': 'Puirkle製。無料のオープンソースです。',
   'settings.about.dataFolder': 'データフォルダー：{path}',
+  'settings.about.report': "問題を報告",
 
   // home
   'home.welcome.title': 'ResinCraftへようこそ',

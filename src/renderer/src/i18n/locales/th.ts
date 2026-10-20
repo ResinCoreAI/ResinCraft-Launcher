@@ -229,6 +229,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': 'ResinCraft จะถามอีกครั้งเมื่อม็อดมีทั้งสองเว็บ',
   'settings.about.credit': 'สร้างโดย Puirkle ใช้ฟรีและเป็นโอเพนซอร์ส',
   'settings.about.dataFolder': 'โฟลเดอร์ข้อมูล: {path}',
+  'settings.about.report': "แจ้งปัญหา",
 
   // home
   'home.welcome.title': 'ยินดีต้อนรับสู่ ResinCraft',

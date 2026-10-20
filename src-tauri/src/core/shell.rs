@@ -33,6 +33,21 @@ pub fn open_url(url: &str) -> Result<()> {
     app()?.opener().open_url(url, None::<&str>).map_err(|e| err_tr!("shell.openLinkFailed", "Couldn't open the link: {error}", error = e.to_string()))
 }
 
+/// Links that start another app on purpose: Minecraft Bedrock, Minecraft Preview and the Microsoft Store.
+const APP_SCHEMES: [&str; 3] = ["minecraft:", "minecraft-preview:", "ms-windows-store:"];
+
+/// Opens a link to one of those apps (`open_url` takes https only, so it can't start them).
+fn is_app_link(url: &str) -> bool {
+    APP_SCHEMES.iter().any(|s| url.starts_with(s))
+}
+
+pub fn open_app_link(url: &str) -> Result<()> {
+    if !is_app_link(url) {
+        bail_tr!("shell.httpsOnly", "Only https links can be opened");
+    }
+    app()?.opener().open_url(url, None::<&str>).map_err(|e| err_tr!("shell.openAppFailed", "Couldn't open Minecraft or the Microsoft Store: {error}", error = e.to_string()))
+}
+
 /// Moves a file or folder to the Recycle Bin / Trash (never a permanent delete).
 pub async fn trash(path: &Path) -> Result<()> {
     let p = path.to_path_buf();
@@ -80,4 +95,19 @@ pub fn copy_png(png: &[u8]) -> Result<()> {
 pub fn downloads_dir() -> PathBuf {
     use tauri::Manager;
     ctx::app().and_then(|a| a.path().download_dir().ok()).unwrap_or_else(std::env::temp_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_links_are_only_minecraft_and_the_store() {
+        for ok in ["minecraft:", "minecraft-preview:", "minecraft://?addExternalServer=A|127.0.0.1:19132", "ms-windows-store://downloadsandupdates"] {
+            assert!(is_app_link(ok), "{ok}");
+        }
+        for bad in ["https://example.com", "file:///C:/Windows", "ms-settings:", "cmd:", "Minecraft:", " minecraft:"] {
+            assert!(!is_app_link(bad), "{bad}");
+        }
+    }
 }

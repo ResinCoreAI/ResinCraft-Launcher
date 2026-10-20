@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Coffee, Download, FolderSearch, Gamepad2, Info, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
+import { Bug, Coffee, Download, FolderSearch, Gamepad2, Info, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
@@ -7,6 +7,24 @@ import { UpdatesSection } from '../components/Updates'
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { fixed } from '../util'
+
+/** A new GitHub issue, with the version and system filled in (nothing is sent until the player submits it there). */
+function issueUrl(version?: string, platform?: string): string {
+  const body = [
+    '**What happened?**',
+    '',
+    '',
+    '**What did you expect to happen?**',
+    '',
+    '',
+    '**Steps to make it happen again**',
+    '1. ',
+    '',
+    '---',
+    `ResinCraft Launcher ${version ? `v${version}` : '(version unknown)'} · ${platform ?? navigator.userAgent}`
+  ].join('\n')
+  return `https://github.com/ResinCoreAI/ResinCraft-Launcher/issues/new?body=${encodeURIComponent(body)}`
+}
 
 /** Mojang's usage guidelines ask for this line word for word, so it isn't translated. */
 const DISCLAIMER = 'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
@@ -347,6 +365,9 @@ export default function SettingsPage() {
                   {DISCLAIMER}
                 </div>
               </div>
+              <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void api.app.openExternal(issueUrl(info?.version, info?.platform))}>
+                <Bug /> {t('settings.about.report')}
+              </button>
             </div>
           </section>
         </div>

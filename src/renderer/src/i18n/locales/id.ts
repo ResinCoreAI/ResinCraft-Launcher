@@ -229,6 +229,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': 'ResinCraft akan bertanya lagi jika mod ada di kedua situs',
   'settings.about.credit': 'Dibuat oleh Puirkle. Gratis dan sumber terbuka.',
   'settings.about.dataFolder': 'Folder data: {path}',
+  'settings.about.report': "Laporkan masalah",
 
   // home
   'home.welcome.title': 'Selamat datang di ResinCraft',

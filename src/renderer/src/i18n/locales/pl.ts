@@ -234,6 +234,7 @@ const dict: Dict = {
   'settings.preferredSource.resetDone': 'ResinCraft znów zapyta, gdy mod będzie w obu serwisach',
   'settings.about.credit': 'Stworzone przez Puirkle. Darmowe i otwartoźródłowe.',
   'settings.about.dataFolder': 'Folder danych: {path}',
+  'settings.about.report': "Zgłoś problem",
 
   // home
   'home.welcome.title': 'Witaj w ResinCraft',

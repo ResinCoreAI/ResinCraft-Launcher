@@ -230,6 +230,7 @@ export default {
   'engine.shell.copyImageFailed': "Couldn't copy the image: {error}",
   'engine.shell.httpsOnly': 'Only https links can be opened',
   'engine.shell.imageUnreadable': "Couldn't read the image: {error}",
+  'engine.shell.openAppFailed': "Couldn't open Minecraft or the Microsoft Store: {error}",
   'engine.shell.openFailed': "Couldn't open {path}: {error}",
   'engine.shell.openLinkFailed': "Couldn't open the link: {error}",
   'engine.shell.showFailed': "Couldn't show {path}: {error}",

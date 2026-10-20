@@ -198,7 +198,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             if meta.kind.bedrock() {
                 // Minecraft (Bedrock) adds the server to its Servers list and opens there.
                 let name: String = meta.name.chars().filter(|c| *c != '|').collect();
-                shell::open_url(&format!("minecraft://?addExternalServer={}|127.0.0.1:{}", urlencoding::encode(&name), meta.port))?;
+                shell::open_app_link(&format!("minecraft://?addExternalServer={}|127.0.0.1:{}", urlencoding::encode(&name), meta.port))?;
                 return done();
             }
             let instance = instance.ok_or_else(|| anyhow::anyhow!("Choose an instance to play with"))?;
