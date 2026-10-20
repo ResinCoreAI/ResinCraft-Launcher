@@ -30,6 +30,11 @@ pub fn init(data_dir: PathBuf, app: Option<AppHandle>) {
     let _ = CTX.set(Ctx { data_dir, app, http, dev: cfg!(debug_assertions) });
 }
 
+/// Whether `init()` has run (unit tests use the core without a data folder).
+pub fn is_ready() -> bool {
+    CTX.get().is_some()
+}
+
 pub fn ctx() -> &'static Ctx {
     CTX.get().expect("ResinCraft core used before init()")
 }

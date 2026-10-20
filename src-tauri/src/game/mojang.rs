@@ -349,13 +349,26 @@ async fn refresh(item: &DownloadItem) -> Result<()> {
     }
 }
 
+/// Downloads (or re-checks) a version's JSON against the manifest.
+async fn fetch_vanilla_version(id: &str, file: &Path) -> Result<()> {
+    let entry = manifest().await?.into_iter().find(|v| v.id == id).ok_or_else(|| err_tr!("mojang.unknownVersion", "Minecraft {id} isn't a known version", id = id))?;
+    refresh(&DownloadItem::new(entry.url, file).hash(Some(Hash::sha1(entry.sha1)))).await
+}
+
 pub async fn get_vanilla_version(id: &str) -> Result<VersionJson> {
     let file = paths::versions().join(id).join(format!("{id}.json"));
-    let fetched: Result<()> = async {
-        let entry = manifest().await?.into_iter().find(|v| v.id == id).ok_or_else(|| err_tr!("mojang.unknownVersion", "Minecraft {id} isn't a known version", id = id))?;
-        refresh(&DownloadItem::new(entry.url, &file).hash(Some(Hash::sha1(entry.sha1)))).await
+    // Saved copy first, so launching doesn't wait on the network (~0.25 s); Mojang rarely re-publishes a
+    // version's JSON, and the background check picks that up for the next start.
+    if let Ok(text) = tokio::fs::read_to_string(&file).await {
+        if let Ok(v) = serde_json::from_str::<VersionJson>(&text) {
+            let id = id.to_string();
+            tokio::spawn(async move {
+                let _ = fetch_vanilla_version(&id, &file).await;
+            });
+            return Ok(v);
+        }
     }
-    .await;
+    let fetched = fetch_vanilla_version(id, &file).await;
     if let Err(e) = fetched {
         if !exists(&file).await {
             return Err(e);

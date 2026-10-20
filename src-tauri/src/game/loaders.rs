@@ -148,15 +148,22 @@ pub async fn resolve_version(mc_version: &str, loader: LoaderType, loader_versio
     };
     let file = paths::versions().join(format!("{}-{mc_version}-{ver}", loader.as_str())).join("profile.json");
     let url = format!("{}/versions/loader/{}/{}/profile/json", meta(loader), enc(mc_version), enc(&ver));
-    let profile: VersionJson = match fetch_json::<VersionJson>(&url).await {
-        Ok(p) => {
+    // Saved profile first, so launching doesn't wait on the network; a background fetch keeps it current
+    // for the next start.
+    let profile: VersionJson = match read_json::<VersionJson>(&file).await {
+        Some(p) => {
+            tokio::spawn(async move {
+                if let Ok(p) = fetch_json::<VersionJson>(&url).await {
+                    let _ = write_json(&file, &p).await;
+                }
+            });
+            p
+        }
+        None => {
+            let p = fetch_json::<VersionJson>(&url).await?;
             write_json(&file, &p).await?;
             p
         }
-        Err(e) => match read_json::<VersionJson>(&file).await {
-            Some(p) => p,
-            None => return Err(e),
-        },
     };
     Ok(merge_versions(&vanilla, &profile))
 }

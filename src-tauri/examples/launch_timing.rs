@@ -55,7 +55,7 @@ async fn breakdown(mc: &str, loader: LoaderType, loader_version: Option<&str>, c
     let remote: Vec<DownloadItem> = items.iter().filter(|i| !i.url.is_empty()).cloned().collect();
     let t = Instant::now();
     download_all(remote.clone(), concurrency, |_, _| {}).await?;
-    println!("[step] libraries + client jar check   {}  ({} files, {:.0} MB sha1-hashed)", secs(t.elapsed()), remote.len(), bytes(&remote) as f64 / 1e6);
+    println!("[step] libraries + client jar check   {}  ({} files, {:.0} MB; SHA-1 unless unchanged since last check)", secs(t.elapsed()), remote.len(), bytes(&remote) as f64 / 1e6);
 
     let t = Instant::now();
     let n = assets.items.len();

@@ -1,15 +1,16 @@
 //! HTTP helpers and the verified, retrying, parallel downloader.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
 use futures::stream::{self, StreamExt};
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha1::Digest;
 use tokio::io::AsyncWriteExt;
 
@@ -165,6 +166,84 @@ pub async fn hash_file(path: &Path, algo: HashAlgo) -> Result<String> {
     .await?
 }
 
+// ---------- Verified-file cache ----------
+// Hashing every library before every launch costs 0.15–0.35 s (≈95 MB for 1.21.1). A file whose hash
+// already matched is remembered with the size and modified time it had then; while both are unchanged
+// it's trusted without re-hashing. Replacing, editing, truncating or deleting a file changes its size or
+// modified time, so it gets hashed again (and re-downloaded if it no longer matches).
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+struct Verified {
+    size: u64,
+    /// Modified time in nanoseconds since 1970.
+    mtime: u128,
+    /// The hash the file matched, lowercase.
+    hash: String,
+}
+
+/// path → last verification; `None` until loaded. The bool says it changed since the last save.
+static VERIFIED: Mutex<Option<(HashMap<String, Verified>, bool)>> = Mutex::new(None);
+
+fn verified_file() -> Option<PathBuf> {
+    super::ctx::is_ready().then(|| super::paths::cache().join("verified-files.json"))
+}
+
+fn with_verified<R>(f: impl FnOnce(&mut (HashMap<String, Verified>, bool)) -> R) -> R {
+    let mut guard = VERIFIED.lock().unwrap();
+    let state = guard.get_or_insert_with(|| {
+        let map = verified_file().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        (map, false)
+    });
+    f(state)
+}
+
+fn stamp(meta: &std::fs::Metadata) -> Option<u128> {
+    meta.modified().ok()?.duration_since(UNIX_EPOCH).ok().map(|d| d.as_nanos())
+}
+
+fn key(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+/// True when `path` was verified against `hash` and hasn't changed since.
+fn verified_unchanged(path: &Path, meta: &std::fs::Metadata, hash: &Hash) -> bool {
+    let Some(mtime) = stamp(meta) else { return false };
+    with_verified(|(map, _)| map.get(&key(path)).is_some_and(|v| v.size == meta.len() && v.mtime == mtime && v.hash.eq_ignore_ascii_case(&hash.value)))
+}
+
+/// Remembers that `path` (as it is on disk now) matched `hash`.
+async fn remember_verified(path: &Path, hash: &Hash) {
+    let Ok(meta) = tokio::fs::metadata(path).await else { return };
+    let Some(mtime) = stamp(&meta) else { return };
+    let entry = Verified { size: meta.len(), mtime, hash: hash.value.to_ascii_lowercase() };
+    with_verified(|(map, dirty)| {
+        if map.get(&key(path)) != Some(&entry) {
+            map.insert(key(path), entry);
+            *dirty = true;
+        }
+    });
+}
+
+fn forget_verified(path: &Path) {
+    with_verified(|(map, dirty)| {
+        if map.remove(&key(path)).is_some() {
+            *dirty = true;
+        }
+    });
+}
+
+/// Writes the verified-file cache if it changed. Losing it only means files get hashed again.
+async fn save_verified() {
+    let Some(file) = verified_file() else { return };
+    let Some(map) = with_verified(|(map, dirty)| std::mem::take(dirty).then(|| map.clone())) else { return };
+    let Ok(json) = serde_json::to_vec(&map) else { return };
+    let tmp = file.with_extension("json.tmp");
+    let _ = tokio::fs::create_dir_all(file.parent().unwrap_or(&file)).await;
+    if tokio::fs::write(&tmp, json).await.is_ok() {
+        let _ = tokio::fs::rename(&tmp, &file).await;
+    }
+}
+
 async fn is_valid(item: &DownloadItem) -> bool {
     let Ok(meta) = tokio::fs::metadata(&item.dest).await else { return false };
     if let Some(size) = item.size {
@@ -173,7 +252,18 @@ async fn is_valid(item: &DownloadItem) -> bool {
         }
     }
     match &item.hash {
-        Some(h) if !item.trust_size => hash_file(&item.dest, h.algo).await.map(|v| v.eq_ignore_ascii_case(&h.value)).unwrap_or(false),
+        Some(h) if !item.trust_size => {
+            if verified_unchanged(&item.dest, &meta, h) {
+                return true;
+            }
+            let ok = hash_file(&item.dest, h.algo).await.map(|v| v.eq_ignore_ascii_case(&h.value)).unwrap_or(false);
+            if ok {
+                remember_verified(&item.dest, h).await;
+            } else {
+                forget_verified(&item.dest);
+            }
+            ok
+        }
         _ => true,
     }
 }
@@ -224,6 +314,9 @@ async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
         }
     }
     tokio::fs::rename(tmp, &item.dest).await?;
+    if let Some(h) = &item.hash {
+        remember_verified(&item.dest, h).await;
+    }
     Ok(())
 }
 
@@ -262,5 +355,36 @@ where
         .buffer_unordered(concurrency.max(1))
         .collect()
         .await;
+    save_verified().await;
     results.into_iter().collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn changed_files_are_hashed_again() {
+        let dir = std::env::temp_dir().join(format!("resin-verified-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("lib.jar");
+        std::fs::write(&path, b"hello world").unwrap();
+        let item = DownloadItem::new("", &path).hash(Some(Hash::sha1(hash_bytes(b"hello world", HashAlgo::Sha1)))).size(Some(11));
+
+        assert!(is_valid(&item).await);
+        // Verified and unchanged: trusted without hashing.
+        let meta = std::fs::metadata(&path).unwrap();
+        assert!(verified_unchanged(&path, &meta, item.hash.as_ref().unwrap()));
+
+        // Same size, different content: the modified time moves, so it's hashed again and rejected.
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(&path, b"hello WORLD").unwrap();
+        assert!(!is_valid(&item).await);
+        // ...and stays rejected (the stale entry was dropped).
+        assert!(!is_valid(&item).await);
+
+        std::fs::remove_file(&path).unwrap();
+        assert!(!is_valid(&item).await);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
