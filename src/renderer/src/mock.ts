@@ -8,6 +8,7 @@ import { mockFiles } from './mock-files'
 import { mockUpdate } from './mock-update'
 import { mockMigrate } from './mock-migrate'
 import { mockRuns } from './mock-runs'
+import { mockQuickJoin } from './mock-quickjoin'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
 
 export function mockApi(): ResinApi {
@@ -400,6 +401,7 @@ export function mockApi(): ResinApi {
       instances = instances.map((i) => (i.id === id ? { ...i, iconUrl, packIconUrl: keep(i) } : i))
       return instances.find((i) => i.id === id)!
     }),
+    ...mockQuickJoin(runs.launch),
     server: servers.server,
     bedrock: {
       status: () =>

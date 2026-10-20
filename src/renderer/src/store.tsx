@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { AccountView, AppInfo, ContentKind, GameEvent, Instance, LogLine, Settings, TaskInfo } from '@shared/types'
+import type { AccountView, AppInfo, ContentKind, GameEvent, Instance, LogLine, QuickJoinRequest, Settings, TaskInfo } from '@shared/types'
 import { api } from './api'
 import { t, type EngineError } from './i18n'
 
@@ -11,6 +11,7 @@ export type Route =
   | { page: 'accounts' }
   | { page: 'servers'; id?: string; fromInstance?: string }
   | { page: 'bedrock' }
+  | { page: 'quickjoin' }
   | { page: 'settings' }
 
 export type GameState = GameEvent['state']
@@ -57,6 +58,8 @@ interface Store {
   runs: Record<string, Run[]>
   /** `accountId`: play once as that account instead of the active one. */
   play: (id: string, accountId?: string) => Promise<void>
+  /** Quick join: starts the request's instance straight into its server (Bedrock: opens Minecraft). False on error. */
+  join: (req: QuickJoinRequest) => Promise<boolean>
   /** `runId`: stop only that run; otherwise every run of the instance. */
   stop: (id: string, runId?: string) => Promise<void>
   /** Per run id (the first run's id is the instance id). */
@@ -161,23 +164,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => media.removeEventListener('change', apply)
   }, [settings?.theme])
 
-  const play = useCallback(
-    async (id: string, accountId?: string) => {
-      const bump = (n: number) => setStarting((s) => ({ ...s, [id]: Math.max(0, (s[id] ?? 0) + n) }))
+  /** Runs a launch, showing the instance as preparing until the engine reports in. */
+  const start = useCallback(
+    async (id: string | undefined, launch: () => Promise<void>) => {
+      const bump = (n: number) => id && setStarting((s) => ({ ...s, [id]: Math.max(0, (s[id] ?? 0) + n) }))
       bump(1)
       try {
-        await api.instances.launch(id, accountId)
+        await launch()
+        return true
       } catch (e) {
         toast((e as Error).message, 'error')
         // Missing account is the most common first-run problem; take the user straight there.
         const { key, message } = e as EngineError
         if (key ? key.startsWith('accounts.') && key !== 'accounts.bedrockOnly' : /sign in|account/i.test(message)) setRoute({ page: 'accounts' })
+        return false
       } finally {
         bump(-1)
       }
     },
     [toast]
   )
+  const play = useCallback(async (id: string, accountId?: string) => void (await start(id, () => api.instances.launch(id, accountId))), [start])
+  const join = useCallback((req: QuickJoinRequest) => start(req.instanceId, () => api.quickjoin.join(req)), [start])
 
   const stop = useCallback(async (id: string, runId?: string) => api.instances.kill(id, runId), [])
   const clearLogs = useCallback((runId: string) => setLogs((l) => ({ ...l, [runId]: [] })), [])
@@ -228,6 +236,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       games,
       runs,
       play,
+      join,
       stop,
       logs,
       clearLogs,
@@ -252,6 +261,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       games,
       runs,
       play,
+      join,
       stop,
       logs,
       clearLogs,

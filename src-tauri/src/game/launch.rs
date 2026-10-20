@@ -307,6 +307,43 @@ pub fn split_args(s: &str) -> Vec<String> {
     re.captures_iter(s).map(|c| c.get(1).or_else(|| c.get(2)).map(|m| m.as_str().to_string()).unwrap_or_default()).collect()
 }
 
+/// The rule features a launch turns on; quick play only when joining a server.
+fn launch_features(server: Option<&str>) -> BTreeMap<String, bool> {
+    BTreeMap::from([
+        ("has_custom_resolution".to_string(), true),
+        ("is_demo_user".to_string(), false),
+        ("is_quick_play_multiplayer".to_string(), server.is_some()),
+    ])
+}
+
+/// Splits "host", "host:port" and "[v6]:port" for `--server/--port` (the port defaults to 25565).
+fn split_host_port(addr: &str) -> (String, String) {
+    let addr = addr.trim();
+    if let Some(rest) = addr.strip_prefix('[') {
+        if let Some((host, tail)) = rest.split_once(']') {
+            let port = tail.strip_prefix(':').filter(|p| !p.is_empty()).unwrap_or("25565");
+            return (host.to_string(), port.to_string());
+        }
+    }
+    match addr.rsplit_once(':') {
+        // More than one colon without brackets: a bare IPv6 address.
+        Some((host, port)) if !host.contains(':') && !port.is_empty() => (host.to_string(), port.to_string()),
+        _ => (addr.to_string(), "25565".to_string()),
+    }
+}
+
+/// Adds joining `server` to the expanded game arguments. 1.20+ already got `--quickPlayMultiplayer` from the
+/// version's own rules; versions before it have no quick play and take `--server/--port` instead.
+fn with_server(mut game: Vec<String>, server: Option<&str>) -> Vec<String> {
+    if let Some(addr) = server {
+        if !game.iter().any(|a| a == "--quickPlayMultiplayer") {
+            let (host, port) = split_host_port(addr);
+            game.extend(["--server".to_string(), host, "--port".to_string(), port]);
+        }
+    }
+    game
+}
+
 /// `server` ("host:port") joins a server right after the game starts: quick play on 1.20+, `--server` before.
 fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchAuth, server: Option<&str>) -> Result<Vec<String>> {
     let v = &p.version;
@@ -340,11 +377,7 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
     ]);
     let re = regex::Regex::new(r"\$\{([^}]+)\}").unwrap();
     let sub = |s: &String| -> String { re.replace_all(s, |c: &regex::Captures| vars.get(&c[1]).cloned().unwrap_or_else(|| c[0].to_string())).into_owned() };
-    let features = BTreeMap::from([
-        ("has_custom_resolution".to_string(), true),
-        ("is_demo_user".to_string(), false),
-        ("is_quick_play_multiplayer".to_string(), server.is_some()),
-    ]);
+    let features = launch_features(server);
 
     let (jvm, game): (Vec<String>, Vec<String>) = match v.minecraft_arguments.as_deref().filter(|s| !s.is_empty()) {
         Some(legacy) => {
@@ -361,14 +394,7 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
         ),
     };
 
-    let mut game = game;
-    if let Some(addr) = server {
-        // Versions before 1.20 have no quick play; they accept --server/--port instead.
-        if !game.iter().any(|a| a == "--quickPlayMultiplayer") {
-            let (host, port) = addr.rsplit_once(':').unwrap_or((addr, "25565"));
-            game.extend(["--server".to_string(), host.to_string(), "--port".to_string(), port.to_string()]);
-        }
-    }
+    let game = with_server(game, server);
 
     let main_class = v.main_class.clone().filter(|m| !m.is_empty()).ok_or_else(|| err_tr!("launch.noMainClass", "Version {version} has no main class", version = v.id))?;
     let memory = inst.memory_mb.unwrap_or(settings.memory_mb);
@@ -722,6 +748,40 @@ mod tests {
 
     fn auth(id: &str, name: &str) -> LaunchAuth {
         LaunchAuth { account_id: id.into(), username: name.into(), uuid: String::new(), access_token: "0".into(), user_type: "legacy", xuid: None }
+    }
+
+    /// The game arguments of a 1.20+ version JSON, with its quick play rules.
+    fn modern_args() -> Vec<Argument> {
+        serde_json::from_value(serde_json::json!([
+            "--username", "${auth_player_name}",
+            { "rules": [{ "action": "allow", "features": { "is_quick_play_multiplayer": true } }], "value": ["--quickPlayMultiplayer", "${quickPlayMultiplayer}"] },
+            { "rules": [{ "action": "allow", "features": { "is_quick_play_singleplayer": true } }], "value": ["--quickPlaySingleplayer", "${quickPlaySingleplayer}"] }
+        ]))
+        .unwrap()
+    }
+
+    #[test]
+    fn joining_on_new_versions_uses_quick_play() {
+        let game = with_server(expand(&modern_args(), &launch_features(Some("play.example.org:25570"))), Some("play.example.org:25570"));
+        assert_eq!(game, ["--username", "${auth_player_name}", "--quickPlayMultiplayer", "${quickPlayMultiplayer}"]);
+        assert!(!game.contains(&"--server".to_string()));
+    }
+
+    #[test]
+    fn no_server_means_no_join_arguments() {
+        let game = with_server(expand(&modern_args(), &launch_features(None)), None);
+        assert_eq!(game, ["--username", "${auth_player_name}"]);
+    }
+
+    #[test]
+    fn joining_old_versions_uses_server_and_port() {
+        let legacy = vec!["--username".to_string(), "${auth_player_name}".to_string()];
+        let join = |addr: &str| with_server(legacy.clone(), Some(addr))[2..].to_vec();
+        assert_eq!(join("play.example.org:25570"), ["--server", "play.example.org", "--port", "25570"]);
+        assert_eq!(join("play.example.org"), ["--server", "play.example.org", "--port", "25565"]);
+        assert_eq!(join("[2001:db8::1]:25580"), ["--server", "2001:db8::1", "--port", "25580"]);
+        assert_eq!(join("[::1]"), ["--server", "::1", "--port", "25565"]);
+        assert_eq!(join("2001:db8::1"), ["--server", "2001:db8::1", "--port", "25565"]);
     }
 
     #[test]

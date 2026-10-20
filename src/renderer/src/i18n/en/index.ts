@@ -13,6 +13,7 @@ import instance from './instance'
 import library from './library'
 import menu from './menu'
 import migrate from './migrate'
+import quickjoin from './quickjoin'
 import servers from './servers'
 import settings from './settings'
 import tabs from './tabs'
@@ -34,6 +35,7 @@ const en = {
   ...menu,
   ...migrate,
   ...servers,
+  ...quickjoin,
   ...updates,
   ...engine
 }

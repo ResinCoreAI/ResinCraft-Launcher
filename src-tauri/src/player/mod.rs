@@ -1,5 +1,5 @@
-//! Accounts (and their Minecraft profiles), the instance page's Worlds / Servers / Screenshots / Notes tabs, and
-//! Bedrock Edition as installed on Windows.
+//! Accounts (and their Minecraft profiles), the instance page's Worlds / Servers / Screenshots / Notes tabs, Quick
+//! join, and Bedrock Edition as installed on Windows.
 
 pub mod accounts;
 pub mod bedrock;
@@ -7,6 +7,7 @@ pub mod files;
 pub mod nbt;
 pub mod notes;
 pub mod profile;
+pub mod quickjoin;
 pub mod screenshots;
 pub mod servers;
 pub mod skins;
@@ -112,6 +113,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "servers:ping" => {
             let Value::String(address) = args.raw(0) else { bail!("Invalid server address") };
             json(servers::ping_server(&address, Duration::from_millis(5000)).await?)
+        }
+
+        "quickjoin:get" => json(quickjoin::get().await),
+        "quickjoin:save" => json(quickjoin::save(args.get::<quickjoin::QuickJoin>(0)?).await?),
+        "quickjoin:saved" => json(quickjoin::saved().await?),
+        "quickjoin:clearRecent" => json(quickjoin::clear_recent().await?),
+        "quickjoin:join" => {
+            quickjoin::join(args.get::<quickjoin::JoinRequest>(0)?).await?;
+            done()
         }
 
         "screenshots:list" => json(screenshots::list_screenshots(&args.get::<String>(0)?).await?),

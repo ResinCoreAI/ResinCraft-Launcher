@@ -1,0 +1,233 @@
+/* Quick join (pages/QuickJoin.tsx, components/QuickJoin.tsx and the Home section). Theme variables only. */
+
+/* Join is a play action: the same green as Play. */
+.qj-split {
+  display: inline-flex;
+  flex: none;
+}
+.qj-split > .btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.qj-split-more {
+  padding: 0 6px;
+  margin-left: 1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.qj-page .btn.primary.sm,
+.qj-home .btn.primary.sm {
+  background: var(--play);
+  border-color: var(--play);
+  color: var(--play-fg);
+}
+.qj-page .btn.primary.sm:hover:not(:disabled),
+.qj-home .btn.primary.sm:hover:not(:disabled) {
+  background: var(--play-hover);
+  border-color: var(--play-hover);
+}
+
+.qj-row {
+  position: relative;
+}
+.qj-row.qj-draggable {
+  cursor: grab;
+}
+.qj-grip {
+  display: grid;
+  place-items: center;
+  margin: 0 -6px 0 -8px;
+  color: var(--text-faint);
+  opacity: 0.5;
+}
+.qj-row:hover .qj-grip {
+  opacity: 1;
+}
+.qj-grip svg {
+  width: 14px;
+  height: 14px;
+}
+.qj-dragging {
+  opacity: 0.45;
+}
+/* Where a dragged row would land: a line above or below the row under the pointer. */
+.qj-drop-before {
+  box-shadow: inset 0 3px 0 0 var(--accent);
+}
+.qj-drop-after {
+  box-shadow: inset 0 -3px 0 0 var(--accent);
+}
+.qj-pin {
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  color: var(--accent);
+}
+.qj-actions {
+  gap: 6px;
+}
+.qj-page .inst-group .list {
+  margin-bottom: 2px;
+}
+
+.qj-recent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 6px;
+}
+.qj-recent .label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.qj-recent .label svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Instance chooser */
+.qj-choose {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow: auto;
+}
+.qj-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.qj-choice:hover {
+  background: var(--surface-2);
+}
+.qj-choice.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.qj-choice .tile {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.qj-choice b,
+.qj-choice small {
+  display: block;
+}
+.qj-choice small {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* Home: pinned and recent servers as compact cards */
+.qj-home {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.qj-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.qj-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.qj-card .ico {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+.qj-card .ico img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.qj-card .ico svg {
+  width: 18px;
+  height: 18px;
+}
+.qj-card .name {
+  font: 600 14px/1.3 var(--font-display);
+}
+.qj-card .sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.qj-card .sub svg {
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+}
+.qj-card .good {
+  color: var(--success);
+}
+.qj-card .ok {
+  color: var(--warning);
+}
+.qj-card .bad {
+  color: var(--danger);
+}
+.qj-home-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.qj-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+.qj-ghost svg {
+  width: 14px;
+  height: 14px;
+}

@@ -222,3 +222,13 @@
   background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
+/* Join: plays this instance straight into the server (the same green as Play). */
+.it-join {
+  background: var(--play);
+  border-color: var(--play);
+  color: var(--play-fg);
+}
+.it-join:hover:not(:disabled) {
+  background: var(--play-hover);
+  border-color: var(--play-hover);
+}

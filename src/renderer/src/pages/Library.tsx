@@ -427,7 +427,7 @@ function DragGhost({ drag }: { drag: DragState }) {
 }
 
 /** Height-animated fold. Content is clipped only while folded or folding, so card menus can still overflow. */
-function Collapsible({ open, children }: { open: boolean; children: ReactNode }) {
+export function Collapsible({ open, children }: { open: boolean; children: ReactNode }) {
   const [clip, setClip] = useState(!open)
   useEffect(() => {
     if (!open) setClip(true)
@@ -992,7 +992,7 @@ function GroupHeader({
   )
 }
 
-function NameModal({
+export function NameModal({
   title,
   initial,
   placeholder,

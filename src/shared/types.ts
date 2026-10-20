@@ -544,6 +544,63 @@ export interface ServerStatus {
   favicon?: string
 }
 
+/** Quick join: a group of the player's own entries. */
+export interface QuickJoinGroup {
+  id: string
+  name: string
+  collapsed: boolean
+}
+
+/** Quick join: a server the player added (name, address and the instance to play it with). */
+export interface QuickJoinEntry {
+  id: string
+  name: string
+  address: string
+  edition: 'java' | 'bedrock'
+  /** Absent: choose an instance each time. Never set for Bedrock. */
+  instanceId?: string
+  /** Absent: Ungrouped. */
+  groupId?: string
+  pinned: boolean
+  /** Base64 PNG, without a data: prefix (the server's last icon). */
+  icon?: string
+  addedAt: number
+}
+
+/** A server joined through the launcher lately, newest first. */
+export interface QuickJoinRecent {
+  address: string
+  name: string
+  edition: 'java' | 'bedrock'
+  instanceId?: string
+  at: number
+}
+
+/** Everything in quickjoin.json; groups and entries are in the player's order. */
+export interface QuickJoinData {
+  groups: QuickJoinGroup[]
+  entries: QuickJoinEntry[]
+  recent: QuickJoinRecent[]
+}
+
+/** A server saved in the game's own list (servers.dat), once per address, with every instance that has it. */
+export interface QuickJoinSaved {
+  name: string
+  address: string
+  icon?: string
+  instances: string[]
+}
+
+export interface QuickJoinRequest {
+  address: string
+  name?: string
+  edition?: 'java' | 'bedrock'
+  /** Required for Java. */
+  instanceId?: string
+  /** Play this once as that account (see instances.launch). */
+  accountId?: string
+}
+
 export interface ScreenshotInfo {
   name: string
   size: number
@@ -1082,6 +1139,16 @@ export interface ResinApi {
     /** Replaces the whole server list, in this order. */
     save(instanceId: string, servers: ServerEntry[]): Promise<void>
     ping(address: string): Promise<ServerStatus>
+  }
+  quickjoin: {
+    get(): Promise<QuickJoinData>
+    /** Replaces groups and entries (`recent` is ignored; only joins change it). Returns what was stored. */
+    save(data: QuickJoinData): Promise<QuickJoinData>
+    /** Servers in every instance's in-game list. */
+    saved(): Promise<QuickJoinSaved[]>
+    clearRecent(): Promise<QuickJoinData>
+    /** Starts the instance straight into the server (Bedrock: opens Minecraft with it) and remembers the join. */
+    join(req: QuickJoinRequest): Promise<void>
   }
   screenshots: {
     list(instanceId: string): Promise<ScreenshotInfo[]>

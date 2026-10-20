@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Copy, Loader2, Pencil, Plus, RefreshCw, Server, Signal, Trash2, Users, WifiOff } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Loader2, Pencil, Play, Plus, RefreshCw, Server, Signal, Trash2, Users, WifiOff, Zap } from 'lucide-react'
 import type { Instance, ServerEntry, ServerStatus } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -7,10 +7,10 @@ import { t } from '../i18n'
 import { ConfirmModal, Empty, Modal, openContextMenu, useCopy } from './ui'
 import '../instance-tabs.css'
 
-type Ping = { state: 'loading' } | { state: 'ok'; status: ServerStatus } | { state: 'error'; error: string }
+export type Ping = { state: 'loading' } | { state: 'ok'; status: ServerStatus } | { state: 'error'; error: string }
 
 export default function ServersTab({ inst }: { inst: Instance }) {
-  const { toast } = useStore()
+  const { toast, join, games, go } = useStore()
   const copy = useCopy()
   const [servers, setServers] = useState<ServerEntry[]>()
   const [pings, setPings] = useState<Record<string, Ping>>({})
@@ -83,6 +83,36 @@ export default function ServersTab({ inst }: { inst: Instance }) {
 
   const visible = (servers ?? []).map((s, index) => ({ s, index })).filter(({ s }) => !s.hidden)
 
+  /** Plays this instance straight into the server. */
+  const joinServer = (s: ServerEntry) => void join({ address: s.ip, name: s.name || s.ip, instanceId: inst.id })
+
+  /** Adds the server to Quick join, set to play with this instance. */
+  const addToQuickJoin = async (s: ServerEntry) => {
+    try {
+      const data = await api.quickjoin.get()
+      const key = (a: string) =>
+        a
+          .trim()
+          .toLowerCase()
+          .replace(/:25565$/, '')
+      if (data.entries.some((e) => key(e.address) === key(s.ip))) return toast(t('quickjoin.alreadyThere', { address: s.ip }), 'info')
+      const entry = {
+        id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+        name: s.name || s.ip,
+        address: s.ip,
+        edition: 'java' as const,
+        instanceId: inst.id,
+        pinned: false,
+        icon: s.icon,
+        addedAt: Date.now()
+      }
+      await api.quickjoin.save({ ...data, entries: [...data.entries, entry] })
+      toast(t('quickjoin.added', { name: entry.name }), 'success', { label: t('quickjoin.open'), run: () => go({ page: 'quickjoin' }) })
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
   /** Swaps a server with its visible neighbour (hidden entries keep their place). */
   const move = (pos: number, dir: -1 | 1) => {
     const a = visible[pos]?.index
@@ -133,6 +163,9 @@ export default function ServersTab({ inst }: { inst: Instance }) {
                 className="list-row"
                 onContextMenu={(e) =>
                   openContextMenu(e, [
+                    { label: t('quickjoin.join'), icon: <Play />, disabled: games[inst.id] === 'preparing', onSelect: () => joinServer(s) },
+                    { label: t('quickjoin.addToQuickJoin'), icon: <Zap />, onSelect: () => void addToQuickJoin(s) },
+                    '-',
                     { label: t('common.edit'), icon: <Pencil />, onSelect: () => setEditing({ index, entry: s }) },
                     { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(s.ip) },
                     { label: t('common.refresh'), icon: <RefreshCw />, onSelect: () => void ping(s.ip) },
@@ -168,6 +201,22 @@ export default function ServersTab({ inst }: { inst: Instance }) {
                 </div>
                 <PingStatus ping={p} />
                 <div className="it-actions">
+                  <button
+                    className="btn ghost icon sm"
+                    title={t('quickjoin.addToQuickJoin')}
+                    aria-label={t('quickjoin.addToQuickJoin')}
+                    onClick={() => void addToQuickJoin(s)}
+                  >
+                    <Zap />
+                  </button>
+                  <button
+                    className="btn sm it-join"
+                    disabled={games[inst.id] === 'preparing'}
+                    title={t('quickjoin.joinHint', { instance: inst.name })}
+                    onClick={() => joinServer(s)}
+                  >
+                    <Play /> {t('quickjoin.join')}
+                  </button>
                   <button className="btn ghost icon sm" title={t('common.edit')} onClick={() => setEditing({ index, entry: s })}>
                     <Pencil />
                   </button>
@@ -208,7 +257,7 @@ export default function ServersTab({ inst }: { inst: Instance }) {
   )
 }
 
-function PingStatus({ ping }: { ping?: Ping }) {
+export function PingStatus({ ping }: { ping?: Ping }) {
   if (!ping || ping.state === 'loading')
     return (
       <div className="it-status">
@@ -260,7 +309,7 @@ const COLORS: Record<string, string> = {
 }
 
 /** Renders a message of the day with § colour and style codes. */
-function Motd({ text }: { text: string }) {
+export function Motd({ text }: { text: string }) {
   const out: ReactNode[] = []
   let style: CSSProperties = {}
   const parts = text.split(/(§[0-9a-fk-or])/i)

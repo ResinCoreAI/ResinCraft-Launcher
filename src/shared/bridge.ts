@@ -115,6 +115,13 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       import: fn('worlds:import')
     },
     servers: { list: fn('servers:list'), save: fn('servers:save'), ping: fn('servers:ping') },
+    quickjoin: {
+      get: fn('quickjoin:get'),
+      save: fn('quickjoin:save'),
+      saved: fn('quickjoin:saved'),
+      clearRecent: fn('quickjoin:clearRecent'),
+      join: fn('quickjoin:join')
+    },
     screenshots: {
       list: fn('screenshots:list'),
       thumbnail: fn('screenshots:thumbnail'),

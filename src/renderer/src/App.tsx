@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Smartphone, Users } from 'lucide-react'
+import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Smartphone, Users, Zap } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
@@ -14,6 +14,7 @@ import Discover from './pages/Discover'
 import Home from './pages/Home'
 import InstancePage from './pages/InstancePage'
 import Library, { useInstanceMenu } from './pages/Library'
+import QuickJoin from './pages/QuickJoin'
 import SettingsPage from './pages/SettingsPage'
 import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
@@ -24,6 +25,7 @@ const Servers = lazy(() => import('./pages/Servers'))
 const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'home', label: 'nav.home', icon: <HomeIcon /> },
   { page: 'library', label: 'nav.library', icon: <Layers /> },
+  { page: 'quickjoin', label: 'quickjoin.nav', icon: <Zap /> },
   { page: 'bedrock', label: 'nav.bedrock', icon: <Smartphone /> },
   { page: 'discover', label: 'nav.discover', icon: <Compass /> },
   { page: 'servers', label: 'servers.nav', icon: <Server /> },
@@ -37,6 +39,7 @@ const ACCOUNT_KIND: Record<AccountView['type'], Key> = { msa: 'app.microsoftAcco
 const TITLES: Record<Route['page'], Key> = {
   home: 'nav.home',
   library: 'nav.library',
+  quickjoin: 'quickjoin.nav',
   bedrock: 'nav.bedrock',
   instance: 'nav.library',
   discover: 'nav.discover',
@@ -158,6 +161,7 @@ export default function App() {
         <div className="content">
           {route.page === 'home' && <Home />}
           {route.page === 'library' && <Library />}
+          {route.page === 'quickjoin' && <QuickJoin />}
           {route.page === 'instance' && <InstancePage key={route.id} id={route.id} tab={route.tab} />}
           {route.page === 'discover' && (
             <Discover key={`${route.instanceId ?? ''}${route.kind ?? ''}`} initialKind={route.kind} instanceId={route.instanceId} build={route.build} />

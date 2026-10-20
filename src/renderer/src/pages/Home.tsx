@@ -2,6 +2,7 @@ import { Check, Clock, Compass, Gamepad2, Layers, Plus, Sparkles, Timer } from '
 import type { Instance } from '@shared/types'
 import { InstanceCard, useInstanceMenu } from './Library'
 import { InstanceTile, Logo, PlayButton } from '../components/ui'
+import { QuickJoinHome } from '../components/QuickJoin'
 import { useStore } from '../store'
 import { describe, greeting, playtime, timeAgo } from '../util'
 import { t } from '../i18n'
@@ -99,6 +100,8 @@ export default function Home() {
           <span>{t('home.stats.discoverHint')}</span>
         </button>
       </div>
+
+      <QuickJoinHome />
 
       <InstanceRow />
     </div>
