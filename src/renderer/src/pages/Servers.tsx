@@ -39,7 +39,7 @@ import FileManager from '../components/FileManager'
 import ServerAddons from '../components/ServerAddons'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
-import { RelayNotes, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
+import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
 import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useStore } from '../store'
 import { bytes, fixed, serverPath, timeAgo } from '../util'
@@ -572,6 +572,7 @@ function ConnectCard({ s }: { s: ServerInfo }) {
         ) : net?.state === 'failed' ? (
           <>
             <span className="hint bad">{net.errorText ? tx(net.errorText) : net.error}</span>
+            <RelayOutOfData s={s} />
             {/* The router tip names this PC's own (192.168…) address; it's no use to someone who chose the relay. */}
             {s.tunnel !== 'resin' && (
               <span className="hint">

@@ -293,18 +293,23 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
   ]
 
   const find = (id: string) => servers.find((s) => s.id === id)!
-  /** Session fields for a mock relay tunnel; ?relay=warn|paused|off previews those states. */
+  /** Session fields for a mock relay tunnel; ?relay=warn|soon|low|out|unlimited|paused|off previews those states. */
   const previewSession = (): Partial<ResinNet> => {
     const mode = new URLSearchParams(location.search).get('relay')
-    if (mode === 'warn') return { endsAt: Date.now() + 10 * 60_000, warning: 10, continues: 0 }
+    const topups = { topupBytes: 30_000_000_000, topupsLeft: 3, continueSecs: 900 }
+    if (mode === 'warn') return { ...topups, endsAt: Date.now() + 10 * 60_000, warning: 10, continues: 0 }
+    if (mode === 'soon') return { ...topups, endsAt: Date.now() + 14 * 60_000, soon: true, continues: 0 }
+    if (mode === 'low') return { ...topups, usedBytes: 99_400_000_000, data: 'low', canTopUp: true, endsAt: Date.now() + 2 * 3600_000, continues: 0 }
+    if (mode === 'out') return { ...topups, usedBytes: 100_000_000_000, data: 'out', canTopUp: true, endsAt: Date.now() + 2 * 3600_000, continues: 0 }
+    if (mode === 'unlimited') return { usedBytes: 140_000_000_000, limitBytes: 0, unlimited: true, continues: 0 }
     if (mode === 'paused') return { endsAt: Date.now() + 95 * 60_000, continues: 1, paused: 'Maintenance until 20:00' }
     if (mode === 'off') return { off: true, paused: 'Moving to a new server tonight' }
-    return { endsAt: Date.now() + 2 * 3600_000, continues: 0 }
+    return { ...topups, endsAt: Date.now() + 2 * 3600_000, continues: 0 }
   }
   const continueSession = (id: string) => {
     const net = find(id).net
     if (!net?.resin) return
-    patch(id, { net: { ...net, resin: { ...net.resin, warning: undefined, endsAt: Date.now() + 2 * 3600_000, continues: (net.resin.continues ?? 0) + 1 } } })
+    patch(id, { net: { ...net, resin: { ...net.resin, warning: undefined, soon: false, endsAt: Date.now() + 2 * 3600_000, continues: (net.resin.continues ?? 0) + 1 } } })
     fire(id)
   }
   const patch = (id: string, p: Partial<ServerInfo>) => (servers = servers.map((s) => (s.id === id ? { ...s, ...p } : s)))
@@ -716,8 +721,23 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       return { name, available: true, mine: name === find(id).relayName }
     },
     relayContinue: async (id) => {
-      if (!find(id).net?.resin?.warning) throw new Error("This server isn't online through ResinCraft Relay right now.")
+      const resin = find(id).net?.resin
+      if (!resin?.warning && !(resin?.endsAt && resin.endsAt - Date.now() <= 15 * 60_000)) throw new Error("This server isn't online through ResinCraft Relay right now.")
       continueSession(id)
+    },
+    relayTopUp: async (id) => {
+      await wait(null, 500)
+      const net = find(id).net
+      const resin = net?.resin
+      if (!net || !resin?.canTopUp) {
+        throw new Error("There's still enough ResinCraft Relay data left this month. You can get more once it runs low.")
+      }
+      const added = resin.topupBytes ?? 30_000_000_000
+      const limitBytes = resin.limitBytes + added
+      const topupsLeft = Math.max(0, (resin.topupsLeft ?? 1) - 1)
+      patch(id, { net: { ...net, resin: { ...resin, limitBytes, topupsLeft, data: undefined, canTopUp: false } } })
+      fire(id)
+      return added
     },
     relayRestart: async (id) => {
       const cur = find(id)

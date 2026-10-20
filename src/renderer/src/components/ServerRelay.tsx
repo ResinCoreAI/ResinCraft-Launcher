@@ -1,8 +1,8 @@
 // ResinCraft Relay for a hosted server: the name friends type (name.rscraft.resincore.tech), checked and reserved on
 // the relay from Settings → Internet access, and the lines the Connect card shows about it.
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, CirclePause, CircleX, Loader2, RefreshCw, RotateCcw, Timer, TimerOff, Users } from 'lucide-react'
-import type { RelayInfo, ServerEvent, ServerInfo } from '@shared/types'
+import { CircleCheck, CirclePause, CircleX, Gauge, Infinity as InfinityIcon, Loader2, PlusCircle, RefreshCw, RotateCcw, Timer, TimerOff, Users } from 'lucide-react'
+import type { RelayInfo, ResinNet, ServerEvent, ServerInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes, fixed } from '../util'
@@ -33,6 +33,110 @@ export function traffic(n: number): string {
   if (n < 1e9) return bytes(n)
   const gb = n / 1e9
   return t('common.size.gb', { n: fixed(gb, gb >= 10 ? 0 : 1) })
+}
+
+/** How early the host may continue when the relay doesn't say (older relays). */
+const CONTINUE_SECS = 15 * 60
+
+/** Whether the Continue button shows: the session ends within the relay's continue window (15 min). */
+export function canContinue(resin: ResinNet | undefined, now = Date.now()): boolean {
+  if (!resin?.endsAt || resin.unlimited) return false
+  return resin.warning !== undefined || resin.endsAt - now <= (resin.continueSecs || CONTINUE_SECS) * 1000
+}
+
+/** "Get 30 GB more" for the server's relay account; toasts the result. */
+export async function topUp(id: string, toast: (text: string, kind?: 'success' | 'error' | 'info') => void): Promise<void> {
+  try {
+    const added = await api.server.relayTopUp(id)
+    toast(t('servers.relayData.added', { size: traffic(added) }), 'success')
+  } catch (e) {
+    toast((e as Error).message, 'error')
+  }
+}
+
+/** Continue the relay session; toasts the result. */
+export async function continueRelay(id: string, toast: (text: string, kind?: 'success' | 'error' | 'info') => void): Promise<void> {
+  try {
+    await api.server.relayContinue(id)
+    toast(t('servers.relaySession.continued'), 'success')
+  } catch (e) {
+    toast((e as Error).message, 'error')
+  }
+}
+
+/**
+ * The live relay lines with their buttons, for the Connect card and the relay settings: this month's data
+ * ("x of y GB", Get 30 GB more once little is left), and the session time (Continue from 15 minutes before the end).
+ */
+export function RelayLive({ s }: { s: ServerInfo }) {
+  const { toast } = useStore()
+  const [busy, setBusy] = useState<'' | 'data' | 'session'>('')
+  const now = useNow(15_000)
+  const resin = s.net?.via === 'resin' ? s.net.resin : undefined
+  if (!resin) return null
+  const run = async (what: 'data' | 'session', f: () => Promise<void>) => {
+    setBusy(what)
+    try {
+      await f()
+    } finally {
+      setBusy('')
+    }
+  }
+  return (
+    <>
+      {resin.unlimited ? (
+        <span className="hint ok">
+          <InfinityIcon /> {t('servers.relayData.unlimited')}
+        </span>
+      ) : resin.limitBytes > 0 ? (
+        <span className={`hint ${resin.data === 'out' ? 'bad' : resin.data === 'low' ? 'warn' : ''}`}>
+          <Gauge /> {t('servers.connect.resinUsage', { used: traffic(resin.usedBytes), limit: traffic(resin.limitBytes) })}
+          {resin.data === 'out' ? <> {t('servers.relayData.outShort')}</> : resin.data === 'low' ? <> {t('servers.relayData.lowShort')}</> : null}
+        </span>
+      ) : null}
+      {resin.canTopUp ? (
+        <div className="relay-live-row">
+          <button className="btn sm primary" disabled={busy !== ''} onClick={() => void run('data', () => topUp(s.id, toast))}>
+            {busy === 'data' ? <Loader2 className="spin" /> : <PlusCircle />} {t('servers.relayData.getMore', { size: traffic(resin.topupBytes ?? 0) })}
+          </button>
+          <span className="hint">{t('servers.relayData.topupsLeft', { count: resin.topupsLeft ?? 0 })}</span>
+        </div>
+      ) : resin.data && resin.topupBytes ? (
+        <span className="hint">{t('servers.relayData.noTopUps')}</span>
+      ) : null}
+      <SessionLeft endsAt={resin.unlimited ? undefined : resin.endsAt} continues={resin.continues ?? 0} />
+      {canContinue(resin, now) && (
+        <div className="relay-live-row">
+          <button className="btn sm primary" disabled={busy !== ''} onClick={() => void run('session', () => continueRelay(s.id, toast))}>
+            {busy === 'session' ? <Loader2 className="spin" /> : <RefreshCw />} {t('servers.relaySession.continue')}
+          </button>
+          <span className="hint">{t('servers.relaySession.continueHint')}</span>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** The relay couldn't start because this month's data is used up: offer a top-up (sharing then starts again). */
+export function RelayOutOfData({ s }: { s: ServerInfo }) {
+  const { toast } = useStore()
+  const [busy, setBusy] = useState(false)
+  if (s.net?.resin?.data !== 'out' || s.net.via === 'resin') return null
+  return (
+    <div className="relay-live-row">
+      <button
+        className="btn sm primary"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          await topUp(s.id, toast)
+          setBusy(false)
+        }}
+      >
+        {busy ? <Loader2 className="spin" /> : <PlusCircle />} {t('servers.relayData.getMoreAny')}
+      </button>
+    </div>
+  )
 }
 
 type Check = { kind: 'idle' } | { kind: 'checking' } | { kind: 'done'; ok: boolean; text: string }
@@ -140,6 +244,12 @@ export function RelaySettings({ s, info, reload }: { s: ServerInfo; info?: Relay
           ) : (
             <span className="hint">{t('servers.relay.auto', { address: address(info.suggested) })}</span>
           )}
+          {s.net?.via === 'resin' && (
+            <div className="sv-relay-live">
+              <RelayLive s={s} />
+            </div>
+          )}
+          <RelayOutOfData s={s} />
         </>
       )}
     </div>
@@ -160,15 +270,18 @@ export function RelayNotes({ s }: { s: ServerInfo }) {
             <Loader2 className="spin" /> {t('servers.connect.resinReconnecting')}
           </span>
         )}
-        {resin.limitBytes > 0 && (
-          <span className="hint">{t('servers.connect.resinUsage', { used: traffic(resin.usedBytes), limit: traffic(resin.limitBytes) })}</span>
-        )}
-        <SessionLeft endsAt={resin.endsAt} continues={resin.continues ?? 0} />
+        <RelayLive s={s} />
       </>
     )
   }
   if (net.via !== 'relay') return null
-  if (resin?.error) return <span className="hint bad">{t('servers.connect.resinInstead', { error: tx(resin.error) })}</span>
+  if (resin?.error)
+    return (
+      <>
+        <span className="hint bad">{t('servers.connect.resinInstead', { error: tx(resin.error) })}</span>
+        <RelayOutOfData s={s} />
+      </>
+    )
   if (net.resinHint && domain) return <span className="hint">{t('servers.connect.resinHint', { domain })}</span>
   return null
 }
@@ -275,26 +388,47 @@ export function RelaySessionBanner({ s }: { s: ServerInfo }) {
   return null
 }
 
-/** App-wide: a toast when a hosted server's relay session is about to end or has ended, whatever page is open. */
+/**
+ * App-wide, whatever page is open: a notification when a hosted server's relay session is 15 minutes from its end
+ * (with Continue), at each warning, when it ended, and when its data runs low or out (with Get 30 GB more) or the
+ * relay's admin added some. Each one once.
+ */
 export function RelayWatcher() {
   const { toast } = useStore()
-  const seen = useRef(new Map<string, string>())
+  const seenSession = useRef(new Map<string, string>())
+  const seenData = useRef(new Map<string, string>())
+  const seenAdded = useRef(new Map<string, number>())
   useEffect(
     () =>
       api.on.server(async (e: ServerEvent) => {
         const resin = e.net?.resin
-        const key = resin?.warning !== undefined ? `warn:${resin.warning}` : resin?.ended ? 'ended' : ''
-        if (seen.current.get(e.serverId) === key) return
-        seen.current.set(e.serverId, key)
-        if (!key) return
+        const id = e.serverId
+        const session = resin?.warning !== undefined ? `warn:${resin.warning}` : resin?.ended ? 'ended' : resin?.soon ? 'soon' : ''
+        const data = resin?.data ?? ''
+        const added = resin?.adminAddedBytes ?? 0
+        const newSession = seenSession.current.get(id) !== session && session !== ''
+        const newData = seenData.current.get(id) !== data && data !== ''
+        const addedNow = added - (seenAdded.current.get(id) ?? 0)
+        seenSession.current.set(id, session)
+        seenData.current.set(id, data)
+        seenAdded.current.set(id, added)
+        if (!newSession && !newData && addedNow <= 0) return
         const name = await api.server
-          .get(e.serverId)
+          .get(id)
           .then((s) => s.name)
-          .catch(() => e.serverId)
-        toast(
-          resin?.ended ? t('servers.relaySession.endedToast', { server: name }) : t('servers.relaySession.warningToast', { server: name, minutes: resin!.warning! }),
-          resin?.ended ? 'error' : 'info'
-        )
+          .catch(() => id)
+        const cont = { label: t('servers.relaySession.continue'), run: () => void continueRelay(id, toast) }
+        if (newSession && session === 'ended') toast(t('servers.relaySession.endedToast', { server: name }), 'error')
+        else if (newSession && session === 'soon')
+          toast(t('servers.relaySession.soonToast', { server: name, minutes: Math.max(1, Math.ceil(((resin?.endsAt ?? 0) - Date.now()) / 60_000)) }), 'info', cont)
+        else if (newSession) toast(t('servers.relaySession.warningToast', { server: name, minutes: resin!.warning! }), 'info', cont)
+        if (newData && resin) {
+          const more = resin.canTopUp ? { label: t('servers.relayData.getMore', { size: traffic(resin.topupBytes ?? 0) }), run: () => void topUp(id, toast) } : undefined
+          const text =
+            data === 'out' ? t('servers.relayData.outToast', { server: name }) : t('servers.relayData.lowToast', { server: name, left: traffic(Math.max(0, resin.limitBytes - resin.usedBytes)) })
+          toast(more || !resin.topupBytes ? text : `${text} ${t('servers.relayData.noTopUps')}`, data === 'out' ? 'error' : 'info', more)
+        }
+        if (addedNow > 0) toast(t('servers.relayData.adminAdded', { server: name, size: traffic(addedNow) }), 'success')
       }),
     [toast]
   )

@@ -478,3 +478,63 @@ async fn bedrock_off_when_no_ports_are_configured() {
     // Java tunnels still work.
     conn.online("no-ports").await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn top_ups_raise_the_cap_a_limited_number_of_times() {
+    let mut cfg = config("topup").await;
+    cfg.limits.monthly_gb_per_account = 0.000_000_1; // 100 bytes
+    cfg.limits.topup_gb = 0.000_001; // 1000 bytes
+    cfg.limits.topups_per_month = 1;
+    cfg.limits.topup_low_gb = 0.000_000_05; // below 50 bytes left
+    let relay = start(cfg).await;
+    let mc = fake_minecraft("U").await;
+    let host = format!("topped.{BASE}");
+    let mut conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    assert!(conn.has_top_ups());
+    conn.auth(Credentials::Minecraft("token-alice".into())).await.unwrap();
+
+    // Plenty left: no top-up yet.
+    assert_eq!(conn.top_up().await.unwrap_err().code(), Some(ErrorCode::TopUpNotYet));
+    let online = conn.online("topped").await.unwrap();
+    assert_eq!(online.limits.monthly_bytes, 100);
+    assert_eq!(online.limits.continue_secs, 15 * 60);
+    assert_eq!((online.usage.cap_bytes, online.usage.topup_bytes, online.usage.topups_left, online.usage.low_bytes), (100, 1000, 1, 50));
+    let _serving = tokio::spawn(conn.serve(mc, |_| {}));
+
+    // Use it up; then a top-up (from another connection of the same account) lets players in again.
+    assert_eq!(description(&ping(relay.public, &host).await), "Fake server U");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(description(&ping(relay.public, &host).await).contains("relay limit"));
+    let mut other = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    other.auth(Credentials::Minecraft("token-alice".into())).await.unwrap();
+    assert_eq!(other.online("topped-2").await.unwrap_err().code(), Some(ErrorCode::OverQuota));
+    let up = other.top_up().await.unwrap();
+    assert_eq!((up.added_bytes, up.usage.cap_bytes, up.usage.topups_left), (1000, 1100, 0));
+    assert!(up.usage.bytes >= 100 && up.usage.left_bytes().unwrap() > 0, "{up:?}");
+    assert_eq!(description(&ping(relay.public, &host).await), "Fake server U");
+    other.online("topped-2").await.unwrap();
+
+    // One top-up a month here: the next is refused.
+    assert_eq!(other.top_up().await.unwrap_err().code(), Some(ErrorCode::TopUpLimit));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn no_top_ups_when_switched_off_or_uncapped() {
+    let mut cfg = config("topup-off").await;
+    cfg.limits.monthly_gb_per_account = 0.000_000_1;
+    cfg.limits.topups_per_month = 0;
+    let relay = start(cfg).await;
+    let mut conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    conn.auth(Credentials::Minecraft("token-bob".into())).await.unwrap();
+    // 0 top-ups a month: only the admin can add data.
+    assert_eq!(conn.top_up().await.unwrap_err().code(), Some(ErrorCode::TopUpLimit));
+    let online = conn.online("bob-off").await.unwrap();
+    assert_eq!((online.usage.topup_bytes, online.usage.topups_left), (0, 0));
+
+    let mut cfg = config("topup-uncapped").await;
+    cfg.limits.monthly_gb_per_account = 0.0;
+    let relay = start(cfg).await;
+    let mut conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    conn.auth(Credentials::Minecraft("token-bob".into())).await.unwrap();
+    assert_eq!(conn.top_up().await.unwrap_err().code(), Some(ErrorCode::TopUpNotYet), "no cap, nothing to raise");
+}

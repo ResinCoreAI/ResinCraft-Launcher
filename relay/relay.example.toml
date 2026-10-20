@@ -50,6 +50,10 @@ agents_per_ip = 16             # launchers from one IP at once
 monthly_gb_per_account = 100   # traffic both ways per calendar month (UTC); 0 = unlimited
 session_minutes = 120          # a relay session lasts this long; the host presses Continue for another. 0 = no limit
 session_warn_minutes = [10, 1] # when the host's launcher warns (Console banner, toast, in-game chat)
+session_continue_minutes = 15  # the host may press Continue once this many minutes are left (and gets a reminder)
+topup_gb = 30                  # one top-up adds this much for the rest of the month
+topups_per_month = 3           # top-ups a host may take per month; 0 = only the admin adds data (dashboard: Usage)
+topup_low_gb = 1               # the host may top up once less than this is left (or after running out)
 handshake_timeout_secs = 5
 idle_timeout_secs = 300
 logins_per_ip_per_hour = 20    # sign-ins with a Minecraft token (each asks Mojang)

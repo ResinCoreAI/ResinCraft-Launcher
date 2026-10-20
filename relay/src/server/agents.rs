@@ -20,7 +20,7 @@ use super::metrics::Metrics;
 use super::{Account, Kick, Relay, Tunnel};
 use crate::agent::{yamux_config, Io};
 use super::session::{SessionClock, Tick};
-use crate::proto::{self, now_secs, AgentMsg, ErrorCode, RelayMsg, MAX_LINE, MIN_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION};
+use crate::proto::{self, now_secs, AgentMsg, ErrorCode, RelayMsg, MAX_LINE, MIN_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION};
 
 /// Control messages one connection may send per minute.
 const MESSAGES_PER_MINUTE: u32 = 240;
@@ -156,9 +156,21 @@ pub(crate) fn message(code: ErrorCode) -> &'static str {
         ErrorCode::ServiceOff => "the relay's admin switched it off for now",
         ErrorCode::SessionEnded => "the host's relay session ended",
         ErrorCode::BedrockUnavailable => "this relay has no free Bedrock ports right now",
+        ErrorCode::TopUpNotYet | ErrorCode::TopUpLimit => proto::top_up_refusal(code),
         ErrorCode::ShuttingDown => "the relay is restarting",
         ErrorCode::Internal | ErrorCode::Unknown => "the relay ran into a problem",
     }
+}
+
+/// "30 GB", "2.5 GB", "500 MB" for the events log.
+pub(crate) fn gb_text(bytes: u64) -> String {
+    let (value, unit) = match bytes {
+        b if b >= 1_000_000_000 => (b as f64 / 1e9, "GB"),
+        b if b >= 1_000_000 => (b as f64 / 1e6, "MB"),
+        b => return format!("{b} bytes"),
+    };
+    let text = format!("{value:.2}");
+    format!("{} {unit}", text.trim_end_matches('0').trim_end_matches('.'))
 }
 
 async fn send(w: &mut WriteHalf<StreamHandle>, msg: &RelayMsg) -> std::io::Result<()> {
@@ -204,6 +216,7 @@ impl Agent {
         usage.tick().await;
         let mut tick = tokio::time::interval(Duration::from_secs(1));
         let mut service = self.relay.service_rx();
+        let mut changes = self.relay.account_changes();
         let kick = self.kick.clone();
         loop {
             let clock = self.clock.clone();
@@ -234,7 +247,8 @@ impl Agent {
                 _ = tick.tick(), if clock.is_some() => {
                     let limits = self.relay.limits_now();
                     let c = clock.as_ref().expect("guarded");
-                    match c.tick(now_secs(), &limits.warn_secs(), limits.session_secs() > 0) {
+                    let limit_on = self.account.as_ref().is_some_and(|a| self.relay.session_limit_on(&a.uuid));
+                    match c.tick(now_secs(), &limits.warn_secs(), limit_on) {
                         Tick::Nothing => None,
                         Tick::Warn(secs_left) => (self.version >= 2).then_some(RelayMsg::SessionWarning { secs_left }),
                         Tick::Ended => {
@@ -252,6 +266,22 @@ impl Agent {
                     let c = clock.as_ref().expect("only with a clock");
                     match c.secs_left(now_secs()) {
                         Some(secs_left) if self.version >= 2 => Some(RelayMsg::SessionExtended { secs_left, continues: c.continues() }),
+                        _ => None,
+                    }
+                }
+                change = changes.recv() => {
+                    let mine = match &change {
+                        Ok(c) => self.account.as_ref().is_some_and(|a| a.uuid == c.uuid),
+                        // Missed some: tell the launcher where things stand anyway.
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => self.account.is_some(),
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                    };
+                    let admin_added = change.ok().and_then(|c| c.admin_added);
+                    match admin_added {
+                        Some(added_bytes) if mine && self.version >= TOPUP_PROTOCOL_VERSION => {
+                            Some(RelayMsg::TopUp { added_bytes, by_admin: true, refused: None, usage: self.usage() })
+                        }
+                        _ if mine && self.online.is_some() => Some(RelayMsg::Usage { usage: self.usage() }),
                         _ => None,
                     }
                 }
@@ -309,7 +339,7 @@ impl Agent {
             AgentMsg::Continue => {
                 let (Some(clock), Some(name)) = (self.clock.clone(), self.online.clone()) else { return Step::Reply(error(ErrorCode::BadRequest)) };
                 let limits = relay.limits_now();
-                if clock.continue_session(now_secs(), limits.session_secs(), &limits.warn_secs()).is_some() {
+                if clock.continue_session(now_secs(), limits.session_secs(), limits.continue_secs()).is_some() {
                     let who = self.account.as_ref().map(|a| a.name.clone()).unwrap_or_default();
                     info!(name = %name, continues = clock.continues(), "relay session continued");
                     relay.event("continue", format!("{who} continued {name} ({} so far)", clock.continues()), None);
@@ -388,6 +418,18 @@ impl Agent {
                         }
                         Err(code) => Step::Reply(error(code)),
                     },
+                    AgentMsg::TopUp => {
+                        let (added_bytes, refused) = match relay.top_up(&acc.uuid) {
+                            Ok(added) => {
+                                let usage = self.usage();
+                                info!(account = %acc.name, topups_left = usage.topups_left, "data top-up");
+                                relay.event("topup", format!("{} took a top-up of {} ({} left this month)", acc.name, gb_text(added), usage.topups_left), None);
+                                (added, None)
+                            }
+                            Err(code) => (0, Some(code)),
+                        };
+                        Step::Reply(RelayMsg::TopUp { added_bytes, by_admin: false, refused, usage: self.usage() })
+                    }
                     AgentMsg::Release { name } => match relay.release(&acc, &name) {
                         Ok(()) => Step::Reply(RelayMsg::Released { name }),
                         Err(code) => Step::Reply(error(code)),
@@ -429,12 +471,12 @@ impl Agent {
                                     self.bedrock = Some(tokio::spawn(bedrock::serve(relay.clone(), sock, name.clone(), tunnel)));
                                 }
                                 self.online = Some(name.clone());
-                                let secs_left = clock.secs_left(now_secs());
+                                let secs_left = clock.secs_left(now_secs()).filter(|_| !relay.is_unlimited(&acc.uuid));
                                 self.clock = Some(clock);
                                 Step::Reply(RelayMsg::Online {
                                     address: proto::address(&name, base),
                                     name,
-                                    limits: relay.limits(),
+                                    limits: relay.limits_for(&acc.uuid),
                                     usage: self.usage(),
                                     secs_left,
                                     bedrock_port,
@@ -448,5 +490,16 @@ impl Agent {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn data_amounts_read_well() {
+        assert_eq!(super::gb_text(30_000_000_000), "30 GB");
+        assert_eq!(super::gb_text(2_500_000_000), "2.5 GB");
+        assert_eq!(super::gb_text(500_000_000), "500 MB");
+        assert_eq!(super::gb_text(1000), "1000 bytes");
     }
 }

@@ -138,6 +138,8 @@ export default {
   'engine.hostRelay.sessionEnded': 'The ResinCraft Relay session ended.',
   'engine.hostRelay.tooManyNames': 'Your account already has as many ResinCraft addresses as it may. Reuse the name of another server.',
   'engine.hostRelay.tooManyTunnels': 'Your account already has as many servers online through ResinCraft Relay as it may. Stop one first.',
+  'engine.hostRelay.topUpLimit': "No more ResinCraft Relay top-ups this month. The relay's admin can add data, or it resets on the 1st.",
+  'engine.hostRelay.topUpNotYet': "There's still enough ResinCraft Relay data left this month. You can get more once it runs low.",
   'engine.hostRelay.unreachable': "Couldn't reach ResinCraft Relay ({error}).",
   'engine.instance.missing': 'That instance no longer exists',
   'engine.instance.stopBeforeDelete': 'Stop the game before deleting this instance',

@@ -551,9 +551,35 @@ fn net_state(state: &'static str, address: Option<String>, error: Option<String>
     }
 }
 
-/// Why ResinCraft Relay wasn't used, for the card.
+/// Why ResinCraft Relay wasn't used, for the card (out of data: it offers a top-up).
 fn resin_failed(e: &anyhow::Error) -> ResinNet {
-    ResinNet { error: Some(text_of(e).cloned().unwrap_or_else(|| Text::plain(e.to_string()))), ..ResinNet::default() }
+    let error = text_of(e).cloned().unwrap_or_else(|| Text::plain(e.to_string()));
+    let data = (error.key == "hostRelay.overQuota").then_some("out");
+    ResinNet { error: Some(error), data, ..ResinNet::default() }
+}
+
+/// What the account's data looks like now: used, its cap, top-ups, and whether it's low or out.
+fn apply_usage(resin: &mut ResinNet, usage: &resincraft_relay::proto::Usage) {
+    resin.used_bytes = usage.bytes;
+    // Relays before protocol 4 don't send the account's cap; the one from going online stays.
+    if usage.cap_bytes > 0 || usage.unlimited {
+        resin.limit_bytes = usage.cap_bytes;
+    }
+    resin.unlimited = usage.unlimited;
+    resin.topup_bytes = usage.topup_bytes;
+    resin.topups_left = usage.topups_left;
+    resin.can_top_up = usage.can_top_up();
+    let left = (resin.limit_bytes > 0 && !usage.unlimited).then(|| resin.limit_bytes.saturating_sub(usage.bytes));
+    resin.data = match left {
+        Some(0) => Some("out"),
+        Some(l) if l < usage.low_bytes => Some("low"),
+        _ => None,
+    };
+    if usage.unlimited {
+        resin.ends_at = None;
+        resin.warning = None;
+        resin.soon = false;
+    }
 }
 
 /// Brings the server online through ResinCraft Relay (`<name>.rscraft.resincore.tech`). Ok also when the server
@@ -571,15 +597,19 @@ async fn open_resin(id: &str) -> Result<()> {
             old.abort();
         }
     });
-    let resin = ResinNet {
+    let mut resin = ResinNet {
         name: Some(opened.name),
-        used_bytes: opened.usage.bytes,
         limit_bytes: opened.limits.monthly_bytes,
-        ends_at: opened.secs_left.map(ends_at),
+        continue_secs: relay::continue_window(&opened.limits),
         paused: opened.paused.as_ref().map(|(_, m)| m.clone().unwrap_or_default()),
         off: opened.paused.as_ref().is_some_and(|(off, _)| *off),
         ..ResinNet::default()
     };
+    apply_usage(&mut resin, &opened.usage);
+    resin.ends_at = opened.secs_left.map(ends_at);
+    if resin.data.is_some() {
+        attention();
+    }
     set_net(id, Some(ServerNet { resin: Some(resin), ..net_state("open", Some(opened.address), None, Some("resin")) }));
     Ok(())
 }
@@ -597,6 +627,17 @@ pub fn relay_continue(id: &str) -> Result<()> {
     relay::continue_session(id)
 }
 
+/// More relay data this month (the "Get 30 GB more" button). After the data ran out and the tunnel couldn't
+/// start, sharing starts again with the new data. Returns the bytes added.
+pub async fn relay_top_up(id: &str) -> Result<u64> {
+    let added = relay::top_up(id).await?;
+    let stopped = net(id).is_some_and(|n| n.via != Some("resin") && n.resin.as_ref().is_some_and(|r| r.data == Some("out")));
+    if stopped && is_running(id) {
+        refresh_internet(id).await;
+    }
+    Ok(added)
+}
+
 /// Starts sharing again after the relay session ended (the "Start again" button).
 pub async fn relay_restart(id: &str) {
     refresh_internet(id).await;
@@ -610,13 +651,21 @@ fn ends_at(secs_left: u64) -> i64 {
 /// Updates from a running ResinCraft Relay tunnel: traffic, reconnecting, back online, or given up.
 fn on_resin_status(id: &str, status: relay::Status) {
     let Some(mut n) = net(id).filter(|n| n.via == Some("resin")) else { return };
+    let before = n.clone();
     let resin = n.resin.get_or_insert_with(ResinNet::default);
+    let data_before = resin.data;
     match status {
-        relay::Status::Usage(u) => {
-            if resin.used_bytes == u.bytes {
-                return;
+        relay::Status::Usage(u) => apply_usage(resin, &u),
+        relay::Status::TopUp { added_bytes, by_admin, usage } => {
+            apply_usage(resin, &usage);
+            if by_admin {
+                resin.admin_added_bytes += added_bytes;
             }
-            resin.used_bytes = u.bytes;
+        }
+        relay::Status::ContinueSoon { secs_left } => {
+            resin.soon = true;
+            resin.ends_at = Some(ends_at(secs_left));
+            attention();
         }
         relay::Status::Reconnecting => {
             if resin.reconnecting {
@@ -624,10 +673,13 @@ fn on_resin_status(id: &str, status: relay::Status) {
             }
             resin.reconnecting = true;
         }
-        relay::Status::Online { address, usage, secs_left } => {
+        relay::Status::Online { address, limits, usage, secs_left } => {
             resin.reconnecting = false;
-            resin.used_bytes = usage.bytes;
+            resin.limit_bytes = limits.monthly_bytes;
+            resin.continue_secs = relay::continue_window(&limits);
+            apply_usage(resin, &usage);
             resin.ends_at = secs_left.map(ends_at);
+            resin.soon = false;
             resin.warning = None;
             resin.paused = None;
             resin.off = false;
@@ -649,6 +701,7 @@ fn on_resin_status(id: &str, status: relay::Status) {
         }
         relay::Status::Extended { secs_left, continues } => {
             resin.warning = None;
+            resin.soon = false;
             resin.ends_at = Some(ends_at(secs_left));
             resin.continues = continues;
         }
@@ -673,6 +726,13 @@ fn on_resin_status(id: &str, status: relay::Status) {
             eprintln!("[server] ResinCraft Relay stopped: {e:#}");
             n = ServerNet { error_text: text_of(&e).cloned(), ..net_state("failed", None, Some(e.to_string()), None) };
         }
+    }
+    // Running low or out of data: flash the taskbar once per step (the app shows a notification too).
+    if n.resin.as_ref().is_some_and(|r| r.data.is_some() && r.data != data_before) {
+        attention();
+    }
+    if n == before {
+        return;
     }
     set_net(id, Some(n));
 }

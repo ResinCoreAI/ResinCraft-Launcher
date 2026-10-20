@@ -102,3 +102,30 @@
     transform: translateY(-4px);
   }
 }
+
+/* Live relay lines with a button: Get 30 GB more, Continue (Connect card and relay settings). */
+.relay-live-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.relay-live-row .hint {
+  margin: 0;
+}
+.sv-relay-live {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+.hint.warn {
+  color: var(--warning);
+}
+
+/* A toast's button (Continue, Get 30 GB more). */
+.toast .toast-action {
+  flex: none;
+  margin-top: -3px;
+}

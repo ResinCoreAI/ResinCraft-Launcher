@@ -16,7 +16,7 @@ use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
 use crate::proto::{
     self, AgentMsg, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS,
-    PROTOCOL_VERSION,
+    PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION,
 };
 
 /// The agent port when a relay URL doesn't name one.
@@ -140,13 +140,26 @@ pub enum Event {
     Extended { secs_left: u64, continues: u32 },
     /// The relay's admin flipped the switch (paused: this tunnel goes on until its session ends).
     Service { state: ServiceState, message: Option<String> },
+    /// A top-up: the answer to [`Command::TopUp`] (`refused` says why there's none), or the relay's admin added
+    /// data (`by_admin`). `usage` is the account's data after it.
+    TopUp { added_bytes: u64, by_admin: bool, refused: Option<ErrorCode>, usage: Usage },
+}
+
+/// The answer to a top-up asked for outside [`Connection::serve`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TopUp {
+    pub added_bytes: u64,
+    pub usage: Usage,
 }
 
 /// What the launcher can ask for while serving.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
-    /// Another full session (after a warning).
+    /// Another full session (once the end is near).
     Continue,
+    /// More data for this month (once little is left); answered with [`Event::TopUp`]. Relays older than
+    /// protocol 4 don't have top-ups: the answer is a refusal right away.
+    TopUp,
 }
 
 enum Target {
@@ -313,7 +326,8 @@ impl Connection {
                 | RelayMsg::Pong { .. }
                 | RelayMsg::Service { .. }
                 | RelayMsg::SessionWarning { .. }
-                | RelayMsg::SessionExtended { .. } => continue,
+                | RelayMsg::SessionExtended { .. }
+                | RelayMsg::TopUp { by_admin: true, .. } => continue,
                 RelayMsg::Error { code, message } => return Err(AgentError::Refused(code, message)),
                 RelayMsg::Shutdown { .. } => return Err(AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into())),
                 other => return Ok(other),
@@ -354,6 +368,24 @@ impl Connection {
         self.send(&AgentMsg::Release { name: name.to_string() }).await?;
         match self.recv().await? {
             RelayMsg::Released { .. } => Ok(()),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Whether this relay has data top-ups.
+    pub fn has_top_ups(&self) -> bool {
+        self.relay_version >= TOPUP_PROTOCOL_VERSION
+    }
+
+    /// Asks for more of this month's data (after running out, before bringing a name online again).
+    pub async fn top_up(&mut self) -> Result<TopUp, AgentError> {
+        if !self.has_top_ups() {
+            return Err(AgentError::Refused(ErrorCode::TopUpLimit, "this relay has no top-ups".into()));
+        }
+        self.send(&AgentMsg::TopUp).await?;
+        match self.recv().await? {
+            RelayMsg::TopUp { refused: Some(code), .. } => Err(AgentError::Refused(code, crate::proto::top_up_refusal(code).into())),
+            RelayMsg::TopUp { added_bytes, usage, .. } => Ok(TopUp { added_bytes, usage }),
             other => Err(unexpected(&other)),
         }
     }
@@ -414,6 +446,7 @@ impl Connection {
                         Ok(RelayMsg::SessionWarning { secs_left }) => on_event(Event::Warning { secs_left }),
                         Ok(RelayMsg::SessionExtended { secs_left, continues }) => on_event(Event::Extended { secs_left, continues }),
                         Ok(RelayMsg::Service { state, message }) => on_event(Event::Service { state, message }),
+                        Ok(RelayMsg::TopUp { added_bytes, by_admin, refused, usage }) => on_event(Event::TopUp { added_bytes, by_admin, refused, usage }),
                         Ok(RelayMsg::Pong { .. }) => {}
                         Ok(RelayMsg::Error { code, message }) => return AgentError::Refused(code, message),
                         Ok(RelayMsg::Shutdown { .. }) => return AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into()),
@@ -430,6 +463,14 @@ impl Connection {
                 cmd = commands.recv(), if commands_open => match cmd {
                     Some(Command::Continue) => {
                         if let Err(e) = self.send(&AgentMsg::Continue).await {
+                            return e;
+                        }
+                    }
+                    Some(Command::TopUp) if !self.has_top_ups() => {
+                        on_event(Event::TopUp { added_bytes: 0, by_admin: false, refused: Some(ErrorCode::TopUpLimit), usage: Usage::default() });
+                    }
+                    Some(Command::TopUp) => {
+                        if let Err(e) = self.send(&AgentMsg::TopUp).await {
                             return e;
                         }
                     }

@@ -165,6 +165,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       relayCheck: fn('server:relayCheck'),
       relayName: fn('server:relayName'),
       relayContinue: fn('server:relayContinue'),
+      relayTopUp: fn('server:relayTopUp'),
       relayRestart: fn('server:relayRestart'),
       domain: fn('server:domain'),
       checkDns: fn('server:checkDns'),

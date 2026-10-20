@@ -476,3 +476,101 @@ async fn session_limit_warns_continues_and_ends() {
         assert!(events.contains(what), "events lack {what}: {events}");
     }
 }
+
+/// The next event that matches, skipping others.
+async fn wait_for(live: &mut Live, wait: Duration, want: impl Fn(&Event) -> bool) -> Event {
+    loop {
+        let e = tokio::time::timeout(wait, live.events.recv()).await.expect("the event in time").expect("events open");
+        if want(&e) {
+            return e;
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn top_ups_and_the_admins_add_data() {
+    // A 100-byte cap and top-ups of 1000 bytes below 50 left.
+    let limits = LimitsConfig { monthly_gb_per_account: 0.000_000_1, topup_gb: 0.000_001, topup_low_gb: 0.000_000_05, ..LimitsConfig::default() };
+    let relay = start_limits("data", vec![], limits).await;
+    let d = relay.dash;
+    let mc = fake_minecraft().await;
+    let auth = sign_in(d).await;
+    let host = format!("alice-smp.{BASE}");
+    let mut live = alice_live(&relay, "alice-smp", mc).await.unwrap();
+
+    // Use the 100 bytes up: the launcher hears when it runs low and when it runs out; players then get the
+    // relay's answer.
+    assert_eq!(ping(relay.public, &host).await, Some(0));
+    let Event::Usage(low) = wait_for(&mut live, Duration::from_secs(5), |e| matches!(e, Event::Usage(_))).await else { unreachable!() };
+    assert!(low.left_bytes().unwrap() < 50 && low.can_top_up(), "a status ping is about 80 bytes: {low:?}");
+    assert_eq!(ping(relay.public, &host).await, Some(0));
+    let Event::Usage(out) = wait_for(&mut live, Duration::from_secs(5), |e| matches!(e, Event::Usage(u) if u.bytes >= u.cap_bytes)).await else { unreachable!() };
+    assert!(out.can_top_up(), "{out:?}");
+    assert!(motd(relay.public, &host).await.contains("relay limit"));
+
+    // The host's own top-up from the running tunnel.
+    live.commands.send(Command::TopUp).unwrap();
+    let Event::TopUp { added_bytes, by_admin, refused, usage } = wait_for(&mut live, Duration::from_secs(5), |e| matches!(e, Event::TopUp { .. })).await else { unreachable!() };
+    assert_eq!((added_bytes, by_admin, refused, usage.cap_bytes, usage.topups_left), (1000, false, None, 1100, 2));
+    // Asking again with plenty left is refused, and the tunnel goes on.
+    live.commands.send(Command::TopUp).unwrap();
+    let Event::TopUp { refused, .. } = wait_for(&mut live, Duration::from_secs(5), |e| matches!(e, Event::TopUp { .. })).await else { unreachable!() };
+    assert_eq!(refused, Some(ErrorCode::TopUpNotYet));
+    assert_eq!(ping(relay.public, &host).await, Some(0));
+
+    // Add data from the dashboard (by name): the launcher is told, and the usage page shows it.
+    assert_eq!(post(d, &auth, "/api/usage/add", json!({ "name": "alice", "gb": 0.000_002 })).await.status, 200);
+    let Event::TopUp { added_bytes, by_admin, usage, .. } = wait_for(&mut live, Duration::from_secs(5), |e| matches!(e, Event::TopUp { by_admin: true, .. })).await else { unreachable!() };
+    assert_eq!((added_bytes, by_admin, usage.cap_bytes), (2000, true, 3100));
+    let u = get(d, &auth, "/api/usage").await;
+    assert_eq!((u["accounts"][0]["cap"].as_u64(), u["accounts"][0]["extra"].as_u64(), u["accounts"][0]["topups"].as_u64()), (Some(3100), Some(3000), Some(1)));
+    assert_eq!(post(d, &auth, "/api/usage/add", json!({ "name": "alice", "gb": 0 })).await.status, 400);
+    assert_eq!(post(d, &auth, "/api/usage/add", json!({ "name": "nobody-seen", "gb": 1 })).await.status, 404);
+    assert_eq!(post(d, &auth, "/api/usage/add", json!({ "uuid": "not-a-uuid", "gb": 1 })).await.status, 400);
+    live.serving.abort();
+
+    let events = get(d, &auth, "/api/events").await.to_string();
+    for what in ["Alice took a top-up of 1000 bytes (2 left this month)", "added 2000 bytes of data for Alice"] {
+        assert!(events.contains(what), "events lack {what}: {events}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn unlimited_accounts_have_no_cap_and_no_session_limit() {
+    // A 100-byte cap and a 3-second session.
+    let limits = LimitsConfig { monthly_gb_per_account: 0.000_000_1, session_minutes: 0.05, session_warn_minutes: vec![2.0 / 60.0], ..LimitsConfig::default() };
+    let relay = start_limits("unlimited", vec![], limits).await;
+    let d = relay.dash;
+    let mc = fake_minecraft().await;
+    let auth = sign_in(d).await;
+    let host = format!("alice-smp.{BASE}");
+    let mut live = alice_live(&relay, "alice-smp", mc).await.unwrap();
+
+    // Unlimited (by UUID): no cap, no session time limit; the session would have ended by now otherwise.
+    let r = post(d, &auth, "/api/usage/unlimited", json!({ "uuid": "8667ba71b85a4004af54457a9734eed7", "on": true })).await;
+    assert_eq!((r.status, r.body["unlimited"].as_bool()), (200, Some(true)));
+    let Event::Usage(free) = wait_for(&mut live, Duration::from_secs(5), |e| matches!(e, Event::Usage(u) if u.unlimited)).await else { unreachable!() };
+    assert_eq!((free.cap_bytes, free.left_bytes(), free.can_top_up()), (0, None, false));
+    let t = get(d, &auth, "/api/tunnels").await;
+    assert_eq!((t[0]["unlimited"].as_bool(), t[0]["secsLeft"].is_null()), (Some(true), true));
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    assert!(!live.serving.is_finished(), "unlimited accounts have no session time limit");
+    for _ in 0..3 {
+        assert_eq!(ping(relay.public, &host).await, Some(0), "and no data cap");
+    }
+    let u = get(d, &auth, "/api/usage").await;
+    assert_eq!((u["accounts"][0]["unlimited"].as_bool(), u["accounts"][0]["cap"].as_u64()), (Some(true), Some(0)));
+    assert!(u["accounts"][0]["bytes"].as_u64().unwrap() > 100);
+
+    // Off again: a fresh session starts (the launcher hears the new time) and the cap is back.
+    assert_eq!(post(d, &auth, "/api/usage/unlimited", json!({ "uuid": "8667ba71-b85a-4004-af54-457a9734eed7", "on": false })).await.status, 200);
+    let Event::Extended { secs_left, .. } = wait_for(&mut live, Duration::from_secs(5), |e| matches!(e, Event::Extended { .. })).await else { unreachable!() };
+    assert!(secs_left <= 3, "{secs_left}");
+    let ended = tokio::time::timeout(Duration::from_secs(10), live.serving).await.expect("the session ends again").unwrap();
+    assert_eq!(ended.code(), Some(ErrorCode::SessionEnded));
+
+    let events = get(d, &auth, "/api/events").await.to_string();
+    for what in ["gave unlimited use (no data cap, no session time limit) to Alice", "took unlimited use away from Alice"] {
+        assert!(events.contains(what), "events lack {what}: {events}");
+    }
+}

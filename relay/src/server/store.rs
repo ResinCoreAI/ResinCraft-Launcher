@@ -27,6 +27,17 @@ pub struct Data {
     /// The admin's on/off switch.
     #[serde(default)]
     pub service: ServiceSetting,
+    /// Accounts (UUID) the admin gave unlimited use: no data cap, no session time limit.
+    #[serde(default)]
+    pub unlimited: BTreeMap<String, UnlimitedEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UnlimitedEntry {
+    /// The account's Minecraft name when it was set (for the dashboard).
+    #[serde(default)]
+    pub name: String,
+    pub since: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -97,6 +108,26 @@ impl BanEntry {
 pub struct UsageEntry {
     pub month: String,
     pub bytes: u64,
+    /// Added to the cap this month: the host's top-ups and the admin's "Add data".
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub extra_bytes: u64,
+    /// Top-ups the host took this month.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub topups: u32,
+}
+
+fn is_zero<T: Default + PartialEq>(v: &T) -> bool {
+    *v == T::default()
+}
+
+impl UsageEntry {
+    /// Starts over when the month changed.
+    pub fn for_month(&mut self, month: &str) -> &mut Self {
+        if self.month != month {
+            *self = UsageEntry { month: month.to_string(), ..UsageEntry::default() };
+        }
+        self
+    }
 }
 
 pub struct Store {

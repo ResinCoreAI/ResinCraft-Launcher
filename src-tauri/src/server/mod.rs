@@ -101,6 +101,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             runtime::relay_continue(&args.get::<String>(0)?)?;
             done()
         }
+        "server:relayTopUp" => json(runtime::relay_top_up(&args.get::<String>(0)?).await?),
         "server:relayRestart" => {
             runtime::relay_restart(&args.get::<String>(0)?).await;
             done()

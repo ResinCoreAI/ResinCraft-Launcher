@@ -81,6 +81,14 @@ pub struct LimitsConfig {
     pub session_minutes: f64,
     /// When to warn the host before the session ends (minutes left).
     pub session_warn_minutes: Vec<f64>,
+    /// The host may press Continue once this many minutes (or fewer) are left.
+    pub session_continue_minutes: f64,
+    /// What one top-up adds to an account's monthly cap, in GB (0 = no top-ups; the admin can still add data).
+    pub topup_gb: f64,
+    /// Top-ups one account may take per month (0 = none; only the admin can add data).
+    pub topups_per_month: u32,
+    /// A top-up can be asked for once less than this many GB are left (or after running out).
+    pub topup_low_gb: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -181,6 +189,10 @@ impl Default for LimitsConfig {
             max_pending_handshakes: 2048,
             session_minutes: 120.0,
             session_warn_minutes: vec![10.0, 1.0],
+            session_continue_minutes: 15.0,
+            topup_gb: 30.0,
+            topups_per_month: 3,
+            topup_low_gb: 1.0,
         }
     }
 }
@@ -215,12 +227,51 @@ impl LimitsConfig {
         v
     }
 
+    /// How early the host may continue, in seconds: never less than the first warning, so Continue always
+    /// works once the host has been warned.
+    pub fn continue_secs(&self) -> u64 {
+        let own = (self.session_continue_minutes.max(0.0) * 60.0).round() as u64;
+        own.max(self.warn_secs().first().copied().unwrap_or(0))
+    }
+
     pub fn monthly_bytes(&self) -> u64 {
-        if self.monthly_gb_per_account <= 0.0 {
+        gb(self.monthly_gb_per_account)
+    }
+
+    /// What one top-up adds (0: top-ups are off).
+    pub fn topup_bytes(&self) -> u64 {
+        if self.topups_per_month == 0 {
             0
         } else {
-            (self.monthly_gb_per_account * 1e9) as u64
+            gb(self.topup_gb)
         }
+    }
+
+    pub fn topup_low_bytes(&self) -> u64 {
+        gb(self.topup_low_gb)
+    }
+}
+
+/// GB (10^9 bytes) to bytes; 0 or less is 0.
+pub fn gb(value: f64) -> u64 {
+    if value <= 0.0 || !value.is_finite() {
+        0
+    } else {
+        (value * 1e9) as u64
+    }
+}
+
+impl LimitsConfig {
+    /// Problems with values the dashboard or relay.toml could set.
+    pub fn check(&self) -> Result<(), &'static str> {
+        if self.tunnels_per_account == 0 || self.names_per_account == 0 || self.session_days == 0 {
+            return Err("tunnels, names and session days must be at least 1");
+        }
+        let numbers = [self.monthly_gb_per_account, self.session_minutes, self.session_continue_minutes, self.topup_gb, self.topup_low_gb];
+        if numbers.iter().chain(&self.session_warn_minutes).any(|v| *v < 0.0 || !v.is_finite()) {
+            return Err("the cap, session times and top-up sizes can't be negative");
+        }
+        Ok(())
     }
 }
 
@@ -278,6 +329,9 @@ impl Config {
         if self.limits.session_minutes < 0.0 || self.limits.session_warn_minutes.iter().any(|m| *m < 0.0) {
             bail!("session_minutes and session_warn_minutes can't be negative");
         }
+        if self.limits.session_continue_minutes < 0.0 || self.limits.topup_gb < 0.0 || self.limits.topup_low_gb < 0.0 {
+            bail!("session_continue_minutes, topup_gb and topup_low_gb can't be negative");
+        }
         if !self.bedrock_ports.trim().is_empty() && self.bedrock_range().is_none() {
             bail!("bedrock_ports must be a range like \"19200-19299\" (or \"\" for no Bedrock tunnels)");
         }
@@ -317,6 +371,8 @@ mod tests {
         cfg.validate().unwrap();
         assert_eq!(cfg.base_domain, "rscraft.resincore.tech");
         assert_eq!(cfg.limits.monthly_bytes(), 100_000_000_000);
+        assert_eq!((cfg.limits.topup_bytes(), cfg.limits.topups_per_month, cfg.limits.topup_low_bytes()), (30_000_000_000, 3, 1_000_000_000));
+        assert_eq!(cfg.limits.continue_secs(), 15 * 60);
         assert!(cfg.tls.is_some());
         assert_eq!(cfg.dashboard.listen.as_deref(), Some("0.0.0.0:443"));
         assert_eq!(cfg.bedrock_range(), Some(19200..=19299));
@@ -360,6 +416,17 @@ mod tests {
         let mut one: Config = toml::from_str("bedrock_ports = \"19200\"").unwrap();
         assert!(one.validate().is_ok() && one.bedrock_range() == Some(19200..=19200));
         assert_eq!(Config::default().bedrock_range(), Some(19200..=19299));
+        // Top-ups: 0 per month switches them off; older dashboard overrides without the new keys still load.
+        let none = LimitsConfig { topups_per_month: 0, ..LimitsConfig::default() };
+        assert_eq!(none.topup_bytes(), 0);
+        let old: LimitsConfig = serde_json::from_str(r#"{"monthly_gb_per_account":50}"#).unwrap();
+        assert_eq!((old.monthly_bytes(), old.topup_bytes()), (50_000_000_000, 30_000_000_000));
+        assert!(LimitsConfig { topup_gb: -1.0, ..LimitsConfig::default() }.check().is_err());
+        let mut neg: Config = toml::from_str("[limits]
+topup_low_gb = -1").unwrap();
+        assert!(neg.validate().is_err());
+        // Continue works from the first warning on, even with a shorter continue window.
+        assert_eq!(LimitsConfig { session_continue_minutes: 5.0, ..LimitsConfig::default() }.continue_secs(), 600);
         let mut bad_ip: Config = toml::from_str("[dashboard]\nallow_ips = [\"nope\"]").unwrap();
         assert!(bad_ip.validate().is_err());
     }

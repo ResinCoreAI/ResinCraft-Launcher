@@ -67,10 +67,10 @@ impl SessionClock {
     }
 
     /// The host's `continue`: another full session on top of what's left, but never more than one session
-    /// plus the warning window ahead (so continuing early can't pile sessions up). Returns the seconds left.
-    pub fn continue_session(&self, now: u64, session_secs: u64, warn_secs: &[u64]) -> Option<u64> {
+    /// plus `window` ahead (how early the host may continue), so continuing early can't pile sessions up.
+    /// Returns the seconds left.
+    pub fn continue_session(&self, now: u64, session_secs: u64, window: u64) -> Option<u64> {
         let left = self.secs_left(now)?;
-        let window = warn_secs.iter().copied().max().unwrap_or(0);
         let new_left = (left + session_secs).min(session_secs + window);
         Some(self.set_left(now, new_left))
     }
@@ -79,6 +79,13 @@ impl SessionClock {
     pub fn extend(&self, now: u64, session_secs: u64) -> Option<u64> {
         let left = self.secs_left(now)?;
         Some(self.set_left(now, left + session_secs))
+    }
+
+    /// A fresh session from `now` (after the admin took an account's unlimited use away); 0: no limit.
+    pub fn restart(&self, now: u64, session_secs: u64) {
+        self.deadline.store(if session_secs == 0 { 0 } else { now + session_secs }, Ordering::Relaxed);
+        self.warned.lock().unwrap().clear();
+        self.changed.notify_one();
     }
 
     fn set_left(&self, now: u64, left: u64) -> u64 {
@@ -124,7 +131,7 @@ mod tests {
         let c = SessionClock::new(0, 0);
         assert_eq!(c.secs_left(0), None);
         assert_eq!(c.tick(10 * HOUR, &WARN, true), Tick::Nothing);
-        assert_eq!(c.continue_session(0, HOUR, &WARN), None);
+        assert_eq!(c.continue_session(0, HOUR, 600), None);
         let limited = SessionClock::new(0, 60);
         assert_eq!(limited.tick(100, &WARN, false), Tick::Nothing, "a limit of 0 in the dashboard stops the clock");
     }
@@ -134,15 +141,27 @@ mod tests {
         let c = SessionClock::new(0, 2 * HOUR);
         let at = 2 * HOUR - 600; // at the 10-minute warning
         assert_eq!(c.tick(at, &WARN, true), Tick::Warn(600));
-        assert_eq!(c.continue_session(at, 2 * HOUR, &WARN), Some(600 + 2 * HOUR));
+        assert_eq!(c.continue_session(at, 2 * HOUR, 600), Some(600 + 2 * HOUR));
         assert_eq!(c.continues(), 1);
         // A new period: warnings come again before the new end.
         let end = at + 600 + 2 * HOUR;
         assert_eq!(c.tick(end - 600, &WARN, true), Tick::Warn(600));
         // Continuing right away again is capped at one session plus the warning window.
         let c2 = SessionClock::new(0, 2 * HOUR);
-        assert_eq!(c2.continue_session(10, 2 * HOUR, &WARN), Some(2 * HOUR + 600));
-        assert_eq!(c2.continue_session(11, 2 * HOUR, &WARN), Some(2 * HOUR + 600));
+        assert_eq!(c2.continue_session(10, 2 * HOUR, 600), Some(2 * HOUR + 600));
+        assert_eq!(c2.continue_session(11, 2 * HOUR, 600), Some(2 * HOUR + 600));
+        // Continuing 15 minutes before the end, with a 15-minute window, loses nothing.
+        let c3 = SessionClock::new(0, 2 * HOUR);
+        assert_eq!(c3.continue_session(2 * HOUR - 900, 2 * HOUR, 900), Some(2 * HOUR + 900));
+    }
+
+    #[test]
+    fn restart_starts_a_fresh_period() {
+        let c = SessionClock::new(0, HOUR);
+        assert_eq!(c.tick(HOUR - 60, &WARN, true), Tick::Warn(60));
+        c.restart(2 * HOUR, HOUR);
+        assert_eq!(c.secs_left(2 * HOUR), Some(HOUR));
+        assert_eq!(c.tick(3 * HOUR - 600, &WARN, true), Tick::Warn(600));
     }
 
     #[test]

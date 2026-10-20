@@ -29,6 +29,13 @@ export interface Toast {
   id: number
   kind: 'success' | 'error' | 'info'
   text: string
+  /** A button on the toast (it then stays longer); pressing it also dismisses the toast. */
+  action?: ToastAction
+}
+
+export interface ToastAction {
+  label: string
+  run: () => void
 }
 
 interface Store {
@@ -57,7 +64,7 @@ interface Store {
   clearLogs: (runId: string) => void
   tasks: TaskInfo[]
   toasts: Toast[]
-  toast: (text: string, kind?: Toast['kind']) => void
+  toast: (text: string, kind?: Toast['kind'], action?: ToastAction) => void
   dismiss: (id: number) => void
   newInstanceOpen: boolean
   setNewInstanceOpen: (v: boolean) => void
@@ -83,14 +90,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), [])
   const toast = useCallback(
-    (text: string, kind: Toast['kind'] = 'success') => {
+    (text: string, kind: Toast['kind'] = 'success', action?: ToastAction) => {
       // A cancelled task already says so in the dock; its "Cancelled" error (alone, or after "{title}: ") needs no
       // second message.
       const cancelled = t('engine.task.cancelled')
       if (kind === 'error' && (text === cancelled || text.endsWith(`: ${cancelled}`) || text.endsWith(`：${cancelled}`))) return
       const id = ++toastId.current
-      setToasts((t) => [...t.slice(-3), { id, kind, text }])
-      setTimeout(() => dismiss(id), kind === 'error' ? 9000 : 4000)
+      setToasts((t) => [...t.slice(-3), { id, kind, text, action }])
+      setTimeout(() => dismiss(id), action ? 30_000 : kind === 'error' ? 9000 : 4000)
     },
     [dismiss]
   )

@@ -860,6 +860,14 @@ pub struct ServerNet {
     pub resin_hint: bool,
 }
 
+fn is_zero_u64(v: &u64) -> bool {
+    *v == 0
+}
+
+fn is_zero_u32(v: &u32) -> bool {
+    *v == 0
+}
+
 /// ResinCraft Relay's part of a server's internet state.
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -869,9 +877,32 @@ pub struct ResinNet {
     /// The connection to the relay dropped; reconnecting (the address stays the same).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub reconnecting: bool,
-    /// The account's relay traffic this month, and the monthly limit (0: none).
+    /// The account's relay traffic this month, and its monthly limit with top-ups (0: none).
     pub used_bytes: u64,
     pub limit_bytes: u64,
+    /// The relay's admin gave the account unlimited use (no data cap, no session time limit).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub unlimited: bool,
+    /// "low" (less than the relay's threshold left, 1 GB by default) or "out" (used up) this month.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<&'static str>,
+    /// What one top-up adds (0: the relay has none), how many are left this month, and whether one would be
+    /// granted now.
+    #[serde(skip_serializing_if = "is_zero_u64")]
+    pub topup_bytes: u64,
+    #[serde(skip_serializing_if = "is_zero_u32")]
+    pub topups_left: u32,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub can_top_up: bool,
+    /// Data the relay's admin added while this server was online (the app says so when it grows).
+    #[serde(skip_serializing_if = "is_zero_u64")]
+    pub admin_added_bytes: u64,
+    /// The host may press Continue once this little time is left (seconds).
+    #[serde(skip_serializing_if = "is_zero_u64")]
+    pub continue_secs: u64,
+    /// The session is within that time (the app reminds the host once).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub soon: bool,
     /// Why ResinCraft Relay wasn't used (another route took over).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<Text>,

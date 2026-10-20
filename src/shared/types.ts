@@ -653,9 +653,23 @@ export interface ResinNet {
   name?: string
   /** The connection to the relay dropped; reconnecting (the address stays the same). */
   reconnecting?: boolean
-  /** The account's relay traffic this month, and the monthly limit (0: none). */
+  /** The account's relay traffic this month, and its monthly limit with top-ups (0: none). */
   usedBytes: number
   limitBytes: number
+  /** The relay's admin gave the account unlimited use: no data cap, no session time limit. */
+  unlimited?: boolean
+  /** Less than the relay's threshold (1 GB by default) left this month, or used up. */
+  data?: 'low' | 'out'
+  /** What one top-up adds (absent: the relay has none), how many are left this month, whether one works now. */
+  topupBytes?: number
+  topupsLeft?: number
+  canTopUp?: boolean
+  /** Data the relay's admin added while the server was online. */
+  adminAddedBytes?: number
+  /** The host may press Continue once this many seconds are left. */
+  continueSecs?: number
+  /** The session is within that time (the app reminded the host). */
+  soon?: boolean
   /** Why ResinCraft Relay wasn't used (another route took over). */
   error?: EngineText
   /** When the relay session ends (Unix ms, this PC's clock); absent: no time limit. */
@@ -1142,6 +1156,8 @@ export interface ResinApi {
     relayName(id: string, name: string): Promise<ServerInfo>
     /** Another full relay session before the current one ends (same as typing `continue` in the console). */
     relayContinue(id: string): Promise<void>
+    /** More relay data for this month (once little is left); resolves with the bytes added. */
+    relayTopUp(id: string): Promise<number>
     /** Shares the server again after its relay session ended. */
     relayRestart(id: string): Promise<void>
     /** The server's own domain: records for its current route and the last DNS check. */

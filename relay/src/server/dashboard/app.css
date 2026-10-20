@@ -333,6 +333,12 @@ td.actions button + button {
   color: var(--data);
   border-color: rgba(34, 211, 238, 0.35);
 }
+.chip.unlimited,
+.chip.data,
+.chip.topup {
+  color: var(--warn);
+  border-color: currentColor;
+}
 .chip .x {
   border: 0;
   background: none;

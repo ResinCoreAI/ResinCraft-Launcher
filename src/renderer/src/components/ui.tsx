@@ -999,6 +999,17 @@ export function Dock() {
         <div className={`toast ${toast.kind}`} key={toast.id}>
           {icons[toast.kind]}
           <span className="grow">{toast.text}</span>
+          {toast.action && (
+            <button
+              className="btn sm primary toast-action"
+              onClick={() => {
+                dismiss(toast.id)
+                toast.action!.run()
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
           <button className="x" onClick={() => dismiss(toast.id)} aria-label={t('common.dismiss')}>
             <X size={15} />
           </button>

@@ -175,7 +175,12 @@ forward it over SSH: `ssh -L 7443:127.0.0.1:7443 you@rscraft.resincore.tech`, th
 - **Names**: search; rename or release names; reserve or unreserve words.
 - **Bans**: ban or unban a Minecraft UUID or an IP / CIDR range, with a reason and an optional duration in hours.
   Banning an account disconnects it at once.
-- **Usage**: bandwidth per account this month against the cap, top users first, totals.
+- **Usage**: bandwidth per account this month against its own cap (the relay's cap plus top-ups), top users
+  first, totals, and each account's top-ups. **Add data** gives an account any amount more for the rest of this
+  month; **Unlimited** marks an account (kept in `data/relay.json`) as having no data cap and no session time
+  limit, with a badge here and in Live tunnels, until **Turn off unlimited** (its running servers then get a fresh
+  session). An account not listed yet can be found by Minecraft name (one the relay has seen) or UUID. Both
+  actions go to the events log.
 - **Settings**: view and change the limits. Changes apply at once and are kept in the data file (they win over
   `relay.toml` until "Reset to relay.toml"); `max_pending_handshakes` applies after a restart.
 - **Events**: the last 500 sign-ins, sign-in failures, claims, kicks, bans and admin actions, with IP addresses.
@@ -198,13 +203,26 @@ Security:
 - A session lasts `session_minutes` (default 120; 0 = no limit). At each of `session_warn_minutes` (default 10 and
   1 minutes before the end) the host's launcher shows a banner with **Continue** in the server's Console tab, a
   toast, flashes in the taskbar, and tells the players in chat once. **Continue**, or typing `continue` in the
-  console, gives another full session (it can't be stacked in advance).
+  console, gives another full session (it can't be stacked in advance). The launcher offers Continue in its
+  relay card from `session_continue_minutes` (default 15) before the end, with a notification at that point.
 - Without Continue the tunnel and its player connections close when the time runs out. For 15 minutes afterwards
   the Minecraft server list says "The host's relay session ended", and the launcher offers **Start again**.
 - **Paused**/**Off**: launchers on Automatic move on to the next way of sharing (bore.pub); a server set to the relay
   by hand waits and reconnects by itself when the relay is on again. The server list shows the admin's message.
 - **Launcher 0.3.0** speaks the older protocol: it works, but its hosts get no warnings or Continue, so their
   sessions just end. Set `session_minutes = 0` until your players are on 0.3.1 or later.
+
+## Monthly data and top-ups
+
+- Each account gets `monthly_gb_per_account` (default 100 GB) per calendar month (UTC), both directions. When it
+  runs out, players get the relay's "limit reached" answer; the host's tunnel stays online.
+- Once less than `topup_low_gb` (default 1 GB) is left, or after it ran out, the host's launcher offers **Get 30 GB
+  more**: one press adds `topup_gb` (default 30) for the rest of the month, up to `topups_per_month` (default 3;
+  0 = no top-ups, only the admin adds data) times. The launcher also shows a notification with that button and
+  flashes in the taskbar when the data runs low and when it runs out.
+- The admin's **Add data** and **Unlimited** (dashboard, Usage) work on top of that. Top-ups and added data end with
+  the month.
+- Launchers before protocol 4 still work; they just can't ask for top-ups (the admin can still add data for them).
 
 ## Day to day
 
@@ -242,9 +260,9 @@ accepting, tells every launcher to reconnect in a few seconds, gives connected p
 to keep playing, saves its data and exits. Launchers reconnect by themselves and keep their names.
 
 Upgrading: build or download the new binary, stop the relay, replace it, start it (Windows: run
-`install-relay.ps1` again; Docker: `docker compose up -d --build`). Launchers and relays speak protocol version 1
-(`proto::PROTOCOL_VERSION`); a relay that bumps it turns older launchers away with "update ResinCraft
-Launcher", so update the relay and ship the launcher together.
+`install-relay.ps1` again; Docker: `docker compose up -d --build`). Launchers and relays speak protocol version 4
+(`proto::PROTOCOL_VERSION`, data top-ups); the relay still serves launchers from protocol 1 on and only sends
+them what they know, so update the relay first, then ship the launcher.
 
 ### Backups
 

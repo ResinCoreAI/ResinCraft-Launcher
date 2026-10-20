@@ -414,7 +414,8 @@ fn tunnels(relay: &Relay) -> Response {
                 "players": t.conns.load(Ordering::Relaxed),
                 "bytesIn": t.bytes_in.load(Ordering::Relaxed),
                 "bytesOut": t.bytes_out.load(Ordering::Relaxed),
-                "secsLeft": t.clock.secs_left(now_secs()).filter(|_| relay.limits_now().session_secs() > 0),
+                "secsLeft": t.clock.secs_left(now_secs()).filter(|_| relay.session_limit_on(&t.owner)),
+                "unlimited": relay.is_unlimited(&t.owner),
                 "continues": t.clock.continues(),
                 "bedrockPort": t.bedrock_port,
             })
@@ -458,27 +459,74 @@ fn bans(relay: &Relay) -> Response {
 fn usage(relay: &Relay) -> Response {
     let who = account_names(relay);
     let month = month_of(now_secs());
-    let cap = relay.limits_now().monthly_bytes();
+    let limits = relay.limits_now();
+    let cap = limits.monthly_bytes();
     let online: HashMap<String, usize> = relay.tunnel_list().into_iter().fold(HashMap::new(), |mut m, (_, t)| {
         *m.entry(t.owner).or_default() += 1;
         m
     });
-    let mut accounts: Vec<(String, u64)> = relay.store.read(|d| d.usage.iter().filter(|(_, u)| u.month == month).map(|(k, u)| (k.clone(), u.bytes)).collect());
-    accounts.sort_by_key(|a| std::cmp::Reverse(a.1));
-    let total: u64 = accounts.iter().map(|(_, b)| b).sum();
+    let (mut accounts, unlimited) = relay.store.read(|d| {
+        let mut m: BTreeMap<String, (u64, u64, u32)> = d.usage.iter().filter(|(_, u)| u.month == month).map(|(k, u)| (k.clone(), (u.bytes, u.extra_bytes, u.topups))).collect();
+        // Unlimited accounts are listed even before they use anything, so the admin can find them.
+        for uuid in d.unlimited.keys() {
+            m.entry(uuid.clone()).or_default();
+        }
+        (m.into_iter().collect::<Vec<_>>(), d.unlimited.clone())
+    });
+    accounts.sort_by_key(|a| std::cmp::Reverse(a.1 .0));
+    let total: u64 = accounts.iter().map(|(_, (b, _, _))| b).sum();
     let list: Vec<Value> = accounts
         .iter()
-        .map(|(uuid, bytes)| {
+        .map(|(uuid, (bytes, extra, topups))| {
+            let free = unlimited.get(uuid);
+            let own_cap = if cap > 0 && free.is_none() { cap.saturating_add(*extra) } else { 0 };
             json!({
                 "uuid": uuid,
-                "name": who.get(uuid),
+                "name": who.get(uuid).or(free.map(|f| &f.name).filter(|n| !n.is_empty())),
                 "bytes": bytes,
-                "percent": if cap > 0 { (*bytes as f64 / cap as f64 * 100.0).min(100.0) } else { 0.0 },
+                "cap": own_cap,
+                "extra": extra,
+                "topups": topups,
+                "unlimited": free.is_some(),
+                "unlimitedSince": free.map(|f| f.since),
+                "percent": if own_cap > 0 { (*bytes as f64 / own_cap as f64 * 100.0).min(100.0) } else { 0.0 },
                 "online": online.get(uuid).copied().unwrap_or(0),
             })
         })
         .collect();
-    Response::ok(json!({ "month": month, "cap": cap, "total": total, "accounts": list }))
+    Response::ok(json!({
+        "month": month,
+        "cap": cap,
+        "total": total,
+        "topupBytes": limits.topup_bytes(),
+        "topupsPerMonth": limits.topups_per_month,
+        "lowBytes": limits.topup_low_bytes(),
+        "accounts": list,
+    }))
+}
+
+/// The account an admin action is about: `uuid` (with or without dashes), or `name` (a Minecraft name the relay
+/// has seen). Returns (UUID, Minecraft name).
+fn account_of(relay: &Relay, input: &Value) -> Result<(String, String), Response> {
+    let who = account_names(relay);
+    if let Some(raw) = text(input, "uuid") {
+        let Some(uuid) = super::auth::dashed_uuid(&raw) else { return Err(Response::error("400 Bad Request", "that isn't a Minecraft UUID")) };
+        let name = who.get(&uuid).cloned().or_else(|| relay.store.read(|d| d.unlimited.get(&uuid).map(|u| u.name.clone()))).unwrap_or_default();
+        return Ok((uuid, name));
+    }
+    let Some(name) = text(input, "name") else { return Err(Response::error("400 Bad Request", "send a uuid or a name")) };
+    match who.iter().find(|(_, n)| n.eq_ignore_ascii_case(&name)) {
+        Some((uuid, n)) => Ok((uuid.clone(), n.clone())),
+        None => Err(Response::error("404 Not Found", "the relay hasn't seen that Minecraft name yet: use the account's UUID")),
+    }
+}
+
+fn label(uuid: &str, name: &str) -> String {
+    if name.is_empty() {
+        uuid.to_string()
+    } else {
+        format!("{name} ({uuid})")
+    }
 }
 
 fn settings(relay: &Relay) -> Response {
@@ -524,6 +572,30 @@ fn action(relay: &Relay, path: &str, input: &Value, ip: IpAddr) -> Response {
             let note = message.map(|m| format!(": \"{m}\"")).unwrap_or_default();
             audit(relay, "service", format!("{what}{note}"), ip);
             Response::ok(service_json(relay))
+        }
+        "/api/usage/add" => {
+            let (uuid, name) = match account_of(relay, input) {
+                Ok(a) => a,
+                Err(r) => return r,
+            };
+            let gb = input.get("gb").and_then(Value::as_f64).filter(|g| g.is_finite() && *g > 0.0 && *g <= 1_000_000.0);
+            let Some(gb) = gb else { return Response::error("400 Bad Request", "how many GB? (more than 0)") };
+            let bytes = super::config::gb(gb);
+            relay.admin_add_data(&uuid, bytes);
+            audit(relay, "data", format!("added {} of data for {} this month", super::agents::gb_text(bytes), label(&uuid, &name)), ip);
+            Response::ok(json!({ "ok": true, "uuid": uuid, "cap": relay.cap_bytes(&uuid) }))
+        }
+        "/api/usage/unlimited" => {
+            let (uuid, name) = match account_of(relay, input) {
+                Ok(a) => a,
+                Err(r) => return r,
+            };
+            let Some(on) = input.get("on").and_then(Value::as_bool) else { return Response::error("400 Bad Request", "send on: true or false") };
+            if relay.admin_set_unlimited(&uuid, &name, on) {
+                let what = if on { "gave unlimited use (no data cap, no session time limit) to" } else { "took unlimited use away from" };
+                audit(relay, "data", format!("{what} {}", label(&uuid, &name)), ip);
+            }
+            Response::ok(json!({ "ok": true, "uuid": uuid, "unlimited": on }))
         }
         "/api/tunnels/extend" => {
             let Some(name) = text(input, "name") else { return Response::error("400 Bad Request", "which name?") };
@@ -621,14 +693,8 @@ fn action(relay: &Relay, path: &str, input: &Value, ip: IpAddr) -> Response {
                 Ok(l) => l,
                 Err(_) => return Response::error("400 Bad Request", "a limit has the wrong type (whole numbers; GB may have decimals)"),
             };
-            if limits.tunnels_per_account == 0
-                || limits.names_per_account == 0
-                || limits.session_days == 0
-                || limits.monthly_gb_per_account < 0.0
-                || limits.session_minutes < 0.0
-                || limits.session_warn_minutes.iter().any(|m| *m < 0.0)
-            {
-                return Response::error("400 Bad Request", "tunnels, names and session days must be at least 1, and the cap can't be negative");
+            if let Err(why) = limits.check() {
+                return Response::error("400 Bad Request", why);
             }
             relay.set_limits(Some(limits));
             let what: Vec<String> = changed.iter().map(|(k, v)| format!("{k} = {v}")).collect();

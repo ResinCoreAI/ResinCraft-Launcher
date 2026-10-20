@@ -92,10 +92,17 @@ Open **https://rscraft.resincore.tech/admin** and sign in with the admin passwor
 - **Live tunnels**: who's online, since when, players, traffic, session time left and how often it was continued;
   **Extend**, **End now** and **Kick**.
 - **Sessions**: 2 hours by default (`session_minutes` in Settings or `relay.toml`, 0 = no limit). Hosts get a
-  Continue banner 10 and 1 minutes before the end. Launcher 0.3.0 can't show it, so use 0 until hosts update.
+  Continue banner 10 and 1 minutes before the end, and may press Continue in the launcher from 15 minutes before
+  (`session_continue_minutes`). Launcher 0.3.0 can't show it, so use 0 until hosts update.
 - **Names**: search, rename or release names; reserve words nobody may take.
 - **Bans**: ban a Minecraft account (UUID) or an IP / CIDR range, with a reason and an optional duration.
-- **Usage**: this month's traffic per account against the cap.
+- **Usage**: this month's traffic per account against its cap. **Add data** gives an account more GB for the
+  rest of this month; **Unlimited** takes away its data cap and session time limit (an *Unlimited* badge shows it;
+  **Turn off unlimited** undoes it). Type a Minecraft name or UUID at the top for an account not in the list yet.
+  Both are written to the events log.
+- **Data top-ups**: hosts get 100 GB a month (`monthly_gb_per_account`). Once less than 1 GB is left
+  (`topup_low_gb`), or after it ran out, a host can press **Get 30 GB more** in the launcher (`topup_gb`), up to
+  3 times a month (`topups_per_month`; 0 = only you add data). All four are in Settings and `relay.toml`.
 - **Settings**: the limits; changes apply at once and are kept in `data\relay.json` (Reset goes back to
   `relay.toml`).
 - **Events**: the last 500 sign-ins, kicks, bans and admin actions, with IP addresses (they appear only there).

@@ -26,13 +26,13 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tokio::net::TcpListener;
-use tokio::sync::{watch, Notify, Semaphore};
+use tokio::sync::{broadcast, watch, Notify, Semaphore};
 use tracing::{info, warn};
 
 pub use config::Config;
 use config::LimitsConfig;
 use metrics::Metrics;
-use store::{BanEntry, NameEntry, SessionEntry, Store};
+use store::{BanEntry, NameEntry, SessionEntry, Store, UnlimitedEntry};
 
 use crate::proto::{self, check_name, month_of, now_secs, ErrorCode, Limits, ServiceState, Usage};
 use session::SessionClock;
@@ -91,7 +91,8 @@ pub(crate) struct Tunnel {
 #[derive(Debug, Clone, Serialize)]
 pub struct Event {
     pub at: u64,
-    /// "online", "offline", "signin", "auth-fail", "join", "kick", "ban", "unban", "name", "admin", "settings"
+    /// "online", "offline", "signin", "auth-fail", "join", "kick", "ban", "unban", "name", "admin", "settings",
+    /// "session", "continue", "topup", "data"
     pub kind: &'static str,
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -99,6 +100,14 @@ pub struct Event {
 }
 
 const EVENTS_KEPT: usize = 500;
+
+/// Something about an account's data changed; its launchers hear about it.
+#[derive(Debug, Clone)]
+pub(crate) struct AccountChange {
+    pub uuid: String,
+    /// The admin added this much (launchers on protocol 4 get a `top_up` with `by_admin`).
+    pub admin_added: Option<u64>,
+}
 
 /// A signed-in account on an agent connection.
 #[derive(Debug, Clone)]
@@ -119,6 +128,8 @@ pub struct Relay {
     recent_ends: Mutex<HashMap<String, u64>>,
     /// The admin's switch, for agents that should hear when it changes.
     service: watch::Sender<(ServiceState, Option<String>)>,
+    /// Top-ups, the admin's Add data / Unlimited, running low or out: for the account's launchers.
+    accounts: broadcast::Sender<AccountChange>,
     pub started: u64,
     pub(crate) dashboard: dashboard::State,
     tunnels: Mutex<HashMap<String, Tunnel>>,
@@ -202,6 +213,7 @@ impl Relay {
         Ok(Relay {
             recent_ends: Mutex::new(HashMap::new()),
             service: watch::channel(service).0,
+            accounts: broadcast::channel(64).0,
             limits: RwLock::new(limits.unwrap_or_else(|| cfg.limits.clone())),
             reserved: RwLock::new(reserved.unwrap_or_else(|| cfg.auth.reserved_names.clone())),
             events: Mutex::new(VecDeque::new()),
@@ -397,6 +409,7 @@ impl Relay {
         true
     }
 
+    /// The relay's limits (an account's own cap and session time: [`Relay::limits_for`]).
     pub fn limits(&self) -> Limits {
         let l = self.limits_now();
         Limits {
@@ -405,38 +418,160 @@ impl Relay {
             connections: l.connections_per_tunnel,
             monthly_bytes: l.monthly_bytes(),
             session_secs: l.session_secs(),
+            continue_secs: l.continue_secs(),
         }
+    }
+
+    /// The limits as they apply to one account: its cap with this month's top-ups; no cap and no session
+    /// limit for unlimited accounts.
+    pub fn limits_for(&self, uuid: &str) -> Limits {
+        let mut l = self.limits();
+        l.monthly_bytes = self.cap_bytes(uuid);
+        if self.is_unlimited(uuid) {
+            l.session_secs = 0;
+        }
+        l
+    }
+
+    pub fn is_unlimited(&self, uuid: &str) -> bool {
+        self.store.read(|d| d.unlimited.contains_key(uuid))
+    }
+
+    /// Whether the session time limit applies to this account right now.
+    pub(crate) fn session_limit_on(&self, uuid: &str) -> bool {
+        self.limits_now().session_secs() > 0 && !self.is_unlimited(uuid)
+    }
+
+    /// (bytes used, bytes added to the cap, top-ups taken) this month.
+    fn month_entry(&self, uuid: &str) -> (u64, u64, u32) {
+        let month = month_of(now_secs());
+        self.store.read(|d| d.usage.get(uuid).filter(|u| u.month == month).map_or((0, 0, 0), |u| (u.bytes, u.extra_bytes, u.topups)))
     }
 
     /// This month's traffic of an account.
     pub fn usage_bytes(&self, uuid: &str) -> u64 {
-        let month = month_of(now_secs());
-        self.store.read(|d| d.usage.get(uuid).filter(|u| u.month == month).map_or(0, |u| u.bytes))
+        self.month_entry(uuid).0
+    }
+
+    /// An account's cap this month: the relay's cap plus its top-ups and the admin's additions. 0: no cap
+    /// (the relay has none, or the account is unlimited).
+    pub fn cap_bytes(&self, uuid: &str) -> u64 {
+        let base = self.limits_now().monthly_bytes();
+        if base == 0 || self.is_unlimited(uuid) {
+            return 0;
+        }
+        base.saturating_add(self.month_entry(uuid).1)
     }
 
     pub(crate) fn usage(&self, uuid: &str, connections: u32) -> Usage {
-        Usage { month: month_of(now_secs()), bytes: self.usage_bytes(uuid), connections }
+        let l = self.limits_now();
+        let (bytes, _, topups) = self.month_entry(uuid);
+        let topup_bytes = l.topup_bytes();
+        Usage {
+            month: month_of(now_secs()),
+            bytes,
+            connections,
+            cap_bytes: self.cap_bytes(uuid),
+            unlimited: self.is_unlimited(uuid),
+            topup_bytes,
+            topups_left: if topup_bytes > 0 { l.topups_per_month.saturating_sub(topups) } else { 0 },
+            low_bytes: l.topup_low_bytes(),
+        }
     }
 
     pub fn over_quota(&self, uuid: &str) -> bool {
-        let cap = self.limits_now().monthly_bytes();
+        let cap = self.cap_bytes(uuid);
         cap > 0 && self.usage_bytes(uuid) >= cap
     }
 
-    /// Adds traffic to an account; false once it's over the monthly cap.
+    /// Adds traffic to an account; false once it's over its monthly cap.
     pub(crate) fn add_usage(&self, uuid: &str, bytes: u64) -> bool {
         let month = month_of(now_secs());
-        let total = self.store.write(|d| {
-            let u = d.usage.entry(uuid.to_string()).or_default();
-            if u.month != month {
-                u.month = month;
-                u.bytes = 0;
-            }
+        let cap = self.cap_bytes(uuid);
+        let (before, total) = self.store.write(|d| {
+            let u = d.usage.entry(uuid.to_string()).or_default().for_month(&month);
+            let before = u.bytes;
             u.bytes += bytes;
-            u.bytes
+            (before, u.bytes)
         });
-        let cap = self.limits_now().monthly_bytes();
+        // Its launchers hear at once when the data runs low or out, not only at the next report.
+        let low = self.limits_now().topup_low_bytes();
+        let crossed = |line: u64| before < line && total >= line;
+        if cap > 0 && (crossed(cap) || crossed(cap.saturating_sub(low))) {
+            self.account_changed(uuid, None);
+        }
         cap == 0 || total < cap
+    }
+
+    pub(crate) fn account_changes(&self) -> broadcast::Receiver<AccountChange> {
+        self.accounts.subscribe()
+    }
+
+    fn account_changed(&self, uuid: &str, admin_added: Option<u64>) {
+        let _ = self.accounts.send(AccountChange { uuid: uuid.to_string(), admin_added });
+    }
+
+    /// The host's top-up: `topup_gb` more for the rest of this month, once less than `topup_low_gb` is left,
+    /// while the account has top-ups left this month. Returns the bytes added.
+    pub(crate) fn top_up(&self, uuid: &str) -> Result<u64, ErrorCode> {
+        let l = self.limits_now();
+        let size = l.topup_bytes();
+        if size == 0 {
+            return Err(ErrorCode::TopUpLimit);
+        }
+        let cap = self.cap_bytes(uuid);
+        if cap == 0 {
+            // Nothing to raise: the account is unlimited, or the relay has no cap.
+            return Err(ErrorCode::TopUpNotYet);
+        }
+        let month = month_of(now_secs());
+        let low = l.topup_low_bytes().max(1);
+        self.store.write(|d| {
+            let u = d.usage.entry(uuid.to_string()).or_default().for_month(&month);
+            if u.topups >= l.topups_per_month {
+                return Err(ErrorCode::TopUpLimit);
+            }
+            if cap.saturating_sub(u.bytes) >= low {
+                return Err(ErrorCode::TopUpNotYet);
+            }
+            u.topups += 1;
+            u.extra_bytes = u.extra_bytes.saturating_add(size);
+            Ok(())
+        })?;
+        self.account_changed(uuid, None);
+        Ok(size)
+    }
+
+    /// The admin's Add data: `bytes` more for this account for the rest of this month.
+    pub fn admin_add_data(&self, uuid: &str, bytes: u64) {
+        let month = month_of(now_secs());
+        self.store.write(|d| {
+            let u = d.usage.entry(uuid.to_string()).or_default().for_month(&month);
+            u.extra_bytes = u.extra_bytes.saturating_add(bytes);
+        });
+        self.account_changed(uuid, Some(bytes));
+    }
+
+    /// The admin's Unlimited switch for an account (no data cap, no session time limit). Turning it off
+    /// gives the account's running tunnels a fresh session. Returns whether anything changed.
+    pub fn admin_set_unlimited(&self, uuid: &str, name: &str, on: bool) -> bool {
+        let changed = self.store.write(|d| {
+            if on {
+                d.unlimited.insert(uuid.to_string(), UnlimitedEntry { name: name.to_string(), since: now_secs() }).is_none()
+            } else {
+                d.unlimited.remove(uuid).is_some()
+            }
+        });
+        if changed && !on {
+            let session = self.limits_now().session_secs();
+            for t in self.tunnels.lock().unwrap().values().filter(|t| t.owner == uuid) {
+                t.clock.restart(now_secs(), session);
+            }
+        }
+        if changed {
+            self.account_changed(uuid, None);
+        }
+        changed
     }
 
     pub fn is_reserved(&self, name: &str) -> bool {

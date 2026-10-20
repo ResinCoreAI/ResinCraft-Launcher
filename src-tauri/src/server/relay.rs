@@ -9,13 +9,14 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::Result;
 use resincraft_relay::agent::{AgentConfig, AgentError, Command, Connection, Credentials, Event};
 use resincraft_relay::proto::{self, ErrorCode, Limits, ServiceState, Usage};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::core::fsutil::{read_json, write_json};
@@ -93,6 +94,11 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ErrorCode::TooManyNames => err_tr!("hostRelay.tooManyNames", "Your account already has as many ResinCraft addresses as it may. Reuse the name of another server."),
         ErrorCode::TooManyTunnels => err_tr!("hostRelay.tooManyTunnels", "Your account already has as many servers online through ResinCraft Relay as it may. Stop one first."),
         ErrorCode::OverQuota => err_tr!("hostRelay.overQuota", "This month's ResinCraft Relay traffic for your account is used up. It resets on the 1st."),
+        ErrorCode::TopUpNotYet => err_tr!("hostRelay.topUpNotYet", "There's still enough ResinCraft Relay data left this month. You can get more once it runs low."),
+        ErrorCode::TopUpLimit => err_tr!(
+            "hostRelay.topUpLimit",
+            "No more ResinCraft Relay top-ups this month. The relay's admin can add data, or it resets on the 1st."
+        ),
         ErrorCode::RateLimited => err_tr!("hostRelay.rateLimited", "Too many attempts. Try again in a few minutes."),
         ErrorCode::Unavailable => err_tr!("hostRelay.mojangDown", "Minecraft's account service didn't answer. Try again in a moment."),
         ErrorCode::Version => err_tr!("hostRelay.outdated", "This ResinCraft Launcher is too old for ResinCraft Relay. Update the launcher."),
@@ -212,8 +218,12 @@ async fn pick_name(conn: &mut Connection, server_name: &str) -> Result<String, F
 /// What the card shows while the tunnel runs.
 pub enum Status {
     /// Back online after reconnecting (or after the relay was paused).
-    Online { address: String, usage: Usage, secs_left: Option<u64> },
+    Online { address: String, limits: Limits, usage: Usage, secs_left: Option<u64> },
     Usage(Usage),
+    /// The session is within the time the host may continue in (15 minutes by default): remind them once.
+    ContinueSoon { secs_left: u64 },
+    /// More data: the host's own top-up, or the relay's admin added some (`by_admin`).
+    TopUp { added_bytes: u64, by_admin: bool, usage: Usage },
     /// The session ends in `secs_left` seconds unless the host continues.
     Warning { secs_left: u64 },
     /// Continued (by the host, or the relay's admin extended it).
@@ -248,6 +258,11 @@ const PAUSED_RETRY_SECS: u64 = 60;
 
 /// Continue requests for the running tunnels, by server id.
 static COMMANDS: Mutex<Option<HashMap<String, mpsc::UnboundedSender<Command>>>> = Mutex::new(None);
+/// Top-ups waiting for the relay's answer, by server id.
+static TOPUPS: Mutex<Option<HashMap<String, oneshot::Sender<Result<u64, ErrorCode>>>>> = Mutex::new(None);
+
+/// How early the host may continue when the relay doesn't say (relays before protocol 4).
+pub const CONTINUE_SECS: u64 = 15 * 60;
 
 fn paused_of(e: &AgentError) -> Option<(bool, Option<String>)> {
     match e {
@@ -268,12 +283,65 @@ pub fn continue_session(id: &str) -> Result<()> {
     }
 }
 
+/// More of this month's relay data for the server's account (the "Get 30 GB more" button): through its running
+/// tunnel, or (after the data ran out and the tunnel couldn't start) on a connection of its own. Returns the
+/// bytes added.
+pub async fn top_up(id: &str) -> Result<u64> {
+    let (tx, rx) = oneshot::channel();
+    let sent = COMMANDS.lock().unwrap().as_ref().and_then(|m| m.get(id)).is_some_and(|c| {
+        TOPUPS.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.to_string(), tx);
+        c.send(Command::TopUp).is_ok()
+    });
+    let refused = |code| describe(&AgentError::Refused(code, String::new()), "");
+    if sent {
+        return match tokio::time::timeout(Duration::from_secs(20), rx).await {
+            Ok(Ok(Ok(added))) => Ok(added),
+            Ok(Ok(Err(code))) => Err(refused(code)),
+            _ => Err(describe(&AgentError::Network("the relay didn't answer".into()), "")),
+        };
+    }
+    let s = settings().ok_or_else(not_configured)?;
+    let meta = store::get(id).await?;
+    let account = accounts::microsoft_account(meta.relay_account.as_deref()).await.ok_or_else(needs_microsoft)?;
+    let mut conn = connect(&s, &account).await.map_err(|f| f.into_error(""))?;
+    conn.top_up().await.map(|t| t.added_bytes).map_err(|e| describe(&e, ""))
+}
+
+/// The session end the reminder watches (Unix seconds; None: no limit), and whether it already reminded.
+#[derive(Default)]
+struct Reminder {
+    ends: Mutex<Option<u64>>,
+    sent: AtomicBool,
+}
+
+impl Reminder {
+    fn set(&self, secs_left: Option<u64>) {
+        *self.ends.lock().unwrap() = secs_left.map(|s| proto::now_secs() + s);
+        self.sent.store(false, Ordering::Relaxed);
+    }
+
+    /// Seconds left, once, when the end is within `window`.
+    fn due(&self, window: u64) -> Option<u64> {
+        let left = self.ends.lock().unwrap().map(|e| e.saturating_sub(proto::now_secs()))?;
+        (left > 0 && left <= window && !self.sent.swap(true, Ordering::Relaxed)).then_some(left)
+    }
+}
+
 /// Brings the name online on `conn`: a Bedrock server gets a UDP port of its own on the relay.
 async fn go_online(conn: &mut Connection, name: &str, bedrock: bool) -> Result<resincraft_relay::agent::Online, AgentError> {
     if bedrock {
         conn.online_bedrock(name).await
     } else {
         conn.online(name).await
+    }
+}
+
+/// How early the host may continue: the relay's own window, or 15 minutes for relays that don't say.
+pub fn continue_window(limits: &Limits) -> u64 {
+    if limits.continue_secs > 0 {
+        limits.continue_secs
+    } else {
+        CONTINUE_SECS
     }
 }
 
@@ -332,26 +400,59 @@ pub async fn open(
     let opened_online = online.clone();
     let task_name = name.clone();
     let task_address = address.clone();
+    let task_id = id.to_string();
+    let reminder = Arc::new(Reminder::default());
+    let mut window = online.as_ref().map_or(CONTINUE_SECS, |o| continue_window(&o.limits));
+    reminder.set(online.as_ref().and_then(|o| o.secs_left));
     let task = tokio::spawn(async move {
         let address = task_address;
         let mut current = online.is_some().then_some(conn);
         let mut wait = PAUSED_RETRY_SECS;
         loop {
             if let Some(conn) = current.take() {
-                let status = on_status.clone();
-                let ended = conn
-                    .serve_with(
-                        local,
-                        move |e| match e {
-                            Event::Usage(u) => status(Status::Usage(u)),
-                            Event::Warning { secs_left } => status(Status::Warning { secs_left }),
-                            Event::Extended { secs_left, continues } => status(Status::Extended { secs_left, continues }),
-                            Event::Service { state: ServiceState::On, .. } => status(Status::Resumed),
-                            Event::Service { state, message } => status(Status::Paused { message, off: state == ServiceState::Off, running: true }),
-                        },
-                        &mut commands,
-                    )
-                    .await;
+                let (status, remind, id) = (on_status.clone(), reminder.clone(), task_id.clone());
+                let serving = conn.serve_with(
+                    local,
+                    move |e| match e {
+                        Event::Usage(u) => {
+                            if u.unlimited {
+                                remind.set(None);
+                            }
+                            status(Status::Usage(u))
+                        }
+                        Event::Warning { secs_left } => status(Status::Warning { secs_left }),
+                        Event::Extended { secs_left, continues } => {
+                            remind.set(Some(secs_left));
+                            status(Status::Extended { secs_left, continues })
+                        }
+                        Event::Service { state: ServiceState::On, .. } => status(Status::Resumed),
+                        Event::Service { state, message } => status(Status::Paused { message, off: state == ServiceState::Off, running: true }),
+                        Event::TopUp { added_bytes, by_admin, refused, usage } => {
+                            if !by_admin {
+                                let waiting = TOPUPS.lock().unwrap().as_mut().and_then(|m| m.remove(&id));
+                                if let Some(tx) = waiting {
+                                    let _ = tx.send(refused.map_or(Ok(added_bytes), Err));
+                                }
+                            }
+                            if refused.is_none() {
+                                status(Status::TopUp { added_bytes, by_admin, usage })
+                            }
+                        }
+                    },
+                    &mut commands,
+                );
+                tokio::pin!(serving);
+                let mut tick = tokio::time::interval(Duration::from_secs(5));
+                let ended = loop {
+                    tokio::select! {
+                        ended = &mut serving => break ended,
+                        _ = tick.tick() => {
+                            if let Some(secs_left) = reminder.due(window) {
+                                on_status(Status::ContinueSoon { secs_left });
+                            }
+                        }
+                    }
+                };
                 if ended.code() == Some(ErrorCode::SessionEnded) {
                     on_status(Status::SessionEnded);
                     return;
@@ -378,7 +479,9 @@ pub async fn open(
                 };
                 match attempt.await {
                     Ok((c, on)) => {
-                        on_status(Status::Online { address: shown_address(&on.address, on.bedrock_port), usage: on.usage, secs_left: on.secs_left });
+                        window = continue_window(&on.limits);
+                        reminder.set(on.secs_left);
+                        on_status(Status::Online { address: shown_address(&on.address, on.bedrock_port), limits: on.limits, usage: on.usage, secs_left: on.secs_left });
                         current = Some(c);
                         break;
                     }

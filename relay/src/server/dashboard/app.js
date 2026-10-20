@@ -319,7 +319,7 @@ async function live() {
             'tr',
             {},
             h('td', {}, h('span', { class: 'mono data' }, t.bedrockPort ? `${t.address}:${t.bedrockPort}` : t.address), t.bedrockPort ? h('div', { class: 'faint' }, 'Bedrock') : null),
-            h('td', {}, h('div', {}, t.ownerName), h('div', { class: 'mono faint' }, t.owner)),
+            h('td', {}, h('div', {}, t.ownerName, t.unlimited ? h('span', { class: 'chip unlimited' }, 'Unlimited') : null), h('div', { class: 'mono faint' }, t.owner)),
             h('td', { title: when(t.since) }, ago(t.since)),
             h('td', { class: 'num' }, h('span', { class: t.secsLeft != null && t.secsLeft <= 600 ? 'warn' : 'data' }, left(t.secsLeft)), t.continues ? h('div', { class: 'faint' }, `continued ×${t.continues}`) : null),
             h('td', { class: 'num' }, t.players),
@@ -475,22 +475,85 @@ async function bans() {
 
 async function usage() {
   const d = await api('/api/usage')
+  const who = h('input', { placeholder: 'Minecraft name or UUID', required: true })
+  const gb = h('input', { type: 'number', min: 0.1, step: 'any', value: 30, title: 'GB to add for this month' })
+  const target = (v) => (/^[0-9a-f-]{32,36}$/i.test(v) ? { uuid: v } : { name: v })
+  const label = (a) => a.name || a.uuid
+  const addData = (a) => {
+    const amount = prompt(`Add how many GB for ${label(a)} this month?`, '30')
+    if (amount == null) return
+    const n = Number(amount)
+    if (!(n > 0)) return toast('Type a number of GB (more than 0)', true)
+    act('/api/usage/add', { uuid: a.uuid, gb: n }, `Added ${n} GB for ${label(a)}`)
+  }
+  const setUnlimited = (a, on) =>
+    (on ? confirm(`Give ${label(a)} unlimited use? No data cap and no session time limit, until you turn it off.`) : confirm(`Turn off unlimited use for ${label(a)}? The cap applies again and running servers get a fresh session.`)) &&
+    act('/api/usage/unlimited', { uuid: a.uuid, on }, on ? `${label(a)} is unlimited` : `${label(a)} is limited again`)
+  const topups = d.topupBytes ? `${bytes(d.topupBytes)} × ${d.topupsPerMonth} a month, below ${bytes(d.lowBytes)} left` : 'off'
   return h(
     'div',
     {},
-    h('div', { class: 'stats' }, stat(`Total ${d.month}`, bytes(d.total)), stat('Cap per account', d.cap ? bytes(d.cap) : 'none'), stat('Accounts with traffic', d.accounts.length)),
+    h(
+      'div',
+      { class: 'stats' },
+      stat(`Total ${d.month}`, bytes(d.total)),
+      stat('Cap per account', d.cap ? bytes(d.cap) : 'none'),
+      stat('Host top-ups', topups),
+      stat('Accounts with traffic', d.accounts.filter((a) => a.bytes > 0).length)
+    ),
+    section(
+      'Add data or unlimited use',
+      h(
+        'form',
+        {
+          class: 'row wrap',
+          onsubmit: (e) => {
+            e.preventDefault()
+            const v = who.value.trim()
+            act('/api/usage/add', { ...target(v), gb: Number(gb.value) }, `Added ${Number(gb.value)} GB for ${v}`)
+          }
+        },
+        who,
+        gb,
+        h('button', { class: 'primary', type: 'submit' }, 'Add data (GB, this month)'),
+        h(
+          'button',
+          {
+            type: 'button',
+            onclick: () => {
+              const v = who.value.trim()
+              if (!v) return toast('Type a Minecraft name or UUID', true)
+              confirm(`Give ${v} unlimited use? No data cap and no session time limit, until you turn it off.`) && act('/api/usage/unlimited', { ...target(v), on: true }, `${v} is unlimited`)
+            }
+          },
+          'Make unlimited'
+        )
+      ),
+      h('p', { class: 'muted' }, 'Added data counts for this month only. Unlimited accounts have no data cap and no session time limit until you turn it off. Both appear in the events log.')
+    ),
     section(
       'Bandwidth per account this month',
       table(
-        ['Account', 'Used', d.cap ? 'Of the cap' : '', 'Online'],
+        ['Account', 'Used', d.cap ? 'Of its cap' : '', 'Extra this month', 'Online', ''],
         d.accounts.map((a) =>
           h(
             'tr',
             {},
-            h('td', {}, h('div', {}, a.name || '–'), h('div', { class: 'mono faint' }, a.uuid)),
+            h('td', {}, h('div', {}, a.name || '–', a.unlimited ? h('span', { class: 'chip unlimited', title: a.unlimitedSince ? `since ${when(a.unlimitedSince)}` : null }, 'Unlimited') : null), h('div', { class: 'mono faint' }, a.uuid)),
             h('td', { class: 'num data' }, bytes(a.bytes)),
-            h('td', {}, d.cap ? h('div', { class: 'meter' }, h('i', { class: a.percent >= 90 ? 'bad' : a.percent >= 70 ? 'warn' : '', style: { width: `${a.percent.toFixed(1)}%` } }), h('span', {}, `${a.percent.toFixed(0)}%`)) : null),
-            h('td', {}, a.online ? h('span', { class: 'chip ok' }, `${a.online} online`) : '–')
+            h(
+              'td',
+              {},
+              a.unlimited ? h('span', { class: 'muted' }, 'no cap') : a.cap ? h('div', { class: 'meter', title: `${bytes(a.bytes)} of ${bytes(a.cap)}` }, h('i', { class: a.percent >= 90 ? 'bad' : a.percent >= 70 ? 'warn' : '', style: { width: `${a.percent.toFixed(1)}%` } }), h('span', {}, `${a.percent.toFixed(0)}% of ${bytes(a.cap)}`)) : null
+            ),
+            h('td', { class: 'num' }, a.extra ? bytes(a.extra) : '–', a.topups ? h('div', { class: 'faint' }, `${a.topups} top-up${a.topups === 1 ? '' : 's'}`) : null),
+            h('td', {}, a.online ? h('span', { class: 'chip ok' }, `${a.online} online`) : '–'),
+            h(
+              'td',
+              { class: 'actions' },
+              d.cap && !a.unlimited ? h('button', { class: 'sm', onclick: () => addData(a) }, 'Add data') : null,
+              a.unlimited ? h('button', { class: 'sm', onclick: () => setUnlimited(a, false) }, 'Turn off unlimited') : h('button', { class: 'sm', onclick: () => setUnlimited(a, true) }, 'Unlimited')
+            )
           )
         ),
         'No traffic yet this month.'
@@ -512,14 +575,20 @@ const LIMITS = [
   ['name_expiry_days', 'Free unused names after (days)', 1],
   ['session_days', 'Launcher sessions last (days)', 1],
   ['max_pending_handshakes', 'Pending handshakes (after a restart)', 1],
-  ['session_minutes', 'Session length (minutes, 0 = no limit)', 0]
+  ['session_minutes', 'Session length (minutes, 0 = no limit)', 0],
+  ['session_continue_minutes', 'Host may press Continue with this many minutes left', 0],
+  ['topup_gb', 'One host top-up adds (GB)', 0],
+  ['topups_per_month', 'Host top-ups per account per month (0 = only you add data)', 0],
+  ['topup_low_gb', 'Host may top up below this much left (GB)', 0]
 ]
+
+const DECIMAL = ['monthly_gb_per_account', 'session_minutes', 'session_continue_minutes', 'topup_gb', 'topup_low_gb']
 
 async function settings() {
   const d = await api('/api/settings')
   const inputs = {}
   const rows = LIMITS.map(([key, label, min]) => {
-    inputs[key] = h('input', { type: 'number', min, step: key === 'monthly_gb_per_account' || key === 'session_minutes' ? 'any' : 1, value: d.limits[key] })
+    inputs[key] = h('input', { type: 'number', min, step: DECIMAL.includes(key) ? 'any' : 1, value: d.limits[key] })
     const changed = d.limits[key] !== d.fileLimits[key]
     return h('label', { class: 'field' }, h('span', {}, label, changed ? h('em', {}, ` (relay.toml: ${d.fileLimits[key]})`) : null), inputs[key])
   })
