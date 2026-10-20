@@ -41,6 +41,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "instances:list" => json(instances::list().await?),
         "instances:create" => json(instances::create(args.get::<NewInstance>(0)?, |_| {}).await?),
         "instances:update" => json(instances::update(&args.get::<String>(0)?, args.raw(1)).await?),
+        // Files to download by hand: pick up the ones that arrived in Downloads.
+        "instances:collectPending" => json(crate::content::manual::collect(&args.get::<String>(0)?).await?),
         "instances:duplicate" => json(instances::duplicate(&args.get::<String>(0)?).await?),
         "instances:setImage" => {
             let id: String = args.get(0)?;

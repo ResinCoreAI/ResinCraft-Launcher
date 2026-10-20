@@ -541,7 +541,7 @@ async fn fill_curseforge(dir: &Path, archive: &Path, server_pack: Option<&Path>,
         let file_name = cf_str(f, "fileName");
         let Some(url) = cf_url(f) else {
             let site = m.and_then(|m| m.get("links")).and_then(|l| l.get("websiteUrl")).and_then(Value::as_str).unwrap_or("https://www.curseforge.com");
-            pending.push(PendingDownload { title, file_name, url: format!("{site}/files/{}", f.get("id").and_then(Value::as_u64).unwrap_or(0)), folder: "mods".into() });
+            pending.push(PendingDownload { title, file_name, url: format!("{site}/files/{}", f.get("id").and_then(Value::as_u64).unwrap_or(0)), folder: "mods".into(), ..Default::default() });
             continue;
         };
         items.push(DownloadItem::new(url, safe_join(&dir.join("mods"), safe_name(&file_name)?)?).hash(cf_sha1(f).map(Hash::sha1)));
@@ -658,6 +658,7 @@ async fn fill_ftb(dir: &Path, v: &FtbVersion, task: &Arc<Task>) -> Result<Vec<Pe
                 file_name: f.name.clone(),
                 url: f.curseforge.as_ref().map(|c| format!("https://www.curseforge.com/projects/{}", c.project)).unwrap_or_else(|| "https://www.feed-the-beast.com/".into()),
                 folder,
+                ..Default::default()
             });
             continue;
         }

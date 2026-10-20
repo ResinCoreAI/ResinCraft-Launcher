@@ -579,9 +579,15 @@ const dict: Dict = {
     many: '{count} plików wymaga ręcznego pobrania',
     other: '{count} pliku wymaga ręcznego pobrania'
   },
-  'instance.pending.body': 'Ich autorzy pozwalają pobierać je tylko ze strony CurseForge. Pobierz każdy z nich i upuść go do wskazanego folderu.',
+  'instance.pending.body': "Ich autorzy pozwalają pobierać je tylko ze swojej strony. Pobierz je w przeglądarce (Pobierz wszystko otwiera kolejne strony): ResinCraft znajdzie je w folderze Pobrane i umieści na miejscu.",
   'instance.pending.getFile': 'Pobierz plik',
   'instance.pending.done': 'Gotowe, dodane',
+  'instance.pending.downloadAll': "Pobierz wszystko",
+  'instance.pending.waiting': "Czekam na {file} w Pobranych…",
+  'instance.pending.openAgain': "Otwórz ponownie",
+  'instance.pending.stop': "Zatrzymaj",
+  'instance.pending.added': "Dodano",
+  'instance.pending.allAdded': "Wszystkie pliki są na miejscu.",
 
   'instance.logs.filter': 'Filtruj log…',
   'instance.logs.warnings': 'Ostrzeżenia',

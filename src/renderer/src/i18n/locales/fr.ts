@@ -558,9 +558,15 @@ const dict: Dict = {
     other: '{count} fichiers doivent être téléchargés manuellement'
   },
   'instance.pending.body':
-    'Leurs auteurs n’autorisent le téléchargement que depuis le site de CurseForge. Téléchargez chacun d’eux, puis déposez-les dans le dossier indiqué.',
+    "Leurs auteurs n'autorisent le téléchargement que depuis leur site. Télécharge-les dans ton navigateur (Tout télécharger ouvre chaque page à tour de rôle) : ResinCraft les trouve dans ton dossier Téléchargements et les met en place.",
   'instance.pending.getFile': 'Obtenir le fichier',
   'instance.pending.done': 'Je les ai ajoutés',
+  'instance.pending.downloadAll': "Tout télécharger",
+  'instance.pending.waiting': "En attente de {file} dans Téléchargements…",
+  'instance.pending.openAgain': "Rouvrir",
+  'instance.pending.stop': "Arrêter",
+  'instance.pending.added': "Ajouté",
+  'instance.pending.allAdded': "Tous les fichiers sont en place.",
 
   'instance.logs.filter': 'Filtrer le journal…',
   'instance.logs.warnings': 'Avertissements',

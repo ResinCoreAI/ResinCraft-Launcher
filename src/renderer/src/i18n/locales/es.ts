@@ -549,9 +549,15 @@ const dict: Dict = {
     one: '{count} archivo necesita descarga manual',
     other: '{count} archivos necesitan descarga manual'
   },
-  'instance.pending.body': 'Sus autores solo permiten descargarlos desde la web de CurseForge. Descarga cada uno y suéltalo en la carpeta que se muestra.',
+  'instance.pending.body': "Sus autores solo permiten descargarlos desde su web. Descárgalos en tu navegador (Descargar todo abre cada página por turnos): ResinCraft los encuentra en tu carpeta de Descargas y los coloca en su sitio.",
   'instance.pending.getFile': 'Obtener archivo',
   'instance.pending.done': 'Ya los añadí',
+  'instance.pending.downloadAll': "Descargar todo",
+  'instance.pending.waiting': "Esperando {file} en Descargas…",
+  'instance.pending.openAgain': "Abrir de nuevo",
+  'instance.pending.stop': "Detener",
+  'instance.pending.added': "Añadido",
+  'instance.pending.allAdded': "Todos los archivos están en su sitio.",
 
   'instance.logs.filter': 'Filtrar registro…',
   'instance.logs.warnings': 'Advertencias',

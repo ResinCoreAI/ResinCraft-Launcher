@@ -25,6 +25,7 @@ import {
   Search,
   Settings2,
   Sparkles,
+  Square,
   Timer,
   ToggleLeft,
   ToggleRight,
@@ -586,16 +587,92 @@ function ContentTab({ inst }: { inst: Instance }) {
   )
 }
 
-/** Files a modpack needs whose authors only allow downloads from their website. */
+/** A CurseForge file page → its download page, which starts the download in the player's browser by itself. */
+const downloadPage = (url: string) => url.replace(/^(https:\/\/www\.curseforge\.com\/.+)\/files\/(\d+)$/, '$1/download/$2')
+
+/** How often to look in the Downloads folder while files are missing. */
+const PENDING_LOOK_MS = 2000
+
+/**
+ * Files a modpack needs whose authors only allow downloads from their website. The player downloads them in their
+ * own browser (Download all opens one page after another, the next once the last file arrived); the launcher
+ * finds each one in Downloads and puts it in place. It never downloads them itself.
+ */
 function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void }) {
-  const { refreshInstances } = useStore()
-  const list = inst.pendingDownloads ?? []
+  const { refreshInstances, toast } = useStore()
+  const list = useMemo(() => inst.pendingDownloads ?? [], [inst.pendingDownloads])
+  // Added while this card was open (they leave `list`), shown ticked.
+  const [added, setAdded] = useState<string[]>([])
+  const [auto, setAuto] = useState(false)
+  // The file whose page Download all opened last (it waits for that one before opening the next).
+  const [opened, setOpened] = useState<string>()
+
+  useEffect(() => {
+    if (!list.length) return
+    let live = true
+    const look = async () => {
+      try {
+        const r = await api.instances.collectPending(inst.id)
+        if (!live || !r.found.length) return
+        setAdded((a) => [...a, ...r.found.filter((f) => !a.includes(f))])
+        if (!r.remaining.length) toast(t('instance.pending.allAdded'), 'success')
+        await refreshInstances()
+        onDone()
+      } catch {
+        // Downloads unreadable for a moment: the next look tries again.
+      }
+    }
+    void look()
+    const timer = setInterval(() => void look(), PENDING_LOOK_MS)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [inst.id, list.length, refreshInstances, onDone, toast])
+
+  const next = list[0]
+  useEffect(() => {
+    if (!auto) return
+    if (!next) {
+      setAuto(false)
+      return
+    }
+    if (opened === next.fileName) return
+    setOpened(next.fileName)
+    void api.app.openExternal(downloadPage(next.url))
+  }, [auto, next, opened])
+
   return (
     <div className="callout pending" style={{ marginBottom: 16 }}>
       <Download />
       <div className="grow" style={{ minWidth: 0 }}>
         <b>{t('instance.pending.title', { count: list.length })}</b>
         <div style={{ margin: '2px 0 10px' }}>{t('instance.pending.body')}</div>
+        <div className="row wrap" style={{ gap: 8, marginBottom: 10 }}>
+          {auto && next ? (
+            <>
+              <span className="hint row" style={{ gap: 6 }}>
+                <Loader2 className="spin" /> {t('instance.pending.waiting', { file: next.fileName })}
+              </span>
+              <button className="btn sm" onClick={() => void api.app.openExternal(downloadPage(next.url))}>
+                <ExternalLink /> {t('instance.pending.openAgain')}
+              </button>
+              <button className="btn sm ghost" onClick={() => setAuto(false)}>
+                <Square /> {t('instance.pending.stop')}
+              </button>
+            </>
+          ) : (
+            <button
+              className="btn sm primary"
+              onClick={() => {
+                setOpened(undefined)
+                setAuto(true)
+              }}
+            >
+              <Download /> {t('instance.pending.downloadAll')}
+            </button>
+          )}
+        </div>
         <div className="pending-list">
           {list.map((p) => (
             <div key={p.fileName} className="row">
@@ -605,9 +682,17 @@ function PendingDownloads({ inst, onDone }: { inst: Instance; onDone: () => void
               <button className="btn sm" onClick={() => void api.instances.openFolder(inst.id, p.folder)}>
                 <FolderOpen /> {p.folder}
               </button>
-              <button className="btn sm primary" onClick={() => void api.app.openExternal(p.url)}>
+              <button className="btn sm" onClick={() => void api.app.openExternal(downloadPage(p.url))}>
                 {t('instance.pending.getFile')} <ExternalLink />
               </button>
+            </div>
+          ))}
+          {added.map((f) => (
+            <div key={`added:${f}`} className="row">
+              <span className="grow ellipsis faint mono">{f}</span>
+              <span className="chip accent">
+                <Check /> {t('instance.pending.added')}
+              </span>
             </div>
           ))}
         </div>

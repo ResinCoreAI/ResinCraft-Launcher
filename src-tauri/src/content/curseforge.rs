@@ -428,7 +428,16 @@ async fn install_file(inst: &Instance, kind: ContentKind, m: &CfMod, f: &CfFile,
     let folder = folder_of(inst, kind);
     let Some(url) = f.url() else {
         return Err(BlockedDownloadError {
-            pending: PendingDownload { title: m.name.clone(), file_name: f.file_name.clone(), url: file_url(m, f), folder: kind.folder().to_string() },
+            pending: PendingDownload {
+                title: m.name.clone(),
+                file_name: f.file_name.clone(),
+                url: file_url(m, f),
+                folder: kind.folder().to_string(),
+                size: f.file_length.filter(|n| *n > 0),
+                sha1: f.sha1(),
+                project_id: Some(prefixed(m.id)),
+                version_id: Some(f.id.to_string()),
+            },
         }
         .into());
     };
@@ -867,6 +876,10 @@ async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task:
                 file_name: f.file_name.clone(),
                 url: m.map(|m| file_url(m, f)).unwrap_or_else(|| "https://www.curseforge.com/".into()),
                 folder: folder.into(),
+                size: f.file_length.filter(|n| *n > 0),
+                sha1: f.sha1(),
+                project_id: Some(prefixed(f.mod_id)),
+                version_id: Some(f.id.to_string()),
             });
             continue;
         };

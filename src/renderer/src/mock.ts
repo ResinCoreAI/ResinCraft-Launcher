@@ -34,7 +34,13 @@ export function mockApi(): ResinApi {
       color: '#22d3ee',
       createdAt: now - 2e9,
       lastPlayed: now - 3e8,
-      playtime: 54_000
+      playtime: 54_000,
+      // Files whose authors only allow downloads from CurseForge's website.
+      pendingDownloads: [
+        { title: 'Species', fileName: 'species-3.5.jar', url: 'https://www.curseforge.com/minecraft/mc-mods/species/files/5000001', folder: 'mods' },
+        { title: 'Create Horse Power', fileName: 'createhorsepower-1.20.1-1.1.0.jar', url: 'https://www.curseforge.com/minecraft/mc-mods/create-horse-power/files/5000002', folder: 'mods' },
+        { title: 'TFC Ambiental Refreshed', fileName: 'TFC_Ambiental_Refreshed_1.18-1.21.1.zip', url: 'https://www.curseforge.com/minecraft/texture-packs/tfc-ambiental/files/5000003', folder: 'resourcepacks' }
+      ]
     },
     { id: 'vanilla', name: 'Vanilla Latest', mcVersion: '26.3', loader: 'vanilla', color: '#b26bff', createdAt: now - 5e8, playtime: 0 },
     {
@@ -50,6 +56,8 @@ export function mockApi(): ResinApi {
       playtime: 9_000
     }
   ]
+  // Files the mock browser has "downloaded" from CurseForge, waiting to be picked up.
+  let mockBrowserDownloads = 0
   let accounts: AccountView[] = [
     { id: 'a1', type: 'msa', username: 'Puirkle', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', active: true },
     // A Microsoft account without Java Edition.
@@ -147,7 +155,11 @@ export function mockApi(): ResinApi {
           microsoft: true,
           curseforge: true
         }),
-      openExternal: async (u) => void window.open(u),
+      // A CurseForge download page "downloads" its file (collectPending picks it up); other links open for real.
+      openExternal: async (u) => {
+        if (/curseforge\.com\/.+\/download\/\d+$/.test(u)) mockBrowserDownloads++
+        else window.open(u)
+      },
       setTitleBar: async () => {},
       cancelTask: async (id) => mockEngine.cancelTask(id),
       showItem: async () => {},
@@ -176,6 +188,14 @@ export function mockApi(): ResinApi {
         const clean = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === null ? undefined : v])) as Partial<Instance>
         instances = instances.map((i) => (i.id === id ? { ...i, ...clean, group: p.group === null ? undefined : (p.group ?? i.group) } : i))
         return instances.find((i) => i.id === id)!
+      },
+      collectPending: async (id) => {
+        const list = instances.find((i) => i.id === id)?.pendingDownloads ?? []
+        if (!mockBrowserDownloads || !list.length) return { found: [], remaining: list }
+        mockBrowserDownloads--
+        const [first, ...rest] = list
+        instances = instances.map((i) => (i.id === id ? { ...i, pendingDownloads: rest } : i))
+        return { found: [first.fileName], remaining: rest }
       },
       duplicate: async (id) => instances.find((i) => i.id === id)!,
       resetIcon: async (id) => {

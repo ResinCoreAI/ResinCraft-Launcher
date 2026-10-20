@@ -344,6 +344,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
                         file_name: m.file.clone(),
                         url: url.unwrap_or_else(|| format!("https://atlauncher.com/pack/{}", p.safe_name)),
                         folder: folder_for(&m.kind, &cfg.minecraft).unwrap_or_default(),
+                        ..Default::default()
                     });
                     continue;
                 }

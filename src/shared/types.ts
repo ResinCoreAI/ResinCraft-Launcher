@@ -31,6 +31,13 @@ export interface PendingDownload {
   folder: string
 }
 
+/** What one look in the Downloads folder found (`instances:collectPending`). */
+export interface PendingCollected {
+  /** File names put into the instance just now. */
+  found: string[]
+  remaining: PendingDownload[]
+}
+
 export interface Instance {
   id: string
   name: string
@@ -891,6 +898,8 @@ export interface ResinApi {
     list(): Promise<Instance[]>
     create(data: NewInstance): Promise<Instance>
     update(id: string, patch: InstancePatch): Promise<Instance>
+    /** Puts the manual downloads that arrived in the Downloads folder into the instance. */
+    collectPending(id: string): Promise<PendingCollected>
     duplicate(id: string): Promise<Instance>
     /** Drops a custom icon (see screenshots.setIcon): back to the modpack's icon, or the generated block art. */
     resetIcon(id: string): Promise<Instance>

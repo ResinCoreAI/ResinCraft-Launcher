@@ -530,9 +530,15 @@ const dict: Dict = {
   'instance.content.removeBody': 'ファイルはごみ箱に移動されます。',
   'instance.pending.title': { other: '{count}個のファイルを手動でダウンロードする必要があります' },
   'instance.pending.body':
-    'これらの作者はCurseForgeのWebサイトからのダウンロードのみを許可しています。それぞれダウンロードして、表示されたフォルダーにドロップしてください。',
+    "作者が自分のサイトからのダウンロードのみ許可しています。ブラウザでダウンロードしてください（「すべてダウンロード」で各ページを順番に開きます）。ResinCraft がダウンロードフォルダーで見つけて、正しい場所に入れます。",
   'instance.pending.getFile': 'ファイルを入手',
   'instance.pending.done': '追加しました',
+  'instance.pending.downloadAll': "すべてダウンロード",
+  'instance.pending.waiting': "ダウンロードフォルダーで {file} を待っています…",
+  'instance.pending.openAgain': "もう一度開く",
+  'instance.pending.stop': "停止",
+  'instance.pending.added': "追加済み",
+  'instance.pending.allAdded': "すべてのファイルを配置しました。",
 
   'instance.logs.filter': 'ログを絞り込み…',
   'instance.logs.warnings': '警告',

@@ -63,9 +63,15 @@ export default {
   'instance.content.removeTitle': 'Remove {name}?',
   'instance.content.removeBody': 'The file will be moved to your Recycle Bin.',
   'instance.pending.title': { one: '{count} file needs a manual download', other: '{count} files need a manual download' },
-  'instance.pending.body': 'Their authors only allow downloads from the CurseForge website. Download each one, then drop it into the folder shown.',
+  'instance.pending.body': "Their authors only allow downloads from their website. Download them in your browser (Download all opens each page in turn): ResinCraft finds them in your Downloads folder and puts them in place.",
   'instance.pending.getFile': 'Get file',
   'instance.pending.done': "I've added them",
+  'instance.pending.downloadAll': "Download all",
+  'instance.pending.waiting': "Waiting for {file} in Downloads…",
+  'instance.pending.openAgain': "Open again",
+  'instance.pending.stop': "Stop",
+  'instance.pending.added': "Added",
+  'instance.pending.allAdded': "All the files are in place.",
 
   // Logs tab
   'instance.logs.filter': 'Filter log…',

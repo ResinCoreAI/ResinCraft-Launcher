@@ -95,13 +95,23 @@ pub fn source_of(project_id: &str) -> ContentSource {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingDownload {
     pub title: String,
     pub file_name: String,
     pub url: String,
     pub folder: String,
+    /// Size and SHA-1, when the source says them: a file found in Downloads must match.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha1: Option<String>,
+    /// "cf:<id>" and the file id, so the file is tracked (updates, content list) once it's in place.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -45,6 +45,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       list: fn('instances:list'),
       create: fn('instances:create'),
       update: fn('instances:update'),
+      collectPending: fn('instances:collectPending'),
       duplicate: fn('instances:duplicate'),
       resetIcon: fn('instances:resetIcon'),
       setImage: fn('instances:setImage'),

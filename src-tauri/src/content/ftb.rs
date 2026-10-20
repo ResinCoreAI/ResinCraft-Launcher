@@ -256,6 +256,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
                             .map(|c| format!("https://www.curseforge.com/projects/{}", c.project))
                             .unwrap_or_else(|| "https://www.feed-the-beast.com/".into()),
                         folder,
+                        ..Default::default()
                     });
                     continue;
                 }

@@ -573,9 +573,15 @@ const dict: Dict = {
     many: '{count} файлов нужно скачать вручную',
     other: '{count} файла нужно скачать вручную'
   },
-  'instance.pending.body': 'Их авторы разрешают скачивать файлы только с сайта CurseForge. Скачай каждый и перетащи его в указанную папку.',
+  'instance.pending.body': "Авторы разрешают скачивать эти файлы только со своего сайта. Скачайте их в браузере («Скачать все» открывает страницы по очереди): ResinCraft найдёт их в папке «Загрузки» и положит куда нужно.",
   'instance.pending.getFile': 'Скачать',
   'instance.pending.done': 'Файлы добавлены',
+  'instance.pending.downloadAll': "Скачать все",
+  'instance.pending.waiting': "Жду {file} в «Загрузках»…",
+  'instance.pending.openAgain': "Открыть снова",
+  'instance.pending.stop': "Стоп",
+  'instance.pending.added': "Добавлен",
+  'instance.pending.allAdded': "Все файлы на месте.",
 
   'instance.logs.filter': 'Фильтр лога…',
   'instance.logs.warnings': 'Предупреждения',

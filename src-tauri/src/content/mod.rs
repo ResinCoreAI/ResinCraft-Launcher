@@ -11,6 +11,7 @@ pub mod index;
 pub mod jarmeta;
 pub mod links;
 pub mod lists;
+pub mod manual;
 pub mod modrinth;
 pub mod sources;
 pub mod technic;
