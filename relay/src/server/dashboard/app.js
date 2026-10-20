@@ -224,22 +224,39 @@ async function renderService() {
     return
   }
   const [label, cls, hint] = SERVICE[svc.state] || SERVICE.on
-  const message = h('input', { placeholder: 'Message for hosts (optional)', value: svc.message || '', maxlength: 200 })
-  const flip = (next) => async () => {
-    if (next === 'off' && !confirm('Switch the relay off? Every tunnel closes now, and their players are dropped.')) return
+  const saved = svc.message || ''
+  // What the admin typed but hasn't saved yet survives a tab switch (this box is drawn again then).
+  const message = h('input', { placeholder: 'Message for hosts (optional)', value: state.serviceDraft ?? saved, maxlength: 200 })
+  const send = async (next, done) => {
     try {
       await api('/api/service', { state: next, message: message.value.trim() })
-      toast(`Relay ${SERVICE[next][0].toLowerCase()}`)
+      state.serviceDraft = undefined
+      toast(done)
       renderService()
       render(true)
     } catch (e) {
       toast(e.message, true)
     }
   }
+  const flip = (next) => () => {
+    if (next === 'off' && svc.state !== 'off' && !confirm('Switch the relay off? Every tunnel closes now, and their players are dropped.')) return
+    void send(next, `Relay ${SERVICE[next][0].toLowerCase()}`)
+  }
+  // Saves just the message, keeping the relay as it is (before, only On / Pause / Off sent it).
+  const save = h('button', { class: 'sm', onclick: () => void send(svc.state, message.value.trim() ? 'Message saved' : 'Message removed') }, 'Save message')
+  const changed = () => {
+    const now = message.value.trim()
+    save.disabled = now === saved
+    state.serviceDraft = now === saved ? undefined : message.value
+  }
+  message.addEventListener('input', changed)
+  message.addEventListener('keydown', (e) => e.key === 'Enter' && !save.disabled && save.click())
+  changed()
   box.replaceChildren(
     h('div', { class: 'service-head' }, h('span', {}, 'Relay'), h('b', { class: cls }, label)),
     h('p', { class: 'muted small' }, hint, svc.since ? ` Since ${ago(svc.since)}.` : ''),
     message,
+    save,
     h(
       'div',
       { class: 'service-buttons' },
