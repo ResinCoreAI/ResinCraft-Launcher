@@ -14,6 +14,7 @@ import {
   Globe,
   Home as HomeIcon,
   Loader2,
+  Info,
   Play,
   Plus,
   Puzzle,
@@ -403,7 +404,7 @@ function ServerDetail({
       {tab === 'players' && <PlayersTab s={s} />}
       {tab === 'addons' && <ServerAddons key="plugins" s={s} area={isHybrid(s) ? 'plugins' : undefined} />}
       {tab === 'mods' && <ServerAddons key="mods" s={s} area="mods" />}
-      {tab === 'properties' && <PropertiesTab s={s} />}
+      {tab === 'properties' && <PropertiesTab s={s} onStart={onStart} />}
       {tab === 'files' && <FileManager root={{ kind: 'server', id: s.id }} rootLabel={t('files.root.server')} running={live(s)} />}
       {tab === 'settings' && <SettingsTab s={s} reload={reload} onDeleted={() => go({ page: 'servers' })} />}
     </>
@@ -847,7 +848,7 @@ const DEFAULTS: Record<string, string> = {
   'view-distance': '10'
 }
 
-function PropertiesTab({ s }: { s: ServerInfo }) {
+function PropertiesTab({ s, onStart }: { s: ServerInfo; onStart: (s: ServerInfo) => void }) {
   const { toast } = useStore()
   const [entries, setEntries] = useState<PropEntry[]>()
   const [values, setValues] = useState<Record<string, string>>({})
@@ -864,6 +865,10 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
   useEffect(() => {
     void load().catch((e) => toast((e as Error).message, 'error'))
   }, [load, toast])
+  // The server writes server.properties while starting: load it again once it runs (unless there are unsaved edits).
+  useEffect(() => {
+    if (s.state === 'running' && !dirty) void load().catch(() => {})
+  }, [s.state])
 
   const get = (k: string) => values[k] ?? DEFAULTS[k] ?? ''
   const set = (k: string, v: string) => {
@@ -891,12 +896,14 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
 
   if (!entries) return <div className="skeleton" style={{ height: 200 }} />
   const others = entries.filter((e) => !FRIENDLY.includes(e.key) && e.key.includes(filter.trim()))
+  // No server.properties yet: the server has never started.
+  const notYet = !entries.some((e) => e.key === 'motd')
 
   return (
     <>
       <div className="sv-savebar">
         <span className="hint grow">
-          {!entries.some((e) => e.key === 'motd') ? t('servers.properties.notYet') : live(s) ? t('servers.properties.restartHint') : ''}
+          {notYet ? '' : live(s) ? t('servers.properties.restartHint') : ''}
         </span>
         <button className="btn ghost" disabled={!dirty || saving} onClick={() => void load()}>
           {t('servers.properties.revert')}
@@ -905,6 +912,23 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
           {saving && <Loader2 className="spin" />} {t('common.save')}
         </button>
       </div>
+
+      {notYet && (
+        <div className="callout" style={{ marginBottom: 16 }}>
+          <Info />
+          <div className="grow">
+            <b>{t('servers.properties.firstStart')}</b>
+            <div>{t('servers.properties.notYet')}</div>
+          </div>
+          {s.state === 'stopped' || s.state === 'crashed' ? (
+            <button className="btn primary sm" onClick={() => onStart(s)}>
+              <Play /> {t('servers.properties.startNow')}
+            </button>
+          ) : (
+            <Loader2 className="spin" />
+          )}
+        </div>
+      )}
 
       <div className="settings-section">
         <h3>{t('servers.properties.common')}</h3>
@@ -999,7 +1023,12 @@ function PropertiesTab({ s }: { s: ServerInfo }) {
         </div>
       </div>
 
-      {entries.length > 0 && (
+      {notYet ? (
+        <div className="settings-section">
+          <h3>{t('servers.properties.all')}</h3>
+          <div className="card pad hint">{t('servers.properties.allAfterStart')}</div>
+        </div>
+      ) : (
         <div className="settings-section">
           <div className="row">
             <h3 className="grow" style={{ margin: 0 }}>

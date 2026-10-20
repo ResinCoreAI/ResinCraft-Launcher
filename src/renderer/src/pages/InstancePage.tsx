@@ -242,21 +242,38 @@ function ContentTab({ inst }: { inst: Instance }) {
   }
 
   const update = async (list: ContentItem[]) => {
+    const before = items ?? []
+    const updated = new Set<string>()
     for (const m of list) {
       setUpdating(m.filename)
       try {
         await api.content.update(inst.id, m.filename)
+        updated.add(m.filename)
       } catch (e) {
         toast(t('instance.content.updateFailed', { name: m.title ?? m.filename, error: (e as Error).message }), 'error')
       }
     }
     setUpdating(undefined)
-    toast(
-      list.length === 1
-        ? t('instance.content.updatedOne', { name: list[0].title ?? list[0].filename })
-        : t('instance.content.updatedMany', { count: list.length })
-    )
-    await load()
+    if (updated.size)
+      toast(
+        updated.size === 1
+          ? t('instance.content.updatedOne', { name: nameOf(list.find((m) => updated.has(m.filename))!) })
+          : t('instance.content.updatedMany', { count: updated.size })
+      )
+    // The fresh list from disk knows nothing about updates: keep what the last check found for every file that
+    // wasn't just updated, so the other badges and Update all stay without checking again.
+    try {
+      const fresh = await api.content.list(inst.id, kind)
+      setItems(
+        fresh.map((f) => {
+          if (f.update) return f
+          const old = before.find((b) => b.filename === f.filename && b.update && !updated.has(b.filename))
+          return old ? { ...f, update: old.update } : f
+        })
+      )
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
   }
 
   /** Saves what's in this tab as a list file. */

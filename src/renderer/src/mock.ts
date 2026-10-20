@@ -333,7 +333,9 @@ export function mockApi(): ResinApi {
       remove: async () => {},
       checkUpdates: () =>
         wait(
-          mods.map((m, i) => (i === 0 ? { ...m, update: { versionId: 'x', versionNumber: '0.6.6' } } : m)),
+          mods.map((m, i) =>
+            i === 0 ? { ...m, update: { versionId: 'x', versionNumber: '0.6.6' } } : i === 1 ? { ...m, update: { versionId: 'y', versionNumber: '0.110.1' } } : m
+          ),
           600
         ),
       update: () => wait(undefined, 500),

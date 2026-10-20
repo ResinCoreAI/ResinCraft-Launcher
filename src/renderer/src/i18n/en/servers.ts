@@ -265,6 +265,9 @@ export default {
   'servers.addons.loadMore': 'Load more',
 
   'servers.properties.notYet': 'server.properties is created the first time the server starts; settings saved here are used then.',
+  'servers.properties.firstStart': 'Start the server once to load all its properties',
+  'servers.properties.startNow': 'Start server',
+  'servers.properties.allAfterStart': 'The full list appears after the server has started once.',
   'servers.properties.restartHint': 'Restart the server to apply changes.',
   'servers.properties.revert': 'Revert',
   'servers.properties.saved': 'Properties saved',
