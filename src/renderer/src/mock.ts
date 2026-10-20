@@ -218,7 +218,13 @@ export function mockApi(): ResinApi {
         instances = instances.map((i) => (i.id === id ? { ...i, pendingDownloads: rest } : i))
         return { found: [first.fileName], remaining: rest }
       },
-      duplicate: async (id) => instances.find((i) => i.id === id)!,
+      // Like the engine: a new instance (new id) with the same settings and content.
+      duplicate: async (id) => {
+        const src = instances.find((i) => i.id === id)!
+        const copy: Instance = { ...src, id: String(Date.now()), name: `${src.name} (copy)`, createdAt: Date.now(), playtime: 0, lastPlayed: undefined }
+        instances = [copy, ...instances]
+        return copy
+      },
       resetIcon: async (id) => {
         instances = instances.map((i) => (i.id === id ? { ...i, iconUrl: i.packIconUrl, packIconUrl: undefined } : i))
         return instances.find((i) => i.id === id)!

@@ -12,10 +12,13 @@ import { OptifineSteps, optifineFits } from './Optifine'
 import { PackFields, type PackDraft } from './OwnPack'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
-  const { settings, activeAccount, refreshInstances, go, toast } = useStore()
+  const { settings, activeAccount, refreshInstances, go, toast, instances } = useStore()
   // 'pack': the player makes their own modpack, then fills it on Discover (see PackBuilderBanner).
   const [mode, setMode] = useState<'instance' | 'pack'>('instance')
   const makingPack = mode === 'pack'
+  // A new modpack can start empty or as a copy of one of the player's instances (its mods, packs and configs).
+  const [fromId, setFromId] = useState<string>()
+  const from = makingPack ? instances.find((i) => i.id === fromId) : undefined
   const [pack, setPack] = useState<PackDraft>({ version: '1.0.0', author: activeAccount?.username ?? '', summary: '', bumpOnExport: true })
   const [versions, setVersions] = useState<McVersion[]>()
   const [snapshots, setSnapshots] = useState(settings?.showSnapshots ?? false)
@@ -97,14 +100,25 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       : t('newInstance.defaultName')
 
   const create = async () => {
-    if (!mc) return
+    if (!mc && !from) return
     setBusy(true)
     setError(undefined)
     try {
-      const created = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color, group: group.trim() || undefined })
+      const packName = name.trim() || (from ? from.name : placeholder)
+      const created = from
+        ? await api.instances.duplicate(from.id)
+        : await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc!, loader, loaderVersion, color, group: group.trim() || undefined })
       const inst = makingPack
         ? await api.instances.update(created.id, {
-            ownPack: { ...pack, name: created.name, version: pack.version.trim() || '1.0.0', author: pack.author.trim(), summary: pack.summary.trim() }
+            ...(from && { name: packName, color }),
+            ...(from && group.trim() && { group: group.trim() }),
+            ownPack: {
+              ...pack,
+              name: from ? packName : created.name,
+              version: pack.version.trim() || '1.0.0',
+              author: pack.author.trim(),
+              summary: pack.summary.trim()
+            }
           })
         : created
       // Pictures are saved right after creating, so a bad picture never stops the instance being made.
@@ -128,7 +142,9 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       toast(t(makingPack ? 'ownPack.created' : 'newInstance.created', { name: inst.name }))
       if (optifineLater) toast(t('optifine.finishInSettings'), 'info')
       onClose()
-      if (makingPack) go({ page: 'discover', kind: 'mod', instanceId: inst.id, build: true })
+      // A copied instance already has its content: straight to the pack, ready to export.
+      if (from) go({ page: 'instance', id: inst.id })
+      else if (makingPack) go({ page: 'discover', kind: 'mod', instanceId: inst.id, build: true })
       else go({ page: 'instance', id: inst.id, tab: optifineLater ? 'settings' : undefined })
     } catch (e) {
       setError((e as Error).message)
@@ -148,7 +164,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={!mc || busy || unavailable || (loader !== 'vanilla' && !loaderVersion)} onClick={create}>
+          <button className="btn primary" disabled={busy || (from ? false : !mc || unavailable || (loader !== 'vanilla' && !loaderVersion))} onClick={create}>
             {busy && <Loader2 className="spin" />} {t(makingPack ? 'ownPack.create' : 'newInstance.create')}
           </button>
         </>
@@ -183,7 +199,14 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="field">
             <label htmlFor="inst-name">{t(makingPack ? 'ownPack.packName' : 'newInstance.name')}</label>
-            <input id="inst-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            <input
+              id="inst-name"
+              className="input"
+              placeholder={from ? from.name : placeholder}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
           </div>
           <div className="field">
             <label htmlFor="inst-group">{t('library.group.label')}</label>
@@ -215,84 +238,109 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
+      {makingPack && (
+        <div className="field">
+          <label htmlFor="pack-from">{t('ownPack.startFrom')}</label>
+          <select id="pack-from" className="select" value={fromId ?? ''} onChange={(e) => setFromId(e.target.value || undefined)}>
+            <option value="">{t('ownPack.startEmpty')}</option>
+            {instances
+              .filter((i) => !i.ownPack)
+              .map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name} · {i.mcVersion} {i.loader === 'vanilla' ? '' : LOADER_LABEL[i.loader]}
+                </option>
+              ))}
+          </select>
+          <span className="hint">{t(from ? 'ownPack.startInstanceHint' : 'ownPack.startEmptyHint')}</span>
+        </div>
+      )}
+
       {makingPack && <PackFields value={pack} onChange={setPack} />}
 
       <BannerPicker value={banner ?? undefined} onChange={setBanner} onError={setError} />
 
-      <div className="field">
-        <label>{t('newInstance.modLoader')}</label>
-        <Segmented<LoaderType>
-          value={loader}
-          onChange={setLoader}
-          options={[
-            { value: 'vanilla', label: 'Vanilla' },
-            { value: 'fabric', label: 'Fabric' },
-            { value: 'quilt', label: 'Quilt' },
-            { value: 'forge', label: 'Forge' },
-            { value: 'neoforge', label: 'NeoForge' }
-          ]}
-        />
-        <span className="hint">
-          {loader === 'vanilla'
-            ? t('newInstance.vanillaHint')
-            : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', { loader: LOADER_LABEL[loader] })}
-        </span>
-      </div>
+      {!from && (
+        <>
+          <div className="field">
+            <label>{t('newInstance.modLoader')}</label>
+            <Segmented<LoaderType>
+              value={loader}
+              onChange={setLoader}
+              options={[
+                { value: 'vanilla', label: 'Vanilla' },
+                { value: 'fabric', label: 'Fabric' },
+                { value: 'quilt', label: 'Quilt' },
+                { value: 'forge', label: 'Forge' },
+                { value: 'neoforge', label: 'NeoForge' }
+              ]}
+            />
+            <span className="hint">
+              {loader === 'vanilla'
+                ? t('newInstance.vanillaHint')
+                : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', { loader: LOADER_LABEL[loader] })}
+            </span>
+          </div>
 
-      <div className="field">
-        <div className="row">
-          <label className="label grow">{t('newInstance.mcVersion')}</label>
-          <span className="hint">{t('newInstance.snapshots')}</span>
-          <Switch on={snapshots} onChange={setSnapshots} label={t('newInstance.showSnapshots')} />
-        </div>
-        <div className="search">
-          <Search />
-          <input className="input" placeholder={t('newInstance.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
-        </div>
-        <div className="version-list">
-          {!versions && !error && (
-            <div className="empty" style={{ padding: 30 }}>
-              <Loader2 className="spin" />
+          <div className="field">
+            <div className="row">
+              <label className="label grow">{t('newInstance.mcVersion')}</label>
+              <span className="hint">{t('newInstance.snapshots')}</span>
+              <Switch on={snapshots} onChange={setSnapshots} label={t('newInstance.showSnapshots')} />
             </div>
-          )}
-          {shown.map((v) => (
-            <button key={v.id} className={v.id === mc ? 'on' : ''} onClick={() => setMc(v.id)}>
-              {v.id}
-              {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
-              <span className="date">{new Date(v.releaseTime).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loader !== 'vanilla' && (
-        <div className="field">
-          <label htmlFor="loader-ver">{t('newInstance.loaderVersion', { loader: LOADER_LABEL[loader] })}</label>
-          {unavailable ? (
-            <div className="callout danger">
-              {loader === 'forge' && legacyForge ? t('newInstance.legacyForge') : t('newInstance.unsupported', { loader: LOADER_LABEL[loader], version: mc })}
+            <div className="search">
+              <Search />
+              <input className="input" placeholder={t('newInstance.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
             </div>
-          ) : (
-            <select
-              id="loader-ver"
-              className="select"
-              value={loaderVersion ?? ''}
-              onChange={(e) => setLoaderVersion(e.target.value)}
-              disabled={!loaderVersions}
-            >
-              {!loaderVersions && <option>{t('common.loading')}</option>}
-              {loaderVersions?.map((l, i) => (
-                <option key={l.version} value={l.version}>
-                  {i === loaderVersions.findIndex((x) => x.stable)
-                    ? t('newInstance.optionRecommended', { version: l.version })
-                    : l.stable
-                      ? l.version
-                      : t('newInstance.optionBeta', { version: l.version })}
-                </option>
+            <div className="version-list">
+              {!versions && !error && (
+                <div className="empty" style={{ padding: 30 }}>
+                  <Loader2 className="spin" />
+                </div>
+              )}
+              {shown.map((v) => (
+                <button key={v.id} className={v.id === mc ? 'on' : ''} onClick={() => setMc(v.id)}>
+                  {v.id}
+                  {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
+                  <span className="date">
+                    {new Date(v.releaseTime).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                </button>
               ))}
-            </select>
+            </div>
+          </div>
+
+          {loader !== 'vanilla' && (
+            <div className="field">
+              <label htmlFor="loader-ver">{t('newInstance.loaderVersion', { loader: LOADER_LABEL[loader] })}</label>
+              {unavailable ? (
+                <div className="callout danger">
+                  {loader === 'forge' && legacyForge
+                    ? t('newInstance.legacyForge')
+                    : t('newInstance.unsupported', { loader: LOADER_LABEL[loader], version: mc })}
+                </div>
+              ) : (
+                <select
+                  id="loader-ver"
+                  className="select"
+                  value={loaderVersion ?? ''}
+                  onChange={(e) => setLoaderVersion(e.target.value)}
+                  disabled={!loaderVersions}
+                >
+                  {!loaderVersions && <option>{t('common.loading')}</option>}
+                  {loaderVersions?.map((l, i) => (
+                    <option key={l.version} value={l.version}>
+                      {i === loaderVersions.findIndex((x) => x.stable)
+                        ? t('newInstance.optionRecommended', { version: l.version })
+                        : l.stable
+                          ? l.version
+                          : t('newInstance.optionBeta', { version: l.version })}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {optifineFits(loader) && !makingPack && (

@@ -57,7 +57,7 @@ const FileManager = lazy(() => import('../components/FileManager'))
 type Tab = 'content' | 'worlds' | 'servers' | 'screenshots' | 'notes' | 'files' | 'logs' | 'settings'
 
 export default function InstancePage({ id, tab: initialTab }: { id: string; tab?: Tab }) {
-  const { instances, go, games } = useStore()
+  const { instances, go, games, activeAccount } = useStore()
   const inst = instances.find((i) => i.id === id)
   const [tab, setTab] = useState<Tab>(initialTab ?? 'content')
   const [exporting, setExporting] = useState(false)
@@ -110,18 +110,15 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
           </div>
         </div>
         {inst.ownPack && (
-          <>
-            <button
-              className="btn lg"
-              title={t('ownPack.addContentHint')}
-              onClick={() => go({ page: 'discover', kind: 'mod', instanceId: inst.id, build: true })}
-            >
-              <Plus /> {t('ownPack.addContent')}
-            </button>
-            <button className="btn lg icon" title={t('ownPack.detailsTitle')} onClick={() => setEditingPack(true)}>
-              <Hammer />
-            </button>
-          </>
+          <button className="btn lg" title={t('ownPack.addContentHint')} onClick={() => go({ page: 'discover', kind: 'mod', instanceId: inst.id, build: true })}>
+            <Plus /> {t('ownPack.addContent')}
+          </button>
+        )}
+        {/* An ordinary instance can become the player's modpack as it is (installed modpacks keep their own). */}
+        {(inst.ownPack || !inst.modpack) && (
+          <button className="btn lg icon" title={t(inst.ownPack ? 'ownPack.detailsTitle' : 'ownPack.makeMine')} onClick={() => setEditingPack(true)}>
+            <Hammer />
+          </button>
         )}
         <button className="btn lg" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
           <PackageOpen /> {t('instance.export')}
@@ -135,7 +132,15 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <PlayButton inst={inst} size="lg" />
       </div>
       {exporting && <ExportModal inst={inst} onClose={() => setExporting(false)} />}
-      {editingPack && inst.ownPack && <PackDetailsModal inst={{ ...inst, ownPack: inst.ownPack }} onClose={() => setEditingPack(false)} />}
+      {editingPack && (
+        <PackDetailsModal
+          inst={{
+            ...inst,
+            ownPack: inst.ownPack ?? { name: inst.name, version: '1.0.0', author: activeAccount?.username ?? '', summary: '', bumpOnExport: true }
+          }}
+          onClose={() => setEditingPack(false)}
+        />
+      )}
 
       <div className="tabs" role="tablist">
         <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>
