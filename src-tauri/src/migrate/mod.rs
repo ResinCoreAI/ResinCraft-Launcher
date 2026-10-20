@@ -542,12 +542,14 @@ async fn import_instance(f: Found, task: &std::sync::Arc<Task>, progress: &impl 
         let url = format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes));
         let _ = crate::core::art::set_image(&inst.id, crate::core::art::Kind::Icon, Some(url)).await;
     }
-    // Look the copied mods and packs up on Modrinth / CurseForge by hash now, so updates work right away.
-    task.update(tr!("migrate.identifying", "Looking up {name}'s mods…", name = f.name.clone()), Some(progress(0.95)));
-    for kind in [ContentKind::Mod, ContentKind::Resourcepack, ContentKind::Shader] {
-        let _ = tokio::time::timeout(Duration::from_secs(60), crate::content::sources::list_content(&inst.id, kind)).await;
-    }
     guard.keep();
+    // Look the copied mods and packs up on Modrinth / CurseForge by hash, so updates work right away: all three
+    // kinds at once, in the background, so the next item starts copying meanwhile (best effort, as before).
+    let id = inst.id.clone();
+    tokio::spawn(async move {
+        let look = |kind| tokio::time::timeout(Duration::from_secs(60), crate::content::sources::list_content(&id, kind));
+        let _ = tokio::join!(look(ContentKind::Mod), look(ContentKind::Resourcepack), look(ContentKind::Shader));
+    });
     Ok((inst.id, skipped))
 }
 
