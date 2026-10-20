@@ -165,21 +165,12 @@ pub async fn duplicate(id: &str) -> Result<Instance> {
     Ok(copy)
 }
 
-/// Recursively copies `from` into `to`, skipping top-level names in `skip`.
+/// Recursively copies `from` into `to`, skipping top-level names in `skip` (several files at a time).
 pub fn copy_dir(from: &Path, to: &Path, skip: &[&str]) -> Result<()> {
-    std::fs::create_dir_all(to)?;
-    for entry in std::fs::read_dir(from)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        if skip.iter().any(|s| name == *s) {
-            continue;
-        }
-        let dest = to.join(&name);
-        if entry.file_type()?.is_dir() {
-            copy_dir(&entry.path(), &dest, &[])?;
-        } else {
-            std::fs::copy(entry.path(), dest)?;
-        }
+    use std::sync::atomic::{AtomicBool, AtomicU64};
+    let jobs = crate::core::fsutil::list_copy(from, to, skip)?;
+    match crate::core::fsutil::copy_many(&jobs, &AtomicBool::new(false), &AtomicU64::new(0)).into_iter().next() {
+        Some((_, e)) => Err(e.into()),
+        None => Ok(()),
     }
-    Ok(())
 }

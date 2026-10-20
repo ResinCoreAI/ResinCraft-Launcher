@@ -1,11 +1,16 @@
-//! Copying another launcher's files. The source is only ever read: files are copied one by one (so Cancel
-//! stops between files), and anything that can't be read is skipped and reported instead of failing the import.
+//! Copying another launcher's files. The source is only ever read: files are copied several at a time (Cancel
+//! stops the copying between files), and anything that can't be read is skipped and reported instead of failing
+//! the import.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
 
 use super::formats::is_skipped;
+use crate::core::fsutil::{copy_many, is_disk_full};
 use crate::core::text::Text;
 use crate::tr;
 
@@ -78,28 +83,43 @@ fn walk(dir: &Path, rel: &Path, skip: &[String], depth: usize, out: &mut Listing
     }
 }
 
-/// Copies the listed files from `from` into `to`. `progress(bytes copied)` is called after each file.
-/// Returns what couldn't be copied.
+/// Sets the flag when dropped: a cancelled import (its future dropped) stops the copying threads.
+struct StopOnDrop(Arc<AtomicBool>);
+
+impl Drop for StopOnDrop {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+}
+
+/// Copies the listed files from `from` into `to`, several at a time. `progress(bytes copied)` is called as they
+/// go (and once at the end). Returns what couldn't be copied.
 pub async fn copy_listed(from: &Path, to: &Path, listing: &Listing, mut progress: impl FnMut(u64)) -> std::io::Result<Vec<Skipped>> {
     tokio::fs::create_dir_all(to).await?;
+    let jobs: Vec<(PathBuf, PathBuf, u64)> = listing.files.iter().map(|(rel, size)| (from.join(rel), to.join(rel), *size)).collect();
+    let stop = Arc::new(AtomicBool::new(false));
+    let _stop_on_drop = StopOnDrop(stop.clone());
+    let done = Arc::new(AtomicU64::new(0));
+    let (jobs, worker_stop, worker_done) = (Arc::new(jobs), stop.clone(), done.clone());
+    let worker_jobs = jobs.clone();
+    let mut work = tokio::task::spawn_blocking(move || copy_many(&worker_jobs, &worker_stop, &worker_done));
+    let failures = loop {
+        tokio::select! {
+            result = &mut work => break result.map_err(std::io::Error::other)?,
+            _ = tokio::time::sleep(Duration::from_millis(150)) => progress(done.load(Ordering::Relaxed)),
+        }
+    };
     let mut skipped = listing.skipped.clone();
-    let mut done = 0u64;
-    for (rel, size) in &listing.files {
-        let dest = to.join(rel);
-        if let Some(parent) = dest.parent() {
-            tokio::fs::create_dir_all(parent).await?;
+    for (i, e) in failures {
+        let (rel, _) = &listing.files[i];
+        let _ = tokio::fs::remove_file(&jobs[i].1).await;
+        // A failure writing here (disk full, the destination gone) stops the import; a file we can't read is skipped.
+        if is_disk_full(&e) || tokio::fs::metadata(to).await.is_err() {
+            return Err(e);
         }
-        if let Err(e) = tokio::fs::copy(from.join(rel), &dest).await {
-            // A failure writing here (disk full) stops the import; a file we can't read is skipped.
-            if tokio::fs::metadata(to).await.is_err() || e.raw_os_error() == Some(112) || e.kind() == std::io::ErrorKind::StorageFull {
-                return Err(e);
-            }
-            let _ = tokio::fs::remove_file(&dest).await;
-            skipped.push(unreadable(rel, &e));
-        }
-        done += size;
-        progress(done);
+        skipped.push(unreadable(rel, &e));
     }
+    progress(listing.bytes);
     Ok(skipped)
 }
 
