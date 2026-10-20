@@ -538,3 +538,47 @@ async fn no_top_ups_when_switched_off_or_uncapped() {
     conn.auth(Credentials::Minecraft("token-bob".into())).await.unwrap();
     assert_eq!(conn.top_up().await.unwrap_err().code(), Some(ErrorCode::TopUpNotYet), "no cap, nothing to raise");
 }
+
+/// A relay from before protocol 4 (like one not updated since Bedrock tunnels): it refuses newer launchers'
+/// hello with `version` and welcomes protocol 3.
+async fn old_relay() -> SocketAddr {
+    use futures::StreamExt;
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        loop {
+            let Ok((sock, _)) = listener.accept().await else { continue };
+            tokio::spawn(async move {
+                let mut session = tokio_yamux::Session::new_server(sock, resincraft_relay::agent::yamux_config());
+                let Some(Ok(mut ctrl)) = session.next().await else { return };
+                tokio::spawn(async move { while session.next().await.is_some() {} });
+                let mut line = Vec::new();
+                let mut byte = [0u8; 1];
+                while ctrl.read_exact(&mut byte).await.is_ok() && byte[0] != b'\n' {
+                    line.push(byte[0]);
+                }
+                let hello: Value = serde_json::from_slice(&line).unwrap();
+                let reply = if hello["version"].as_u64().unwrap() > 3 {
+                    r#"{"t":"error","code":"version","message":"this launcher is too old for the relay; update ResinCraft Launcher"}"#
+                } else {
+                    r#"{"t":"welcome","version":3,"base_domain":"old.localtest.me"}"#
+                };
+                let _ = ctrl.write_all(format!("{reply}\n").as_bytes()).await;
+                let _ = ctrl.flush().await;
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            });
+        }
+    });
+    addr
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn newer_launcher_falls_back_for_an_older_relay() {
+    let addr = old_relay().await;
+    let conn = Connection::connect(&agent_cfg(&format!("tcp://{addr}"))).await.expect("connects with protocol 3");
+    assert_eq!((conn.base_domain.as_str(), conn.relay_version), ("old.localtest.me", 3));
+    // And a current relay still gets the newest protocol.
+    let relay = start(config("fallback").await).await;
+    let conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    assert_eq!(conn.relay_version, resincraft_relay::proto::PROTOCOL_VERSION);
+}

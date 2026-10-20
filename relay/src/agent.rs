@@ -239,8 +239,19 @@ impl Drop for Connection {
 }
 
 impl Connection {
-    /// Connects and says hello.
+    /// Connects and says hello. A relay that doesn't know this protocol yet (one not updated since Bedrock
+    /// tunnels came, protocol 3) is asked again with protocol 3: the newer features then stay off.
     pub async fn connect(cfg: &AgentConfig) -> Result<Connection, AgentError> {
+        match Self::over_version(Self::open(cfg).await?, &cfg.client, PROTOCOL_VERSION).await {
+            Err(AgentError::Refused(ErrorCode::Version, _)) if PROTOCOL_VERSION > BEDROCK_PROTOCOL_VERSION => {
+                Self::over_version(Self::open(cfg).await?, &cfg.client, BEDROCK_PROTOCOL_VERSION).await
+            }
+            other => other,
+        }
+    }
+
+    /// The connection to the agent port (TLS unless the URL says tcp://).
+    async fn open(cfg: &AgentConfig) -> Result<Box<dyn Io>, AgentError> {
         let target = parse_url(&cfg.url)?;
         let (host, port) = match &target {
             Target::Tls { host, port } | Target::Plain { host, port } => (host.clone(), *port),
@@ -262,11 +273,15 @@ impl Connection {
                 Box::new(tls)
             }
         };
-        Self::over(io, &cfg.client).await
+        Ok(io)
     }
 
     /// Runs the protocol over an already open byte stream (tests use in-memory pipes).
     pub async fn over(io: Box<dyn Io>, client: &str) -> Result<Connection, AgentError> {
+        Self::over_version(io, client, PROTOCOL_VERSION).await
+    }
+
+    async fn over_version(io: Box<dyn Io>, client: &str, version: u32) -> Result<Connection, AgentError> {
         let mut session = Session::new_client(io, yamux_config());
         let mut control = session.control();
         let (tx, rx) = mpsc::channel(64);
@@ -298,11 +313,12 @@ impl Connection {
             relay_version: 0,
             seq: 0,
         };
-        conn.send(&AgentMsg::Hello { version: PROTOCOL_VERSION, client: client.to_string() }).await?;
+        conn.send(&AgentMsg::Hello { version, client: client.to_string() }).await?;
         match conn.recv().await? {
-            RelayMsg::Welcome { base_domain, version } => {
+            RelayMsg::Welcome { base_domain, version: relay_version } => {
                 conn.base_domain = base_domain;
-                conn.relay_version = version;
+                // What both sides speak: an older launcher protocol keeps the newer features off.
+                conn.relay_version = relay_version.min(version);
             }
             other => return Err(unexpected(&other)),
         }
