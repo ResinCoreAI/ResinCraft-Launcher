@@ -110,7 +110,9 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       importModpack: fn('content:importModpack'),
       importModpackFile: fn('content:importModpackFile'),
       exportPreview: fn('content:exportPreview'),
-      exportModpack: fn('content:exportModpack')
+      exportModpack: fn('content:exportModpack'),
+      pickExportFolder: fn('content:pickExportFolder'),
+      exportModpackTo: fn('content:exportModpackTo')
     },
     notes: { get: fn('notes:get'), set: fn('notes:set') },
     worlds: {

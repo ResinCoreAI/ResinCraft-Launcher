@@ -395,6 +395,12 @@ export function mockApi(): ResinApi {
           },
           900
         )
+      },
+      pickExportFolder: () => wait('C:/Users/you/Documents/Modpacks', 300),
+      exportModpackTo: (id, o, folder) => {
+        const own = packContent.get(id)
+        const file = `${o.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${o.version}.${o.format === 'mrpack' ? 'mrpack' : 'zip'}`
+        return wait({ path: `${folder}/${file}`, linked: own ? own.length : 41, bundled: [], skippedDisabled: 0 }, 900)
       }
     },
     ...mockInstanceTabs((id, iconUrl) => {

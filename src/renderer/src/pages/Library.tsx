@@ -51,6 +51,7 @@ import { useInstanceTask, useStore } from '../store'
 import { COLOR_NAMES, COLORS, describe, hasCustomIcon, instancePath, playtime } from '../util'
 import { t } from '../i18n'
 import { OwnPackChip } from '../components/OwnPack'
+import { SelectBox, SelectionBar, SelectionContext, useBulkActions, useSelection, type Selection } from './LibrarySelection'
 
 type Sort = 'recent' | 'name' | 'version' | 'playtime' | 'custom'
 const SORTS: Sort[] = ['recent', 'name', 'version', 'playtime', 'custom']
@@ -127,6 +128,82 @@ export default function Library() {
       return next
     })
 
+  // ---------- Selection ----------
+
+  // Cards picked with their checkbox, Ctrl+click or Shift+click; the bar and the right-click menu act on all of them.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const anchor = useRef<string>(undefined)
+  // Only what's shown counts: a search hides the rest of the selection from every action.
+  const picked = useMemo(() => shown.filter((i) => selected.has(i.id)), [shown, selected])
+  // Cards in the order they appear (for Shift+click ranges); folded groups are skipped.
+  const flat = useMemo(() => (grouped ? sections.flatMap(([g, list]) => (collapsed.has(g) ? [] : list)) : shown), [grouped, sections, collapsed, shown])
+  const clearSelection = useCallback(() => setSelected(new Set()), [])
+  const bulk = useBulkActions(picked, clearSelection)
+  const pickedRef = useRef(picked)
+  pickedRef.current = picked
+
+  const selection: Selection = {
+    active: picked.length > 0,
+    count: picked.length,
+    has: (id) => selected.has(id),
+    click: (e, inst, force) => {
+      const id = inst.id
+      if (e.shiftKey && anchor.current && anchor.current !== id) {
+        const a = flat.findIndex((x) => x.id === anchor.current)
+        const b = flat.findIndex((x) => x.id === id)
+        if (a >= 0 && b >= 0) {
+          const range = flat.slice(Math.min(a, b), Math.max(a, b) + 1).map((x) => x.id)
+          setSelected((s) => new Set([...(e.ctrlKey || e.metaKey ? s : []), ...range]))
+          return true
+        }
+      }
+      if (!force && !e.ctrlKey && !e.metaKey && picked.length === 0) return false
+      anchor.current = id
+      setSelected((s) => {
+        const next = new Set([...s].filter((x) => shown.some((i) => i.id === x)))
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        return next
+      })
+      return true
+    },
+    menuFor: (inst) => (picked.length > 1 && selected.has(inst.id) ? bulk.entries : undefined),
+    clearIfOutside: (inst) => {
+      if (!selected.has(inst.id)) clearSelection()
+    },
+    remove: bulk.askDelete
+  }
+
+  /** The group header's checkbox: picks (or drops) every card in that group. */
+  const selectGroup = (list: Instance[]) => {
+    const all = list.every((i) => selected.has(i.id))
+    setSelected((s) => {
+      const next = new Set(s)
+      for (const i of list) {
+        if (all) next.delete(i.id)
+        else next.add(i.id)
+      }
+      return next
+    })
+  }
+
+  // Ctrl+A picks every card shown, Esc forgets the selection (not while typing, in a dialog or in a menu).
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const el = e.target
+      if ((el instanceof Element && el.closest('input, textarea, select, [contenteditable="true"]')) || document.querySelector('.backdrop, .ctx-menu')) return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && shown.length) {
+        e.preventDefault()
+        setSelected(new Set(shown.map((i) => i.id)))
+      } else if (e.key === 'Escape' && selected.size && !dragRef.current) {
+        e.preventDefault()
+        clearSelection()
+      }
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [shown, selected.size, clearSelection])
+
   // ---------- Dragging ----------
 
   const dragRef = useRef<DragState | null>(null)
@@ -188,7 +265,10 @@ export default function Library() {
             toast(t('library.order.switched'), 'info')
           }
         }
-        if (moved) await api.instances.update(d.inst.id, { group: d.over || null })
+        // A picked card carries the rest of the selection with it into the group.
+        const carried = pickedRef.current.some((i) => i.id === d.inst.id) ? pickedRef.current : [d.inst]
+        if (moved) for (const i of carried) if ((i.group?.trim() ?? '') !== d.over) await api.instances.update(i.id, { group: d.over || null })
+        if (moved && carried.length > 1) toast(t('library.sel.moved', { count: carried.length, group: d.over || t('library.group.ungrouped') }))
         await refreshInstances()
         setLanded(d.inst.id)
         setTimeout(() => setLanded((l) => (l === d.inst.id ? null : l)), 900)
@@ -294,7 +374,7 @@ export default function Library() {
     ])
 
   return (
-    <div className="page fill" onContextMenu={pageMenu}>
+    <div className={`page fill ${picked.length ? 'selecting' : ''}`} onContextMenu={pageMenu}>
       <div className="page-head">
         <div>
           <h1>{t('library.title')}</h1>
@@ -352,6 +432,7 @@ export default function Library() {
           </div>
           {grouped && <p className="hint drag-hint">{t('library.group.dragHint')}</p>}
 
+          <SelectionContext.Provider value={selection}>
           {grouped ? (
             sections.map(([name, list]) => (
               <section
@@ -372,6 +453,8 @@ export default function Library() {
                   onToggle={() => toggle(name)}
                   order={sectionOrder}
                   onGripDown={() => setGroupDrag({ name, over: null, after: false })}
+                  picked={list.filter((i) => selected.has(i.id)).length}
+                  onSelectAll={list.length ? () => selectGroup(list) : undefined}
                 />
                 <Collapsible open={!collapsed.has(name)}>
                   {list.length > 0 ? <div className="grid">{list.map(card)}</div> : <div className="group-empty">{t('library.group.empty')}</div>}
@@ -381,6 +464,7 @@ export default function Library() {
           ) : (
             <div className="grid">{shown.map(card)}</div>
           )}
+          </SelectionContext.Provider>
 
           {shown.length === 0 && (
             <Empty icon={<Search />} title={t('library.noMatch.title')}>
@@ -390,7 +474,18 @@ export default function Library() {
         </>
       )}
 
-      {drag && <DragGhost drag={drag} />}
+      {(picked.length > 0 || bulk.progress) && (
+        <SelectionBar
+          count={picked.length}
+          total={shown.length}
+          bulk={bulk}
+          onSelectAll={() => setSelected(new Set(shown.map((i) => i.id)))}
+          onClear={clearSelection}
+        />
+      )}
+      {bulk.dialogs}
+
+      {drag && <DragGhost drag={drag} more={picked.some((i) => i.id === drag.inst.id) ? picked.length - 1 : 0} />}
 
       {creating && (
         <NameModal
@@ -411,12 +506,13 @@ export default function Library() {
 }
 
 /** The card that follows the pointer while dragging. */
-function DragGhost({ drag }: { drag: DragState }) {
+function DragGhost({ drag, more }: { drag: DragState; more: number }) {
   const style: CSSProperties = { width: drag.width, transform: `translate(${drag.x - drag.dx}px, ${drag.y - drag.dy}px) rotate(-2deg) scale(1.04)` }
   // In <body>, so the page's transform can't offset it from the pointer.
   return createPortal(
     <div className="drag-ghost" style={style} aria-hidden>
       <InstanceTile inst={drag.inst} wide />
+      {more > 0 && <span className="drag-more">+{more}</span>}
       <div className="body">
         <div className="name ellipsis">{drag.inst.name}</div>
         <div className="sub">{describe(drag.inst)}</div>
@@ -468,6 +564,10 @@ export function InstanceCard({
   const { go, games, play, stop } = useStore()
   const task = useInstanceTask(inst.id)
   const menu = useInstanceMenu(inst)
+  const sel = useSelection()
+  const picked = !!sel?.has(inst.id)
+  // On a card in a selection of several, the menu (right-click and "…") is the selection's.
+  const bulkItems = sel?.menuFor(inst)
   const state = games[inst.id]
   const ref = useRef<HTMLDivElement>(null)
   const dragged = useRef(false)
@@ -497,24 +597,53 @@ export function InstanceCard({
       <div
         ref={ref}
         data-id={inst.id}
-        className={`icard ${dragging ? 'is-dragging' : ''} ${landed ? 'landed' : ''} ${dropSide ? `drop-${dropSide}` : ''}`}
+        className={`icard ${dragging ? 'is-dragging' : ''} ${landed ? 'landed' : ''} ${dropSide ? `drop-${dropSide}` : ''} ${picked ? 'selected' : ''}`}
         style={{ '--i': Math.min(index, 12) } as CSSProperties}
         role="button"
         tabIndex={0}
+        aria-pressed={sel ? picked : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={tilt.onPointerMove}
         onPointerLeave={tilt.onPointerLeave}
-        onContextMenu={menu.open}
-        onClick={() => {
+        onContextMenu={(e) => {
+          if (bulkItems) return openContextMenu(e, bulkItems(), t('menu.selected', { count: sel!.count }))
+          sel?.clearIfOutside(inst)
+          menu.open(e)
+        }}
+        onClick={(e) => {
           if (dragged.current) {
             dragged.current = false
             return
           }
+          if (sel?.click(e, inst)) return
           go({ page: 'instance', id: inst.id })
         }}
-        onKeyDown={menu.onKeyDown}
+        onKeyDown={(e) => {
+          if (sel && e.target === e.currentTarget) {
+            // Space picks the focused card; Delete on a picked card deletes the whole selection.
+            if (e.key === ' ') {
+              e.preventDefault()
+              sel.click(e, inst, true)
+              return
+            }
+            if (e.key === 'Delete' && bulkItems) {
+              e.preventDefault()
+              sel.remove()
+              return
+            }
+          }
+          menu.onKeyDown(e)
+        }}
       >
         <InstanceTile inst={inst} wide />
+        {sel && (
+          <SelectBox
+            className="card-check"
+            checked={picked}
+            label={t('library.sel.select', { name: inst.name })}
+            onToggle={(e) => sel.click(e, inst, true)}
+          />
+        )}
         {state === 'running' && <span className="chip success badge-live">● {t('library.card.running')}</span>}
         <button
           className={`quick ${state === 'running' ? 'running busy' : state === 'preparing' ? 'busy' : ''}`}
@@ -546,7 +675,7 @@ export function InstanceCard({
                 )}
               </div>
             </div>
-            {withMenu && <MoreButton items={menu.items} className="card-more" />}
+            {withMenu && <MoreButton items={bulkItems ?? menu.items} className="card-more" />}
           </div>
         </div>
       </div>
@@ -861,7 +990,7 @@ function setGroupOrder(list: string[]) {
   setSavedGroups(list.filter((g) => g !== ''))
 }
 
-function addSavedGroup(name: string) {
+export function addSavedGroup(name: string) {
   const n = name.trim()
   if (n && !savedGroups.includes(n)) setSavedGroups([...savedGroups, n])
 }
@@ -899,7 +1028,9 @@ function GroupHeader({
   collapsed,
   onToggle,
   order,
-  onGripDown
+  onGripDown,
+  picked = 0,
+  onSelectAll
 }: {
   name: string
   count: number
@@ -908,6 +1039,9 @@ function GroupHeader({
   /** Every section, Ungrouped ('') included, in their current order (for Move up / Move down). */
   order: string[]
   onGripDown?: () => void
+  /** How many of this group's cards are picked, and the checkbox that picks them all (none for an empty group). */
+  picked?: number
+  onSelectAll?: () => void
 }) {
   const { instances, refreshInstances, toast } = useStore()
   const [renaming, setRenaming] = useState(false)
@@ -946,6 +1080,15 @@ function GroupHeader({
         >
           <GripVertical />
         </span>
+      )}
+      {onSelectAll && (
+        <SelectBox
+          className={`group-check ${picked ? 'shown' : ''}`}
+          checked={picked > 0 && picked === count}
+          mixed={picked > 0 && picked < count}
+          label={t('library.sel.selectGroup', { name: label })}
+          onToggle={onSelectAll}
+        />
       )}
       <button
         className={`group-toggle ${collapsed ? '' : 'open'}`}

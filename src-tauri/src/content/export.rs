@@ -349,6 +349,27 @@ async fn remember_export(instance_id: &str, opts: &ExportOptions) -> Result<()> 
     Ok(())
 }
 
+/// The file name an export suggests: "<pack-name>-<version>.mrpack" (or .zip for CurseForge).
+pub fn pack_file_name(opts: &ExportOptions) -> String {
+    let ext = if opts.format == "mrpack" { "mrpack" } else { "zip" };
+    let version = if opts.version.is_empty() { "1.0.0" } else { opts.version.as_str() };
+    format!("{}-{version}.{ext}", crate::core::fsutil::slugify(&opts.name))
+}
+
+/// `dir/name`, or "name (2).ext", "name (3).ext"… when that file is already there, so exporting several
+/// instances into one folder never overwrites one with another.
+pub fn free_path(dir: &Path, name: &str) -> PathBuf {
+    let first = dir.join(name);
+    if !first.exists() {
+        return first;
+    }
+    let (stem, ext) = match name.rfind('.') {
+        Some(at) if at > 0 => (&name[..at], &name[at..]),
+        _ => (name, ""),
+    };
+    (2..).map(|n| dir.join(format!("{stem} ({n}){ext}"))).find(|p| !p.exists()).expect("some free name")
+}
+
 /// Writes `instance_id` as a Modrinth .mrpack or CurseForge .zip to `dest`.
 pub async fn export_modpack(instance_id: &str, opts: ExportOptions, dest: &Path) -> Result<ExportResult> {
     let inst = instances::get(instance_id).await?;
@@ -521,5 +542,25 @@ mod tests {
         assert!(after.bump_on_export);
         opts.bump_on_export = Some(false);
         assert!(!exported(&pack, &opts, 43).bump_on_export);
+    }
+    #[test]
+    fn free_path_never_overwrites() {
+        let dir = std::env::temp_dir().join(format!("resincraft-export-free-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(free_path(&dir, "pack-1.0.0.mrpack"), dir.join("pack-1.0.0.mrpack"));
+        std::fs::write(dir.join("pack-1.0.0.mrpack"), "a").unwrap();
+        assert_eq!(free_path(&dir, "pack-1.0.0.mrpack"), dir.join("pack-1.0.0 (2).mrpack"));
+        std::fs::write(dir.join("pack-1.0.0 (2).mrpack"), "b").unwrap();
+        assert_eq!(free_path(&dir, "pack-1.0.0.mrpack"), dir.join("pack-1.0.0 (3).mrpack"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn pack_file_name_uses_format_and_version() {
+        assert_eq!(pack_file_name(&options("mrpack")), "my-pack-1.0.0.mrpack");
+        let mut cf = options("curseforge");
+        cf.version = String::new();
+        assert_eq!(pack_file_name(&cf), "my-pack-1.0.0.zip");
     }
 }

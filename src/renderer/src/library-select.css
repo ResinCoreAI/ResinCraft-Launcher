@@ -1,0 +1,150 @@
+/* ---------- Library multi-select: checkboxes, selected cards, the selection bar ---------- */
+
+.sel-box {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--accent-fg, #fff);
+  cursor: pointer;
+  transition:
+    opacity 0.12s var(--ease),
+    background-color 0.12s var(--ease),
+    border-color 0.12s var(--ease),
+    transform 0.12s var(--spring, var(--ease));
+}
+.sel-box:hover {
+  border-color: var(--accent);
+}
+.sel-box:active {
+  transform: scale(0.9);
+}
+.sel-box.on,
+.sel-box.mixed {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.sel-box svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+/* On a card: top right of the picture, shown on hover, on focus, and whenever anything is picked. */
+.icard .card-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  opacity: 0;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.icard:hover .card-check,
+.icard:focus-visible .card-check,
+.icard .card-check:focus-visible,
+.selecting .icard .card-check,
+.icard.selected .card-check {
+  opacity: 1;
+}
+.icard.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.icard.selected:hover {
+  border-color: var(--accent);
+}
+
+/* In a group header: before the name, shown on hover / focus / while picking, or when some of the group is picked. */
+.group-head .group-check {
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+}
+.group-head:hover .group-check,
+.group-check:focus-visible,
+.selecting .group-head .group-check,
+.group-check.shown {
+  opacity: 1;
+}
+
+/* Sticks to the bottom of the scrolling page while anything is picked. */
+.sel-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 40;
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+  animation: sel-bar-in 0.18s var(--ease);
+}
+@keyframes sel-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.sel-bar .sel-count {
+  font: 600 14px var(--font-display);
+  white-space: nowrap;
+}
+.sel-bar .spacer {
+  flex: 1;
+}
+.sel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.sel-progress {
+  flex: 1 1 320px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+}
+.sel-progress .bar {
+  margin-top: 5px;
+  border-radius: 2px;
+}
+.sel-progress-name {
+  font-size: 12px;
+}
+
+.sel-names {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow-y: auto;
+  color: var(--text);
+}
+
+.drag-ghost .drag-more {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 12px/18px var(--font-display);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sel-bar {
+    animation: none;
+  }
+}

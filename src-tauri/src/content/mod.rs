@@ -21,7 +21,6 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use serde_json::Value;
 
-use crate::core::fsutil::slugify;
 use crate::core::router::{done, json};
 use crate::core::shell;
 use crate::core::types::{ContentKind, ExportOptions, SearchQuery};
@@ -80,13 +79,20 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             let opts: ExportOptions = args.get(1)?;
             let mrpack = opts.format == "mrpack";
             let ext = if mrpack { "mrpack" } else { "zip" };
-            let version = if opts.version.is_empty() { "1.0.0" } else { opts.version.as_str() };
-            let default = shell::downloads_dir().join(format!("{}-{version}.{ext}", slugify(&opts.name)));
+            let default = shell::downloads_dir().join(export::pack_file_name(&opts));
             let filter_name = if mrpack { "Modrinth modpack" } else { "CurseForge modpack" };
             match shell::save_file("Export modpack", &default, &[(filter_name, &[ext])]).await? {
                 Some(dest) => json(export::export_modpack(&id, opts, &dest).await?),
                 None => done(),
             }
+        }
+        // Exporting several instances at once (Library selection): one folder, a file per instance.
+        "content:pickExportFolder" => json(shell::pick_folder("Choose a folder for the modpacks").await?.map(|p| p.to_string_lossy().into_owned())),
+        "content:exportModpackTo" => {
+            let id: String = args.get(0)?;
+            let opts: ExportOptions = args.get(1)?;
+            let dest = export::free_path(&PathBuf::from(args.get::<String>(2)?), &export::pack_file_name(&opts));
+            json(export::export_modpack(&id, opts, &dest).await?)
         }
         _ => bail!("Unknown request: {channel}"),
     }

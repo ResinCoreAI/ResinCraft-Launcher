@@ -1179,6 +1179,10 @@ export interface StorageChange {
     exportPreview(instanceId: string): Promise<ExportEntry[]>
     /** Asks where to save, then writes the pack; null if cancelled. */
     exportModpack(instanceId: string, options: ExportOptions): Promise<ExportResult | null>
+    /** Asks for a folder to export several instances into; null if cancelled. */
+    pickExportFolder(): Promise<string | null>
+    /** Writes the pack into `folder` under its usual file name (never overwriting: "name (2).mrpack"). */
+    exportModpackTo(instanceId: string, options: ExportOptions, folder: string): Promise<ExportResult>
   }
   notes: {
     get(instanceId: string): Promise<string>
