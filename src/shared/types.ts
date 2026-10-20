@@ -64,6 +64,21 @@ export interface Instance {
   bannerUrl?: string
   /** OptiFine the player downloaded from optifine.net and imported (api.optifine). */
   optifine?: OptifineRef
+  /** Set when the player made this instance as their own modpack (New instance → Create a modpack). */
+  ownPack?: OwnPack
+}
+
+/** The details of a modpack the player is making; the export dialog starts from them and saves them back. */
+export interface OwnPack {
+  name: string
+  version: string
+  author: string
+  summary: string
+  /** Suggest the next version (1.0.0 → 1.0.1) when exporting again after `version` was exported. */
+  bumpOnExport: boolean
+  /** The version last exported, and when (ms); none until the first export. */
+  exportedVersion?: string
+  exportedAt?: number
 }
 
 /** An imported OptiFine jar: `version` is "<mc>_<edition>" ("1.20.1_HD_U_I6"). */
@@ -91,7 +106,7 @@ export interface NewInstance {
   group?: string
 }
 
-export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVersion' | 'pendingDownloads'>> & {
+export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVersion' | 'pendingDownloads' | 'ownPack'>> & {
   /** `null` goes back to the launcher default (undefined would be dropped on the way to the engine). */
   memoryMb?: number | null
   /** `null` goes back to automatic Java. */
@@ -450,6 +465,8 @@ export interface ExportOptions {
   summary: string
   /** Names from ExportEntry to bundle as overrides. */
   include: string[]
+  /** For the player's own modpack: whether the next export should suggest a bumped version. */
+  bumpOnExport?: boolean
 }
 
 export interface ExportResult {

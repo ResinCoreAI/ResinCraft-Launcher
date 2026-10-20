@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, Search } from 'lucide-react'
+import { Blocks, Hammer, Loader2, Search } from 'lucide-react'
 import type { LoaderType, LoaderVersion, McVersion, OptifineJar } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -9,9 +9,14 @@ import { Modal, Segmented, Switch } from './ui'
 import { BannerPicker, IconPicker } from './ImagePicker'
 import { useGroupNames } from '../pages/Library'
 import { OptifineSteps, optifineFits } from './Optifine'
+import { PackFields, type PackDraft } from './OwnPack'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
-  const { settings, refreshInstances, go, toast } = useStore()
+  const { settings, activeAccount, refreshInstances, go, toast } = useStore()
+  // 'pack': the player makes their own modpack, then fills it on Discover (see PackBuilderBanner).
+  const [mode, setMode] = useState<'instance' | 'pack'>('instance')
+  const makingPack = mode === 'pack'
+  const [pack, setPack] = useState<PackDraft>({ version: '1.0.0', author: activeAccount?.username ?? '', summary: '', bumpOnExport: true })
   const [versions, setVersions] = useState<McVersion[]>()
   const [snapshots, setSnapshots] = useState(settings?.showSnapshots ?? false)
   const [filter, setFilter] = useState('')
@@ -75,7 +80,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
     }
   }, [ofPath, mc])
   const pickOptifine = useCallback((path: string) => setOfPath(path), [])
-  const withOptifine = optifine && optifineFits(loader)
+  // OptiFine's terms forbid shipping it in a pack, so a new modpack never gets it.
+  const withOptifine = optifine && optifineFits(loader) && !makingPack
 
   const shown = useMemo(
     () => (versions ?? []).filter((v) => (snapshots ? true : v.type === 'release') && v.id.toLowerCase().includes(filter.trim().toLowerCase())),
@@ -84,14 +90,23 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
   const unavailable = loader !== 'vanilla' && loaderVersions?.length === 0
   const legacyForge = !!mc && /^1\.(\d|1[0-2])(\.|$)/.test(mc)
-  const placeholder = mc ? `${loader === 'vanilla' ? 'Minecraft' : LOADER_LABEL[loader]} ${mc}` : t('newInstance.defaultName')
+  const placeholder = makingPack
+    ? t('ownPack.defaultName')
+    : mc
+      ? `${loader === 'vanilla' ? 'Minecraft' : LOADER_LABEL[loader]} ${mc}`
+      : t('newInstance.defaultName')
 
   const create = async () => {
     if (!mc) return
     setBusy(true)
     setError(undefined)
     try {
-      const inst = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color, group: group.trim() || undefined })
+      const created = await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc, loader, loaderVersion, color, group: group.trim() || undefined })
+      const inst = makingPack
+        ? await api.instances.update(created.id, {
+            ownPack: { ...pack, name: created.name, version: pack.version.trim() || '1.0.0', author: pack.author.trim(), summary: pack.summary.trim() }
+          })
+        : created
       // Pictures are saved right after creating, so a bad picture never stops the instance being made.
       try {
         if (icon) await api.instances.setImage(inst.id, 'icon', icon)
@@ -110,10 +125,11 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         }
       }
       await refreshInstances()
-      toast(t('newInstance.created', { name: inst.name }))
+      toast(t(makingPack ? 'ownPack.created' : 'newInstance.created', { name: inst.name }))
       if (optifineLater) toast(t('optifine.finishInSettings'), 'info')
       onClose()
-      go({ page: 'instance', id: inst.id, tab: optifineLater ? 'settings' : undefined })
+      if (makingPack) go({ page: 'discover', kind: 'mod', instanceId: inst.id, build: true })
+      else go({ page: 'instance', id: inst.id, tab: optifineLater ? 'settings' : undefined })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -123,8 +139,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title={t('newInstance.title')}
-      subtitle={t('newInstance.subtitle')}
+      title={t(makingPack ? 'ownPack.title' : 'newInstance.title')}
+      subtitle={t(makingPack ? 'ownPack.subtitle' : 'newInstance.subtitle')}
       onClose={onClose}
       wide
       footer={
@@ -133,16 +149,40 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
             {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!mc || busy || unavailable || (loader !== 'vanilla' && !loaderVersion)} onClick={create}>
-            {busy && <Loader2 className="spin" />} {t('newInstance.create')}
+            {busy && <Loader2 className="spin" />} {t(makingPack ? 'ownPack.create' : 'newInstance.create')}
           </button>
         </>
       }
     >
+      <div className="new-mode">
+        <Segmented<'instance' | 'pack'>
+          value={mode}
+          onChange={setMode}
+          options={[
+            {
+              value: 'instance',
+              label: (
+                <>
+                  <Blocks /> {t('ownPack.mode.instance')}
+                </>
+              )
+            },
+            {
+              value: 'pack',
+              label: (
+                <>
+                  <Hammer /> {t('ownPack.mode.pack')}
+                </>
+              )
+            }
+          ]}
+        />
+      </div>
       <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
         <IconPicker inst={{ name: name || placeholder, color, iconUrl: icon ?? undefined }} onChange={setIcon} onError={setError} />
         <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="field">
-            <label htmlFor="inst-name">{t('newInstance.name')}</label>
+            <label htmlFor="inst-name">{t(makingPack ? 'ownPack.packName' : 'newInstance.name')}</label>
             <input id="inst-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
           <div className="field">
@@ -174,6 +214,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
+
+      {makingPack && <PackFields value={pack} onChange={setPack} />}
 
       <BannerPicker value={banner ?? undefined} onChange={setBanner} onError={setError} />
 
@@ -253,7 +295,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {optifineFits(loader) && (
+      {optifineFits(loader) && !makingPack && (
         <div className="field">
           <div className="row">
             <label className="label grow">OptiFine</label>

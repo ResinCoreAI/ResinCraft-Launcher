@@ -130,6 +130,9 @@ export function mockApi(): ResinApi {
     source: 'modrinth',
     url: `https://modrinth.com/mod/${id}`
   }))
+  // The player's own modpacks (instances with ownPack) start empty and keep their own content.
+  const packContent = new Map<string, ContentItem[]>()
+  const contentOf = (id: string) => packContent.get(id) ?? mods
   const mods: ContentItem[] = [
     {
       filename: 'sodium-fabric-0.6.5.jar',
@@ -190,6 +193,7 @@ export function mockApi(): ResinApi {
         // `group: null` means Ungrouped.
         // `null` removes a setting, like the engine does.
         const clean = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === null ? undefined : v])) as Partial<Instance>
+        if (p.ownPack && !packContent.has(id)) packContent.set(id, [])
         instances = instances.map((i) => (i.id === id ? { ...i, ...clean, group: p.group === null ? undefined : (p.group ?? i.group) } : i))
         return instances.find((i) => i.id === id)!
       },
@@ -317,9 +321,9 @@ export function mockApi(): ResinApi {
         await wait(undefined, 900)
         if (!/^https?:\/\//.test(url)) throw new Error("That isn't a web address")
       },
-      duplicates: (_i, picks) => wait(mockDuplicates(picks, mods), 500),
-      installMany: (_i, picks, replace) => wait(mockInstallMany(mods, picks, replace), 900),
-      list: (_i, kind) => wait(kind === 'mod' ? [...mods] : []),
+      duplicates: (i, picks) => wait(mockDuplicates(picks, contentOf(i)), 500),
+      installMany: (i, picks, replace) => wait(mockInstallMany(contentOf(i), picks, replace), 900),
+      list: (i, kind) => wait(packContent.has(i) ? packContent.get(i)!.filter((m) => m.kind === kind) : kind === 'mod' ? [...mods] : []),
       toggle: async () => {},
       remove: async () => {},
       checkUpdates: () =>
@@ -342,16 +346,35 @@ export function mockApi(): ResinApi {
           { name: 'saves', isDir: true, suggested: false },
           { name: 'options.txt', isDir: false, suggested: false }
         ]),
-      exportModpack: (_id, o) =>
-        wait(
+      exportModpack: async (id, o) => {
+        const own = packContent.get(id)
+        // Like the engine: the player's own modpack keeps what it was exported with.
+        instances = instances.map((i) =>
+          i.id === id && i.ownPack
+            ? {
+                ...i,
+                ownPack: {
+                  name: o.name,
+                  version: o.version,
+                  author: o.author,
+                  summary: o.summary,
+                  bumpOnExport: o.bumpOnExport ?? i.ownPack.bumpOnExport,
+                  exportedVersion: o.version,
+                  exportedAt: Date.now()
+                }
+              }
+            : i
+        )
+        return wait(
           {
             path: 'C:/Users/you/Downloads/' + o.name + '-' + o.version + (o.format === 'mrpack' ? '.mrpack' : '.zip'),
-            linked: 41,
-            bundled: ['mods/my-handmade-mod.jar'],
-            skippedDisabled: 1
+            linked: own ? own.length : 41,
+            bundled: own ? [] : ['mods/my-handmade-mod.jar'],
+            skippedDisabled: own ? 0 : 1
           },
           900
         )
+      }
     },
     ...mockInstanceTabs((id, iconUrl) => {
       // Like the engine: a modpack's own icon is kept for resetIcon.

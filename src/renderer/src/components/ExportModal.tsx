@@ -3,17 +3,20 @@ import { Check, FileText, Folder, FolderOpen, Info, Loader2, PackageOpen } from 
 import type { ExportEntry, ExportResult, Instance, PackFormat } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
-import { Modal, Segmented } from './ui'
+import { Modal, Segmented, Switch } from './ui'
+import { nextExportVersion } from './OwnPack'
 import { rich, t } from '../i18n'
 
-/** Exports an instance as a Modrinth .mrpack or CurseForge .zip. */
+/** Exports an instance as a Modrinth .mrpack or CurseForge .zip. The player's own modpack starts from its saved details. */
 export default function ExportModal({ inst, onClose }: { inst: Instance; onClose: () => void }) {
-  const { activeAccount, settings, toast, info } = useStore()
+  const { activeAccount, settings, toast, info, refreshInstances } = useStore()
+  const own = inst.ownPack
   const [format, setFormat] = useState<PackFormat>('mrpack')
-  const [name, setName] = useState(inst.modpack?.name ?? inst.name)
-  const [version, setVersion] = useState('1.0.0')
-  const [author, setAuthor] = useState(activeAccount?.username ?? '')
-  const [summary, setSummary] = useState('')
+  const [name, setName] = useState(own?.name || inst.modpack?.name || inst.name)
+  const [version, setVersion] = useState(own ? nextExportVersion(own) : '1.0.0')
+  const [author, setAuthor] = useState(own?.author || activeAccount?.username || '')
+  const [summary, setSummary] = useState(own?.summary ?? '')
+  const [bump, setBump] = useState(own?.bumpOnExport ?? false)
   const [entries, setEntries] = useState<ExportEntry[]>()
   const [include, setInclude] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -43,9 +46,12 @@ export default function ExportModal({ inst, onClose }: { inst: Instance; onClose
         version: version.trim() || '1.0.0',
         author: author.trim(),
         summary: summary.trim(),
-        include: [...include]
+        include: [...include],
+        bumpOnExport: own ? bump : undefined
       })
       if (r) setResult(r)
+      // The engine saved these details on the player's own modpack.
+      if (r && own) await refreshInstances()
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
@@ -147,6 +153,18 @@ export default function ExportModal({ inst, onClose }: { inst: Instance; onClose
           </div>
         )}
       </div>
+
+      {own && (
+        <div className="row">
+          <div className="grow">
+            <b>{t('ownPack.bump')}</b>
+            <div className="hint">
+              {own.exportedVersion ? t('ownPack.lastExported', { version: own.exportedVersion }) : t('ownPack.firstExport')} {t('ownPack.savedHint')}
+            </div>
+          </div>
+          <Switch on={bump} onChange={setBump} label={t('ownPack.bump')} />
+        </div>
+      )}
 
       <div className="field">
         <label>{t('export.alsoInclude')}</label>

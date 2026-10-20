@@ -12,6 +12,7 @@ import {
   FileDown,
   FileUp,
   FolderOpen,
+  Hammer,
   ListChecks,
   Gamepad2,
   Image,
@@ -47,6 +48,7 @@ import ScreenshotsTab from '../components/ScreenshotsTab'
 import ServersTab from '../components/ServersTab'
 import WorldsTab from '../components/WorldsTab'
 import { OptifineSteps, optifineFits, optifineHow } from '../components/Optifine'
+import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
 const FileManager = lazy(() => import('../components/FileManager'))
@@ -58,6 +60,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
   const inst = instances.find((i) => i.id === id)
   const [tab, setTab] = useState<Tab>(initialTab ?? 'content')
   const [exporting, setExporting] = useState(false)
+  const [editingPack, setEditingPack] = useState(false)
 
   if (!inst)
     return (
@@ -97,13 +100,28 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
             <span className="chip">
               <Clock /> {inst.lastPlayed ? timeAgo(inst.lastPlayed) : t('time.neverPlayed')}
             </span>
-            {inst.modpack && (
+            {inst.modpack && !inst.ownPack && (
               <span className="chip accent">
                 <Package /> {t('instance.modpack')}
               </span>
             )}
+            {inst.ownPack && <OwnPackChip pack={inst.ownPack} />}
           </div>
         </div>
+        {inst.ownPack && (
+          <>
+            <button
+              className="btn lg"
+              title={t('ownPack.addContentHint')}
+              onClick={() => go({ page: 'discover', kind: 'mod', instanceId: inst.id, build: true })}
+            >
+              <Plus /> {t('ownPack.addContent')}
+            </button>
+            <button className="btn lg icon" title={t('ownPack.detailsTitle')} onClick={() => setEditingPack(true)}>
+              <Hammer />
+            </button>
+          </>
+        )}
         <button className="btn lg" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
           <PackageOpen /> {t('instance.export')}
         </button>
@@ -116,6 +134,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <PlayButton inst={inst} size="lg" />
       </div>
       {exporting && <ExportModal inst={inst} onClose={() => setExporting(false)} />}
+      {editingPack && inst.ownPack && <PackDetailsModal inst={{ ...inst, ownPack: inst.ownPack }} onClose={() => setEditingPack(false)} />}
 
       <div className="tabs" role="tablist">
         <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>

@@ -41,6 +41,7 @@ import {
 import { useStore } from '../store'
 import { compact, describe, timeAgo } from '../util'
 import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
+import { PackBuilderBanner } from '../components/OwnPack'
 
 const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.ReactNode }[] = [
   { value: 'mod', labelKey: 'discover.kind.mod', searchKey: 'discover.search.mod', icon: <Blocks size={15} /> },
@@ -190,7 +191,7 @@ type InstallPlan = { picks: ProjectHit[]; replace: ContentFileRef[] }
 
 const toPick = (h: ProjectHit, versionId?: string): ModPick => ({ id: h.id, kind: h.kind, title: h.title, author: h.author, slug: h.slug, versionId })
 
-export default function Discover({ initialKind, instanceId }: { initialKind?: ContentKind; instanceId?: string }) {
+export default function Discover({ initialKind, instanceId, build }: { initialKind?: ContentKind; instanceId?: string; build?: boolean }) {
   const { instances, go, toast, refreshInstances, info, settings, updateSettings } = useStore()
   const target = instances.find((i) => i.id === instanceId)
   const [source, setSourceState] = useState<Site>(() => {
@@ -548,20 +549,24 @@ export default function Discover({ initialKind, instanceId }: { initialKind?: Co
         </div>
       </div>
 
-      {target && (
-        <div className="context-banner">
-          <InstanceTile inst={target} />
-          <div className="grow">
-            <b>{t('discover.target.title', { name: target.name })}</b>
-            <div className="hint">{t('discover.target.compatible', { target: describe(target) })}</div>
+      {target?.ownPack && build ? (
+        <PackBuilderBanner inst={{ ...target, ownPack: target.ownPack }} refresh={installed} />
+      ) : (
+        target && (
+          <div className="context-banner">
+            <InstanceTile inst={target} />
+            <div className="grow">
+              <b>{t('discover.target.title', { name: target.name })}</b>
+              <div className="hint">{t('discover.target.compatible', { target: describe(target) })}</div>
+            </div>
+            <button className="btn sm" onClick={() => go({ page: 'instance', id: target.id })}>
+              {t('discover.target.back')}
+            </button>
+            <button className="btn ghost icon sm" title={t('discover.target.clear')} onClick={() => go({ page: 'discover', kind })}>
+              <X />
+            </button>
           </div>
-          <button className="btn sm" onClick={() => go({ page: 'instance', id: target.id })}>
-            {t('discover.target.back')}
-          </button>
-          <button className="btn ghost icon sm" title={t('discover.target.clear')} onClick={() => go({ page: 'discover', kind })}>
-            <X />
-          </button>
-        </div>
+        )
       )}
 
       <div className="toolbar">

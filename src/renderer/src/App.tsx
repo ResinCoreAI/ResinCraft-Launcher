@@ -128,7 +128,7 @@ export default function App() {
           {route.page === 'library' && <Library />}
           {route.page === 'instance' && <InstancePage key={route.id} id={route.id} tab={route.tab} />}
           {route.page === 'discover' && (
-            <Discover key={`${route.instanceId ?? ''}${route.kind ?? ''}`} initialKind={route.kind} instanceId={route.instanceId} />
+            <Discover key={`${route.instanceId ?? ''}${route.kind ?? ''}`} initialKind={route.kind} instanceId={route.instanceId} build={route.build} />
           )}
           {route.page === 'accounts' && <Accounts />}
           {route.page === 'bedrock' && <Bedrock />}

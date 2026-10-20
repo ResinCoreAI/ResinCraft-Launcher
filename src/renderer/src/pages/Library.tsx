@@ -46,6 +46,7 @@ import {
 import { useInstanceTask, useStore } from '../store'
 import { COLOR_NAMES, COLORS, describe, hasCustomIcon, instancePath, playtime } from '../util'
 import { t } from '../i18n'
+import { OwnPackChip } from '../components/OwnPack'
 
 type Sort = 'recent' | 'name' | 'version' | 'playtime' | 'custom'
 const SORTS: Sort[] = ['recent', 'name', 'version', 'playtime', 'custom']
@@ -523,6 +524,7 @@ export function InstanceCard({
                   </span>
                 ) : (
                   <>
+                    {inst.ownPack && <OwnPackChip pack={inst.ownPack} compact />}
                     <span className="ellipsis">{describe(inst)}</span>
                     <span>·</span>
                     <span>{playtime(inst.playtime)}</span>

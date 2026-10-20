@@ -1,0 +1,31 @@
+/* The player's own modpacks (components/OwnPack.tsx). */
+
+.own-pack-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+}
+
+textarea.input.own-pack-desc {
+  font-family: inherit;
+  resize: vertical;
+}
+
+.chip.own-pack {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.chip.own-pack.compact {
+  padding: 0 6px;
+  font-size: 11px;
+  flex: none;
+}
+
+.own-pack-banner {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+}
+
+.new-mode {
+  margin-bottom: 4px;
+}

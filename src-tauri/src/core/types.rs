@@ -164,6 +164,29 @@ pub struct Instance {
     /// OptiFine the player downloaded and imported (see game/optifine.rs).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub optifine: Option<OptifineRef>,
+    /// Set when the player made this instance as their own modpack (New instance → Create a modpack).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own_pack: Option<OwnPack>,
+}
+
+/// The details of a modpack the player is making; the export dialog starts from them and saves them back.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnPack {
+    pub name: String,
+    pub version: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub summary: String,
+    /// Suggest the next version (1.0.0 → 1.0.1) when exporting again after `version` was exported.
+    #[serde(default)]
+    pub bump_on_export: bool,
+    /// The version last exported, and when (ms); none until the first export.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exported_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exported_at: Option<i64>,
 }
 
 /// An imported OptiFine jar: `version` is "<mc>_<edition>" ("1.20.1_HD_U_I6"), `file` the jar's name in mods/
@@ -533,6 +556,9 @@ pub struct ExportOptions {
     pub author: String,
     pub summary: String,
     pub include: Vec<String>,
+    /// For the player's own modpack: whether the next export should suggest a bumped version.
+    #[serde(default)]
+    pub bump_on_export: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
