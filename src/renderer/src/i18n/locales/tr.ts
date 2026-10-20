@@ -142,6 +142,8 @@ const dict: Dict = {
   'profile.loading': 'Minecraft profilin yükleniyor…',
   'profile.front': 'Ön',
   'profile.back': 'Arka',
+  'profile.skin3d': "{name} adlı oyuncunun 3B görünümü",
+  'profile.dragToTurn': "Döndürmek için sürükle",
   'profile.skinFront': 'Görünüm, önden',
   'profile.skinBack': 'Görünüm, arkadan',
   'profile.defaultSkin': 'Varsayılan görünüm',

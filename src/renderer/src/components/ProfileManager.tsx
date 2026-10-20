@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { AlertTriangle, Check, CircleSlash, Link2, Loader2, RotateCcw, X } from 'lucide-react'
 import type { AccountView, NameStatus, OnlineSkin, PlayerProfile, SavedSkin, SkinUpload, SkinVariant } from '@shared/types'
 import { api } from '../api'
@@ -6,6 +6,9 @@ import { currentLanguage, t } from '../i18n'
 import { useStore } from '../store'
 import { FindSkins, MySkins, type Peek } from './SkinLibrary'
 import { CapeView, SkinView, useImage } from './SkinPreview'
+
+// three.js is big: the 3D figure loads only when the skin manager opens.
+const Skin3D = lazy(() => import('./Skin3D'))
 import { Modal, Segmented } from './ui'
 import '../profile.css'
 
@@ -136,16 +139,9 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
       ) : (
         <div className="pm">
           <div className="pm-figure">
-            <div className="pm-views">
-              <figure>
-                <SkinView url={skinUrl} variant={showVariant} side="front" label={t('profile.skinFront')} />
-                <figcaption>{t('profile.front')}</figcaption>
-              </figure>
-              <figure>
-                <SkinView url={skinUrl} variant={showVariant} side="back" capeUrl={cape?.url} label={t('profile.skinBack')} />
-                <figcaption>{t('profile.back')}</figcaption>
-              </figure>
-            </div>
+            <Suspense fallback={<SkinView url={skinUrl} variant={showVariant} side="front" scale={8} label={t('profile.skinFront')} />}>
+              <Skin3D url={skinUrl} variant={showVariant} capeUrl={cape?.url} label={t('profile.skin3d', { name: profile.name })} />
+            </Suspense>
             <b className="pm-name">{profile.name}</b>
             <span className="hint">
               {peek || pending

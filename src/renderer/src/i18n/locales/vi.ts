@@ -142,6 +142,8 @@ const dict: Dict = {
   'profile.loading': 'Đang tải hồ sơ Minecraft của bạn…',
   'profile.front': 'Trước',
   'profile.back': 'Sau',
+  'profile.skin3d': "Skin của {name} dạng 3D",
+  'profile.dragToTurn': "Kéo để xoay",
   'profile.skinFront': 'Skin, mặt trước',
   'profile.skinBack': 'Skin, mặt sau',
   'profile.defaultSkin': 'Skin mặc định',

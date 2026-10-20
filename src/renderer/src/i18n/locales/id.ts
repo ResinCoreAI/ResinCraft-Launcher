@@ -142,6 +142,8 @@ const dict: Dict = {
   'profile.loading': 'Memuat profil Minecraft Anda…',
   'profile.front': 'Depan',
   'profile.back': 'Belakang',
+  'profile.skin3d': "Skin {name} dalam 3D",
+  'profile.dragToTurn': "Seret untuk memutar",
   'profile.skinFront': 'Skin, tampak depan',
   'profile.skinBack': 'Skin, tampak belakang',
   'profile.defaultSkin': 'Skin bawaan',

@@ -36,6 +36,36 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+/* The 3D figure: drag to turn it (it spins by itself otherwise). */
+.skin-3d {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.skin-3d canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  border-radius: var(--radius-sm);
+}
+.skin-3d canvas:active {
+  cursor: grabbing;
+}
+.skin-3d-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  transition: color 0.2s ease;
+}
+.skin-3d-hint.on {
+  color: var(--text-dim);
+}
+@media (prefers-reduced-motion: reduce) {
+  .skin-3d-hint {
+    transition: none;
+  }
+}
+
 .skin-view,
 .cape-view {
   image-rendering: pixelated;

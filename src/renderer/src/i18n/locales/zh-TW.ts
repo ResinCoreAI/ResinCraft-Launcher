@@ -142,6 +142,8 @@ const dict: Dict = {
   'profile.loading': '正在載入你的 Minecraft 個人資料…',
   'profile.front': '正面',
   'profile.back': '背面',
+  'profile.skin3d': "{name} 的外觀（3D）",
+  'profile.dragToTurn': "拖曳以旋轉",
   'profile.skinFront': '外觀正面',
   'profile.skinBack': '外觀背面',
   'profile.defaultSkin': '預設外觀',

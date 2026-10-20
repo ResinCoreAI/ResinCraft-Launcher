@@ -43,6 +43,8 @@ export default {
   'profile.loading': 'Loading your Minecraft profile…',
   'profile.front': 'Front',
   'profile.back': 'Back',
+  'profile.skin3d': "{name}'s skin in 3D",
+  'profile.dragToTurn': "Drag to turn it",
   'profile.skinFront': 'Skin, front view',
   'profile.skinBack': 'Skin, back view',
   'profile.defaultSkin': 'Default skin',

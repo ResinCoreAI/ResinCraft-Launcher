@@ -142,6 +142,8 @@ const dict: Dict = {
   'profile.loading': 'Wczytywanie profilu Minecraft…',
   'profile.front': 'Przód',
   'profile.back': 'Tył',
+  'profile.skin3d': "Skin {name} w 3D",
+  'profile.dragToTurn': "Przeciągnij, aby obrócić",
   'profile.skinFront': 'Skórka, widok z przodu',
   'profile.skinBack': 'Skórka, widok z tyłu',
   'profile.defaultSkin': 'Domyślna skórka',

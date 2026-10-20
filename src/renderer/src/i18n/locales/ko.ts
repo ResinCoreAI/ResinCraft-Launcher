@@ -142,6 +142,8 @@ const dict: Dict = {
   'profile.loading': 'Minecraft 프로필을 불러오는 중…',
   'profile.front': '앞',
   'profile.back': '뒤',
+  'profile.skin3d': "{name}의 스킨 (3D)",
+  'profile.dragToTurn': "드래그해서 돌리기",
   'profile.skinFront': '스킨 앞면',
   'profile.skinBack': '스킨 뒷면',
   'profile.defaultSkin': '기본 스킨',

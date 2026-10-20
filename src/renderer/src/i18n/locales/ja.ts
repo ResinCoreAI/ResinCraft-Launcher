@@ -142,6 +142,8 @@ const dict: Dict = {
   'profile.loading': 'Minecraftプロフィールを読み込み中…',
   'profile.front': '正面',
   'profile.back': '背面',
+  'profile.skin3d': "{name} のスキン（3D）",
+  'profile.dragToTurn': "ドラッグで回転",
   'profile.skinFront': 'スキン（正面）',
   'profile.skinBack': 'スキン（背面）',
   'profile.defaultSkin': 'デフォルトのスキン',
