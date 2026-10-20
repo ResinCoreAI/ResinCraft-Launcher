@@ -51,6 +51,7 @@ import { useInstanceTask, useStore } from '../store'
 import { COLOR_NAMES, COLORS, describe, hasCustomIcon, instancePath, playtime } from '../util'
 import { t } from '../i18n'
 import { OwnPackChip } from '../components/OwnPack'
+import { PackUpdateBadge } from '../components/PackUpdates'
 import { SelectBox, SelectionBar, SelectionContext, useBulkActions, useSelection, type Selection } from './LibrarySelection'
 
 type Sort = 'recent' | 'name' | 'version' | 'playtime' | 'custom'
@@ -668,6 +669,7 @@ export function InstanceCard({
                 ) : (
                   <>
                     {inst.ownPack && <OwnPackChip pack={inst.ownPack} compact />}
+                    <PackUpdateBadge target="instance" id={inst.id} compact />
                     <span className="ellipsis">{describe(inst)}</span>
                     <span>·</span>
                     <span>{playtime(inst.playtime)}</span>

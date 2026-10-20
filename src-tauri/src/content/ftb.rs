@@ -10,6 +10,7 @@ use serde_json::json;
 
 use super::dupes::dedupe_pack;
 use super::index::{discard_instance, iso_from_secs, parse_loader, safe_name, InstanceGuard};
+use super::packswitch::{PackTarget, Side, TargetFile};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
@@ -104,6 +105,7 @@ struct FtbFile {
     sha1: String,
     size: Option<u64>,
     serveronly: bool,
+    clientonly: bool,
     curseforge: Option<FtbCurse>,
 }
 
@@ -270,7 +272,9 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             if !pending.is_empty() {
                 instances::update(&inst.id, json!({ "pendingDownloads": pending })).await?;
             }
-            instances::get(&inst.id).await
+            let inst = instances::get(&inst.id).await?;
+            super::packswitch::record_install(&inst).await;
+            Ok(inst)
         }
         .await;
         guard.keep();
@@ -280,4 +284,62 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         result
     })
     .await
+}
+
+/// Version `version_id` of FTB pack `project_id`, for switching an instance to it (see packswitch.rs).
+pub(crate) async fn pack_target(project_id: &str, version_id: &str, side: Side) -> Result<PackTarget> {
+    let p = pack(ftb_id(project_id)).await?;
+    let version: FtbVersion = fetch_json(&format!("{API}/modpack/{}/{}", p.id, enc_id(version_id))).await?;
+    let mc_version = version
+        .summary
+        .target("game")
+        .map(|t| t.version.clone())
+        .ok_or_else(|| err_tr!("modpack.noMcVersion", "{name} doesn't say which Minecraft version it needs", name = p.name.clone()))?;
+    let ml = version.summary.target("modloader").cloned();
+    let loader = match &ml {
+        None => LoaderType::Vanilla,
+        Some(t) => parse_loader(&t.name).ok_or_else(|| {
+            err_tr!("modpack.needsUnsupportedLoader", "{name} needs {loader}, which ResinCraft doesn't support yet.", name = p.name.clone(), loader = t.name.clone())
+        })?,
+    };
+    let (mut files, mut pending) = (Vec::new(), Vec::new());
+    for f in version.files.iter().filter(|f| if side == Side::Server { !f.clientonly } else { !f.serveronly }) {
+        let folder = f.path.strip_prefix("./").or_else(|| f.path.strip_prefix('.')).unwrap_or(&f.path);
+        let folder = folder.trim_matches('/').to_string();
+        if f.url.is_empty() {
+            pending.push(PendingDownload {
+                title: f.name.clone(),
+                file_name: f.name.clone(),
+                url: f.curseforge.as_ref().map(|c| format!("https://www.curseforge.com/projects/{}", c.project)).unwrap_or_else(|| "https://www.feed-the-beast.com/".into()),
+                folder,
+                sha1: Some(f.sha1.clone()).filter(|s| !s.is_empty()),
+                ..Default::default()
+            });
+            continue;
+        }
+        let path = if folder.is_empty() { safe_name(&f.name)?.to_string() } else { format!("{folder}/{}", safe_name(&f.name)?) };
+        files.push(TargetFile { path, url: f.url.clone(), hash: (!f.sha1.is_empty()).then(|| Hash::sha1(&f.sha1)), size: f.size });
+    }
+    Ok(PackTarget {
+        version_id: version.summary.id.to_string(),
+        version_name: version.summary.name.clone(),
+        mc_version,
+        loader,
+        loader_version: ml.map(|t| t.version).filter(|v| !v.is_empty()),
+        files,
+        layers: vec![],
+        pending,
+        index: vec![],
+    })
+}
+
+fn enc_id(id: &str) -> String {
+    urlencoding::encode(id).into_owned()
+}
+
+/// Drops a cached pack, so the update check sees versions published since it was fetched.
+pub(crate) fn forget_cache(project_id: &str) {
+    if let Some(m) = PACKS.lock().unwrap().as_mut() {
+        m.remove(&ftb_id(project_id));
+    }
 }

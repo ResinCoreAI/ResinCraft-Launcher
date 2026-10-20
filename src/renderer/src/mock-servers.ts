@@ -21,6 +21,8 @@ import type {
   ServerNet
 } from '@shared/types'
 
+import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
+
 type Listener<T> = (e: T) => void
 
 export function mockServers(): { server: ResinApi['server']; onServer: ResinApi['on']['server']; onServerLog: ResinApi['on']['serverLog'] } {
@@ -122,7 +124,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       memoryMb: 6144,
       port: 25566,
       createdAt: now - 2e9,
-      modpack: { name: 'Create: Above and Beyond', projectId: 'abc' },
+      modpack: { name: 'Create: Above and Beyond', projectId: MOCK_PACK, versionId: 'tech-1.5.0' },
       launch: { jar: 'fabric-server-launch.jar' }
     },
     {
@@ -351,6 +353,10 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
   }
 
   const server: ResinApi['server'] = {
+    ...mockServerPacks(
+      (id) => servers.find((s) => s.id === id),
+      (next) => (servers = servers.map((s) => (s.id === next.id ? next : s)))
+    ),
     list: () => wait(servers, 150),
     get: async (id) => find(id),
     versions: (type) =>

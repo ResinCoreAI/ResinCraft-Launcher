@@ -251,5 +251,67 @@ export default {
   'versionPicker.releaseNotes': 'Release notes',
   // note for translators: "MC" is short for Minecraft, {versions} is a version or range like 1.20.1 – 1.21
   'versionPicker.gameVersions': 'MC {versions}',
-  'versionPicker.downloads': { one: '{downloads} download', other: '{downloads} downloads' }
+  'versionPicker.downloads': { one: '{downloads} download', other: '{downloads} downloads' },
+  // Changing an installed modpack's version (components/PackVersion.tsx)
+  'packVersion.change': 'Change the modpack version',
+  'packVersion.changeEllipsis': 'Change version…',
+  'packVersion.subtitle': 'Move up to a newer version of the pack, or back to an older one',
+  'packVersion.keeps':
+    'Your worlds, screenshots, settings, servers and the mods you added stay. Config files you changed stay too, unless the new version changes them: then yours is kept next to it as a .bak file.',
+  'packVersion.closeFirst': 'Close {name} before switching its modpack version.',
+  'packVersion.switched': 'Switched {name} to {version}',
+  'packVersion.backups': {
+    one: 'The new version replaced {count} file you had changed. Your copy is next to it as a .bak file.',
+    other: 'The new version replaced {count} files you had changed. Your copies are next to them as .bak files.'
+  },
+  'packVersion.pending': {
+    one: '{count} file of the new version needs a manual download: see Download all on the Content tab.',
+    other: '{count} files of the new version need a manual download: see Download all on the Content tab.'
+  },
+  'packVersion.updateAvailable': 'Update available',
+  'packVersion.updateTo': 'Update to {version}',
+  'packVersion.installed': 'Version {version} installed',
+  'packVersion.installedUnknown': "The installed version isn't listed by the pack's site",
+  'packVersion.newer': '{version} is available',
+  'packVersion.noSource': "ResinCraft doesn't know where this modpack came from",
+  'packVersion.serverPending': "Some files of the new version are only downloadable from their website. Put them in the server's folder: {files}",
+  'packVersion.stopFirst': 'Stop {name} before switching its modpack version.',
+  'packVersion.keepsServer':
+    "The server's worlds, player data, whitelist, ops and bans, server.properties and the files you added stay. Config files you changed stay too, unless the new version changes them: then yours is kept next to it as a .bak file.",
+  // The automatic modpack update check (components/PackUpdates.tsx)
+  'packUpdates.section': 'Modpack updates',
+  'packUpdates.setting': 'Check modpacks for updates',
+  'packUpdates.settingHint': 'At start and every few hours: instances and servers installed from a modpack, and servers made from an instance',
+  'packUpdates.checkNow': 'Check now',
+  'packUpdates.checking': 'Checking…',
+  'packUpdates.found': { one: '{count} update found {when}', other: '{count} updates found {when}' },
+  'packUpdates.none': 'Everything is up to date (checked {when})',
+  'packUpdates.title': { one: '{count} modpack update', other: '{count} modpack updates' },
+  'packUpdates.more': { one: 'and {count} more', other: 'and {count} more' },
+  'packUpdates.syncAvailable': 'Sync available',
+  'packUpdates.instanceChanged': 'its instance changed',
+  'packUpdates.review': 'Review…',
+  // Syncing a server from the instance it was made from (components/ServerPacks.tsx)
+  'sync.section': 'Made from an instance',
+  'sync.from': 'From {name}',
+  'sync.gone': "{name} was deleted, so there's nothing to sync from.",
+  'sync.changed': '{name} changed since the last sync.',
+  'sync.hint': "Bring the instance's server-side mods, configs and game version over to this server.",
+  'sync.button': 'Sync from {name}…',
+  'sync.title': 'Sync {name}',
+  'sync.subtitle': 'What changes on the server to match {name}',
+  'sync.now': 'Sync now',
+  'sync.done': 'Synced {name} from {instance}',
+  'sync.upToDate': 'The server already matches {name}.',
+  'sync.minecraft': 'Minecraft',
+  'sync.loader': 'Mod loader',
+  'sync.added': 'Added',
+  'sync.updated': 'Updated',
+  'sync.removed': 'Removed',
+  'sync.kept': 'Your changes that stay',
+  'sync.backups': 'Your copies kept as .bak',
+  'sync.dropped': 'Client-only mods stay off the server: {names}',
+  'sync.firstSync': 'First sync: files that are only on the server stay, except older copies of mods the instance has.',
+  'sync.keeps':
+    'Worlds, player data, whitelist, ops and bans, server.properties and files only on the server stay. A backup is made first, and anything that goes wrong is undone.'
 }

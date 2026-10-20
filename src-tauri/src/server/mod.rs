@@ -8,6 +8,7 @@ pub mod create;
 pub mod domain;
 pub mod installers;
 pub mod network;
+pub mod packs;
 pub mod playit;
 pub mod plugins;
 pub mod properties;
@@ -37,6 +38,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:softwareIcons" => json(installers::software_icons().await),
         "server:builds" => json(installers::builds(args.get::<ServerKind>(0)?, &args.get::<String>(1)?).await?),
         "server:create" => json(create::create(args.get::<NewServer>(0)?).await?),
+        "server:switchPack" => json(packs::switch_pack(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:origin" => json(packs::origin(&args.get::<String>(0)?).await?),
+        "server:syncPreview" => json(packs::sync_preview(&args.get::<String>(0)?).await?),
+        "server:syncFromInstance" => json(packs::sync_from_instance(&args.get::<String>(0)?).await?),
         "server:update" => {
             let id: String = args.get(0)?;
             let patch = args.raw(1);

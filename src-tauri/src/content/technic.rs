@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -14,6 +14,7 @@ use serde_json::Value;
 
 use super::dupes::dedupe_pack;
 use super::index::{discard_instance, extract_where, lenient_u64, lenient_u64_zero, natural_cmp, open_zip, safe_name, InstanceGuard, Zip};
+use super::packswitch::{Layer, PackTarget};
 use crate::core::events::Task;
 use crate::core::instances;
 use crate::core::net::{download_all, fetch_json, DownloadItem, Hash};
@@ -414,9 +415,91 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         // Two of the pack's zips may carry the same mod; Technic lists none of them as such.
         dedupe_pack(&inst, &task, &[]).await;
         guard.keep();
-        instances::get(&inst.id).await
+        let inst = instances::get(&inst.id).await?;
+        super::packswitch::record_install(&inst).await;
+        Ok(inst)
     })
     .await;
     let _ = tokio::fs::remove_dir_all(&tmp2).await;
     res
+}
+
+/// Build `version_id` of Technic pack `project_id`, for switching an instance to it (see packswitch.rs). Downloads
+/// the build's zips into `work`. A pack without Solder only has its current download.
+pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path, task: &Arc<Task>) -> Result<PackTarget> {
+    let p = pack(slug_of(project_id)).await?;
+    let mut mc = p.minecraft.clone().filter(|m| !m.is_empty());
+    let mut items = Vec::new();
+    if p.solder().is_some() {
+        let b: SolderBuild = fetch_json(&p.solder_url(&format!("/{}", enc(version_id)))).await?;
+        mc = Some(b.minecraft.clone()).filter(|m| !m.is_empty()).or(mc);
+        for (i, m) in b.mods.iter().enumerate() {
+            let hash = m.md5.as_ref().filter(|s| !s.is_empty()).map(Hash::md5);
+            items.push(DownloadItem::new(&m.url, work.join(format!("{i}.zip"))).hash(hash).size(m.filesize.filter(|s| *s > 0)));
+        }
+    } else {
+        let current = p.version.clone().unwrap_or_else(|| "latest".into());
+        if version_id != current {
+            bail_tr!("technic.onlyLatest", "{name} only offers its current version ({version}) for download", name = p.display_name.clone(), version = current);
+        }
+        let url = p.url().ok_or_else(|| err_tr!("technic.noDownload", "{name} has no download on Technic", name = p.display_name.clone()))?;
+        items.push(DownloadItem::new(url, work.join("pack.zip")));
+    }
+    let zips: Vec<PathBuf> = items.iter().map(|i| i.dest.clone()).collect();
+    download_all(items, 4, task.counter(tr!("technic.downloading", "Downloading modpack"))).await?;
+    let name = p.display_name.clone();
+    let paths_ = zips.clone();
+    let found = tokio::task::spawn_blocking(move || -> Result<Found> {
+        let mut opened = Vec::new();
+        for f in &paths_ {
+            opened.push(open_zip(f).map_err(|_| err_tr!("technic.notZip", "{name}'s download isn't a zip file. The author's download link may be broken.", name = name.clone()))?);
+        }
+        read_version_json(&mut opened)
+    })
+    .await??;
+    let (vj, (loader, loader_version)) = match found {
+        Found::Unreadable => bail_tr!(
+            "technic.customModpackJar",
+            "{name} ships a custom bin/modpack.jar that ResinCraft can't read, so it can't tell which mod loader to install.",
+            name = p.display_name.clone()
+        ),
+        Found::None => (None, (LoaderType::Vanilla, None)),
+        Found::Json(v) => {
+            let l = detect_loader(&v).ok_or_else(|| err_tr!("technic.unknownLoader", "{name} uses a mod loader ResinCraft doesn't recognise.", name = p.display_name.clone()))?;
+            (Some(v), l)
+        }
+    };
+    let mc_version = vj
+        .and_then(|v| v.inherits_from)
+        .filter(|m| !m.is_empty())
+        .or(mc)
+        .ok_or_else(|| err_tr!("modpack.noMcVersion", "{name} doesn't say which Minecraft version it needs", name = p.display_name.clone()))?;
+    Ok(PackTarget {
+        version_id: version_id.to_string(),
+        version_name: version_id.to_string(),
+        mc_version,
+        loader,
+        loader_version,
+        files: vec![],
+        layers: zips.into_iter().map(|zip| Layer { zip, prefix: String::new(), to: String::new(), skip_bin: true }).collect(),
+        pending: vec![],
+        index: vec![],
+    })
+}
+
+/// The build a Technic pack recommends now (its only download for a pack without Solder), for the update check.
+pub(crate) async fn recommended_build(project_id: &str) -> Result<Option<String>> {
+    let p = pack(slug_of(project_id)).await?;
+    if p.solder().is_none() {
+        return Ok(p.version.clone().filter(|v| !v.is_empty()));
+    }
+    let s: SolderPack = fetch_json(&p.solder_url("")).await?;
+    Ok(s.recommended.or(s.latest).filter(|b| !b.is_empty()))
+}
+
+/// Drops a cached pack, so the update check sees builds published since it was fetched.
+pub(crate) fn forget_cache(project_id: &str) {
+    if let Some(m) = PACKS.lock().unwrap().as_mut() {
+        m.remove(slug_of(project_id));
+    }
 }

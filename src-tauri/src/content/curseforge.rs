@@ -15,6 +15,7 @@ use super::index::{
     discard_instance, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, parse_date_ms, read_zip_text, remove_project_files, safe_name, save_index, ContentIndex, IndexEntry, InstanceGuard,
 };
 use super::jarmeta::RemoteFile;
+use super::packswitch::{Layer, PackTarget, Side, TargetFile};
 use crate::core::ctx::http;
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
@@ -186,6 +187,8 @@ struct CfFile {
     dependencies: Vec<CfDependency>,
     #[serde(default)]
     is_server_pack: Option<bool>,
+    #[serde(default)]
+    server_pack_file_id: Option<u64>,
     #[serde(default)]
     file_fingerprint: Option<u64>,
 }
@@ -840,7 +843,9 @@ pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance
             if !pending.is_empty() {
                 instances::update(&inst.id, json!({ "pendingDownloads": pending })).await?;
             }
-            instances::get(&inst.id).await
+            let inst = instances::get(&inst.id).await?;
+            super::packswitch::record_install(&inst).await;
+            Ok(inst)
         }
         .await;
         guard.keep();
@@ -854,14 +859,8 @@ pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance
 
 async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task: &Arc<Task>) -> Result<Vec<PendingDownload>> {
     let dir = paths::game_dir(&inst.id);
-    let wanted: Vec<&CfManifestFile> = manifest.files.iter().filter(|f| f.required != Some(false)).collect();
     task.update(tr!("curseforge.lookingUpFiles", "Looking up modpack files…"), None);
-    let mut file_list: Vec<CfFile> = Vec::new();
-    let mut mod_list: Vec<CfMod> = Vec::new();
-    for chunk in wanted.chunks(500) {
-        file_list.extend(cf::<Vec<CfFile>>("/mods/files", Some(json!({ "fileIds": chunk.iter().map(|f| f.file_id).collect::<Vec<_>>() }))).await?);
-        mod_list.extend(cf::<Vec<CfMod>>("/mods", Some(json!({ "modIds": chunk.iter().map(|f| f.project_id).collect::<Vec<_>>() }))).await?);
-    }
+    let (file_list, mod_list) = lookup_pack(manifest).await?;
 
     let mut idx = load_index(&inst.id).await;
     let mut pending = Vec::new();
@@ -871,31 +870,12 @@ async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task:
         let class = m.and_then(|m| m.class_id).unwrap_or(class_of(ContentKind::Mod));
         let folder = folder_of_class(class);
         let Some(url) = f.url() else {
-            pending.push(PendingDownload {
-                title: m.map(|m| m.name.clone()).unwrap_or_else(|| f.display_name.clone()),
-                file_name: f.file_name.clone(),
-                url: m.map(|m| file_url(m, f)).unwrap_or_else(|| "https://www.curseforge.com/".into()),
-                folder: folder.into(),
-                size: f.file_length.filter(|n| *n > 0),
-                sha1: f.sha1(),
-                project_id: Some(prefixed(f.mod_id)),
-                version_id: Some(f.id.to_string()),
-            });
+            pending.push(pending_of(m, f, folder));
             continue;
         };
         let sha1 = f.sha1();
         items.push(DownloadItem::new(url, safe_join(&dir.join(folder), safe_name(&f.file_name)?)?).hash(sha1.clone().map(Hash::sha1)).size(f.file_length));
-        idx.insert(
-            index_key(kind_of_class(class).unwrap_or(ContentKind::Mod), &f.file_name),
-            IndexEntry {
-                project_id: prefixed(f.mod_id),
-                version_id: f.id.to_string(),
-                version_number: f.display_name.clone(),
-                title: m.map(|m| m.name.clone()).unwrap_or_else(|| f.display_name.clone()),
-                icon_url: m.and_then(|m| m.icon()),
-                sha1: sha1.unwrap_or_default(),
-            },
-        );
+        idx.insert(index_key(kind_of_class(class).unwrap_or(ContentKind::Mod), &f.file_name), entry_of(m, f));
     }
     download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
     save_index(&inst.id, &idx).await?;
@@ -912,4 +892,127 @@ async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task:
     let listed: Vec<String> = file_list.iter().filter(|f| f.url().is_some() && folder_of_class(class(f)) == "mods").map(|f| f.file_name.clone()).collect();
     dedupe_pack(inst, task, &listed).await;
     Ok(pending)
+}
+
+/// The files and projects a pack's manifest lists (optional ones left out).
+async fn lookup_pack(manifest: &CfManifest) -> Result<(Vec<CfFile>, Vec<CfMod>)> {
+    let wanted: Vec<&CfManifestFile> = manifest.files.iter().filter(|f| f.required != Some(false)).collect();
+    let mut file_list: Vec<CfFile> = Vec::new();
+    let mut mod_list: Vec<CfMod> = Vec::new();
+    for chunk in wanted.chunks(500) {
+        file_list.extend(cf::<Vec<CfFile>>("/mods/files", Some(json!({ "fileIds": chunk.iter().map(|f| f.file_id).collect::<Vec<_>>() }))).await?);
+        mod_list.extend(cf::<Vec<CfMod>>("/mods", Some(json!({ "modIds": chunk.iter().map(|f| f.project_id).collect::<Vec<_>>() }))).await?);
+    }
+    Ok((file_list, mod_list))
+}
+
+/// A pack file whose author only allows downloads from the CurseForge website.
+fn pending_of(m: Option<&CfMod>, f: &CfFile, folder: &str) -> PendingDownload {
+    PendingDownload {
+        title: m.map(|m| m.name.clone()).unwrap_or_else(|| f.display_name.clone()),
+        file_name: f.file_name.clone(),
+        url: m.map(|m| file_url(m, f)).unwrap_or_else(|| "https://www.curseforge.com/".into()),
+        folder: folder.into(),
+        size: f.file_length.filter(|n| *n > 0),
+        sha1: f.sha1(),
+        project_id: Some(prefixed(f.mod_id)),
+        version_id: Some(f.id.to_string()),
+    }
+}
+
+fn entry_of(m: Option<&CfMod>, f: &CfFile) -> IndexEntry {
+    IndexEntry {
+        project_id: prefixed(f.mod_id),
+        version_id: f.id.to_string(),
+        version_number: f.display_name.clone(),
+        title: m.map(|m| m.name.clone()).unwrap_or_else(|| f.display_name.clone()),
+        icon_url: m.and_then(|m| m.icon()),
+        sha1: f.sha1().unwrap_or_default(),
+    }
+}
+
+/// File `version_id` of CurseForge pack `project_id`, for switching an instance to it (see packswitch.rs). Downloads
+/// the pack's zip into `work`.
+/// For a server: the pack's official server pack when it has one, else its mods (not the client-only ones) and overrides.
+pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path, task: &Arc<Task>, side: Side) -> Result<PackTarget> {
+    let m: CfMod = cf(&format!("/mods/{}", cf_id(project_id)), None).await?;
+    let pack: CfFile = cf(&format!("/mods/{}/files/{version_id}", m.id), None).await?;
+    let Some(url) = pack.url() else {
+        bail_tr!("curseforge.packBlocked", "{name}'s author only allows downloads from the CurseForge website.", name = m.name)
+    };
+    let archive = safe_join(work, safe_name(&pack.file_name)?)?;
+    task.update(tr!("modpack.downloading", "Downloading {name}", name = pack.display_name.clone()), None);
+    download_file(&DownloadItem::new(url, &archive).size(pack.file_length)).await?;
+    let a = archive.clone();
+    let raw = tokio::task::spawn_blocking(move || -> Result<Option<String>> { read_zip_text(&mut open_zip(&a)?, "manifest.json") }).await??;
+    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| err_tr!("curseforge.notModpack", "This file isn't a CurseForge modpack (it has no manifest.json)"))?;
+    let manifest: CfManifest = serde_json::from_str(&raw)?;
+    let primary = manifest.minecraft.mod_loaders.iter().find(|l| l.primary == Some(true)).or(manifest.minecraft.mod_loaders.first());
+    let (loader, loader_version) = parse_loader(primary.map(|l| l.id.as_str()))?;
+    let base = PackTarget {
+        version_id: pack.id.to_string(),
+        version_name: pack.display_name.clone(),
+        mc_version: manifest.minecraft.version.clone(),
+        loader,
+        loader_version: loader_version.clone(),
+        files: vec![],
+        layers: vec![],
+        pending: vec![],
+        index: vec![],
+    };
+    if side == Side::Server {
+        if let Some(sp_id) = pack.server_pack_file_id.filter(|v| *v > 0) {
+            let sp: CfFile = cf(&format!("/mods/{}/files/{sp_id}", m.id), None).await?;
+            if let Some(sp_url) = sp.url() {
+                let zip = safe_join(work, &format!("server-{}", safe_name(&sp.file_name)?))?;
+                task.update(tr!("packswitch.serverPack", "Downloading the server pack…"), None);
+                download_file(&DownloadItem::new(sp_url, &zip).hash(sp.sha1().map(Hash::sha1)).size(sp.file_length)).await?;
+                let z = zip.clone();
+                // Many server packs wrap everything in one top-level folder; look inside it.
+                let prefix = tokio::task::spawn_blocking(move || -> Result<String> {
+                    let names: Vec<String> = open_zip(&z)?.file_names().map(str::to_string).collect();
+                    let tops: HashSet<&str> = names.iter().filter_map(|n| n.split_once('/').map(|(a, _)| a)).collect();
+                    Ok(if tops.len() == 1 && names.iter().all(|n| n.contains('/')) { format!("{}/", tops.into_iter().next().unwrap_or_default()) } else { String::new() })
+                })
+                .await??;
+                return Ok(PackTarget { layers: vec![Layer::new(zip, prefix)], ..base });
+            }
+        }
+    }
+    if !manifest.files.is_empty() && !has_key().await {
+        bail_tr!("curseforge.importUnavailable", "Importing CurseForge modpacks isn't available in this build of ResinCraft.");
+    }
+    task.update(tr!("curseforge.lookingUpFiles", "Looking up modpack files…"), None);
+    let (file_list, mod_list) = lookup_pack(&manifest).await?;
+    let (mut files, mut pending, mut index) = (Vec::new(), Vec::new(), Vec::new());
+    for f in &file_list {
+        let m = mod_list.iter().find(|m| m.id == f.mod_id);
+        let class = m.and_then(|m| m.class_id).unwrap_or(class_of(ContentKind::Mod));
+        if side == Side::Server {
+            // Only mods go to a server, and not those tagged as client-only.
+            let tags: Vec<String> = f.game_versions.iter().map(|t| t.to_lowercase()).collect();
+            if class != class_of(ContentKind::Mod) || (tags.iter().any(|t| t == "client") && !tags.iter().any(|t| t == "server")) {
+                continue;
+            }
+        }
+        let folder = folder_of_class(class);
+        let path = format!("{folder}/{}", safe_name(&f.file_name)?);
+        match f.url() {
+            Some(url) => {
+                files.push(TargetFile { path: path.clone(), url: url.to_string(), hash: f.sha1().map(Hash::sha1), size: f.file_length });
+                index.push((path, entry_of(m, f)));
+            }
+            None => pending.push(pending_of(m, f, folder)),
+        }
+    }
+    let mut prefix = manifest.overrides.clone().unwrap_or_else(|| "overrides".into());
+    if !prefix.ends_with('/') {
+        prefix.push('/');
+    }
+    Ok(PackTarget { files, layers: vec![Layer::new(archive, prefix)], pending, index, ..base })
+}
+
+/// Whether CurseForge can be asked (a key is configured or built in).
+pub(crate) async fn available() -> bool {
+    has_key().await
 }

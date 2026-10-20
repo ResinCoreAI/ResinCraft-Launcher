@@ -11,6 +11,7 @@ import { mockStorage } from './mock-storage'
 import { mockRuns } from './mock-runs'
 import { mockQuickJoin } from './mock-quickjoin'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
+import { MOCK_PACK, mockPackUpdates, mockPackVersions, mockSwitchPack } from './mock-packswitch'
 
 export function mockApi(): ResinApi {
   const servers = mockServers()
@@ -39,6 +40,7 @@ export function mockApi(): ResinApi {
       createdAt: now - 2e9,
       lastPlayed: now - 3e8,
       playtime: 54_000,
+      modpack: { projectId: MOCK_PACK, versionId: 'tech-1.4.0', name: 'Tech & Automation' },
       // Files whose authors only allow downloads from CurseForge's website.
       pendingDownloads: [
         { title: 'Species', fileName: 'species-3.5.jar', url: 'https://www.curseforge.com/minecraft/mc-mods/species/files/5000001', folder: 'mods' },
@@ -93,7 +95,8 @@ export function mockApi(): ResinApi {
     showSnapshots: false,
     autoUpdate: false,
     preferredModSource: 'ask',
-    watchFolders: []
+    watchFolders: [],
+    autoCheckPacks: true
   }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },
@@ -184,9 +187,9 @@ export function mockApi(): ResinApi {
       pathForFile: (f: File) => f.name
     },
     settings: { get: () => wait(settings, 0), set: async (p) => (settings = { ...settings, ...p }) },
+    storage: mockStorage(),
     update: updates.update,
     versions: {
-    storage: mockStorage(),
       list: () => wait(versions),
       loaders: () =>
         wait([
@@ -309,8 +312,9 @@ export function mockApi(): ResinApi {
         const page = all.slice(offset, offset + (q.limit ?? 20))
         return wait({ hits: page.map((h) => ({ ...h, kind: q.kind })), total: all.length, offset }, 400)
       },
-      versions: () =>
+      versions: (projectId) =>
         wait(
+          mockPackVersions(projectId) ??
           (
             [
               ['0.6.7-beta.1', 'beta', 2],
@@ -354,6 +358,14 @@ export function mockApi(): ResinApi {
         ),
       update: () => wait(undefined, 500),
       changeVersion: () => wait(undefined, 700),
+      packUpdates: async () => mockPackUpdates(instances, await servers.server.list()),
+      switchPack: async (id, versionId) =>
+        mockSwitchPack(
+          instances.find((i) => i.id === id),
+          versionId,
+          (await runs.running()).includes(id),
+          (next) => (instances = instances.map((i) => (i.id === id ? next : i)))
+        ),
       installModpack: async () => {
         await mockEngine.download({ key: 'modpack.installing', text: 'Installing TerraFirmaGreg-Modern', params: { name: 'TerraFirmaGreg-Modern' } })
         return instances[0]

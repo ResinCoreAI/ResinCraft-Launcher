@@ -248,6 +248,9 @@ pub async fn start(id: &str) -> Result<()> {
     if is_running(id) {
         bail!("This server is already running");
     }
+    if crate::content::packswitch::is_switching(&format!("server:{id}")) {
+        crate::bail_tr!("packswitch.wait", "Wait for the modpack version switch to finish first");
+    }
     let meta = store::get(id).await?;
     let dir = store::dir(id)?;
     if !store::eula_accepted(id).await {

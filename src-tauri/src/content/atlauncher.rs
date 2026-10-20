@@ -1,7 +1,7 @@
 //! ATLauncher's public pack API. The pack list has no download counts or authors, so search is done
 //! locally over the ~150 public packs. ATLauncher only publishes modpacks.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 
 use super::dupes::dedupe_pack;
 use super::index::{discard_instance, encode_uri, extract_where, iso_from_secs, lenient_u64, open_zip, safe_name, InstanceGuard};
+use super::packswitch::{Layer, PackTarget, TargetFile};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
@@ -391,7 +392,9 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             if !pending.is_empty() {
                 instances::update(&inst.id, json!({ "pendingDownloads": pending })).await?;
             }
-            instances::get(&inst.id).await
+            let inst = instances::get(&inst.id).await?;
+            super::packswitch::record_install(&inst).await;
+            Ok(inst)
         }
         .await;
         guard.keep();
@@ -401,4 +404,79 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         result
     })
     .await
+}
+
+/// Version `version_id` of ATLauncher pack `project_id`, for switching an instance to it (see packswitch.rs).
+/// Downloads the archives the version unpacks (Configs.zip and "extract" files) into `work`.
+pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path, task: &Arc<Task>) -> Result<PackTarget> {
+    let p = pack(atl_name(project_id)).await?;
+    let base = format!("{CDN}/packs/{}/versions/{}", enc(&p.safe_name), enc(version_id));
+    let cfg: AtlConfig = fetch_json(&format!("{base}/Configs.json")).await?;
+    let (loader, loader_version) = loader_of(&p.name, &cfg)?;
+    let mods: Vec<&AtlMod> = cfg.mods.iter().filter(|m| m.client != Some(false) && (m.optional != Some(true) || m.selected == Some(true))).collect();
+    let (mut files, mut pending, mut layers, mut archives) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for (i, m) in mods.iter().enumerate() {
+        let url = if m.download == "server" { format!("{CDN}/{}", encode_uri(&m.url)) } else { m.url.clone() };
+        let hash = m.md5.as_ref().filter(|s| !s.is_empty()).map(Hash::md5);
+        let size = m.filesize.filter(|s| *s > 0);
+        if m.kind == "extract" {
+            if m.download == "browser" {
+                bail_tr!("atlauncher.manualExtract", "{name} needs \"{file}\" downloaded by hand and unpacked, which ResinCraft can't do for you.", name = p.name.clone(), file = m.name.clone());
+            }
+            let zip = work.join(format!("{i}-{}", safe_name(&m.file)?));
+            archives.push(DownloadItem::new(url, &zip).hash(hash).size(size));
+            let mut prefix = m.extract_folder.clone().unwrap_or_default().trim_start_matches('/').to_string();
+            if !prefix.is_empty() && !prefix.ends_with('/') {
+                prefix.push('/');
+            }
+            let to = m.extract_to.clone().filter(|t| !t.is_empty() && t != "root").unwrap_or_default();
+            layers.push(Layer { zip, prefix, to, skip_bin: false });
+            continue;
+        }
+        let Some(folder) = folder_for(&m.kind, &cfg.minecraft) else {
+            bail_tr!(
+                "atlauncher.unsupportedFileType",
+                "{name} {version} installs \"{file}\" as a {kind} file, which ResinCraft can't install.",
+                name = p.name.clone(),
+                version = cfg.version.clone(),
+                file = m.name.clone(),
+                kind = m.kind.clone()
+            );
+        };
+        if m.download == "browser" {
+            let page = [&m.url, m.website.as_deref().unwrap_or_default()].into_iter().find(|u| !u.is_empty()).map(|u| u.to_string());
+            pending.push(PendingDownload {
+                title: m.name.clone(),
+                file_name: m.file.clone(),
+                url: page.unwrap_or_else(|| format!("https://atlauncher.com/pack/{}", p.safe_name)),
+                folder,
+                ..Default::default()
+            });
+            continue;
+        }
+        files.push(TargetFile { path: format!("{folder}/{}", m.file), url, hash, size });
+    }
+    if cfg.no_configs != Some(true) {
+        let zip = work.join("Configs.zip");
+        let c = cfg.configs.clone().unwrap_or_default();
+        archives.push(DownloadItem::new(format!("{base}/Configs.zip"), &zip).hash(c.sha1.filter(|s| !s.is_empty()).map(Hash::sha1)).size(c.filesize));
+        layers.push(Layer::new(zip, ""));
+    }
+    download_all(archives, 4, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
+    Ok(PackTarget {
+        version_id: cfg.version.clone(),
+        version_name: cfg.version.clone(),
+        mc_version: cfg.minecraft.clone(),
+        loader,
+        loader_version,
+        files,
+        layers,
+        pending,
+        index: vec![],
+    })
+}
+
+/// Drops the cached pack list, so the update check sees versions published since it was fetched.
+pub(crate) async fn forget_cache() {
+    *LIST.lock().await = None;
 }

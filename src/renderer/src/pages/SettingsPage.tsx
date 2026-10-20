@@ -5,6 +5,7 @@ import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
 import { StorageSection } from '../components/Storage'
 import { UpdatesSection } from '../components/Updates'
+import { PackUpdatesSetting } from '../components/PackUpdates'
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { fixed } from '../util'
@@ -354,6 +355,13 @@ export default function SettingsPage() {
           <StorageSection />
 
           <UpdatesSection />
+
+          <section className="settings-section" id="pack-updates">
+            <h3>{t('packUpdates.section')}</h3>
+            <div className="card">
+              <PackUpdatesSetting />
+            </div>
+          </section>
 
           <section className="settings-section" id="about">
             <h3>{t('settings.nav.about')}</h3>

@@ -41,6 +41,8 @@ import ServerAddons from '../components/ServerAddons'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import MigrateModal from '../components/MigrateModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
+import { ServerOriginChips, ServerPackSettings } from '../components/ServerPacks'
+import { PackUpdateBadge } from '../components/PackUpdates'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
 import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useStore } from '../store'
@@ -310,6 +312,7 @@ function ServerList({
                 <div className="sub">
                   <span className="data">{describeServer(s)}</span>
                   {s.modpack && <span className="ellipsis">{s.modpack.name}</span>}
+                  <PackUpdateBadge target="server" id={s.id} />
                   <span>{t('servers.portShort', { port: String(s.port) })}</span>
                   <span>{s.lastStarted ? t('servers.lastStarted', { when: timeAgo(s.lastStarted, true) }) : t('servers.neverStarted')}</span>
                 </div>
@@ -388,7 +391,7 @@ function ServerDetail({
               <Server /> {describeServer(s)}
               {s.loaderVersion ? ` · ${s.loaderVersion}` : ''}
             </span>
-            {s.modpack && <span className="chip accent">{s.modpack.name}</span>}
+            <ServerOriginChips s={s} reload={reload} />
             <span className="chip">{t('servers.portShort', { port: String(s.port) })}</span>
             <StatePill s={s} />
             {live(s) && (
@@ -1221,6 +1224,8 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
       </div>
 
       <BedrockJoinSettings s={s} />
+
+      <ServerPackSettings s={s} reload={reload} />
 
       <div className="settings-section">
         <h3>{t('servers.settings.internet')}</h3>

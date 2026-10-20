@@ -1,0 +1,73 @@
+/* The modpack version chip on the instance header (components/PackVersion.tsx). */
+button.chip.pack-chip {
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+button.chip.pack-chip:hover {
+  filter: brightness(1.15);
+}
+button.chip.pack-chip .mono {
+  opacity: 0.85;
+}
+.pack-version-note {
+  margin: 0 0 10px;
+}
+
+/* The modpack updates notification (components/PackUpdates.tsx), under ResinCraft's own update banner if both show. */
+.update-banner.pack-updates {
+  width: 360px;
+}
+.update-banner ~ .update-banner.pack-updates {
+  top: calc(var(--titlebar) + 150px);
+}
+.pack-updates-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.pack-updates-list li {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.pack-updates-list li:first-child {
+  border-top: 0;
+}
+.pack-updates-list .actions {
+  margin-top: 6px;
+}
+.chip.pack-update-badge {
+  flex: none;
+}
+
+/* Sync from an instance (components/ServerPacks.tsx). */
+.sync-preview p {
+  margin: 0 0 8px;
+}
+.sync-files {
+  margin: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+}
+.sync-files summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.sync-files.add summary {
+  color: var(--success);
+}
+.sync-files.remove summary {
+  color: var(--danger);
+}
+.sync-files ul {
+  margin: 6px 0 2px;
+  padding-left: 16px;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 12px;
+}
+.chip.pack-update-badge.compact {
+  padding: 0 4px;
+  height: 18px;
+}

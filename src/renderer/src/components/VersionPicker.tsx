@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Check, Download, ExternalLink, Loader2, Repeat } from 'lucide-react'
 import type { Instance, ProjectVersion } from '@shared/types'
 import { api } from '../api'
@@ -26,6 +26,9 @@ export default function VersionPicker({
   load,
   target,
   currentVersionId,
+  subtitle,
+  note,
+  blocked,
   onPick,
   onClose
 }: {
@@ -37,6 +40,12 @@ export default function VersionPicker({
   /** What "compatible" means, for the subtitle (e.g. "Paper 1.21.1"). */
   target?: string
   currentVersionId?: string
+  /** Replaces the "Showing versions that work with…" line. */
+  subtitle?: string
+  /** Shown above the list (e.g. what switching a modpack keeps). */
+  note?: ReactNode
+  /** Turns off the switch button (e.g. while the instance runs). */
+  blocked?: boolean
   onPick: (versionId: string) => Promise<void>
   onClose: () => void
 }) {
@@ -94,7 +103,8 @@ export default function VersionPicker({
     <Modal
       title={currentVersionId ? t('versionPicker.changeTitle', { title }) : t('versionPicker.chooseTitle', { title })}
       subtitle={
-        instance ? t('versionPicker.compatible', { target: describe(instance) }) : target ? t('versionPicker.compatible', { target }) : t('versionPicker.allPublished')
+        subtitle ??
+        (instance ? t('versionPicker.compatible', { target: describe(instance) }) : target ? t('versionPicker.compatible', { target }) : t('versionPicker.allPublished'))
       }
       onClose={onClose}
       wide
@@ -108,7 +118,7 @@ export default function VersionPicker({
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={!pick || isCurrent || busy} onClick={confirm}>
+          <button className="btn primary" disabled={!pick || isCurrent || busy || blocked} onClick={confirm}>
             {busy ? <Loader2 className="spin" /> : currentVersionId ? <Repeat /> : <Download />}
             {isCurrent
               ? t('versionPicker.alreadyInstalled')
@@ -119,6 +129,7 @@ export default function VersionPicker({
         </>
       }
     >
+      {note}
       <div className="row">
         <Segmented
           value={channel}
@@ -174,12 +185,13 @@ export default function VersionPicker({
                 </div>
                 <div className="hint ellipsis">
                   {v.name !== v.versionNumber && <>{v.name} · </>}
-                  {t('versionPicker.gameVersions', { versions: gameRange(v.gameVersions) })} · {v.loaders.map((l) => LOADER_NAMES[l] ?? l).join(', ')}
+                  {t('versionPicker.gameVersions', { versions: gameRange(v.gameVersions) })}
+                  {v.loaders.length > 0 && <> · {v.loaders.map((l) => LOADER_NAMES[l] ?? l).join(', ')}</>}
                 </div>
               </div>
               <div className="vmeta">
-                <span>{timeAgo(v.published)}</span>
-                <span>{t('versionPicker.downloads', { count: v.downloads, downloads: compact(v.downloads) })}</span>
+                {v.published && <span>{timeAgo(v.published)}</span>}
+                {v.downloads > 0 && <span>{t('versionPicker.downloads', { count: v.downloads, downloads: compact(v.downloads) })}</span>}
               </div>
             </button>
           ))}

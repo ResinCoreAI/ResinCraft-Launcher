@@ -253,6 +253,8 @@ export interface Settings {
   preferredModSource: ModSourcePreference
   /** Folders besides Downloads where Download all looks for files. */
   watchFolders: string[]
+  /** Look for newer versions of installed modpacks (and instances changed since a server synced) on their own. */
+  autoCheckPacks: boolean
 }
 
 export type ModSourcePreference = 'ask' | 'modrinth' | 'curseforge'
@@ -451,6 +453,75 @@ export interface DuplicateCheck {
 }
 
 /** A new modpack instance, plus the extra copies removed of mods the pack had twice (listed and in its overrides…). */
+/** What switching a modpack instance's version did (content.switchPack). */
+export interface PackSwitch {
+  versionName: string
+  added: number
+  updated: number
+  removed: number
+  /** Pack files the player had changed that stay as they are. */
+  kept: string[]
+  /** `.bak` copies of the player's changed files that the new version replaced. */
+  backups: string[]
+  /** Website-only files now waiting in Download all. */
+  pending: number
+  /** A server's website-only files (it has no Download all). */
+  pendingFiles?: PendingDownload[]
+  /** Client-only mods left off a server. */
+  dropped?: string[]
+}
+
+/** A modpack instance or server with a newer pack version, or a server whose instance changed since its last sync. */
+export interface PackUpdate {
+  target: 'instance' | 'server'
+  id: string
+  name: string
+  kind: 'pack' | 'sync'
+  packName?: string
+  currentId?: string
+  current?: string
+  latestId?: string
+  latest?: string
+}
+
+export interface PackUpdates {
+  /** When the sources were last asked (ms); 0 = never. */
+  checkedAt: number
+  updates: PackUpdate[]
+  /** False when Settings turned the automatic check off. */
+  enabled: boolean
+}
+
+/** Where a server came from: the instance it was made from, and whether that instance changed since the last sync. */
+export interface ServerOrigin {
+  instanceId?: string
+  instanceName?: string
+  /** The instance was deleted since. */
+  instanceGone: boolean
+  syncAvailable: boolean
+}
+
+/** What syncing a server from its instance changes (or changed). */
+export interface SyncPreview {
+  instanceId: string
+  instanceName: string
+  missing: boolean
+  added: string[]
+  updated: string[]
+  removed: string[]
+  /** Files the host changed that stay as they are. */
+  kept: string[]
+  /** `.bak` copies of the host's changed files the sync replaces. */
+  backups: string[]
+  /** Client-only mods left off the server. */
+  dropped: string[]
+  /** [server, instance] when they differ. */
+  minecraft?: [string, string]
+  loader?: [string, string]
+  /** Never synced before: files only on the server stay. */
+  firstSync: boolean
+}
+
 export interface InstalledPack extends Instance {
   duplicatesRemoved?: { filename: string; kept: string; title: string }[]
 }
@@ -978,20 +1049,6 @@ export interface WriteTextOptions {
   bom?: boolean
 }
 
-/** The API exposed to the renderer as `window.resin`. */
-export interface ResinApi {
-  app: {
-    info(): Promise<AppInfo>
-    openExternal(url: string): Promise<void>
-    showItem(path: string): Promise<void>
-    /** Absolute path of a file dropped onto the window (synchronous, preload-side). */
-    pathForFile(file: File): string
-    setTitleBar(bg: string, fg: string): Promise<void>
-    /** Stops a running task: its downloads stop and anything half-made is removed. False if it already ended. */
-    cancelTask(id: string): Promise<boolean>
-  }
-  settings: {
-    get(): Promise<Settings>
 /** Where instances, hosted servers and the shared game files are kept (Settings → Storage). */
 export interface StorageInfo {
   folder: string
@@ -1043,7 +1100,31 @@ export interface StorageChange {
   leftovers?: string
 }
 
+/** The API exposed to the renderer as `window.resin`. */
+export interface ResinApi {
+  app: {
+    info(): Promise<AppInfo>
+    openExternal(url: string): Promise<void>
+    showItem(path: string): Promise<void>
+    /** Absolute path of a file dropped onto the window (synchronous, preload-side). */
+    pathForFile(file: File): string
+    setTitleBar(bg: string, fg: string): Promise<void>
+    /** Stops a running task: its downloads stop and anything half-made is removed. False if it already ended. */
+    cancelTask(id: string): Promise<boolean>
+  }
+  settings: {
+    get(): Promise<Settings>
     set(patch: Partial<Settings>): Promise<Settings>
+  }
+  /** Where instances and game files are kept, and moving them (Settings → Storage). */
+  storage: {
+    info(): Promise<StorageInfo>
+    drives(): Promise<StorageDrive[]>
+    check(folder: string): Promise<StorageCheck>
+    /** The folder picker, titled `title`; null if cancelled. */
+    pick(title?: string): Promise<string | null>
+    /** Switches to `folder`. `move` (default true): bring the current instances along as a cancellable task. */
+    change(folder: string, move?: boolean): Promise<StorageChange>
   }
   /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
   bedrock: {
@@ -1059,16 +1140,6 @@ export interface StorageChange {
   }
   /** ResinCraft's own updates. */
   update: {
-  /** Where instances and game files are kept, and moving them (Settings → Storage). */
-  storage: {
-    info(): Promise<StorageInfo>
-    drives(): Promise<StorageDrive[]>
-    check(folder: string): Promise<StorageCheck>
-    /** The folder picker, titled `title`; null if cancelled. */
-    pick(title?: string): Promise<string | null>
-    /** Switches to `folder`. `move` (default true): bring the current instances along as a cancellable task. */
-    change(folder: string, move?: boolean): Promise<StorageChange>
-  }
     status(): Promise<UpdateStatus>
     /** Asks the update server; network problems come back as `error`, not as a rejection. */
     check(): Promise<UpdateStatus>
@@ -1172,6 +1243,13 @@ export interface StorageChange {
     checkUpdates(instanceId: string): Promise<ContentItem[]>
     update(instanceId: string, filename: string): Promise<void>
     changeVersion(instanceId: string, kind: ContentKind, filename: string, versionId: string): Promise<void>
+    /**
+     * Switches a modpack instance to another version of its pack (newer or older): the pack's files change, the
+     * player's worlds, settings, own mods and changes stay. A cancellable task; a failure leaves the instance as it was.
+     */
+    switchPack(instanceId: string, versionId: string): Promise<PackSwitch>
+    /** Newer modpack versions for installed packs and servers (cached for a few hours unless `force`). */
+    packUpdates(force?: boolean): Promise<PackUpdates>
     installModpack(projectId: string, versionId?: string): Promise<InstalledPack>
     /** Opens a file picker for a .mrpack or CurseForge .zip; null if cancelled. */
     importModpack(): Promise<InstalledPack | null>
@@ -1229,6 +1307,14 @@ export interface StorageChange {
   }
   server: {
     list(): Promise<ServerInfo[]>
+    /** Switches a server made from a modpack to another version of the pack (its server files). Stop it first. */
+    switchPack(id: string, versionId: string): Promise<PackSwitch>
+    /** The instance a server was made from, if any, and whether it changed since the last sync. */
+    origin(id: string): Promise<ServerOrigin>
+    /** What syncing from that instance would change, without changing anything. */
+    syncPreview(id: string): Promise<SyncPreview>
+    /** Syncs the server from its instance (a cancellable task). Stop it first. */
+    syncFromInstance(id: string): Promise<SyncPreview>
     get(id: string): Promise<ServerInfo>
     /** Minecraft versions a type has its own list of (Paper, Leaf, Arclight… and Bedrock's server versions). */
     versions(type: ServerKind): Promise<string[]>

@@ -35,6 +35,9 @@ pub struct Settings {
     pub preferred_mod_source: String,
     /// Folders besides Downloads where files for Download all are looked for (a browser that saves elsewhere).
     pub watch_folders: Vec<String>,
+    /// Look for newer versions of installed modpacks (and instances changed since a server synced) at start and every
+    /// few hours (Settings → Updates).
+    pub auto_check_packs: bool,
 }
 
 pub fn total_memory_mb() -> u64 {
@@ -64,6 +67,7 @@ impl Default for Settings {
             auto_update: false,
             preferred_mod_source: "ask".into(),
             watch_folders: Vec::new(),
+            auto_check_packs: true,
         }
     }
 }

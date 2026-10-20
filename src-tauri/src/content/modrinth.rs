@@ -13,6 +13,7 @@ use super::index::{
     discard_instance, display_cmp, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, read_zip_text, remove_project_files, safe_name, save_index, ContentIndex, IndexEntry, InstanceGuard,
 };
 use super::jarmeta::RemoteFile;
+use super::packswitch::{Layer, PackTarget, Side, TargetFile};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
@@ -532,6 +533,8 @@ struct PackHashes {
 struct PackEnv {
     #[serde(default)]
     client: Option<String>,
+    #[serde(default)]
+    server: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -554,15 +557,8 @@ pub struct PackMeta {
     pub version_id: Option<String>,
 }
 
-pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
-    let f = file.to_path_buf();
-    let raw = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
-        let mut zip = open_zip(&f).map_err(|_| err_tr!("modrinth.notModpack", "This file isn't a Modrinth modpack (.mrpack)"))?;
-        read_zip_text(&mut zip, "modrinth.index.json")
-    })
-    .await??;
-    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| err_tr!("modrinth.notModpack", "This file isn't a Modrinth modpack (.mrpack)"))?;
-    let pack: PackIndex = serde_json::from_str(&raw)?;
+/// The Minecraft version, loader and loader version a pack needs.
+fn pack_needs(pack: &PackIndex) -> Result<(String, LoaderType, Option<String>)> {
     let deps = &pack.dependencies;
     let (loader, loader_version) = if let Some(v) = deps.get("fabric-loader") {
         (LoaderType::Fabric, Some(v.clone()))
@@ -576,6 +572,28 @@ pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
         (LoaderType::Vanilla, None)
     };
     let mc = deps.get("minecraft").cloned().ok_or_else(|| err_tr!("modrinth.noMcVersion", "The modpack does not say which Minecraft version it needs"))?;
+    Ok((mc, loader, loader_version))
+}
+
+/// The pack's download address for a file, from a host ResinCraft trusts.
+fn pack_url(f: &PackFile) -> Result<&str> {
+    f.downloads
+        .iter()
+        .find(|u| reqwest::Url::parse(u).ok().and_then(|x| x.host_str().map(|h| PACK_HOSTS.contains(&h))).unwrap_or(false))
+        .map(String::as_str)
+        .ok_or_else(|| err_tr!("modrinth.untrustedHost", "Modpack file {path} comes from an untrusted host", path = f.path.clone()))
+}
+
+pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
+    let f = file.to_path_buf();
+    let raw = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
+        let mut zip = open_zip(&f).map_err(|_| err_tr!("modrinth.notModpack", "This file isn't a Modrinth modpack (.mrpack)"))?;
+        read_zip_text(&mut zip, "modrinth.index.json")
+    })
+    .await??;
+    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| err_tr!("modrinth.notModpack", "This file isn't a Modrinth modpack (.mrpack)"))?;
+    let pack: PackIndex = serde_json::from_str(&raw)?;
+    let (mc, loader, loader_version) = pack_needs(&pack)?;
 
     let file = file.to_path_buf();
     Task::run(tr!("modpack.installing", "Installing {name}", name = pack.name), None, move |task| async move {
@@ -592,7 +610,10 @@ pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
         let filled = fill_pack(&inst, &pack, &file, &task).await;
         guard.keep();
         match filled {
-            Ok(()) => Ok(inst),
+            Ok(()) => {
+                super::packswitch::record_install(&inst).await;
+                Ok(inst)
+            }
             Err(e) => {
                 // Don't leave a half-installed instance behind.
                 discard_instance(&inst.id).await;
@@ -608,11 +629,7 @@ async fn fill_pack(inst: &Instance, pack: &PackIndex, file: &Path, task: &Arc<Ta
     let mut items = Vec::new();
     let mut listed = Vec::new();
     for f in pack.files.iter().filter(|f| f.env.as_ref().and_then(|e| e.client.as_deref()) != Some("unsupported")) {
-        let url = f
-            .downloads
-            .iter()
-            .find(|u| reqwest::Url::parse(u).ok().and_then(|x| x.host_str().map(|h| PACK_HOSTS.contains(&h))).unwrap_or(false))
-            .ok_or_else(|| err_tr!("modrinth.untrustedHost", "Modpack file {path} comes from an untrusted host", path = f.path))?;
+        let url = pack_url(f)?;
         items.push(DownloadItem::new(url, safe_join(&dir, &f.path)?).hash(Some(Hash::sha1(&f.hashes.sha1))).size(f.file_size));
         listed.extend(f.path.strip_prefix("mods/").filter(|n| !n.contains('/')).map(str::to_string));
     }
@@ -644,6 +661,42 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
     let res = install_mrpack(&dest, PackMeta { icon_url: p.icon_url.clone(), project_id: Some(p.id.clone()), version_id: Some(v.id.clone()) }).await;
     let _ = tokio::fs::remove_file(&dest).await;
     res
+}
+
+/// Version `version_id` of a Modrinth pack, for switching an instance to it (see packswitch.rs). Downloads the .mrpack
+/// into `work`.
+pub(crate) async fn pack_target(version_id: &str, work: &Path, task: &Arc<Task>, side: Side) -> Result<PackTarget> {
+    let v = version(version_id).await?;
+    let no_version = || err_tr!("modrinth.noInstallableVersion", "{name} has no version ResinCraft can install", name = v.name.clone());
+    let file = v.files.iter().find(|f| f.primary).or_else(|| v.files.first()).ok_or_else(no_version)?;
+    let dest = safe_join(work, safe_name(&file.filename)?)?;
+    task.update(tr!("modpack.downloading", "Downloading {name}", name = v.version_number.clone()), None);
+    download_file(&DownloadItem::new(&file.url, &dest).hash(Some(Hash::sha1(&file.hashes.sha1))).size(Some(file.size))).await?;
+    let d = dest.clone();
+    let raw = tokio::task::spawn_blocking(move || -> Result<Option<String>> { read_zip_text(&mut open_zip(&d)?, "modrinth.index.json") }).await??;
+    let raw = raw.filter(|r| !r.is_empty()).ok_or_else(|| err_tr!("modrinth.notModpack", "This file isn't a Modrinth modpack (.mrpack)"))?;
+    let pack: PackIndex = serde_json::from_str(&raw)?;
+    let (mc_version, loader, loader_version) = pack_needs(&pack)?;
+    let mut files = Vec::new();
+    let runs = |f: &&PackFile| {
+        let env = f.env.as_ref();
+        let on = if side == Side::Server { env.and_then(|e| e.server.as_deref()) } else { env.and_then(|e| e.client.as_deref()) };
+        on != Some("unsupported")
+    };
+    for f in pack.files.iter().filter(runs) {
+        files.push(TargetFile { path: f.path.clone(), url: pack_url(f)?.to_string(), hash: Some(Hash::sha1(&f.hashes.sha1)), size: f.file_size });
+    }
+    Ok(PackTarget {
+        version_id: v.id.clone(),
+        version_name: v.version_number.clone(),
+        mc_version,
+        loader,
+        loader_version,
+        files,
+        layers: vec![Layer::new(dest.clone(), "overrides/"), Layer::new(dest, if side == Side::Server { "server-overrides/" } else { "client-overrides/" })],
+        pending: vec![],
+        index: vec![],
+    })
 }
 
 /// Download info for a file Modrinth knows.

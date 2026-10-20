@@ -104,12 +104,23 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
     store::save(&meta).await?;
 
     let temp = plan.temp.clone();
+    // Remembered so the server can sync from its instance, or switch its pack's version, later.
+    let from_instance = match &plan.content {
+        Content::Instance(i) => Some(i.clone()),
+        _ => None,
+    };
+    let pack_version = plan.modpack.as_ref().and_then(|m| m.version_id.clone()).filter(|_| from_instance.is_none());
     let content = plan.content;
     let dir2 = dir.clone();
     let result = Task::run(format!("Creating {name}"), Some(id.clone()), move |task| async move {
         let mut meta = meta;
         // Content first, so the loader installed by ResinCraft wins over anything a server pack brought along.
         let (dropped, pending) = fill(&dir2, content, &task).await?;
+        if let Some(inst) = &from_instance {
+            super::packs::link_instance(&dir2, inst).await;
+        } else if let Some(v) = &pack_version {
+            crate::content::packswitch::record_server_install(&dir2, v).await;
+        }
         installers::install(&mut meta, &dir2, &task).await?;
         // Saving chunks asynchronously is much smoother on most disks; keep a value a pack brought along.
         if properties::get_value(&dir2, "sync-chunk-writes").await.is_none() {
@@ -723,6 +734,20 @@ pub async fn drop_client_only(mods: &Path, task: &Arc<Task>) -> Vec<String> {
 }
 
 async fn find_client_only(mods: &Path) -> Result<Vec<(PathBuf, String)>> {
+    let mut by_hash: HashMap<String, PathBuf> = HashMap::new();
+    let Ok(mut rd) = tokio::fs::read_dir(mods).await else { return Ok(Vec::new()) };
+    while let Some(e) = rd.next_entry().await? {
+        if e.file_name().to_string_lossy().to_lowercase().ends_with(".jar") {
+            by_hash.insert(hash_file(&e.path(), HashAlgo::Sha1).await?, e.path());
+        }
+    }
+    let found = client_only_sha1s(&by_hash.keys().cloned().collect::<Vec<_>>()).await?;
+    Ok(found.into_iter().filter_map(|(hash, title)| by_hash.get(&hash).map(|p| (p.clone(), title))).collect())
+}
+
+/// Which of these mod files (by SHA-1) Modrinth marks as not running on servers, with their names. Mods Modrinth
+/// doesn't know are left out (kept on the server).
+pub async fn client_only_sha1s(sha1s: &[String]) -> Result<HashMap<String, String>> {
     #[derive(Deserialize)]
     struct Ver {
         project_id: String,
@@ -734,32 +759,22 @@ async fn find_client_only(mods: &Path) -> Result<Vec<(PathBuf, String)>> {
         #[serde(default)]
         server_side: String,
     }
-    let mut by_hash: HashMap<String, PathBuf> = HashMap::new();
-    let Ok(mut rd) = tokio::fs::read_dir(mods).await else { return Ok(Vec::new()) };
-    while let Some(e) = rd.next_entry().await? {
-        if e.file_name().to_string_lossy().to_lowercase().ends_with(".jar") {
-            by_hash.insert(hash_file(&e.path(), HashAlgo::Sha1).await?, e.path());
-        }
+    let mut out = HashMap::new();
+    if sha1s.is_empty() {
+        return Ok(out);
     }
-    if by_hash.is_empty() {
-        return Ok(Vec::new());
+    let mut found: HashMap<String, Ver> = HashMap::new();
+    for chunk in sha1s.chunks(500) {
+        found.extend(post_json::<HashMap<String, Ver>, _>(&format!("{MODRINTH}/version_files"), &json!({ "hashes": chunk, "algorithm": "sha1" })).await?);
     }
-    let found: HashMap<String, Ver> = post_json(&format!("{MODRINTH}/version_files"), &json!({ "hashes": by_hash.keys().collect::<Vec<_>>(), "algorithm": "sha1" })).await?;
     let ids: Vec<String> = found.values().map(|v| v.project_id.clone()).collect::<HashSet<_>>().into_iter().collect();
-    if ids.is_empty() {
-        return Ok(Vec::new());
-    }
     let mut projects: Vec<Proj> = Vec::new();
     for chunk in ids.chunks(100) {
         projects.extend(fetch_json::<Vec<Proj>>(&format!("{MODRINTH}/projects?ids={}", enc(&serde_json::to_string(chunk)?))).await?);
     }
-    let mut out = Vec::new();
     for (hash, v) in found {
-        let Some(p) = projects.iter().find(|p| p.id == v.project_id) else { continue };
-        if p.server_side == "unsupported" {
-            if let Some(path) = by_hash.get(&hash) {
-                out.push((path.clone(), p.title.clone()));
-            }
+        if let Some(p) = projects.iter().find(|p| p.id == v.project_id && p.server_side == "unsupported") {
+            out.insert(hash, p.title.clone());
         }
     }
     Ok(out)

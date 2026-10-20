@@ -13,6 +13,8 @@ pub mod links;
 pub mod lists;
 pub mod manual;
 pub mod modrinth;
+pub mod packswitch;
+pub mod packupdates;
 pub mod sources;
 pub mod technic;
 
@@ -64,6 +66,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             sources::change_version(&args.get::<String>(0)?, args.get(1)?, &args.get::<String>(2)?, &args.get::<String>(3)?).await?;
             done()
         }
+        "content:packUpdates" => json(packupdates::check(args.get::<Option<bool>>(0)?.unwrap_or(false)).await?),
+        "content:switchPack" => json(packswitch::switch_version(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "content:installModpack" => dupes::pack_result(sources::install_modpack(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:importModpack" => {
             let picked = shell::pick_file("Import a modpack", &[("Modrinth or CurseForge modpack", &["mrpack", "zip"])]).await?;

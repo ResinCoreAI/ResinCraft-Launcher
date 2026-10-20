@@ -57,6 +57,9 @@ pub async fn launch(id: &str, server: Option<String>) -> Result<()> {
 /// Like `launch`, with a given account instead of the active one.
 pub async fn launch_as(id: &str, account: Option<&str>, server: Option<String>) -> Result<()> {
     crate::core::storage::ensure_not_moving()?;
+    if crate::content::packswitch::is_switching(id) {
+        crate::bail_tr!("packswitch.wait", "Wait for the modpack version switch to finish first");
+    }
     let settings = settings::get().await;
     let auth = crate::player::accounts::launch_auth_for(account).await?;
     let mode = settings.on_launch.clone();
