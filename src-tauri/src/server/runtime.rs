@@ -745,7 +745,8 @@ async fn open_bedrock(id: String, meta: ServerMeta) {
     if meta.tunnel == TunnelMode::Resin {
         if let Err(e) = open_resin(&id).await {
             if is_running(&id) && net(&id).is_some() {
-                set_net(&id, Some(ServerNet { resin: Some(resin_failed(&e)), ..net_state("failed", None, Some(format!("{e}")), None) }));
+                let resin = resin_failed(&e);
+                set_net(&id, Some(ServerNet { error_text: resin.error.clone(), resin: Some(resin), ..net_state("failed", None, Some(format!("{e}")), None) }));
             }
         }
         return;

@@ -571,9 +571,12 @@ function ConnectCard({ s }: { s: ServerInfo }) {
         ) : net?.state === 'failed' ? (
           <>
             <span className="hint bad">{net.errorText ? tx(net.errorText) : net.error}</span>
-            <span className="hint">
-              {t(isBedrock(s) ? 'servers.connect.forwardHintUdp' : 'servers.connect.forwardHint', { port: String(s.port), ip: lanIp ?? '…' })}
-            </span>
+            {/* The router tip names this PC's own (192.168…) address; it's no use to someone who chose the relay. */}
+            {s.tunnel !== 'resin' && (
+              <span className="hint">
+                {t(isBedrock(s) ? 'servers.connect.forwardHintUdp' : 'servers.connect.forwardHint', { port: String(s.port), ip: lanIp ?? '…' })}
+              </span>
+            )}
             {isBedrock(s) && net.playitHint && <span className="hint">{t('servers.connect.playitHintBedrock')}</span>}
           </>
         ) : (

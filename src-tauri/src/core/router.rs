@@ -43,8 +43,27 @@ pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
         ("server", _) => crate::server::handle(channel, args).await,
         ("files", _) => crate::files::handle(channel, args).await,
         ("update", _) => crate::updater::handle(channel, args).await,
-        ("accounts" | "notes" | "worlds" | "servers" | "screenshots", _) => crate::player::handle(channel, args).await,
+        ("accounts" | "skins" | "notes" | "worlds" | "servers" | "screenshots", _) => crate::player::handle(channel, args).await,
         ("bedrock", _) => crate::player::bedrock::handle(channel, args).await,
         _ => bail!("Unknown request: {channel}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Every request group the UI uses (src/shared/bridge.ts) has a route above, so none ends as "Unknown request".
+    #[test]
+    fn every_ui_request_group_is_routed() {
+        let bridge = include_str!("../../../src/shared/bridge.ts");
+        let router = include_str!("router.rs");
+        let routes = &router[..router.find("#[cfg(test)]").unwrap_or(router.len())];
+        let mut missing = Vec::new();
+        for part in bridge.split("fn('").skip(1) {
+            let Some(group) = part.split(':').next() else { continue };
+            if !routes.contains(&format!("\"{group}\"")) && !missing.contains(&group) {
+                missing.push(group);
+            }
+        }
+        assert!(missing.is_empty(), "request groups without a route: {missing:?}");
     }
 }
