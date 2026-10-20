@@ -93,7 +93,7 @@ async fn run() -> anyhow::Result<bool> {
                     }
                     if !booted.load(Ordering::SeqCst) && BOOT_MARKERS.iter().any(|m| text.contains(m)) {
                         booted.store(true, Ordering::SeqCst);
-                        launch::kill_instance(&id);
+                        launch::kill_instance(&id, None);
                     }
                 }
             }
@@ -112,6 +112,7 @@ async fn run() -> anyhow::Result<bool> {
     s.memory_mb = 2048;
     let t0 = Instant::now();
     let auth = LaunchAuth {
+        account_id: "offline-test".into(),
         username: "ResinTester".into(),
         uuid: "00000000-0000-0000-0000-000000000000".into(),
         access_token: "0".into(),
@@ -121,7 +122,7 @@ async fn run() -> anyhow::Result<bool> {
     let launched = launch::launch_instance(&inst.id, &s, auth, launch::LaunchHooks::default()).await;
     if launched.is_ok() {
         if tokio::time::timeout(Duration::from_secs(180), stop_rx.recv()).await.is_err() {
-            launch::kill_instance(&inst.id);
+            launch::kill_instance(&inst.id, None);
             let _ = tokio::time::timeout(Duration::from_secs(30), stop_rx.recv()).await;
         }
     }

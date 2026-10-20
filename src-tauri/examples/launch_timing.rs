@@ -172,7 +172,7 @@ async fn run() -> anyhow::Result<()> {
         });
     }
 
-    let auth = LaunchAuth { username: "ResinTester".into(), uuid: "00000000-0000-0000-0000-000000000000".into(), access_token: "0".into(), user_type: "legacy", xuid: None };
+    let auth = LaunchAuth { account_id: "offline-test".into(), username: "ResinTester".into(), uuid: "00000000-0000-0000-0000-000000000000".into(), access_token: "0".into(), user_type: "legacy", xuid: None };
     let launched = launch::launch_instance(&inst.id, &s, auth, launch::LaunchHooks::default()).await;
     if launched.is_ok() {
         let deadline = Instant::now() + Duration::from_secs(240);
@@ -185,7 +185,7 @@ async fn run() -> anyhow::Result<()> {
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        launch::kill_instance(&inst.id);
+        launch::kill_instance(&inst.id, None);
         let _ = tokio::time::timeout(Duration::from_secs(30), stop_rx.recv()).await;
     }
     tokio::time::sleep(Duration::from_millis(300)).await;
