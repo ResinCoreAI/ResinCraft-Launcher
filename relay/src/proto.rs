@@ -64,6 +64,11 @@ pub enum AgentMsg {
         name: String,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         bedrock: bool,
+        /// A Java server that also takes Bedrock players (Geyser): the relay adds a UDP port for them, given as
+        /// `bedrock_port` in the answer. Relays that don't know this ignore it (no `bedrock_port`), so launchers try
+        /// it without a protocol version of its own.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        geyser: bool,
     },
     /// Keep the session going for another full session (after a `session_warning`). Protocol 2.
     Continue,
@@ -448,8 +453,9 @@ mod tests {
         let old: RelayMsg = serde_json::from_str(r#"{"t":"online","name":"a","address":"a.b","limits":{"tunnels":1,"names":1,"connections":1,"monthly_bytes":0},"usage":{"month":"2026-10","bytes":0,"connections":0}}"#).unwrap();
         assert!(matches!(old, RelayMsg::Online { secs_left: None, bedrock_port: None, limits: Limits { session_secs: 0, .. }, .. }));
         // A Java tunnel's `online` looks the same as in protocol 2; older relays ignore `bedrock`.
-        assert_eq!(serde_json::to_string(&AgentMsg::Online { name: "a".into(), bedrock: false }).unwrap(), r#"{"t":"online","name":"a"}"#);
-        assert_eq!(serde_json::from_str::<AgentMsg>(r#"{"t":"online","name":"a"}"#).unwrap(), AgentMsg::Online { name: "a".into(), bedrock: false });
+        assert_eq!(serde_json::to_string(&AgentMsg::Online { name: "a".into(), bedrock: false, geyser: false }).unwrap(), r#"{"t":"online","name":"a"}"#);
+        assert_eq!(serde_json::from_str::<AgentMsg>(r#"{"t":"online","name":"a"}"#).unwrap(), AgentMsg::Online { name: "a".into(), bedrock: false, geyser: false });
+        assert_eq!(serde_json::to_string(&AgentMsg::Online { name: "a".into(), bedrock: false, geyser: true }).unwrap(), r#"{"t":"online","name":"a","geyser":true}"#);
         assert_eq!(serde_json::to_string(&DataHeader { peer: None, udp: true }).unwrap(), r#"{"udp":true}"#);
         assert_eq!(serde_json::from_str::<DataHeader>("{}").unwrap(), DataHeader::default());
         assert_eq!(serde_json::to_string(&AgentMsg::Continue).unwrap(), r#"{"t":"continue"}"#);

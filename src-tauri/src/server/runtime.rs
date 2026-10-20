@@ -588,7 +588,9 @@ fn apply_usage(resin: &mut ResinNet, usage: &resincraft_relay::proto::Usage) {
 async fn open_resin(id: &str) -> Result<()> {
     let Ok(meta) = store::get(id).await else { return Ok(()) };
     let status_id = id.to_string();
-    let opened = relay::open(id, meta.port, meta.tunnel == TunnelMode::Resin, meta.kind.bedrock(), move |s| on_resin_status(&status_id, s)).await?;
+    // A Java server with Geyser asks the relay for a port for its Bedrock players too.
+    let geyser = if meta.kind.bedrock() { None } else { geyser_port(id).await };
+    let opened = relay::open(id, meta.port, meta.tunnel == TunnelMode::Resin, meta.kind.bedrock(), geyser, move |s| on_resin_status(&status_id, s)).await?;
     if !is_running(id) || net(id).is_none() {
         opened.task.abort();
         return Ok(());
@@ -608,6 +610,9 @@ async fn open_resin(id: &str) -> Result<()> {
     };
     apply_usage(&mut resin, &opened.usage);
     resin.ends_at = opened.secs_left.map(ends_at);
+    if let Some(address) = opened.geyser_address.clone() {
+        set_geyser_address(id, address);
+    }
     if resin.data.is_some() {
         attention();
     }
@@ -674,7 +679,10 @@ fn on_resin_status(id: &str, status: relay::Status) {
             }
             resin.reconnecting = true;
         }
-        relay::Status::Online { address, limits, usage, secs_left } => {
+        relay::Status::Online { address, geyser_address, limits, usage, secs_left } => {
+            if let Some(g) = geyser_address {
+                set_geyser_address(id, g);
+            }
             resin.reconnecting = false;
             resin.limit_bytes = limits.monthly_bytes;
             resin.continue_secs = relay::continue_window(&limits);
@@ -883,12 +891,43 @@ async fn open_bedrock(id: String, meta: ServerMeta) {
 
 /// Geyser next to a Java server: opens its UDP port for Bedrock players (the router, else playit.gg once
 /// linked). Nothing to do when Geyser isn't installed.
-async fn open_geyser(id: String, name: String) {
-    let Ok(status) = super::plugins::bedrock_status(&id).await else { return };
+/// Geyser's local UDP port when this Java server has Geyser installed.
+async fn geyser_port(id: &str) -> Option<u16> {
+    let status = super::plugins::bedrock_status(id).await.ok()?;
     if status.get("geyser").and_then(serde_json::Value::as_bool) != Some(true) {
+        return None;
+    }
+    Some(status.get("port").and_then(serde_json::Value::as_u64).and_then(|p| u16::try_from(p).ok()).unwrap_or(19132))
+}
+
+/// Where Bedrock players join this Java server through ResinCraft Relay (Geyser's port there).
+fn set_geyser_address(id: &str, address: String) {
+    with(|w| {
+        if let Some(p) = w.procs.get_mut(id) {
+            p.bedrock = Some(address);
+            // Not a router mapping: nothing to close on the router later.
+            p.bedrock_port = None;
+        }
+    });
+    emit_state(id, None);
+}
+
+async fn open_geyser(id: String, name: String) {
+    let Some(port) = geyser_port(&id).await else { return };
+    // ResinCraft Relay carries Geyser along with the Java server when it can: wait until sharing has settled, and
+    // use the router or playit.gg only if the relay didn't give Bedrock players an address.
+    for _ in 0..120 {
+        if !is_running(&id) {
+            return;
+        }
+        if net(&id).is_none_or(|n| n.state != "opening") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    if with(|w| w.procs.get(&id).is_some_and(|p| p.bedrock.is_some())) {
         return;
     }
-    let port = status.get("port").and_then(serde_json::Value::as_u64).and_then(|p| u16::try_from(p).ok()).unwrap_or(19132);
     let set = |address: Option<String>, mapped: Option<u16>| {
         with(|w| {
             if let Some(p) = w.procs.get_mut(&id) {

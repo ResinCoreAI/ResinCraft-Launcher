@@ -434,7 +434,7 @@ impl Agent {
                         Ok(()) => Step::Reply(RelayMsg::Released { name }),
                         Err(code) => Step::Reply(error(code)),
                     },
-                    AgentMsg::Online { name, bedrock } => {
+                    AgentMsg::Online { name, bedrock, geyser } => {
                         if self.online.is_some() {
                             return Step::Reply(error(ErrorCode::BadRequest));
                         }
@@ -443,6 +443,9 @@ impl Agent {
                                 Ok(bound) => Some(bound),
                                 Err(code) => return Step::Reply(error(code)),
                             }
+                        } else if geyser {
+                            // Geyser's players are extra: without a free port, the Java server still comes online.
+                            relay.bind_bedrock(&name).await.ok()
                         } else {
                             None
                         };
@@ -460,11 +463,16 @@ impl Agent {
                             kick: self.kick.clone(),
                             since: now_secs(),
                             bedrock_port,
+                            bedrock_only: bedrock,
                         };
                         match relay.go_online(&acc, &name, tunnel.clone()) {
                             Ok(()) => {
                                 info!(name = %name, account = %acc.name, bedrock_port, "tunnel online");
-                                let what = bedrock_port.map(|p| format!(", Bedrock on port {p}")).unwrap_or_default();
+                                let what = match (bedrock_port, bedrock) {
+                                    (Some(p), true) => format!(", Bedrock on port {p}"),
+                                    (Some(p), false) => format!(", Bedrock players (Geyser) on port {p}"),
+                                    (None, _) => String::new(),
+                                };
                                 relay.event("online", format!("{name} came online ({}{what})", acc.name), Some(self.peer.ip()));
                                 if let Some((port, sock)) = udp {
                                     relay.remember_bedrock_port(&name, port);

@@ -418,6 +418,7 @@ fn tunnels(relay: &Relay) -> Response {
                 "unlimited": relay.is_unlimited(&t.owner),
                 "continues": t.clock.continues(),
                 "bedrockPort": t.bedrock_port,
+                "bedrockOnly": t.bedrock_only,
             })
         })
         .collect();

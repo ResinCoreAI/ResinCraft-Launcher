@@ -229,6 +229,8 @@ pub struct Connection {
     pub base_domain: String,
     /// The relay's protocol version (3 and later can carry Bedrock servers).
     pub relay_version: u32,
+    /// Where Bedrock players' datagrams go when it isn't the served address (a Java server's Geyser port).
+    udp_target: Option<SocketAddr>,
     seq: u64,
 }
 
@@ -311,6 +313,7 @@ impl Connection {
             driver,
             base_domain: String::new(),
             relay_version: 0,
+            udp_target: None,
             seq: 0,
         };
         conn.send(&AgentMsg::Hello { version, client: client.to_string() }).await?;
@@ -424,8 +427,25 @@ impl Connection {
         Ok(online)
     }
 
+    /// Brings a Java server's `name` online and asks for a UDP port for its Bedrock players too (Geyser). The
+    /// answer's `bedrock_port` is None when the relay has no free port or doesn't do this yet. Then call
+    /// [`Connection::set_udp_target`] with Geyser's address before serving.
+    pub async fn online_with_geyser(&mut self, name: &str) -> Result<Online, AgentError> {
+        self.send(&AgentMsg::Online { name: name.to_string(), bedrock: false, geyser: true }).await?;
+        self.read_online().await
+    }
+
+    /// Where Bedrock players' datagrams go (Geyser's port); without it they go to the address given to serve.
+    pub fn set_udp_target(&mut self, addr: SocketAddr) {
+        self.udp_target = Some(addr);
+    }
+
     async fn online_as(&mut self, name: &str, bedrock: bool) -> Result<Online, AgentError> {
-        self.send(&AgentMsg::Online { name: name.to_string(), bedrock }).await?;
+        self.send(&AgentMsg::Online { name: name.to_string(), bedrock, geyser: false }).await?;
+        self.read_online().await
+    }
+
+    async fn read_online(&mut self) -> Result<Online, AgentError> {
         match self.recv().await? {
             RelayMsg::Online { name, address, limits, usage, secs_left, bedrock_port } => Ok(Online { name, address, limits, usage, secs_left, bedrock_port }),
             other => Err(unexpected(&other)),
@@ -472,7 +492,7 @@ impl Connection {
                 }
                 stream = self.inbound.recv() => match stream {
                     Some(stream) => {
-                        tokio::spawn(forward(stream, local));
+                        tokio::spawn(forward(stream, local, self.udp_target.unwrap_or(local)));
                     }
                     None => return net("the relay connection dropped"),
                 },
@@ -518,7 +538,7 @@ fn unexpected(msg: &RelayMsg) -> AgentError {
 }
 
 /// One player: read the stream's header line, then join the rest to the local server.
-async fn forward(stream: StreamHandle, local: SocketAddr) {
+async fn forward(stream: StreamHandle, local: SocketAddr, udp_local: SocketAddr) {
     let mut stream = BufReader::new(stream);
     let mut line = Vec::new();
     let header = tokio::time::timeout(Duration::from_secs(10), (&mut stream).take(4096).read_until(b'\n', &mut line)).await;
@@ -527,7 +547,7 @@ async fn forward(stream: StreamHandle, local: SocketAddr) {
     }
     let header: DataHeader = serde_json::from_slice(&line).unwrap_or_default();
     if header.udp {
-        return forward_udp(stream, local).await;
+        return forward_udp(stream, udp_local).await;
     }
     let Ok(mut server) = TcpStream::connect(local).await else {
         // Nothing listens locally (the server is restarting): the player gets disconnected.

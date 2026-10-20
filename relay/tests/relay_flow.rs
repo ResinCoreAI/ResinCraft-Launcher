@@ -582,3 +582,36 @@ async fn newer_launcher_falls_back_for_an_older_relay() {
     let conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
     assert_eq!(conn.relay_version, resincraft_relay::proto::PROTOCOL_VERSION);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn java_server_with_geyser_gets_a_bedrock_port() {
+    let mut cfg = config("geyser").await;
+    cfg.bedrock_ip = "127.0.0.1".into();
+    cfg.bedrock_ports = "39261-39264".into();
+    let relay = start(cfg).await;
+    let java = fake_minecraft("G").await;
+    let geyser = fake_bedrock().await;
+
+    let mut conn = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    conn.auth(Credentials::Minecraft("token-alice".into())).await.unwrap();
+    let online = conn.online_with_geyser("alice-geyser").await.unwrap();
+    let port = online.bedrock_port.expect("a port for Bedrock players");
+    assert!((39261..=39264).contains(&port));
+    conn.set_udp_target(geyser);
+    let _serving = tokio::spawn(conn.serve(java, |_| {}));
+
+    // Java players still reach the Java server (not "This is a Bedrock server")…
+    assert_eq!(description(&ping(relay.public, &format!("alice-geyser.{BASE}")).await), "Fake server G");
+    // …and Bedrock players on the UDP port reach Geyser.
+    let player = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let reply = bedrock_call(&player, port, b"\x01ping").await.expect("Geyser answers");
+    assert!(reply.starts_with("echo:\x01ping|"), "{reply}");
+
+    // Without free ports the Java server still comes online, just without a Bedrock port.
+    let mut cfg2 = config("geyser-none").await;
+    cfg2.bedrock_ports = String::new();
+    let relay2 = start(cfg2).await;
+    let mut conn2 = Connection::connect(&agent_cfg(&relay2.agent_url)).await.unwrap();
+    conn2.auth(Credentials::Minecraft("token-bob".into())).await.unwrap();
+    assert_eq!(conn2.online_with_geyser("bob-java").await.unwrap().bedrock_port, None);
+}

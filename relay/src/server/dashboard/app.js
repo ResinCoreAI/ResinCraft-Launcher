@@ -318,7 +318,12 @@ async function live() {
           h(
             'tr',
             {},
-            h('td', {}, h('span', { class: 'mono data' }, t.bedrockPort ? `${t.address}:${t.bedrockPort}` : t.address), t.bedrockPort ? h('div', { class: 'faint' }, 'Bedrock') : null),
+            h(
+              'td',
+              {},
+              h('span', { class: 'mono data' }, t.bedrockPort && t.bedrockOnly ? `${t.address}:${t.bedrockPort}` : t.address),
+              t.bedrockPort ? h('div', { class: 'faint' }, t.bedrockOnly ? 'Bedrock' : `+ Bedrock players on port ${t.bedrockPort}`) : null
+            ),
             h('td', {}, h('div', {}, t.ownerName, t.unlimited ? h('span', { class: 'chip unlimited' }, 'Unlimited') : null), h('div', { class: 'mono faint' }, t.owner)),
             h('td', { title: when(t.since) }, ago(t.since)),
             h('td', { class: 'num' }, h('span', { class: t.secsLeft != null && t.secsLeft <= 600 ? 'warn' : 'data' }, left(t.secsLeft)), t.continues ? h('div', { class: 'faint' }, `continued ×${t.continues}`) : null),

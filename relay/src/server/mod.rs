@@ -82,8 +82,11 @@ pub(crate) struct Tunnel {
     pub since: u64,
     /// Its session time (Continue / Extend move it).
     pub clock: Arc<SessionClock>,
-    /// A Bedrock server: its UDP port on the relay (players reach it there, not through the Java port).
+    /// Its UDP port on the relay for Bedrock players: a Bedrock server's only way in, or a Java server's extra one
+    /// for Geyser.
     pub bedrock_port: Option<u16>,
+    /// A Bedrock server (no Java players at all); false for a Java server, with or without Geyser.
+    pub bedrock_only: bool,
 }
 
 /// One line of the dashboard's events log. Player and launcher IP addresses appear here (and at debug log

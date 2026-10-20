@@ -81,7 +81,7 @@ pub(crate) async fn serve(relay: Arc<Relay>, mut sock: TcpStream, peer: SocketAd
         };
         return answer(&relay, sock, buf, used, &hs, why).await;
     };
-    if let Some(port) = tunnel.bedrock_port {
+    if let Some(port) = tunnel.bedrock_port.filter(|_| tunnel.bedrock_only) {
         return answer(&relay, sock, buf, used, &hs, Why::Bedrock(address, port)).await;
     }
     if relay.over_quota(&tunnel.owner) {

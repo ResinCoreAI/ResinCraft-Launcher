@@ -218,7 +218,8 @@ async fn pick_name(conn: &mut Connection, server_name: &str) -> Result<String, F
 /// What the card shows while the tunnel runs.
 pub enum Status {
     /// Back online after reconnecting (or after the relay was paused).
-    Online { address: String, limits: Limits, usage: Usage, secs_left: Option<u64> },
+    /// Back online. `geyser_address`: where Bedrock players join a Java server with Geyser ("name.domain:port").
+    Online { address: String, geyser_address: Option<String>, limits: Limits, usage: Usage, secs_left: Option<u64> },
     Usage(Usage),
     /// The session is within the time the host may continue in (15 minutes by default): remind them once.
     ContinueSoon { secs_left: u64 },
@@ -249,6 +250,9 @@ pub struct Opened {
     pub secs_left: Option<u64>,
     /// The relay is paused or off right now: (off, admin's message). The task waits for it to come back.
     pub paused: Option<(bool, Option<String>)>,
+    /// A Java server with Geyser: where Bedrock players join through the relay ("name.domain:port"); None when the
+    /// relay has no port for them or doesn't do this yet (then the router or playit.gg carries Geyser).
+    pub geyser_address: Option<String>,
     /// Aborting it closes the tunnel.
     pub task: JoinHandle<()>,
 }
@@ -327,13 +331,23 @@ impl Reminder {
     }
 }
 
-/// Brings the name online on `conn`: a Bedrock server gets a UDP port of its own on the relay.
-async fn go_online(conn: &mut Connection, name: &str, bedrock: bool) -> Result<resincraft_relay::agent::Online, AgentError> {
+/// Brings the name online on `conn`: a Bedrock server gets a UDP port of its own on the relay, and a Java server
+/// with Geyser (`geyser`: Geyser's local port) asks for one for its Bedrock players.
+async fn go_online(conn: &mut Connection, name: &str, bedrock: bool, geyser: Option<u16>) -> Result<resincraft_relay::agent::Online, AgentError> {
     if bedrock {
-        conn.online_bedrock(name).await
-    } else {
-        conn.online(name).await
+        return conn.online_bedrock(name).await;
     }
+    let Some(port) = geyser else { return conn.online(name).await };
+    let online = conn.online_with_geyser(name).await?;
+    if online.bedrock_port.is_some() {
+        conn.set_udp_target(SocketAddr::from(([127, 0, 0, 1], port)));
+    }
+    Ok(online)
+}
+
+/// Where Bedrock players join a Java server's Geyser through the relay.
+fn geyser_address(bedrock: bool, online: &resincraft_relay::agent::Online) -> Option<String> {
+    online.bedrock_port.filter(|_| !bedrock).map(|port| format!("{}:{port}", online.address))
 }
 
 /// How early the host may continue: the relay's own window, or 15 minutes for relays that don't say.
@@ -356,12 +370,14 @@ fn shown_address(address: &str, bedrock_port: Option<u16>) -> String {
 /// Brings the server's name online (choosing one first if it has none) and keeps it online, reconnecting
 /// when the connection drops, until the task is aborted. With `wait_if_paused` (the server is set to ResinCraft
 /// Relay by hand), a paused or switched-off relay isn't an error: the task waits and comes back by itself.
-/// `bedrock`: a Bedrock server (UDP), reached on its own port of the relay.
+/// `bedrock`: a Bedrock server (UDP), reached on its own port of the relay. `geyser`: a Java server's Geyser port,
+/// so Bedrock players get a port on the relay too.
 pub async fn open(
     id: &str,
     local_port: u16,
     wait_if_paused: bool,
     bedrock: bool,
+    geyser: Option<u16>,
     on_status: impl Fn(Status) + Send + Sync + 'static,
 ) -> Result<Opened> {
     let s = settings().ok_or_else(not_configured)?;
@@ -376,7 +392,7 @@ pub async fn open(
         None => pick_name(&mut conn, &meta.name).await.map_err(|f| f.into_error(&wanted))?,
     };
     let address = proto::address(&name, &conn.base_domain);
-    let (online, paused) = match go_online(&mut conn, &name, bedrock).await {
+    let (online, paused) = match go_online(&mut conn, &name, bedrock, geyser).await {
         Ok(on) => (Some(on), None),
         Err(e) => match paused_of(&e).filter(|_| wait_if_paused) {
             Some(p) => {
@@ -474,14 +490,20 @@ pub async fn open(
                 tokio::time::sleep(Duration::from_secs(wait)).await;
                 let attempt = async {
                     let mut c = connect(&s, &account).await?;
-                    let on = go_online(&mut c, &task_name, bedrock).await.map_err(Failure::Relay)?;
+                    let on = go_online(&mut c, &task_name, bedrock, geyser).await.map_err(Failure::Relay)?;
                     Ok::<_, Failure>((c, on))
                 };
                 match attempt.await {
                     Ok((c, on)) => {
                         window = continue_window(&on.limits);
                         reminder.set(on.secs_left);
-                        on_status(Status::Online { address: shown_address(&on.address, on.bedrock_port), limits: on.limits, usage: on.usage, secs_left: on.secs_left });
+                        on_status(Status::Online {
+                            address: shown_address(&on.address, on.bedrock_port.filter(|_| bedrock)),
+                            geyser_address: geyser_address(bedrock, &on),
+                            limits: on.limits,
+                            usage: on.usage,
+                            secs_left: on.secs_left,
+                        });
                         current = Some(c);
                         break;
                     }
@@ -499,9 +521,10 @@ pub async fn open(
             }
         }
     });
-    let address = shown_address(&address, opened_online.as_ref().and_then(|o| o.bedrock_port));
+    let address = shown_address(&address, opened_online.as_ref().and_then(|o| o.bedrock_port).filter(|_| bedrock));
+    let geyser_address = opened_online.as_ref().and_then(|o| geyser_address(bedrock, o));
     let (limits, usage, secs_left) = opened_online.map(|o| (o.limits, o.usage, o.secs_left)).unwrap_or_default();
-    Ok(Opened { name, address, limits, usage, secs_left, paused, task })
+    Ok(Opened { name, address, limits, usage, secs_left, paused, geyser_address, task })
 }
 
 // ---------- The name picker ----------
