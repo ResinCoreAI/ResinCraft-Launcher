@@ -5,6 +5,7 @@ pub mod java;
 pub mod launch;
 pub mod loaders;
 pub mod mojang;
+pub mod optifine;
 
 use anyhow::{bail, Result};
 use serde_json::Value;

@@ -937,6 +937,16 @@ a:hover,
   color: var(--text-dim);
 }
 
+/* OptiFine's download-then-import steps (new instance and instance settings). */
+.optifine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.optifine .step {
+  padding: 10px 14px;
+}
+
 /* A single readout strip, not a row of stat cards. */
 .stats {
   display: flex;

@@ -45,6 +45,7 @@ import NotesTab from '../components/NotesTab'
 import ScreenshotsTab from '../components/ScreenshotsTab'
 import ServersTab from '../components/ServersTab'
 import WorldsTab from '../components/WorldsTab'
+import { OptifineSteps, optifineFits, optifineHow } from '../components/Optifine'
 
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
 const FileManager = lazy(() => import('../components/FileManager'))
@@ -87,6 +88,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
             <span className="chip">
               <Gamepad2 /> {describe(inst)}
               {inst.loaderVersion ? ` ${inst.loaderVersion}` : ''}
+              {inst.optifine ? ' + OptiFine' : ''}
             </span>
             <span className="chip">
               <Timer /> {playtime(inst.playtime)}
@@ -865,6 +867,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
         </div>
       </div>
 
+      <OptifineSection inst={inst} />
+
       <div className="settings-section">
         <h3>{t('instance.settings.dangerZone')}</h3>
         <div className="card">
@@ -882,5 +886,94 @@ function SettingsTab({ inst }: { inst: Instance }) {
 
       {deleting && <DeleteInstance inst={inst} onClose={() => setDeleting(false)} onDeleted={() => go({ page: 'library' })} />}
     </>
+  )
+}
+
+/** Adds OptiFine from a jar the player downloaded themselves, or shows and removes the one already added. */
+function OptifineSection({ inst }: { inst: Instance }) {
+  const { refreshInstances, toast } = useStore()
+  const [busy, setBusy] = useState(false)
+  const [replacing, setReplacing] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const of = inst.optifine
+
+  const add = useCallback(
+    async (path: string) => {
+      setBusy(true)
+      try {
+        await api.optifine.add(inst.id, path)
+        await refreshInstances()
+        setReplacing(false)
+        toast(t('optifine.added', { name: inst.name }))
+      } catch (e) {
+        toast((e as Error).message, 'error')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [inst.id, inst.name, refreshInstances, toast]
+  )
+
+  const remove = async () => {
+    try {
+      await api.optifine.remove(inst.id)
+      await refreshInstances()
+      toast(t('optifine.removed'))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
+  return (
+    <div className="settings-section">
+      <h3>OptiFine</h3>
+      <div className="card">
+        {!optifineFits(inst.loader) ? (
+          <div className="setting">
+            <div className="text">
+              <span>{t('optifine.neoforge')}</span>
+            </div>
+          </div>
+        ) : of && !replacing ? (
+          <div className="setting">
+            <div className="text">
+              <b>{t('optifine.installed', { edition: of.version.replace(/_/g, ' ') })}</b>
+              <span>{optifineHow(inst.loader)}</span>
+            </div>
+            <div className="control row">
+              <button className="btn sm" onClick={() => setReplacing(true)}>
+                <Repeat /> {t('optifine.replace')}
+              </button>
+              <button className="btn sm danger" onClick={() => setRemoving(true)}>
+                <Trash2 /> {t('common.remove')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="setting stack">
+            <div className="text">
+              <span>{t('optifine.settingsHint')}</span>
+            </div>
+            <OptifineSteps mc={inst.mcVersion} loader={inst.loader} busy={busy} onPick={(p) => void add(p)} />
+            {replacing && (
+              <div className="row">
+                <button className="btn sm ghost" onClick={() => setReplacing(false)}>
+                  {t('common.cancel')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {removing && (
+        <ConfirmModal
+          title={t('optifine.removeTitle')}
+          body={t(inst.loader === 'fabric' || inst.loader === 'quilt' ? 'optifine.removeBodyFabric' : 'optifine.removeBody', { name: inst.name })}
+          confirm={t('common.remove')}
+          onConfirm={remove}
+          onClose={() => setRemoving(false)}
+        />
+      )}
+    </div>
   )
 }

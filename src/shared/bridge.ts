@@ -40,6 +40,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       cancel: fn('update:cancel')
     },
     versions: { list: fn('versions:list'), loaders: fn('versions:loaders') },
+    optifine: { browse: fn('optifine:browse'), inspect: fn('optifine:inspect'), add: fn('optifine:add'), remove: fn('optifine:remove') },
     instances: {
       list: fn('instances:list'),
       create: fn('instances:create'),

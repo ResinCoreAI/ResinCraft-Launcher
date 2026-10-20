@@ -55,6 +55,22 @@ export interface Instance {
   group?: string
   /** A data URL of the 16:9 banner (banner.jpg), shown on Library cards and the instance page. */
   bannerUrl?: string
+  /** OptiFine the player downloaded from optifine.net and imported (api.optifine). */
+  optifine?: OptifineRef
+}
+
+/** An imported OptiFine jar: `version` is "<mc>_<edition>" ("1.20.1_HD_U_I6"). */
+export interface OptifineRef {
+  version: string
+  file: string
+}
+
+/** What optifine.inspect found in a jar. */
+export interface OptifineJar {
+  version: string
+  mcVersion: string
+  /** "HD U I6", for display. */
+  edition: string
 }
 
 export type InstanceImage = 'icon' | 'banner'
@@ -859,6 +875,17 @@ export interface ResinApi {
   versions: {
     list(): Promise<McVersion[]>
     loaders(loader: LoaderType, mcVersion: string): Promise<LoaderVersion[]>
+  }
+  /** OptiFine can't be downloaded for the player (its terms forbid mirroring it): they download it, these import it. */
+  optifine: {
+    /** Shows a file picker for the downloaded jar; null when cancelled. */
+    browse(): Promise<string | null>
+    /** Checks a jar is OptiFine (for that Minecraft version, when given) and reads its version. */
+    inspect(path: string, mcVersion?: string): Promise<OptifineJar>
+    /** Imports the jar into an instance: mods/ on Forge, plus OptiFabric on Fabric/Quilt, a launch profile on vanilla. */
+    add(instanceId: string, path: string): Promise<Instance>
+    /** Removes OptiFine (and OptiFabric) from an instance; the files go to the Recycle Bin. */
+    remove(instanceId: string): Promise<void>
   }
   instances: {
     list(): Promise<Instance[]>

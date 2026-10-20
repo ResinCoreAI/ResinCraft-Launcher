@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, Search } from 'lucide-react'
-import type { LoaderType, LoaderVersion, McVersion } from '@shared/types'
+import type { LoaderType, LoaderVersion, McVersion, OptifineJar } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { COLORS, LOADER_LABEL } from '../util'
@@ -8,6 +8,7 @@ import { currentLanguage, t } from '../i18n'
 import { Modal, Segmented, Switch } from './ui'
 import { BannerPicker, IconPicker } from './ImagePicker'
 import { useGroupNames } from '../pages/Library'
+import { OptifineSteps, optifineFits } from './Optifine'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const { settings, refreshInstances, go, toast } = useStore()
@@ -26,6 +27,11 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const [banner, setBanner] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  // OptiFine: the jar the player downloaded from optifine.net, checked against the chosen Minecraft version.
+  const [optifine, setOptifine] = useState(false)
+  const [ofPath, setOfPath] = useState<string>()
+  const [ofJar, setOfJar] = useState<OptifineJar>()
+  const [ofError, setOfError] = useState<string>()
 
   useEffect(() => {
     api.versions
@@ -55,6 +61,22 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
     }
   }, [mc, loader])
 
+  useEffect(() => {
+    setOfJar(undefined)
+    setOfError(undefined)
+    if (!ofPath || !mc) return
+    let live = true
+    api.optifine
+      .inspect(ofPath, mc)
+      .then((jar) => live && setOfJar(jar))
+      .catch((e) => live && setOfError((e as Error).message))
+    return () => {
+      live = false
+    }
+  }, [ofPath, mc])
+  const pickOptifine = useCallback((path: string) => setOfPath(path), [])
+  const withOptifine = optifine && optifineFits(loader)
+
   const shown = useMemo(
     () => (versions ?? []).filter((v) => (snapshots ? true : v.type === 'release') && v.id.toLowerCase().includes(filter.trim().toLowerCase())),
     [versions, snapshots, filter]
@@ -77,10 +99,21 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       } catch (e) {
         toast(t('art.saveFailed', { error: (e as Error).message }), 'error')
       }
+      // OptiFine is added after creating too: if it fails, the instance is still there to retry from Settings.
+      let optifineLater = withOptifine && !ofJar
+      if (withOptifine && ofJar && ofPath) {
+        try {
+          await api.optifine.add(inst.id, ofPath)
+        } catch (e) {
+          optifineLater = true
+          toast(t('optifine.addFailed', { error: (e as Error).message }), 'error')
+        }
+      }
       await refreshInstances()
       toast(t('newInstance.created', { name: inst.name }))
+      if (optifineLater) toast(t('optifine.finishInSettings'), 'info')
       onClose()
-      go({ page: 'instance', id: inst.id })
+      go({ page: 'instance', id: inst.id, tab: optifineLater ? 'settings' : undefined })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -217,6 +250,18 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
           )}
+        </div>
+      )}
+
+      {optifineFits(loader) && (
+        <div className="field">
+          <div className="row">
+            <label className="label grow">OptiFine</label>
+            <Switch on={optifine} onChange={setOptifine} label={t('optifine.add')} />
+          </div>
+          <span className="hint">{t('optifine.newHint')}</span>
+          {optifine && mc && <OptifineSteps mc={mc} loader={loader} jar={ofJar} onPick={pickOptifine} />}
+          {optifine && ofError && <div className="callout danger">{ofError}</div>}
         </div>
       )}
 

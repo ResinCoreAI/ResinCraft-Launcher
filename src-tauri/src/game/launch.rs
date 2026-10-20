@@ -115,7 +115,7 @@ async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Resu
         })
     };
     let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(settings.concurrency), java: Some(picker) };
-    let version = resolve_version(&inst.mc_version, inst.loader, inst.loader_version.as_deref(), &ctx).await?;
+    let mut version = resolve_version(&inst.mc_version, inst.loader, inst.loader_version.as_deref(), &ctx).await?;
 
     let libraries = resolve_libraries(&version);
     let client = client_jar(&version)?;
@@ -165,7 +165,13 @@ async fn prepare(inst: &Instance, settings: &Settings, task: &Arc<Task>) -> Resu
     task.update(tr!("launch.checkingJava", "Checking Java…"), None);
     let java = choose_java(inst, settings, version.java_major(), task).await?;
 
-    let mut classpath: Vec<PathBuf> = libraries.iter().filter(|l| l.classpath).map(|l| l.item.dest.clone()).collect();
+    // OptiFine on vanilla launches through launchwrapper; its jars go first on the classpath.
+    let mut classpath: Vec<PathBuf> = Vec::new();
+    if inst.loader == LoaderType::Vanilla && inst.optifine.is_some() {
+        task.update(tr!("launch.settingUpOptifine", "Setting up OptiFine…"), None);
+        classpath = super::optifine::apply_vanilla(inst, &mut version, &client.dest, &java, settings.concurrency).await?;
+    }
+    classpath.extend(libraries.iter().filter(|l| l.classpath).map(|l| l.item.dest.clone()));
     classpath.push(client.dest.clone());
     Ok(Prepared {
         java,

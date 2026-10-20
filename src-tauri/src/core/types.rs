@@ -151,6 +151,28 @@ pub struct Instance {
     /// A data URL of banner.jpg (16:9), shown on Library cards and the instance page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub banner_url: Option<String>,
+    /// OptiFine the player downloaded and imported (see game/optifine.rs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optifine: Option<OptifineRef>,
+}
+
+/// An imported OptiFine jar: `version` is "<mc>_<edition>" ("1.20.1_HD_U_I6"), `file` the jar's name in mods/
+/// (Forge, Fabric, Quilt) or in the instance's optifine/ folder (vanilla).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OptifineRef {
+    pub version: String,
+    pub file: String,
+}
+
+/// What `optifine:inspect` found in a jar.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OptifineJar {
+    pub version: String,
+    pub mc_version: String,
+    /// "HD U I6", for display.
+    pub edition: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

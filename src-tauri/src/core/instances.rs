@@ -85,6 +85,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         pending_downloads: None,
         group: data.group.map(|g| g.trim().to_string()).filter(|g| !g.is_empty()),
         banner_url: None,
+        optifine: None,
     };
     extra(&mut inst);
     tokio::fs::create_dir_all(paths::game_dir(&id)).await?;
@@ -153,6 +154,7 @@ pub async fn duplicate(id: &str) -> Result<Instance> {
         i.pack_icon_url = s.pack_icon_url;
         i.banner_url = s.banner_url;
         i.modpack = s.modpack;
+        i.optifine = s.optifine;
     })
     .await?;
     // Copy everything except the metadata and per-launch natives (worlds, mods, notes, content index…).

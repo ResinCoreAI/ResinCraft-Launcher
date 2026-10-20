@@ -82,6 +82,10 @@ fn content_files(inst: &Instance) -> Result<(Vec<LocalFile>, u64)> {
             if !lower.ends_with(".jar") && !lower.ends_with(".zip") {
                 continue;
             }
+            // OptiFine's terms forbid redistributing it, so it never goes into a pack.
+            if folder == "mods" && (lower.starts_with("optifine_") || lower.starts_with("preview_optifine_")) {
+                continue;
+            }
             let abs = dir.join(folder).join(&name);
             let data = std::fs::read(&abs)?;
             let sha1 = hash_bytes(&data, HashAlgo::Sha1);

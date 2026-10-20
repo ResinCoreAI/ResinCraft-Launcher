@@ -225,6 +225,21 @@ export function mockApi(): ResinApi {
         ]),
       browse: async () => null
     },
+    optifine: {
+      browse: async () => 'C:\\Users\\you\\Downloads\\OptiFine_1.21.1_HD_U_J1.jar',
+      inspect: async (path, mc) => {
+        const m = /OptiFine_([\d.]+)_(HD\w*?)\.jar$/i.exec(path)
+        if (!m) throw new Error(`${path.split(/[\\/]/).pop()} isn't an OptiFine jar.`)
+        if (mc && m[1] !== mc) throw new Error(`This OptiFine is for Minecraft ${m[1]}, but the instance is Minecraft ${mc}.`)
+        return wait({ version: `${m[1]}_${m[2]}`, mcVersion: m[1], edition: m[2].replace(/_/g, ' ') })
+      },
+      add: async (id, path) => {
+        const version = /OptiFine_([\d.]+_HD\w*?)\.jar$/i.exec(path)?.[1] ?? 'unknown'
+        instances = instances.map((i) => (i.id === id ? { ...i, optifine: { version, file: `OptiFine_${version}.jar` } } : i))
+        return wait(instances.find((i) => i.id === id)!)
+      },
+      remove: async (id) => void (instances = instances.map((i) => (i.id === id ? { ...i, optifine: undefined } : i)))
+    },
     content: {
       search: (q) => {
         const base =

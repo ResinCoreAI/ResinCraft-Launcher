@@ -38,6 +38,7 @@ pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
         (_, "instances:launch" | "instances:kill" | "instances:running") => crate::game::handle(channel, args).await,
         ("app" | "settings" | "instances", _) => crate::app_cmds::handle(channel, args).await,
         ("versions" | "java", _) => crate::game::handle(channel, args).await,
+        ("optifine", _) => crate::game::optifine::handle(channel, args).await,
         ("content", _) => crate::content::handle(channel, args).await,
         ("server", _) => crate::server::handle(channel, args).await,
         ("files", _) => crate::files::handle(channel, args).await,
