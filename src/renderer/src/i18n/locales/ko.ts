@@ -12,6 +12,7 @@ const dict: Dict = {
   'common.add': '추가',
   'common.edit': '편집',
   'common.back': '뒤로',
+  'common.next': '다음',
   'common.done': '완료',
   'common.apply': '적용',
   'common.retry': '다시 시도',

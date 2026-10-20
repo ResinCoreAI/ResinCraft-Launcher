@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Blocks, ChevronLeft, ChevronRight, Combine, FileArchive, FlaskConical, Layers, Leaf, Loader2, Package, Search, Server, Smartphone } from 'lucide-react'
+import { Blocks, Check, ChevronLeft, ChevronRight, Combine, FileArchive, FlaskConical, Layers, Leaf, Loader2, Package, Search, Server, Smartphone } from 'lucide-react'
 import type {
   ContentSource,
   Instance,
@@ -301,6 +301,9 @@ export default function NewServerModal({
               <button className="btn ghost" onClick={onClose}>
                 {t('common.cancel')}
               </button>
+              <button className="btn primary" onClick={() => setStep('details')}>
+                {t('common.next')} <ChevronRight />
+              </button>
             </>
           ) : (
             <>
@@ -347,20 +350,21 @@ export default function NewServerModal({
                   <button
                     key={k}
                     className={`sv-type ${k === kind ? 'on' : ''}`}
+                    aria-pressed={k === kind}
+                    // A click only selects (Next goes on); a double-click goes on at once.
                     onClick={() => {
+                      if (k !== kind) setFilter('')
                       setKind(k)
-                      setFilter('')
                       setError(undefined)
-                      setStep('details')
                     }}
+                    onDoubleClick={() => setStep('details')}
                   >
                     <SoftwareLogo kind={k} icons={icons} />
                     <span className="sv-type-text">
-                      <b>
-                        {pickLabel(k)} <ChevronRight className="sv-type-go" />
-                      </b>
+                      <b>{pickLabel(k)}</b>
                       <span>{t(`servers.type.${k}` as Key)}</span>
                     </span>
+                    {k === kind && <Check className="sv-type-check" aria-hidden />}
                   </button>
                 ))}
               </div>

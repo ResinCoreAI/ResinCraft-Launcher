@@ -196,24 +196,27 @@
   flex: 1;
   pointer-events: none;
 }
-.sv-type .sv-type-go {
-  width: 14px;
-  height: 14px;
-  vertical-align: -2px;
-  opacity: 0;
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+/* The selected software: a check in the corner, on top of the accent border. */
+.sv-type {
+  position: relative;
 }
-.sv-type:hover .sv-type-go,
-.sv-type:focus-visible .sv-type-go {
-  opacity: 0.7;
-  transform: translateX(2px);
+.sv-type-check {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 16px;
+  height: 16px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  stroke-width: 3;
 }
-@media (prefers-reduced-motion: reduce) {
-  .sv-type .sv-type-go {
-    transition: none;
-  }
+.sv-type.on b {
+  color: var(--accent);
+}
+.sv-type.on:has(.sv-type-check) b {
+  padding-right: 18px;
 }
 .sv-types {
   display: grid;
@@ -238,13 +241,14 @@
 .sv-type.on {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .sv-type b {
   font: 600 13.5px var(--font-display);
 }
 .sv-type span {
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--text-dim);
   line-height: 1.35;
 }
 

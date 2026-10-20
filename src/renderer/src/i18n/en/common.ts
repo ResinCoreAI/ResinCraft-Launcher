@@ -9,6 +9,7 @@ export default {
   'common.add': 'Add',
   'common.edit': 'Edit',
   'common.back': 'Back',
+  'common.next': 'Next',
   'common.done': 'Done',
   'common.apply': 'Apply',
   'common.retry': 'Try again',

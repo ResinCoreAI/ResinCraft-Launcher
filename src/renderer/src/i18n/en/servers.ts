@@ -60,7 +60,7 @@ export default {
   'servers.create.groupPlugins': 'Plugins',
   'servers.create.groupMods': 'Mods',
   'servers.create.groupHybrid': 'Mods and plugins',
-  'servers.create.pickHint': 'Pick the server software. Its versions come next.',
+  'servers.create.pickHint': 'Pick the server software, then press Next to choose its version.',
   'servers.create.change': 'Change',
   'servers.create.groupBedrock': 'Bedrock Edition',
   'servers.create.snapshotHint': 'Snapshots are test versions of the next update. A world can break between snapshots, so back it up often.',

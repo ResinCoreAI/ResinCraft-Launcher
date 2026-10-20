@@ -13,6 +13,7 @@ const dict: Dict = {
   'common.add': 'Ajouter',
   'common.edit': 'Modifier',
   'common.back': 'Retour',
+  'common.next': 'Suivant',
   'common.done': 'Terminé',
   'common.apply': 'Appliquer',
   'common.retry': 'Réessayer',

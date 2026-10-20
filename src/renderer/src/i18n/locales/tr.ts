@@ -12,6 +12,7 @@ const dict: Dict = {
   'common.add': 'Ekle',
   'common.edit': 'Düzenle',
   'common.back': 'Geri',
+  'common.next': 'İleri',
   'common.done': 'Tamam',
   'common.apply': 'Uygula',
   'common.retry': 'Tekrar dene',

@@ -12,6 +12,7 @@ const dict: Dict = {
   'common.add': '添加',
   'common.edit': '编辑',
   'common.back': '返回',
+  'common.next': '下一步',
   'common.done': '完成',
   'common.apply': '应用',
   'common.retry': '重试',
