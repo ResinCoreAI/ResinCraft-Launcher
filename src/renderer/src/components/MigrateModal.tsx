@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeftRight, Check, FolderOpen, Loader2, Server, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Check, FolderOpen, Loader2, Server, Trash2, X } from 'lucide-react'
 import type { MigrateItem, MigrateOutcome, MigrateRef, MigrateSource } from '@shared/migrate'
 import { api } from '../api'
 import { BlockArt, Empty, Modal } from './ui'
@@ -35,6 +35,9 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
   const [browsing, setBrowsing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [outcomes, setOutcomes] = useState<MigrateOutcome[]>()
+  /** "Remove the originals after moving" (off until ticked), and its confirm step. */
+  const [removeOriginals, setRemoveOriginals] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   /** Bytes per item, filled in after the list shows (walking big instances takes a while). */
   const [sizes, setSizes] = useState<Map<string, number>>(new Map())
   const asked = useRef(new Set<string>())
@@ -98,6 +101,10 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
   const all = useMemo(() => (sources ?? []).flatMap((s) => s.items), [sources])
   const chosen = all.filter((i) => picked.has(keyOf(i)) && importable(i))
 
+  const labelOf = useMemo(() => new Map((sources ?? []).flatMap((s) => s.items.map((i) => [keyOf(i), s.label] as const))), [sources])
+  const removable = chosen.filter((i) => !i.removeBlocked)
+  const removeFrom = [...new Set(removable.map((i) => labelOf.get(keyOf(i)) ?? ''))]
+
   // Measures new items three at a time.
   useEffect(() => {
     const queue = all.filter((i) => importable(i) && !asked.current.has(keyOf(i)))
@@ -131,10 +138,16 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
     })
 
   const run = async () => {
+    const remove = removeOriginals && removable.length > 0
+    if (remove && !confirming) {
+      setConfirming(true)
+      return
+    }
+    setConfirming(false)
     setBusy(true)
     try {
       const refs: MigrateRef[] = chosen.map(({ launcher, root, path, profile, server }) => ({ launcher, root, path, profile, server }))
-      const out = await api.migrate.import(refs)
+      const out = await api.migrate.import(refs, remove)
       setOutcomes(out)
       const ok = out.filter((o) => o.id).length
       if (ok) toast(t('migrate.done.toast', { count: ok }))
@@ -172,6 +185,16 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
                   {o.server && <span className="chip">{t('migrate.server')}</span>}
                 </div>
                 {o.error && <div className="hint">{tx(o.error)}</div>}
+                {o.removed && (
+                  <div className="mg-sub">
+                    <Trash2 /> {t('migrate.remove.removed')}
+                  </div>
+                )}
+                {o.kept && (
+                  <div className="mg-sub warn">
+                    <AlertTriangle /> {t('migrate.remove.kept', { reason: tx(o.kept) })}
+                  </div>
+                )}
                 {o.skipped.length > 0 && (
                   <details className="mg-skipped">
                     <summary>{t('migrate.done.skipped', { count: o.skipped.length })}</summary>
@@ -199,6 +222,51 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
             </li>
           ))}
         </ul>
+      </Modal>
+    )
+  }
+
+  if (confirming) {
+    const staying = chosen.filter((i) => i.removeBlocked)
+    return (
+      <Modal
+        title={t('migrate.remove.confirmTitle')}
+        onClose={() => setConfirming(false)}
+        wide
+        footer={
+          <>
+            <button className="btn ghost" onClick={() => setConfirming(false)}>
+              {t('common.back')}
+            </button>
+            <button className="btn primary" onClick={() => void run()}>
+              <Trash2 /> {t('migrate.remove.confirm')}
+            </button>
+          </>
+        }
+      >
+        <p className="hint">{t('migrate.remove.confirmBody', { count: removable.length })}</p>
+        <ul className="mg-confirm">
+          {removable.map((i) => (
+            <li key={keyOf(i)}>
+              <b>{i.name}</b> <span className="hint">{labelOf.get(keyOf(i))}</span>
+              <div className="mono hint ellipsis" title={i.path}>
+                {i.path}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {staying.length > 0 && (
+          <>
+            <p className="hint">{t('migrate.remove.confirmKept')}</p>
+            <ul className="mg-confirm">
+              {staying.map((i) => (
+                <li key={keyOf(i)}>
+                  <b>{i.name}</b> <span className="hint">{tx(i.removeBlocked)}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </Modal>
     )
   }
@@ -277,6 +345,9 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
                         {i.server && <span className="chip">{t('migrate.server')}</span>}
                         {i.imported && <span className="chip success">{t('migrate.imported')}</span>}
                       </div>
+                      {removeOriginals && i.removeBlocked && picked.has(keyOf(i)) && !i.problem && (
+                        <div className="mg-sub">{t('migrate.remove.stays', { reason: tx(i.removeBlocked) })}</div>
+                      )}
                       {i.problem ? (
                         <div className="mg-sub warn">
                           <AlertTriangle /> {tx(i.problem)}
@@ -302,6 +373,20 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
               </section>
             )
           })}
+          {!servers && (
+            <label className={`mg-remove ${removeOriginals ? 'on' : ''}`}>
+              <input
+                type="checkbox"
+                checked={removeOriginals}
+                disabled={busy || removable.length === 0}
+                onChange={(e) => setRemoveOriginals(e.target.checked)}
+              />
+              <span className="grow">
+                {removeFrom.length ? t('migrate.remove.label', { launchers: removeFrom.join(', ') }) : t('migrate.remove.labelGeneric')}
+                <span className="hint">{t('migrate.remove.hint')}</span>
+              </span>
+            </label>
+          )}
           <p className="hint">{t('migrate.tip')}</p>
         </div>
       )}

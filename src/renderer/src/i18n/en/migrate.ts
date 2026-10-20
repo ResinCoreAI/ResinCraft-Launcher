@@ -30,5 +30,18 @@ export default {
   'migrate.tip': 'Close the other launcher first, so nothing is in use while it copies.',
   'migrate.done.title': 'Moved to ResinCraft',
   'migrate.done.toast': { one: 'Moved {count} item to ResinCraft', other: 'Moved {count} items to ResinCraft' },
-  'migrate.done.skipped': { one: "{count} file couldn't be read and was left behind", other: "{count} files couldn't be read and were left behind" }
+  'migrate.done.skipped': { one: "{count} file couldn't be read and was left behind", other: "{count} files couldn't be read and were left behind" },
+  'migrate.remove.label': 'Remove the originals from {launchers} after moving',
+  'migrate.remove.labelGeneric': 'Remove the originals from their launchers after moving',
+  'migrate.remove.hint': 'Each one goes to the Recycle Bin, and only after its copy finished with nothing left behind.',
+  'migrate.remove.stays': 'The original stays: {reason}',
+  'migrate.remove.confirmTitle': 'Remove the originals?',
+  'migrate.remove.confirmBody': {
+    one: 'After a clean copy, this instance goes to the Recycle Bin and disappears from its launcher. You can restore it from the Recycle Bin.',
+    other: 'After a clean copy, these {count} instances go to the Recycle Bin and disappear from their launchers. You can restore them from the Recycle Bin.'
+  },
+  'migrate.remove.confirmKept': 'These stay where they are:',
+  'migrate.remove.confirm': 'Move and remove the originals',
+  'migrate.remove.removed': 'Original moved to the Recycle Bin',
+  'migrate.remove.kept': 'Kept the original. {reason}'
 }

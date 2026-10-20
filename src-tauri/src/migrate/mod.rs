@@ -6,6 +6,7 @@
 
 pub mod copy;
 pub mod formats;
+pub mod remove;
 pub mod server_dir;
 
 use std::collections::{BTreeMap, HashSet};
@@ -46,7 +47,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(scan_folder(dir).await?)
         }
         "migrate:size" => json(size_of(args.get::<ItemRef>(0)?).await?),
-        "migrate:import" => json(import(args.get::<Vec<ItemRef>>(0)?).await?),
+        "migrate:import" => json(import(args.get::<Vec<ItemRef>>(0)?, args.get::<Option<bool>>(1)?.unwrap_or(false)).await?),
         _ => anyhow::bail!("Unknown request: {channel}"),
     }
 }
@@ -84,6 +85,9 @@ pub struct Item {
     pub problem: Option<Text>,
     /// Imported before (and that instance or server still exists).
     pub imported: bool,
+    /// Why "Remove the originals" can't take this one out of its launcher (absent when it can).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remove_blocked: Option<Text>,
 }
 
 /// Which item to import; the engine reads it again from disk rather than trusting the list.
@@ -117,6 +121,17 @@ pub struct Outcome {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<Text>,
     pub skipped: Vec<Skipped>,
+    /// The original was moved to the Recycle Bin.
+    pub removed: bool,
+    /// Why the original was kept, when removing was asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kept: Option<Text>,
+}
+
+impl Outcome {
+    fn failed(name: String, server: bool, error: Text) -> Outcome {
+        Outcome { name, server, id: None, error: Some(error), skipped: Vec::new(), removed: false, kept: None }
+    }
 }
 
 // ---------- Where launchers keep their data ----------
@@ -344,6 +359,7 @@ fn to_item(f: &Found, root: &Path, imported: &BTreeMap<String, String>) -> Item 
         icon_url: icon_preview(&f.icon),
         problem: f.problem.clone(),
         imported,
+        remove_blocked: remove::plan_for(f).err(),
         r,
     }
 }
@@ -421,7 +437,9 @@ pub async fn scan_folder(dir: PathBuf) -> Result<Source> {
 
 /// Imports the chosen items one after another as one cancellable task. An item that fails is reported and the
 /// rest still run; Cancel keeps the finished ones and removes the half-copied one.
-pub async fn import(refs: Vec<ItemRef>) -> Result<Vec<Outcome>> {
+/// With `remove_originals`, each instance whose launcher allows it is then taken out of that launcher (Recycle Bin),
+/// but only after a clean copy (see remove.rs).
+pub async fn import(refs: Vec<ItemRef>, remove_originals: bool) -> Result<Vec<Outcome>> {
     let total = refs.len().max(1);
     Task::run(tr!("migrate.task", "Moving from other launchers"), None, move |task| async move {
         let mut out = Vec::new();
@@ -429,21 +447,16 @@ pub async fn import(refs: Vec<ItemRef>) -> Result<Vec<Outcome>> {
             let r2 = r.clone();
             let found = tokio::task::spawn_blocking(move || reread(&r2)).await?;
             let Some(f) = found else {
-                out.push(Outcome {
-                    name: file_name(&r.path),
-                    server: r.server,
-                    id: None,
-                    error: Some(tr!("migrate.gone", "It's no longer there")),
-                    skipped: Vec::new(),
-                });
+                out.push(Outcome::failed(file_name(&r.path), r.server, tr!("migrate.gone", "It's no longer there")));
                 continue;
             };
             let name = f.name.clone();
             let server = f.server;
             if let Some(problem) = f.problem.clone() {
-                out.push(Outcome { name, server, id: None, error: Some(problem), skipped: Vec::new() });
+                out.push(Outcome::failed(name, server, problem));
                 continue;
             }
+            let original = remove_originals.then(|| (f.clone(), remove::plan_for(&f)));
             let progress = |p: f64| (i as f64 + p.clamp(0.0, 1.0)) / total as f64;
             let result = if server { import_server(f, &task, &progress).await } else { import_instance(f, &task, &progress).await };
             match result {
@@ -451,12 +464,29 @@ pub async fn import(refs: Vec<ItemRef>) -> Result<Vec<Outcome>> {
                     let mut record = imported_ids().await;
                     record.insert(r.key(), id.clone());
                     let _ = write_json(&record_file(), &record).await;
-                    out.push(Outcome { name, server, id: Some(id), error: None, skipped });
+                    let (mut removed, mut kept) = (false, None);
+                    if let Some((original, plan)) = original {
+                        task.update(tr!("migrate.removing", "Removing the original {name}…", name = name.clone()), Some(progress(1.0)));
+                        let copied = remove::after_copy(&skipped, still_exists(&id, server));
+                        let result = match (plan, copied) {
+                            (Err(why), _) | (_, Err(why)) => Err(why),
+                            (Ok(plan), Ok(())) => tokio::task::spawn_blocking(move || {
+                                remove::remove(&original, &plan, remove::launcher_running, |p| trash::delete(p).map_err(|e| anyhow::anyhow!(e.to_string())))
+                            })
+                            .await
+                            .unwrap_or_else(|e| Err(Text::plain(e.to_string()))),
+                        };
+                        match result {
+                            Ok(()) => removed = true,
+                            Err(why) => kept = Some(why),
+                        }
+                    }
+                    out.push(Outcome { name, server, id: Some(id), error: None, skipped, removed, kept });
                 }
                 Err(e) if is_cancelled(&e) => return Err(e),
                 Err(e) => {
                     let error = text_of(&e).cloned().unwrap_or_else(|| Text::plain(e.to_string()));
-                    out.push(Outcome { name, server, id: None, error: Some(error), skipped: Vec::new() });
+                    out.push(Outcome::failed(name, server, error));
                 }
             }
         }

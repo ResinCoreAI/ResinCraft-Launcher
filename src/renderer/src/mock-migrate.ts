@@ -11,16 +11,20 @@ const text = (key: string, english: string, params?: Record<string, unknown>): E
 /** The engine sends sizes separately (api.migrate.size); the mock keeps them on the item. */
 type MockItem = MigrateItem & { size: number }
 
-const item = (p: Partial<MockItem> & Pick<MigrateItem, 'launcher' | 'root' | 'name'>): MockItem => ({
-  path: `${p.root}/instances/${p.name}`,
-  server: false,
-  loader: 'vanilla',
-  size: 0,
-  mods: 0,
-  worlds: 0,
-  imported: false,
-  ...p
-})
+/** Why "Remove the originals" leaves an item alone, as the engine says it (migrate/remove.rs). */
+function blocked(i: MockItem): EngineText | undefined {
+  if (i.server) return text('migrate.remove.serverKept', 'Server folders stay; delete the old one yourself once the copy works')
+  if (i.launcher === 'modrinth')
+    return text('migrate.remove.database', 'Modrinth App keeps its instances in a database, so remove it there', { launcher: 'Modrinth App' })
+  if (i.launcher === 'official') return text('migrate.remove.shared', "The Minecraft Launcher's folder is shared by all its profiles, so it's never removed")
+  if (i.launcher === 'folder') return text('migrate.remove.folder', 'Folders picked by hand stay where they are')
+  return undefined
+}
+
+const item = (p: Partial<MockItem> & Pick<MigrateItem, 'launcher' | 'root' | 'name'>): MockItem => {
+  const it: MockItem = { path: `${p.root}/instances/${p.name}`, server: false, loader: 'vanilla', size: 0, mods: 0, worlds: 0, imported: false, ...p }
+  return { ...it, removeBlocked: blocked(it) }
+}
 
 const PRISM = 'C:/Users/you/AppData/Roaming/PrismLauncher'
 const CF = 'C:/Users/you/curseforge/minecraft'
@@ -163,7 +167,7 @@ export function mockMigrate(add: (inst: Instance) => void): { migrate: ResinApi[
         if (picks++ % 2) throw engineError({ message: "There's no instance, launcher data or server in that folder", key: 'migrate.nothingFound' })
         return SERVER
       },
-      import: async (refs) => {
+      import: async (refs, removeOriginals) => {
         const title = text('migrate.task', 'Moving from other launchers')
         const task: TaskInfo = { id: `mg-${Date.now()}`, title: title.text, titleText: title, state: 'running', cancellable: true }
         const emit = (patch: Partial<TaskInfo>) => mockEngine.emitTask({ ...task, ...patch })
@@ -197,7 +201,18 @@ export function mockMigrate(add: (inst: Instance) => void): { migrate: ResinApi[
           }
           const skipped =
             n === 0 ? [{ path: 'saves/New World/session.lock', reason: text('migrate.denied', 'Access was denied (another program may be using it)') }] : []
-          out.push({ name, server: r.server, id, skipped })
+          // Removing: kept when blocked, after skipped files, or (for CurseForge) because the app is open.
+          let kept: EngineText | undefined
+          if (removeOriginals) {
+            kept =
+              it?.removeBlocked ??
+              (skipped.length
+                ? text('migrate.remove.skippedFiles', "Some of its files couldn't be copied")
+                : r.launcher === 'curseforge'
+                  ? text('migrate.remove.running', 'Close CurseForge and try again', { launcher: 'CurseForge' })
+                  : undefined)
+          }
+          out.push({ name, server: r.server, id, skipped, removed: !!removeOriginals && !kept, kept })
         }
         emit({ state: 'done', progress: 1 })
         return out
