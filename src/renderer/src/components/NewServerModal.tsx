@@ -173,6 +173,8 @@ export default function NewServerModal({
   }, [kind])
 
   const loader = LOADER_OF[serverKind]
+  // Forge for Minecraft 1.6 and older isn't supported (its files are gone).
+  const ancientForge = !!mc && /^1\.[0-6](\.|$)/.test(mc)
   useEffect(() => {
     setBuilds(undefined)
     setBuild(undefined)
@@ -451,7 +453,11 @@ export default function NewServerModal({
             <div className="field">
               <label htmlFor="srv-loader">{t('servers.create.loaderVersion', { loader: SERVER_LABEL[serverKind] })}</label>
               {loaderVersions?.length === 0 ? (
-                <div className="callout danger">{t('servers.create.loaderUnavailable', { loader: SERVER_LABEL[serverKind], version: mc ?? '' })}</div>
+                <div className="callout danger">
+                  {serverKind === 'forge' && ancientForge
+                    ? t('servers.create.ancientForge')
+                    : t('servers.create.loaderUnavailable', { loader: SERVER_LABEL[serverKind], version: mc ?? '' })}
+                </div>
               ) : (
                 <select
                   id="srv-loader"

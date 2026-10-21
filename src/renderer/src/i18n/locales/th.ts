@@ -1110,6 +1110,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': 'การติดตั้ง {name} สร้างไฟล์ที่ไม่คาดคิด ลองอีกครั้ง หรือเลือกเวอร์ชันอื่น',
   'engine.forge.unknownValue': 'ตัวติดตั้ง {name} อ้างถึงค่าที่ไม่รู้จัก {value}',
   'engine.forge.unpacking': 'กำลังแตกไฟล์ {name}…',
+  'engine.forge.serverLibMissing': "ดาวน์โหลด {file} ที่เซิร์ฟเวอร์ Forge นี้ต้องใช้ไม่ได้",
   'engine.files.badName': 'ใช้ "{name}" เป็นชื่อไม่ได้',
   'engine.files.changedOnDisk': '{name} ถูกโปรแกรมอื่นแก้ไขหลังจากคุณเปิด',
   'engine.files.exists': 'มีรายการชื่อ {name} อยู่ที่นี่แล้ว',
@@ -1454,6 +1455,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "ข้อมูล ResinCraft Relay ของ {server} หมดแล้ว เพื่อนจะเข้าร่วมไม่ได้จนกว่าคุณจะรับเพิ่ม",
   'servers.domain.useResin': 'ใช้ ResinCraft Relay',
   'servers.domain.recordsResin': 'สร้างเรคคอร์ดนี้ที่ผู้ให้บริการ DNS ของคุณ เรคคอร์ดนี้ชี้ไปยังที่อยู่ ResinCraft ของคุณ บน Cloudflare ให้ตั้งเป็น "DNS only" (เมฆสีเทา)',
+  'servers.create.ancientForge': "เซิร์ฟเวอร์ Forge ใช้ได้กับ Minecraft 1.7.10 ขึ้นไป เลือกเวอร์ชันที่ใหม่กว่าหรือซอฟต์แวร์เซิร์ฟเวอร์ประเภทอื่น",
   'servers.domain.resinSrv': 'สำหรับโดเมนที่ไม่มีซับโดเมน (เช่น example.com) ให้สร้างเรคคอร์ด SRV นี้แทน:',
 
   // ResinCraft Relay (engine messages)

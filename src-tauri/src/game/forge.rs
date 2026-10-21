@@ -319,7 +319,7 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
 const LEGACY_MAVENS: [&str; 3] = ["https://maven.minecraftforge.net/", "https://libraries.minecraft.net/", "https://repo1.maven.org/maven2/"];
 
 /// Maven bases worth trying for one library: its own (moved hosts rewritten), then the usual ones.
-fn legacy_lib_bases(url: Option<&str>) -> Vec<String> {
+pub(crate) fn legacy_lib_bases(url: Option<&str>) -> Vec<String> {
     let own = match url.map(str::trim).filter(|u| !u.is_empty()) {
         Some(u) => {
             let mut u = u.replace("http://", "https://");

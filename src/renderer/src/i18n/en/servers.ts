@@ -78,6 +78,7 @@ export default {
   'servers.create.noVersions': 'No versions found.',
   'servers.create.loaderVersion': '{loader} version',
   'servers.create.loaderUnavailable': "{loader} isn't available for Minecraft {version}.",
+  'servers.create.ancientForge': 'Forge servers run Minecraft 1.7.10 and newer. Pick a newer version or another server type.',
   'servers.create.unstable': 'beta',
   'servers.create.searchPacks': 'Search modpacks',
   'servers.create.noPacks': 'No modpacks found.',

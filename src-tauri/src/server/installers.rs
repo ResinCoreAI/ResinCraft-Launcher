@@ -1,25 +1,29 @@
 //! Installing server software into a server folder: the official vanilla server.jar, Paper / Purpur / Folia /
 //! Leaf from their download APIs, Fabric's server launcher, Quilt's installer, the Forge / NeoForge installers
-//! (`--installServer`), the Arclight hybrid (one jar; it fetches its libraries on first start) and Bedrock
-//! Dedicated Server. Each fills in `ServerMeta::launch` (how to start it) and the loader/build version.
+//! (`--installServer`; Forge 1.7.10–1.12.2 is laid out from its installer instead), the Arclight hybrid (one
+//! jar; it fetches its libraries on first start) and Bedrock Dedicated Server. Each fills in
+//! `ServerMeta::launch` (how to start it) and the loader/build version.
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Result};
+use futures::StreamExt;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::content::index::natural_cmp;
 use crate::core::events::Task;
-use crate::core::net::{download_all, fetch_json, fetch_text, status_of, DownloadItem, Hash};
+use crate::core::net::{download_all, download_file, fetch_json, fetch_text, status_of, DownloadItem, Hash};
 use crate::core::types::{LoaderType, ServerBuild, ServerKind, ServerLaunch, ServerMeta};
 use crate::core::{paths, settings};
 use crate::game::java::{find_java, hidden_command, install_java};
-use crate::game::loaders::{installer_url, is_legacy_forge, latest_loader, legacy_forge_error, normalize_loader_version};
-use crate::game::mojang::{get_vanilla_version, plain};
+use crate::game::forge::legacy_lib_bases;
+use crate::game::loaders::{full_forge_version, installer_url, is_ancient_forge, is_legacy_forge, latest_loader, legacy_forge_error, normalize_loader_version};
+use crate::game::mojang::{get_vanilla_version, maven_path, plain};
+use crate::{err_tr, tr};
 
 const FILL: &str = "https://fill.papermc.io/v3/projects";
 const PURPUR: &str = "https://api.purpurmc.org/v2/purpur";
@@ -580,9 +584,12 @@ async fn quilt(mc: &str, loader: &str, dir: &Path, java: &str, task: &Arc<Task>)
 /// Runs the Forge / NeoForge installer with `--installServer` and works out how to start the result:
 /// the @argument file of modern versions (1.17+), or the forge jar of older ones.
 async fn forge_like(loader: LoaderType, mc: &str, ver: &str, dir: &Path, java: &str, task: &Arc<Task>) -> Result<ServerLaunch> {
-    if loader == LoaderType::Forge && is_legacy_forge(mc) {
+    let legacy = loader == LoaderType::Forge && is_legacy_forge(mc);
+    if legacy && is_ancient_forge(mc) {
         return Err(legacy_forge_error(mc));
     }
+    // Old builds are published with a branch suffix ("10.13.4.1614-1.7.10").
+    let ver = &if legacy { full_forge_version(mc, ver).await } else { ver.to_string() };
     let name = format!("{} {ver}", loader.label());
     task.update(format!("Downloading the {name} installer…"), None);
     let installer = paths::cache().join("server-installers").join(format!("{}-{mc}-{ver}-installer.jar", loader.as_str()));
@@ -591,6 +598,11 @@ async fn forge_like(loader: LoaderType, mc: &str, ver: &str, dir: &Path, java: &
             bail!("{name} for Minecraft {mc} couldn't be found");
         }
         return Err(e);
+    }
+    if legacy {
+        if let Some(launch) = legacy_forge(mc, &name, &installer, dir, task).await? {
+            return Ok(launch);
+        }
     }
     let args = vec!["-jar".to_string(), plain(&installer), "--installServer".into(), plain(dir)];
     run_installer(java, &args, dir, task, &name).await?;
@@ -625,6 +637,121 @@ async fn forge_like(loader: LoaderType, mc: &str, ver: &str, dir: &Path, java: &
         Some(j) => Ok(jar(&j)),
         None => bail!("The {name} installer finished, but ResinCraft couldn't find how to start the server"),
     }
+}
+
+/// Forge for Minecraft 1.7.10–1.12.2. Its installer's `--installServer` downloads from hosts that are gone (or
+/// too slow to finish), so this does the same job: the universal jar from the installer, the libraries its
+/// manifest's Class-Path lists (the launcher's own copies, else the moved Maven hosts) and the vanilla server jar.
+/// The universal jar starts the server itself (FML's ServerLaunchWrapper: launchwrapper with the FML server
+/// tweaker). Both installer formats are handled: install + versionInfo (up to 1.12.2's 14.23.5.2847) and the
+/// processor-less modern one of the last 1.12.2 builds. None for anything else, which runs the installer.
+async fn legacy_forge(mc: &str, name: &str, installer: &Path, dir: &Path, task: &Arc<Task>) -> Result<Option<ServerLaunch>> {
+    task.update(tr!("forge.unpacking", "Unpacking {name}…", name = name), None);
+    let found = {
+        let (installer, dir, name) = (installer.to_path_buf(), dir.to_path_buf(), name.to_string());
+        tokio::task::spawn_blocking(move || -> Result<Option<(String, Vec<String>, HashMap<String, String>)>> {
+            let missing = |file: &str| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = file);
+            let mut zip = crate::content::index::open_zip(&installer)?;
+            let text = crate::content::index::read_zip_text(&mut zip, "install_profile.json")?.ok_or_else(|| missing("install_profile.json"))?;
+            let profile: Value = serde_json::from_str(&text)?;
+            let libraries = |v: &Value| v.get("libraries").and_then(Value::as_array).cloned().unwrap_or_default();
+            // The universal jar inside the installer, and each library's own Maven host by its path in the
+            // libraries folder.
+            let (entry, libs, base_of): (String, Vec<Value>, fn(&Value, &str) -> String) = match profile.get("install") {
+                Some(install) => {
+                    let file = install.get("filePath").and_then(Value::as_str).filter(|f| !f.is_empty()).ok_or_else(|| missing("install.filePath"))?;
+                    let libs = profile.get("versionInfo").map(libraries).unwrap_or_default();
+                    (file.to_string(), libs, |l, _| l.get("url").and_then(Value::as_str).unwrap_or_default().to_string())
+                }
+                None => {
+                    let has_processors = profile.get("processors").and_then(Value::as_array).is_some_and(|p| !p.is_empty());
+                    let (Some(path), Some(json)) = (profile.get("path").and_then(Value::as_str), profile.get("json").and_then(Value::as_str)) else { return Ok(None) };
+                    if has_processors {
+                        return Ok(None);
+                    }
+                    let version = crate::content::index::read_zip_text(&mut zip, json.trim_start_matches('/'))?.ok_or_else(|| missing(json))?;
+                    let libs = libraries(&serde_json::from_str(&version)?);
+                    let base = |l: &Value, rel: &str| {
+                        let url = l.pointer("/downloads/artifact/url").and_then(Value::as_str).unwrap_or_default();
+                        url.strip_suffix(rel).unwrap_or_default().to_string()
+                    };
+                    (format!("maven/{}", maven_path(path)), libs, base)
+                }
+            };
+            let urls = libs
+                .iter()
+                .filter_map(|l| {
+                    let rel = maven_path(l.get("name")?.as_str()?);
+                    let base = base_of(l, &rel);
+                    Some((rel, base))
+                })
+                .collect();
+            let jar_name = crate::content::index::safe_name(entry.rsplit('/').next().unwrap_or(&entry))?.to_string();
+            let mut bytes = Vec::new();
+            std::io::Read::read_to_end(&mut zip.by_name(&entry).map_err(|_| missing(&entry))?, &mut bytes)?;
+            let mut universal = zip::ZipArchive::new(std::io::Cursor::new(&bytes))?;
+            let manifest = crate::content::index::read_zip_text(&mut universal, "META-INF/MANIFEST.MF")?.unwrap_or_default();
+            // Manifest lines wrap at 72 bytes; continuation lines start with a space.
+            let unfolded = manifest.replace("\r\n ", "").replace("\n ", "");
+            let class_path: Vec<String> =
+                unfolded.lines().find_map(|l| l.strip_prefix("Class-Path:")).map(|c| c.split_whitespace().map(str::to_string).collect()).unwrap_or_default();
+            if class_path.is_empty() {
+                return Err(missing("Class-Path"));
+            }
+            std::fs::write(dir.join(&jar_name), &bytes)?;
+            Ok(Some((jar_name, class_path, urls)))
+        })
+        .await??
+    };
+    let Some((jar_name, class_path, urls)) = found else { return Ok(None) };
+
+    let server_jar = format!("minecraft_server.{mc}.jar");
+    vanilla_jar(mc, &dir.join(&server_jar), task).await?;
+
+    let libs: Vec<String> = class_path.into_iter().filter_map(|c| c.strip_prefix("libraries/").map(str::to_string)).collect();
+    let total = libs.len();
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    let progress = task.counter(tr!("forge.downloadingLibraries", "Downloading {name} libraries", name = name));
+    let results = futures::stream::iter(libs.into_iter().map(|rel| {
+        let (done, progress, urls) = (&done, &progress, &urls);
+        async move {
+            let r = legacy_forge_lib(&rel, urls.get(&rel).map(String::as_str), dir).await;
+            progress(done.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1, total);
+            r
+        }
+    }))
+    .buffer_unordered(8)
+    .collect::<Vec<_>>()
+    .await;
+    results.into_iter().collect::<Result<Vec<()>>>()?;
+    Ok(Some(jar(&jar_name)))
+}
+
+/// One library for an old Forge server: already there, copied from the launcher's libraries, or downloaded from
+/// the first host that still has it.
+async fn legacy_forge_lib(rel: &str, url: Option<&str>, dir: &Path) -> Result<()> {
+    let dest = crate::core::fsutil::safe_join(&dir.join("libraries"), rel)?;
+    if dest.is_file() {
+        return Ok(());
+    }
+    let shared = crate::core::fsutil::safe_join(&paths::libraries(), rel)?;
+    if shared.is_file() {
+        if let Some(parent) = dest.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        if tokio::fs::copy(&shared, &dest).await.is_ok() {
+            return Ok(());
+        }
+    }
+    let mut last = None;
+    for base in legacy_lib_bases(url) {
+        match download_file(&DownloadItem::new(format!("{base}{rel}"), &dest)).await {
+            Ok(()) => return Ok(()),
+            Err(e) => last = Some(e),
+        }
+    }
+    let file = rel.rsplit('/').next().unwrap_or(rel);
+    Err(last.unwrap_or_else(|| anyhow!("{file}")).context(err_tr!("forge.serverLibMissing", "Couldn't download {file}, which this Forge server needs", file = file)))
 }
 
 fn find_files(dir: &Path, name: &str, depth: u32, out: &mut Vec<PathBuf>) {

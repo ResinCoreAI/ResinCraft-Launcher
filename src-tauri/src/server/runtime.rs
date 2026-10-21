@@ -15,7 +15,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::core::events::{emit, Task};
 use crate::core::text::{text_of, Text};
-use crate::core::types::{LogLine, ResinNet, ServerEvent, ServerLogEvent, ServerMeta, ServerNet, TunnelMode};
+use crate::core::types::{LogLine, ResinNet, ServerEvent, ServerKind, ServerLogEvent, ServerMeta, ServerNet, TunnelMode};
 use crate::game::java::hidden_command;
 use crate::game::launch::{split_args, LogParser};
 use crate::player::files::unique_name;
@@ -316,8 +316,10 @@ pub async fn start(id: &str) -> Result<()> {
     // Plugin/mod changes queued while the server last ran (normally applied when it stopped).
     let applied = super::plugins::apply_pending(id).await.unwrap_or_default();
 
-    // Only Paperclip and Spigot need it; other loaders resolve real paths and break across drives.
-    let run_dir = if meta.kind.plugins() {
+    // Only Paperclip, Spigot and Forge 1.7.10–1.12.2 need it (old log4j cuts jar URLs at the first '!' and then
+    // scans the whole drive); other loaders resolve real paths and break across drives.
+    let legacy_forge = meta.kind == ServerKind::Forge && crate::game::loaders::is_legacy_mc(&meta.mc_version);
+    let run_dir = if meta.kind.plugins() || legacy_forge {
         launch_dir(id, &dir).await
     } else {
         dir.clone()
