@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Archive, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, RefreshCw, Search, Skull, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Archive, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, Play, RefreshCw, Search, Skull, Trash2, Upload } from 'lucide-react'
 import type { GameMode, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -15,8 +15,15 @@ const MODE_LABEL: Record<GameMode, Key> = {
   spectator: 'worlds.mode.spectator'
 }
 
+/** Minecraft 1.20+ (and the year-numbered releases, 26.1 on) can open a world from outside the game. Snapshots: try. */
+function hasQuickPlay(mc: string): boolean {
+  const m = /^(\d+)\.(\d+)/.exec(mc)
+  if (!m) return true
+  return Number(m[1]) > 1 || Number(m[2]) >= 20
+}
+
 export default function WorldsTab({ inst }: { inst: Instance }) {
-  const { toast, games, info } = useStore()
+  const { toast, games, info, playWorld } = useStore()
   const copy = useCopy()
   const [worlds, setWorlds] = useState<WorldInfo[]>()
   const [q, setQ] = useState('')
@@ -25,6 +32,10 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
   const [backingUp, setBackingUp] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
   const running = games[inst.id] === 'running' || games[inst.id] === 'preparing'
+  // Opening a world from outside the game is Minecraft's quick play, which came in 1.20 (snapshots: try and see).
+  const quickPlay = hasQuickPlay(inst.mcVersion)
+  const playTitle = (w: WorldInfo) =>
+    w.error ? tx(w.errorText, w.error) : running ? t('worlds.play.running') : quickPlay ? t('worlds.play.hint', { name: w.name }) : t('worlds.play.tooOld', { version: inst.mcVersion })
 
   const load = useCallback(async () => {
     try {
@@ -56,6 +67,8 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
 
   // The same actions as the row's buttons, plus a few more; the "…" button shows this menu too.
   const menuFor = (w: WorldInfo): ContextEntry[] => [
+    { label: t('worlds.play'), icon: <Play />, disabled: !quickPlay || running || !!w.error, onSelect: () => void playWorld(inst.id, w.folder) },
+    '-',
     { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.worlds.openFolder(inst.id, w.folder).catch((e) => toast(e.message, 'error')) },
     { label: t('worlds.backup'), icon: <Archive />, disabled: backingUp.includes(w.folder), onSelect: () => void backup(w) },
     { label: t('menu.rename'), icon: <Pencil />, disabled: !!w.error || running, onSelect: () => setRenaming(w) },
@@ -174,6 +187,9 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
                 </div>
               </div>
               <div className="it-actions">
+                <button className="btn primary sm" disabled={!quickPlay || running || !!w.error} title={playTitle(w)} onClick={() => void playWorld(inst.id, w.folder)}>
+                  <Play /> {t('worlds.play')}
+                </button>
                 <button className="btn sm" disabled={backingUp.includes(w.folder)} title={t('worlds.backup.hint')} onClick={() => void backup(w)}>
                   {backingUp.includes(w.folder) ? <Loader2 className="spin" /> : <Archive />} {t('worlds.backup')}
                 </button>

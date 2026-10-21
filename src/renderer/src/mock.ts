@@ -459,7 +459,7 @@ export function mockApi(): ResinApi {
       const keep = (i: Instance) => (i.iconUrl?.startsWith('data:') ? i.packIconUrl : i.iconUrl)
       instances = instances.map((i) => (i.id === id ? { ...i, iconUrl, packIconUrl: keep(i) } : i))
       return instances.find((i) => i.id === id)!
-    }),
+    }, runs.launch),
     ...mockQuickJoin(runs.launch),
     server: servers.server,
     bedrock: {

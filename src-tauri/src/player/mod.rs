@@ -83,6 +83,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             worlds::remove_world(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()
         }
+        "worlds:play" => {
+            let (id, folder): (String, String) = (args.get(0)?, args.get(1)?);
+            // Only one of the instance's own worlds (and never a path out of saves/).
+            if !worlds::world_path(&id, &folder).await?.join("level.dat").is_file() {
+                crate::bail_tr!("worlds.notFound", "{folder} isn't a world in this instance any more.", folder = folder);
+            }
+            crate::game::launch_as(&id, args.get::<Option<String>>(2)?.as_deref(), Some(crate::game::launch::Target::World(folder))).await?;
+            done()
+        }
         "worlds:openFolder" => {
             let path = worlds::world_path(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             shell::open_path(&path)?;

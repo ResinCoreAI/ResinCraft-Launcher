@@ -1362,6 +1362,8 @@ export interface ResinApi {
     /** Moves the world to the Recycle Bin. */
     remove(instanceId: string, folder: string): Promise<void>
     openFolder(instanceId: string, folder: string): Promise<void>
+    /** Starts the game straight into this world (Minecraft 1.20+). `accountId`: play as that account. */
+    play(instanceId: string, folder: string, accountId?: string): Promise<void>
     /** Imports a world from a .zip; opens a file picker when no path is given. Null if cancelled. */
     import(instanceId: string, zipPath?: string): Promise<WorldInfo | null>
   }

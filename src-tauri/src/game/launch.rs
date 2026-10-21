@@ -307,12 +307,37 @@ pub fn split_args(s: &str) -> Vec<String> {
     re.captures_iter(s).map(|c| c.get(1).or_else(|| c.get(2)).map(|m| m.as_str().to_string()).unwrap_or_default()).collect()
 }
 
-/// The rule features a launch turns on; quick play only when joining a server.
-fn launch_features(server: Option<&str>) -> BTreeMap<String, bool> {
+/// Where the game goes once it's up, instead of the title screen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Target {
+    /// Joins a server ("host:port").
+    Server(String),
+    /// Opens a singleplayer world (its folder in saves/). Minecraft 1.20+ only.
+    World(String),
+}
+
+impl Target {
+    fn server(&self) -> Option<&str> {
+        match self {
+            Target::Server(s) => Some(s),
+            Target::World(_) => None,
+        }
+    }
+    fn world(&self) -> Option<&str> {
+        match self {
+            Target::World(w) => Some(w),
+            Target::Server(_) => None,
+        }
+    }
+}
+
+/// The rule features a launch turns on; quick play only when going straight to a server or world.
+fn launch_features(target: Option<&Target>) -> BTreeMap<String, bool> {
     BTreeMap::from([
         ("has_custom_resolution".to_string(), true),
         ("is_demo_user".to_string(), false),
-        ("is_quick_play_multiplayer".to_string(), server.is_some()),
+        ("is_quick_play_multiplayer".to_string(), target.and_then(Target::server).is_some()),
+        ("is_quick_play_singleplayer".to_string(), target.and_then(Target::world).is_some()),
     ])
 }
 
@@ -332,20 +357,25 @@ fn split_host_port(addr: &str) -> (String, String) {
     }
 }
 
-/// Adds joining `server` to the expanded game arguments. 1.20+ already got `--quickPlayMultiplayer` from the
-/// version's own rules; versions before it have no quick play and take `--server/--port` instead.
-fn with_server(mut game: Vec<String>, server: Option<&str>) -> Vec<String> {
-    if let Some(addr) = server {
-        if !game.iter().any(|a| a == "--quickPlayMultiplayer") {
+/// Adds the target to the expanded game arguments. 1.20+ already got `--quickPlayMultiplayer` or
+/// `--quickPlaySingleplayer` from the version's own rules. Before it there is no quick play: servers take
+/// `--server/--port` instead, and worlds can't be opened from outside the game.
+fn with_target(mut game: Vec<String>, target: Option<&Target>, mc: &str) -> Result<Vec<String>> {
+    match target {
+        Some(Target::Server(addr)) if !game.iter().any(|a| a == "--quickPlayMultiplayer") => {
             let (host, port) = split_host_port(addr);
             game.extend(["--server".to_string(), host, "--port".to_string(), port]);
         }
+        Some(Target::World(_)) if !game.iter().any(|a| a == "--quickPlaySingleplayer") => {
+            bail_tr!("launch.worldNeedsNewer", "Opening a world straight away needs Minecraft 1.20 or newer; this instance is {mc}. Start the game and pick the world there.", mc = mc);
+        }
+        _ => {}
     }
-    game
+    Ok(game)
 }
 
-/// `server` ("host:port") joins a server right after the game starts: quick play on 1.20+, `--server` before.
-fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchAuth, server: Option<&str>) -> Result<Vec<String>> {
+/// `target` is where the game goes once it's up: a server (quick play on 1.20+, `--server` before) or a world.
+fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchAuth, target: Option<&Target>) -> Result<Vec<String>> {
     let v = &p.version;
     let dir = paths::game_dir(&inst.id);
     let uuid = auth.uuid.replace('-', "");
@@ -373,11 +403,12 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
         ("launcher_version", LAUNCHER_VERSION.into()),
         ("resolution_width", settings.game_width.to_string()),
         ("resolution_height", settings.game_height.to_string()),
-        ("quickPlayMultiplayer", server.unwrap_or_default().to_string()),
+        ("quickPlayMultiplayer", target.and_then(Target::server).unwrap_or_default().to_string()),
+        ("quickPlaySingleplayer", target.and_then(Target::world).unwrap_or_default().to_string()),
     ]);
     let re = regex::Regex::new(r"\$\{([^}]+)\}").unwrap();
     let sub = |s: &String| -> String { re.replace_all(s, |c: &regex::Captures| vars.get(&c[1]).cloned().unwrap_or_else(|| c[0].to_string())).into_owned() };
-    let features = launch_features(server);
+    let features = launch_features(target);
 
     let (jvm, game): (Vec<String>, Vec<String>) = match v.minecraft_arguments.as_deref().filter(|s| !s.is_empty()) {
         Some(legacy) => {
@@ -394,7 +425,7 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
         ),
     };
 
-    let game = with_server(game, server);
+    let game = with_target(game, target, &inst.mc_version)?;
 
     let main_class = v.main_class.clone().filter(|m| !m.is_empty()).ok_or_else(|| err_tr!("launch.noMainClass", "Version {version} has no main class", version = v.id))?;
     let memory = inst.memory_mb.unwrap_or(settings.memory_mb);
@@ -562,9 +593,9 @@ pub async fn launch_instance(id: &str, settings: &Settings, auth: LaunchAuth, ho
     launch_instance_to(id, settings, auth, hooks, None).await
 }
 
-/// Like `launch_instance`, joining `server` ("host:port") once the game is up.
+/// Like `launch_instance`, going to `target` (a server or a world) once the game is up.
 /// The instance can already be running with other accounts; each run gets its own log and state (see `Run`).
-pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth, hooks: LaunchHooks, server: Option<&str>) -> Result<()> {
+pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth, hooks: LaunchHooks, target: Option<&Target>) -> Result<()> {
     let inst = instances::get(id).await?;
     let slot = reserve(id, &auth)?;
     let run = RunInfo { instance_id: id.to_string(), run_id: run_id(id, slot), account_id: auth.account_id.clone(), username: auth.username.clone() };
@@ -581,7 +612,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         async move { prepare(&inst, &settings, natives, &t).await }
     })
     .await
-    .and_then(|p| build_args(&inst, settings, &p, &auth, server).map(|args| (p, args)));
+    .and_then(|p| build_args(&inst, settings, &p, &auth, target).map(|args| (p, args)));
     let (prepared, args) = match prepared {
         Ok(p) => p,
         Err(e) => {
@@ -762,21 +793,32 @@ mod tests {
 
     #[test]
     fn joining_on_new_versions_uses_quick_play() {
-        let game = with_server(expand(&modern_args(), &launch_features(Some("play.example.org:25570"))), Some("play.example.org:25570"));
+        let to = Target::Server("play.example.org:25570".into());
+        let game = with_target(expand(&modern_args(), &launch_features(Some(&to))), Some(&to), "1.21.1").unwrap();
         assert_eq!(game, ["--username", "${auth_player_name}", "--quickPlayMultiplayer", "${quickPlayMultiplayer}"]);
         assert!(!game.contains(&"--server".to_string()));
     }
 
     #[test]
     fn no_server_means_no_join_arguments() {
-        let game = with_server(expand(&modern_args(), &launch_features(None)), None);
+        let game = with_target(expand(&modern_args(), &launch_features(None)), None, "1.21.1").unwrap();
         assert_eq!(game, ["--username", "${auth_player_name}"]);
+    }
+
+    #[test]
+    fn worlds_open_with_quick_play() {
+        let to = Target::World("New World (2)".into());
+        let game = with_target(expand(&modern_args(), &launch_features(Some(&to))), Some(&to), "1.21.1").unwrap();
+        assert_eq!(game, ["--username", "${auth_player_name}", "--quickPlaySingleplayer", "${quickPlaySingleplayer}"]);
+        // Versions without quick play can't open a world from outside the game.
+        let legacy = vec!["--username".to_string(), "${auth_player_name}".to_string()];
+        assert!(with_target(legacy, Some(&to), "1.12.2").is_err());
     }
 
     #[test]
     fn joining_old_versions_uses_server_and_port() {
         let legacy = vec!["--username".to_string(), "${auth_player_name}".to_string()];
-        let join = |addr: &str| with_server(legacy.clone(), Some(addr))[2..].to_vec();
+        let join = |addr: &str| with_target(legacy.clone(), Some(&Target::Server(addr.into())), "1.12.2").unwrap()[2..].to_vec();
         assert_eq!(join("play.example.org:25570"), ["--server", "play.example.org", "--port", "25570"]);
         assert_eq!(join("play.example.org"), ["--server", "play.example.org", "--port", "25565"]);
         assert_eq!(join("[2001:db8::1]:25580"), ["--server", "2001:db8::1", "--port", "25580"]);

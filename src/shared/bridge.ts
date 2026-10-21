@@ -131,6 +131,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       backup: fn('worlds:backup'),
       remove: fn('worlds:remove'),
       openFolder: fn('worlds:openFolder'),
+      play: fn('worlds:play'),
       import: fn('worlds:import')
     },
     servers: { list: fn('servers:list'), save: fn('servers:save'), ping: fn('servers:ping') },

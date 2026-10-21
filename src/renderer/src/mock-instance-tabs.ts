@@ -13,8 +13,8 @@ function fakeShot(hue: number, w: number, h: number, square = false): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-/** `setIcon` stores a custom icon on the mock instance (mock.ts owns the instance list). */
-export function mockInstanceTabs(setIcon: (instanceId: string, iconUrl: string) => Instance): TabsApi {
+/** `setIcon` stores a custom icon on the mock instance (mock.ts owns the instance list); `launch` starts a fake run. */
+export function mockInstanceTabs(setIcon: (instanceId: string, iconUrl: string) => Instance, launch: (id: string, accountId?: string) => Promise<void>): TabsApi {
   const now = Date.now()
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
   const notes: Record<string, string> = {
@@ -83,6 +83,7 @@ export function mockInstanceTabs(setIcon: (instanceId: string, iconUrl: string) 
       backup: (_id, folder) => wait(`C:\\Users\\you\\…\\minecraft\\backups\\2026-10-18_12-00-00_${folder}.zip`, 900),
       remove: async (_id, folder) => void (worlds = worlds.filter((w) => w.folder !== folder)),
       openFolder: async () => {},
+      play: (id, _folder, accountId) => launch(id, accountId),
       import: async () => null
     },
     servers: {

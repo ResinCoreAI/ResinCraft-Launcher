@@ -173,6 +173,7 @@ export default {
   'engine.launch.readingVersion': 'Reading version info…',
   'engine.launch.settingUpOptifine': 'Setting up OptiFine…',
   'engine.launch.unpackingNatives': 'Unpacking natives…',
+  'engine.launch.worldNeedsNewer': 'Opening a world straight away needs Minecraft 1.20 or newer; this instance is {mc}. Start the game and pick the world there.',
   'engine.links.downloading': 'Downloading {name}',
   'engine.links.serverPlugin': "That's a server plugin. Add it to a server's Plugins tab instead.",
   'engine.lists.empty': '{name} has no {kind} to list',
@@ -384,6 +385,7 @@ export default {
   'engine.worlds.noDataSection': 'level.dat has no Data section',
   'engine.worlds.noLevelDat': 'No level.dat found',
   'engine.worlds.noWorldInZip': "That zip doesn't contain a Minecraft world (no level.dat)",
+  'engine.worlds.notFound': "{folder} isn't a world in this instance any more.",
   'engine.worlds.writeFailed': 'Could not write level.dat',
   'engine.worlds.writingZip': 'Writing zip…'
 }

@@ -51,11 +51,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
 /// Launches an instance with the player's account and the "on launch" window behaviour from Settings.
 /// `server` ("host:port") joins that server once the game is up.
 pub async fn launch(id: &str, server: Option<String>) -> Result<()> {
-    launch_as(id, None, server).await
+    launch_as(id, None, server.map(launch::Target::Server)).await
 }
 
 /// Like `launch`, with a given account instead of the active one.
-pub async fn launch_as(id: &str, account: Option<&str>, server: Option<String>) -> Result<()> {
+pub async fn launch_as(id: &str, account: Option<&str>, target: Option<launch::Target>) -> Result<()> {
     crate::core::storage::ensure_not_moving()?;
     if crate::content::packswitch::is_switching(id) {
         crate::bail_tr!("packswitch.wait", "Wait for the modpack version switch to finish first");
@@ -87,7 +87,7 @@ pub async fn launch_as(id: &str, account: Option<&str>, server: Option<String>) 
             }
         })),
     };
-    launch::launch_instance_to(id, &settings, auth, hooks, server.as_deref()).await
+    launch::launch_instance_to(id, &settings, auth, hooks, target.as_ref()).await
 }
 
 fn main_window() -> Option<tauri::WebviewWindow> {

@@ -306,7 +306,7 @@ pub async fn join(req: JoinRequest) -> Result<()> {
     }
     match (req.edition, instance) {
         (Edition::Bedrock, _) => shell::open_app_link(&bedrock_link(&name, &address)),
-        (Edition::Java, Some(id)) => crate::game::launch_as(&id, req.account_id.as_deref(), Some(address)).await,
+        (Edition::Java, Some(id)) => crate::game::launch_as(&id, req.account_id.as_deref(), Some(crate::game::launch::Target::Server(address))).await,
         (Edition::Java, None) => unreachable!(),
     }
 }
