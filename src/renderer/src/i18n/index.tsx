@@ -8,6 +8,7 @@
 import { Fragment, useSyncExternalStore, type ReactNode } from 'react'
 import type { EngineText } from '@shared/types'
 import en from './en'
+import { localWords } from '../platform'
 
 export type Key = keyof typeof en
 export type Plural = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string }
@@ -152,9 +153,10 @@ function pick(msg: Msg, count: number | undefined): string {
 
 /** Translates `key`, filling {placeholders} from `params`. A numeric `count` param chooses the plural form. */
 export function t(key: Key, params?: Params): string {
-  const msg = dict[key] ?? en[key]
+  const own = dict[key]
+  const msg = own ?? en[key]
   const count = typeof params?.count === 'number' ? params.count : undefined
-  const text = pick(msg as Msg, count)
+  const text = own != null && dict !== en ? pick(msg as Msg, count) : localWords(pick(msg as Msg, count))
   if (!params) return text
   return text.replace(/\{(\w+)\}/g, (m, name: string) => {
     const v = params[name]

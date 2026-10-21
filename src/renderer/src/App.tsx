@@ -19,6 +19,7 @@ import QuickJoin from './pages/QuickJoin'
 import SettingsPage from './pages/SettingsPage'
 import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
+import { hasBedrockApp } from './platform'
 
 // Server hosting is self-contained and fairly large; load it on first visit.
 const Servers = lazy(() => import('./pages/Servers'))
@@ -98,7 +99,7 @@ export default function App() {
         </div>
 
         <nav className="nav">
-          {NAV.map((n) => (
+          {NAV.filter((n) => n.page !== 'bedrock' || hasBedrockApp).map((n) => (
             <button key={n.page} className={`nav-item ${current === n.page ? 'active' : ''}`} onClick={() => go({ page: n.page } as Route)}>
               {n.icon}
               <span className="ellipsis">{t(n.label)}</span>

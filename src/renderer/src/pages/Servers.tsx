@@ -49,6 +49,7 @@ import { useStore } from '../store'
 import { bytes, fixed, serverPath, timeAgo } from '../util'
 import { rich, t, tx, type Key } from '../i18n'
 import '../servers.css'
+import { hasBedrockApp } from '../platform'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
 const MAX_LOG = 3000
@@ -509,7 +510,7 @@ function ConnectCard({ s }: { s: ServerInfo }) {
         </span>
         <CopyAddress value={isBedrock(s) ? `127.0.0.1:${s.port}` : `localhost:${s.port}`} />
         {isBedrock(s) ? (
-          <div className="play-here">
+          hasBedrockApp && <div className="play-here">
             <button className="btn primary" disabled={launching || s.state === 'stopped' || s.state === 'crashed'} onClick={() => void openBedrock()}>
               {launching ? <Loader2 className="spin" /> : <Gamepad2 />} {t('servers.connect.openBedrock')}
             </button>

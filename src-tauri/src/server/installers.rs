@@ -477,6 +477,9 @@ async fn bedrock_versions() -> Result<Vec<String>> {
 /// Bedrock Dedicated Server from minecraft.net, unpacked into the server folder. Mojang publishes no checksums,
 /// so the download is checked by unpacking it and finding the server program inside. Returns the program's name.
 async fn bedrock(version: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    if !cfg!(any(windows, all(target_os = "linux", target_arch = "x86_64"))) {
+        bail!("Mojang's Bedrock server only runs on Windows and x64 Linux");
+    }
     let (_, folder, _) = bedrock_platform();
     let zip = paths::cache().join("server-installers").join(format!("bedrock-server-{version}.zip"));
     let url = format!("{BEDROCK_CDN}/{folder}/bedrock-server-{}.zip", enc(version));

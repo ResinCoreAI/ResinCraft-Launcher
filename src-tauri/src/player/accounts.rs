@@ -114,7 +114,8 @@ mod dpapi {
     }
 }
 
-/// Encrypts a token for accounts.json: DPAPI (current Windows user) where available, else base64.
+/// Encrypts a token for accounts.json: DPAPI (current Windows user) where available, else base64 in a file only
+/// this user can read (see `save`).
 pub fn seal(s: &str) -> String {
     #[cfg(windows)]
     if let Ok(enc) = dpapi::protect(s.as_bytes()) {
@@ -165,7 +166,14 @@ async fn load() -> Vec<StoredAccount> {
 }
 
 async fn save(list: &[StoredAccount]) -> Result<()> {
-    write_json(&paths::accounts_file(), list).await
+    write_json(&paths::accounts_file(), list).await?;
+    // macOS and Linux have no DPAPI, so the tokens are only encoded: keep the file to this user.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = tokio::fs::set_permissions(paths::accounts_file(), std::fs::Permissions::from_mode(0o600)).await;
+    }
+    Ok(())
 }
 
 fn view(a: &StoredAccount) -> AccountView {

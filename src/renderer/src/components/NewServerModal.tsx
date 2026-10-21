@@ -17,6 +17,7 @@ import { useStore } from '../store'
 import { compact, describe } from '../util'
 import { t, type Key } from '../i18n'
 import { BlockArt, Modal, Segmented } from './ui'
+import { canHostBedrock } from '../platform'
 
 type Mode = 'software' | 'modpack' | 'instance' | 'file'
 
@@ -344,7 +345,7 @@ export default function NewServerModal({
 
       {mode === 'software' && step === 'pick' && (
         <div className="sv-pick-page">
-          {GROUPS.map((g) => (
+          {GROUPS.filter((g) => canHostBedrock || !g.types.includes('bedrock')).map((g) => (
             <div className="field" key={g.title}>
               <label>{t(g.title)}</label>
               <div className="sv-types">

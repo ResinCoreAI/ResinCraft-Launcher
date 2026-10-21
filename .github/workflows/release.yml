@@ -1,10 +1,17 @@
-# Builds the Windows installer and attaches it to a draft GitHub Release when a version tag is pushed:
+# Builds ResinCraft Launcher for Windows, macOS and Linux and attaches it to a draft GitHub Release when a version
+# tag is pushed:
 #   git tag v0.1.0 && git push origin v0.1.0
+# Running it by hand (workflow_dispatch) builds the same files and keeps them as the run's artifacts, with no release.
 # Repository secrets RESINCRAFT_MS_CLIENT_ID and RESINCRAFT_CURSEFORGE_KEY are compiled into the app
 # (see src-tauri/build.rs); they are never stored in the code.
 #
-# Updates: TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD sign the installer, which is also the
-# update file. Its signature goes into latest.json, which waits on the draft; the separate .sig is removed. The
+# What each platform ships:
+#   Windows  the NSIS installer (…_x64-setup.exe), which is also its update file
+#   macOS    one universal .dmg (Apple Silicon and Intel), and the .app.tar.gz the updater installs
+#   Linux    an .AppImage (also its update file) and a .deb, each for x64 (amd64) and ARM (aarch64/arm64)
+#
+# Updates: TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD sign every update file. The `release` job
+# puts all the signatures into one latest.json, which waits on the draft; the .sig files aren't uploaded. The
 # release stays a draft until it is published by hand, and publishing it runs publish-update.yml, which moves
 # latest.json to the `updates` branch where installed copies look. So publishing is what offers the update
 # (README, "Updates").
@@ -19,8 +26,28 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            args: ''
+            bundle: src-tauri/target/release/bundle
+          - platform: macos
+            os: macos-latest
+            args: --target universal-apple-darwin
+            bundle: src-tauri/target/universal-apple-darwin/release/bundle
+          - platform: linux
+            os: ubuntu-22.04
+            args: ''
+            bundle: src-tauri/target/release/bundle
+          - platform: linux-arm
+            os: ubuntu-22.04-arm
+            args: ''
+            bundle: src-tauri/target/release/bundle
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       # v0.2.0 shipped with a mangled key (a dotenv parser expanded its `$` parts); never build with a key that fails.
@@ -31,18 +58,26 @@ jobs:
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: $KEY" https://api.curseforge.com/v1/games/432)
           if [ "$code" != "200" ]; then echo "::error::CurseForge rejected RESINCRAFT_CURSEFORGE_KEY (HTTP $code). Re-set it with: printf '%s' \"<key>\" | gh secret set RESINCRAFT_CURSEFORGE_KEY"; exit 1; fi
+      - name: Install the Linux build libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          key: ${{ matrix.platform }}
       - run: npm ci
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RESINCRAFT_MS_CLIENT_ID: ${{ secrets.RESINCRAFT_MS_CLIENT_ID }}
           RESINCRAFT_CURSEFORGE_KEY: ${{ secrets.RESINCRAFT_CURSEFORGE_KEY }}
           # Optional: without them the build still works, the relay route just isn't offered.
@@ -52,25 +87,110 @@ jobs:
           RESINCRAFT_MINESKIN_KEY: ${{ secrets.RESINCRAFT_MINESKIN_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ResinCraft Launcher ${{ github.ref_name }}
-          releaseBody: |
-            Download the installer below. Windows may warn that the publisher is unverified until releases are code-signed. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.
-
-            NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: true
-          updaterJsonPreferNsis: true
-      # Its text is inside latest.json, which is all the updater reads, so the release doesn't need the .sig.
-      - name: Remove the .sig file from the draft
+        run: npx tauri build ${{ matrix.args }}
+      # Collects the downloads and their update signatures under the names they get on the release (GitHub turns
+      # spaces into dots, so that's done here and latest.json can name them).
+      - name: Collect the files
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+          BUNDLE: ${{ matrix.bundle }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          version=$(jq -r .version src-tauri/tauri.conf.json)
+          mkdir -p out/release
+          take() { cp "$1" "out/release/$2"; [ -f "$1.sig" ] && cp "$1.sig" "out/release/$2.sig"; return 0; }
+          case "${{ matrix.platform }}" in
+            windows)
+              for f in "$BUNDLE"/nsis/*-setup.exe; do take "$f" "$(basename "$f" | tr ' ' '.')"; done ;;
+            macos)
+              for f in "$BUNDLE"/dmg/*.dmg; do take "$f" "$(basename "$f" | tr ' ' '.')"; done
+              for f in "$BUNDLE"/macos/*.app.tar.gz; do take "$f" "ResinCraft.Launcher_${version}_universal.app.tar.gz"; done ;;
+            linux*)
+              for f in "$BUNDLE"/appimage/*.AppImage "$BUNDLE"/deb/*.deb; do take "$f" "$(basename "$f" | tr ' ' '.')"; done
+              # The .deb updates installs made from it; sign it if the bundler didn't.
+              for f in out/release/*.deb; do
+                [ -f "$f.sig" ] || npx tauri signer sign "$f" > /dev/null
+              done ;;
+          esac
+          ls -l out/release
+          n=$(ls out/release | grep -vc '\.sig$' || true)
+          if [ "$n" -eq 0 ]; then echo "::error::The build made no files to ship."; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.platform }}
+          path: out/release/*
+          if-no-files-found: error
+
+  # Writes latest.json for all platforms and, for a tag, puts everything on a draft release. One job does the
+  # uploading, so the three builds never race to create the release or to edit latest.json.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NOTES: |
+        Downloads: Windows, the `_x64-setup.exe` installer. macOS (Apple Silicon and Intel), the `_universal.dmg`. Linux, the `.AppImage` (any distribution) or the `.deb` (Debian, Ubuntu, Mint…): `amd64` for most PCs, `aarch64` / `arm64` for ARM ones such as a Raspberry Pi 5.
+
+        Windows may warn that the publisher is unverified, and macOS that the app is from an unidentified developer, until releases are code-signed: on macOS, right-click the app and choose Open the first time. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.
+
+        NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Write latest.json
+        run: |
+          set -euo pipefail
+          version=$(jq -r .version src-tauri/tauri.conf.json)
+          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_REF_NAME}" != "v$version" ]; then
+            echo "::error::The tag is ${GITHUB_REF_NAME} but tauri.conf.json says $version."; exit 1
+          fi
+          base="https://github.com/${GH_REPO}/releases/download/v$version"
+          one() { # <file suffix>: the one file ending in it, which must have a signature
+            local f; f=$(cd files && ls -- *"$1" | grep -v '\.sig$')
+            [ "$(printf '%s\n' "$f" | wc -l)" = 1 ] && [ -n "$f" ] || { echo "::error::Expected one *$1, found: $f"; exit 1; }
+            [ -s "files/$f.sig" ] || { echo "::error::$f has no update signature."; exit 1; }
+            jq -n --arg url "$base/$f" --rawfile sig "files/$f.sig" '{signature: ($sig | rtrimstr("\n")), url: $url}'
+          }
+          win=$(one _x64-setup.exe); mac=$(one _universal.app.tar.gz)
+          appimage=$(one _amd64.AppImage); deb=$(one _amd64.deb); arm_appimage=$(one _aarch64.AppImage); arm_deb=$(one _arm64.deb)
+          jq -n --arg v "$version" --arg notes "$NOTES" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson win "$win" --argjson mac "$mac" --argjson appimage "$appimage" --argjson deb "$deb" \
+            --argjson arm_appimage "$arm_appimage" --argjson arm_deb "$arm_deb" '{
+              version: $v, notes: ($notes | rtrimstr("\n")), pub_date: $date,
+              platforms: {
+                "windows-x86_64": $win, "windows-x86_64-nsis": $win,
+                "darwin-x86_64": $mac, "darwin-x86_64-app": $mac,
+                "darwin-aarch64": $mac, "darwin-aarch64-app": $mac,
+                "linux-x86_64": $appimage, "linux-x86_64-appimage": $appimage,
+                "linux-x86_64-deb": $deb,
+                "linux-aarch64": $arm_appimage, "linux-aarch64-appimage": $arm_appimage,
+                "linux-aarch64-deb": $arm_deb
+              }
+            }' > files/latest.json
+          jq '.platforms | map_values(.url)' files/latest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: latest-json
+          path: files/latest.json
+      - name: Attach everything to a draft release
+        if: github.ref_type == 'tag'
+        env:
           TAG: ${{ github.ref_name }}
         run: |
-          gh release view "$TAG" --json assets -q '.assets[].name | select(endswith(".sig"))' | while read -r name; do
-            gh release delete-asset "$TAG" "$name" -y
-          done
+          set -euo pipefail
+          cd files
+          shopt -s extglob
+          ship=( !(*.sig) )
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            [ "$(gh release view "$TAG" --json isDraft -q .isDraft)" = true ] || { echo "::error::$TAG is already published."; exit 1; }
+            gh release upload "$TAG" "${ship[@]}" --clobber
+          else
+            gh release create "$TAG" "${ship[@]}" --draft --title "ResinCraft Launcher $TAG" --notes "$NOTES"
+          fi

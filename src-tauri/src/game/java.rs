@@ -161,12 +161,44 @@ fn suits(j: &JavaInstall, required: u32) -> bool {
     }
 }
 
-fn is64(j: &JavaInstall) -> bool {
-    j.arch.as_deref().map(|a| a.contains("64")).unwrap_or(true)
+/// The CPU this build of the launcher runs on, in Adoptium's names.
+pub fn host_cpu() -> &'static str {
+    if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "x64"
+    }
+}
+
+/// Adoptium's name for a `mojang::game_arch` CPU.
+pub fn cpu_for(game_arch: &str) -> &'static str {
+    if game_arch == "arm64" {
+        "aarch64"
+    } else {
+        "x64"
+    }
+}
+
+fn is_arm(arch: &str) -> bool {
+    arch.contains("aarch64") || arch.contains("arm64")
+}
+
+/// A 64-bit Java for `cpu`. On a Mac both kinds can run (x64 through Rosetta 2), so the CPU has to match the
+/// game's natives; elsewhere any 64-bit Java does, as before.
+fn fits_cpu(j: &JavaInstall, cpu: &str) -> bool {
+    match j.arch.as_deref() {
+        None => cpu == host_cpu(),
+        Some(a) => a.contains("64") && (!cfg!(target_os = "macos") || is_arm(a) == (cpu == "aarch64")),
+    }
 }
 
 pub async fn find_java(required: u32) -> Result<Option<JavaInstall>> {
-    let all: Vec<JavaInstall> = detect_java().await?.into_iter().filter(is64).collect();
+    find_java_for(required, host_cpu()).await
+}
+
+/// A Java for `required` that runs as `cpu` ("x64" or "aarch64").
+pub async fn find_java_for(required: u32, cpu: &str) -> Result<Option<JavaInstall>> {
+    let all: Vec<JavaInstall> = detect_java().await?.into_iter().filter(|j| fits_cpu(j, cpu)).collect();
     if let Some(j) = all.iter().find(|j| j.major == required) {
         return Ok(Some(j.clone()));
     }
@@ -191,8 +223,31 @@ struct AdoptiumAsset {
     binary: AdoptiumBinary,
 }
 
-/// Downloads an Eclipse Temurin JRE into the launcher's own Java folder.
+/// macOS and Linux: makes sure the programs in `<home>/bin` can run (tar keeps the bits, but a copy may not).
+async fn make_runnable(home: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(mut rd) = tokio::fs::read_dir(home.join("bin")).await else { return };
+        while let Ok(Some(e)) = rd.next_entry().await {
+            if let Ok(meta) = e.metadata().await {
+                if meta.is_file() && meta.permissions().mode() & 0o111 != 0o111 {
+                    let _ = tokio::fs::set_permissions(e.path(), std::fs::Permissions::from_mode(meta.permissions().mode() | 0o755)).await;
+                }
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = home;
+}
+
+/// Downloads an Eclipse Temurin JRE for this computer's CPU into the launcher's own Java folder.
 pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall> {
+    install_java_for(required, host_cpu(), task).await
+}
+
+/// Downloads an Eclipse Temurin JRE that runs as `cpu` ("x64" or "aarch64").
+pub async fn install_java_for(required: u32, cpu: &str, task: &Arc<Task>) -> Result<JavaInstall> {
     // Temurin dropped its Java 16 builds; 17 runs Minecraft 1.17 fine.
     let major = if required == 16 { 17 } else { required };
     let os = if cfg!(windows) {
@@ -202,7 +257,6 @@ pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall
     } else {
         "linux"
     };
-    let cpu = if cfg!(target_arch = "aarch64") { "aarch64" } else { "x64" };
     task.update(tr!("java.finding", "Finding Java {major}…", major = major), None);
     let assets: Vec<AdoptiumAsset> =
         fetch_json(&format!("https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={cpu}&image_type=jre&os={os}&vendor=eclipse")).await?;
@@ -213,8 +267,10 @@ pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall
     download_file(&DownloadItem::new(pkg.link.clone(), &archive).hash(Some(Hash::sha256(pkg.checksum.clone()))).size(Some(pkg.size))).await?;
 
     task.update(tr!("java.unpacking", "Unpacking Java {major}…", major = major), None);
-    let staging = paths::java().join(format!(".staging-{major}"));
-    let target = paths::java().join(format!("java-{major}"));
+    // Java for the other CPU (x64 on an Apple Silicon Mac) gets its own folder next to the native one.
+    let suffix = if cpu == host_cpu() { String::new() } else { format!("-{cpu}") };
+    let staging = paths::java().join(format!(".staging-{major}{suffix}"));
+    let target = paths::java().join(format!("java-{major}{suffix}"));
     let _ = tokio::fs::remove_dir_all(&staging).await;
     tokio::fs::create_dir_all(&staging).await?;
     if pkg.name.ends_with(".zip") {
@@ -250,7 +306,10 @@ pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall
     })
     .await?;
     let installed = match homes.into_iter().next() {
-        Some(h) => probe(&h, true).await,
+        Some(h) => {
+            make_runnable(&h).await;
+            probe(&h, true).await
+        }
         None => None,
     };
     installed.ok_or_else(|| err_tr!("java.wontStart", "Java {major} was downloaded but couldn't be started", major = major))
