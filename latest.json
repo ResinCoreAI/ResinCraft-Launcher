@@ -1,15 +1,55 @@
 {
-  "version": "1.1.3",
-  "notes": "Download the installer below. Windows may warn that the publisher is unverified until releases are code-signed. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.\n\nNOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
-  "pub_date": "2026-10-21T14:42:16.410Z",
+  "version": "1.2.0",
+  "notes": "Downloads: Windows, the `_x64-setup.exe` installer. macOS (Apple Silicon and Intel), the `_universal.dmg`. Linux, the `.AppImage` (any distribution) or the `.deb` (Debian, Ubuntu, Mint…): `amd64` for most PCs, `aarch64` / `arm64` for ARM ones such as a Raspberry Pi 5.\n\nWindows may warn that the publisher is unverified, and macOS that the app is from an unidentified developer, until releases are code-signed: on macOS, right-click the app and choose Open the first time. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.\n\nNOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
+  "pub_date": "2026-10-21T18:51:11Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGJaWG9vaGliTVg0RElra0lKZTVmOW03dFBXclVvYjVWVHVmR1c1TllMd2l6MDlEcEg1UmZRQlVXb1VKVzF6dTdGL1NpbGNWYmY0Ly9jTTBnTUVEQWdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTkzNzMyCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjEuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjMKUzg1MndnSUIrZ2pBM25pV3ByVFZNL2lHNVc5b1lTR2JpOWN1U3lObEZCK25BTkcrRUdsS1NlZERNTFhpNUJXSVY0MnQxZG5aU3BxTFFCTVoxSC9yQnc9PQo=",
-      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.1.3/ResinCraft.Launcher_1.1.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGJOU2c0eG4wUERaWUpVU3p2TnhpTnNGWCtKWVFsODI0Szd6VlErdW51UkZDcDN0NFczeEkycVBGWVBMdzF2bDN0c3FqRFFob1EvZFhra2FuVWt3eXcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NjEzCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4yLjAKc2IwWTlhTUNSTkNMTUJDTEtzWDA4V2JkZXhoR3ZXZHBHQWl6a2ZjU0FXbnhlMWJOekRnRjJBWkpPczhjcm5YNUpxNldEcDFJMmZ3R1JpaERBeXRQQ3c9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_x64-setup.exe"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGJaWG9vaGliTVg0RElra0lKZTVmOW03dFBXclVvYjVWVHVmR1c1TllMd2l6MDlEcEg1UmZRQlVXb1VKVzF6dTdGL1NpbGNWYmY0Ly9jTTBnTUVEQWdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTkzNzMyCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjEuM194NjQtc2V0dXAuZXhlCXZlcnNpb246MS4xLjMKUzg1MndnSUIrZ2pBM25pV3ByVFZNL2lHNVc5b1lTR2JpOWN1U3lObEZCK25BTkcrRUdsS1NlZERNTFhpNUJXSVY0MnQxZG5aU3BxTFFCTVoxSC9yQnc9PQo=",
-      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.1.3/ResinCraft.Launcher_1.1.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGJOU2c0eG4wUERaWUpVU3p2TnhpTnNGWCtKWVFsODI0Szd6VlErdW51UkZDcDN0NFczeEkycVBGWVBMdzF2bDN0c3FqRFFob1EvZFhra2FuVWt3eXcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NjEzCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4yLjAKc2IwWTlhTUNSTkNMTUJDTEtzWDA4V2JkZXhoR3ZXZHBHQWl6a2ZjU0FXbnhlMWJOekRnRjJBWkpPczhjcm5YNUpxNldEcDFJMmZ3R1JpaERBeXRQQ3c9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_x64-setup.exe"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSFhRVGRiMlM4enhoNFFwWTNUbkxycWpxUVUvYm9MS3g2Y0c1T3NoZms3RzJHL2xYQ2tHeTJYd0xpZ2tsV1ZKZXFjaTN2UWRBV3dBcmJxb0VpdktFaWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NjEwCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlci5hcHAudGFyLmd6CXZlcnNpb246MS4yLjAKOWN2YVl6TklKcFBacW5JM3NsN0t1c2hOc2w3MTZ1cU5wS0VxcnljWlMzYzVscWR6cytwTDY2S2g2WHVlcDM2MzZ5dHBNQ2w0cjBleEM1aVBkODNLQWc9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_universal.app.tar.gz"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSFhRVGRiMlM4enhoNFFwWTNUbkxycWpxUVUvYm9MS3g2Y0c1T3NoZms3RzJHL2xYQ2tHeTJYd0xpZ2tsV1ZKZXFjaTN2UWRBV3dBcmJxb0VpdktFaWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NjEwCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlci5hcHAudGFyLmd6CXZlcnNpb246MS4yLjAKOWN2YVl6TklKcFBacW5JM3NsN0t1c2hOc2w3MTZ1cU5wS0VxcnljWlMzYzVscWR6cytwTDY2S2g2WHVlcDM2MzZ5dHBNQ2w0cjBleEM1aVBkODNLQWc9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_universal.app.tar.gz"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSFhRVGRiMlM4enhoNFFwWTNUbkxycWpxUVUvYm9MS3g2Y0c1T3NoZms3RzJHL2xYQ2tHeTJYd0xpZ2tsV1ZKZXFjaTN2UWRBV3dBcmJxb0VpdktFaWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NjEwCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlci5hcHAudGFyLmd6CXZlcnNpb246MS4yLjAKOWN2YVl6TklKcFBacW5JM3NsN0t1c2hOc2w3MTZ1cU5wS0VxcnljWlMzYzVscWR6cytwTDY2S2g2WHVlcDM2MzZ5dHBNQ2w0cjBleEM1aVBkODNLQWc9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_universal.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSFhRVGRiMlM4enhoNFFwWTNUbkxycWpxUVUvYm9MS3g2Y0c1T3NoZms3RzJHL2xYQ2tHeTJYd0xpZ2tsV1ZKZXFjaTN2UWRBV3dBcmJxb0VpdktFaWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NjEwCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlci5hcHAudGFyLmd6CXZlcnNpb246MS4yLjAKOWN2YVl6TklKcFBacW5JM3NsN0t1c2hOc2w3MTZ1cU5wS0VxcnljWlMzYzVscWR6cytwTDY2S2g2WHVlcDM2MzZ5dHBNQ2w0cjBleEM1aVBkODNLQWc9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_universal.app.tar.gz"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGFpejd0Y0hSOXl1bE0vNEt6aDBWUWNySGFQSDV6YktMVnQ4Q001Ky92YVRwM0N5YlNWcUVSOXlVS20wZDVONS80M2hiaDBtM2pmRHE1cHpvMVkzMkF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NDIxCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF9hbWQ2NC5BcHBJbWFnZQl2ZXJzaW9uOjEuMi4wCm15MlFkdVZNNHJRNTlDMkRyMTlRUllHVmswbSs2VE5oam9BWkwrZ0JWRUlhUTYvNHhPSzhRanAvTURLNDlmYnQxdHFCSE1kWWx0cUZLSkQ3REVRdEJnPT0K",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_amd64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGFpejd0Y0hSOXl1bE0vNEt6aDBWUWNySGFQSDV6YktMVnQ4Q001Ky92YVRwM0N5YlNWcUVSOXlVS20wZDVONS80M2hiaDBtM2pmRHE1cHpvMVkzMkF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NDIxCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF9hbWQ2NC5BcHBJbWFnZQl2ZXJzaW9uOjEuMi4wCm15MlFkdVZNNHJRNTlDMkRyMTlRUllHVmswbSs2VE5oam9BWkwrZ0JWRUlhUTYvNHhPSzhRanAvTURLNDlmYnQxdHFCSE1kWWx0cUZLSkQ3REVRdEJnPT0K",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSFVKSmlkenp5dW5oUi9nMklkYktTbGdqTGZiRWczamNMRGdaZ243T0VGWWU4TVRWL1Flbk5zcXN5NkVLcmFBbEdTeStHbXRveVYyMjNFTzN4SUhJS0E0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4NDIxCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF9hbWQ2NC5kZWIJdmVyc2lvbjoxLjIuMAoxdzZEalRrRG8wc0ZtdlJpTER1ZGwwQ05ocTNsbk9lSHF6K04wbkxPUCsxak0renVhQU9MUjY2cmpjZVJLTXlYVTg3a1JPR3U4Y3hvbHY4R2xUZzNEZz09Cg==",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_amd64.deb"
+    },
+    "linux-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGJ0Ym0xWEFFUDljWGdvU3VFb1F0UDJ6c1dMZmY3WFpBeFVqcXNPaDNxemN0cEluTHZVSk1jbFdOVTZ0dWt0TkFvV1gxbThGV2FKZk1qSGtqWG9hbGd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4MzcxCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF9hYXJjaDY0LkFwcEltYWdlCXZlcnNpb246MS4yLjAKS1VkSzZzanU1S1crdWdsQXVhSXJ0UGRES2h6QlFPcmJpZGpGUE5FTVNXck90dEwyTFhwaFYyc3ZQVng2NDF6Sk5uNHZzYlZxdEZsZ2ZGZmFqaDVNQ2c9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_aarch64.AppImage"
+    },
+    "linux-aarch64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGJ0Ym0xWEFFUDljWGdvU3VFb1F0UDJ6c1dMZmY3WFpBeFVqcXNPaDNxemN0cEluTHZVSk1jbFdOVTZ0dWt0TkFvV1gxbThGV2FKZk1qSGtqWG9hbGd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4MzcxCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF9hYXJjaDY0LkFwcEltYWdlCXZlcnNpb246MS4yLjAKS1VkSzZzanU1S1crdWdsQXVhSXJ0UGRES2h6QlFPcmJpZGpGUE5FTVNXck90dEwyTFhwaFYyc3ZQVng2NDF6Sk5uNHZzYlZxdEZsZ2ZGZmFqaDVNQ2c9PQo=",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_aarch64.AppImage"
+    },
+    "linux-aarch64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTdjREUFFsa0VKSGVaRDVRMWV5N0ZWYlRWNEtzRXR6dG9OM0FZZVRQWFBZTWw4dE9WU0ZuNUUzMVRoMXdxc0ZlVm9tbDV3bHlYaTdBNUY5UjRqM1MzbEdSUFJ0bFJmdHdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjA4MzcxCWZpbGU6UmVzaW5DcmFmdCBMYXVuY2hlcl8xLjIuMF9hcm02NC5kZWIJdmVyc2lvbjoxLjIuMAo4SzJ6RXV5c0dWYy9Ca3FpQnZWeVkrS1AwdTI5L2ZwNFNDbTNRMUV4MnprK1JjaTlXd1pzRGg5d0U0V0RVdXBHbDYxWWlXTnBEb1FXU3YyUUh6dW5CUT09Cg==",
+      "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/v1.2.0/ResinCraft.Launcher_1.2.0_arm64.deb"
     }
   }
 }
