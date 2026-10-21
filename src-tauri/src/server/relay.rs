@@ -24,7 +24,7 @@ use crate::core::paths;
 use crate::core::text::{text_of, Text};
 use crate::core::types::{RelayInfo, RelayNameCheck, ServerMeta};
 use crate::player::accounts::{self, MicrosoftAccount};
-use crate::err_tr;
+use crate::{err_tr, tr};
 
 use super::store;
 
@@ -76,8 +76,64 @@ fn admin_message(e: &AgentError) -> String {
     }
 }
 
+/// A moment in a `{placeholder}`: the UI shows it as a date and time in the player's language and time zone
+/// (the English text in logs: "2026-11-01 18:00 UTC").
+struct DateTime(u64);
+
+impl std::fmt::Display for DateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&proto::utc_text(self.0))
+    }
+}
+
+impl serde::Serialize for DateTime {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        serde_json::json!({ "dateTime": self.0 }).serialize(s)
+    }
+}
+
+/// The time from now until a moment: the UI shows it like "in 3 days" and keeps it current.
+struct TimeLeft(u64);
+
+impl std::fmt::Display for TimeLeft {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let minutes = self.0.saturating_sub(proto::now_secs()).div_ceil(60).max(1);
+        match minutes {
+            m if m < 120 => write!(f, "in {m} minute{}", if m == 1 { "" } else { "s" }),
+            m if m < 48 * 60 => write!(f, "in {} hours", (m + 30) / 60),
+            m => write!(f, "in {} days", (m + 720) / 1440),
+        }
+    }
+}
+
+impl serde::Serialize for TimeLeft {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        serde_json::json!({ "timeLeft": self.0 }).serialize(s)
+    }
+}
+
+/// What a banned player is told: until when (or permanently) and why.
+fn banned_error(ban: &proto::Ban) -> anyhow::Error {
+    let base = match ban.until {
+        Some(t) => tr!("hostRelay.bannedUntil", "You're banned from ResinCraft Relay until {date} ({left}).", date = DateTime(t), left = TimeLeft(t)),
+        None => tr!("hostRelay.bannedForever", "You're banned from ResinCraft Relay permanently."),
+    };
+    match ban.reason.trim() {
+        "" => base.into(),
+        why => err_tr!("hostRelay.bannedReason", "{ban} Reason: {reason}", ban = base, reason = why.to_string()),
+    }
+}
+
+/// Whether an error is the relay's ban (with how long and why, or from a relay that doesn't say).
+pub fn is_banned(e: &anyhow::Error) -> bool {
+    text_of(e).is_some_and(|t| t.key.starts_with("hostRelay.banned"))
+}
+
 /// Turns the relay's answer into what the player is told.
 pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
+    if let AgentError::Banned(ban) = e {
+        return banned_error(ban);
+    }
     let Some(code) = e.code() else {
         return match e {
             AgentError::Config(msg) => err_tr!("hostRelay.badConfig", "This build's ResinCraft Relay address doesn't work ({error}).", error = msg),
@@ -87,6 +143,7 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
     match code {
         ErrorCode::AuthFailed => err_tr!("hostRelay.authFailed", "ResinCraft Relay couldn't confirm your Minecraft account. Sign in again in Accounts."),
         ErrorCode::NotOwned => err_tr!("hostRelay.notOwned", "This Microsoft account doesn't own Minecraft: Java Edition, which ResinCraft Relay needs."),
+        // A relay from before bans said how long and why.
         ErrorCode::Banned => err_tr!("hostRelay.banned", "This Minecraft account can't use ResinCraft Relay."),
         ErrorCode::NameInvalid => err_tr!("hostRelay.nameInvalid", "Use 3 to 24 lowercase letters, numbers and dashes, not starting or ending with a dash."),
         ErrorCode::NameReserved => err_tr!("hostRelay.nameReserved", "\"{name}\" is reserved. Pick another name.", name = name),
@@ -238,7 +295,8 @@ pub enum Status {
     Reconnecting,
     /// The session time ran out (the host can start it again).
     SessionEnded,
-    /// Gave up (a ban, the name taken over elsewhere, the monthly cap…).
+    /// Gave up (a ban, the name taken over elsewhere, the monthly cap…). A ban isn't retried: the relay would
+    /// refuse every reconnect until it ends.
     Failed(anyhow::Error),
 }
 

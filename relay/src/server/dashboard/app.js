@@ -336,7 +336,8 @@ async function live() {
               t.secsLeft != null
                 ? h('button', { class: 'sm', onclick: () => confirm(`End ${t.address}'s session now? Its players are dropped; the host can start it again.`) && act('/api/tunnels/end', { name: t.name }, `Ended ${t.name}'s session`) }, 'End now')
                 : null,
-              h('button', { class: 'danger sm', onclick: () => confirm(`Disconnect ${t.address}? Its players are dropped and the host's launcher won't reconnect by itself.`) && act('/api/tunnels/kick', { name: t.name }, `Disconnected ${t.name}`) }, 'Kick')
+              h('button', { class: 'danger sm', onclick: () => confirm(`Disconnect ${t.address}? Its players are dropped and the host's launcher won't reconnect by itself.`) && act('/api/tunnels/kick', { name: t.name }, `Disconnected ${t.name}`) }, 'Kick'),
+              h('button', { class: 'danger sm', onclick: () => banDialog({ uuid: t.owner, name: t.ownerName }) }, 'Ban')
             )
           )
         ),
@@ -424,43 +425,135 @@ async function names() {
   )
 }
 
+// ---------- Ban dialog ----------
+
+const BAN_PRESETS = [
+  ['1h', '1 hour', 3600],
+  ['1d', '1 day', 86400],
+  ['7d', '7 days', 7 * 86400],
+  ['30d', '30 days', 30 * 86400],
+  ['forever', 'Permanently'],
+  ['custom', 'Until a date…']
+]
+
+/** A datetime-local input's value for a Unix time (the browser's own time zone). */
+function localInput(unix) {
+  const d = new Date(unix * 1000)
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 16)
+}
+
+/** "until 01/11/2026, 18:00 (in 3d 4h)" or "permanently". */
+function banEnds(expires) {
+  if (!expires) return 'permanently'
+  return `until ${when(expires)} (in ${duration(Math.max(60, expires - Math.floor(Date.now() / 1000)))})`
+}
+
+/**
+ * Bans an account or IP: how long (presets or a date) and why. `target`: { uuid, name } or { ip } to ban that one,
+ * nothing to type one in; `current`: the ban being changed ({ reason, expires }).
+ */
+function banDialog(target, current) {
+  const now = () => Math.floor(Date.now() / 1000)
+  const kind = h('select', {}, h('option', { value: 'uuid' }, 'Minecraft UUID'), h('option', { value: 'ip' }, 'IP or CIDR'))
+  const value = h('input', { placeholder: '069a79f4-44e9-4726-a5be-fca90e38aaf5 or 203.0.113.0/24', required: !target, autofocus: !target })
+  const preset = h('select', {}, BAN_PRESETS.map(([v, label]) => h('option', { value: v }, label)))
+  const date = h('input', { type: 'datetime-local', min: localInput(now() + 60), value: localInput(current?.expires || now() + 7 * 86400) })
+  const dateField = h('label', { class: 'field' }, h('span', {}, 'Ends (your time)'), date)
+  const reason = h('textarea', { rows: 3, maxlength: 300, placeholder: 'Shown to the player in their launcher (optional)', value: current?.reason || '' })
+  const summary = h('p', { class: 'muted' })
+  const msg = h('p', { class: 'msg' })
+  const button = h('button', { class: 'danger', type: 'submit' }, current ? 'Save ban' : 'Ban')
+  preset.value = current ? (current.expires ? 'custom' : 'forever') : '1d'
+  const ip = () => (target ? !!target.ip : kind.value === 'ip')
+  // Unix seconds the ban ends (null: permanent), or a string saying what's wrong.
+  const end = () => {
+    const p = BAN_PRESETS.find(([v]) => v === preset.value)
+    if (p[2]) return now() + p[2]
+    if (preset.value === 'forever') return null
+    const t = Math.floor(new Date(date.value).getTime() / 1000)
+    return t > now() ? t : 'Pick a time in the future.'
+  }
+  const update = () => {
+    dateField.hidden = preset.value !== 'custom'
+    const e = end()
+    summary.textContent =
+      typeof e === 'string'
+        ? e
+        : `Banned ${banEnds(e)}. ${ip() ? 'Players and launchers from there are dropped without a word.' : 'Its launcher is disconnected now and told how long and why; it can sign in again once the ban ends.'}`
+  }
+  kind.addEventListener('change', update)
+  preset.addEventListener('change', update)
+  date.addEventListener('input', update)
+  update()
+  const who = target ? target.name || target.uuid || target.ip : null
+  const dlg = h(
+    'dialog',
+    { class: 'card dialog', 'aria-label': who ? `Ban ${who}` : 'Ban' },
+    h(
+      'form',
+      {
+        onsubmit: async (e) => {
+          e.preventDefault()
+          const until = end()
+          if (typeof until === 'string') return (msg.textContent = until)
+          const id = target ? (target.ip ? { ip: target.ip } : { uuid: target.uuid }) : { [kind.value]: value.value.trim() }
+          button.disabled = true
+          msg.textContent = ''
+          try {
+            await api('/api/bans/add', { ...id, reason: reason.value.trim(), ...(until ? { until } : {}) })
+            dlg.close()
+            toast(`Banned ${who || Object.values(id)[0]} ${banEnds(until)}`)
+            await render()
+          } catch (err) {
+            msg.textContent = err.message
+            button.disabled = false
+          }
+        }
+      },
+      h('h2', {}, who ? `Ban ${who}` : 'Ban an account or IP'),
+      target && target.uuid && target.name ? h('p', { class: 'mono faint' }, target.uuid) : null,
+      target ? null : h('div', { class: 'row wrap' }, kind, value),
+      h('label', { class: 'field' }, h('span', {}, 'How long'), preset),
+      dateField,
+      h('label', { class: 'field' }, h('span', {}, 'Reason'), reason),
+      summary,
+      msg,
+      h('div', { class: 'row end' }, h('button', { type: 'button', onclick: () => dlg.close() }, 'Cancel'), button)
+    )
+  )
+  dlg.addEventListener('close', () => dlg.remove())
+  document.body.append(dlg)
+  dlg.showModal()
+}
+
 async function bans() {
   const d = await api('/api/bans')
-  const kind = h('select', {}, h('option', { value: 'uuid' }, 'Minecraft UUID'), h('option', { value: 'ip' }, 'IP or CIDR'))
-  const value = h('input', { placeholder: '069a79f4-44e9-4726-a5be-fca90e38aaf5 or 203.0.113.0/24', required: true })
-  const reason = h('input', { placeholder: 'Reason (optional)' })
-  const hours = h('input', { type: 'number', min: 0, step: 1, placeholder: 'Hours (empty: forever)' })
-  const until = (b) => (b.expires ? `until ${when(b.expires)}` : 'forever')
   const unban = (body, label) => h('button', { class: 'sm', onclick: () => act('/api/bans/remove', body, `Unbanned ${label}`) }, 'Unban')
+  const change = (target, b) => h('button', { class: 'sm', onclick: () => banDialog(target, b) }, 'Change')
   return h(
     'div',
     {},
     section(
       'Ban',
-      h(
-        'form',
-        {
-          class: 'row wrap',
-          onsubmit: (e) => {
-            e.preventDefault()
-            const body = { [kind.value]: value.value.trim(), reason: reason.value.trim() }
-            if (Number(hours.value) > 0) body.hours = Number(hours.value)
-            act('/api/bans/add', body, `Banned ${value.value.trim()}`)
-          }
-        },
-        kind,
-        value,
-        reason,
-        hours,
-        h('button', { class: 'danger', type: 'submit' }, 'Ban')
-      ),
-      h('p', { class: 'muted' }, 'Banning an account disconnects its tunnels at once. IP bans apply to players and launchers.')
+      h('div', { class: 'row' }, h('button', { class: 'danger', onclick: () => banDialog() }, 'Ban an account or IP…')),
+      h('p', { class: 'muted' }, 'A banned account’s launcher is disconnected at once and told how long and why. Bans with an end lift by themselves. IP bans apply to players and launchers.')
     ),
     section(
       'Banned accounts',
       table(
         ['Account', 'Reason', 'Since', 'Ends', ''],
-        d.uuids.map((b) => h('tr', {}, h('td', {}, h('div', {}, b.name || '–'), h('div', { class: 'mono faint' }, b.uuid)), h('td', {}, b.reason || '–'), h('td', {}, ago(b.at)), h('td', {}, until(b)), h('td', { class: 'actions' }, unban({ uuid: b.uuid }, b.name || b.uuid)))),
+        d.uuids.map((b) =>
+          h(
+            'tr',
+            {},
+            h('td', {}, h('div', {}, b.name || '–'), h('div', { class: 'mono faint' }, b.uuid)),
+            h('td', { class: 'reason' }, b.reason || '–'),
+            h('td', { title: when(b.at) }, ago(b.at)),
+            h('td', {}, banEnds(b.expires)),
+            h('td', { class: 'actions' }, change({ uuid: b.uuid, name: b.name }, b), unban({ uuid: b.uuid }, b.name || b.uuid))
+          )
+        ),
         'No banned accounts.'
       )
     ),
@@ -468,7 +561,17 @@ async function bans() {
       'Banned IPs',
       table(
         ['IP / range', 'Reason', 'Since', 'Ends', ''],
-        d.ips.map((b) => h('tr', {}, h('td', { class: 'mono' }, b.ip), h('td', {}, b.reason || '–'), h('td', {}, ago(b.at)), h('td', {}, until(b)), h('td', { class: 'actions' }, unban({ ip: b.ip }, b.ip)))),
+        d.ips.map((b) =>
+          h(
+            'tr',
+            {},
+            h('td', { class: 'mono' }, b.ip),
+            h('td', { class: 'reason' }, b.reason || '–'),
+            h('td', { title: when(b.at) }, ago(b.at)),
+            h('td', {}, banEnds(b.expires)),
+            h('td', { class: 'actions' }, change({ ip: b.ip }, b), unban({ ip: b.ip }, b.ip))
+          )
+        ),
         'No banned IPs.'
       ),
       d.fromConfig.uuids.length || d.fromConfig.ips.length
@@ -544,7 +647,24 @@ async function usage() {
           h(
             'tr',
             {},
-            h('td', {}, h('div', {}, a.name || '–', a.unlimited ? h('span', { class: 'chip unlimited', title: a.unlimitedSince ? `since ${when(a.unlimitedSince)}` : null }, 'Unlimited') : null), h('div', { class: 'mono faint' }, a.uuid)),
+            h(
+              'td',
+              {},
+              h(
+                'div',
+                {},
+                a.name || '–',
+                a.unlimited ? h('span', { class: 'chip unlimited', title: a.unlimitedSince ? `since ${when(a.unlimitedSince)}` : null }, 'Unlimited') : null,
+                a.ban
+                  ? h(
+                      'span',
+                      { class: 'chip ban', title: `Banned ${banEnds(a.ban.until)}${a.ban.reason ? `. Reason: ${a.ban.reason}` : ''}` },
+                      a.ban.until ? `Banned · ${duration(Math.max(60, a.ban.until - Math.floor(Date.now() / 1000)))}` : 'Banned'
+                    )
+                  : null
+              ),
+              h('div', { class: 'mono faint' }, a.uuid)
+            ),
             h('td', { class: 'num data' }, bytes(a.bytes)),
             h(
               'td',
@@ -557,7 +677,10 @@ async function usage() {
               'td',
               { class: 'actions' },
               d.cap && !a.unlimited ? h('button', { class: 'sm', onclick: () => addData(a) }, 'Add data') : null,
-              a.unlimited ? h('button', { class: 'sm', onclick: () => setUnlimited(a, false) }, 'Turn off unlimited') : h('button', { class: 'sm', onclick: () => setUnlimited(a, true) }, 'Unlimited')
+              a.unlimited ? h('button', { class: 'sm', onclick: () => setUnlimited(a, false) }, 'Turn off unlimited') : h('button', { class: 'sm', onclick: () => setUnlimited(a, true) }, 'Unlimited'),
+              a.ban
+                ? h('button', { class: 'sm', onclick: () => act('/api/bans/remove', { uuid: a.uuid }, `Unbanned ${label(a)}`) }, 'Unban')
+                : h('button', { class: 'danger sm', onclick: () => banDialog({ uuid: a.uuid, name: a.name }) }, 'Ban')
             )
           )
         ),

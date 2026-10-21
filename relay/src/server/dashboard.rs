@@ -492,6 +492,7 @@ fn usage(relay: &Relay) -> Response {
                 "unlimitedSince": free.map(|f| f.since),
                 "percent": if own_cap > 0 { (*bytes as f64 / own_cap as f64 * 100.0).min(100.0) } else { 0.0 },
                 "online": online.get(uuid).copied().unwrap_or(0),
+                "ban": relay.ban_of(uuid),
             })
         })
         .collect();
@@ -662,9 +663,16 @@ fn action(relay: &Relay, path: &str, input: &Value, ip: IpAddr) -> Response {
         }
         "/api/bans/add" | "/api/bans/remove" => {
             let adding = path.ends_with("/add");
-            let hours = input.get("hours").and_then(Value::as_f64).filter(|h| *h > 0.0);
-            let ban = adding.then(|| (text(input, "reason").unwrap_or_default(), hours.map(|h| now_secs() + (h * 3600.0) as u64)));
-            let until = hours.map(|h| format!(" for {h} h")).unwrap_or_default();
+            let end = match adding.then(|| super::ban_end(input)).transpose() {
+                Ok(end) => end.flatten(),
+                Err(why) => return Response::error("400 Bad Request", why),
+            };
+            let reason = super::ban_reason(text(input, "reason"));
+            let until = match end {
+                Some(t) => format!(" until {}", proto::utc_text(t)),
+                None => " permanently".to_string(),
+            } + &if reason.is_empty() { String::new() } else { format!(" ({reason})") };
+            let ban = adding.then(|| (reason.clone(), end));
             if let Some(uuid) = text(input, "uuid") {
                 let Some(id) = relay.ban_uuid(&uuid, ban) else { return Response::error("400 Bad Request", "that isn't a Minecraft UUID") };
                 audit(relay, if adding { "ban" } else { "unban" }, format!("{} account {id}{}", if adding { "banned" } else { "unbanned" }, if adding { &until } else { "" }), ip);

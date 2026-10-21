@@ -615,3 +615,89 @@ async fn java_server_with_geyser_gets_a_bedrock_port() {
     conn2.auth(Credentials::Minecraft("token-bob".into())).await.unwrap();
     assert_eq!(conn2.online_with_geyser("bob-java").await.unwrap().bedrock_port, None);
 }
+
+/// A protocol 1 launcher (0.3, before bans carried how long and why): hello, resume, and the first answer as
+/// raw JSON. Its own message type only knows `code` and `message`.
+async fn old_launcher_resume(agent_url: &str, session: &str) -> Value {
+    use futures::StreamExt;
+    let addr = agent_url.trim_start_matches("tcp://");
+    let sock = TcpStream::connect(addr).await.unwrap();
+    let mut yamux = tokio_yamux::Session::new_client(sock, resincraft_relay::agent::yamux_config());
+    let mut control = yamux.control();
+    tokio::spawn(async move { while yamux.next().await.is_some() {} });
+    let mut ctrl = control.open_stream().await.unwrap();
+    let mut lines = Vec::new();
+    for msg in [r#"{"t":"hello","version":1,"client":"ResinCraft Launcher 0.3.0"}"#.to_string(), format!(r#"{{"t":"resume","session":"{session}"}}"#)] {
+        ctrl.write_all(format!("{msg}\n").as_bytes()).await.unwrap();
+        ctrl.flush().await.unwrap();
+        let mut line = Vec::new();
+        let mut byte = [0u8; 1];
+        while tokio::time::timeout(Duration::from_secs(5), ctrl.read_exact(&mut byte)).await.expect("an answer").is_ok() && byte[0] != b'\n' {
+            line.push(byte[0]);
+        }
+        lines.push(serde_json::from_slice::<Value>(&line).unwrap());
+    }
+    assert_eq!(lines[0]["t"], "welcome");
+    lines.pop().unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn bans_tell_the_launcher_how_long_and_why() {
+    use resincraft_relay::proto::{now_secs, Ban};
+    let relay = start(config("bans").await).await;
+    let mc = fake_minecraft("B").await;
+    let token = Some("test-admin-token-0123456789abcdef");
+
+    // Alice hosts a server, and has a second launcher signed in without one (the name picker).
+    let mut host = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    let session = host.auth(Credentials::Minecraft("token-alice".into())).await.unwrap().session.unwrap();
+    host.online("alice-ban").await.unwrap();
+    let serving = tokio::spawn(host.serve(mc, |_| {}));
+    let mut picker = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    picker.auth(Credentials::Session(session.clone())).await.unwrap();
+
+    // A ban in the past is refused; then a timed ban with a reason.
+    let past = http(relay.admin, "POST", "/admin/ban", token, &format!(r#"{{"uuid":"{ALICE}","until":{}}}"#, now_secs() - 10)).await;
+    assert_eq!(past.0, 400, "{}", past.1);
+    let until = now_secs() + 3;
+    let body = format!(r#"{{"uuid":"{ALICE}","reason":"  Griefing at spawn ","until":{until}}}"#);
+    assert_eq!(http(relay.admin, "POST", "/admin/ban", token, &body).await.0, 200);
+    let ban = Ban { until: Some(until), reason: "Griefing at spawn".into() };
+
+    // The live tunnel is told and dropped; so is the signed-in launcher.
+    let ended = tokio::time::timeout(Duration::from_secs(5), serving).await.expect("banned tunnel kicked").unwrap();
+    assert_eq!(ended, AgentError::Banned(ban.clone()));
+    assert!(!ended.retryable(), "a banned launcher doesn't reconnect by itself");
+    assert_eq!(ended.code(), Some(ErrorCode::Banned));
+    assert_eq!(picker.check("anything").await.unwrap_err(), AgentError::Banned(ban.clone()));
+    let free = ping(relay.public, &format!("alice-ban.{BASE}")).await;
+    assert!(!description(&free).contains("Fake server"), "{free}");
+
+    // Coming back while banned: refused with the same, for the relay's session and a Minecraft sign-in alike.
+    let mut again = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    assert_eq!(again.auth(Credentials::Session(session.clone())).await.unwrap_err(), AgentError::Banned(ban.clone()));
+    let mut fresh = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    assert_eq!(fresh.auth(Credentials::Minecraft("token-alice".into())).await.unwrap_err(), AgentError::Banned(ban.clone()));
+
+    // A launcher from before this still gets `banned`, and a message that says how long and why.
+    let old = old_launcher_resume(&relay.agent_url, &session).await;
+    assert_eq!((old["t"].as_str(), old["code"].as_str()), (Some("error"), Some("banned")), "{old}");
+    let words = old["message"].as_str().unwrap();
+    assert!(words.contains("until ") && words.contains("UTC") && words.contains("Reason: Griefing at spawn"), "{words}");
+
+    // The ban ends by itself.
+    tokio::time::sleep(Duration::from_secs(until + 1 - now_secs())).await;
+    let mut back = Connection::connect(&agent_cfg(&relay.agent_url)).await.unwrap();
+    back.auth(Credentials::Session(session.clone())).await.expect("the ban ended");
+    back.online("alice-ban").await.unwrap();
+
+    // A permanent ban without a reason.
+    let serving = tokio::spawn(back.serve(mc, |_| {}));
+    assert_eq!(http(relay.admin, "POST", "/admin/ban", token, &format!(r#"{{"uuid":"{ALICE}"}}"#)).await.0, 200);
+    let ended = tokio::time::timeout(Duration::from_secs(5), serving).await.expect("kicked").unwrap();
+    assert_eq!(ended, AgentError::Banned(Ban::default()));
+    let old = old_launcher_resume(&relay.agent_url, &session).await;
+    assert_eq!(old["message"], "this account is banned from the relay permanently");
+    let (_, bans) = http(relay.admin, "GET", "/admin/bans", token, "").await;
+    assert!(bans.contains("8667ba71-b85a-4004-af54-457a9734eed7"), "{bans}");
+}

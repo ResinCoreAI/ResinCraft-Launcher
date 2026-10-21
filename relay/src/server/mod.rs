@@ -34,7 +34,7 @@ use config::LimitsConfig;
 use metrics::Metrics;
 use store::{BanEntry, NameEntry, SessionEntry, Store, UnlimitedEntry};
 
-use crate::proto::{self, check_name, month_of, now_secs, ErrorCode, Limits, ServiceState, Usage};
+use crate::proto::{self, check_name, month_of, now_secs, Ban, ErrorCode, Limits, ServiceState, Usage};
 use session::SessionClock;
 
 /// How a tunnel was told to go away (with the admin's message, for paused/off).
@@ -61,6 +61,31 @@ impl Kick {
         self.notify.notified().await;
         self.reason.lock().unwrap().clone()
     }
+}
+
+/// Longest ban reason kept (the banned launcher shows it).
+pub const BAN_REASON_MAX: usize = 300;
+
+/// When a ban asked for over the admin API or dashboard ends: `until` (Unix seconds, in the future) or `hours`
+/// from now; neither: permanent.
+pub(crate) fn ban_end(input: &serde_json::Value) -> Result<Option<u64>, &'static str> {
+    let now = now_secs();
+    if let Some(until) = input.get("until").filter(|v| !v.is_null()) {
+        return match until.as_f64() {
+            Some(t) if t > now as f64 => Ok(Some(t as u64)),
+            _ => Err("the ban's end has to be a time in the future"),
+        };
+    }
+    match input.get("hours").filter(|v| !v.is_null()).map(serde_json::Value::as_f64) {
+        None => Ok(None),
+        Some(Some(h)) if h > 0.0 => Ok(Some(now + (h * 3600.0) as u64)),
+        Some(_) => Err("hours has to be a number above 0"),
+    }
+}
+
+/// A ban's reason as kept: trimmed, at most BAN_REASON_MAX characters.
+pub(crate) fn ban_reason(text: Option<String>) -> String {
+    text.unwrap_or_default().trim().chars().take(BAN_REASON_MAX).collect()
 }
 
 /// How long the relay answers "the host's relay session ended" for a name after its session ran out.
@@ -360,19 +385,29 @@ impl Relay {
     }
 
     pub fn is_banned_uuid(&self, uuid: &str) -> bool {
-        let id = auth::dashed_uuid(uuid).unwrap_or_else(|| uuid.to_string());
-        let now = now_secs();
-        self.cfg.bans.uuids.iter().any(|u| auth::dashed_uuid(u).as_deref() == Some(id.as_str()))
-            || self.store.read(|d| d.bans.uuids.get(&id).is_some_and(|b| b.active(now)))
+        self.ban_of(uuid).is_some()
     }
 
-    /// Bans a Minecraft account (disconnecting its tunnels) or lifts the ban. `expires`: Unix seconds.
+    /// The account's ban while it lasts (relay.toml bans are permanent and give no reason). Expired bans no
+    /// longer count, even before `prune` drops them.
+    pub fn ban_of(&self, uuid: &str) -> Option<Ban> {
+        let id = auth::dashed_uuid(uuid).unwrap_or_else(|| uuid.to_string());
+        if self.cfg.bans.uuids.iter().any(|u| auth::dashed_uuid(u).as_deref() == Some(id.as_str())) {
+            return Some(Ban::default());
+        }
+        let now = now_secs();
+        self.store.read(|d| d.bans.uuids.get(&id).filter(|b| b.active(now)).map(|b| Ban { until: b.expires, reason: b.reason.clone() }))
+    }
+
+    /// Bans a Minecraft account or lifts the ban. `expires`: Unix seconds. Its launchers are told (with how long
+    /// and why) and disconnected: tunnels and signed-in connections alike.
     pub fn ban_uuid(&self, uuid: &str, ban: Option<(String, Option<u64>)>) -> Option<String> {
         let id = auth::dashed_uuid(uuid)?;
         match ban {
             Some((reason, expires)) => {
-                self.store.write(|d| d.bans.uuids.insert(id.clone(), BanEntry { reason, at: now_secs(), expires }));
+                self.store.write(|d| d.bans.uuids.insert(id.clone(), BanEntry { reason: reason.trim().to_string(), at: now_secs(), expires }));
                 self.kick_account(&id, ErrorCode::Banned);
+                self.account_changed(&id, None);
             }
             None => {
                 self.store.write(|d| d.bans.uuids.remove(&id));

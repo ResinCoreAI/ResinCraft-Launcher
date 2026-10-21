@@ -163,6 +163,8 @@ export default {
   'servers.relaySession.endedToast': 'The ResinCraft Relay session for {server} ended.',
   'servers.relaySession.continueHint': 'The session ends soon. Continue for another one.',
   'servers.relaySession.soonToast': 'ResinCraft Relay for {server}: {minutes} min left. Continue now for another session.',
+  'servers.relayBan.hint': "ResinCraft won't connect to the relay while the ban lasts. Ask the relay's admin if you think it's a mistake.",
+  'servers.relayBan.toast': 'ResinCraft Relay for {server}: {message}',
   'servers.relayData.unlimited': "Unlimited relay use, set by the relay's admin: no data cap and no session time limit.",
   'servers.relayData.lowShort': 'Running low.',
   'servers.relayData.outShort': "Used up: friends can't join.",

@@ -95,7 +95,8 @@ Open **https://rscraft.resincore.tech/admin** and sign in with the admin passwor
   Continue banner 10 and 1 minutes before the end, and may press Continue in the launcher from 15 minutes before
   (`session_continue_minutes`). Launcher 0.3.0 can't show it, so use 0 until hosts update.
 - **Names**: search, rename or release names; reserve words nobody may take.
-- **Bans**: ban a Minecraft account (UUID) or an IP / CIDR range, with a reason and an optional duration.
+- **Bans**: ban a Minecraft account (UUID) or an IP / CIDR range for a preset time, until a date or permanently, with a
+  reason. The banned player's launcher shows how long and why.
 - **Usage**: this month's traffic per account against its cap. **Add data** gives an account more GB for the
   rest of this month; **Unlimited** takes away its data cap and session time limit (an *Unlimited* badge shows it;
   **Turn off unlimited** undoes it). Type a Minecraft name or UUID at the top for an account not in the list yet.

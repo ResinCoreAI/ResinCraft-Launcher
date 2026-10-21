@@ -288,15 +288,29 @@ async fn admin_actions_take_effect() {
 
     // Banning the account disconnects it and keeps it out; unbanning lets it back.
     let serving = alice_online(&relay, "alice-smp", mc).await;
-    let r = post(d, &auth, "/api/bans/add", json!({ "uuid": "8667ba71b85a4004af54457a9734eed7", "reason": "test", "hours": 1 })).await;
+    // The ban dialog sends an end time (a preset or a date) and the reason.
+    let past = post(d, &auth, "/api/bans/add", json!({ "uuid": "8667ba71b85a4004af54457a9734eed7", "until": 1_000_000 })).await;
+    assert_eq!(past.status, 400);
+    let until = resincraft_relay::proto::now_secs() + 86_400;
+    let r = post(d, &auth, "/api/bans/add", json!({ "uuid": "8667ba71b85a4004af54457a9734eed7", "reason": "test", "until": until })).await;
     assert_eq!(r.status, 200);
     let ended = tokio::time::timeout(Duration::from_secs(5), serving).await.unwrap().unwrap();
-    assert_eq!(ended.code(), Some(ErrorCode::Banned));
+    let ban = resincraft_relay::proto::Ban { until: Some(until), reason: "test".into() };
+    assert_eq!(ended, resincraft_relay::agent::AgentError::Banned(ban.clone()));
     let bans = get(d, &auth, "/api/bans").await;
     assert_eq!(bans["uuids"][0]["reason"], "test");
-    assert!(bans["uuids"][0]["expires"].as_u64().is_some());
+    assert_eq!(bans["uuids"][0]["expires"].as_u64(), Some(until));
+    // The account list says so too.
+    let usage = get(d, &auth, "/api/usage").await;
+    assert_eq!(usage["accounts"][0]["ban"], json!({ "until": until, "reason": "test" }));
     let mut conn = Connection::connect(&AgentConfig { url: relay.agent_url.clone(), extra_roots_pem: None, client: "test".into() }).await.unwrap();
-    assert_eq!(conn.auth(Credentials::Minecraft("token-alice".into())).await.unwrap_err().code(), Some(ErrorCode::Banned));
+    assert_eq!(conn.auth(Credentials::Minecraft("token-alice".into())).await.unwrap_err(), resincraft_relay::agent::AgentError::Banned(ban));
+    // Changing the ban (the dialog's Change) replaces it: an hour, then permanently.
+    assert_eq!(post(d, &auth, "/api/bans/add", json!({ "uuid": "8667ba71b85a4004af54457a9734eed7", "reason": "test", "hours": 1 })).await.status, 200);
+    assert!(get(d, &auth, "/api/bans").await["uuids"][0]["expires"].as_u64().unwrap() <= until - 3600 * 22);
+    assert_eq!(post(d, &auth, "/api/bans/add", json!({ "uuid": "8667ba71b85a4004af54457a9734eed7", "reason": "test" })).await.status, 200);
+    assert!(get(d, &auth, "/api/bans").await["uuids"][0]["expires"].is_null());
+    assert!(get(d, &auth, "/api/usage").await["accounts"][0]["ban"]["until"].is_null());
     assert_eq!(post(d, &auth, "/api/bans/remove", json!({ "uuid": "8667ba71-b85a-4004-af54-457a9734eed7" })).await.status, 200);
     let serving = alice_online(&relay, "alice-smp", mc).await;
 
@@ -334,7 +348,7 @@ async fn admin_actions_take_effect() {
 
     // Every admin action is in the events log.
     let events = get(d, &auth, "/api/events").await.to_string();
-    for what in ["disconnected alice-smp", "banned account", "unbanned IP", "changed limits: tunnels_per_account = 1", "renamed alice-smp to alice-new", "released alice-new"] {
+    for what in ["disconnected alice-smp", "banned account", "permanently (test)", "unbanned IP", "changed limits: tunnels_per_account = 1", "renamed alice-smp to alice-new", "released alice-new"] {
         assert!(events.contains(what), "events lack {what}: {events}");
     }
     let overview = get(d, &auth, "/api/overview").await;

@@ -9,7 +9,9 @@
 //!    picker (check, reserve) and starts the server; the launcher brings the name online.
 //! 4. As a headless Minecraft client, through the relay: a server list ping, then a login (Login Start →
 //!    Login Success → Login Acknowledged → the first configuration packet).
-//! 5. Checks the relay route for the server's own domain (a CNAME), stops the server and checks the relay
+//! 5. The relay's admin bans the account for an hour with a reason: the launcher shows until when and why,
+//!    the name picker says the same, and nothing reconnects. Unbanned, Start again brings it back.
+//! 6. Checks the relay route for the server's own domain (a CNAME), stops the server and checks the relay
 //!    then answers "This server is offline" by itself.
 
 use std::io::Read;
@@ -22,7 +24,7 @@ use resincraft_lib::core::{ctx, events, paths};
 use resincraft_lib::player::accounts;
 use resincraft_lib::server::{domain, properties, relay, runtime, store};
 use resincraft_relay::handshake::{client_handshake, packet, read_varint, write_string, write_varint};
-use resincraft_relay::server::{Config, Server};
+use resincraft_relay::server::{Config, Relay, Server};
 use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -132,6 +134,7 @@ async fn run(opts: Opts, public_port: u16, agent_port: u16) -> Result<()> {
     cfg.validate()?;
     let server = Server::bind(cfg).await?;
     let relay_addr: SocketAddr = server.public_addrs()[0];
+    let admin = server.relay();
     let (stop_relay, stopped) = tokio::sync::oneshot::channel::<()>();
     let relay_task = tokio::spawn(server.run(async move {
         let _ = stopped.await;
@@ -152,13 +155,13 @@ async fn run(opts: Opts, public_port: u16, agent_port: u16) -> Result<()> {
     tokio::fs::write(paths::accounts_file(), serde_json::to_vec_pretty(&account)?).await?;
     let _ = tokio::fs::remove_file(paths::root().join("relay-sessions.json")).await;
 
-    let result = exercise(&opts, relay_addr).await;
+    let result = exercise(&opts, relay_addr, &admin).await;
     let _ = stop_relay.send(());
     let _ = tokio::time::timeout(Duration::from_secs(10), relay_task).await;
     result
 }
 
-async fn exercise(opts: &Opts, relay_addr: SocketAddr) -> Result<()> {
+async fn exercise(opts: &Opts, relay_addr: SocketAddr, admin: &Relay) -> Result<()> {
     // 3. A vanilla server shared through ResinCraft Relay.
     let req = NewServer {
         name: "Check Relay".into(),
@@ -172,7 +175,7 @@ async fn exercise(opts: &Opts, relay_addr: SocketAddr) -> Result<()> {
     let created = resincraft_lib::server::create::create(req).await?;
     let id = created.server.meta.id.clone();
     println!("created {id} (Minecraft {})", created.server.meta.mc_version);
-    let result = with_server(&id, opts, relay_addr).await;
+    let result = with_server(&id, opts, relay_addr, admin).await;
     if runtime::is_running(&id) {
         runtime::kill(&id);
         let _ = runtime::wait_state(&id, &["stopped", "crashed"], Duration::from_secs(20)).await;
@@ -183,7 +186,7 @@ async fn exercise(opts: &Opts, relay_addr: SocketAddr) -> Result<()> {
     result
 }
 
-async fn with_server(id: &str, _opts: &Opts, relay_addr: SocketAddr) -> Result<()> {
+async fn with_server(id: &str, _opts: &Opts, relay_addr: SocketAddr, admin: &Relay) -> Result<()> {
     store::update(id, json!({ "tunnel": "resin" })).await?;
     store::accept_eula(id).await?;
     properties::set_values(&store::dir(id)?, &[("online-mode", "false".into()), ("motd", "Hello through ResinCraft Relay".into())]).await?;
@@ -233,7 +236,36 @@ async fn with_server(id: &str, _opts: &Opts, relay_addr: SocketAddr) -> Result<(
     let config_packet = login(relay_addr, &address, protocol, "RelayBot").await?;
     println!("login through the relay: Login Success, then configuration packet 0x{config_packet:02x}");
 
-    // 5. The server's own domain: a CNAME to the relay address.
+    // 5. Banned by the relay's admin: told until when and why, and no reconnecting.
+    admin.ban_uuid(UUID, Some(("Testing bans".into(), Some(resincraft_relay::proto::now_secs() + 3600))));
+    let banned = wait_for(Duration::from_secs(10), || runtime::net(id).filter(|n| n.resin.as_ref().is_some_and(|r| r.banned))).await.ok_or_else(|| anyhow!("the launcher didn't notice the ban"))?;
+    let text = banned.error_text.clone().ok_or_else(|| anyhow!("no ban text for the UI"))?;
+    println!("banned: state={} {:?} (key {}, params {})", banned.state, text.text, text.key, serde_json::to_string(&text.params)?);
+    if banned.state != "failed" || text.key != "hostRelay.bannedReason" || !text.text.contains("until ") || !text.text.contains("(in 60 minutes). Reason: Testing bans") {
+        bail!("unexpected ban message");
+    }
+    if text.params["ban"]["params"]["date"]["dateTime"].as_u64().is_none() || text.params["ban"]["params"]["left"]["timeLeft"].as_u64().is_none() {
+        bail!("the UI needs the ban's end as a time");
+    }
+    let picker = relay::check(id, NAME).await.err().map(|e| e.to_string()).unwrap_or_default();
+    println!("name picker while banned: {picker:?}");
+    if !picker.contains("Reason: Testing bans") {
+        bail!("the name picker should say the account is banned");
+    }
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    if runtime::net(id).is_some_and(|n| n.state != "failed") {
+        bail!("the launcher reconnected while banned");
+    }
+    // Unbanned: Start again brings the name back.
+    admin.ban_uuid(UUID, None);
+    runtime::relay_restart(id).await;
+    let back = wait_for(Duration::from_secs(20), || runtime::net(id).filter(|n| n.state == "open" && n.via == Some("resin"))).await;
+    println!("after unbanning: {:?}", back.as_ref().map(|n| n.address.clone()));
+    if back.is_none() {
+        bail!("Start again didn't bring the name back after the ban");
+    }
+
+    // 6. The server's own domain: a CNAME to the relay address.
     store::update(id, json!({ "domain": "play.example.test" })).await?;
     let d = domain::info(id).await?;
     let rec = d.records.first().ok_or_else(|| anyhow!("no DNS records for the relay route"))?;

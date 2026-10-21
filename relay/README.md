@@ -173,8 +173,10 @@ forward it over SSH: `ssh -L 7443:127.0.0.1:7443 you@rscraft.resincore.tech`, th
   left and how often it was continued; **Extend** gives another session, **End now** ends it, **Kick**
   disconnects a server (its launcher doesn't reconnect by itself).
 - **Names**: search; rename or release names; reserve or unreserve words.
-- **Bans**: ban or unban a Minecraft UUID or an IP / CIDR range, with a reason and an optional duration in hours.
-  Banning an account disconnects it at once.
+- **Bans**: ban or unban a Minecraft UUID or an IP / CIDR range (also from the Live and Usage lists): 1 hour, 1 day,
+  7 or 30 days, permanently or until a date, with a reason. Banning an account disconnects its launchers at once, and
+  they show the player "banned until … (… left). Reason: …" (or permanently) and stop reconnecting; launchers that
+  sign in while banned are told the same. Bans with an end lift by themselves.
 - **Usage**: bandwidth per account this month against its own cap (the relay's cap plus top-ups), top users
   first, totals, and each account's top-ups. **Add data** gives an account any amount more for the rest of this
   month; **Unlimited** marks an account (kept in `data/relay.json`) as having no data cap and no session time
@@ -243,6 +245,8 @@ With `[admin] tokens` set, on the local admin port only:
 T=<admin token>
 curl -s -H "Authorization: Bearer $T" localhost:7001/admin/tunnels
 curl -s -H "Authorization: Bearer $T" -d '{"uuid":"8667ba71-b85a-4004-af54-457a9734eed7","reason":"spam"}' localhost:7001/admin/ban
+# For a week ("until" takes Unix seconds instead; neither: permanent)
+curl -s -H "Authorization: Bearer $T" -d '{"uuid":"8667ba71-b85a-4004-af54-457a9734eed7","reason":"spam","hours":168}' localhost:7001/admin/ban
 curl -s -H "Authorization: Bearer $T" -d '{"ip":"203.0.113.0/24"}' localhost:7001/admin/ban
 curl -s -H "Authorization: Bearer $T" -d '{"name":"some-name"}' localhost:7001/admin/release
 ```
