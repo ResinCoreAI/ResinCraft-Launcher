@@ -1142,6 +1142,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': 'A instalação do {name} gerou arquivos inesperados. Tente de novo ou escolha outra versão.',
   'engine.forge.unknownValue': 'O instalador do {name} faz referência a um valor desconhecido: {value}',
   'engine.forge.unpacking': 'Descompactando {name}…',
+  'engine.forge.serverLibMissing': "Não foi possível baixar {file}, necessário para este servidor Forge",
   'engine.files.badName': '"{name}" não pode ser usado como nome',
   'engine.files.changedOnDisk': '{name} foi alterado por outro programa depois que você o abriu',
   'engine.files.exists': 'Já existe algo chamado {name} aqui',
@@ -1489,6 +1490,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "Os dados do ResinCraft Relay de {server} acabaram. Seus amigos não conseguem entrar até você obter mais.",
   'servers.domain.useResin': 'Usar ResinCraft Relay',
   'servers.domain.recordsResin': 'Crie este registro no seu provedor de DNS. Ele aponta para o seu endereço ResinCraft; no Cloudflare, deixe como "Somente DNS" (nuvem cinza).',
+  'servers.create.ancientForge': "Servidores Forge funcionam a partir do Minecraft 1.7.10. Escolha uma versão mais nova ou outro tipo de servidor.",
   'servers.domain.resinSrv': 'Para um domínio sem subdomínio (como example.com), crie este registro SRV no lugar:',
 
   // ResinCraft Relay (engine messages)

@@ -1177,6 +1177,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': 'Установка {name} создала неожиданные файлы. Попробуй ещё раз или выбери другую версию.',
   'engine.forge.unknownValue': 'Установщик {name} ссылается на неизвестное значение {value}',
   'engine.forge.unpacking': 'Распаковка {name}…',
+  'engine.forge.serverLibMissing': "Не удалось скачать {file}, нужный этому серверу Forge",
   'engine.files.badName': '«{name}» нельзя использовать как имя',
   'engine.files.changedOnDisk': '{name} изменила другая программа, пока он был открыт',
   'engine.files.exists': 'Здесь уже есть {name}',
@@ -1522,6 +1523,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "Трафик ResinCraft Relay для {server} исчерпан. Друзья не смогут подключиться, пока вы не получите ещё.",
   'servers.domain.useResin': 'Использовать ResinCraft Relay',
   'servers.domain.recordsResin': 'Создайте эту запись у своего DNS-провайдера. Она указывает на ваш адрес ResinCraft; в Cloudflare оставьте режим «Только DNS» (серое облако).',
+  'servers.create.ancientForge': "Серверы Forge работают с Minecraft 1.7.10 и новее. Выбери более новую версию или другой тип сервера.",
   'servers.domain.resinSrv': 'Для домена без поддомена (например, example.com) вместо этого создайте эту SRV-запись:',
 
   // ResinCraft Relay (engine messages)

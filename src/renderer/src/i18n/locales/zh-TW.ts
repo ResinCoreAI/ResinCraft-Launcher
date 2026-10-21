@@ -1108,6 +1108,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': '{name} 安裝產生了非預期的檔案。請再試一次，或選擇其他版本。',
   'engine.forge.unknownValue': '{name} 安裝程式參照了未知的值 {value}',
   'engine.forge.unpacking': '正在解壓縮 {name}…',
+  'engine.forge.serverLibMissing': "無法下載此 Forge 伺服器需要的 {file}",
   'engine.files.badName': '「{name}」不能當作名稱',
   'engine.files.changedOnDisk': '{name} 在你開啟後被其他程式修改過',
   'engine.files.exists': '這裡已有名為 {name} 的項目',
@@ -1452,6 +1453,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "{server} 的 ResinCraft Relay 流量已用完。在你取得更多之前，好友無法加入。",
   'servers.domain.useResin': '使用 ResinCraft Relay',
   'servers.domain.recordsResin': '在你的 DNS 供應商建立這筆記錄。它指向你的 ResinCraft 位址；在 Cloudflare 上請保持「僅限 DNS」（灰色雲朵）。',
+  'servers.create.ancientForge': "Forge 伺服器支援 Minecraft 1.7.10 及更新版本。請選擇較新的版本或其他伺服器類型。",
   'servers.domain.resinSrv': '若網域沒有子網域（例如 example.com），請改為建立這筆 SRV 記錄：',
 
   // ResinCraft Relay (engine messages)

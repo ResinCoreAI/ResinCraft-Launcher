@@ -1118,6 +1118,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': 'Instalasi {name} menghasilkan file yang tidak terduga. Coba lagi, atau pilih versi lain.',
   'engine.forge.unknownValue': 'Installer {name} merujuk ke nilai tak dikenal {value}',
   'engine.forge.unpacking': 'Mengekstrak {name}…',
+  'engine.forge.serverLibMissing': "Tidak dapat mengunduh {file}, yang dibutuhkan server Forge ini",
   'engine.files.badName': '"{name}" tidak dapat dipakai sebagai nama',
   'engine.files.changedOnDisk': '{name} diubah oleh program lain setelah Anda membukanya',
   'engine.files.exists': 'Sudah ada sesuatu bernama {name} di sini',
@@ -1465,6 +1466,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "Data ResinCraft Relay untuk {server} sudah habis. Teman tidak bisa bergabung sampai kamu mendapatkan lagi.",
   'servers.domain.useResin': 'Pakai ResinCraft Relay',
   'servers.domain.recordsResin': 'Buat record ini di penyedia DNS kamu. Record ini mengarah ke alamat ResinCraft kamu; di Cloudflare, biarkan "DNS only" (awan abu-abu).',
+  'servers.create.ancientForge': "Server Forge berjalan untuk Minecraft 1.7.10 dan yang lebih baru. Pilih versi yang lebih baru atau jenis server lain.",
   'servers.domain.resinSrv': 'Untuk domain tanpa subdomain (seperti example.com), buat record SRV ini sebagai gantinya:',
 
   // ResinCraft Relay (engine messages)

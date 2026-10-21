@@ -1118,6 +1118,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': 'Quá trình cài đặt {name} tạo ra các tệp không mong đợi. Hãy thử lại hoặc chọn phiên bản khác.',
   'engine.forge.unknownValue': 'Trình cài đặt {name} tham chiếu tới giá trị không xác định {value}',
   'engine.forge.unpacking': 'Đang giải nén {name}…',
+  'engine.forge.serverLibMissing': "Không tải được {file}, tệp mà máy chủ Forge này cần",
   'engine.files.badName': 'Không thể dùng "{name}" làm tên',
   'engine.files.changedOnDisk': '{name} đã bị chương trình khác sửa sau khi bạn mở',
   'engine.files.exists': 'Ở đây đã có mục tên {name}',
@@ -1462,6 +1463,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "Dữ liệu ResinCraft Relay của {server} đã hết. Bạn bè không thể vào cho đến khi bạn nhận thêm.",
   'servers.domain.useResin': 'Dùng ResinCraft Relay',
   'servers.domain.recordsResin': 'Tạo bản ghi này ở nhà cung cấp DNS của bạn. Nó trỏ tới địa chỉ ResinCraft của bạn; trên Cloudflare, để ở chế độ "DNS only" (đám mây xám).',
+  'servers.create.ancientForge': "Máy chủ Forge chạy với Minecraft 1.7.10 trở lên. Hãy chọn phiên bản mới hơn hoặc loại máy chủ khác.",
   'servers.domain.resinSrv': 'Với tên miền không có tên miền phụ (như example.com), hãy tạo bản ghi SRV này thay thế:',
 
   // ResinCraft Relay (engine messages)

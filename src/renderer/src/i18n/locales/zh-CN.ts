@@ -1108,6 +1108,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': '{name} 安装生成了意外的文件。请重试，或选择其他版本。',
   'engine.forge.unknownValue': '{name} 安装器引用了未知的值 {value}',
   'engine.forge.unpacking': '正在解压 {name}…',
+  'engine.forge.serverLibMissing': "无法下载此 Forge 服务器所需的 {file}",
   'engine.files.badName': '“{name}”不能用作名称',
   'engine.files.changedOnDisk': '{name} 在你打开后被其他程序修改过',
   'engine.files.exists': '这里已有名为 {name} 的项目',
@@ -1452,6 +1453,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "{server} 的 ResinCraft Relay 流量已用完。在你获取更多之前，好友无法加入。",
   'servers.domain.useResin': '使用 ResinCraft Relay',
   'servers.domain.recordsResin': '在你的 DNS 服务商处创建这条记录。它指向你的 ResinCraft 地址；在 Cloudflare 上请保持“仅 DNS”（灰色云朵）。',
+  'servers.create.ancientForge': "Forge 服务器支持 Minecraft 1.7.10 及更高版本。请选择更新的版本或其他服务器类型。",
   'servers.domain.resinSrv': '对于没有子域名的域名（如 example.com），请改为创建这条 SRV 记录：',
 
   // ResinCraft Relay (engine messages)

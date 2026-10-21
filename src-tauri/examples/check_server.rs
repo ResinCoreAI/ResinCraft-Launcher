@@ -1,8 +1,10 @@
 //! Headless end-to-end check of server hosting (no window needed):
 //!   cargo run --example check_server -- [type[@version]…] [--mc 1.21.1] [--keep] [--upnp] [--tunnel auto|playit|relay] [--relay host[:port]] [--relay-secret s] [--managed-java] [--update-test] [--geyser] [--port 25590] [--verbose]
 //! Types: vanilla paper purpur folia spigot leaf fabric quilt forge neoforge arclight bedrock, or
-//! modpack:<Modrinth id or slug> (default: vanilla paper fabric). "type@version" picks that type's Minecraft
-//! version (Bedrock: its server version; without one, the newest). Each server is created, given a plugin
+//! modpack:<Modrinth id or slug, cf:<CurseForge id> or ftb:<id>> (default: vanilla paper fabric). "type@version"
+//! picks that type's Minecraft version (Bedrock: its server version; without one, the newest). Classic Forge:
+//! forge@1.12.2 forge@1.7.10 modpack:cf:285109 (RLCraft); these also check that Forge Mod Loader came up.
+//! "type@version#build" picks a loader build too (forge@1.12.2#14.23.5.2847: the older installer format). Each server is created, given a plugin
 //! (plugin servers and hybrids: LuckPerms from Modrinth) or a server-side mod (Fabric/Quilt: Lithium), started
 //! until it's ready, asked `list`, backed up and stopped with `stop`. --geyser also lets Bedrock players join
 //! (Geyser + Floodgate) and checks Geyser starts. Servers are deleted afterwards unless --keep is given.
@@ -123,6 +125,11 @@ async fn run() -> Result<bool> {
 
 async fn check(t: &str, opts: &Opts, port: u16) -> Result<()> {
     let (t, version) = t.split_once('@').map(|(a, b)| (a, Some(b.to_string()))).unwrap_or((t, None));
+    // "forge@1.12.2#14.23.5.2847": a specific loader build.
+    let (version, loader_version) = match version.as_deref().and_then(|v| v.split_once('#')) {
+        Some((v, l)) => (Some(v.to_string()), Some(l.to_string())),
+        None => (version, None),
+    };
     let (kind, source) = match t.strip_prefix("modpack:") {
         Some(pack) => (None, Some(ServerSource::Modpack { project_id: pack.to_string(), version_id: None })),
         None => (Some(serde_json::from_value::<ServerKind>(json!(t)).map_err(|_| anyhow!("unknown server type {t}"))?), None),
@@ -143,7 +150,7 @@ async fn check(t: &str, opts: &Opts, port: u16) -> Result<()> {
         name: format!("check-server {t}"),
         kind,
         mc_version: source.is_none().then(|| mc.clone()),
-        loader_version: None,
+        loader_version,
         memory_mb: Some(2048),
         port: Some(port),
         source,
@@ -253,6 +260,14 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     }
     let done = runtime::log(id).into_iter().find(|l| l.text.contains("Done (") || l.text.contains("Server started.")).map(|l| l.text).unwrap_or_default();
     println!("  {done}");
+    if meta.loader == Some(resincraft_lib::core::types::LoaderType::Forge) && resincraft_lib::game::loaders::is_legacy_mc(&meta.mc_version) {
+        // Forge 1.7.10–1.12.2 runs from its universal jar: make sure that was Forge, not plain vanilla.
+        // Big packs push it out of the console buffer, so look in the log files too.
+        let files = ["logs/fml-server-latest.log", "logs/latest.log"].map(|f| std::fs::read_to_string(store::dir(id).unwrap().join(f)).unwrap_or_default());
+        let lines = runtime::log(id).into_iter().map(|l| l.text).chain(files.iter().flat_map(|f| f.lines().map(str::to_string)));
+        let fml = lines.into_iter().find(|l| l.contains("Forge Mod Loader version"));
+        println!("  {}", fml.as_deref().ok_or_else(|| anyhow!("Forge Mod Loader never started"))?);
+    }
     if opts.geyser {
         // Geyser starts once the Java server is up.
         let geyser_re = Regex::new(r"(?i)started geyser|geyser.*(?:listening|started) on")?;

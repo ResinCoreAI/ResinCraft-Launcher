@@ -1128,6 +1128,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': '{name} yüklemesi beklenmeyen dosyalar oluşturdu. Tekrar dene ya da başka bir sürüm seç.',
   'engine.forge.unknownValue': '{name} yükleme programı bilinmeyen bir değere başvuruyor: {value}',
   'engine.forge.unpacking': '{name} ayıklanıyor…',
+  'engine.forge.serverLibMissing': "Bu Forge sunucusunun ihtiyaç duyduğu {file} indirilemedi",
   'engine.files.badName': '"{name}" ad olarak kullanılamaz',
   'engine.files.changedOnDisk': '{name} sen açtıktan sonra başka bir program tarafından değiştirildi',
   'engine.files.exists': 'Burada zaten {name} adında bir şey var',
@@ -1475,6 +1476,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "{server} için ResinCraft Relay verisi bitti. Daha fazla alana kadar arkadaşlar katılamaz.",
   'servers.domain.useResin': "ResinCraft Relay'i kullan",
   'servers.domain.recordsResin': 'Bu kaydı DNS sağlayıcınızda oluşturun. ResinCraft adresinizi gösterir; Cloudflare\'da "Yalnızca DNS" (gri bulut) olarak bırakın.',
+  'servers.create.ancientForge': "Forge sunucuları Minecraft 1.7.10 ve sonrasında çalışır. Daha yeni bir sürüm ya da başka bir sunucu türü seç.",
   'servers.domain.resinSrv': 'Alt alan adı olmayan bir alan adı için (example.com gibi) bunun yerine bu SRV kaydını oluşturun:',
 
   // ResinCraft Relay (engine messages)

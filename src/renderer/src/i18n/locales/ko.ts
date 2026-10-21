@@ -1110,6 +1110,7 @@ const dict: Dict = {
   'engine.forge.unexpectedFiles': '{name} 설치 중에 예기치 않은 파일이 생성됐어요. 다시 시도하거나 다른 버전을 선택하세요.',
   'engine.forge.unknownValue': '{name} 설치 프로그램이 알 수 없는 값 {value}을(를) 참조해요',
   'engine.forge.unpacking': '{name} 압축 푸는 중…',
+  'engine.forge.serverLibMissing': "이 Forge 서버에 필요한 {file}을(를) 다운로드할 수 없습니다",
   'engine.files.badName': "'{name}'은(는) 이름으로 쓸 수 없어요",
   'engine.files.changedOnDisk': '{name}을(를) 연 뒤에 다른 프로그램이 파일을 바꿨어요',
   'engine.files.exists': '여기에 이미 {name}이(가) 있어요',
@@ -1455,6 +1456,7 @@ const dict: Dict = {
   'servers.relayData.outToast': "{server}의 ResinCraft Relay 데이터를 모두 사용했어요. 더 받을 때까지 친구가 접속할 수 없어요.",
   'servers.domain.useResin': 'ResinCraft Relay 사용',
   'servers.domain.recordsResin': 'DNS 업체에서 이 레코드를 만드세요. ResinCraft 주소를 가리킵니다. Cloudflare에서는 "DNS 전용"(회색 구름)으로 두세요.',
+  'servers.create.ancientForge': "Forge 서버는 Minecraft 1.7.10 이상에서 실행됩니다. 더 새로운 버전이나 다른 서버 종류를 선택하세요.",
   'servers.domain.resinSrv': '하위 도메인이 없는 도메인(예: example.com)이라면 대신 이 SRV 레코드를 만드세요:',
 
   // ResinCraft Relay (engine messages)
