@@ -4,6 +4,7 @@ import accounts from './accounts'
 import art from './art'
 import app from './app'
 import bedrock from './bedrock'
+import commands from './commands'
 import common from './common'
 import discover from './discover'
 import engine from './engine'
@@ -38,6 +39,7 @@ const en = {
   ...migrate,
   ...servers,
   ...quickjoin,
+  ...commands,
   ...updates,
   ...engine
 }

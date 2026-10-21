@@ -97,7 +97,9 @@ export function mockApi(): ResinApi {
     autoUpdate: false,
     preferredModSource: 'ask',
     watchFolders: [],
-    autoCheckPacks: true
+    autoCheckPacks: true,
+    env: [],
+    commands: { preLaunch: '', wrapper: '', postExit: '' }
   }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },

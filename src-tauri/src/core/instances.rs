@@ -87,6 +87,8 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         banner_url: None,
         optifine: None,
         own_pack: None,
+        env: Vec::new(),
+        commands: None,
     };
     extra(&mut inst);
     tokio::fs::create_dir_all(paths::game_dir(&id)).await?;
@@ -110,6 +112,7 @@ pub async fn update(id: &str, patch: Value) -> Result<Instance> {
         }
     }
     let inst: Instance = serde_json::from_value(current)?;
+    crate::game::commands::check_env(&inst.env)?;
     save(&inst).await?;
     Ok(inst)
 }

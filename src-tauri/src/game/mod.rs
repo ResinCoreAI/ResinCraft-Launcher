@@ -1,5 +1,6 @@
 //! Minecraft versions, mod loaders, Java and launching (`versions:*`, `java:*`, `instances:launch|kill|running|runs`).
 
+pub mod commands;
 pub mod forge;
 pub mod java;
 pub mod launch;

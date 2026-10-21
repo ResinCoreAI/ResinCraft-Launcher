@@ -21,6 +21,7 @@ use crate::core::types::{GameEvent, Instance, LoaderType, LogEvent, LogLine, Run
 use crate::player::accounts::LaunchAuth;
 use crate::{bail_tr, err_tr, tr};
 
+use super::commands;
 use super::java::{find_java, hidden_command, install_java};
 use super::loaders::{resolve_version, JavaPicker, ResolveContext};
 use super::mojang::{asset_items, plain,client_jar, logging_config, materialize_legacy_assets, resolve_libraries, rules_allow, ArgValue, Argument, VersionJson};
@@ -374,6 +375,15 @@ fn with_target(mut game: Vec<String>, target: Option<&Target>, mc: &str) -> Resu
     Ok(game)
 }
 
+/// The memory flags and the player's JVM arguments (also `$INST_JAVA_ARGS` for commands).
+fn memory_and_user_flags(inst: &Instance, settings: &Settings) -> Vec<String> {
+    let memory = inst.memory_mb.unwrap_or(settings.memory_mb);
+    let user_jvm = non_empty(inst.jvm_args.as_deref()).unwrap_or_else(|| settings.jvm_args.clone());
+    let mut args = vec![format!("-Xmx{memory}M"), format!("-Xms{}M", memory.min(1024))];
+    args.extend(split_args(&user_jvm));
+    args
+}
+
 /// `target` is where the game goes once it's up: a server (quick play on 1.20+, `--server` before) or a world.
 fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchAuth, target: Option<&Target>) -> Result<Vec<String>> {
     let v = &p.version;
@@ -428,10 +438,7 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
     let game = with_target(game, target, &inst.mc_version)?;
 
     let main_class = v.main_class.clone().filter(|m| !m.is_empty()).ok_or_else(|| err_tr!("launch.noMainClass", "Version {version} has no main class", version = v.id))?;
-    let memory = inst.memory_mb.unwrap_or(settings.memory_mb);
-    let user_jvm = non_empty(inst.jvm_args.as_deref()).unwrap_or_else(|| settings.jvm_args.clone());
-    let mut args = vec![format!("-Xmx{memory}M"), format!("-Xms{}M", memory.min(1024))];
-    args.extend(split_args(&user_jvm));
+    let mut args = memory_and_user_flags(inst, settings);
     args.extend(jvm.iter().map(sub));
     if let Some(l) = &p.log_argument {
         args.push(l.clone());
@@ -646,20 +653,84 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     push(LogLine { text: format!("Java: {}", prepared.java), level: "info" });
     push(LogLine { text: format!("Command: {}", shown.join(" ")), level: "debug" });
 
+    let own = commands::effective(settings, &inst);
+    let env = commands::merged_env(settings, &inst);
+    let vars = commands::command_vars(&inst, &prepared.java, &memory_and_user_flags(&inst, settings), &env);
+    if !env.is_empty() {
+        push(LogLine { text: format!("Environment: {}", commands::shown_env(&env)), level: "info" });
+    }
+    let ticker = {
+        let flush = flush.clone();
+        tokio::spawn(async move {
+            let mut iv = tokio::time::interval(Duration::from_millis(120));
+            loop {
+                iv.tick().await;
+                flush();
+            }
+        })
+    };
+    let stop_early = |message: Option<String>| {
+        flush();
+        ticker.abort();
+        release(id, slot);
+        game_event(&run, "stopped", None, message);
+    };
+
     let game_dir = paths::game_dir(id);
     let _ = tokio::fs::create_dir_all(&game_dir).await;
-    let mut cmd = hidden_command(&prepared.java);
-    cmd.args(&args)
+    let pre_launch = own.pre_launch.trim().to_string();
+    if !pre_launch.is_empty() {
+        push(LogLine { text: format!("Running pre-launch command: {pre_launch}"), level: "info" });
+        let ran = Task::run(tr!("commands.runningPreLaunch", "Running the pre-launch command for {name}", name = inst.name), Some(id.to_string()), |_| {
+            let (vars, dir, push) = (vars.clone(), game_dir.clone(), push.clone());
+            async move {
+                match commands::run(&pre_launch, &vars, &dir, commands::COMMAND_TIMEOUT, push).await? {
+                    Some(f) if f.code == Some(0) => Ok(()),
+                    Some(f) => {
+                        let code = f.code.map(|c| c.to_string()).unwrap_or_else(|| "none".into());
+                        let output = if f.tail.is_empty() { "(no output)".to_string() } else { f.tail.join("\n") };
+                        bail_tr!("commands.preLaunchFailed", "The pre-launch command failed (exit code {code}), so the game didn't start:\n{output}", code = code, output = output)
+                    }
+                    None => bail_tr!(
+                        "commands.preLaunchTimedOut",
+                        "The pre-launch command was still running after {minutes} minutes, so it was stopped and the game didn't start.",
+                        minutes = commands::COMMAND_TIMEOUT.as_secs() / 60
+                    ),
+                }
+            }
+        })
+        .await;
+        if let Err(e) = ran {
+            push(LogLine { text: e.to_string(), level: "error" });
+            stop_early(None);
+            return Err(e);
+        }
+    }
+
+    let wrapper = own.wrapper.trim().to_string();
+    let (program, program_args) = if wrapper.is_empty() { (prepared.java.clone(), args.clone()) } else { commands::wrapped(&wrapper, &prepared.java, &args, &vars) };
+    if !wrapper.is_empty() {
+        push(LogLine { text: format!("Wrapper: {wrapper}"), level: "info" });
+    }
+    let mut cmd = hidden_command(&program);
+    cmd.args(&program_args)
+        .envs(vars.iter().map(|(k, v)| (k, v)))
         .current_dir(&game_dir)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    // Stop has to reach Java behind the wrapper too: give them a process group of their own.
+    #[cfg(unix)]
+    if !wrapper.is_empty() {
+        cmd.process_group(0);
+    }
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
-            flush();
-            release(id, slot);
-            game_event(&run, "stopped", None, Some(e.to_string()));
+            stop_early(Some(e.to_string()));
+            if !wrapper.is_empty() {
+                bail_tr!("commands.wrapperStartFailed", "Couldn't start the wrapper command ({program}): {error}", program = program, error = e.to_string());
+            }
             bail_tr!("launch.javaStartFailed", "Couldn't start Java ({java}): {error}", java = prepared.java, error = e.to_string());
         }
     };
@@ -701,16 +772,6 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
             parser.feed("\n");
         }));
     }
-    let ticker = {
-        let flush = flush.clone();
-        tokio::spawn(async move {
-            let mut iv = tokio::time::interval(Duration::from_millis(120));
-            loop {
-                iv.tick().await;
-                flush();
-            }
-        })
-    };
 
     game_event(&run, "running", None, None);
     if let Some(f) = hooks.on_started {
@@ -720,6 +781,8 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
 
     let id = id.to_string();
     let on_exit = hooks.on_exit;
+    let post_exit = own.post_exit.trim().to_string();
+    let wrapped = !wrapper.is_empty();
     tokio::spawn(async move {
         let mut killed = false;
         let status = loop {
@@ -727,7 +790,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
                 s = child.wait() => break s,
                 Some(()) = kill_rx.recv(), if !killed => {
                     killed = true;
-                    terminate(&mut child);
+                    terminate(&mut child, wrapped);
                 }
             }
         };
@@ -745,6 +808,20 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
             code.map(|c| c.to_string()).unwrap_or_else(|| "null".into())
         };
         push(LogLine { text: format!("Game exited with code {shown_code}"), level: if crashed { "error" } else { "info" } });
+        if !post_exit.is_empty() {
+            push(LogLine { text: format!("Running post-exit command: {post_exit}"), level: "info" });
+            let mut vars = vars;
+            vars.push(("INST_EXIT_CODE".into(), if killed { String::new() } else { code.map(|c| c.to_string()).unwrap_or_default() }));
+            let line = match commands::run(&post_exit, &vars, &paths::game_dir(&id), commands::COMMAND_TIMEOUT, push.clone()).await {
+                Ok(Some(f)) => LogLine {
+                    text: format!("Post-exit command finished with code {}", f.code.map(|c| c.to_string()).unwrap_or_else(|| "none".into())),
+                    level: if f.code == Some(0) { "info" } else { "warn" },
+                },
+                Ok(None) => LogLine { text: format!("Post-exit command was still running after {} minutes and was stopped", commands::COMMAND_TIMEOUT.as_secs() / 60), level: "warn" },
+                Err(e) => LogLine { text: format!("Post-exit command didn't run: {e}"), level: "error" },
+            };
+            push(line);
+        }
         flush();
         ticker.abort();
         let secs = (started.elapsed().as_millis() as f64 / 1000.0).round() as i64;
@@ -763,11 +840,19 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
 }
 
 /// Asks the game to stop: SIGTERM on Unix (lets Minecraft save), TerminateProcess on Windows (as Node's kill does).
-fn terminate(child: &mut tokio::process::Child) {
+/// Behind a wrapper the child is the wrapper, so the whole tree (process group) gets it.
+fn terminate(child: &mut tokio::process::Child, tree: bool) {
     #[cfg(unix)]
     if let Some(pid) = child.id() {
-        if std::process::Command::new("kill").arg("-TERM").arg(pid.to_string()).status().map(|s| s.success()).unwrap_or(false) {
+        let target = if tree { format!("-{pid}") } else { pid.to_string() };
+        if std::process::Command::new("kill").args(["-TERM", "--", &target]).status().map(|s| s.success()).unwrap_or(false) {
             return;
+        }
+    }
+    #[cfg(windows)]
+    if tree {
+        if let Some(pid) = child.id() {
+            commands::kill_tree(pid);
         }
     }
     let _ = child.start_kill();
