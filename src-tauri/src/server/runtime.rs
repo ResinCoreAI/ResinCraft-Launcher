@@ -561,7 +561,7 @@ fn net_state(state: &'static str, address: Option<String>, error: Option<String>
 fn resin_failed(e: &anyhow::Error) -> ResinNet {
     let error = text_of(e).cloned().unwrap_or_else(|| Text::plain(e.to_string()));
     let data = (error.key == "hostRelay.overQuota").then_some("out");
-    ResinNet { error: Some(error), data, ..ResinNet::default() }
+    ResinNet { error: Some(error), data, banned: relay::is_banned(e), ..ResinNet::default() }
 }
 
 /// What the account's data looks like now: used, its cap, top-ups, and whether it's low or out.
@@ -738,7 +738,12 @@ fn on_resin_status(id: &str, status: relay::Status) {
         }
         relay::Status::Failed(e) => {
             eprintln!("[server] ResinCraft Relay stopped: {e:#}");
-            n = ServerNet { error_text: text_of(&e).cloned(), ..net_state("failed", None, Some(e.to_string()), None) };
+            // Banned: the card and the banner say until when and why (and nothing reconnects).
+            let resin = relay::is_banned(&e).then(|| ResinNet { name: resin.name.clone(), ..resin_failed(&e) });
+            if resin.is_some() {
+                attention();
+            }
+            n = ServerNet { error_text: text_of(&e).cloned(), resin, ..net_state("failed", None, Some(e.to_string()), None) };
         }
     }
     // Running low or out of data: flash the taskbar once per step (the app shows a notification too).

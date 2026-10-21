@@ -6,6 +6,7 @@ import type {
   DnsCheck,
   DnsRecord,
   DomainInfo,
+  EngineText,
   LogLine,
   PlayerListKind,
   PropEntry,
@@ -24,6 +25,19 @@ import type {
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
 
 type Listener<T> = (e: T) => void
+
+/** The relay's ban for ?relay=banned (3 days, with a reason) or ?relay=banned-forever, as the engine words it. */
+function mockRelayBan(): EngineText | undefined {
+  const mode = new URLSearchParams(location.search).get('relay')
+  if (mode !== 'banned' && mode !== 'banned-forever') return undefined
+  const until = Math.floor(Date.now() / 1000) + 3 * 86400 + 3600
+  const base: EngineText =
+    mode === 'banned'
+      ? { key: 'hostRelay.bannedUntil', text: "You're banned from ResinCraft Relay until 2026-10-24 18:00 UTC (in 3 days).", params: { date: { dateTime: until }, left: { timeLeft: until } } }
+      : { key: 'hostRelay.bannedForever', text: "You're banned from ResinCraft Relay permanently." }
+  const reason = 'Griefing other servers through the relay'
+  return { key: 'hostRelay.bannedReason', text: `${base.text} Reason: ${reason}`, params: { ban: base, reason } }
+}
 
 export function mockServers(): { server: ResinApi['server']; onServer: ResinApi['on']['server']; onServerLog: ResinApi['on']['serverLog'] } {
   const now = Date.now()
@@ -496,6 +510,17 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
           fire(id)
           return
         }
+        // ?relay=banned (or banned-forever) shows the relay's admin banning the account mid-session.
+        const ban = mockRelayBan()
+        if (net.via === 'resin' && ban) {
+          patch(id, { net })
+          fire(id)
+          later(id, 2500, () => {
+            patch(id, { net: { state: 'failed', error: ban.text, errorText: ban, resin: { name: relayName, usedBytes: 0, limitBytes: 0, banned: true, error: ban } } })
+            fire(id)
+          })
+          return
+        }
         if (geyser[id]) net.bedrockAddress = `${PUBLIC_IP}:19132`
         if (net.via === 'resin' && net.resin?.warning)
           say(id, `[${ts()}] [Server thread/INFO]: [Server] ResinCraft Relay closes in ${net.resin.warning} minutes unless the host continues.`)
@@ -716,6 +741,8 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     }),
     relayCheck: async (id, name) => {
       await wait(null, 450)
+      const ban = mockRelayBan()
+      if (ban) throw { message: ban.text, key: ban.key, params: ban.params }
       if (['smp', 'survival', 'test-server'].includes(name)) {
         return {
           name,

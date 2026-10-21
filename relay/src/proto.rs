@@ -21,6 +21,9 @@
 //! (answered with `top_up`, which the relay also sends when its admin adds data), and [`Usage`] carries the
 //! account's own cap (top-ups and unlimited accounts included). Older launchers never get `top_up` and ignore
 //! the new [`Usage`] and [`Limits`] fields.
+//!
+//! A `banned` error carries the ban itself ([`Ban`]: until when, and why) in `ban`. It needs no protocol version
+//! of its own: every launcher knows the `banned` code, and older ones skip the field.
 
 use serde::{Deserialize, Serialize};
 
@@ -134,7 +137,13 @@ pub enum RelayMsg {
         usage: Usage,
     },
     Pong { seq: u64 },
-    Error { code: ErrorCode, message: String },
+    Error {
+        code: ErrorCode,
+        message: String,
+        /// With `banned`: how long and why (relays from before this field leave it out).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ban: Option<Ban>,
+    },
     /// The relay is restarting: reconnect after this long.
     Shutdown { reconnect_ms: u64 },
 }
@@ -206,6 +215,32 @@ pub fn top_up_refusal(code: ErrorCode) -> &'static str {
     match code {
         ErrorCode::TopUpNotYet => "there's still enough data left this month",
         _ => "no more top-ups this month; the relay's admin can add data",
+    }
+}
+
+/// An account's ban, as the banned launcher is told.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Ban {
+    /// When it ends (Unix seconds); None: never.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<u64>,
+    /// The admin's words (may be empty).
+    #[serde(default)]
+    pub reason: String,
+}
+
+impl Ban {
+    /// "until 2026-11-01 18:00 UTC" or "permanently", then the reason: the English text in the error, which is
+    /// what launchers that don't know `ban` can show.
+    pub fn describe(&self) -> String {
+        let how_long = match self.until {
+            Some(t) => format!("until {}", utc_text(t)),
+            None => "permanently".to_string(),
+        };
+        match self.reason.trim() {
+            "" => format!("this account is banned from the relay {how_long}"),
+            why => format!("this account is banned from the relay {how_long}. Reason: {why}"),
+        }
     }
 }
 
@@ -380,6 +415,19 @@ pub fn address(name: &str, base_domain: &str) -> String {
 
 /// "2026-10" for a Unix time in seconds (UTC).
 pub fn month_of(unix_secs: u64) -> String {
+    let (year, month, _) = civil(unix_secs);
+    format!("{year:04}-{month:02}")
+}
+
+/// "2026-11-01 18:00 UTC" for a Unix time in seconds.
+pub fn utc_text(unix_secs: u64) -> String {
+    let (year, month, day) = civil(unix_secs);
+    let secs = unix_secs % 86_400;
+    format!("{year:04}-{month:02}-{day:02} {:02}:{:02} UTC", secs / 3600, secs % 3600 / 60)
+}
+
+/// (year, month, day) of a Unix time in seconds (UTC).
+fn civil(unix_secs: u64) -> (i64, i64, i64) {
     // Howard Hinnant's days-to-civil algorithm.
     let z = (unix_secs / 86_400) as i64 + 719_468;
     let era = z.div_euclid(146_097);
@@ -387,9 +435,10 @@ pub fn month_of(unix_secs: u64) -> String {
     let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = yoe + era * 400 + i64::from(month <= 2);
-    format!("{year:04}-{month:02}")
+    (year, month, day)
 }
 
 pub fn now_secs() -> u64 {
@@ -437,6 +486,23 @@ mod tests {
         assert_eq!(month_of(1_709_164_800), "2024-02"); // 2024-02-29 (leap day)
         assert_eq!(month_of(1_735_689_599), "2024-12"); // 2024-12-31 23:59:59
         assert_eq!(month_of(1_735_689_600), "2025-01");
+        assert_eq!(utc_text(1_709_164_800 + 13 * 3600 + 5 * 60 + 59), "2024-02-29 13:05 UTC");
+        assert_eq!(utc_text(1_735_689_599), "2024-12-31 23:59 UTC");
+    }
+
+    #[test]
+    fn bans_on_the_wire() {
+        let ban = RelayMsg::Error { code: ErrorCode::Banned, message: "x".into(), ban: Some(Ban { until: Some(1_735_689_600), reason: "griefing".into() }) };
+        let text = serde_json::to_string(&ban).unwrap();
+        assert_eq!(text, r#"{"t":"error","code":"banned","message":"x","ban":{"until":1735689600,"reason":"griefing"}}"#);
+        assert_eq!(serde_json::from_str::<RelayMsg>(&text).unwrap(), ban);
+        // Permanent; and from a relay that doesn't send `ban` yet.
+        let forever: RelayMsg = serde_json::from_str(r#"{"t":"error","code":"banned","message":"x","ban":{}}"#).unwrap();
+        assert!(matches!(forever, RelayMsg::Error { ban: Some(Ban { until: None, .. }), .. }));
+        let old: RelayMsg = serde_json::from_str(r#"{"t":"error","code":"banned","message":"x"}"#).unwrap();
+        assert!(matches!(old, RelayMsg::Error { ban: None, .. }));
+        assert_eq!(Ban { until: Some(1_735_689_600), reason: " griefing ".into() }.describe(), "this account is banned from the relay until 2025-01-01 00:00 UTC. Reason: griefing");
+        assert_eq!(Ban::default().describe(), "this account is banned from the relay permanently");
     }
 
     #[test]
@@ -446,7 +512,7 @@ mod tests {
         assert_eq!(text, r#"{"t":"reserve","name":"abc"}"#);
         assert_eq!(serde_json::from_str::<AgentMsg>(&text).unwrap(), up);
         let down: RelayMsg = serde_json::from_str(r#"{"t":"error","code":"something_new","message":"x"}"#).unwrap();
-        assert_eq!(down, RelayMsg::Error { code: ErrorCode::Unknown, message: "x".into() });
+        assert_eq!(down, RelayMsg::Error { code: ErrorCode::Unknown, message: "x".into(), ban: None });
         assert!(!ErrorCode::NameTaken.retryable() && ErrorCode::ShuttingDown.retryable());
         assert!(ErrorCode::Paused.retryable() && ErrorCode::ServiceOff.retryable() && !ErrorCode::SessionEnded.retryable());
         // Fields protocol 1 launchers don't know are skipped by them, and default when missing.

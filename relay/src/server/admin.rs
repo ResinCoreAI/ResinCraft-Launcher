@@ -4,8 +4,9 @@
 //! - `GET /healthz`: 200 with `{"ok":true,…}` while the relay runs.
 //! - `GET /metrics`: Prometheus counters.
 //! - With `Authorization: Bearer <admin token>`: `GET /admin/tunnels`, `GET /admin/names`, `GET /admin/bans`,
-//!   `POST /admin/ban` and `POST /admin/unban` with `{"uuid": "…"}` or `{"ip": "…"}` (and an optional
-//!   `"reason"`), `POST /admin/release` with `{"name": "…"}`.
+//!   `POST /admin/ban` and `POST /admin/unban` with `{"uuid": "…"}` or `{"ip": "…"}` (a ban takes an optional
+//!   `"reason"` and `"until"` (Unix seconds) or `"hours"`; without either it's permanent),
+//!   `POST /admin/release` with `{"name": "…"}`.
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -91,7 +92,10 @@ fn admin(relay: &Relay, method: &str, path: &str, input: &Value) -> Response {
             Response::ok(json!({ "uuids": uuids, "ips": ips, "fromConfig": { "uuids": relay.cfg.bans.uuids, "ips": relay.cfg.bans.ips } }))
         }
         ("POST", "/admin/ban") | ("POST", "/admin/unban") => {
-            let ban = path.ends_with("/ban").then(|| (field("reason").unwrap_or_default(), None));
+            let ban = match path.ends_with("/ban").then(|| super::ban_end(input)).transpose() {
+                Ok(end) => end.map(|end| (super::ban_reason(field("reason")), end)),
+                Err(why) => return Response::error("400 Bad Request", why),
+            };
             let banned = ban.is_some();
             if let Some(uuid) = field("uuid") {
                 let Some(id) = relay.ban_uuid(&uuid, ban) else { return Response::error("400 Bad Request", "not a UUID") };

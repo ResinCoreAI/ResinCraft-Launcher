@@ -1,7 +1,7 @@
 // ResinCraft Relay for a hosted server: the name friends type (name.rscraft.resincore.tech), checked and reserved on
 // the relay from Settings → Internet access, and the lines the Connect card shows about it.
 import { useEffect, useRef, useState } from 'react'
-import { CircleCheck, CirclePause, CircleX, Gauge, Infinity as InfinityIcon, Loader2, PlusCircle, RefreshCw, RotateCcw, Timer, TimerOff, Users } from 'lucide-react'
+import { Ban, CircleCheck, CirclePause, CircleX, Gauge, Infinity as InfinityIcon, Loader2, PlusCircle, RefreshCw, RotateCcw, Timer, TimerOff, Users } from 'lucide-react'
 import type { RelayInfo, ResinNet, ServerEvent, ServerInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -249,6 +249,7 @@ export function RelaySettings({ s, info, reload }: { s: ServerInfo; info?: Relay
               <RelayLive s={s} />
             </div>
           )}
+          <RelayBanned s={s} />
           <RelayOutOfData s={s} />
         </>
       )}
@@ -317,6 +318,30 @@ function SessionLeft({ endsAt, continues }: { endsAt?: number; continues: number
   )
 }
 
+/** The ban's words (until when, or permanently, and why), from the relay's refusal. */
+function banText(s: ServerInfo): string | undefined {
+  const net = s.net
+  if (!net?.resin?.banned) return undefined
+  return tx(net.resin.error ?? net.errorText, net.error ?? t('engine.hostRelay.banned'))
+}
+
+/** "You're banned from ResinCraft Relay until … (in 3 days). Reason: …", above the console and in the relay settings. */
+export function RelayBanned({ s }: { s: ServerInfo }) {
+  // The time left counts down.
+  useNow(30_000)
+  const text = banText(s)
+  if (!text) return null
+  return (
+    <div className="relay-banner banned" role="alert">
+      <Ban />
+      <div className="grow">
+        <b>{text}</b>
+        <span>{t('servers.relayBan.hint')}</span>
+      </div>
+    </div>
+  )
+}
+
 /**
  * The relay's time limit and admin switch, shown above the server console: minutes left with Continue,
  * the admin's pause or switch-off message, or the ended session with Start again.
@@ -328,6 +353,7 @@ export function RelaySessionBanner({ s }: { s: ServerInfo }) {
   const net = s.net
   const resin = net?.resin
   if (!net || !resin) return null
+  if (resin.banned) return <RelayBanned s={s} />
 
   const act = async (run: () => Promise<void>, done?: string) => {
     setBusy(true)
@@ -390,7 +416,7 @@ export function RelaySessionBanner({ s }: { s: ServerInfo }) {
 
 /**
  * App-wide, whatever page is open: a notification when a hosted server's relay session is 15 minutes from its end
- * (with Continue), at each warning, when it ended, and when its data runs low or out (with Get 30 GB more) or the
+ * (with Continue), at each warning, when it ended, when the relay's admin banned the account (until when and why), and when its data runs low or out (with Get 30 GB more) or the
  * relay's admin added some. Each one once.
  */
 export function RelayWatcher() {
@@ -403,7 +429,7 @@ export function RelayWatcher() {
       api.on.server(async (e: ServerEvent) => {
         const resin = e.net?.resin
         const id = e.serverId
-        const session = resin?.warning !== undefined ? `warn:${resin.warning}` : resin?.ended ? 'ended' : resin?.soon ? 'soon' : ''
+        const session = resin?.banned ? 'banned' : resin?.warning !== undefined ? `warn:${resin.warning}` : resin?.ended ? 'ended' : resin?.soon ? 'soon' : ''
         const data = resin?.data ?? ''
         const added = resin?.adminAddedBytes ?? 0
         const newSession = seenSession.current.get(id) !== session && session !== ''
@@ -418,7 +444,8 @@ export function RelayWatcher() {
           .then((s) => s.name)
           .catch(() => id)
         const cont = { label: t('servers.relaySession.continue'), run: () => void continueRelay(id, toast) }
-        if (newSession && session === 'ended') toast(t('servers.relaySession.endedToast', { server: name }), 'error')
+        if (newSession && session === 'banned') toast(t('servers.relayBan.toast', { server: name, message: tx(resin?.error ?? e.net?.errorText, t('engine.hostRelay.banned')) }), 'error')
+        else if (newSession && session === 'ended') toast(t('servers.relaySession.endedToast', { server: name }), 'error')
         else if (newSession && session === 'soon')
           toast(t('servers.relaySession.soonToast', { server: name, minutes: Math.max(1, Math.ceil(((resin?.endsAt ?? 0) - Date.now()) / 60_000)) }), 'info', cont)
         else if (newSession) toast(t('servers.relaySession.warningToast', { server: name, minutes: resin!.warning! }), 'info', cont)

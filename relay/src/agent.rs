@@ -15,7 +15,7 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
 use crate::proto::{
-    self, AgentMsg, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS,
+    self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS,
     PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION,
 };
 
@@ -41,6 +41,9 @@ pub struct AgentConfig {
 pub enum AgentError {
     /// The relay said no (`code` decides what the player is told).
     Refused(ErrorCode, String),
+    /// This account is banned from the relay: until when and why (relays from before bans said so send a plain
+    /// `Refused(Banned, …)` instead).
+    Banned(Ban),
     /// The relay couldn't be reached, didn't answer or the connection dropped.
     Network(String),
     /// The relay sent something unexpected.
@@ -54,6 +57,7 @@ impl AgentError {
     pub fn retryable(&self) -> bool {
         match self {
             AgentError::Refused(code, _) => code.retryable(),
+            AgentError::Banned(_) => false,
             AgentError::Network(_) | AgentError::Protocol(_) => true,
             AgentError::Config(_) => false,
         }
@@ -62,6 +66,7 @@ impl AgentError {
     pub fn code(&self) -> Option<ErrorCode> {
         match self {
             AgentError::Refused(code, _) => Some(*code),
+            AgentError::Banned(_) => Some(ErrorCode::Banned),
             _ => None,
         }
     }
@@ -71,6 +76,7 @@ impl std::fmt::Display for AgentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AgentError::Refused(_, msg) => write!(f, "the relay refused: {msg}"),
+            AgentError::Banned(ban) => write!(f, "the relay refused: {}", ban.describe()),
             AgentError::Network(msg) => write!(f, "{msg}"),
             AgentError::Protocol(msg) => write!(f, "unexpected answer from the relay: {msg}"),
             AgentError::Config(msg) => write!(f, "{msg}"),
@@ -79,6 +85,14 @@ impl std::fmt::Display for AgentError {
 }
 
 impl std::error::Error for AgentError {}
+
+/// The relay's `error`, with its ban when it sent one.
+fn refused(code: ErrorCode, message: String, ban: Option<Ban>) -> AgentError {
+    match ban {
+        Some(ban) if code == ErrorCode::Banned => AgentError::Banned(ban),
+        _ => AgentError::Refused(code, message),
+    }
+}
 
 fn net(e: impl std::fmt::Display) -> AgentError {
     AgentError::Network(e.to_string())
@@ -331,8 +345,23 @@ impl Connection {
     async fn send(&mut self, msg: &AgentMsg) -> Result<(), AgentError> {
         let mut line = serde_json::to_vec(msg).map_err(|e| AgentError::Protocol(e.to_string()))?;
         line.push(b'\n');
-        self.writer.write_all(&line).await.map_err(|e| net(format!("the relay connection dropped: {e}")))?;
-        self.writer.flush().await.map_err(|e| net(format!("the relay connection dropped: {e}")))
+        let sent = match self.writer.write_all(&line).await {
+            Ok(()) => self.writer.flush().await,
+            Err(e) => Err(e),
+        };
+        match sent {
+            Ok(()) => Ok(()),
+            Err(e) => Err(self.last_words().await.unwrap_or_else(|| net(format!("the relay connection dropped: {e}")))),
+        }
+    }
+
+    /// Why the relay hung up, when it said so first (a ban arrives just before the connection closes).
+    async fn last_words(&mut self) -> Option<AgentError> {
+        let line = tokio::time::timeout(Duration::from_secs(1), self.lines.next()).await.ok()??.ok()?;
+        match serde_json::from_str(&line).ok()? {
+            RelayMsg::Error { code, message, ban } => Some(refused(code, message, ban)),
+            _ => None,
+        }
     }
 
     /// The next message that answers a request (usage reports and pongs are skipped; errors become Err).
@@ -347,7 +376,7 @@ impl Connection {
                 | RelayMsg::SessionWarning { .. }
                 | RelayMsg::SessionExtended { .. }
                 | RelayMsg::TopUp { by_admin: true, .. } => continue,
-                RelayMsg::Error { code, message } => return Err(AgentError::Refused(code, message)),
+                RelayMsg::Error { code, message, ban } => return Err(refused(code, message, ban)),
                 RelayMsg::Shutdown { .. } => return Err(AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into())),
                 other => return Ok(other),
             }
@@ -484,7 +513,7 @@ impl Connection {
                         Ok(RelayMsg::Service { state, message }) => on_event(Event::Service { state, message }),
                         Ok(RelayMsg::TopUp { added_bytes, by_admin, refused, usage }) => on_event(Event::TopUp { added_bytes, by_admin, refused, usage }),
                         Ok(RelayMsg::Pong { .. }) => {}
-                        Ok(RelayMsg::Error { code, message }) => return AgentError::Refused(code, message),
+                        Ok(RelayMsg::Error { code, message, ban }) => return refused(code, message, ban),
                         Ok(RelayMsg::Shutdown { .. }) => return AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into()),
                         Ok(_) => {}
                         Err(e) => return e,

@@ -886,6 +886,8 @@ export interface ResinNet {
   off?: boolean
   /** The session time ran out; the host can start it again. */
   ended?: boolean
+  /** The relay's admin banned the account: `error` says until when and why. The launcher doesn't reconnect. */
+  banned?: boolean
 }
 
 /** The ResinCraft Relay part of a server's Settings. */

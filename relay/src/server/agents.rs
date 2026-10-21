@@ -20,7 +20,7 @@ use super::metrics::Metrics;
 use super::{Account, Kick, Relay, Tunnel};
 use crate::agent::{yamux_config, Io};
 use super::session::{SessionClock, Tick};
-use crate::proto::{self, now_secs, AgentMsg, ErrorCode, RelayMsg, MAX_LINE, MIN_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION};
+use crate::proto::{self, now_secs, AgentMsg, Ban, ErrorCode, RelayMsg, MAX_LINE, MIN_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION};
 
 /// Control messages one connection may send per minute.
 const MESSAGES_PER_MINUTE: u32 = 240;
@@ -124,12 +124,17 @@ enum Step {
 }
 
 fn error(code: ErrorCode) -> RelayMsg {
-    RelayMsg::Error { code, message: message(code).to_string() }
+    RelayMsg::Error { code, message: message(code).to_string(), ban: None }
 }
 
 /// An error with the admin's own words when there are some (paused, off).
 fn error_with(code: ErrorCode, text: Option<String>) -> RelayMsg {
-    RelayMsg::Error { code, message: text.unwrap_or_else(|| message(code).to_string()) }
+    RelayMsg::Error { code, message: text.unwrap_or_else(|| message(code).to_string()), ban: None }
+}
+
+/// `banned`, with how long and why. The message says the same in English, for launchers that don't read `ban`.
+fn banned(ban: Ban) -> RelayMsg {
+    RelayMsg::Error { code: ErrorCode::Banned, message: ban.describe(), ban: Some(ban) }
 }
 
 /// English text for each code (the launcher shows its own, translated wording).
@@ -276,6 +281,11 @@ impl Agent {
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => self.account.is_some(),
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
                     };
+                    // The admin banned this account: say so (how long, why) and hang up.
+                    if let Some(ban) = self.account.as_ref().filter(|_| mine).and_then(|a| self.relay.ban_of(&a.uuid)) {
+                        let _ = send(&mut w, &banned(ban)).await;
+                        return;
+                    }
                     let admin_added = change.ok().and_then(|c| c.admin_added);
                     match admin_added {
                         Some(added_bytes) if mine && self.version >= TOPUP_PROTOCOL_VERSION => {
@@ -293,7 +303,8 @@ impl Agent {
                     (self.version >= 2).then_some(RelayMsg::Service { state, message })
                 }
                 (reason, text) = kick.wait() => {
-                    let _ = send(&mut w, &error_with(reason, text)).await;
+                    let ban = self.account.as_ref().filter(|_| reason == ErrorCode::Banned).and_then(|a| self.relay.ban_of(&a.uuid));
+                    let _ = send(&mut w, &ban.map_or_else(|| error_with(reason, text), banned)).await;
                     return;
                 }
                 _ = shutdown.changed() => {
@@ -357,10 +368,10 @@ impl Agent {
                 }
                 match auth::verify(&relay.http, &relay.cfg.auth.profile_url, &minecraft_token).await {
                     Ok(profile) => {
-                        if relay.is_banned_uuid(&profile.uuid) {
+                        if let Some(ban) = relay.ban_of(&profile.uuid) {
                             Metrics::inc(&relay.metrics.rejected_banned_total);
                             relay.event("auth-fail", format!("Banned account {} ({}) tried to sign in", profile.name, profile.uuid), Some(self.peer.ip()));
-                            return Step::Close(error(ErrorCode::Banned));
+                            return Step::Close(banned(ban));
                         }
                         Metrics::inc(&relay.metrics.logins_total);
                         let session = relay.new_session(&profile.uuid, &profile.name);
@@ -392,12 +403,13 @@ impl Agent {
                 if self.account.is_some() {
                     return Step::Reply(error(ErrorCode::BadRequest));
                 }
-                match relay.resume(&session) {
-                    Some(acc) if relay.is_banned_uuid(&acc.uuid) => {
+                match relay.resume(&session).map(|acc| (relay.ban_of(&acc.uuid), acc)) {
+                    Some((Some(ban), acc)) => {
+                        Metrics::inc(&relay.metrics.rejected_banned_total);
                         relay.event("auth-fail", format!("Banned account {} ({}) tried to reconnect", acc.name, acc.uuid), Some(self.peer.ip()));
-                        Step::Close(error(ErrorCode::Banned))
+                        Step::Close(banned(ban))
                     }
-                    Some(acc) => {
+                    Some((None, acc)) => {
                         Metrics::inc(&relay.metrics.resumes_total);
                         let reply = RelayMsg::Authed { uuid: acc.uuid.clone(), username: acc.name.clone(), session: None };
                         self.account = Some(acc);

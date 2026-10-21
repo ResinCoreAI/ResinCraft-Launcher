@@ -996,6 +996,9 @@ pub struct ResinNet {
     /// The session time ran out (the card offers to start it again).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub ended: bool,
+    /// The relay's admin banned the account: `error` says until when and why. The launcher doesn't reconnect.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub banned: bool,
 }
 
 /// The ResinCraft Relay part of a server's Settings, before asking the relay anything.

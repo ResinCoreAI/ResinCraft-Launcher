@@ -96,6 +96,15 @@
 .relay-banner.ended > svg {
   color: var(--danger);
 }
+.relay-banner.banned {
+  border-color: var(--danger);
+}
+.relay-banner.banned > svg {
+  color: var(--danger);
+}
+.sv-relay .relay-banner {
+  margin: 4px 0 0;
+}
 @keyframes relay-banner-in {
   from {
     opacity: 0;

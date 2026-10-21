@@ -175,8 +175,25 @@ export function tx(text: EngineText | null | undefined, fallback = ''): string {
   const key = `engine.${text.key}`
   if (!text.key || !(key in en)) return text.text
   const params: Params = {}
-  for (const [k, v] of Object.entries(text.params ?? {})) params[k] = isEngineText(v) ? tx(v) : typeof v === 'number' ? v : String(v ?? '')
+  for (const [k, v] of Object.entries(text.params ?? {})) params[k] = isEngineText(v) ? tx(v) : (moment(v) ?? (typeof v === 'number' ? v : String(v ?? '')))
   return t(key as Key, params)
+}
+
+/**
+ * Engine params that are times: `{ dateTime: unixSecs }` → a date and time in the UI language and the local time zone,
+ * `{ timeLeft: unixSecs }` → how far off it is ("in 3 days"), as of now.
+ */
+function moment(v: unknown): string | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const { dateTime, timeLeft } = v as { dateTime?: unknown; timeLeft?: unknown }
+  const lang = currentLanguage()
+  if (typeof dateTime === 'number') return new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short' }).format(dateTime * 1000)
+  if (typeof timeLeft !== 'number') return undefined
+  const minutes = Math.max(1, Math.ceil((timeLeft * 1000 - Date.now()) / 60_000))
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'always' })
+  if (minutes < 120) return rtf.format(minutes, 'minute')
+  if (minutes < 48 * 60) return rtf.format(Math.round(minutes / 60), 'hour')
+  return rtf.format(Math.round(minutes / 1440), 'day')
 }
 
 /** An engine error in the UI language. `key` keeps the engine's message id for code that reacts to one error. */
