@@ -32,6 +32,12 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       pick: fn('storage:pick'),
       change: fn('storage:change')
     },
+    backup: {
+      export: fn('backup:export'),
+      pick: fn('backup:pick'),
+      inspect: fn('backup:inspect'),
+      import: fn('backup:import')
+    },
     bedrock: {
       status: fn('bedrock:status'),
       play: fn('bedrock:play'),

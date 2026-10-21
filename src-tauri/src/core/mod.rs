@@ -2,6 +2,7 @@
 //! paths, settings, instances, OS integration and the IPC router.
 
 pub mod art;
+pub mod backup;
 pub mod ctx;
 pub mod events;
 pub mod fsutil;

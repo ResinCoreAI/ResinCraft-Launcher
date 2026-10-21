@@ -32,6 +32,39 @@ export interface PendingDownload {
   folder: string
 }
 
+/** What a .resincraft backup holds. */
+export interface BackupInfo {
+  path: string
+  format: string
+  version: number
+  appVersion: string
+  /** When it was made (ms). */
+  created: number
+  instances: { id: string; name: string }[]
+  servers: { id: string; name: string }[]
+  gameFiles: boolean
+  bytes: number
+  /** Ids that already exist here (they come in as copies). */
+  existing: string[]
+  freeBytes: number | null
+}
+
+export interface BackupExport {
+  path: string
+  bytes: number
+  instances: number
+  servers: number
+}
+
+export interface BackupImport {
+  instances: number
+  servers: number
+  renamed: number
+  skins: number
+  quickJoin: number
+  settings: boolean
+}
+
 /** What one look in the Downloads folder found (`instances:collectPending`). */
 export interface PendingCollected {
   /** File names put into the instance just now. */
@@ -1125,6 +1158,16 @@ export interface ResinApi {
     pick(title?: string): Promise<string | null>
     /** Switches to `folder`. `move` (default true): bring the current instances along as a cancellable task. */
     change(folder: string, move?: boolean): Promise<StorageChange>
+  }
+  /** Moving to another PC: everything in one .resincraft file, and back (Settings → Move to another PC). */
+  backup: {
+    /** Makes a backup; `dest` null asks where. Null if the save dialog was cancelled. */
+    export(dest: string | null, gameFiles: boolean): Promise<BackupExport | null>
+    /** The open-file dialog for a backup; null if cancelled. */
+    pick(): Promise<string | null>
+    inspect(path: string): Promise<BackupInfo>
+    /** Adds the backup to this launcher (nothing here is replaced). */
+    import(path: string, useSettings: boolean): Promise<BackupImport>
   }
   /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
   bedrock: {

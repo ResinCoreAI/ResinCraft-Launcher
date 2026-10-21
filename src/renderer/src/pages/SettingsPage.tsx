@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Bug, Coffee, Download, FolderSearch, Gamepad2, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
+import { ArrowLeftRight, Bug, Coffee, Download, FolderSearch, Gamepad2, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
 import { StorageSection } from '../components/Storage'
+import { BackupSection } from '../components/Backup'
 import { UpdatesSection } from '../components/Updates'
 import { PackUpdatesSetting } from '../components/PackUpdates'
 import { useStore } from '../store'
@@ -37,6 +38,7 @@ const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'java', label: 'settings.nav.java', icon: <Coffee size={16} /> },
   { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
   { id: 'storage', label: 'storage.nav', icon: <HardDrive size={16} /> },
+  { id: 'backup', label: 'backup.nav', icon: <ArrowLeftRight size={16} /> },
   { id: 'updates', label: 'updates.nav', icon: <RefreshCw size={16} /> },
   { id: 'about', label: 'settings.nav.about', icon: <Info size={16} /> }
 ]
@@ -353,6 +355,8 @@ export default function SettingsPage() {
           </section>
 
           <StorageSection />
+
+          <BackupSection />
 
           <UpdatesSection />
 

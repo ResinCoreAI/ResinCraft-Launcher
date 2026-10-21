@@ -188,6 +188,31 @@ export function mockApi(): ResinApi {
     },
     settings: { get: () => wait(settings, 0), set: async (p) => (settings = { ...settings, ...p }) },
     storage: mockStorage(),
+    // The preview can't open file dialogs: it pretends a backup was saved, and that one was picked.
+    backup: {
+      export: async (_dest, gameFiles) => {
+        await mockEngine.download({ key: 'backup.exporting', text: 'Making a backup', params: {} })
+        return { path: 'C:\\Users\\you\\Downloads\\ResinCraft backup.resincraft', bytes: gameFiles ? 3.4e9 : 1.2e9, instances: instances.length, servers: 5 }
+      },
+      pick: () => wait('C:\\Users\\you\\Downloads\\ResinCraft backup.resincraft', 200),
+      inspect: async (path) => ({
+        path,
+        format: 'resincraft-backup',
+        version: 1,
+        appVersion: '1.1.0',
+        created: Date.now() - 864e5,
+        instances: instances.map((i) => ({ id: i.id, name: i.name })),
+        servers: [{ id: 'smp', name: 'Friends SMP' }],
+        gameFiles: false,
+        bytes: 1.2e9,
+        existing: instances.slice(0, 2).map((i) => i.id),
+        freeBytes: 210e9
+      }),
+      import: async () => {
+        await mockEngine.download({ key: 'backup.importing', text: 'Importing a backup', params: {} })
+        return { instances: instances.length, servers: 1, renamed: 2, skins: 3, quickJoin: 4, settings: true }
+      }
+    },
     update: updates.update,
     versions: {
       list: () => wait(versions),

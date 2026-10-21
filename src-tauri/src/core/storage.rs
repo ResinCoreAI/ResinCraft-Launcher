@@ -257,6 +257,11 @@ fn drive_root(path: &Path) -> Option<PathBuf> {
     }
 }
 
+/// Free bytes on the drive holding `path` (None: unknown).
+pub fn free_bytes(path: &Path) -> Option<u64> {
+    space(path).map(|(free, _)| free)
+}
+
 /// (free, total) bytes on the drive holding `path`.
 fn space(path: &Path) -> Option<(u64, u64)> {
     #[cfg(windows)]
@@ -520,7 +525,7 @@ pub async fn check(raw: &str) -> Result<FolderCheck> {
 }
 
 /// Why nothing can change right now: a game or server running, other work in the task list, a move.
-async fn blocker() -> Option<Text> {
+pub(crate) async fn blocker() -> Option<Text> {
     if MOVING.load(Ordering::SeqCst) {
         return Some(tr!("storage.moving", "Your instances are being moved to another folder. Wait for that to finish."));
     }
