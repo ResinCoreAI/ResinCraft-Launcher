@@ -31,7 +31,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
       # 0.3.0 is only days old: copies that haven't updated yet still need this address.
-      KEEP_RELEASE_JSON_UNTIL: '1.1.1'
+      KEEP_RELEASE_JSON_UNTIL: '1.1.2'
     steps:
       - name: Copy latest.json to the updates branch
         run: |
