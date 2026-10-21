@@ -19,6 +19,7 @@ import { InstanceTile, Modal, openMenuBelow, playAsEntries, Segmented, Switch, t
 import type { Ping } from './ServersTab'
 import '../instance-tabs.css'
 import '../quickjoin.css'
+import { hasBedrockApp } from '../platform'
 
 /** The same server however it was typed (as in the engine's quickjoin::address_key). */
 export const addressKey = (a: string) => {
@@ -521,7 +522,8 @@ export function EntryModal({
           onChange={(edition) => set({ edition })}
           options={[
             { value: 'java', label: t('quickjoin.edition.java') },
-            { value: 'bedrock', label: t('quickjoin.edition.bedrock') }
+            // Bedrock opens the Microsoft Store game, which only Windows has.
+            ...(hasBedrockApp || d.edition === 'bedrock' ? [{ value: 'bedrock' as const, label: t('quickjoin.edition.bedrock') }] : [])
           ]}
         />
       </div>

@@ -6,21 +6,37 @@ A small native app built with Tauri 2 and Rust, with a React interface. It talks
 
 > NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
+## Download
+
+Get the newest version from [Releases](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
+
+| System | File |
+|---|---|
+| **Windows** 10/11 (x64) | `ResinCraft.Launcher_<version>_x64-setup.exe` |
+| **macOS** 10.15+ (Apple Silicon and Intel) | `ResinCraft.Launcher_<version>_universal.dmg` |
+| **Linux** x64, any distribution | `ResinCraft.Launcher_<version>_amd64.AppImage` (make it executable, then run it) |
+| **Linux** x64, Debian / Ubuntu / Mint | `ResinCraft.Launcher_<version>_amd64.deb` |
+| **Linux** ARM64 (e.g. Raspberry Pi 5) | `ResinCraft.Launcher_<version>_aarch64.AppImage` or `…_arm64.deb` |
+
+Every copy updates itself in place. The builds aren't code-signed yet: Windows may say the publisher is unverified, and macOS that the app is from an unidentified developer (right-click it and choose **Open** the first time).
+
+On Apple Silicon, Minecraft 1.19 and newer run natively; older versions run as Intel through Rosetta 2 (ResinCraft says so if it isn't installed). On ARM Linux, Minecraft 1.19 and newer are supported (older versions have no ARM build of their graphics library). Bedrock Edition is a Microsoft Store app, so its page is Windows-only.
+
 ## Features
 
 | | |
 |---|---|
-| **Instances** | Separate installs per version or modpack, each with its own mods, worlds, Java, memory and JVM arguments. Groups, your own order (drag to arrange), icons, banners and colours. Duplicate, open folder, delete to the Recycle Bin. |
+| **Instances** | Separate installs per version or modpack, each with its own mods, worlds, Java, memory and JVM arguments. Groups, your own order (drag to arrange), icons, banners and colours. Duplicate, open folder, delete to the Recycle Bin / Trash. |
 | **Any version** | Every release and snapshot from Mojang's manifest, back to the classic alphas (legacy asset layouts handled). |
 | **Mod loaders** | Fabric, Quilt, Forge and NeoForge, with a loader version picker. |
 | **Discover** | Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher, Technic and GitHub releases, filtered to the instance's version and loader. "All" searches every site at once; paste a link to install it directly. |
 | **Smart installs** | Pick any version, install several at once, required dependencies added automatically, duplicate-mod check across sources. |
 | **Mod management** | Enable/disable, remove, recognise hand-added jars by hash, check for and apply updates (one or all). Export the mods, resource packs or shaders as a list, and install everything on a list into another instance. |
 | **Modpacks** | Import Modrinth `.mrpack`, CurseForge, FTB, ATLauncher and Technic packs; export an instance as `.mrpack` or a CurseForge `.zip`. |
-| **Java** | Auto-detects installed Javas (including the official launcher's runtimes), picks the right major version per game, and downloads Eclipse Temurin when none fits. |
-| **Accounts** | Microsoft sign-in via device code (no password ever enters the app), tokens encrypted with Windows' data protection, skins, capes and name changes, multiple accounts. Offline profiles for singleplayer and LAN, no Microsoft account needed. |
-| **Server hosting** | Vanilla (releases and snapshots), Paper, Purpur, Folia, Spigot, Leaf, Fabric, Quilt, Forge, NeoForge, Arclight (mods and plugins together) and Bedrock Dedicated Server, or a server from a modpack. Console, players, plugin and mod manager with updates (Modrinth, Hangar, SpigotMC, dev.bukkit.org, CurseForge, GitHub, or a link), optimised startup flags, and "Bedrock players can join" (Geyser + Floodgate). Friends join through the router, playit.gg, ResinCraft Relay (`<name>.rscraft.resincore.tech`) or bore.pub, or your own domain. |
-| **Bedrock Edition** | Shows the installed Minecraft for Windows and Minecraft Preview with their worlds, opens them, and joins your Bedrock servers. |
+| **Java** | Auto-detects installed Javas (including the official launcher's runtimes), picks the right major version per game, and downloads Eclipse Temurin for your system and CPU when none fits. |
+| **Accounts** | Microsoft sign-in via device code (no password ever enters the app), tokens encrypted with Windows' data protection (on macOS and Linux, kept in a file only your user can read), skins, capes and name changes, multiple accounts. Offline profiles for singleplayer and LAN, no Microsoft account needed. |
+| **Server hosting** | Vanilla (releases and snapshots), Paper, Purpur, Folia, Spigot, Leaf, Fabric, Quilt, Forge, NeoForge, Arclight (mods and plugins together) and Bedrock Dedicated Server (Windows and x64 Linux), or a server from a modpack. Console, players, plugin and mod manager with updates (Modrinth, Hangar, SpigotMC, dev.bukkit.org, CurseForge, GitHub, or a link), optimised startup flags, and "Bedrock players can join" (Geyser + Floodgate). Friends join through the router, playit.gg, ResinCraft Relay (`<name>.rscraft.resincore.tech`) or bore.pub, or your own domain. |
+| **Bedrock Edition** | Windows: shows the installed Minecraft for Windows and Minecraft Preview with their worlds, opens them, and joins your Bedrock servers. |
 | **Files** | A file manager and editor on every instance and server. |
 | **Play** | Download progress (any download or install can be cancelled from its card), live colour-coded log console with filter/copy, crash notice, play-time tracking, minimize/hide launcher while playing. |
 | **Updates** | Signed in-app updates from GitHub releases. |
@@ -28,7 +44,11 @@ A small native app built with Tauri 2 and Rust, with a React interface. It talks
 
 ## Getting started
 
-Needs Node.js 24, Rust (stable, MSVC on Windows) and, on Windows, the Visual Studio C++ Build Tools. WebView2 ships with Windows 10/11.
+Needs Node.js 24 and Rust (stable), plus per system:
+
+- **Windows**: the Visual Studio C++ Build Tools (MSVC). WebView2 ships with Windows 10/11.
+- **macOS**: Xcode's command-line tools (`xcode-select --install`).
+- **Linux** (Debian/Ubuntu): `sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf build-essential`.
 
 ```bash
 npm install
@@ -36,7 +56,7 @@ npm run dev
 ```
 
 - `npm run dev` starts the UI on Vite (port 1420) and the Rust engine in `src-tauri/`, with hot reload for the UI. Dev builds keep all game data in `.dev-data/` inside the project, so testing never touches a real install.
-- `npm run build` builds a release installer (NSIS) into `src-tauri/target/release/bundle/`.
+- `npm run build` builds this system's release files into `src-tauri/target/release/bundle/`: the NSIS installer on Windows, the `.app` and `.dmg` on macOS (`npm run build -- --target universal-apple-darwin` for one that runs on both CPUs), the `.AppImage` and `.deb` on Linux. Release CI builds all of them (`.github/workflows/release.yml`).
 - `npm run dev:web` serves the UI alone at http://localhost:1420 with a mock engine and sample data, which is handy for design work.
 - `npm run typecheck` / `npm run format`. Translations: `npx tsx tools/check-i18n.ts` and `npx tsx tools/engine-strings.ts --check`.
 - Headless engine checks (inside `src-tauri/`): `cargo run --example smoke -- 1.21.1 fabric` creates a throwaway instance, downloads everything and boots Minecraft with an offline profile; also `check_content`, `check_player` and `check_server`.
@@ -79,7 +99,7 @@ tools/                 Translation checks
 
 ## Updates
 
-Installed copies update themselves with Tauri's updater (`src-tauri/src/updater.rs`, UI in `src/renderer/src/components/Updates.tsx`): a quiet check when ResinCraft starts and every 6 hours, a small "ResinCraft x.y is ready to install" banner (Update now / Release notes / Later), and **Settings → Updates** (check now, last checked, "Install updates automatically", release notes). The update file is the release's NSIS installer itself (`bundle.createUpdaterArtifacts`). It is checked against the public key in `tauri.conf.json` (and must carry the version it was signed for, `requireSignedVersion`, so a tampered latest.json can't pass off an older release as new), then runs in passive mode: it replaces the program files only, so `%APPDATA%\ResinCraft Launcher` (instances, accounts, settings) stays, and the new version starts by itself. If a game or a hosted server is running, ResinCraft offers to wait until they stop.
+Installed copies update themselves with Tauri's updater (`src-tauri/src/updater.rs`, UI in `src/renderer/src/components/Updates.tsx`): a quiet check when ResinCraft starts and every 6 hours, a small "ResinCraft x.y is ready to install" banner (Update now / Release notes / Later), and **Settings → Updates** (check now, last checked, "Install updates automatically", release notes). The update file is the release's NSIS installer itself on Windows, the `.app.tar.gz` on macOS and the `.AppImage` (or the `.deb`, for installs made from it) on Linux (`bundle.createUpdaterArtifacts`). It is checked against the public key in `tauri.conf.json` (and must carry the version it was signed for, `requireSignedVersion`, so a tampered latest.json can't pass off an older release as new), then installs over the program only (on Windows the installer runs in passive mode), so the data folder (instances, accounts, settings: `%APPDATA%\ResinCraft Launcher`, `~/Library/Application Support/ResinCraft Launcher` or `~/.config/ResinCraft Launcher`) stays, and the new version starts by itself. If a game or a hosted server is running, ResinCraft offers to wait until they stop.
 
 Where it looks (`plugins.updater.endpoints`): `https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/updates/latest.json`. The `updates` branch holds only that file. It's written by `.github/workflows/publish-update.yml` when a release is published (not a draft, not a pre-release, and only if it's the latest release), so a release reaches players only once its draft is published. The release itself then shows just the installer: the `.sig` is removed (its text is inside `latest.json`), and so is `latest.json`, except on releases up to 1.1.2, because launcher 0.3.0 still looks for it on the newest release.
 
@@ -92,7 +112,7 @@ set -a; . ./updater.local.env; set +a; export TAURI_SIGNING_PRIVATE_KEY="$PWD/up
 **Releasing an update.**
 
 1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
-2. Push a tag (`git tag v1.1.2 && git push origin v1.1.2`). CI makes a draft release with `ResinCraft.Launcher_<version>_x64-setup.exe` and `latest.json`.
+2. Push a tag (`git tag v1.1.2 && git push origin v1.1.2`). CI builds on Windows, macOS and Linux (x64 and ARM) and makes a draft release with the downloads listed under [Download](#download), the macOS update file `…_universal.app.tar.gz`, and `latest.json`, which carries the signed update for every platform (`windows-x86_64`, `darwin-aarch64` / `darwin-x86_64`, `linux-x86_64`, `linux-aarch64`, and `-deb` entries for `.deb` installs). Running **Release** from the Actions tab builds the same files as the run's artifacts, with no release.
 3. Publish the draft on GitHub. That is the rollout: **Publish update** copies `latest.json` to the `updates` branch, and players get the update at their next check (start, or within 6 hours). If that workflow fails, re-run it from the Actions tab (Run workflow, with the tag).
 
 **Testing an update locally.** Build an older and a newer copy under a separate name, so the test never touches a real install or its data (`RESINCRAFT_DATA_FOLDER` is read at build time):

@@ -435,27 +435,48 @@ pub(crate) fn join_rel(base: &Path, rel: &str) -> PathBuf {
     safe_join(base, rel).unwrap_or_else(|_| base.join(rel))
 }
 
-fn native_matches_arch(classifier: &str) -> bool {
-    let a = node_arch();
+/// The CPU a version's game runs as, in `node_arch` names. Apple Silicon Macs run 1.19 and newer natively (their
+/// version JSONs bring arm64 natives); older versions have none, so they run as x64 through Rosetta 2.
+pub fn game_arch(v: &VersionJson) -> &'static str {
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) && !v.libraries.iter().any(|l| l.name.ends_with(":natives-macos-arm64")) {
+        "x64"
+    } else {
+        node_arch()
+    }
+}
+
+/// Whether a `natives-*` classifier is for `a`; a classifier without a CPU suffix is the x64 (or universal) one.
+fn native_matches_arch(classifier: &str, a: &str) -> bool {
     if classifier.ends_with("-arm64") || classifier.ends_with("-aarch_64") {
         return a == "arm64";
     }
     if classifier.ends_with("-x86") {
         return a == "ia32";
     }
-    a != "ia32"
+    a == "x64"
 }
 
+/// ARM Linux: Mojang lists only x64 Linux natives, but LWJGL 3.3 and newer (Minecraft 1.19+) publish arm64 ones on
+/// Maven Central. For an `org.lwjgl:<lib>:<version>:natives-linux` library, the arm64 jar's coordinates.
+fn linux_arm64_natives(name: &str) -> Option<String> {
+    let p: Vec<&str> = name.split(':').collect();
+    let [group, artifact, version, "natives-linux"] = p.as_slice() else { return None };
+    let mut v = version.split(['.', '-']).map(|n| n.parse::<u32>().unwrap_or(0));
+    let (major, minor) = (v.next()?, v.next().unwrap_or(0));
+    (*group == "org.lwjgl" && (major, minor) >= (3, 3)).then(|| format!("org.lwjgl:{artifact}:{version}:natives-linux-arm64"))
+}
+
+/// The libraries of a whole version, with the natives for the CPU it runs as (`game_arch`).
 pub fn resolve_libraries(v: &VersionJson) -> Vec<ResolvedLibrary> {
-    resolve_library_list(&v.libraries, true)
+    resolve_library_list_in(&v.libraries, true, &paths::libraries(), game_arch(v))
 }
 
 /// `dedupe = false` keeps several versions of the same artifact (Forge installer tools need that).
 pub fn resolve_library_list(libs: &[Library], dedupe: bool) -> Vec<ResolvedLibrary> {
-    resolve_library_list_in(libs, dedupe, &paths::libraries())
+    resolve_library_list_in(libs, dedupe, &paths::libraries(), node_arch())
 }
 
-fn resolve_library_list_in(libs: &[Library], dedupe: bool, root: &Path) -> Vec<ResolvedLibrary> {
+fn resolve_library_list_in(libs: &[Library], dedupe: bool, root: &Path, arch: &str) -> Vec<ResolvedLibrary> {
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let sha = |s: &Option<String>| s.as_ref().filter(|s| !s.is_empty()).map(|s| Hash::sha1(s.clone()));
@@ -483,9 +504,18 @@ fn resolve_library_list_in(libs: &[Library], dedupe: bool, root: &Path) -> Vec<R
             out.push(ResolvedLibrary {
                 item: DownloadItem::new(art.url.clone(), join_rel(root, &rel)).hash(sha(&art.sha1)).size(art.size),
                 classpath: true,
-                extract: is_native && native_matches_arch(classifier.unwrap_or("")),
+                extract: is_native && native_matches_arch(classifier.unwrap_or(""), arch),
                 exclude: Vec::new(),
             });
+            if let Some(coords) = linux_arm64_natives(&lib.name).filter(|_| arch == "arm64" && os_name() == "linux") {
+                let rel = maven_path(&coords);
+                out.push(ResolvedLibrary {
+                    item: DownloadItem::new(format!("https://repo1.maven.org/maven2/{rel}"), join_rel(root, &rel)),
+                    classpath: true,
+                    extract: true,
+                    exclude: Vec::new(),
+                });
+            }
         } else if lib.natives.is_none() {
             // Plain Maven coordinates, as used by Fabric and Quilt profiles.
             let rel = maven_path(&lib.name);
@@ -502,8 +532,9 @@ fn resolve_library_list_in(libs: &[Library], dedupe: bool, root: &Path) -> Vec<R
         }
 
         // Pre-1.19 style natives live in a "classifiers" map keyed per OS.
-        if let Some(natives) = &lib.natives {
-            let cls = natives.get(os_name()).map(|c| c.replace("${arch}", if node_arch() == "ia32" { "32" } else { "64" }));
+        // (They are all x86: on arm64 they're left out, and a version with nothing else can't run there.)
+        if let Some(natives) = lib.natives.as_ref().filter(|_| arch != "arm64") {
+            let cls = natives.get(os_name()).map(|c| c.replace("${arch}", if arch == "ia32" { "32" } else { "64" }));
             let file = cls.as_ref().and_then(|c| lib.downloads.as_ref()?.classifiers.as_ref()?.get(c));
             if let (Some(cls), Some(file)) = (cls.as_ref(), file) {
                 let rel = file.path.clone().unwrap_or_else(|| maven_path(&format!("{}:{cls}", lib.name)));
@@ -625,8 +656,46 @@ mod tests {
             ]"#,
         )
         .unwrap();
-        let out = resolve_library_list_in(&libs, true, Path::new("libraries"));
+        let out = resolve_library_list_in(&libs, true, Path::new("libraries"), "x64");
         assert_eq!(out.iter().filter(|l| l.classpath).count(), 1, "the jar goes on the classpath once");
         assert_eq!(out.iter().filter(|l| l.extract).count(), 1, "and its natives are still unpacked");
+    }
+
+    #[test]
+    fn only_the_natives_for_the_game_cpu_are_unpacked() {
+        // Minecraft 1.19+ lists LWJGL natives per CPU: plain (x64), -arm64 and -x86.
+        let libs: Vec<Library> = serde_json::from_str(
+            r#"[
+              {"name":"org.lwjgl:lwjgl:3.3.1:natives-macos","downloads":{"artifact":{"url":"https://x/m.jar","path":"m.jar"}}},
+              {"name":"org.lwjgl:lwjgl:3.3.1:natives-macos-arm64","downloads":{"artifact":{"url":"https://x/ma.jar","path":"ma.jar"}}},
+              {"name":"org.lwjgl:lwjgl:3.3.1:natives-windows-x86","downloads":{"artifact":{"url":"https://x/w.jar","path":"w.jar"}}}
+            ]"#,
+        )
+        .unwrap();
+        let unpacked = |arch| -> Vec<String> {
+            resolve_library_list_in(&libs, true, Path::new("libraries"), arch).into_iter().filter(|l| l.extract).map(|l| l.item.url).collect()
+        };
+        assert_eq!(unpacked("x64"), ["https://x/m.jar"]);
+        assert_eq!(unpacked("arm64"), ["https://x/ma.jar"]);
+        assert_eq!(unpacked("ia32"), ["https://x/w.jar"]);
+    }
+
+    #[test]
+    fn apple_silicon_runs_versions_without_arm64_natives_as_x64() {
+        let v = |libs: &str| VersionJson { libraries: serde_json::from_str(libs).unwrap(), ..Default::default() };
+        let modern = v(r#"[{"name":"org.lwjgl:lwjgl:3.3.1:natives-macos-arm64"}]"#);
+        let old = v(r#"[{"name":"org.lwjgl:lwjgl:3.2.2"}]"#);
+        assert_eq!(game_arch(&modern), node_arch());
+        let expected_old = if cfg!(all(target_os = "macos", target_arch = "aarch64")) { "x64" } else { node_arch() };
+        assert_eq!(game_arch(&old), expected_old);
+    }
+
+    #[test]
+    fn arm_linux_natives_come_from_maven_central_for_lwjgl_3_3() {
+        assert_eq!(linux_arm64_natives("org.lwjgl:lwjgl-glfw:3.3.1:natives-linux").as_deref(), Some("org.lwjgl:lwjgl-glfw:3.3.1:natives-linux-arm64"));
+        assert_eq!(linux_arm64_natives("org.lwjgl:lwjgl:3.3.3:natives-linux").as_deref(), Some("org.lwjgl:lwjgl:3.3.3:natives-linux-arm64"));
+        assert_eq!(linux_arm64_natives("org.lwjgl:lwjgl:3.2.2:natives-linux"), None, "3.2 has no arm64 build on Maven Central");
+        assert_eq!(linux_arm64_natives("org.lwjgl:lwjgl:3.3.1:natives-windows"), None);
+        assert_eq!(linux_arm64_natives("com.mojang:text2speech:1.17.9:natives-linux"), None);
     }
 }

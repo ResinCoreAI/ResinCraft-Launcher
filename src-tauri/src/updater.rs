@@ -3,7 +3,9 @@
 //! The update file is the release's NSIS installer itself (`bundle.createUpdaterArtifacts`), signed with the key
 //! whose public half is in tauri.conf.json. It is checked against that key after downloading, then runs in
 //! passive mode with `/UPDATE`: it replaces the program files only, so everything in %APPDATA%\ResinCraft
-//! Launcher (instances, accounts, settings) stays, and it starts the new version when it's done.
+//! Launcher (instances, accounts, settings) stays, and it starts the new version when it's done. On macOS the
+//! update is the `.app.tar.gz`, on Linux the `.AppImage` (or the `.deb` for .deb installs); both replace only
+//! the app, and the app restarts itself.
 //!
 //! Where updates come from (tauri.conf.json `plugins.updater.endpoints`): latest.json on the repository's `updates`
 //! branch, which .github/workflows/publish-update.yml writes when a release is published, so publishing a release's

@@ -21,9 +21,9 @@ use crate::core::types::{GameEvent, Instance, LoaderType, LogEvent, LogLine, Run
 use crate::player::accounts::LaunchAuth;
 use crate::{bail_tr, err_tr, tr};
 
-use super::java::{find_java, hidden_command, install_java};
+use super::java::{cpu_for, find_java_for, hidden_command, host_cpu, install_java_for};
 use super::loaders::{resolve_version, JavaPicker, ResolveContext};
-use super::mojang::{asset_items, plain,client_jar, logging_config, materialize_legacy_assets, resolve_libraries, rules_allow, ArgValue, Argument, VersionJson};
+use super::mojang::{asset_items, game_arch, os_name, plain,client_jar, logging_config, materialize_legacy_assets, resolve_libraries, rules_allow, ArgValue, Argument, VersionJson};
 
 const LAUNCHER_NAME: &str = "ResinCraft";
 const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -172,15 +172,17 @@ fn non_empty(s: Option<&str>) -> Option<String> {
     s.filter(|s| !s.is_empty()).map(str::to_string)
 }
 
-async fn choose_java(inst: &Instance, settings: &Settings, required: u32, task: &Arc<Task>) -> Result<String> {
+/// A Java for `required` that runs as `cpu` (Adoptium's "x64" / "aarch64"; it only differs from this computer's
+/// on an Apple Silicon Mac playing a version without arm64 natives).
+async fn choose_java(inst: &Instance, settings: &Settings, required: u32, cpu: &str, task: &Arc<Task>) -> Result<String> {
     if let Some(custom) = non_empty(inst.java_path.as_deref()).or_else(|| non_empty(Some(&settings.java_path))) {
         return Ok(custom);
     }
-    if let Some(found) = find_java(required).await? {
+    if let Some(found) = find_java_for(required, cpu).await? {
         return Ok(found.path);
     }
     if settings.auto_java {
-        return Ok(install_java(required, task).await?.path);
+        return Ok(install_java_for(required, cpu, task).await?.path);
     }
     bail_tr!(
         "launch.needJava",
@@ -208,13 +210,24 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         let (inst, settings, task) = (inst.clone(), settings.clone(), task.clone());
         Box::new(move |major| {
             let (inst, settings, task) = (inst.clone(), settings.clone(), task.clone());
-            Box::pin(async move { choose_java(&inst, &settings, major, &task).await })
+            Box::pin(async move { choose_java(&inst, &settings, major, host_cpu(), &task).await })
         })
     };
     let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(settings.concurrency), java: Some(picker) };
     let mut version = resolve_version(&inst.mc_version, inst.loader, inst.loader_version.as_deref(), &ctx).await?;
 
     let libraries = resolve_libraries(&version);
+    let arch = game_arch(&version);
+    if arch == "arm64" && os_name() == "linux" && !libraries.iter().any(|l| l.extract) {
+        bail_tr!(
+            "launch.noArmLinux",
+            "Minecraft {version} can't run on ARM Linux: its graphics library (LWJGL) has no ARM build. Minecraft 1.19 and newer work.",
+            version = inst.mc_version
+        );
+    }
+    if cpu_for(arch) != host_cpu() {
+        need_rosetta(&inst.mc_version).await?;
+    }
     let client = client_jar(&version)?;
     let logging = logging_config(&version);
     let assets = asset_items(&version).await?;
@@ -259,7 +272,7 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
     }
 
     task.update(tr!("launch.checkingJava", "Checking Java…"), None);
-    let java = choose_java(inst, settings, version.java_major(), task).await?;
+    let java = choose_java(inst, settings, version.java_major(), cpu_for(arch), task).await?;
 
     // OptiFine on vanilla launches through launchwrapper; its jars go first on the classpath.
     let mut classpath: Vec<PathBuf> = Vec::new();
@@ -279,6 +292,19 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         version,
         natives,
     })
+}
+
+/// Apple Silicon: versions before 1.19 run as x64 through Rosetta 2, which macOS doesn't install by itself.
+async fn need_rosetta(mc_version: &str) -> Result<()> {
+    let ok = hidden_command("/usr/bin/arch").args(["-x86_64", "/usr/bin/true"]).status().await.map(|s| s.success()).unwrap_or(false);
+    if !ok {
+        bail_tr!(
+            "launch.needRosetta",
+            "Minecraft {version} runs through Rosetta 2 on Apple Silicon. Install it by running \"softwareupdate --install-rosetta\" in Terminal, then play again.",
+            version = mc_version
+        );
+    }
+    Ok(())
 }
 
 // ---------- Arguments ----------
