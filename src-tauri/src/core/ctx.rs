@@ -41,8 +41,9 @@ pub fn ctx() -> &'static Ctx {
     CTX.get().expect("ResinCraft core used before init()")
 }
 
+/// The Tauri app; None in headless runs and before `init()` (unit tests).
 pub fn app() -> Option<&'static AppHandle> {
-    ctx().app.as_ref()
+    CTX.get().and_then(|c| c.app.as_ref())
 }
 
 pub fn http() -> &'static reqwest::Client {

@@ -777,7 +777,12 @@ export interface BedrockStatus {
   /** Bedrock Edition only exists as an app on Windows. */
   supported: boolean
   editions: BedrockEdition[]
+  /** Gaming Services (the Xbox service Store games need) is installed. The Store usually adds it with the game. */
+  gamingServices?: boolean
 }
+
+/** install: get it; update: install an update if there is one; repair: install it again over itself (worlds stay). */
+export type BedrockInstallMode = 'install' | 'update' | 'repair'
 
 // ---------- Server hosting ----------
 
@@ -1215,8 +1220,15 @@ export interface ResinApi {
     status(): Promise<BedrockStatus>
     /** Opens the game. */
     play(edition: BedrockEditionKind): Promise<void>
-    /** Opens the Microsoft Store's install window for it. */
+    /**
+     * Has the Microsoft Store's install service install, update or repair it, as a cancellable task tied to
+     * `bedrock:<edition>`. Failures carry keys under `bedrock.store.*` (notOwned, gamingServices, offline…).
+     */
+    install(edition: BedrockEditionKind, mode: BedrockInstallMode): Promise<'done' | 'upToDate'>
+    /** Opens the Microsoft Store's install window for it: the way out when installing from here fails. */
     get(edition: BedrockEditionKind): Promise<void>
+    /** Opens Gaming Services in the Microsoft Store. */
+    gamingServices(): Promise<void>
     /** Opens the Microsoft Store's Downloads and updates page. */
     update(): Promise<void>
     /** Opens a world's folder, or the edition's worlds folder. */

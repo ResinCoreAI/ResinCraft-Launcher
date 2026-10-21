@@ -2667,6 +2667,24 @@ body.dragging * {
   background: var(--surface-2);
   color: var(--text-dim);
 }
+/* Installing, updating or repairing from the launcher: the task's line and bar on the edition's card. */
+.bd-task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.bd-task .bar {
+  border-radius: 2px;
+}
+.bd-edition .bd-callout {
+  margin-top: 12px;
+}
+.bd-editions + .bd-callout {
+  align-items: center;
+  margin-bottom: 18px;
+}
 @media (max-width: 860px) {
   .bd-editions {
     grid-template-columns: minmax(0, 1fr);

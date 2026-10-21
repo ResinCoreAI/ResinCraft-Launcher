@@ -1,8 +1,8 @@
 //! `bedrock:*`: Minecraft Bedrock Edition (Minecraft for Windows, and Minecraft Preview) as installed from the
 //! Microsoft Store or the Xbox app. ResinCraft finds the installed version and the worlds, opens the game, and
-//! opens the Store's install window to get it or its updates page to update it. Only the Store (or the Xbox app)
-//! may install these paid apps (winget's Store source doesn't carry them either), so ResinCraft can't download
-//! them itself or switch them to another version: Preview is the way to try the next update.
+//! has the Store's install service install, update or repair it in a task (`bedrock_store`), with the Store's own
+//! pages as the way out when that fails. Only the Store may install these apps, so ResinCraft never downloads them
+//! itself or switches them to another version: Preview is the way to try the next update.
 
 use std::path::{Path, PathBuf};
 
@@ -37,12 +37,23 @@ impl Edition {
             Edition::Preview => "minecraft-preview:",
         }
     }
-    /// The Microsoft Store's compact install window for it (the "mini" product page).
-    fn store(self) -> &'static str {
+    /// Its Microsoft Store product id.
+    pub(crate) fn product_id(self) -> &'static str {
         match self {
-            Edition::Release => "ms-windows-store://pdp/?productid=9NBLGGH2JHXJ&mode=mini",
-            Edition::Preview => "ms-windows-store://pdp/?productid=9P5X4QVLC2XR&mode=mini",
+            Edition::Release => "9NBLGGH2JHXJ",
+            Edition::Preview => "9P5X4QVLC2XR",
         }
+    }
+    /// The app's name (the same in every language).
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Edition::Release => "Minecraft for Windows",
+            Edition::Preview => "Minecraft Preview",
+        }
+    }
+    /// The Microsoft Store's compact install window for it (the "mini" product page).
+    fn store(self) -> String {
+        store_page(self.product_id())
     }
     /// Where the game keeps its data: `%APPDATA%\Minecraft Bedrock` (and the older app-package folder).
     fn data_dirs(self) -> Vec<PathBuf> {
@@ -85,11 +96,22 @@ pub struct BedrockEdition {
     pub worlds: Vec<BedrockWorld>,
 }
 
+/// Gaming Services: the Xbox service that installs and runs Store games like Bedrock.
+const GAMING_SERVICES: &str = "Microsoft.GamingServices";
+const GAMING_SERVICES_ID: &str = "9MWPM2CQNLHN";
+
+fn store_page(product_id: &str) -> String {
+    format!("ms-windows-store://pdp/?productid={product_id}&mode=mini")
+}
+
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BedrockStatus {
     /// Bedrock Edition only exists as an app on Windows.
     pub supported: bool,
     pub editions: Vec<BedrockEdition>,
+    /// Gaming Services is installed (Windows only; the Store usually adds it with the game).
+    pub gaming_services: bool,
 }
 
 /// "1.26.5203.0" (the app package's version) → "1.26.52.3" (the game's).
@@ -114,7 +136,7 @@ async fn installed_packages() -> Vec<(String, String)> {
         return Vec::new();
     }
     // -Name takes one name (with wildcards); the editions are picked out below.
-    let script = "Get-AppxPackage -Name 'Microsoft.Minecraft*' | Select-Object Name, Version | ConvertTo-Json -Compress";
+    let script = "@(Get-AppxPackage -Name 'Microsoft.Minecraft*') + @(Get-AppxPackage -Name 'Microsoft.GamingServices') | Select-Object Name, Version | ConvertTo-Json -Compress";
     let out = crate::game::java::hidden_command("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script]).output().await;
     let Ok(out) = out else { return Vec::new() };
     let text = String::from_utf8_lossy(&out.stdout);
@@ -184,7 +206,7 @@ fn worlds(edition: Edition) -> Vec<BedrockWorld> {
 
 pub async fn status() -> Result<BedrockStatus> {
     if !cfg!(windows) {
-        return Ok(BedrockStatus { supported: false, editions: Vec::new() });
+        return Ok(BedrockStatus { supported: false, editions: Vec::new(), gaming_services: false });
     }
     let packages = installed_packages().await;
     let editions = Edition::ALL
@@ -194,7 +216,8 @@ pub async fn status() -> Result<BedrockStatus> {
             BedrockEdition { edition, installed: version.is_some(), version, worlds: worlds(edition) }
         })
         .collect();
-    Ok(BedrockStatus { supported: true, editions })
+    let gaming_services = packages.iter().any(|(n, _)| n == GAMING_SERVICES);
+    Ok(BedrockStatus { supported: true, editions, gaming_services })
 }
 
 /// A world's folder, found again by its id (never a path from the UI).
@@ -212,8 +235,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             shell::open_app_link(args.get::<Edition>(0)?.protocol())?;
             done()
         }
+        // Install, update or repair in a task: [edition, "install" | "update" | "repair"] → "done" | "upToDate".
+        "bedrock:install" => json(super::bedrock_store::run(args.get(0)?, args.get(1)?).await?),
+        // The Store's own install window: the way out when installing from here fails.
         "bedrock:get" => {
-            shell::open_app_link(args.get::<Edition>(0)?.store())?;
+            shell::open_app_link(&args.get::<Edition>(0)?.store())?;
+            done()
+        }
+        "bedrock:gamingServices" => {
+            shell::open_app_link(&store_page(GAMING_SERVICES_ID))?;
             done()
         }
         // The Store's Downloads and updates page, which updates every Store app (Minecraft included).

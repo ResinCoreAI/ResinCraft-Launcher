@@ -3,6 +3,7 @@
 
 pub mod accounts;
 pub mod bedrock;
+pub mod bedrock_store;
 pub mod files;
 pub mod nbt;
 pub mod notes;

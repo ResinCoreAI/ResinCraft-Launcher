@@ -10,6 +10,7 @@ import { mockMigrate } from './mock-migrate'
 import { mockStorage } from './mock-storage'
 import { mockRuns } from './mock-runs'
 import { mockQuickJoin } from './mock-quickjoin'
+import { mockBedrock } from './mock-bedrock'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
 import { mockDetails, mockVersionInfo } from './mock-details'
 import { MOCK_PACK, mockPackUpdates, mockPackVersions, mockSwitchPack } from './mock-packswitch'
@@ -462,31 +463,7 @@ export function mockApi(): ResinApi {
     }, runs.launch),
     ...mockQuickJoin(runs.launch),
     server: servers.server,
-    bedrock: {
-      status: () =>
-        wait(
-          {
-            supported: true,
-            editions: [
-              {
-                edition: 'release' as const,
-                installed: true,
-                version: '1.26.52.3',
-                worlds: [
-                  { id: 'ZxKDIpkP4Tc=', name: 'Island Survival', modified: now - 3.6e6 },
-                  { id: 'xLICWZyiNe4=', name: 'Creative Build', modified: now - 4.3e8 }
-                ]
-              },
-              { edition: 'preview' as const, installed: false, worlds: [] }
-            ]
-          },
-          500
-        ),
-      play: () => wait(undefined, 300),
-      get: () => wait(undefined, 300),
-      update: () => wait(undefined, 300),
-      openFolder: () => wait(undefined, 100)
-    },
+    bedrock: mockBedrock(now),
     ...mockFiles(),
     ...mockMigrate((inst) => {
       instances = [inst, ...instances]
