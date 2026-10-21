@@ -92,7 +92,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   )
 
   const unavailable = loader !== 'vanilla' && loaderVersions?.length === 0
-  const legacyForge = !!mc && /^1\.(\d|1[0-2])(\.|$)/.test(mc)
+  const legacyForge = !!mc && /^1\.[0-6](\.|$)/.test(mc)
   const placeholder = makingPack
     ? t('ownPack.defaultName')
     : mc

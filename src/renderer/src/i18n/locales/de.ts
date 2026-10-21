@@ -772,7 +772,7 @@ const dict: Dict = {
   'newInstance.type.old_beta': 'Beta',
   'newInstance.type.old_alpha': 'Alpha',
   'newInstance.loaderVersion': '{loader}-Version',
-  'newInstance.legacyForge': 'ResinCraft unterstützt Forge ab Minecraft 1.13. Wähle eine neuere Version oder einen anderen Loader.',
+  'newInstance.legacyForge': 'ResinCraft unterstützt Forge ab Minecraft 1.7.10. Wähle eine neuere Version oder einen anderen Loader.',
   'newInstance.unsupported': '{loader} unterstützt Minecraft {version} noch nicht. Wähle eine andere Version oder einen anderen Loader.',
   'newInstance.optionRecommended': '{version} (empfohlen)',
   'newInstance.optionBeta': '{version} (Beta)',
@@ -1088,8 +1088,6 @@ const dict: Dict = {
   'engine.accounts.xbox.country': 'Xbox Live ist im Land dieses Kontos nicht verfügbar.',
   'engine.accounts.xbox.failed': 'Xbox-Anmeldung fehlgeschlagen: {error}',
   'engine.accounts.xbox.noProfile': 'Dieses Microsoft-Konto hat noch kein Xbox-Profil. Melde dich einmal auf xbox.com an und versuch es dann erneut.',
-  'engine.atlauncher.legacyForge':
-    '{name} {version} ist für Minecraft {mc}. ResinCraft unterstützt Forge ab Minecraft 1.13; wähle eine neuere Version des Packs, falls es eine gibt.',
   'engine.atlauncher.legacyFormat':
     '{name} {version} verwendet das alte Installationsformat von ATLauncher (Minecraft {mc}), das ResinCraft nicht unterstützt.',
   'engine.atlauncher.manualExtract':
@@ -1130,7 +1128,6 @@ const dict: Dict = {
   'engine.forge.needJava': 'Für die Installation dieses Mod-Loaders wird Java {major} benötigt',
   'engine.forge.noMainClass': '{jar} hat keine Main-Class',
   'engine.forge.notFound': '{name} für Minecraft {mc} wurde nicht gefunden',
-  'engine.forge.oldInstaller': '{name} verwendet das alte Installer-Format (Minecraft 1.12 und älter), das ResinCraft noch nicht unterstützt.',
   'engine.forge.processorFailed': 'Installation von {name} fehlgeschlagen ({main_class} wurde mit Code {code} beendet):\n{tail}',
   'engine.forge.unexpectedFiles': 'Die Installation von {name} hat unerwartete Dateien erzeugt. Versuch es erneut oder wähle eine andere Version.',
   'engine.forge.unknownValue': 'Der Installer von {name} verweist auf einen unbekannten Wert {value}',
@@ -1171,8 +1168,6 @@ const dict: Dict = {
   'engine.launch.readingVersion': 'Versionsinfos werden gelesen…',
   'engine.launch.settingUpOptifine': 'OptiFine wird eingerichtet…',
   'engine.launch.unpackingNatives': 'Native Bibliotheken werden entpackt…',
-  'engine.loader.legacyForge':
-    'ResinCraft unterstützt Forge ab Minecraft 1.13. Minecraft {mc} verwendet einen älteren Forge-Installer, der noch nicht unterstützt wird.',
   'engine.loader.notAvailable': '{loader} ist für Minecraft {mc} noch nicht verfügbar',
   'engine.modpack.applyingSettings': 'Modpack-Einstellungen werden übernommen…',
   'engine.modpack.downloading': '{name} wird heruntergeladen',
@@ -1270,8 +1265,6 @@ const dict: Dict = {
   'engine.technic.customModpackJar':
     '{name} liefert eine eigene bin/modpack.jar mit, die ResinCraft nicht lesen kann. Daher ist unklar, welcher Mod-Loader installiert werden soll.',
   'engine.technic.downloading': 'Modpack wird heruntergeladen',
-  'engine.technic.legacyMc':
-    '{name} ist für Minecraft {mc}. ResinCraft kann Technic-Packs ab Minecraft 1.13 installieren (ältere brauchen den alten Forge-Installer).',
   'engine.technic.noBuild': '{name} hat keinen Build zum Installieren',
   'engine.technic.noDownload': '{name} hat keinen Download auf Technic',
   'engine.technic.notZip': 'Der Download von {name} ist keine ZIP-Datei. Möglicherweise ist der Download-Link des Autors defekt.',

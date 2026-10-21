@@ -19,7 +19,7 @@ use crate::core::ctx::http;
 use crate::core::net::HttpError;
 
 /// The metadata files that name a mod, one per loader family.
-const META_FILES: [&str; 4] = ["fabric.mod.json", "quilt.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"];
+const META_FILES: [&str; 5] = ["fabric.mod.json", "quilt.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml", "mcmod.info"];
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct JarMeta {
@@ -31,7 +31,7 @@ pub struct JarMeta {
 
 impl JarMeta {
     fn add(&mut self, id: Option<String>, name: Option<String>, version: Option<String>) {
-        let Some(id) = id.map(|i| i.trim().to_lowercase()).filter(|i| usable(i)) else { return };
+        let Some(id) = id.map(|i| i.trim().to_lowercase()).filter(|i| usable(i) && !is_template_id(i)) else { return };
         if !self.ids.contains(&id) {
             self.ids.push(id);
         }
@@ -42,6 +42,11 @@ impl JarMeta {
             self.version = version.map(|v| v.trim().to_string()).filter(|v| usable(v));
         }
     }
+}
+
+/// Ids left over from a mod template, which many unrelated jars share ("examplemod").
+fn is_template_id(id: &str) -> bool {
+    matches!(id, "examplemod" | "example_mod" | "modid" | "mod_id" | "yourmodid" | "examplemodid" | "mymod" | "tutorialmod" | "templatemod")
 }
 
 /// Not empty and not a build placeholder left unfilled ("${version}").
@@ -141,6 +146,22 @@ pub fn parse_mods_toml(text: &str) -> (Option<String>, Option<String>, Option<St
     (id, name, version)
 }
 
+/// mcmod.info (Forge for Minecraft ≤1.12): `modid`, `name` and `version` of the first mod listed, either a bare list
+/// or `{"modList": [...]}`. Hand-written and often not quite JSON, so read loosely when serde can't.
+pub fn parse_mcmod(text: &str) -> (Option<String>, Option<String>, Option<String>) {
+    if let Some(v) = json_of(text) {
+        let first = match &v {
+            Value::Array(list) => list.first(),
+            Value::Object(_) => v.get("modList").and_then(Value::as_array).and_then(|l| l.first()),
+            _ => None,
+        };
+        if let Some(m) = first {
+            return (str_at(m, &["modid"]), str_at(m, &["name"]), str_at(m, &["version"]));
+        }
+    }
+    (loose_value(text, "modid"), loose_value(text, "name"), loose_value(text, "version"))
+}
+
 /// Reads a jar's metadata from its metadata files' text (looked up by name).
 fn meta_from(mut text: impl FnMut(&str) -> Option<String>) -> JarMeta {
     let mut m = JarMeta::default();
@@ -149,6 +170,7 @@ fn meta_from(mut text: impl FnMut(&str) -> Option<String>) -> JarMeta {
         let (id, name, version) = match file {
             "fabric.mod.json" => parse_fabric(&t),
             "quilt.mod.json" => parse_quilt(&t),
+            "mcmod.info" => parse_mcmod(&t),
             _ => parse_mods_toml(&t),
         };
         m.add(id, name, version);
@@ -513,5 +535,26 @@ modId="wrong"
         // Not a zip: nothing.
         let sent = AtomicU64::new(0);
         assert!(rt.block_on(read_remote(5000, server(vec![7; 5000], true, &sent))).is_none());
+    }
+}
+
+#[cfg(test)]
+mod mcmod_tests {
+    use super::*;
+
+    #[test]
+    fn reads_old_forge_mod_info() {
+        assert_eq!(
+            parse_mcmod(r#"[{"modid": "BiblioCraft", "name": "BiblioCraft", "version": "1.11.7"}]"#),
+            (Some("BiblioCraft".into()), Some("BiblioCraft".into()), Some("1.11.7".into()))
+        );
+        assert_eq!(parse_mcmod(r#"{"modListVersion": 2, "modList": [{"modid": "ForgeMultipart", "name": "Forge Multipart"}, {"modid": "McMultipart"}]}"#).0.as_deref(), Some("ForgeMultipart"));
+        // Not quite JSON (trailing comma, raw newline in a string), as many old mods ship it.
+        let loose = "[\n{\n \"modid\": \"bibliowoodsnatura\",\n \"name\": \"BiblioWoods\",\n \"description\": \"Line one\nline two\",\n},\n]";
+        assert_eq!(parse_mcmod(loose).0.as_deref(), Some("bibliowoodsnatura"));
+        // Two unrelated jars that both kept the template's id are not one mod.
+        let mut a = JarMeta::default();
+        a.add(Some("examplemod".into()), None, None);
+        assert!(a.ids.is_empty());
     }
 }

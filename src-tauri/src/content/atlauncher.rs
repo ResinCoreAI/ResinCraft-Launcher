@@ -234,9 +234,6 @@ pub async fn versions(project_id: &str) -> Result<Vec<ProjectVersion>> {
         .collect())
 }
 
-fn is_legacy_mc(mc: &str) -> bool {
-    mc.starts_with("1.") && mc.split('.').nth(1).and_then(|m| m.parse::<u32>().ok()).unwrap_or(0) < 13
-}
 
 /// Works out the loader, refusing (before anything is created) packs ResinCraft can't run.
 fn loader_of(name: &str, cfg: &AtlConfig) -> Result<(LoaderType, Option<String>)> {
@@ -258,9 +255,9 @@ fn loader_of(name: &str, cfg: &AtlConfig) -> Result<(LoaderType, Option<String>)
     };
     let md = &l.metadata;
     match l.kind.to_lowercase().as_str() {
-        "forge" if is_legacy_mc(mc) => bail_tr!(
-            "atlauncher.legacyForge",
-            "{name} {version} is for Minecraft {mc}. ResinCraft supports Forge for Minecraft 1.13 and newer; pick a newer version of the pack if there is one.",
+        "forge" if crate::game::loaders::is_ancient_forge(mc) => bail_tr!(
+            "atlauncher.ancientForge",
+            "{name} {version} is for Minecraft {mc}. ResinCraft supports Forge for Minecraft 1.7.10 and newer; pick a newer version of the pack if there is one.",
             name = name,
             version = cfg.version,
             mc = mc

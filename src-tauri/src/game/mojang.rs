@@ -452,6 +452,10 @@ pub fn resolve_libraries(v: &VersionJson) -> Vec<ResolvedLibrary> {
 
 /// `dedupe = false` keeps several versions of the same artifact (Forge installer tools need that).
 pub fn resolve_library_list(libs: &[Library], dedupe: bool) -> Vec<ResolvedLibrary> {
+    resolve_library_list_in(libs, dedupe, &paths::libraries())
+}
+
+fn resolve_library_list_in(libs: &[Library], dedupe: bool, root: &Path) -> Vec<ResolvedLibrary> {
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let sha = |s: &Option<String>| s.as_ref().filter(|s| !s.is_empty()).map(|s| Hash::sha1(s.clone()));
@@ -464,15 +468,20 @@ pub fn resolve_library_list(libs: &[Library], dedupe: bool) -> Vec<ResolvedLibra
         let parts: Vec<&str> = lib.name.split('@').next().unwrap_or_default().split(':').collect();
         let classifier = parts.get(3).copied();
         let key = format!("{}:{}:{}", parts.first().unwrap_or(&""), parts.get(1).unwrap_or(&""), classifier.unwrap_or(""));
-        if dedupe && !seen.insert(key) {
+        // A repeated artifact adds nothing to the classpath, but may still carry natives: Minecraft 1.14–1.18
+        // list each LWJGL library twice, once plain and once with its natives.
+        let repeated = dedupe && !seen.insert(key);
+        if repeated && lib.natives.is_none() {
             continue;
         }
 
         let is_native = classifier.is_some_and(|c| c.starts_with("natives-"));
-        if let Some(art) = lib.downloads.as_ref().and_then(|d| d.artifact.as_ref()) {
+        if repeated {
+            // Only the natives below.
+        } else if let Some(art) = lib.downloads.as_ref().and_then(|d| d.artifact.as_ref()) {
             let rel = art.path.clone().unwrap_or_else(|| maven_path(&lib.name));
             out.push(ResolvedLibrary {
-                item: DownloadItem::new(art.url.clone(), join_rel(&paths::libraries(), &rel)).hash(sha(&art.sha1)).size(art.size),
+                item: DownloadItem::new(art.url.clone(), join_rel(root, &rel)).hash(sha(&art.sha1)).size(art.size),
                 classpath: true,
                 extract: is_native && native_matches_arch(classifier.unwrap_or("")),
                 exclude: Vec::new(),
@@ -485,7 +494,7 @@ pub fn resolve_library_list(libs: &[Library], dedupe: bool) -> Vec<ResolvedLibra
                 base.push('/');
             }
             out.push(ResolvedLibrary {
-                item: DownloadItem::new(format!("{base}{rel}"), join_rel(&paths::libraries(), &rel)).hash(sha(&lib.sha1)).size(lib.size),
+                item: DownloadItem::new(format!("{base}{rel}"), join_rel(root, &rel)).hash(sha(&lib.sha1)).size(lib.size),
                 classpath: true,
                 extract: false,
                 exclude: Vec::new(),
@@ -499,7 +508,7 @@ pub fn resolve_library_list(libs: &[Library], dedupe: bool) -> Vec<ResolvedLibra
             if let (Some(cls), Some(file)) = (cls.as_ref(), file) {
                 let rel = file.path.clone().unwrap_or_else(|| maven_path(&format!("{}:{cls}", lib.name)));
                 out.push(ResolvedLibrary {
-                    item: DownloadItem::new(file.url.clone(), join_rel(&paths::libraries(), &rel)).hash(sha(&file.sha1)).size(file.size),
+                    item: DownloadItem::new(file.url.clone(), join_rel(root, &rel)).hash(sha(&file.sha1)).size(file.size),
                     classpath: false,
                     extract: true,
                     exclude: lib.extract.as_ref().and_then(|e| e.exclude.clone()).unwrap_or_default(),
@@ -597,4 +606,27 @@ pub async fn materialize_legacy_assets(index: &AssetIndex, id: &str, game_direct
         tokio::fs::copy(object_path(&obj.hash), &dest).await.map_err(|_| err_tr!("mojang.copyAssetFailed", "Couldn't copy asset {name}", name = name))?;
     }
     Ok(target)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_libraries_still_bring_their_natives() {
+        // Minecraft 1.16.5 lists LWJGL plain first, then again with natives for every OS.
+        let libs: Vec<Library> = serde_json::from_str(
+            r#"[
+              {"name":"org.lwjgl:lwjgl:3.2.2","downloads":{"artifact":{"url":"https://x/lwjgl.jar","path":"org/lwjgl/lwjgl/3.2.2/lwjgl-3.2.2.jar"}}},
+              {"name":"org.lwjgl:lwjgl:3.2.2","natives":{"linux":"natives-linux","osx":"natives-macos","windows":"natives-windows"},
+               "downloads":{"artifact":{"url":"https://x/lwjgl.jar","path":"org/lwjgl/lwjgl/3.2.2/lwjgl-3.2.2.jar"},
+                 "classifiers":{"natives-linux":{"url":"https://x/l.jar","path":"l.jar"},"natives-macos":{"url":"https://x/m.jar","path":"m.jar"},
+                                "natives-windows":{"url":"https://x/w.jar","path":"w.jar"}}}}
+            ]"#,
+        )
+        .unwrap();
+        let out = resolve_library_list_in(&libs, true, Path::new("libraries"));
+        assert_eq!(out.iter().filter(|l| l.classpath).count(), 1, "the jar goes on the classpath once");
+        assert_eq!(out.iter().filter(|l| l.extract).count(), 1, "and its natives are still unpacked");
+    }
 }

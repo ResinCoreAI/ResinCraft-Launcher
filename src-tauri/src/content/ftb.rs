@@ -93,6 +93,8 @@ struct FtbPack {
 #[derive(Deserialize, Clone, Default)]
 #[serde(default)]
 struct FtbCurse {
+    // Older packs send it as a string ("227083").
+    #[serde(deserialize_with = "super::index::lenient_u64_zero")]
     project: u64,
 }
 
@@ -341,5 +343,21 @@ fn enc_id(id: &str) -> String {
 pub(crate) fn forget_cache(project_id: &str) {
     if let Some(m) = PACKS.lock().unwrap().as_mut() {
         m.remove(&ftb_id(project_id));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_curseforge_ids_sent_as_text() {
+        let v: FtbVersion = serde_json::from_str(
+            r#"{"id":99,"name":"3.1.0","files":[{"path":"./mods/","name":"a.jar","url":"u","curseforge":{"project":"227083","file":"2224857"}},
+                {"path":"./mods/","name":"b.jar","url":"u","curseforge":{"project":229323,"file":2242993}}]}"#,
+        )
+        .unwrap();
+        let ids: Vec<u64> = v.files.iter().map(|f| f.curseforge.as_ref().unwrap().project).collect();
+        assert_eq!(ids, [227083, 229323]);
     }
 }

@@ -761,7 +761,7 @@ const dict: Dict = {
   'newInstance.type.old_beta': 'ベータ',
   'newInstance.type.old_alpha': 'アルファ',
   'newInstance.loaderVersion': '{loader}のバージョン',
-  'newInstance.legacyForge': 'ResinCraftはMinecraft 1.13以降のForgeに対応しています。新しいバージョンか別のローダーを選んでください。',
+  'newInstance.legacyForge': 'ResinCraft が対応している Forge は Minecraft 1.7.10 以降です。新しいバージョンか別のローダーを選んでください。',
   'newInstance.unsupported': '{loader}はまだMinecraft {version}に対応していません。別のバージョンかローダーを選んでください。',
   'newInstance.optionRecommended': '{version}（推奨）',
   'newInstance.optionBeta': '{version}（ベータ）',
@@ -1073,8 +1073,6 @@ const dict: Dict = {
   'engine.accounts.xbox.country': 'このアカウントの国または地域ではXbox Liveを利用できません。',
   'engine.accounts.xbox.failed': 'Xboxサインインに失敗しました：{error}',
   'engine.accounts.xbox.noProfile': 'このMicrosoftアカウントにはまだXboxプロフィールがありません。一度xbox.comでサインインしてから、もう一度お試しください。',
-  'engine.atlauncher.legacyForge':
-    '{name} {version}はMinecraft {mc}用です。ResinCraftはMinecraft 1.13以降のForgeに対応しています。新しいバージョンのパックがあれば、そちらを選んでください。',
   'engine.atlauncher.legacyFormat': '{name} {version}はATLauncherの旧インストール形式（Minecraft {mc}）を使っており、ResinCraftでは対応していません。',
   'engine.atlauncher.manualExtract': '{name}には、手動でダウンロードして展開する必要がある「{file}」が含まれています。これはResinCraftでは代行できません。',
   'engine.atlauncher.noSuchVersion': '{name}にはインストールできるバージョン{version}がありません',
@@ -1113,7 +1111,6 @@ const dict: Dict = {
   'engine.forge.needJava': 'このModローダーのインストールにはJava {major}が必要です',
   'engine.forge.noMainClass': '{jar}にMain-Classがありません',
   'engine.forge.notFound': 'Minecraft {mc}用の{name}が見つかりませんでした',
-  'engine.forge.oldInstaller': '{name}は古い（Minecraft 1.12以前の）インストーラー形式を使っており、ResinCraftはまだ対応していません。',
   'engine.forge.processorFailed': '{name}のインストールに失敗しました（{main_class}が終了コード{code}で終了）：\n{tail}',
   'engine.forge.unexpectedFiles': '{name}のインストールで予期しないファイルが生成されました。もう一度試すか、別のバージョンを選んでください。',
   'engine.forge.unknownValue': '{name}のインストーラーが不明な値{value}を参照しています',
@@ -1154,8 +1151,6 @@ const dict: Dict = {
   'engine.launch.readingVersion': 'バージョン情報を読み込み中…',
   'engine.launch.settingUpOptifine': 'OptiFine を設定中…',
   'engine.launch.unpackingNatives': 'ネイティブライブラリを展開中…',
-  'engine.loader.legacyForge':
-    'ResinCraftはMinecraft 1.13以降のForgeに対応しています。Minecraft {mc}は古いForgeインストーラーを使っており、まだ対応していません。',
   'engine.loader.notAvailable': '{loader}はまだMinecraft {mc}に対応していません',
   'engine.modpack.applyingSettings': 'Modパックの設定を適用中…',
   'engine.modpack.downloading': '{name}をダウンロード中',
@@ -1251,8 +1246,6 @@ const dict: Dict = {
   'engine.task.progress': '{label}（{done}/{total}）',
   'engine.technic.customModpackJar': '{name}にはResinCraftが読み取れない独自のbin/modpack.jarが含まれているため、インストールするModローダーを判別できません。',
   'engine.technic.downloading': 'Modパックをダウンロード中',
-  'engine.technic.legacyMc':
-    '{name}はMinecraft {mc}用です。ResinCraftがインストールできるTechnicのパックはMinecraft 1.13以降のものです（それより古いものには旧Forgeインストーラーが必要です）。',
   'engine.technic.noBuild': '{name}にはインストールできるビルドがありません',
   'engine.technic.noDownload': '{name}はTechnicでダウンロードできません',
   'engine.technic.notZip': '{name}のダウンロードはzipファイルではありません。作者のダウンロードリンクが壊れている可能性があります。',

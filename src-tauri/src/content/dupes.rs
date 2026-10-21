@@ -262,7 +262,9 @@ pub fn same_mod(a: &ModFacts, b: &ModFacts) -> Option<Evidence> {
         !x.is_empty() && x == y
     };
     let repo = a.links.iter().filter_map(|l| repo_of(l)).any(|x| b.links.iter().filter_map(|l| repo_of(l)).any(|y| y == x));
-    if repo && (title || author || slug) {
+    // One author's mods often share a repository or issue tracker (BiblioCraft and BiblioWoods), so a shared
+    // link and author isn't enough: the name or slug has to agree too.
+    if repo && (title || slug) {
         Some(Evidence::Link)
     } else if title && author {
         Some(Evidence::Name)
@@ -747,11 +749,40 @@ impl PackJar {
 /// Whether two of a pack's jars are the same mod: one project twice, one mod from both sites, or the same mod id
 /// inside (the safety net for files neither site knows).
 fn same_jar(a: &PackJar, b: &PackJar) -> bool {
-    let by_site = match (&a.site, &b.site) {
-        (Some(x), Some(y)) => x.id == y.id || same_mod(x, y).is_some(),
-        _ => false,
-    };
-    by_site || jarmeta::same_mod_id(&a.meta, &b.meta)
+    if jarmeta::same_mod_id(&a.meta, &b.meta) {
+        return true;
+    }
+    // Both jars name their mods and the names differ: different mods, whatever the sites say (CurseForge
+    // projects sometimes host add-ons as files of the main mod, like BiblioWoods under BiblioCraft).
+    if !a.meta.ids.is_empty() && !b.meta.ids.is_empty() {
+        return false;
+    }
+    let (Some(x), Some(y)) = (&a.site, &b.site) else { return false };
+    match same_mod(x, y) {
+        // One project twice is usually two versions of a mod, but some projects host several (Galacticraft keeps
+        // Core, Planets and MicdoodleCore in one): without mod ids, the file names must agree too.
+        _ if x.id == y.id => file_base(&a.file) == file_base(&b.file),
+        Some(Evidence::Hash) => true,
+        // Two files the pack lists on purpose need more than similar names to count as one mod.
+        Some(_) => !(a.listed && b.listed),
+        None => false,
+    }
+}
+
+/// A jar's name without its versions: "Galacticraft-Planets-1.12.2-4.0.2.280.jar" → "galacticraft planets",
+/// "BiblioWoods[Forestry][v1.7].jar" → "bibliowoods forestry".
+fn file_base(file: &str) -> String {
+    let stem = file.rsplit_once('.').map(|(s, _)| s).unwrap_or(file).to_lowercase();
+    let mut words = Vec::new();
+    for w in stem.split(|c: char| matches!(c, '-' | '_' | ' ' | '+' | '[' | ']' | '(' | ')')).filter(|w| !w.is_empty()) {
+        let versionish = w.starts_with(|c: char| c.is_ascii_digit())
+            || ((w.starts_with('v') || w.starts_with("mc")) && w.trim_start_matches("mc").trim_start_matches('v').starts_with(|c: char| c.is_ascii_digit()));
+        if versionish {
+            continue;
+        }
+        words.push(w.to_string());
+    }
+    words.join(" ")
 }
 
 /// The jars to remove, each with the copy that stays instead. Of each set of jars that are one mod, the copy from
@@ -792,7 +823,7 @@ fn pack_removals(jars: &[PackJar], pref: &str) -> Vec<(usize, usize)> {
             .copied()
             .max_by(|&a, &b| {
                 let (x, y) = (&jars[a], &jars[b]);
-                rank(x).cmp(&rank(y)).then_with(|| natural_cmp(x.version(), y.version())).then_with(|| y.file.cmp(&x.file))
+                rank(x).cmp(&rank(y)).then_with(|| natural_cmp(x.version(), y.version())).then_with(|| natural_cmp(&x.file, &y.file))
             })
             .unwrap_or(members[0]);
         out.extend(members.iter().filter(|&&i| i != keep).map(|&i| (i, keep)));
@@ -1048,6 +1079,10 @@ mod tests {
         let c = mr("x2", "Alpha", "alice", "alpha", &["https://github.com/alice/mods"]);
         let d = cf(3, "Beta", &["bob"], "beta", &["https://github.com/alice/mods"]);
         assert_eq!(same_mod(&c, &d), None);
+        // Nor are a shared repository and author: one author's add-ons link the main mod's tracker.
+        let g = mr("x4", "BiblioCraft", "Nuchaz", "bibliocraft", &["https://github.com/Nuchaz/BiblioCraft"]);
+        let h = cf(5, "BiblioWoods Forestry Edition", &["Nuchaz"], "bibliowoods-forestry", &["https://github.com/Nuchaz/BiblioCraft"]);
+        assert_eq!(same_mod(&g, &h), None);
         // Same slug alone isn't either.
         let e = mr("x3", "Iris", "someone", "iris", &[]);
         let f = cf(4, "Iris Flowers", &["gardener"], "iris", &[]);
@@ -1182,6 +1217,50 @@ mod tests {
         let jars = vec![jar("a.jar", false, None, &["create"], "0.5.1"), jar("b.jar", false, None, &["create"], "0.5.10"), jar("c.jar", false, None, &["create"], "0.5.9")];
         assert_eq!(removals(&jars, "ask"), vec![("a.jar".to_string(), "b.jar".to_string()), ("c.jar".to_string(), "b.jar".to_string())]);
         assert_eq!(jars[1].title(), "b.jar");
+    }
+
+    #[test]
+    fn file_names_without_versions() {
+        assert_eq!(file_base("Galacticraft-Planets-1.12.2-4.0.2.280.jar"), "galacticraft planets");
+        assert_eq!(file_base("MicdoodleCore-1.12.2-4.0.2.280.jar"), "micdoodlecore");
+        assert_eq!(file_base("BiblioWoods[Forestry][v1.7].jar"), "bibliowoods forestry");
+        assert_eq!(file_base("iris-1.7.jar"), file_base("iris-mc1.20.1-1.8.jar"));
+        // Same project, no mod ids: different files stay, two versions of one file don't.
+        let gc = || Some(cf(501948, "Galacticraft Legacy", &["micdoodle8"], "", &[]));
+        let jars = vec![
+            jar("Galacticraft-Planets-1.12.2-4.0.2.280.jar", false, gc(), &[], ""),
+            jar("MicdoodleCore-1.12.2-4.0.2.280.jar", false, gc(), &[], ""),
+            jar("MicdoodleCore-1.12.2-4.0.2.270.jar", false, gc(), &[], ""),
+        ];
+        assert_eq!(removals(&jars, "ask"), vec![("MicdoodleCore-1.12.2-4.0.2.270.jar".to_string(), "MicdoodleCore-1.12.2-4.0.2.280.jar".to_string())]);
+    }
+
+    #[test]
+    fn one_project_can_hold_different_mods() {
+        // CurseForge hosts the BiblioWoods add-ons as files of the BiblioCraft project.
+        let biblio = || Some(cf(228027, "BiblioCraft", &["Nuchaz"], "bibliocraft", &[]));
+        let jars = vec![
+            jar("BiblioCraft.jar", true, biblio(), &["bibliocraft"], "1.11.7"),
+            jar("BiblioWoods-Natura.jar", true, biblio(), &["bibliowoodsnatura"], "1.5"),
+            jar("BiblioCraft-old.jar", false, biblio(), &["bibliocraft"], "1.11.5"),
+        ];
+        assert_eq!(removals(&jars, "ask"), vec![("BiblioCraft-old.jar".to_string(), "BiblioCraft.jar".to_string())]);
+    }
+
+    #[test]
+    fn pack_keeps_both_listed_files_unless_proven_one() {
+        // An FTB pack lists BiblioCraft and an add-on found on the other site under a similar name: both stay.
+        let jars = vec![
+            jar("BiblioCraft.jar", true, Some(mr("x9", "Sodium", "jellysquid3", "", &[])), &[], ""),
+            jar("BiblioWoods.jar", true, Some(cf(394468, "Sodium", &["JellySquid"], "", &[])), &[], ""),
+        ];
+        assert_eq!(removals(&jars, "ask"), vec![]);
+        // The same pair with one copy shipped in the overrides is still cleaned up.
+        let jars = vec![
+            jar("sodium-cf.jar", true, Some(cf(394468, "Sodium", &["JellySquid"], "", &[])), &[], ""),
+            jar("sodium-mr.jar", false, Some(mr("AANobbMI", "Sodium", "jellysquid3", "", &[])), &[], ""),
+        ];
+        assert_eq!(removals(&jars, "ask"), vec![("sodium-mr.jar".to_string(), "sodium-cf.jar".to_string())]);
     }
 
     #[test]

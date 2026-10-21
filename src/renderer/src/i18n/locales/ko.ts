@@ -758,7 +758,7 @@ const dict: Dict = {
   'newInstance.type.old_beta': '베타',
   'newInstance.type.old_alpha': '알파',
   'newInstance.loaderVersion': '{loader} 버전',
-  'newInstance.legacyForge': 'ResinCraft는 Minecraft 1.13 이상의 Forge를 지원해요. 더 새로운 버전이나 다른 로더를 선택하세요.',
+  'newInstance.legacyForge': 'ResinCraft는 Minecraft 1.7.10 이상용 Forge를 지원합니다. 더 새로운 버전이나 다른 로더를 고르세요.',
   'newInstance.unsupported': '{loader}에서는 아직 Minecraft {version} 버전을 지원하지 않아요. 다른 버전이나 로더를 선택하세요.',
   'newInstance.optionRecommended': '{version}(권장)',
   'newInstance.optionBeta': '{version}(베타)',
@@ -1068,8 +1068,6 @@ const dict: Dict = {
   'engine.accounts.xbox.country': '이 계정의 국가에서는 Xbox Live를 사용할 수 없어요.',
   'engine.accounts.xbox.failed': 'Xbox 로그인 실패: {error}',
   'engine.accounts.xbox.noProfile': '이 Microsoft 계정에는 아직 Xbox 프로필이 없어요. xbox.com에서 한 번 로그인한 다음 다시 시도하세요.',
-  'engine.atlauncher.legacyForge':
-    '{name} {version}은(는) Minecraft {mc}용이에요. ResinCraft는 Minecraft 1.13 이상의 Forge를 지원해요. 더 새로운 버전의 팩이 있다면 그 버전을 선택하세요.',
   'engine.atlauncher.legacyFormat': '{name} {version}은(는) ATLauncher의 구형 설치 형식(Minecraft {mc})을 사용해서 ResinCraft에서 지원하지 않아요.',
   'engine.atlauncher.manualExtract': '{name}에는 직접 다운로드해서 압축을 풀어야 하는 “{file}” 파일이 필요해요. 이 작업은 ResinCraft가 대신 할 수 없어요.',
   'engine.atlauncher.noSuchVersion': '{name}에는 설치할 {version} 버전이 없어요',
@@ -1108,7 +1106,6 @@ const dict: Dict = {
   'engine.forge.needJava': '이 모드 로더를 설치하려면 Java {major}이(가) 필요해요',
   'engine.forge.noMainClass': '{jar}에 Main-Class가 없어요',
   'engine.forge.notFound': 'Minecraft {mc}용 {name}을(를) 찾을 수 없어요',
-  'engine.forge.oldInstaller': '{name}은(는) 이전(Minecraft 1.12 이하) 설치 프로그램 형식을 사용해서 ResinCraft에서 아직 지원하지 않아요.',
   'engine.forge.processorFailed': '{name} 설치에 실패했어요({main_class} 종료 코드 {code}):\n{tail}',
   'engine.forge.unexpectedFiles': '{name} 설치 중에 예기치 않은 파일이 생성됐어요. 다시 시도하거나 다른 버전을 선택하세요.',
   'engine.forge.unknownValue': '{name} 설치 프로그램이 알 수 없는 값 {value}을(를) 참조해요',
@@ -1149,8 +1146,6 @@ const dict: Dict = {
   'engine.launch.readingVersion': '버전 정보 읽는 중…',
   'engine.launch.settingUpOptifine': 'OptiFine 설정 중…',
   'engine.launch.unpackingNatives': '네이티브 라이브러리 압축 푸는 중…',
-  'engine.loader.legacyForge':
-    'ResinCraft는 Minecraft 1.13 이상의 Forge를 지원해요. Minecraft {mc}은(는) 아직 지원되지 않는 이전 Forge 설치 프로그램을 사용해요.',
   'engine.loader.notAvailable': '{loader}은(는) 아직 Minecraft {mc}에서 사용할 수 없어요',
   'engine.modpack.applyingSettings': '모드팩 설정 적용 중…',
   'engine.modpack.downloading': '{name} 다운로드 중',
@@ -1246,8 +1241,6 @@ const dict: Dict = {
   'engine.task.progress': '{label}({done}/{total})',
   'engine.technic.customModpackJar': '{name}에 ResinCraft가 읽을 수 없는 사용자 지정 bin/modpack.jar이 들어 있어서 설치할 모드 로더를 알 수 없어요.',
   'engine.technic.downloading': '모드팩 다운로드 중',
-  'engine.technic.legacyMc':
-    '{name}은(는) Minecraft {mc}용이에요. ResinCraft는 Minecraft 1.13 이상용 Technic 팩을 설치할 수 있어요(이전 버전은 구형 Forge 설치 프로그램이 필요해요).',
   'engine.technic.noBuild': '{name}에는 설치할 빌드가 없어요',
   'engine.technic.noDownload': '{name}은(는) Technic에서 다운로드할 수 없어요',
   'engine.technic.notZip': '{name}의 다운로드 파일이 zip 파일이 아니에요. 제작자의 다운로드 링크가 잘못됐을 수 있어요.',

@@ -770,7 +770,7 @@ const dict: Dict = {
   'newInstance.type.old_beta': 'beta',
   'newInstance.type.old_alpha': 'alfa',
   'newInstance.loaderVersion': '{loader} sürümü',
-  'newInstance.legacyForge': "ResinCraft, Forge'u Minecraft 1.13 ve sonrası için destekler. Daha yeni bir sürüm ya da başka bir yükleyici seç.",
+  'newInstance.legacyForge': "ResinCraft, Minecraft 1.7.10 ve sonrası için Forge'u destekler. Daha yeni bir sürüm ya da başka bir yükleyici seç.",
   'newInstance.unsupported': '{loader} henüz Minecraft {version} sürümünü desteklemiyor. Başka bir sürüm ya da yükleyici seç.',
   'newInstance.optionRecommended': '{version} (önerilen)',
   'newInstance.optionBeta': '{version} (beta)',
@@ -1086,8 +1086,6 @@ const dict: Dict = {
   'engine.accounts.xbox.country': 'Xbox Live bu hesabın ülkesinde kullanılamıyor.',
   'engine.accounts.xbox.failed': 'Xbox girişi başarısız oldu: {error}',
   'engine.accounts.xbox.noProfile': "Bu Microsoft hesabının henüz bir Xbox profili yok. xbox.com'da bir kez giriş yap, sonra tekrar dene.",
-  'engine.atlauncher.legacyForge':
-    "{name} {version}, Minecraft {mc} içindir. ResinCraft, Forge'u Minecraft 1.13 ve sonrası için destekler; varsa paketin daha yeni bir sürümünü seç.",
   'engine.atlauncher.legacyFormat': "{name} {version}, ATLauncher'ın eski kurulum biçimini (Minecraft {mc}) kullanıyor; ResinCraft bu biçimi desteklemiyor.",
   'engine.atlauncher.manualExtract': '{name} için “{file}” dosyasının elle indirilip ayıklanması gerekiyor; ResinCraft bunu senin yerine yapamaz.',
   'engine.atlauncher.noSuchVersion': '{name} için yüklenecek {version} sürümü yok',
@@ -1126,7 +1124,6 @@ const dict: Dict = {
   'engine.forge.needJava': 'Bu mod yükleyiciyi yüklemek için Java {major} gerekiyor',
   'engine.forge.noMainClass': '{jar} içinde Main-Class yok',
   'engine.forge.notFound': 'Minecraft {mc} için {name} bulunamadı',
-  'engine.forge.oldInstaller': '{name}, eski (Minecraft 1.12 ve öncesi) yükleme programı biçimini kullanıyor; ResinCraft bunu henüz desteklemiyor.',
   'engine.forge.processorFailed': '{name} yüklenemedi ({main_class} {code} koduyla çıktı):\n{tail}',
   'engine.forge.unexpectedFiles': '{name} yüklemesi beklenmeyen dosyalar oluşturdu. Tekrar dene ya da başka bir sürüm seç.',
   'engine.forge.unknownValue': '{name} yükleme programı bilinmeyen bir değere başvuruyor: {value}',
@@ -1167,8 +1164,6 @@ const dict: Dict = {
   'engine.launch.readingVersion': 'Sürüm bilgisi okunuyor…',
   'engine.launch.settingUpOptifine': 'OptiFine kuruluyor…',
   'engine.launch.unpackingNatives': 'Yerel kitaplıklar ayıklanıyor…',
-  'engine.loader.legacyForge':
-    "ResinCraft, Forge'u Minecraft 1.13 ve sonrası için destekler. Minecraft {mc}, henüz desteklenmeyen eski bir Forge yükleme programı kullanıyor.",
   'engine.loader.notAvailable': '{loader} henüz Minecraft {mc} için kullanılamıyor',
   'engine.modpack.applyingSettings': 'Mod paketi ayarları uygulanıyor…',
   'engine.modpack.downloading': '{name} indiriliyor',
@@ -1266,8 +1261,6 @@ const dict: Dict = {
   'engine.technic.customModpackJar':
     "{name}, ResinCraft'ın okuyamadığı özel bir bin/modpack.jar içeriyor; bu yüzden hangi mod yükleyicinin yükleneceği anlaşılamıyor.",
   'engine.technic.downloading': 'Mod paketi indiriliyor',
-  'engine.technic.legacyMc':
-    '{name}, Minecraft {mc} içindir. ResinCraft, Technic paketlerini Minecraft 1.13 ve sonrası için yükleyebilir (daha eskileri eski Forge yükleme programını gerektirir).',
   'engine.technic.noBuild': '{name} için yüklenecek bir derleme yok',
   'engine.technic.noDownload': "{name} için Technic'te indirme yok",
   'engine.technic.notZip': '{name} indirmesi bir zip dosyası değil. Yazarın indirme bağlantısı bozuk olabilir.',

@@ -75,15 +75,15 @@ pub async fn loader_versions(loader: LoaderType, mc_version: &str) -> Result<Vec
 
 pub(crate) fn legacy_forge_error(mc: &str) -> anyhow::Error {
     err_tr!(
-        "loader.legacyForge",
-        "ResinCraft supports Forge for Minecraft 1.13 and newer. Minecraft {mc} uses an older Forge installer that isn't supported yet.",
+        "loader.tooOldForge",
+        "ResinCraft supports Forge for Minecraft 1.7.10 and newer. Minecraft {mc} needs an older Forge that isn't supported.",
         mc = mc
     )
 }
 
 /// Newest stable loader version for a game version.
 pub async fn latest_loader(loader: LoaderType, mc_version: &str) -> Result<String> {
-    if loader == LoaderType::Forge && is_legacy_forge(mc_version) {
+    if loader == LoaderType::Forge && is_ancient_forge(mc_version) {
         return Err(legacy_forge_error(mc_version));
     }
     let versions = loader_versions(loader, mc_version).await?;
@@ -249,11 +249,46 @@ pub(crate) fn compare_versions(a: &str, b: &str) -> Ordering {
     }
 }
 
-/// Forge for Minecraft ≤1.12 ships a different installer format we don't handle.
-pub(crate) fn is_legacy_forge(mc: &str) -> bool {
-    let Some(rest) = mc.strip_prefix("1.") else { return false };
+fn minor_of(mc: &str) -> Option<u32> {
+    let rest = mc.strip_prefix("1.")?;
     let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
-    digits.parse::<u32>().map(|n| n < 13).unwrap_or(false)
+    digits.parse().ok()
+}
+
+/// Forge for Minecraft ≤1.12 ships the old installer format (install + versionInfo, no processors).
+pub(crate) fn is_legacy_forge(mc: &str) -> bool {
+    minor_of(mc).is_some_and(|n| n < 13)
+}
+
+/// Minecraft 1.12.2 and older (for tools that check how far an old game got).
+pub fn is_legacy_mc(mc: &str) -> bool {
+    is_legacy_forge(mc)
+}
+
+/// Forge for Minecraft ≤1.6 loads its libraries from servers that are gone; not supported.
+pub(crate) fn is_ancient_forge(mc: &str) -> bool {
+    minor_of(mc).is_some_and(|n| n < 7)
+}
+
+/// Old Forge builds carry a branch suffix in their Maven version ("10.13.4.1614-1.7.10"), which pack
+/// formats leave out ("forge-10.13.4.1614"). Finds the published name; unchanged when nothing matches.
+pub(crate) async fn full_forge_version(mc: &str, ver: &str) -> String {
+    if !is_legacy_forge(mc) {
+        return ver.to_string();
+    }
+    let Ok(xml) = cached_text(&format!("{FORGE_MAVEN}/maven-metadata.xml"), "forge-metadata.xml").await else {
+        return ver.to_string();
+    };
+    pick_full_forge_version(&maven_versions(&xml), mc, ver)
+}
+
+fn pick_full_forge_version(published: &[String], mc: &str, ver: &str) -> String {
+    let exact = format!("{mc}-{ver}");
+    if published.iter().any(|v| *v == exact) {
+        return ver.to_string();
+    }
+    let branch = format!("{exact}-");
+    published.iter().find(|v| v.starts_with(&branch)).and_then(|v| v.strip_prefix(&format!("{mc}-"))).map(str::to_string).unwrap_or_else(|| ver.to_string())
 }
 
 static TEXT_CACHE: Mutex<Option<HashMap<String, (Instant, String)>>> = Mutex::new(None);
@@ -304,7 +339,7 @@ struct Promotions {
 }
 
 async fn forge_versions(mc: &str) -> Result<Vec<LoaderVersion>> {
-    if is_legacy_forge(mc) {
+    if is_ancient_forge(mc) {
         return Ok(Vec::new());
     }
     let metadata_url = format!("{FORGE_MAVEN}/maven-metadata.xml");
@@ -387,5 +422,17 @@ mod tests {
         assert_eq!(neoforge_game_version("26.1.0.3"), Some("26.1".into()));
         assert_eq!(neoforge_game_version("21.0.5-beta"), Some("1.21".into()));
         assert!(is_legacy_forge("1.12.2") && !is_legacy_forge("1.13"));
+        assert!(is_ancient_forge("1.6.4") && !is_ancient_forge("1.7.10") && !is_ancient_forge("1.12.2"));
+    }
+
+    #[test]
+    fn finds_old_forge_branch_names() {
+        let published: Vec<String> =
+            ["1.7.10-10.13.4.1614-1.7.10", "1.7.10-10.13.4.1558-1.7.10", "1.12.2-14.23.5.2860", "1.7.2-10.12.2.1161-mc172"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(pick_full_forge_version(&published, "1.7.10", "10.13.4.1614"), "10.13.4.1614-1.7.10");
+        assert_eq!(pick_full_forge_version(&published, "1.7.10", "10.13.4.1614-1.7.10"), "10.13.4.1614-1.7.10");
+        assert_eq!(pick_full_forge_version(&published, "1.12.2", "14.23.5.2860"), "14.23.5.2860");
+        assert_eq!(pick_full_forge_version(&published, "1.7.2", "10.12.2.1161"), "10.12.2.1161-mc172");
+        assert_eq!(pick_full_forge_version(&published, "1.7.10", "10.13.0.1"), "10.13.0.1");
     }
 }

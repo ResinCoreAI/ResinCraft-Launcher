@@ -412,6 +412,10 @@ pub fn check_folder(folder: &Path, rules: &Rules, drive: impl Fn(&Path) -> Optio
     if path.chars().count() > MAX_PATH_LEN {
         return Some(tr!("storage.tooLong", "That path is too long for Minecraft's files. Pick one under {max} characters.", max = MAX_PATH_LEN));
     }
+    // Java reads "!" in a path as the end of a jar's name, so many mods can't find their own files there.
+    if path.contains('!') {
+        return Some(tr!("storage.exclamation", "Many mods break when a folder name has \"!\" in it. Pick a folder without one."));
+    }
     for (dir, why) in &rules.off_limits {
         if inside(folder, dir) {
             return Some(match why {
@@ -882,6 +886,7 @@ mod tests {
         assert_eq!(check(Path::new("relative\\folder")), "storage.notAbsolute");
         assert_eq!(check(dir.ancestors().last().unwrap()), "storage.driveRoot");
         assert_eq!(check(&dir.join("x".repeat(MAX_PATH_LEN))), "storage.tooLong");
+        assert_eq!(check(&dir.join("!Games/ResinCraft")), "storage.exclamation");
         assert_eq!(check(&current), "storage.same");
         assert_eq!(check(&current.join("instances").join("elsewhere")), "storage.insideGames");
         assert_eq!(check(&current.join("libraries")), "storage.insideGames");

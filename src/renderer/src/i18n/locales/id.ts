@@ -764,7 +764,7 @@ const dict: Dict = {
   'newInstance.type.old_beta': 'beta',
   'newInstance.type.old_alpha': 'alfa',
   'newInstance.loaderVersion': 'Versi {loader}',
-  'newInstance.legacyForge': 'ResinCraft mendukung Forge untuk Minecraft 1.13 dan yang lebih baru. Pilih versi yang lebih baru atau loader lain.',
+  'newInstance.legacyForge': 'ResinCraft mendukung Forge untuk Minecraft 1.7.10 dan yang lebih baru. Pilih versi yang lebih baru atau loader lain.',
   'newInstance.unsupported': '{loader} belum mendukung Minecraft {version}. Pilih versi atau loader lain.',
   'newInstance.optionRecommended': '{version} (disarankan)',
   'newInstance.optionBeta': '{version} (beta)',
@@ -1077,8 +1077,6 @@ const dict: Dict = {
   'engine.accounts.xbox.country': 'Xbox Live tidak tersedia di negara akun ini.',
   'engine.accounts.xbox.failed': 'Gagal masuk ke Xbox: {error}',
   'engine.accounts.xbox.noProfile': 'Akun Microsoft ini belum punya profil Xbox. Masuk sekali di xbox.com, lalu coba lagi.',
-  'engine.atlauncher.legacyForge':
-    '{name} {version} ditujukan untuk Minecraft {mc}. ResinCraft mendukung Forge untuk Minecraft 1.13 dan yang lebih baru; pilih versi paket yang lebih baru jika ada.',
   'engine.atlauncher.legacyFormat': '{name} {version} memakai format instalasi lama ATLauncher (Minecraft {mc}), yang tidak didukung ResinCraft.',
   'engine.atlauncher.manualExtract': '{name} memerlukan “{file}” yang diunduh secara manual lalu diekstrak, dan ResinCraft tidak bisa melakukannya untuk Anda.',
   'engine.atlauncher.noSuchVersion': '{name} tidak punya versi {version} untuk dipasang',
@@ -1116,7 +1114,6 @@ const dict: Dict = {
   'engine.forge.needJava': 'Memasang loader mod ini memerlukan Java {major}',
   'engine.forge.noMainClass': '{jar} tidak memiliki Main-Class',
   'engine.forge.notFound': '{name} untuk Minecraft {mc} tidak ditemukan',
-  'engine.forge.oldInstaller': '{name} memakai format installer lama (Minecraft 1.12 dan sebelumnya), yang belum didukung ResinCraft.',
   'engine.forge.processorFailed': 'Gagal memasang {name} ({main_class} keluar dengan kode {code}):\n{tail}',
   'engine.forge.unexpectedFiles': 'Instalasi {name} menghasilkan file yang tidak terduga. Coba lagi, atau pilih versi lain.',
   'engine.forge.unknownValue': 'Installer {name} merujuk ke nilai tak dikenal {value}',
@@ -1157,8 +1154,6 @@ const dict: Dict = {
   'engine.launch.readingVersion': 'Membaca info versi…',
   'engine.launch.settingUpOptifine': 'Menyiapkan OptiFine…',
   'engine.launch.unpackingNatives': 'Mengekstrak pustaka native…',
-  'engine.loader.legacyForge':
-    'ResinCraft mendukung Forge untuk Minecraft 1.13 dan yang lebih baru. Minecraft {mc} memakai installer Forge lama yang belum didukung.',
   'engine.loader.notAvailable': '{loader} belum tersedia untuk Minecraft {mc}',
   'engine.modpack.applyingSettings': 'Menerapkan pengaturan modpack…',
   'engine.modpack.downloading': 'Mengunduh {name}',
@@ -1256,8 +1251,6 @@ const dict: Dict = {
   'engine.technic.customModpackJar':
     '{name} menyertakan bin/modpack.jar khusus yang tidak bisa dibaca ResinCraft, jadi loader mod yang perlu dipasang tidak bisa diketahui.',
   'engine.technic.downloading': 'Mengunduh modpack',
-  'engine.technic.legacyMc':
-    '{name} ditujukan untuk Minecraft {mc}. ResinCraft bisa memasang paket Technic untuk Minecraft 1.13 dan yang lebih baru (versi lama memerlukan installer Forge lama).',
   'engine.technic.noBuild': '{name} tidak punya build untuk dipasang',
   'engine.technic.noDownload': '{name} tidak punya unduhan di Technic',
   'engine.technic.notZip': 'Unduhan {name} bukan file zip. Tautan unduhan dari pembuatnya mungkin rusak.',

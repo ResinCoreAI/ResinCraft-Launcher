@@ -163,7 +163,7 @@ export default {
   'newInstance.type.old_beta': 'beta',
   'newInstance.type.old_alpha': 'alpha',
   'newInstance.loaderVersion': '{loader} version',
-  'newInstance.legacyForge': 'ResinCraft supports Forge for Minecraft 1.13 and newer. Pick a newer version or another loader.',
+  'newInstance.legacyForge': 'ResinCraft supports Forge for Minecraft 1.7.10 and newer. Pick a newer version or another loader.',
   'newInstance.unsupported': "{loader} doesn't support Minecraft {version} yet. Pick another version or loader.",
   'newInstance.optionRecommended': '{version} (recommended)',
   'newInstance.optionBeta': '{version} (beta)',

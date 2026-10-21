@@ -6,6 +6,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -17,8 +18,8 @@ use crate::core::types::LoaderType;
 use crate::{bail_tr, err_tr, tr};
 
 use super::java::{find_java, hidden_command};
-use super::loaders::{installer_url, is_legacy_forge, legacy_forge_error, ResolveContext};
-use super::mojang::{client_jar, exists, get_vanilla_version, lib_path, merge_versions, resolve_libraries, resolve_library_list, FileRef, Library, VersionJson};
+use super::loaders::{full_forge_version, installer_url, is_ancient_forge, legacy_forge_error, ResolveContext};
+use super::mojang::{client_jar, exists, get_vanilla_version, lib_path, maven_path, merge_versions, resolve_libraries, resolve_library_list, FileRef, Library, VersionJson};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
@@ -61,6 +62,11 @@ fn path_str(p: &Path) -> String {
 }
 
 pub async fn resolve_forge_like(mc: &str, loader: LoaderType, ver: &str, ctx: &ResolveContext) -> Result<VersionJson> {
+    if loader == LoaderType::Forge && is_ancient_forge(mc) {
+        return Err(legacy_forge_error(mc));
+    }
+    let full = if loader == LoaderType::Forge { full_forge_version(mc, ver).await } else { ver.to_string() };
+    let ver = full.as_str();
     let dir = paths::versions().join(format!("{}-{mc}-{ver}", loader.as_str()));
     let cache_file = dir.join("installed.json");
     if let Some(cached) = read_json::<InstalledLoader>(&cache_file).await {
@@ -76,9 +82,6 @@ pub async fn resolve_forge_like(mc: &str, loader: LoaderType, ver: &str, ctx: &R
         }
     }
 
-    if loader == LoaderType::Forge && is_legacy_forge(mc) {
-        return Err(legacy_forge_error(mc));
-    }
     let installed = install_forge_like(mc, loader, ver, &dir, ctx).await?;
     write_json(&cache_file, &installed).await?;
     Ok(installed.version)
@@ -128,19 +131,21 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
 
     let (profile, child) = {
         let (installer, name) = (installer.to_path_buf(), name.to_string());
-        blocking(move || -> Result<(InstallProfile, VersionJson)> {
+        blocking(move || -> Result<(InstallProfile, Option<VersionJson>)> {
             let mut zip = open_zip(&installer)?;
             let text = read_entry(&mut zip, "install_profile.json").filter(|t| !t.is_empty()).ok_or_else(|| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = "install_profile.json"))?;
             let profile: InstallProfile = serde_json::from_slice(&text)?;
-            let json = profile.json.clone().filter(|j| !j.is_empty());
-            if profile.install.is_some() || profile.version_info.is_some() || json.is_none() {
-                bail_tr!("forge.oldInstaller", "{name} uses the old (Minecraft 1.12 and earlier) installer format, which ResinCraft doesn't support yet.", name = name);
+            if profile.install.is_some() && profile.version_info.is_some() {
+                return Ok((profile, None));
             }
-            let json = json.unwrap_or_default();
+            let json = profile.json.clone().filter(|j| !j.is_empty()).ok_or_else(|| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = "version.json"))?;
             let text = read_entry(&mut zip, json.trim_start_matches('/')).filter(|t| !t.is_empty()).ok_or_else(|| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = json))?;
-            Ok((profile, serde_json::from_slice(&text)?))
+            Ok((profile, Some(serde_json::from_slice(&text)?)))
         })
         .await?
+    };
+    let Some(child) = child else {
+        return install_legacy(mc, name, installer, profile, ctx).await;
     };
 
     let vanilla = get_vanilla_version(mc).await?;
@@ -306,6 +311,127 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
     let mut seen = std::collections::HashSet::new();
     files.retain(|f| seen.insert(f.clone()));
     Ok(InstalledLoader { version: merged, files })
+}
+
+// ---------- Forge for Minecraft 1.7.10 – 1.12.2 (installer with install + versionInfo) ----------
+
+/// Where old Forge profiles point (some of these hosts are gone), in the order tried.
+const LEGACY_MAVENS: [&str; 3] = ["https://maven.minecraftforge.net/", "https://libraries.minecraft.net/", "https://repo1.maven.org/maven2/"];
+
+/// Maven bases worth trying for one library: its own (moved hosts rewritten), then the usual ones.
+fn legacy_lib_bases(url: Option<&str>) -> Vec<String> {
+    let own = match url.map(str::trim).filter(|u| !u.is_empty()) {
+        Some(u) => {
+            let mut u = u.replace("http://", "https://");
+            for old in ["https://files.minecraftforge.net/maven/", "https://files.minecraftforge.net/", "https://maven.minecraftforge.net/maven/"] {
+                if u.starts_with(old) {
+                    u = format!("https://maven.minecraftforge.net/{}", &u[old.len()..]);
+                }
+            }
+            if !u.ends_with('/') {
+                u.push('/');
+            }
+            u
+        }
+        None => LEGACY_MAVENS[1].to_string(),
+    };
+    let mut out = vec![own];
+    for m in LEGACY_MAVENS {
+        if !out.iter().any(|o| o == m) {
+            out.push(m.to_string());
+        }
+    }
+    out
+}
+
+/// The old format needs no Java: the Forge jar is inside the installer and the rest are plain libraries.
+async fn install_legacy(mc: &str, name: &str, installer: &Path, profile: InstallProfile, ctx: &ResolveContext) -> Result<InstalledLoader> {
+    let install = profile.install.unwrap_or_default();
+    let mut child: VersionJson = serde_json::from_value(profile.version_info.unwrap_or_default())?;
+    let forge_lib = install["path"].as_str().unwrap_or_default().to_string();
+    let file_path = install["filePath"].as_str().unwrap_or_default().to_string();
+    if forge_lib.is_empty() || file_path.is_empty() {
+        bail_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = "install.path");
+    }
+
+    update(ctx, tr!("forge.unpacking", "Unpacking {name}…", name = name), None);
+    let forge_jar = lib_path(&forge_lib);
+    {
+        let (installer, dest, file_path, name) = (installer.to_path_buf(), forge_jar.clone(), file_path.clone(), name.to_string());
+        blocking(move || -> Result<()> {
+            let mut zip = open_zip(&installer)?;
+            let bytes = read_entry(&mut zip, &file_path).ok_or_else(|| err_tr!("forge.installerMissing", "The {name} installer is missing {file}", name = name, file = file_path))?;
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&dest, bytes)?;
+            Ok(())
+        })
+        .await?;
+    }
+
+    let vanilla = get_vanilla_version(mc).await?;
+    let client = client_jar(&vanilla)?;
+    let concurrency = ctx.concurrency.unwrap_or(8);
+    let progress: Box<dyn Fn(usize, usize) + Send + Sync> = match &ctx.task {
+        Some(t) => Box::new(t.counter(tr!("forge.downloadingLibraries", "Downloading {name} libraries", name = name))),
+        None => Box::new(|_, _| {}),
+    };
+    download_all(vec![client], 1, |_, _| {}).await?;
+
+    // Each library: the first host that has it. Server-only extras that nobody has any more are dropped.
+    let libs = std::mem::take(&mut child.libraries);
+    let total = libs.len();
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    let results = futures::stream::iter(libs.into_iter().map(|lib| {
+        let (forge_lib, done, progress) = (&forge_lib, &done, &progress);
+        async move {
+            let r = fetch_legacy_lib(lib, forge_lib).await;
+            progress(done.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1, total);
+            r
+        }
+    }))
+    .buffered(concurrency)
+    .collect::<Vec<_>>()
+    .await;
+    for r in results {
+        if let Some(lib) = r? {
+            child.libraries.push(lib);
+        }
+    }
+    Ok(InstalledLoader { version: merge_versions(&vanilla, &child), files: vec![path_str(&forge_jar)] })
+}
+
+async fn fetch_legacy_lib(mut lib: Library, forge_lib: &str) -> Result<Option<Library>> {
+    let rel = maven_path(&lib.name);
+    if lib.name == forge_lib {
+        // Unpacked from the installer above; nothing to download.
+        lib.url = None;
+        lib.downloads = Some(super::mojang::LibDownloads { artifact: Some(FileRef { url: String::new(), path: Some(rel), ..Default::default() }), classifiers: None });
+        return Ok(Some(lib));
+    }
+    let client = lib.extra.get("clientreq").and_then(Value::as_bool);
+    let server_only = client != Some(true) && lib.extra.get("serverreq").and_then(Value::as_bool) == Some(true);
+    let dest = lib_path(&lib.name);
+    let bases = legacy_lib_bases(lib.url.as_deref());
+    if exists(&dest).await {
+        lib.url = bases.into_iter().next();
+        return Ok(Some(lib));
+    }
+    let mut last = None;
+    for base in bases {
+        match download_file(&DownloadItem::new(format!("{base}{rel}"), &dest)).await {
+            Ok(()) => {
+                lib.url = Some(base);
+                return Ok(Some(lib));
+            }
+            Err(e) => last = Some(e),
+        }
+    }
+    if server_only {
+        return Ok(None);
+    }
+    Err(last.unwrap_or_else(|| anyhow!("{} couldn't be downloaded", lib.name)))
 }
 
 async fn pick_java(major: u32, ctx: &ResolveContext) -> Result<String> {

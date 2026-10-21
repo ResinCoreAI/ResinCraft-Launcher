@@ -819,7 +819,7 @@ const dict: Dict = {
   'newInstance.type.old_beta': 'бета',
   'newInstance.type.old_alpha': 'альфа',
   'newInstance.loaderVersion': 'Версия {loader}',
-  'newInstance.legacyForge': 'ResinCraft поддерживает Forge для Minecraft 1.13 и новее. Выбери версию поновее или другой загрузчик.',
+  'newInstance.legacyForge': 'ResinCraft поддерживает Forge для Minecraft 1.7.10 и новее. Выберите версию поновее или другой загрузчик.',
   'newInstance.unsupported': '{loader} пока не поддерживает Minecraft {version}. Выбери другую версию или загрузчик.',
   'newInstance.optionRecommended': '{version} (рекомендуется)',
   'newInstance.optionBeta': '{version} (бета)',
@@ -1136,8 +1136,6 @@ const dict: Dict = {
   'engine.accounts.xbox.country': 'Xbox Live недоступен в стране этого аккаунта.',
   'engine.accounts.xbox.failed': 'Не удалось войти в Xbox: {error}',
   'engine.accounts.xbox.noProfile': 'У этого аккаунта Microsoft ещё нет профиля Xbox. Войди один раз на xbox.com и попробуй снова.',
-  'engine.atlauncher.legacyForge':
-    '{name} {version} предназначен для Minecraft {mc}. ResinCraft поддерживает Forge для Minecraft 1.13 и новее; выбери более новую версию модпака, если она есть.',
   'engine.atlauncher.legacyFormat': '{name} {version} использует устаревший формат установки ATLauncher (Minecraft {mc}), который ResinCraft не поддерживает.',
   'engine.atlauncher.manualExtract': 'Для {name} нужно вручную скачать и распаковать «{file}» — ResinCraft не может сделать это за тебя.',
   'engine.atlauncher.noSuchVersion': 'У {name} нет версии {version} для установки',
@@ -1175,7 +1173,6 @@ const dict: Dict = {
   'engine.forge.needJava': 'Для установки этого загрузчика модов нужна Java {major}',
   'engine.forge.noMainClass': 'В {jar} нет Main-Class',
   'engine.forge.notFound': 'Не удалось найти {name} для Minecraft {mc}',
-  'engine.forge.oldInstaller': '{name} использует старый формат установщика (Minecraft 1.12 и ранее), который ResinCraft пока не поддерживает.',
   'engine.forge.processorFailed': 'Ошибка установки {name} ({main_class} завершился с кодом {code}):\n{tail}',
   'engine.forge.unexpectedFiles': 'Установка {name} создала неожиданные файлы. Попробуй ещё раз или выбери другую версию.',
   'engine.forge.unknownValue': 'Установщик {name} ссылается на неизвестное значение {value}',
@@ -1216,8 +1213,6 @@ const dict: Dict = {
   'engine.launch.readingVersion': 'Чтение данных о версии…',
   'engine.launch.settingUpOptifine': 'Настройка OptiFine…',
   'engine.launch.unpackingNatives': 'Распаковка нативных библиотек…',
-  'engine.loader.legacyForge':
-    'ResinCraft поддерживает Forge для Minecraft 1.13 и новее. Minecraft {mc} использует старый установщик Forge, который пока не поддерживается.',
   'engine.loader.notAvailable': '{loader} пока недоступен для Minecraft {mc}',
   'engine.modpack.applyingSettings': 'Применение настроек модпака…',
   'engine.modpack.downloading': 'Загрузка {name}',
@@ -1313,8 +1308,6 @@ const dict: Dict = {
   'engine.technic.customModpackJar':
     '{name} содержит собственный bin/modpack.jar, который ResinCraft не может прочитать, поэтому непонятно, какой загрузчик модов установить.',
   'engine.technic.downloading': 'Загрузка модпака',
-  'engine.technic.legacyMc':
-    '{name} предназначен для Minecraft {mc}. ResinCraft устанавливает модпаки Technic для Minecraft 1.13 и новее (для более старых нужен устаревший установщик Forge).',
   'engine.technic.noBuild': 'У {name} нет билда для установки',
   'engine.technic.noDownload': 'У {name} нет загрузки на Technic',
   'engine.technic.notZip': 'Загрузка {name} не является zip-файлом. Возможно, ссылка автора не работает.',

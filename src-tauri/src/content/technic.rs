@@ -306,8 +306,9 @@ pub fn detect_loader(v: &VersionJson) -> Option<(LoaderType, Option<String>)> {
     None
 }
 
-fn is_legacy_mc(mc: &str) -> bool {
-    mc.starts_with("1.") && mc.split('.').nth(1).and_then(|m| m.parse::<u32>().ok()).unwrap_or(0) < 13
+/// Minecraft 1.6 and older: jar-mod era packs, which ResinCraft can't run.
+fn is_ancient_mc(mc: &str) -> bool {
+    crate::game::loaders::is_ancient_forge(mc)
 }
 
 pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Result<Instance> {
@@ -337,11 +338,11 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         files.push(DownloadItem::new(url, tmp.join("pack.zip")));
     }
     let mc = mc.ok_or_else(|| err_tr!("modpack.noMcVersion", "{name} doesn't say which Minecraft version it needs", name = p.display_name))?;
-    // Practically every pre-1.13 Technic pack is built on legacy Forge; don't download gigabytes to find out.
-    if is_legacy_mc(&mc) {
+    // Packs for Minecraft 1.6 and older patch the game jar itself; don't download gigabytes to find out.
+    if is_ancient_mc(&mc) {
         bail_tr!(
-            "technic.legacyMc",
-            "{name} is for Minecraft {mc}. ResinCraft can install Technic packs for Minecraft 1.13 and newer (older ones need the legacy Forge installer).",
+            "technic.ancientMc",
+            "{name} is for Minecraft {mc}. ResinCraft can install Technic packs for Minecraft 1.7.10 and newer.",
             name = p.display_name,
             mc = mc
         );
