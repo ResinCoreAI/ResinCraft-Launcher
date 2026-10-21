@@ -22,6 +22,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             dev: ctx::ctx().dev,
             microsoft: !settings::ms_client_id().await.is_empty(),
             curseforge: !settings::curseforge_key().await.is_empty(),
+            discord: crate::discord::available(),
         }),
         "app:openExternal" => {
             shell::open_url(&args.get::<String>(0)?)?;
@@ -36,7 +37,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:cancelTask" => json(crate::core::events::cancel(&args.get::<String>(0)?)),
 
         "settings:get" => json(settings::redacted(settings::get().await)),
-        "settings:set" => json(settings::redacted(settings::set(args.raw(0)).await?)),
+        "settings:set" => {
+            let s = settings::set(args.raw(0)).await?;
+            crate::discord::refresh().await;
+            json(settings::redacted(s))
+        }
 
         "instances:list" => json(instances::list().await?),
         "instances:create" => json(instances::create(args.get::<NewInstance>(0)?, |_| {}).await?),

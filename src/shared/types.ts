@@ -288,6 +288,12 @@ export interface Settings {
   watchFolders: string[]
   /** Look for newer versions of installed modpacks (and instances changed since a server synced) on their own. */
   autoCheckPacks: boolean
+  /** Discord Rich Presence while a game runs (needs a build with a Discord app ID, see AppInfo.discord). */
+  discordPresence: boolean
+  /** Rich Presence names the server joined (off by default: the address can be private). */
+  discordShowServer: boolean
+  /** Rich Presence shows "In the launcher" while ResinCraft is open. */
+  discordInLauncher: boolean
 }
 
 export type ModSourcePreference = 'ask' | 'modrinth' | 'curseforge'
@@ -333,6 +339,8 @@ export interface AppInfo {
   microsoft: boolean
   /** This build can use CurseForge (it has an API key built in). */
   curseforge: boolean
+  /** This build can show Discord Rich Presence (it has a Discord app ID built in). */
+  discord: boolean
 }
 
 /** What installing a content list did. */

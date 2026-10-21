@@ -15,11 +15,18 @@ fn main() {
 }
 
 /// Compiles the app's service keys in (Microsoft Client ID, CurseForge API key, the ResinCraft Relay address,
-/// the optional MineSkin API key for the online skin search)
+/// the optional MineSkin API key for the online skin search, the optional Discord app ID for Rich Presence)
 /// so players never have to set them up. They come from environment variables or the git-ignored
 /// ../keys.local.env file.
 fn embed_keys() {
-    const KEYS: [&str; 5] = ["RESINCRAFT_MS_CLIENT_ID", "RESINCRAFT_CURSEFORGE_KEY", "RESINCRAFT_RELAY_URL", "RESINCRAFT_RELAY_DOMAIN", "RESINCRAFT_MINESKIN_KEY"];
+    const KEYS: [&str; 6] = [
+        "RESINCRAFT_MS_CLIENT_ID",
+        "RESINCRAFT_CURSEFORGE_KEY",
+        "RESINCRAFT_RELAY_URL",
+        "RESINCRAFT_RELAY_DOMAIN",
+        "RESINCRAFT_MINESKIN_KEY",
+        "RESINCRAFT_DISCORD_APP_ID",
+    ];
     println!("cargo:rerun-if-changed=../keys.local.env");
     let file = std::fs::read_to_string("../keys.local.env").unwrap_or_default();
     for key in KEYS {

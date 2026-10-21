@@ -9,10 +9,12 @@
 //! - `server`: hosting Minecraft servers on this computer
 //! - `files`: the file manager and text editor for instance and server folders
 //! - `updater`: checking for and installing new ResinCraft versions
+//! - `discord`: Discord Rich Presence for running games
 
 pub mod app_cmds;
 pub mod content;
 pub mod core;
+pub mod discord;
 pub mod files;
 pub mod game;
 pub mod migrate;
@@ -42,6 +44,7 @@ pub fn run() {
             let data_dir = core::paths::default_data_dir(app.path().config_dir().ok());
             std::fs::create_dir_all(&data_dir)?;
             core::ctx::init(data_dir, Some(app.handle().clone()));
+            tauri::async_runtime::spawn(discord::init());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![ipc])
@@ -50,6 +53,7 @@ pub fn run() {
         .run(|_, event| {
             // Hosted servers would otherwise keep running (and holding their port) after the launcher closes.
             if let tauri::RunEvent::Exit = event {
+                discord::shutdown();
                 tauri::async_runtime::block_on(server::runtime::shutdown_all(std::time::Duration::from_secs(20)));
             }
         });

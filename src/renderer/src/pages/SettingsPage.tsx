@@ -222,6 +222,36 @@ export default function SettingsPage() {
                 </div>
                 <Switch on={s.showSnapshots} onChange={(v) => set({ showSnapshots: v })} label={t('settings.snapshots')} />
               </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.discord')}</b>
+                  <span>{info?.discord === false ? t('settings.discord.unavailable') : t('settings.discord.hint')}</span>
+                </div>
+                <Switch
+                  on={!!info?.discord && s.discordPresence}
+                  onChange={(v) => set({ discordPresence: v })}
+                  label={t('settings.discord')}
+                  disabled={!info?.discord}
+                />
+              </div>
+              {info?.discord && s.discordPresence && (
+                <>
+                  <div className="setting">
+                    <div className="text">
+                      <b>{t('settings.discordServer')}</b>
+                      <span>{t('settings.discordServer.hint')}</span>
+                    </div>
+                    <Switch on={s.discordShowServer} onChange={(v) => set({ discordShowServer: v })} label={t('settings.discordServer')} />
+                  </div>
+                  <div className="setting">
+                    <div className="text">
+                      <b>{t('settings.discordLauncher')}</b>
+                      <span>{t('settings.discordLauncher.hint')}</span>
+                    </div>
+                    <Switch on={s.discordInLauncher} onChange={(v) => set({ discordInLauncher: v })} label={t('settings.discordLauncher')} />
+                  </div>
+                </>
+              )}
             </div>
           </section>
 

@@ -98,7 +98,10 @@ export function mockApi(): ResinApi {
     autoUpdate: false,
     preferredModSource: 'ask',
     watchFolders: [],
-    autoCheckPacks: true
+    autoCheckPacks: true,
+    discordPresence: true,
+    discordShowServer: false,
+    discordInLauncher: false
   }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },
@@ -178,7 +181,8 @@ export function mockApi(): ResinApi {
           totalMemMb: 16384,
           dev: true,
           microsoft: true,
-          curseforge: true
+          curseforge: true,
+          discord: true
         }),
       // A CurseForge download page "downloads" its file (collectPending picks it up); other links open for real.
       openExternal: async (u) => {

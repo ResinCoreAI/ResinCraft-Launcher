@@ -85,6 +85,8 @@ jobs:
           RESINCRAFT_RELAY_DOMAIN: ${{ secrets.RESINCRAFT_RELAY_DOMAIN }}
           # Optional: MineSkin API key for the online skin search (works without one, with lower limits).
           RESINCRAFT_MINESKIN_KEY: ${{ secrets.RESINCRAFT_MINESKIN_KEY }}
+          # Optional: Discord application ID for Rich Presence (without it the feature is off).
+          RESINCRAFT_DISCORD_APP_ID: ${{ secrets.RESINCRAFT_DISCORD_APP_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build ${{ matrix.args }}
