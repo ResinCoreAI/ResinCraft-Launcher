@@ -394,6 +394,8 @@ pub struct AppInfo {
     pub microsoft: bool,
     /// This build can use CurseForge (has an API key).
     pub curseforge: bool,
+    /// This build can show Discord Rich Presence (has a Discord app ID).
+    pub discord: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -38,6 +38,12 @@ pub struct Settings {
     /// Look for newer versions of installed modpacks (and instances changed since a server synced) at start and every
     /// few hours (Settings → Updates).
     pub auto_check_packs: bool,
+    /// Discord Rich Presence while a game runs (only in builds with a Discord app ID).
+    pub discord_presence: bool,
+    /// Rich Presence names the server joined; off by default, the address can be private.
+    pub discord_show_server: bool,
+    /// Rich Presence shows "In the launcher" while ResinCraft is open and no game runs.
+    pub discord_in_launcher: bool,
 }
 
 pub fn total_memory_mb() -> u64 {
@@ -68,6 +74,9 @@ impl Default for Settings {
             preferred_mod_source: "ask".into(),
             watch_folders: Vec::new(),
             auto_check_packs: true,
+            discord_presence: true,
+            discord_show_server: false,
+            discord_in_launcher: false,
         }
     }
 }

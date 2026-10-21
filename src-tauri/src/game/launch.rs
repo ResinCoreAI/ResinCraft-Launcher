@@ -713,6 +713,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     };
 
     game_event(&run, "running", None, None);
+    crate::discord::started(&run.run_id, &inst, target).await;
     if let Some(f) = hooks.on_started {
         f();
     }
@@ -752,6 +753,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         let _ = instances::update(&id, json!({ "playtime": playtime + secs })).await;
         let code = if signal { None } else { code };
         game_event(&run, if crashed { "crashed" } else { "stopped" }, code, None);
+        crate::discord::stopped(&run.run_id).await;
         if slot > 1 {
             let _ = tokio::fs::remove_dir_all(natives_for(&id, slot)).await;
         }
