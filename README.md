@@ -12,7 +12,7 @@ A small native app built with Tauri 2 and Rust, with a React interface. It talks
 |---|---|
 | **Instances** | Separate installs per version or modpack, each with its own mods, worlds, Java, memory and JVM arguments. Groups, your own order (drag to arrange), icons, banners and colours. Duplicate, open folder, delete to the Recycle Bin. |
 | **Any version** | Every release and snapshot from Mojang's manifest, back to the classic alphas (legacy asset layouts handled). |
-| **Mod loaders** | Fabric, Quilt, Forge and NeoForge, with a loader version picker. |
+| **Mod loaders** | Fabric, Quilt, Forge (back to Minecraft 1.2.5, where it's a jar mod), NeoForge and LiteLoader (on its own or next to Forge), with a loader version picker. Jar mods and your own version changes (main class, libraries, tweakers, arguments) in an instance's settings. |
 | **Discover** | Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher, Technic and GitHub releases, filtered to the instance's version and loader. "All" searches every site at once; paste a link to install it directly. |
 | **Smart installs** | Pick any version, install several at once, required dependencies added automatically, duplicate-mod check across sources. |
 | **Mod management** | Enable/disable, remove, recognise hand-added jars by hash, check for and apply updates (one or all). Export the mods, resource packs or shaders as a list, and install everything on a list into another instance. |

@@ -22,7 +22,7 @@ use crate::player::accounts::LaunchAuth;
 use crate::{bail_tr, err_tr, tr};
 
 use super::java::{find_java, hidden_command, install_java};
-use super::loaders::{resolve_version, JavaPicker, ResolveContext};
+use super::loaders::{JavaPicker, ResolveContext};
 use super::mojang::{asset_items, plain,client_jar, logging_config, materialize_legacy_assets, resolve_libraries, rules_allow, ArgValue, Argument, VersionJson};
 
 const LAUNCHER_NAME: &str = "ResinCraft";
@@ -212,7 +212,7 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         })
     };
     let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(settings.concurrency), java: Some(picker) };
-    let mut version = resolve_version(&inst.mc_version, inst.loader, inst.loader_version.as_deref(), &ctx).await?;
+    let mut version = super::versionpatch::resolve_instance(inst, &ctx).await?;
 
     let libraries = resolve_libraries(&version);
     let client = client_jar(&version)?;
@@ -268,7 +268,7 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         classpath = super::optifine::apply_vanilla(inst, &mut version, &client.dest, &java, settings.concurrency).await?;
     }
     classpath.extend(libraries.iter().filter(|l| l.classpath).map(|l| l.item.dest.clone()));
-    classpath.push(client.dest.clone());
+    classpath.push(super::jarmods::client_jar_for(inst, &version, &client.dest, task).await?);
     Ok(Prepared {
         java,
         classpath,

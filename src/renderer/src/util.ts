@@ -1,7 +1,14 @@
 import type { Instance, LoaderType } from '@shared/types'
 import { currentLanguage, t, type Key } from './i18n'
 
-export const LOADER_LABEL: Record<LoaderType, string> = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
+export const LOADER_LABEL: Record<LoaderType, string> = {
+  vanilla: 'Vanilla',
+  fabric: 'Fabric',
+  quilt: 'Quilt',
+  forge: 'Forge',
+  neoforge: 'NeoForge',
+  liteloader: 'LiteLoader'
+}
 
 export const COLORS = ['#b26bff', '#22d3ee', '#39e58c', '#6d7bff', '#f472b6', '#2dd4bf', '#a3e635', '#fb7185']
 /** Names for COLORS, in the same order. */
@@ -54,7 +61,7 @@ export function projectUrl(projectId?: string): string | undefined {
 export const hasCustomIcon = (i: Pick<Instance, 'iconUrl'>) => !!i.iconUrl?.startsWith('data:')
 
 export function describe(i: Instance): string {
-  return `${i.mcVersion} · ${LOADER_LABEL[i.loader]}`
+  return `${i.mcVersion} · ${LOADER_LABEL[i.loader]}${i.liteloader ? ' + LiteLoader' : ''}`
 }
 
 export function playtime(seconds: number): string {

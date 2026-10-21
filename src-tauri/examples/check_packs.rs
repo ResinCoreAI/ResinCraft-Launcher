@@ -20,7 +20,8 @@ const LOADED: [&str; 1] = ["Sound engine started"];
 /// Forge stops on its own error screen (and waits there) for these.
 const STUCK: [&str; 3] = ["MissingModsException", "Missing or unsupported mandatory dependencies", "DuplicateModsFoundException"];
 /// Forge for Minecraft ≤1.12 starts the sound system before its mods finish loading; wait for this instead.
-const LEGACY_LOADED: [&str; 1] = ["Forge Mod Loader has successfully loaded"];
+/// (Forge for 1.2.5 only writes "load complete" to ForgeModLoader-0.log in the game folder, which is watched too.)
+const LEGACY_LOADED: [&str; 2] = ["Forge Mod Loader has successfully loaded", "Forge Mod Loader load complete"];
 const BOOT_MINUTES: u64 = 12;
 
 struct Current {
@@ -156,7 +157,8 @@ async fn check(id: &str, version: Option<String>) -> anyhow::Result<String> {
     let (stop_tx, mut stop_rx) = mpsc::unbounded_channel::<(String, Option<i64>)>();
     *CURRENT.lock().unwrap() = Some(Current {
         id: inst.id.clone(),
-        legacy: inst.loader.as_str() == "forge" && resincraft_lib::game::loaders::is_legacy_mc(&inst.mc_version),
+        // Old Forge, or an old pack whose bin/modpack.jar (Forge and all) became a jar mod.
+        legacy: (inst.loader.as_str() == "forge" || !inst.jar_mods.is_empty()) && resincraft_lib::game::loaders::is_legacy_mc(&inst.mc_version),
         loaded: loaded.clone(),
         stuck: stuck.clone(), tail: tail.clone(), stop: stop_tx });
 
@@ -171,6 +173,21 @@ async fn check(id: &str, version: Option<String>) -> anyhow::Result<String> {
         xuid: None,
     };
     let launched = launch::launch_instance(&inst.id, &s, auth, launch::LaunchHooks::default()).await;
+    let fml_log = {
+        let (file, id, loaded) = (paths::game_dir(&inst.id).join("ForgeModLoader-0.log"), inst.id.clone(), loaded.clone());
+        let legacy = CURRENT.lock().unwrap().as_ref().is_some_and(|c| c.legacy);
+        tokio::spawn(async move {
+            while legacy && !loaded.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                let text = tokio::fs::read_to_string(&file).await.unwrap_or_default();
+                if let Some(line) = text.lines().find(|l| LEGACY_LOADED.iter().any(|m| l.contains(m))) {
+                    loaded.store(true, Ordering::SeqCst);
+                    println!("[game] reached: {line}");
+                    launch::kill_instance(&id, None);
+                }
+            }
+        })
+    };
     let mut ended = None;
     if launched.is_ok() {
         match tokio::time::timeout(Duration::from_secs(BOOT_MINUTES * 60), stop_rx.recv()).await {
@@ -182,6 +199,7 @@ async fn check(id: &str, version: Option<String>) -> anyhow::Result<String> {
         }
     }
     tokio::time::sleep(Duration::from_millis(300)).await;
+    fml_log.abort();
     *CURRENT.lock().unwrap() = None;
     let ok = loaded.load(Ordering::SeqCst) && !stuck.load(Ordering::SeqCst);
     let keep = !ok || std::env::var_os("RESIN_KEEP").is_some();

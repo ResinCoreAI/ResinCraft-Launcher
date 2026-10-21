@@ -1,11 +1,14 @@
 //! Minecraft versions, mod loaders, Java and launching (`versions:*`, `java:*`, `instances:launch|kill|running|runs`).
 
 pub mod forge;
+pub mod jarmods;
 pub mod java;
 pub mod launch;
+pub mod liteloader;
 pub mod loaders;
 pub mod mojang;
 pub mod optifine;
+pub mod versionpatch;
 
 use anyhow::{bail, Result};
 use serde_json::Value;
@@ -22,6 +25,25 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             let loader: LoaderType = args.get(0)?;
             let mc: String = args.get(1)?;
             json(loaders::loader_versions(loader, &mc).await?)
+        }
+        // Instance settings → Version: what the game starts with, jar mods, and jars added as libraries.
+        "versions:resolved" => json(versionpatch::resolved(&args.get::<String>(0)?).await?),
+        "versions:browseJars" => {
+            let picked = shell::pick_files("Choose jar mods", &[("Jar mods", &["jar", "zip"])]).await?;
+            json(picked.into_iter().map(|p| p.to_string_lossy().into_owned()).collect::<Vec<_>>())
+        }
+        "versions:addJarMods" => {
+            let files: Vec<String> = args.get(1)?;
+            json(jarmods::add(&args.get::<String>(0)?, &files.iter().map(std::path::PathBuf::from).collect::<Vec<_>>()).await?)
+        }
+        "versions:removeJarMod" => json(jarmods::remove(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "versions:setJarMods" => json(jarmods::set(&args.get::<String>(0)?, args.get(1)?).await?),
+        "versions:addLibrary" => {
+            let picked = shell::pick_file("Choose a library jar", &[("Java library", &["jar"])]).await?;
+            json(match picked {
+                Some(p) => Some(versionpatch::add_local_library(&p).await?),
+                None => None,
+            })
         }
 
         "java:list" => json(java::detect_java().await?),

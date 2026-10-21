@@ -53,9 +53,11 @@ pub fn folder_of(inst: &Instance, kind: ContentKind) -> PathBuf {
     paths::game_dir(&inst.id).join(kind.folder())
 }
 
-/// Loaders whose mods an instance can run (Quilt runs Fabric mods; NeoForge 1.20.1 still runs Forge mods).
+/// Loaders whose mods an instance can run (Quilt runs Fabric mods; NeoForge 1.20.1 still runs Forge mods;
+/// Forge with LiteLoader runs both).
 pub fn loaders_for(inst: &Instance) -> Vec<String> {
     match inst.loader {
+        LoaderType::Forge if inst.liteloader.as_deref().is_some_and(|v| !v.is_empty()) => vec!["forge".into(), "liteloader".into()],
         LoaderType::Quilt => vec!["quilt".into(), "fabric".into()],
         LoaderType::Neoforge if inst.mc_version == "1.20.1" => vec!["neoforge".into(), "forge".into()],
         l => vec![l.as_str().into()],

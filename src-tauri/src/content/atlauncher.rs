@@ -291,13 +291,7 @@ fn loader_of(name: &str, cfg: &AtlConfig) -> Result<(LoaderType, Option<String>)
     };
     let md = &l.metadata;
     match l.kind.to_lowercase().as_str() {
-        "forge" if crate::game::loaders::is_ancient_forge(mc) => bail_tr!(
-            "atlauncher.ancientForge",
-            "{name} {version} is for Minecraft {mc}. ResinCraft supports Forge for Minecraft 1.7.10 and newer; pick a newer version of the pack if there is one.",
-            name = name,
-            version = cfg.version,
-            mc = mc
-        ),
+        "forge" if crate::game::loaders::forge_too_old(mc) => Err(crate::game::loaders::forge_floor_error(mc)),
         "forge" => Ok((LoaderType::Forge, if md.latest == Some(true) { None } else { md.version.clone() })),
         "neoforge" => Ok((LoaderType::Neoforge, if md.latest == Some(true) { None } else { md.version.clone() })),
         "fabric" => Ok((LoaderType::Fabric, md.loader.clone())),
