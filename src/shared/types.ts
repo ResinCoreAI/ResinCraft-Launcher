@@ -100,6 +100,26 @@ export interface Instance {
   optifine?: OptifineRef
   /** Set when the player made this instance as their own modpack (New instance → Create a modpack). */
   ownPack?: OwnPack
+  /** Environment variables for the game, added to the ones in Settings (a name set here wins). */
+  env?: EnvVar[]
+  /** Commands run around a launch instead of the ones in Settings. */
+  commands?: LaunchCommands
+}
+
+/** One environment variable for the game and its commands. */
+export interface EnvVar {
+  name: string
+  value: string
+}
+
+/** The player's own commands around a launch (empty = none). They run through cmd on Windows, sh elsewhere. */
+export interface LaunchCommands {
+  /** Runs before Java starts; a non-zero exit stops the launch. */
+  preLaunch: string
+  /** The game runs through it; `{java}` marks where the Java command goes, else it goes last. */
+  wrapper: string
+  /** Runs after the game closes, with its exit code in $INST_EXIT_CODE. */
+  postExit: string
 }
 
 /** The details of a modpack the player is making; the export dialog starts from them and saves them back. */
@@ -149,6 +169,10 @@ export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVer
   jvmArgs?: string | null
   /** `null` moves the instance back to Ungrouped. */
   group?: string | null
+  /** `null` clears the instance's own environment variables. */
+  env?: EnvVar[] | null
+  /** `null` goes back to the commands in Settings. */
+  commands?: LaunchCommands | null
 }
 
 export interface McVersion {
@@ -294,6 +318,10 @@ export interface Settings {
   discordShowServer: boolean
   /** Rich Presence shows "In the launcher" while ResinCraft is open. */
   discordInLauncher: boolean
+  /** Environment variables for every game (an instance's own win). */
+  env: EnvVar[]
+  /** Pre-launch, wrapper and post-exit commands for instances without their own. */
+  commands: LaunchCommands
 }
 
 export type ModSourcePreference = 'ask' | 'modrinth' | 'curseforge'

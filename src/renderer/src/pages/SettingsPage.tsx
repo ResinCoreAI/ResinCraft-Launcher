@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, Bug, Coffee, Download, FolderSearch, Gamepad2, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun } from 'lucide-react'
+import { ArrowLeftRight, Bug, Coffee, Download, FolderSearch, Gamepad2, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun, Terminal } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
@@ -7,6 +7,7 @@ import { StorageSection } from '../components/Storage'
 import { BackupSection } from '../components/Backup'
 import { UpdatesSection } from '../components/Updates'
 import { PackUpdatesSetting } from '../components/PackUpdates'
+import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../components/LaunchCommands'
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { fixed } from '../util'
@@ -36,6 +37,7 @@ const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'appearance', label: 'settings.nav.appearance', icon: <Palette size={16} /> },
   { id: 'game', label: 'settings.nav.game', icon: <Gamepad2 size={16} /> },
   { id: 'java', label: 'settings.nav.java', icon: <Coffee size={16} /> },
+  { id: 'commands', label: 'commands.nav', icon: <Terminal size={16} /> },
   { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
   { id: 'storage', label: 'storage.nav', icon: <HardDrive size={16} /> },
   { id: 'backup', label: 'backup.nav', icon: <ArrowLeftRight size={16} /> },
@@ -333,6 +335,16 @@ export default function SettingsPage() {
                   placeholder="-XX:+UseG1GC -XX:MaxGCPauseMillis=50"
                 />
               </div>
+            </div>
+          </section>
+
+          <section className="settings-section" id="commands">
+            <h3>{t('commands.nav')}</h3>
+            <p>{t('commands.lead')}</p>
+            <CommandsWarning />
+            <div className="card">
+              <EnvEditor value={s.env} onSave={(env) => updateSettings({ env })} hint="commands.env.hint" />
+              <CommandFields value={s.commands ?? NO_COMMANDS} onSave={(commands) => set({ commands })} />
             </div>
           </section>
 

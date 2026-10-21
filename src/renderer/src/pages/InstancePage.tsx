@@ -36,6 +36,7 @@ import {
 import type { ContentItem, ContentKind, Instance, InstanceImage, JavaInstall } from '@shared/types'
 import { api } from '../api'
 import { ConfirmModal, Empty, fromKeyboard, InstanceTile, openContextMenu, PlayButton, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
+import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../components/LaunchCommands'
 import { isLive, useStore } from '../store'
 import { bytes, COLORS, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
 import { engineError, t } from '../i18n'
@@ -1037,6 +1038,30 @@ function SettingsTab({ inst }: { inst: Instance }) {
       </div>
 
       <OptifineSection inst={inst} />
+
+      <div className="settings-section">
+        <h3>{t('commands.section')}</h3>
+        <CommandsWarning />
+        <div className="card">
+          <EnvEditor value={inst.env} onSave={(env) => save({ env: env.length ? env : null })} hint="commands.env.instanceHint" />
+          <div className="setting">
+            <div className="text">
+              <b>{t('commands.own')}</b>
+              <span>{t('commands.own.hint')}</span>
+            </div>
+            <Switch
+              on={inst.commands != null}
+              onChange={(v) => void save({ commands: v ? (settings?.commands ?? NO_COMMANDS) : null })}
+              label={t('commands.own')}
+            />
+          </div>
+          <CommandFields
+            value={inst.commands ?? settings?.commands ?? NO_COMMANDS}
+            disabled={inst.commands == null}
+            onSave={(commands) => void save({ commands })}
+          />
+        </div>
+      </div>
 
       <div className="settings-section">
         <h3>{t('instance.settings.dangerZone')}</h3>

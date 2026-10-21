@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use super::fsutil::{read_json, write_json};
 use super::paths;
+use super::types::{EnvVar, LaunchCommands};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -44,6 +45,10 @@ pub struct Settings {
     pub discord_show_server: bool,
     /// Rich Presence shows "In the launcher" while ResinCraft is open and no game runs.
     pub discord_in_launcher: bool,
+    /// Environment variables for every game (an instance's own win; Settings → Commands).
+    pub env: Vec<EnvVar>,
+    /// Pre-launch, wrapper and post-exit commands for instances without their own (Settings → Commands).
+    pub commands: LaunchCommands,
 }
 
 pub fn total_memory_mb() -> u64 {
@@ -77,6 +82,8 @@ impl Default for Settings {
             discord_presence: true,
             discord_show_server: false,
             discord_in_launcher: false,
+            env: Vec::new(),
+            commands: LaunchCommands::default(),
         }
     }
 }
@@ -133,6 +140,7 @@ pub async fn set(patch: Value) -> Result<Settings> {
         }
     }
     let s: Settings = serde_json::from_value(current)?;
+    crate::game::commands::check_env(&s.env)?;
     write_json(&paths::settings_file(), &s).await?;
     *CACHE.lock().unwrap() = Some(s.clone());
     Ok(s)

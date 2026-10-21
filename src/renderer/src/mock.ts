@@ -101,7 +101,9 @@ export function mockApi(): ResinApi {
     autoCheckPacks: true,
     discordPresence: true,
     discordShowServer: false,
-    discordInLauncher: false
+    discordInLauncher: false,
+    env: [],
+    commands: { preLaunch: '', wrapper: '', postExit: '' }
   }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },

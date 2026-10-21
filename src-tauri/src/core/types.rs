@@ -167,6 +167,33 @@ pub struct Instance {
     /// Set when the player made this instance as their own modpack (New instance → Create a modpack).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub own_pack: Option<OwnPack>,
+    /// Environment variables for the game, added to the ones in Settings (a name set here wins).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub env: Vec<EnvVar>,
+    /// Commands run around a launch instead of the ones in Settings (see game/commands.rs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commands: Option<LaunchCommands>,
+}
+
+/// One environment variable the player set for the game and its commands.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvVar {
+    pub name: String,
+    #[serde(default)]
+    pub value: String,
+}
+
+/// The player's own commands around a launch, as Prism Launcher has them. Empty means none.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LaunchCommands {
+    /// Runs before Java starts; a non-zero exit stops the launch.
+    pub pre_launch: String,
+    /// The game runs through it (`prime-run`); `{java}` marks where the Java command goes, else it goes last.
+    pub wrapper: String,
+    /// Runs after the game closes, with its exit code in `$INST_EXIT_CODE`.
+    pub post_exit: String,
 }
 
 /// The details of a modpack the player is making; the export dialog starts from them and saves them back.
