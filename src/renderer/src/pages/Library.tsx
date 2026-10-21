@@ -604,6 +604,8 @@ export function InstanceCard({
         tabIndex={0}
         aria-pressed={sel ? picked : undefined}
         onPointerDown={onPointerDown}
+        // The card moves by pointer events; a native drag (of its banner, or selected text) would cancel them.
+        onDragStart={(e) => e.preventDefault()}
         onPointerMove={tilt.onPointerMove}
         onPointerLeave={tilt.onPointerLeave}
         onContextMenu={(e) => {

@@ -92,7 +92,7 @@ export function InstanceTile({
   const src = (wide && inst.bannerUrl) || inst.iconUrl
   return (
     <div className={`tile ${className ?? ''}`} style={style}>
-      {src ? <img src={src} alt="" /> : <BlockArt seed={inst.id ?? inst.name} color={inst.color} cols={wide ? 16 : 8} rows={wide ? 9 : 8} />}
+      {src ? <img src={src} alt="" draggable={false} /> : <BlockArt seed={inst.id ?? inst.name} color={inst.color} cols={wide ? 16 : 8} rows={wide ? 9 : 8} />}
     </div>
   )
 }
