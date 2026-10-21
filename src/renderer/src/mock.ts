@@ -11,6 +11,7 @@ import { mockStorage } from './mock-storage'
 import { mockRuns } from './mock-runs'
 import { mockQuickJoin } from './mock-quickjoin'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
+import { mockDetails, mockVersionInfo } from './mock-details'
 import { MOCK_PACK, mockPackUpdates, mockPackVersions, mockSwitchPack } from './mock-packswitch'
 
 export function mockApi(): ResinApi {
@@ -146,6 +147,8 @@ export function mockApi(): ResinApi {
   }))
   // The player's own modpacks (instances with ownPack) start empty and keep their own content.
   const packContent = new Map<string, ContentItem[]>()
+  /** Every result shown so far, so a details page (or a dependency's) can be built for it. */
+  const seen = new Map<string, ProjectHit>()
   const contentOf = (id: string) => packContent.get(id) ?? mods
   const mods: ContentItem[] = [
     {
@@ -334,8 +337,9 @@ export function mockApi(): ResinApi {
           return i < base.length ? h : { ...h, id: `${h.id}-${i}`, slug: `${h.slug}-${i}`, title: `${h.title} ${Math.floor(i / base.length) + 1}` }
         })
         const offset = q.offset ?? 0
-        const page = all.slice(offset, offset + (q.limit ?? 20))
-        return wait({ hits: page.map((h) => ({ ...h, kind: q.kind })), total: all.length, offset }, 400)
+        const page = all.slice(offset, offset + (q.limit ?? 20)).map((h) => ({ ...h, kind: q.kind }))
+        for (const h of page) seen.set(h.id, h)
+        return wait({ hits: page, total: all.length, offset }, 400)
       },
       versions: (projectId) =>
         wait(
@@ -360,6 +364,16 @@ export function mockApi(): ResinApi {
             downloads: 400_000 - i * 50_000
           }))
         ),
+      details: async (projectId) => {
+        const h = seen.get(projectId) ?? [...hits, ...mockCurseForgeHits(now)].find((x) => x.id === projectId)
+        if (!h) throw new Error('Project not found')
+        return wait(mockDetails(h), 500)
+      },
+      versionInfo: (projectId, versionId) => {
+        const info = mockVersionInfo(projectId, versionId, [...hits, ...mockCurseForgeHits(now)])
+        // Modpacks list their mods, not dependencies.
+        return wait(seen.get(projectId)?.kind === 'modpack' ? { ...info, dependencies: [] } : info, 350)
+      },
       install: () => wait(undefined, 800),
       exportList: (_i, kind) =>
         wait(`C:\\Users\\you\\Downloads\\cozy-survival ${kind === 'mod' ? 'mods' : kind === 'shader' ? 'shaders' : 'resource-packs'}.json`, 500),

@@ -8,6 +8,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::details;
 use super::dupes::dedupe_pack;
 use super::index::{discard_instance, encode_uri, extract_where, iso_from_secs, lenient_u64, open_zip, safe_name, InstanceGuard};
 use super::packswitch::{Layer, PackTarget, TargetFile};
@@ -17,7 +18,8 @@ use crate::core::instances;
 use crate::core::net::{download_all, fetch_json, DownloadItem, Hash};
 use crate::core::paths;
 use crate::core::types::{
-    ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectHit, ProjectVersion, SearchQuery, SearchResult,
+    ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectDetails, ProjectHit, ProjectLink, ProjectVersion,
+    SearchQuery, SearchResult, VersionInfo,
 };
 use crate::{bail_tr, err_tr, tr};
 
@@ -48,6 +50,12 @@ struct AtlPack {
     safe_name: String,
     description: Option<String>,
     versions: Vec<AtlVersionSummary>,
+    #[serde(rename = "discordInviteURL")]
+    discord_invite_url: Option<String>,
+    #[serde(rename = "supportURL")]
+    support_url: Option<String>,
+    #[serde(rename = "websiteURL")]
+    website_url: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Default)]
@@ -234,6 +242,34 @@ pub async fn versions(project_id: &str) -> Result<Vec<ProjectVersion>> {
         .collect())
 }
 
+pub async fn details(project_id: &str) -> Result<ProjectDetails> {
+    let p = pack(atl_name(project_id)).await?;
+    Ok(ProjectDetails {
+        // Plain text, not Markdown.
+        body: details::markdown(p.description.as_deref().unwrap_or_default(), true),
+        gallery: Vec::new(),
+        links: ProjectLink::list([("website", p.website_url.clone()), ("issues", p.support_url.clone()), ("discord", p.discord_invite_url.clone())]),
+        license: None,
+        changelogs: true,
+        dependencies: false,
+        hit: to_hit(&p),
+    })
+}
+
+pub async fn version_info(project_id: &str, version_id: &str) -> Result<VersionInfo> {
+    #[derive(Deserialize, Default)]
+    #[serde(default)]
+    struct Version {
+        changelog: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct Res {
+        data: Version,
+    }
+    let v: Res = fetch_json(&format!("{API}/pack/{}/{}", enc(atl_name(project_id)), enc(version_id))).await?;
+    let text = v.data.changelog.filter(|c| !c.trim().is_empty());
+    Ok(VersionInfo { changelog: text.map(|c| details::markdown(&c, true)), dependencies: Vec::new() })
+}
 
 /// Works out the loader, refusing (before anything is created) packs ResinCraft can't run.
 fn loader_of(name: &str, cfg: &AtlConfig) -> Result<(LoaderType, Option<String>)> {

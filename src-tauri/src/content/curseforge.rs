@@ -10,6 +10,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::details;
 use super::dupes::{dedupe_pack, dep_facts, skipped_text, Guard, ModFacts};
 use super::index::{
     discard_instance, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, parse_date_ms, read_zip_text, remove_project_files, safe_name, save_index, ContentIndex, IndexEntry, InstanceGuard,
@@ -25,8 +26,8 @@ use crate::core::paths;
 use crate::core::settings;
 use crate::core::text::Text;
 use crate::core::types::{
-    ContentItem, ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectHit, ProjectVersion, SearchQuery,
-    SearchResult, UpdateRef,
+    ContentItem, ContentKind, ContentSource, GalleryImage, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectDependency, ProjectDetails,
+    ProjectHit, ProjectLink, ProjectVersion, SearchQuery, SearchResult, UpdateRef, VersionInfo,
 };
 use crate::{bail_tr, err_tr, tr};
 
@@ -393,6 +394,80 @@ pub async fn versions(project_id: &str, instance_id: Option<&str>) -> Result<Vec
             version_number: f.display_name,
         })
         .collect())
+}
+
+// ---------- Details page ----------
+
+pub async fn details(project_id: &str) -> Result<ProjectDetails> {
+    #[derive(Deserialize, Default)]
+    #[serde(rename_all = "camelCase", default)]
+    struct Shot {
+        title: String,
+        description: String,
+        url: String,
+        thumbnail_url: String,
+    }
+    #[derive(Deserialize, Default)]
+    #[serde(rename_all = "camelCase", default)]
+    struct Extra {
+        screenshots: Vec<Shot>,
+        links: Links,
+    }
+    #[derive(Deserialize, Default)]
+    #[serde(rename_all = "camelCase", default)]
+    struct Links {
+        wiki_url: Option<String>,
+    }
+    let id = cf_id(project_id);
+    let (page, description) = (format!("/mods/{id}"), format!("/mods/{id}/description"));
+    let (raw, body) = futures::try_join!(cf::<Value>(&page, None), cf::<String>(&description, None))?;
+    let m: CfMod = serde_json::from_value(raw.clone())?;
+    let extra: Extra = serde_json::from_value(raw).unwrap_or_default();
+    let some = |s: String| Some(s).filter(|s| !s.trim().is_empty());
+    Ok(ProjectDetails {
+        body,
+        gallery: extra
+            .screenshots
+            .into_iter()
+            .filter(|s| !s.url.is_empty())
+            .map(|s| GalleryImage { thumb: some(s.thumbnail_url), title: some(s.title), description: some(s.description), url: s.url })
+            .collect(),
+        links: ProjectLink::list([("source", m.links.source_url.clone()), ("issues", m.links.issues_url.clone()), ("wiki", extra.links.wiki_url)]),
+        license: None,
+        changelogs: true,
+        dependencies: true,
+        hit: to_hit(&m),
+    })
+}
+
+pub async fn version_info(project_id: &str, version_id: &str) -> Result<VersionInfo> {
+    let id = cf_id(project_id);
+    let file_id: u64 = version_id.parse().unwrap_or(0);
+    let (path, notes) = (format!("/mods/{id}/files/{file_id}"), format!("/mods/{id}/files/{file_id}/changelog"));
+    let (file, changelog) = futures::try_join!(cf::<CfFile>(&path, None), cf::<String>(&notes, None))?;
+    let kind = |relation: u32| match relation {
+        REQUIRED_DEPENDENCY => "required",
+        2 | 4 => "optional",
+        1 | 6 => "embedded",
+        _ => "incompatible",
+    };
+    let ids: Vec<u64> = file.dependencies.iter().map(|d| d.mod_id).collect();
+    let mods: Vec<CfMod> = if ids.is_empty() { Vec::new() } else { cf("/mods", Some(json!({ "modIds": ids }))).await.unwrap_or_default() };
+    let mut dependencies: Vec<ProjectDependency> = file
+        .dependencies
+        .iter()
+        .map(|d| {
+            let m = mods.iter().find(|m| m.id == d.mod_id);
+            ProjectDependency {
+                id: Some(prefixed(d.mod_id)),
+                title: m.map(|m| m.name.clone()).unwrap_or_else(|| format!("#{}", d.mod_id)),
+                icon_url: m.and_then(CfMod::icon),
+                kind: kind(d.relation_type).into(),
+            }
+        })
+        .collect();
+    dependencies.sort_by_key(|d| details::dependency_rank(&d.kind));
+    Ok(VersionInfo { changelog: Some(changelog).filter(|c| !c.trim().is_empty()), dependencies })
 }
 
 // ---------- Install ----------

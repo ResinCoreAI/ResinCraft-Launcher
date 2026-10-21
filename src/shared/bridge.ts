@@ -100,6 +100,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
     content: {
       search: fn('content:search'),
       versions: fn('content:versions'),
+      details: fn('content:details'),
+      versionInfo: fn('content:versionInfo'),
       install: fn('content:install'),
       installFromLink: fn('content:installFromLink'),
       exportList: fn('content:exportList'),

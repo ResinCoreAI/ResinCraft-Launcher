@@ -3,6 +3,7 @@
 
 pub mod atlauncher;
 pub mod curseforge;
+pub mod details;
 pub mod dupes;
 pub mod export;
 pub mod ftb;
@@ -35,6 +36,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             let instance: Option<String> = args.get(1)?;
             json(sources::versions(&args.get::<String>(0)?, instance.as_deref()).await?)
         }
+        "content:details" => json(details::details(&args.get::<String>(0)?).await?),
+        "content:versionInfo" => json(details::version_info(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "content:install" => {
             sources::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?, args.get(3)?).await?;
             done()

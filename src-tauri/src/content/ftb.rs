@@ -8,6 +8,7 @@ use futures::stream::{self, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
 
+use super::details;
 use super::dupes::dedupe_pack;
 use super::index::{discard_instance, iso_from_secs, parse_loader, safe_name, InstanceGuard};
 use super::packswitch::{PackTarget, Side, TargetFile};
@@ -17,7 +18,8 @@ use crate::core::instances;
 use crate::core::net::{download_all, fetch_json, DownloadItem, Hash};
 use crate::core::paths;
 use crate::core::types::{
-    ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectHit, ProjectVersion, SearchQuery, SearchResult,
+    ContentKind, ContentSource, GalleryImage, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectDetails, ProjectHit, ProjectLink,
+    ProjectVersion, SearchQuery, SearchResult, VersionInfo,
 };
 use crate::{err_tr, tr};
 
@@ -66,6 +68,14 @@ struct FtbArt {
     url: String,
     #[serde(rename = "type")]
     kind: String,
+    title: String,
+}
+
+#[derive(Deserialize, Clone, Default)]
+#[serde(default)]
+struct FtbLink {
+    name: String,
+    link: String,
 }
 
 #[derive(Deserialize, Clone, Default)]
@@ -81,6 +91,9 @@ struct FtbPack {
     name: String,
     slug: Option<String>,
     synopsis: String,
+    /// Markdown.
+    description: String,
+    links: Vec<FtbLink>,
     installs: u64,
     plays: u64,
     updated: i64,
@@ -202,6 +215,40 @@ pub async fn versions(project_id: &str) -> Result<Vec<ProjectVersion>> {
             downloads: 0,
         })
         .collect())
+}
+
+pub async fn details(project_id: &str) -> Result<ProjectDetails> {
+    let p = pack(ftb_id(project_id)).await?;
+    // FTB's own link names ("Wiki", "Issue Tracker", "Discord").
+    let links = ProjectLink::list(p.links.iter().map(|l| {
+        let name = l.name.to_lowercase();
+        let kind = ["wiki", "issue", "discord", "source", "github"].into_iter().find(|k| name.contains(k)).unwrap_or("website");
+        (if kind == "issue" { "issues" } else if kind == "github" { "source" } else { kind }, Some(l.link.clone()))
+    }));
+    Ok(ProjectDetails {
+        body: details::markdown(&p.description, false),
+        gallery: p
+            .art
+            .iter()
+            .filter(|a| !a.url.is_empty() && a.kind != "square" && a.kind != "logo")
+            .map(|a| GalleryImage { url: a.url.clone(), thumb: None, title: Some(a.title.clone()).filter(|t| !t.is_empty()), description: None })
+            .collect(),
+        links,
+        license: None,
+        changelogs: true,
+        dependencies: false,
+        hit: to_hit(&p),
+    })
+}
+
+pub async fn version_info(project_id: &str, version_id: &str) -> Result<VersionInfo> {
+    #[derive(Deserialize, Default)]
+    #[serde(default)]
+    struct Changelog {
+        content: String,
+    }
+    let c: Changelog = fetch_json(&format!("{API}/modpack/{}/{}/changelog", ftb_id(project_id), enc_id(version_id))).await?;
+    Ok(VersionInfo { changelog: Some(c.content).filter(|c| !c.trim().is_empty()).map(|c| details::markdown(&c, false)), dependencies: Vec::new() })
 }
 
 pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Result<Instance> {

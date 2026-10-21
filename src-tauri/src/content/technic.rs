@@ -12,6 +12,7 @@ use futures::stream::{self, StreamExt};
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::details;
 use super::dupes::dedupe_pack;
 use super::index::{discard_instance, extract_where, lenient_u64, lenient_u64_zero, natural_cmp, open_zip, safe_name, InstanceGuard, Zip};
 use super::packswitch::{Layer, PackTarget};
@@ -19,7 +20,9 @@ use crate::core::events::Task;
 use crate::core::instances;
 use crate::core::net::{download_all, fetch_json, DownloadItem, Hash};
 use crate::core::paths;
-use crate::core::types::{ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, ProjectHit, ProjectVersion, SearchQuery, SearchResult};
+use crate::core::types::{
+    ContentKind, ContentSource, GalleryImage, Instance, LoaderType, ModpackRef, NewInstance, ProjectDetails, ProjectHit, ProjectVersion, SearchQuery, SearchResult,
+};
 use crate::{bail_tr, err_tr, tr};
 
 const API: &str = "https://api.technicpack.net";
@@ -61,6 +64,7 @@ struct TechnicPack {
     tags: Option<String>,
     version: Option<String>,
     icon: Option<Icon>,
+    background: Option<Icon>,
     platform_url: String,
     /// Download of the whole pack, for packs without Solder.
     url: Option<String>,
@@ -171,6 +175,20 @@ pub async fn search(sq: &SearchQuery) -> Result<SearchResult> {
     let offset = sq.offset.unwrap_or(0) as usize;
     let limit = sq.limit.unwrap_or(20) as usize;
     Ok(SearchResult { hits: list.iter().skip(offset).take(limit).map(|p| to_hit(p)).collect(), total: list.len() as u64, offset: offset as u64 })
+}
+
+pub async fn details(project_id: &str) -> Result<ProjectDetails> {
+    let p = pack(slug_of(project_id)).await?;
+    Ok(ProjectDetails {
+        // Plain text; Technic has no long description, changelogs or screenshots, only the pack's background.
+        body: details::markdown(p.description.as_deref().unwrap_or_default(), true),
+        gallery: p.background.iter().filter_map(|b| b.url.clone()).map(|url| GalleryImage { url, thumb: None, title: None, description: None }).collect(),
+        links: Vec::new(),
+        license: None,
+        changelogs: false,
+        dependencies: false,
+        hit: to_hit(&p),
+    })
 }
 
 fn row(id: &str, mc: Option<String>, kind: &str) -> ProjectVersion {

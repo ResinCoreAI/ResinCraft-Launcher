@@ -56,6 +56,8 @@ idna = "1"
 tauri-plugin-updater = "2"
 # ResinCraft Relay (../relay): the launcher's side of <name>.rscraft.resincore.tech tunnels.
 resincraft-relay = { path = "../relay", default-features = false, features = ["agent"] }
+# Mod and modpack descriptions and changelogs (Markdown) for Discover's details page; the UI sanitizes the HTML.
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 
 [dev-dependencies]
 # The relay server itself, for examples/check_relay.rs.

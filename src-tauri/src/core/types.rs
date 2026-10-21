@@ -527,6 +527,81 @@ pub struct ProjectVersion {
     pub downloads: u64,
 }
 
+/// A project's page inside Discover. HTML here comes straight from the source (or from its Markdown) and is
+/// sanitized by the UI before it's shown.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDetails {
+    #[serde(flatten)]
+    pub hit: ProjectHit,
+    /// The long description as HTML; empty when the source only has the short one.
+    pub body: String,
+    pub gallery: Vec<GalleryImage>,
+    pub links: Vec<ProjectLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    /// Whether `version_info` can tell a version's changelog / dependencies for this source.
+    pub changelogs: bool,
+    pub dependencies: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryImage {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thumb: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectLink {
+    /// "website" | "source" | "issues" | "wiki" | "discord" | "donate"
+    pub kind: String,
+    pub url: String,
+}
+
+impl ProjectLink {
+    /// The links that are set, in the order given.
+    pub fn list<'a>(links: impl IntoIterator<Item = (&'a str, Option<String>)>) -> Vec<ProjectLink> {
+        let mut out: Vec<ProjectLink> = Vec::new();
+        for (kind, url) in links {
+            if let Some(url) = url.map(|u| u.trim().to_string()).filter(|u| u.starts_with("http")) {
+                if !out.iter().any(|l| l.url == url) {
+                    out.push(ProjectLink { kind: kind.into(), url });
+                }
+            }
+        }
+        out
+    }
+}
+
+/// One version's changelog (HTML) and what it needs.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changelog: Option<String>,
+    pub dependencies: Vec<ProjectDependency>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDependency {
+    /// The project's id on the same source, when known (opens its own details page).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    /// "required" | "optional" | "embedded" | "incompatible"
+    #[serde(rename = "type")]
+    pub kind: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateRef {

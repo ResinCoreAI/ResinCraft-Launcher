@@ -8,6 +8,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::details;
 use super::dupes::{dedupe_pack, dep_facts, skipped_text, Guard, ModFacts};
 use super::index::{
     discard_instance, display_cmp, extract_overrides, folder_of, index_key, load_index, loaders_for, open_zip, read_zip_text, remove_project_files, safe_name, save_index, ContentIndex, IndexEntry, InstanceGuard,
@@ -20,8 +21,8 @@ use crate::core::instances;
 use crate::core::net::{download_all, download_file, fetch_json, hash_file, post_json, DownloadItem, Hash, HashAlgo};
 use crate::core::paths;
 use crate::core::types::{
-    source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType, ModpackRef, NewInstance, ProjectHit, ProjectVersion, SearchQuery,
-    SearchResult, UpdateRef,
+    source_of, ContentItem, ContentKind, ContentSource, GalleryImage, Instance, LoaderType, ModpackRef, NewInstance, ProjectDependency, ProjectDetails,
+    ProjectHit, ProjectLink, ProjectVersion, SearchQuery, SearchResult, UpdateRef, VersionInfo,
 };
 use crate::{bail_tr, err_tr, tr};
 
@@ -105,6 +106,8 @@ struct MrVersion {
     files: Vec<MrFile>,
     #[serde(default)]
     dependencies: Vec<MrDependency>,
+    #[serde(default)]
+    changelog: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -234,6 +237,190 @@ pub async fn versions(project_id: &str, instance_id: Option<&str>) -> Result<Vec
             downloads: v.downloads,
         })
         .collect())
+}
+
+// ---------- Details page ----------
+
+#[derive(Deserialize)]
+struct MrImage {
+    url: String,
+    #[serde(default)]
+    raw_url: Option<String>,
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    featured: bool,
+    #[serde(default)]
+    ordering: i64,
+}
+
+#[derive(Deserialize)]
+struct MrLicense {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct MrDonation {
+    url: String,
+}
+
+#[derive(Deserialize)]
+struct MrPage {
+    id: String,
+    slug: String,
+    title: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    body: String,
+    #[serde(default)]
+    icon_url: Option<String>,
+    project_type: String,
+    #[serde(default)]
+    downloads: u64,
+    #[serde(default)]
+    followers: u64,
+    #[serde(default)]
+    categories: Vec<String>,
+    #[serde(default)]
+    updated: String,
+    #[serde(default)]
+    team: String,
+    #[serde(default)]
+    organization: Option<String>,
+    #[serde(default)]
+    source_url: Option<String>,
+    #[serde(default)]
+    issues_url: Option<String>,
+    #[serde(default)]
+    wiki_url: Option<String>,
+    #[serde(default)]
+    discord_url: Option<String>,
+    #[serde(default)]
+    donation_urls: Vec<MrDonation>,
+    #[serde(default)]
+    gallery: Vec<MrImage>,
+    #[serde(default)]
+    license: Option<MrLicense>,
+}
+
+/// Who a project is by: its organization, else its team's owner.
+async fn author_of(p: &MrPage) -> String {
+    #[derive(Deserialize)]
+    struct Named {
+        #[serde(default)]
+        name: String,
+        #[serde(default)]
+        username: String,
+    }
+    #[derive(Deserialize)]
+    struct Member {
+        user: Named,
+        #[serde(default)]
+        role: String,
+        #[serde(default)]
+        is_owner: bool,
+    }
+    if let Some(org) = p.organization.as_deref().filter(|o| !o.is_empty()) {
+        if let Ok(o) = fetch_json::<Named>(&format!("{API}/organization/{}", enc(org))).await {
+            return o.name;
+        }
+    }
+    let members: Vec<Member> = fetch_json(&format!("{API}/team/{}/members", enc(&p.team))).await.unwrap_or_default();
+    let owner = members.iter().find(|m| m.is_owner || m.role == "Owner").or(members.first());
+    owner.map(|m| m.user.username.clone()).unwrap_or_default()
+}
+
+pub async fn details(project_id: &str) -> Result<ProjectDetails> {
+    let p: MrPage = fetch_json(&format!("{API}/project/{}", enc(project_id))).await?;
+    let author = author_of(&p).await;
+    let mut gallery: Vec<&MrImage> = p.gallery.iter().collect();
+    gallery.sort_by_key(|g| (!g.featured, g.ordering));
+    let links = ProjectLink::list(
+        [("source", p.source_url.clone()), ("issues", p.issues_url.clone()), ("wiki", p.wiki_url.clone()), ("discord", p.discord_url.clone())]
+            .into_iter()
+            .chain(p.donation_urls.iter().map(|d| ("donate", Some(d.url.clone())))),
+    );
+    // Custom licenses come as "LicenseRef-Polyform-Shield-1.0.0" with no name.
+    let license = p.license.as_ref().map(|l| if l.name.is_empty() { l.id.trim_start_matches("LicenseRef-").replace('-', " ") } else { l.name.clone() }).filter(|l| !l.is_empty());
+    Ok(ProjectDetails {
+        body: details::markdown(&p.body, false),
+        gallery: gallery
+            .into_iter()
+            .map(|g| GalleryImage {
+                url: non_empty(g.raw_url.clone()).unwrap_or_else(|| g.url.clone()),
+                thumb: Some(g.url.clone()),
+                title: non_empty(g.title.clone()),
+                description: non_empty(g.description.clone()),
+            })
+            .collect(),
+        links,
+        license,
+        changelogs: true,
+        dependencies: true,
+        hit: ProjectHit {
+            url: format!("https://modrinth.com/{}/{}", p.project_type, p.slug),
+            kind: kind_of(&p.project_type).unwrap_or(ContentKind::Mod),
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            description: p.description,
+            icon_url: non_empty(p.icon_url),
+            author,
+            downloads: p.downloads,
+            follows: p.followers,
+            categories: p.categories,
+            updated: p.updated,
+            source: ContentSource::Modrinth,
+        },
+    })
+}
+
+/// A version's changelog and dependencies, with each dependency's name and icon.
+pub async fn version_info(version_id: &str) -> Result<VersionInfo> {
+    #[derive(Deserialize)]
+    struct Brief {
+        id: String,
+        title: String,
+        #[serde(default)]
+        icon_url: Option<String>,
+    }
+    let v = version(version_id).await?;
+    // Some dependencies only name a version; ask which projects those belong to.
+    let by_version: Vec<&str> = v.dependencies.iter().filter(|d| d.project_id.is_none()).filter_map(|d| d.version_id.as_deref()).collect();
+    let mut owners: HashMap<String, String> = HashMap::new();
+    if !by_version.is_empty() {
+        let list: Vec<MrVersion> = fetch_json(&format!("{API}/versions?ids={}", enc(&serde_json::to_string(&by_version)?))).await.unwrap_or_default();
+        owners = list.into_iter().map(|x| (x.id, x.project_id)).collect();
+    }
+    let deps: Vec<(String, String)> = v
+        .dependencies
+        .iter()
+        .filter_map(|d| {
+            let id = d.project_id.clone().or_else(|| d.version_id.as_ref().and_then(|x| owners.get(x).cloned()))?;
+            Some((id, d.dependency_type.clone()))
+        })
+        .collect();
+    let mut names: HashMap<String, Brief> = HashMap::new();
+    if !deps.is_empty() {
+        let ids: Vec<&str> = deps.iter().map(|(id, _)| id.as_str()).collect();
+        let list: Vec<Brief> = fetch_json(&format!("{API}/projects?ids={}", enc(&serde_json::to_string(&ids)?))).await.unwrap_or_default();
+        names = list.into_iter().map(|b| (b.id.clone(), b)).collect();
+    }
+    let mut dependencies: Vec<ProjectDependency> = deps
+        .into_iter()
+        .map(|(id, kind)| {
+            let b = names.get(&id);
+            ProjectDependency { title: b.map(|b| b.title.clone()).unwrap_or_else(|| id.clone()), icon_url: b.and_then(|b| non_empty(b.icon_url.clone())), id: Some(id), kind }
+        })
+        .collect();
+    dependencies.sort_by_key(|d| details::dependency_rank(&d.kind));
+    Ok(VersionInfo { changelog: v.changelog.filter(|c| !c.trim().is_empty()).map(|c| details::markdown(&c, false)), dependencies })
 }
 
 // ---------- Install ----------

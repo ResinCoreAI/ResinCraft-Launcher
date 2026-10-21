@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   Heart,
+  Info,
   Link2,
   Image,
   KeyRound,
@@ -42,6 +43,7 @@ import { useStore } from '../store'
 import { compact, describe, timeAgo } from '../util'
 import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
 import { PackBuilderBanner } from '../components/OwnPack'
+import { ProjectPage } from '../components/ProjectPage'
 
 const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.ReactNode }[] = [
   { value: 'mod', labelKey: 'discover.kind.mod', searchKey: 'discover.search.mod', icon: <Blocks size={15} /> },
@@ -241,6 +243,12 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const [asking, setAsking] = useState<{ rows: DupRow[]; inst: Instance; total: number; answer: (a: DupAnswer | null) => void }>()
   const [showSelection, setShowSelection] = useState(false)
   const [checking, setChecking] = useState(false)
+  /** Details pages open on top of the results; dependencies stack up, Back goes down one. */
+  const [pages, setPages] = useState<ProjectHit[]>([])
+  /** The version to install once an instance is picked (installing a version from a details page). */
+  const [pickedVersion, setPickedVersion] = useState<{ id: string; number: string }>()
+  const pageRef = useRef<HTMLDivElement>(null)
+  const resultsScroll = useRef(0)
   const selectBar = useRef<HTMLDivElement>(null)
   const canSelect = kind !== 'modpack'
 
@@ -385,10 +393,11 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
    * Installs one project; returns whether it worked. `from` is where the burst of blocks starts (the button or row
    * that started it).
    */
-  const install = async (hit: ProjectHit, inst?: Instance, versionId?: string, from?: Element): Promise<boolean> => {
+  const install = async (hit: ProjectHit, inst?: Instance, versionId?: string, from?: Element, versionNumber?: string): Promise<boolean> => {
     const into = inst ?? target
     if (hit.kind !== 'modpack' && !into) {
       setPicking([hit])
+      setPickedVersion(versionId ? { id: versionId, number: versionNumber ?? versionId } : undefined)
       return false
     }
     if (hit.kind !== 'modpack') return installPicks([hit], into!, versionId, from)
@@ -491,6 +500,20 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
 
   const installMany = (list: ProjectHit[], inst: Instance) => installPicks(list, inst, undefined, undefined, () => setSelected(new Map()))
 
+  /** The scrolling area the page sits in, so the results come back where they were. */
+  const scroller = () => pageRef.current?.closest('.content') ?? null
+  const openDetails = (h: ProjectHit) => {
+    const box = scroller()
+    if (pages.length === 0 && box) resultsScroll.current = box.scrollTop
+    setPages((p) => [...p, h])
+    box?.scrollTo({ top: 0 })
+  }
+  const closeDetails = () => {
+    const back = pages.length === 1
+    setPages((p) => p.slice(0, -1))
+    requestAnimationFrame(() => scroller()?.scrollTo({ top: back ? resultsScroll.current : 0 }))
+  }
+
   const copy = useCopy()
   const resultMenu = (h: ProjectHit, row: Element): ContextEntry[] => {
     const have = installed.get(h.id)
@@ -517,6 +540,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         ? { label: t(selected.has(h.id) ? 'menu.discover.deselect' : 'menu.discover.select'), icon: <SquareCheck />, onSelect: () => toggleSelect(h) }
         : null,
       '-',
+      { label: t('discover.result.details'), icon: <Info />, onSelect: () => openDetails(h) },
       { label: t('discover.result.openOn', { source: siteLabel(h.source) }), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(h.url) },
       { label: t('menu.copyLink'), icon: <Link />, onSelect: () => void copy(h.url) }
     ]
@@ -540,14 +564,19 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
     setChoosing({ hit, inst: target, current: installed.get(hit.id) })
   }
 
+  const top = pages[pages.length - 1]
+  const topSite = top && SOURCES.find((s) => s.value === top.source)
+
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>{t('discover.title')}</h1>
-          <p>{t('discover.subtitle')}</p>
+    <div className="page" ref={pageRef}>
+      {!top && (
+        <div className="page-head">
+          <div>
+            <h1>{t('discover.title')}</h1>
+            <p>{t('discover.subtitle')}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {target?.ownPack && build ? (
         <PackBuilderBanner inst={{ ...target, ownPack: target.ownPack }} refresh={installed} />
@@ -569,328 +598,355 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         )
       )}
 
-      <div className="toolbar">
-        <Segmented<Site>
-          value={source}
-          onChange={setSource}
-          options={[
-            { value: 'all' as Site, label: <>{t('discover.allSites')}</> },
-            ...SOURCES.filter((s) => !(target && modpackOnly(s.value))).map((s) => ({
-              value: s.value as Site,
-              label: (
-                <>
-                  <span className="source-dot" style={{ background: s.color }} /> {s.label}
-                </>
-              )
-            }))
-          ]}
+      {top && (
+        <ProjectPage
+          key={`${pages.length}:${top.id}`}
+          hit={top}
+          site={{ label: topSite?.label ?? top.source, color: topSite?.color ?? 'var(--accent)' }}
+          target={target}
+          installed={installed.get(top.id)}
+          state={installing[top.id]}
+          backLabel={pages.length > 1 ? t('project.backTo', { title: pages[pages.length - 2].title }) : t('project.backToResults')}
+          onBack={closeDetails}
+          onOpen={openDetails}
+          onInstall={(h, v, from) => void install(h, undefined, v?.id, from, v?.versionNumber)}
+          onChooseVersion={chooseVersion}
+          categoryLabel={categoryLabel}
         />
-        <span className="toolbar-divider" />
-        <Segmented
-          value={kind}
-          onChange={(k) => setKind(k)}
-          options={KINDS.filter((k) => sourceInfo.kinds.includes(k.value) && !(target && k.value === 'modpack')).map((k) => ({
-            value: k.value,
-            label: (
-              <>
-                {k.icon} {t(k.labelKey)}
-              </>
-            )
-          }))}
-        />
-        {canSelect && <span className="hint">{t('discover.selectHint')}</span>}
-      </div>
-      <div className="toolbar">
-        <div className="search">
-          <Search />
-          <input
-            className="input"
-            placeholder={t(KINDS.find((k) => k.value === kind)?.searchKey ?? 'discover.search.mod')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-        </div>
-        <select
-          className="select"
-          value={gameVersion}
-          onChange={(e) => setGameVersion(e.target.value)}
-          disabled={!!target}
-          aria-label={t('discover.filter.gameVersion')}
-        >
-          <option value="">{t('discover.filter.allVersions')}</option>
-          {target && !versions.some((v) => v.id === target.mcVersion) && <option value={target.mcVersion}>{target.mcVersion}</option>}
-          {versions.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.id}
-            </option>
-          ))}
-        </select>
-        {kind === 'mod' && (
-          <select
-            className="select"
-            value={loader}
-            onChange={(e) => setLoader(e.target.value as LoaderType)}
-            disabled={!!target}
-            aria-label={t('discover.filter.loader')}
-          >
-            <option value="">{t('discover.filter.anyLoader')}</option>
-            <option value="fabric">Fabric</option>
-            <option value="quilt">Quilt</option>
-            <option value="forge">Forge</option>
-            <option value="neoforge">NeoForge</option>
-          </select>
-        )}
-        <select className="select" value={sort} onChange={(e) => setSort(e.target.value as SortMode)} aria-label={t('discover.sort.label')}>
-          {SORTS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {t(s.labelKey)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {source === 'all' && failed.length > 0 && hits && hits.length > 0 && (
-        <span className="hint bad">{t('discover.someFailed', { sources: failed.map(siteLabel).join(', ') })}</span>
       )}
-      {isLink(query) ? (
-        <div className="results">
-          <div className="result">
-            <div className="ico">
-              <Link2 />
-            </div>
-            <div className="grow" style={{ minWidth: 0 }}>
-              <h3>{t('discover.link.title')}</h3>
-              <p className="ellipsis">{query.trim()}</p>
-              <div className="stats-line">
-                <span className="faint">{kind === 'modpack' ? t('discover.link.noModpacks') : t('discover.link.hint')}</span>
-              </div>
-            </div>
-            {kind !== 'modpack' && (
-              <div className="actions">
-                {!target && (
-                  <select
-                    className="select"
-                    value={linkInto ?? instances[0]?.id ?? ''}
-                    onChange={(e) => setLinkInto(e.target.value)}
-                    aria-label={t('discover.link.into')}
-                  >
-                    {instances.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button className="btn primary sm" disabled={linking || (!target && !instances.length)} onClick={() => void installLink()}>
-                  {linking ? <Loader2 className="spin" /> : <Download />} {t('common.install')}
-                </button>
-              </div>
-            )}
+
+      {!top && (
+        <>
+          <div className="toolbar">
+            <Segmented<Site>
+              value={source}
+              onChange={setSource}
+              options={[
+                { value: 'all' as Site, label: <>{t('discover.allSites')}</> },
+                ...SOURCES.filter((s) => !(target && modpackOnly(s.value))).map((s) => ({
+                  value: s.value as Site,
+                  label: (
+                    <>
+                      <span className="source-dot" style={{ background: s.color }} /> {s.label}
+                    </>
+                  )
+                }))
+              ]}
+            />
+            <span className="toolbar-divider" />
+            <Segmented
+              value={kind}
+              onChange={(k) => setKind(k)}
+              options={KINDS.filter((k) => sourceInfo.kinds.includes(k.value) && !(target && k.value === 'modpack')).map((k) => ({
+                value: k.value,
+                label: (
+                  <>
+                    {k.icon} {t(k.labelKey)}
+                  </>
+                )
+              }))}
+            />
+            {canSelect && <span className="hint">{t('discover.selectHint')}</span>}
           </div>
-        </div>
-      ) : needsKey ? (
-        <Empty icon={<KeyRound />} title={t('discover.noKey.title')}>
-          {t('discover.noKey.body')}
-        </Empty>
-      ) : error ? (
-        <Empty icon={<X />} title={t('discover.error.title', { source: sourceInfo.label })}>
-          {error}
-        </Empty>
-      ) : !hits ? (
-        <div className="results">
-          {Array.from({ length: 5 }, (_, i) => (
-            <div key={i} className="skeleton" />
-          ))}
-        </div>
-      ) : hits.length === 0 ? (
-        <Empty icon={<Search />} title={t('discover.empty.title')}>
-          {t('discover.empty.body')}
-        </Empty>
-      ) : (
-        <div className="results">
-          {hits.map((h) => {
-            const have = installed.get(h.id)
-            const isSelected = selected.has(h.id)
-            const state = installing[h.id]
-            return (
-              <div key={h.id} className={`result ${isSelected ? 'selected' : ''}`} onContextMenu={(e) => openContextMenu(e, resultMenu(h, e.currentTarget))}>
-                {canSelect && (
-                  <button
-                    className={`check ${isSelected ? 'on' : ''}`}
-                    role="checkbox"
-                    aria-checked={isSelected}
-                    aria-label={t('discover.result.select', { title: h.title })}
-                    disabled={!!have || state === 'busy'}
-                    title={have ? t('discover.result.alreadyInstalled') : t('discover.result.selectTooltip')}
-                    onClick={() => toggleSelect(h)}
-                  >
-                    {isSelected && <Check strokeWidth={3} />}
-                  </button>
-                )}
-                <div className="ico">{h.iconUrl ? <img src={h.iconUrl} alt="" loading="lazy" /> : <Blocks />}</div>
-                <div className="grow">
-                  <h3>
-                    {h.title}
-                    <small>{t('discover.result.by', { author: h.author })}</small>
-                  </h3>
-                  <p>{h.description}</p>
+          <div className="toolbar">
+            <div className="search">
+              <Search />
+              <input
+                className="input"
+                placeholder={t(KINDS.find((k) => k.value === kind)?.searchKey ?? 'discover.search.mod')}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <select
+              className="select"
+              value={gameVersion}
+              onChange={(e) => setGameVersion(e.target.value)}
+              disabled={!!target}
+              aria-label={t('discover.filter.gameVersion')}
+            >
+              <option value="">{t('discover.filter.allVersions')}</option>
+              {target && !versions.some((v) => v.id === target.mcVersion) && <option value={target.mcVersion}>{target.mcVersion}</option>}
+              {versions.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.id}
+                </option>
+              ))}
+            </select>
+            {kind === 'mod' && (
+              <select
+                className="select"
+                value={loader}
+                onChange={(e) => setLoader(e.target.value as LoaderType)}
+                disabled={!!target}
+                aria-label={t('discover.filter.loader')}
+              >
+                <option value="">{t('discover.filter.anyLoader')}</option>
+                <option value="fabric">Fabric</option>
+                <option value="quilt">Quilt</option>
+                <option value="forge">Forge</option>
+                <option value="neoforge">NeoForge</option>
+              </select>
+            )}
+            <select className="select" value={sort} onChange={(e) => setSort(e.target.value as SortMode)} aria-label={t('discover.sort.label')}>
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {t(s.labelKey)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {source === 'all' && failed.length > 0 && hits && hits.length > 0 && (
+            <span className="hint bad">{t('discover.someFailed', { sources: failed.map(siteLabel).join(', ') })}</span>
+          )}
+          {isLink(query) ? (
+            <div className="results">
+              <div className="result">
+                <div className="ico">
+                  <Link2 />
+                </div>
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <h3>{t('discover.link.title')}</h3>
+                  <p className="ellipsis">{query.trim()}</p>
                   <div className="stats-line">
-                    {h.source === 'github' ? (
-                      <span title={t('discover.result.stars')}>
-                        <Star /> {compact(h.follows)}
-                      </span>
-                    ) : (
-                      <>
-                        <span>
-                          <Download /> {compact(h.downloads)}
-                        </span>
-                        {h.follows > 0 && (
-                          <span>
-                            <Heart /> {compact(h.follows)}
-                          </span>
-                        )}
-                      </>
-                    )}
-                    {source === 'all' && (
-                      <span>
-                        <span className="source-dot" style={{ background: SOURCES.find((s) => s.value === h.source)?.color }} /> {siteLabel(h.source)}
-                      </span>
-                    )}
-                    {h.also && <span className="faint">{t('discover.alsoOn', { sources: h.also.map((a) => siteLabel(a.source)).join(', ') })}</span>}
-                    <span>
-                      <Calendar /> {t('discover.result.updated', { when: timeAgo(h.updated, true) })}
-                    </span>
-                    {h.categories.slice(0, 3).map((c) => (
-                      <span key={c} className="chip">
-                        {categoryLabel(c)}
-                      </span>
-                    ))}
+                    <span className="faint">{kind === 'modpack' ? t('discover.link.noModpacks') : t('discover.link.hint')}</span>
                   </div>
                 </div>
-                <div className="actions">
-                  {have ? (
-                    <>
-                      <span className="chip success">
-                        <Check /> {have.versionNumber ? t('discover.result.installedVersion', { version: have.versionNumber }) : t('common.installed')}
-                      </span>
-                      <button className="btn sm" onClick={() => chooseVersion(h)}>
-                        <Repeat /> {t('discover.result.changeVersion')}
-                      </button>
-                    </>
-                  ) : state === 'done' ? (
-                    <button className="btn sm" disabled>
-                      <Check /> {t('common.installed')}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className="btn primary sm"
-                        onClick={(e) => void install(h, undefined, undefined, e.currentTarget)}
-                        disabled={state === 'busy'}
-                        title={t('discover.result.installLatestHint')}
+                {kind !== 'modpack' && (
+                  <div className="actions">
+                    {!target && (
+                      <select
+                        className="select"
+                        value={linkInto ?? instances[0]?.id ?? ''}
+                        onChange={(e) => setLinkInto(e.target.value)}
+                        aria-label={t('discover.link.into')}
                       >
-                        {state === 'busy' ? <Loader2 className="spin" /> : <Download />}{' '}
-                        {h.kind === 'modpack' ? t('discover.result.installPack') : t('common.install')}
-                      </button>
-                      <button className="btn sm" onClick={() => chooseVersion(h)} disabled={state === 'busy'}>
-                        {t('discover.result.chooseVersion')} <ChevronDown />
-                      </button>
-                    </>
-                  )}
-                  <button
-                    className="btn ghost sm"
-                    title={t('discover.result.openOn', { source: siteLabel(h.source) })}
-                    onClick={() => void api.app.openExternal(h.url)}
-                  >
-                    {t('discover.result.details')} <ExternalLink />
-                  </button>
-                </div>
+                        {instances.map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button className="btn primary sm" disabled={linking || (!target && !instances.length)} onClick={() => void installLink()}>
+                      {linking ? <Loader2 className="spin" /> : <Download />} {t('common.install')}
+                    </button>
+                  </div>
+                )}
               </div>
-            )
-          })}
-          {hasMore && (
-            <AutoLoadMore
-              onLoad={more}
-              loading={loadingMore}
-              count={hits.length}
-              label={t('discover.loadMore')}
-              style={{ alignSelf: 'center', marginTop: 8 }}
-            />
-          )}
-        </div>
-      )}
-
-      {selected.size > 0 && (
-        <div className="select-bar" ref={selectBar}>
-          <ListChecks size={18} />
-          <button
-            className="select-count"
-            aria-expanded={showSelection}
-            title={bySite.map(([s, list]) => t('discover.selection.bySource', { source: s.label, count: list.length })).join('\n')}
-            onClick={() => setShowSelection((v) => !v)}
-          >
-            <span>{rich('discover.selection.count', { b: (s) => <b>{s}</b> }, { count: selected.size })}</span>
-            {bySite.length > 1 && (
-              <span className="select-sites" aria-hidden>
-                {bySite.map(([s, list]) => (
-                  <span key={s.value}>
-                    <span className="source-dot" style={{ background: s.color }} />
-                    {list.length}
-                  </span>
-                ))}
-              </span>
-            )}
-            <ChevronUp className="chev" aria-label={t('discover.selection.show')} />
-          </button>
-          <button className="btn ghost sm" onClick={() => setSelected(new Map())}>
-            {t('discover.selection.clear')}
-          </button>
-          <button
-            className="btn primary sm"
-            disabled={[...selected.keys()].some((id) => installing[id] === 'busy')}
-            onClick={() => (target ? void installMany([...selected.values()], target) : setPicking([...selected.values()]))}
-          >
-            {[...selected.keys()].some((id) => installing[id] === 'busy') ? <Loader2 className="spin" /> : <Download />}{' '}
-            {checking
-              ? t('discover.dupes.checking')
-              : selected.size === 1
-                ? target
-                  ? t('discover.selection.installOneInto', { instance: target.name })
-                  : t('discover.selection.installOne')
-                : target
-                  ? t('discover.selection.installAllInto', { count: selected.size, instance: target.name })
-                  : t('discover.selection.installAll', { count: selected.size })}
-          </button>
-          {showSelection && (
-            <div className="select-pop">
-              {bySite.map(([s, list]) => (
-                <div key={s.value}>
-                  <h4>
-                    <span className="source-dot" style={{ background: s.color }} /> {s.label}
-                    <b>{list.length}</b>
-                  </h4>
-                  {list.map((h) => (
-                    <div key={h.id} className="select-item">
-                      <span className="thumb">{h.iconUrl ? <img src={h.iconUrl} alt="" /> : <Blocks />}</span>
-                      <span className="ellipsis">{h.title}</span>
-                      <button className="btn ghost icon sm" aria-label={t('discover.selection.remove', { title: h.title })} onClick={() => toggleSelect(h)}>
-                        <X />
+            </div>
+          ) : needsKey ? (
+            <Empty icon={<KeyRound />} title={t('discover.noKey.title')}>
+              {t('discover.noKey.body')}
+            </Empty>
+          ) : error ? (
+            <Empty icon={<X />} title={t('discover.error.title', { source: sourceInfo.label })}>
+              {error}
+            </Empty>
+          ) : !hits ? (
+            <div className="results">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="skeleton" />
+              ))}
+            </div>
+          ) : hits.length === 0 ? (
+            <Empty icon={<Search />} title={t('discover.empty.title')}>
+              {t('discover.empty.body')}
+            </Empty>
+          ) : (
+            <div className="results">
+              {hits.map((h) => {
+                const have = installed.get(h.id)
+                const isSelected = selected.has(h.id)
+                const state = installing[h.id]
+                return (
+                  <div
+                    key={h.id}
+                    className={`result ${isSelected ? 'selected' : ''}`}
+                    onContextMenu={(e) => openContextMenu(e, resultMenu(h, e.currentTarget))}
+                  >
+                    {canSelect && (
+                      <button
+                        className={`check ${isSelected ? 'on' : ''}`}
+                        role="checkbox"
+                        aria-checked={isSelected}
+                        aria-label={t('discover.result.select', { title: h.title })}
+                        disabled={!!have || state === 'busy'}
+                        title={have ? t('discover.result.alreadyInstalled') : t('discover.result.selectTooltip')}
+                        onClick={() => toggleSelect(h)}
+                      >
+                        {isSelected && <Check strokeWidth={3} />}
                       </button>
+                    )}
+                    <div className="ico">{h.iconUrl ? <img src={h.iconUrl} alt="" loading="lazy" /> : <Blocks />}</div>
+                    <div className="grow">
+                      <h3>
+                        <button className="result-title" onClick={() => openDetails(h)}>
+                          {h.title}
+                        </button>
+                        <small>{t('discover.result.by', { author: h.author })}</small>
+                      </h3>
+                      <p>{h.description}</p>
+                      <div className="stats-line">
+                        {h.source === 'github' ? (
+                          <span title={t('discover.result.stars')}>
+                            <Star /> {compact(h.follows)}
+                          </span>
+                        ) : (
+                          <>
+                            <span>
+                              <Download /> {compact(h.downloads)}
+                            </span>
+                            {h.follows > 0 && (
+                              <span>
+                                <Heart /> {compact(h.follows)}
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {source === 'all' && (
+                          <span>
+                            <span className="source-dot" style={{ background: SOURCES.find((s) => s.value === h.source)?.color }} /> {siteLabel(h.source)}
+                          </span>
+                        )}
+                        {h.also && <span className="faint">{t('discover.alsoOn', { sources: h.also.map((a) => siteLabel(a.source)).join(', ') })}</span>}
+                        <span>
+                          <Calendar /> {t('discover.result.updated', { when: timeAgo(h.updated, true) })}
+                        </span>
+                        {h.categories.slice(0, 3).map((c) => (
+                          <span key={c} className="chip">
+                            {categoryLabel(c)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="actions">
+                      {have ? (
+                        <>
+                          <span className="chip success">
+                            <Check /> {have.versionNumber ? t('discover.result.installedVersion', { version: have.versionNumber }) : t('common.installed')}
+                          </span>
+                          <button className="btn sm" onClick={() => chooseVersion(h)}>
+                            <Repeat /> {t('discover.result.changeVersion')}
+                          </button>
+                        </>
+                      ) : state === 'done' ? (
+                        <button className="btn sm" disabled>
+                          <Check /> {t('common.installed')}
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className="btn primary sm"
+                            onClick={(e) => void install(h, undefined, undefined, e.currentTarget)}
+                            disabled={state === 'busy'}
+                            title={t('discover.result.installLatestHint')}
+                          >
+                            {state === 'busy' ? <Loader2 className="spin" /> : <Download />}{' '}
+                            {h.kind === 'modpack' ? t('discover.result.installPack') : t('common.install')}
+                          </button>
+                          <button className="btn sm" onClick={() => chooseVersion(h)} disabled={state === 'busy'}>
+                            {t('discover.result.chooseVersion')} <ChevronDown />
+                          </button>
+                        </>
+                      )}
+                      <button className="btn ghost sm" onClick={() => openDetails(h)}>
+                        <Info /> {t('discover.result.details')}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+              {hasMore && (
+                <AutoLoadMore
+                  onLoad={more}
+                  loading={loadingMore}
+                  count={hits.length}
+                  label={t('discover.loadMore')}
+                  style={{ alignSelf: 'center', marginTop: 8 }}
+                />
+              )}
+            </div>
+          )}
+
+          {selected.size > 0 && (
+            <div className="select-bar" ref={selectBar}>
+              <ListChecks size={18} />
+              <button
+                className="select-count"
+                aria-expanded={showSelection}
+                title={bySite.map(([s, list]) => t('discover.selection.bySource', { source: s.label, count: list.length })).join('\n')}
+                onClick={() => setShowSelection((v) => !v)}
+              >
+                <span>{rich('discover.selection.count', { b: (s) => <b>{s}</b> }, { count: selected.size })}</span>
+                {bySite.length > 1 && (
+                  <span className="select-sites" aria-hidden>
+                    {bySite.map(([s, list]) => (
+                      <span key={s.value}>
+                        <span className="source-dot" style={{ background: s.color }} />
+                        {list.length}
+                      </span>
+                    ))}
+                  </span>
+                )}
+                <ChevronUp className="chev" aria-label={t('discover.selection.show')} />
+              </button>
+              <button className="btn ghost sm" onClick={() => setSelected(new Map())}>
+                {t('discover.selection.clear')}
+              </button>
+              <button
+                className="btn primary sm"
+                disabled={[...selected.keys()].some((id) => installing[id] === 'busy')}
+                onClick={() => (target ? void installMany([...selected.values()], target) : setPicking([...selected.values()]))}
+              >
+                {[...selected.keys()].some((id) => installing[id] === 'busy') ? <Loader2 className="spin" /> : <Download />}{' '}
+                {checking
+                  ? t('discover.dupes.checking')
+                  : selected.size === 1
+                    ? target
+                      ? t('discover.selection.installOneInto', { instance: target.name })
+                      : t('discover.selection.installOne')
+                    : target
+                      ? t('discover.selection.installAllInto', { count: selected.size, instance: target.name })
+                      : t('discover.selection.installAll', { count: selected.size })}
+              </button>
+              {showSelection && (
+                <div className="select-pop">
+                  {bySite.map(([s, list]) => (
+                    <div key={s.value}>
+                      <h4>
+                        <span className="source-dot" style={{ background: s.color }} /> {s.label}
+                        <b>{list.length}</b>
+                      </h4>
+                      {list.map((h) => (
+                        <div key={h.id} className="select-item">
+                          <span className="thumb">{h.iconUrl ? <img src={h.iconUrl} alt="" /> : <Blocks />}</span>
+                          <span className="ellipsis">{h.title}</span>
+                          <button className="btn ghost icon sm" aria-label={t('discover.selection.remove', { title: h.title })} onClick={() => toggleSelect(h)}>
+                            <X />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {picking && (
         <PickInstance
           hits={picking}
-          onClose={() => setPicking(undefined)}
-          onInstall={(inst) => (picking.length === 1 ? void install(picking[0], inst) : void installMany(picking, inst))}
+          version={pickedVersion?.number}
+          onClose={() => {
+            setPicking(undefined)
+            setPickedVersion(undefined)
+          }}
+          onInstall={(inst) => (picking.length === 1 ? void install(picking[0], inst, pickedVersion?.id) : void installMany(picking, inst))}
           onChooseVersion={(inst) => setChoosing({ hit: picking[0], inst })}
         />
       )}
@@ -928,12 +984,15 @@ function PickInstance({
   hits,
   onClose,
   onInstall,
-  onChooseVersion
+  onChooseVersion,
+  version
 }: {
   hits: ProjectHit[]
   onClose: () => void
   onInstall: (inst: Instance) => void
   onChooseVersion: (inst: Instance) => void
+  /** A version already chosen (from a details page): installed instead of the latest. */
+  version?: string
 }) {
   const { instances, setNewInstanceOpen } = useStore()
   const [selected, setSelected] = useState<Instance>()
@@ -961,13 +1020,18 @@ function PickInstance({
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          {single && (
+          {single && !version && (
             <button className="btn" disabled={!selected} onClick={done(onChooseVersion)}>
               {t('discover.result.chooseVersion')} <ChevronDown />
             </button>
           )}
           <button className="btn primary" disabled={!selected} onClick={done(onInstall)}>
-            <Download /> {single ? t('discover.pick.installLatest') : t('discover.selection.installAll', { count: hits.length })}
+            <Download />{' '}
+            {version
+              ? t('versionPicker.install', { version })
+              : single
+                ? t('discover.pick.installLatest')
+                : t('discover.selection.installAll', { count: hits.length })}
           </button>
         </>
       }

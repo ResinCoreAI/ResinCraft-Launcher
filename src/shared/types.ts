@@ -448,6 +448,47 @@ export interface ProjectVersion {
   downloads: number
 }
 
+/**
+ * A project's page inside Discover. `body` and changelogs are HTML as the source wrote it (or rendered from its
+ * Markdown): always sanitize before showing.
+ */
+export interface ProjectDetails extends ProjectHit {
+  /** The long description; empty when the source only has the short one. */
+  body: string
+  gallery: GalleryImage[]
+  links: ProjectLink[]
+  license?: string
+  /** Whether `versionInfo` can tell changelogs / dependencies for this source. */
+  changelogs: boolean
+  dependencies: boolean
+}
+
+export interface GalleryImage {
+  url: string
+  thumb?: string
+  title?: string
+  description?: string
+}
+
+export interface ProjectLink {
+  kind: 'website' | 'source' | 'issues' | 'wiki' | 'discord' | 'donate'
+  url: string
+}
+
+/** One version's changelog (HTML, unsanitized) and what it needs. */
+export interface VersionInfo {
+  changelog?: string
+  dependencies: ProjectDependency[]
+}
+
+export interface ProjectDependency {
+  /** The project on the same source, when known (has its own details page). */
+  id?: string
+  title: string
+  iconUrl?: string
+  type: 'required' | 'optional' | 'embedded' | 'incompatible'
+}
+
 export interface ContentItem {
   filename: string
   enabled: boolean
@@ -1269,6 +1310,10 @@ export interface ResinApi {
   content: {
     search(q: SearchQuery): Promise<SearchResult>
     versions(projectId: string, instanceId?: string): Promise<ProjectVersion[]>
+    /** Description, gallery and links for Discover's details page. */
+    details(projectId: string): Promise<ProjectDetails>
+    /** A version's changelog and dependencies. */
+    versionInfo(projectId: string, versionId: string): Promise<VersionInfo>
     install(instanceId: string, projectId: string, kind: ContentKind, versionId?: string): Promise<void>
     /** Installs what a link points to (a Modrinth, CurseForge or GitHub page, or a .jar) into an instance. */
     installFromLink(instanceId: string, url: string, kind: ContentKind): Promise<void>

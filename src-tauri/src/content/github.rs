@@ -9,17 +9,22 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Result};
+use base64::Engine;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::details;
 use super::index::{folder_of, index_key, load_index, loaders_for, remove_project_files, safe_name, save_index, ContentIndex, IndexEntry};
 use crate::core::ctx::http;
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
 use crate::core::net::{download_file, hash_file, DownloadItem, Hash, HashAlgo, HttpError};
-use crate::core::types::{ContentItem, ContentKind, ContentSource, Instance, LoaderType, ProjectHit, ProjectVersion, SearchQuery, SearchResult, UpdateRef};
+use crate::core::types::{
+    ContentItem, ContentKind, ContentSource, Instance, LoaderType, ProjectDetails, ProjectHit, ProjectLink, ProjectVersion, SearchQuery, SearchResult, UpdateRef,
+    VersionInfo,
+};
 use crate::{bail_tr, err_tr, tr};
 
 const API: &str = "https://api.github.com";
@@ -57,6 +62,16 @@ pub struct Repo {
     topics: Vec<String>,
     #[serde(default)]
     pushed_at: Option<String>,
+    #[serde(default)]
+    homepage: Option<String>,
+    #[serde(default)]
+    license: Option<License>,
+}
+
+#[derive(Deserialize, Clone)]
+struct License {
+    #[serde(default)]
+    spdx_id: Option<String>,
 }
 
 impl Repo {
@@ -112,6 +127,9 @@ pub struct Release {
     pub html_url: String,
     #[serde(default)]
     pub assets: Vec<Asset>,
+    /// Release notes (Markdown).
+    #[serde(default)]
+    body: Option<String>,
 }
 
 impl Release {
@@ -122,6 +140,19 @@ impl Release {
         self.assets.iter().map(|a| a.download_count).sum()
     }
     /// The .jar files that are the mod or plugin itself (not sources, docs or API jars).
+    /// The Minecraft versions and loaders its jars' names mention.
+    fn targets(&self) -> (Vec<String>, Vec<String>) {
+        let mut mc: Vec<String> = Vec::new();
+        let mut loaders: Vec<String> = Vec::new();
+        for p in self.jars().iter().flat_map(|a| parts(&a.name)) {
+            if let Some(v) = mc_part(&p).map(str::to_string).filter(|v| !mc.contains(v)) {
+                mc.push(v);
+            } else if ["fabric", "quilt", "forge", "neoforge"].contains(&p.as_str()) && !loaders.contains(&p) {
+                loaders.push(p);
+            }
+        }
+        (mc, loaders)
+    }
     pub fn jars(&self) -> Vec<&Asset> {
         self.assets
             .iter()
@@ -262,27 +293,74 @@ pub async fn search_hits(q: &SearchQuery) -> Result<SearchResult> {
     let limit = q.limit.unwrap_or(20).clamp(1, 50) as usize;
     let (repos, total) = search(&q.query, "minecraft-mod", offset, limit).await?;
     Ok(SearchResult {
-        hits: repos
-            .into_iter()
-            .map(|r| ProjectHit {
-                id: r.id(),
-                slug: r.name.clone(),
-                description: r.description(),
-                icon_url: r.avatar(),
-                author: r.owner(),
-                downloads: 0,
-                follows: r.stargazers_count,
-                categories: Vec::new(),
-                kind: ContentKind::Mod,
-                updated: r.pushed_at.clone().unwrap_or_default(),
-                source: ContentSource::Github,
-                url: r.html_url.clone(),
-                title: r.name,
-            })
-            .collect(),
+        hits: repos.into_iter().map(to_hit).collect(),
         total,
         offset: offset as u64,
     })
+}
+
+fn to_hit(r: Repo) -> ProjectHit {
+    ProjectHit {
+        id: r.id(),
+        slug: r.name.clone(),
+        description: r.description(),
+        icon_url: r.avatar(),
+        author: r.owner(),
+        downloads: 0,
+        follows: r.stargazers_count,
+        categories: Vec::new(),
+        kind: ContentKind::Mod,
+        updated: r.pushed_at.clone().unwrap_or_default(),
+        source: ContentSource::Github,
+        url: r.html_url.clone(),
+        title: r.name,
+    }
+}
+
+/// The repository's README as the description; its releases' notes are the changelogs.
+pub async fn details(project_id: &str) -> Result<ProjectDetails> {
+    #[derive(Deserialize)]
+    struct Readme {
+        content: String,
+        #[serde(default)]
+        html_url: Option<String>,
+        #[serde(default)]
+        download_url: Option<String>,
+    }
+    let full = repo_of(project_id)?;
+    let r = repo(project_id).await?;
+    // Not every repository has a README.
+    let readme: Option<Readme> = get(&format!("/repos/{full}/readme")).await.ok();
+    let dir = |u: String| u.rfind('/').map(|i| u[..=i].to_string());
+    let body = readme
+        .and_then(|rd| {
+            let text: String = rd.content.split_whitespace().collect();
+            let text = String::from_utf8(base64::engine::general_purpose::STANDARD.decode(text).ok()?).ok()?;
+            let page = rd.html_url.and_then(dir).unwrap_or_else(|| format!("{}/blob/HEAD/", r.html_url));
+            let raw = rd.download_url.and_then(dir).unwrap_or_else(|| format!("https://raw.githubusercontent.com/{full}/HEAD/"));
+            Some(details::absolutize(&details::markdown(&text, false), &page, &raw))
+        })
+        .unwrap_or_default();
+    // GitHub calls licenses it doesn't recognise "Other" (NOASSERTION), which tells nothing.
+    let license = r.license.as_ref().and_then(|l| l.spdx_id.clone().filter(|id| id != "NOASSERTION")).filter(|l| !l.is_empty());
+    Ok(ProjectDetails {
+        body,
+        gallery: Vec::new(),
+        links: ProjectLink::list([("website", r.homepage.clone()), ("issues", Some(format!("{}/issues", r.html_url)))]),
+        license,
+        changelogs: true,
+        dependencies: false,
+        hit: to_hit(r),
+    })
+}
+
+pub async fn version_info(project_id: &str, tag: &str) -> Result<VersionInfo> {
+    let full = repo_of(project_id)?;
+    let r = release(project_id, tag).await?;
+    let notes = r.body.filter(|b| !b.trim().is_empty()).map(|b| {
+        details::absolutize(&details::markdown(&b, false), &format!("https://github.com/{full}/blob/HEAD/"), &format!("https://raw.githubusercontent.com/{full}/HEAD/"))
+    });
+    Ok(VersionInfo { changelog: notes, dependencies: Vec::new() })
 }
 
 fn loader_names(inst: &Instance) -> Vec<String> {
@@ -303,12 +381,14 @@ pub async fn versions_for(project_id: &str, instance_id: Option<&str>) -> Result
         .into_iter()
         .map(|r| {
             let fit = inst.as_ref().and_then(|i| pick(&r, &i.mc_version, &loaders).map(|a| (i, a.name.clone())));
+            // Without an instance, say what the files' names say.
+            let (mc, named) = if inst.is_none() { r.targets() } else { Default::default() };
             ProjectVersion {
                 id: r.tag_name.clone(),
                 name: fit.as_ref().map(|(_, n)| n.clone()).unwrap_or_else(|| r.title()),
                 version_number: r.title(),
-                game_versions: fit.as_ref().map(|(i, _)| vec![i.mc_version.clone()]).unwrap_or_default(),
-                loaders: fit.as_ref().map(|(i, _)| vec![i.loader.as_str().to_string()]).unwrap_or_default(),
+                game_versions: fit.as_ref().map(|(i, _)| vec![i.mc_version.clone()]).unwrap_or(mc),
+                loaders: fit.as_ref().map(|(i, _)| vec![i.loader.as_str().to_string()]).unwrap_or(named),
                 kind: if r.prerelease { "beta".into() } else { "release".into() },
                 published: r.published_at.clone().unwrap_or_default(),
                 downloads: r.downloads(),
