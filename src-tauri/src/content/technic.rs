@@ -1,6 +1,7 @@
 //! Technic Platform's public API (the one the Technic Launcher uses). A pack is either a single zip
 //! ("url") or a Solder server that serves one zip per mod for each build. Either way the zips are
-//! unpacked over the game directory, and bin/modpack.jar carries a version.json naming the loader.
+//! unpacked over the game directory, and bin/modpack.jar carries a version.json naming the loader. Packs for
+//! Minecraft 1.5.2 and older have no version.json: their modpack.jar is a jar mod (Forge and all) instead.
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -260,6 +261,8 @@ enum Found {
     Json(VersionJson),
     None,
     Unreadable,
+    /// bin/modpack.jar without a version.json: the jar itself, merged into the game jar on old packs.
+    JarMod(Vec<u8>),
 }
 
 /// Reads bin/version.json, or the version.json inside bin/modpack.jar, from whichever zip has it.
@@ -276,7 +279,7 @@ fn read_version_json(zips: &mut [Zip]) -> Result<Found> {
             Err(_) => continue,
         }
         let inner = (|| -> Result<Option<VersionJson>> {
-            let mut z = zip::ZipArchive::new(std::io::Cursor::new(jar))?;
+            let mut z = zip::ZipArchive::new(std::io::Cursor::new(&jar))?;
             Ok(match super::index::read_zip_text(&mut z, "version.json")? {
                 Some(t) => Some(serde_json::from_str(&t)?),
                 None => None,
@@ -284,7 +287,8 @@ fn read_version_json(zips: &mut [Zip]) -> Result<Found> {
         })();
         return Ok(match inner {
             Ok(Some(v)) => Found::Json(v),
-            _ => Found::Unreadable,
+            Ok(None) => Found::JarMod(jar),
+            Err(_) => Found::Unreadable,
         });
     }
     Ok(Found::None)
@@ -324,11 +328,6 @@ pub fn detect_loader(v: &VersionJson) -> Option<(LoaderType, Option<String>)> {
     None
 }
 
-/// Minecraft 1.6 and older: jar-mod era packs, which ResinCraft can't run.
-fn is_ancient_mc(mc: &str) -> bool {
-    crate::game::loaders::is_ancient_forge(mc)
-}
-
 pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Result<Instance> {
     let p = pack(slug_of(project_id)).await?;
     let mut mc = p.minecraft.clone().filter(|m| !m.is_empty());
@@ -356,15 +355,6 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         files.push(DownloadItem::new(url, tmp.join("pack.zip")));
     }
     let mc = mc.ok_or_else(|| err_tr!("modpack.noMcVersion", "{name} doesn't say which Minecraft version it needs", name = p.display_name))?;
-    // Packs for Minecraft 1.6 and older patch the game jar itself; don't download gigabytes to find out.
-    if is_ancient_mc(&mc) {
-        bail_tr!(
-            "technic.ancientMc",
-            "{name} is for Minecraft {mc}. ResinCraft can install Technic packs for Minecraft 1.7.10 and newer.",
-            name = p.display_name,
-            mc = mc
-        );
-    }
 
     let tmp2 = tmp.clone();
     let res = Task::run(tr!("modpack.installing", "Installing {name}", name = p.display_name), None, move |task| async move {
@@ -383,8 +373,14 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
             Ok((zips, found))
         })
         .await??;
+        let mut jar_mod = None;
         let (vj, (loader, loader_version)) = match found {
-            Found::Unreadable => {
+            // Before Minecraft 1.6, the jar is the game's patch itself (usually Forge and the pack's base mods).
+            Found::JarMod(bytes) if is_jar_mod_era(&mc) => {
+                jar_mod = Some(bytes);
+                (None, (LoaderType::Vanilla, None))
+            }
+            Found::Unreadable | Found::JarMod(_) => {
                 bail_tr!(
                     "technic.customModpackJar",
                     "{name} ships a custom bin/modpack.jar that ResinCraft can't read, so it can't tell which mod loader to install.",
@@ -415,6 +411,12 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         })
         .await?;
         let guard = InstanceGuard::new(&inst.id);
+        if let Some(bytes) = jar_mod {
+            if let Err(e) = add_modpack_jar(&inst.id, bytes).await {
+                discard_instance(&inst.id).await;
+                return Err(e);
+            }
+        }
         let dir = paths::game_dir(&inst.id);
         task.update(tr!("technic.unpacking", "Unpacking modpack…"), None);
         let unpacked = tokio::task::spawn_blocking(move || -> Result<()> {
@@ -441,6 +443,21 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
     .await;
     let _ = tokio::fs::remove_dir_all(&tmp2).await;
     res
+}
+
+/// Minecraft 1.5.2 and older, where packs patch the game jar.
+fn is_jar_mod_era(mc: &str) -> bool {
+    crate::game::loaders::is_jar_mod_forge(mc)
+}
+
+/// Keeps an old pack's bin/modpack.jar as the instance's jar mod.
+async fn add_modpack_jar(id: &str, bytes: Vec<u8>) -> Result<()> {
+    let dir = crate::game::jarmods::jar_dir(id);
+    tokio::fs::create_dir_all(&dir).await?;
+    tokio::fs::write(dir.join("modpack.jar"), bytes).await?;
+    let mut inst = instances::get(id).await?;
+    inst.jar_mods = vec![crate::core::types::JarMod { file: "modpack.jar".into(), name: "modpack.jar".into(), disabled: false }];
+    instances::save(&inst).await
 }
 
 /// Build `version_id` of Technic pack `project_id`, for switching an instance to it (see packswitch.rs). Downloads
@@ -477,7 +494,12 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
     })
     .await??;
     let (vj, (loader, loader_version)) = match found {
-        Found::Unreadable => bail_tr!(
+        Found::JarMod(_) if mc.as_deref().is_some_and(is_jar_mod_era) => bail_tr!(
+            "technic.jarModSwitch",
+            "{name} patches the game jar, so ResinCraft can't switch it to another version. Install that version as a new instance instead.",
+            name = p.display_name.clone()
+        ),
+        Found::Unreadable | Found::JarMod(_) => bail_tr!(
             "technic.customModpackJar",
             "{name} ships a custom bin/modpack.jar that ResinCraft can't read, so it can't tell which mod loader to install.",
             name = p.display_name.clone()

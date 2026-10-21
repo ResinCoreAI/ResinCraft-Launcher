@@ -14,6 +14,7 @@ import { mockBedrock } from './mock-bedrock'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
 import { mockDetails, mockVersionInfo } from './mock-details'
 import { MOCK_PACK, mockPackUpdates, mockPackVersions, mockSwitchPack } from './mock-packswitch'
+import { mockVersions } from './mock-versions'
 
 export function mockApi(): ResinApi {
   const servers = mockServers()
@@ -51,6 +52,30 @@ export function mockApi(): ResinApi {
       ]
     },
     { id: 'vanilla', name: 'Vanilla Latest', mcVersion: '26.3', loader: 'vanilla', color: '#b26bff', createdAt: now - 5e8, playtime: 0 },
+    // An old Technic pack: its bin/modpack.jar runs as a jar mod.
+    {
+      id: 'tekkit',
+      group: 'Modpacks',
+      name: 'Tekkit Classic',
+      mcVersion: '1.2.5',
+      loader: 'vanilla',
+      color: '#facc15',
+      createdAt: now - 4e8,
+      playtime: 7_200,
+      modpack: { projectId: 'technic:tekkit', versionId: '3.1.2', name: 'Tekkit Classic' },
+      jarMods: [{ file: 'modpack.jar', name: 'modpack.jar' }]
+    },
+    {
+      id: 'classic-forge',
+      name: 'Forge + LiteLoader',
+      mcVersion: '1.12.2',
+      loader: 'forge',
+      loaderVersion: '14.23.5.2860',
+      liteloader: '1.12.2-SNAPSHOT',
+      color: '#fb7185',
+      createdAt: now - 3e8,
+      playtime: 600
+    },
     {
       id: 'skyblock',
       group: 'Modpacks',
@@ -115,7 +140,10 @@ export function mockApi(): ResinApi {
     { id: '1.20.1', type: 'release', releaseTime: '2023-06-12T00:00:00Z' },
     { id: '1.16.5', type: 'release', releaseTime: '2021-01-14T00:00:00Z' },
     { id: '1.12.2', type: 'release', releaseTime: '2017-09-18T00:00:00Z' },
-    { id: '1.8.9', type: 'release', releaseTime: '2015-12-09T00:00:00Z' }
+    { id: '1.8.9', type: 'release', releaseTime: '2015-12-09T00:00:00Z' },
+    { id: '1.6.4', type: 'release', releaseTime: '2013-09-19T00:00:00Z' },
+    { id: '1.5.2', type: 'release', releaseTime: '2013-04-25T00:00:00Z' },
+    { id: '1.2.5', type: 'release', releaseTime: '2012-03-29T00:00:00Z' }
   ]
   const hits: ProjectHit[] = [
     ['sodium', 'Sodium', 'The fastest and most compatible rendering optimization mod for Minecraft.', 'jellysquid3', 72e6, ['optimization']],
@@ -226,11 +254,10 @@ export function mockApi(): ResinApi {
     update: updates.update,
     versions: {
       list: () => wait(versions),
-      loaders: () =>
-        wait([
-          { version: '0.16.10', stable: true },
-          { version: '0.16.9', stable: true }
-        ])
+      ...mockVersions(
+        () => instances,
+        (list) => (instances = list)
+      )
     },
     instances: {
       list: () => wait(instances, 0),

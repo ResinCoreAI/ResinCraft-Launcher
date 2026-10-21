@@ -69,11 +69,12 @@ fn loader_id(l: LoaderType) -> Option<u32> {
         LoaderType::Fabric => Some(4),
         LoaderType::Quilt => Some(5),
         LoaderType::Neoforge => Some(6),
+        LoaderType::Liteloader => Some(3),
         LoaderType::Vanilla => None,
     }
 }
 
-const LOADER_NAMES: [&str; 4] = ["forge", "fabric", "quilt", "neoforge"];
+const LOADER_NAMES: [&str; 5] = ["forge", "fabric", "quilt", "neoforge", "liteloader"];
 
 /// "cf:238222" → 238222.
 pub fn cf_id(project_id: &str) -> u64 {

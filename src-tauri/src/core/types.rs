@@ -13,6 +13,7 @@ pub enum LoaderType {
     Quilt,
     Forge,
     Neoforge,
+    Liteloader,
 }
 
 impl LoaderType {
@@ -23,6 +24,7 @@ impl LoaderType {
             Self::Quilt => "quilt",
             Self::Forge => "forge",
             Self::Neoforge => "neoforge",
+            Self::Liteloader => "liteloader",
         }
     }
     /// Human name, for messages.
@@ -33,6 +35,7 @@ impl LoaderType {
             Self::Quilt => "Quilt",
             Self::Forge => "Forge",
             Self::Neoforge => "NeoForge",
+            Self::Liteloader => "LiteLoader",
         }
     }
 }
@@ -173,6 +176,15 @@ pub struct Instance {
     /// Commands run around a launch instead of the ones in Settings (see game/commands.rs).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub commands: Option<LaunchCommands>,
+    /// LiteLoader version loaded next to Forge (a LiteLoader-only instance has loader `liteloader` instead).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub liteloader: Option<String>,
+    /// Zips merged into the game jar, in order (later ones win); files in the instance's jarmods/ folder.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub jar_mods: Vec<JarMod>,
+    /// The player's own changes to the version the game starts with (instance settings → Version).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_patch: Option<VersionPatch>,
 }
 
 /// One environment variable the player set for the game and its commands.
@@ -194,6 +206,47 @@ pub struct LaunchCommands {
     pub wrapper: String,
     /// Runs after the game closes, with its exit code in `$INST_EXIT_CODE`.
     pub post_exit: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct JarMod {
+    /// File name in the instance's jarmods/ folder.
+    pub file: String,
+    /// Shown name (the file the player picked).
+    pub name: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub disabled: bool,
+}
+
+/// Changes applied over the loader's version JSON at launch (see game/versionpatch.rs). Empty values change nothing.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct VersionPatch {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub main_class: Option<String>,
+    /// Extra libraries, put in front of the classpath.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub libraries: Vec<PatchLibrary>,
+    /// launchwrapper tweak classes (`--tweakClass`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tweakers: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub jvm_args: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub game_args: Vec<String>,
+}
+
+/// A library: Maven coordinates ("group:artifact:version[:classifier]") with the repository to get it from, or a
+/// jar file kept in the instance's libraries/ folder (`file`).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PatchLibrary {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
 }
 
 /// The details of a modpack the player is making; the export dialog starts from them and saves them back.
@@ -791,7 +844,7 @@ impl ServerKind {
     }
     pub fn from_loader(l: LoaderType) -> ServerKind {
         match l {
-            LoaderType::Vanilla => Self::Vanilla,
+            LoaderType::Vanilla | LoaderType::Liteloader => Self::Vanilla,
             LoaderType::Fabric => Self::Fabric,
             LoaderType::Quilt => Self::Quilt,
             LoaderType::Forge => Self::Forge,

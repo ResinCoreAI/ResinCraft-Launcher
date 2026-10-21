@@ -54,7 +54,16 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       install: fn('update:install'),
       cancel: fn('update:cancel')
     },
-    versions: { list: fn('versions:list'), loaders: fn('versions:loaders') },
+    versions: {
+      list: fn('versions:list'),
+      loaders: fn('versions:loaders'),
+      resolved: fn('versions:resolved'),
+      browseJars: fn('versions:browseJars'),
+      addJarMods: fn('versions:addJarMods'),
+      removeJarMod: fn('versions:removeJarMod'),
+      setJarMods: fn('versions:setJarMods'),
+      addLibrary: fn('versions:addLibrary')
+    },
     optifine: { browse: fn('optifine:browse'), inspect: fn('optifine:inspect'), add: fn('optifine:add'), remove: fn('optifine:remove') },
     instances: {
       list: fn('instances:list'),

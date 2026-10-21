@@ -10,6 +10,7 @@ import { BannerPicker, IconPicker } from './ImagePicker'
 import { useGroupNames } from '../pages/Library'
 import { OptifineSteps, optifineFits } from './Optifine'
 import { PackFields, type PackDraft } from './OwnPack'
+import { liteloaderFits } from './VersionSettings'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const { settings, activeAccount, refreshInstances, go, toast, instances } = useStore()
@@ -40,6 +41,9 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const [ofPath, setOfPath] = useState<string>()
   const [ofJar, setOfJar] = useState<OptifineJar>()
   const [ofError, setOfError] = useState<string>()
+  // LiteLoader next to Forge (Minecraft 1.5.2 – 1.12.2): its newest build, added after creating.
+  const [lite, setLite] = useState(false)
+  const [liteVersion, setLiteVersion] = useState<string | null>()
 
   useEffect(() => {
     api.versions
@@ -82,6 +86,19 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       live = false
     }
   }, [ofPath, mc])
+  const liteFits = loader === 'forge' && !!mc && liteloaderFits(mc)
+  useEffect(() => {
+    setLiteVersion(undefined)
+    if (!lite || !liteFits || !mc) return
+    let live = true
+    api.versions
+      .loaders('liteloader', mc)
+      .then((l) => live && setLiteVersion((l.find((x) => x.stable) ?? l[0])?.version ?? null))
+      .catch(() => live && setLiteVersion(null))
+    return () => {
+      live = false
+    }
+  }, [lite, liteFits, mc])
   const pickOptifine = useCallback((path: string) => setOfPath(path), [])
   // OptiFine's terms forbid shipping it in a pack, so a new modpack never gets it.
   const withOptifine = optifine && optifineFits(loader) && !makingPack
@@ -92,7 +109,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   )
 
   const unavailable = loader !== 'vanilla' && loaderVersions?.length === 0
-  const legacyForge = !!mc && /^1\.[0-6](\.|$)/.test(mc)
+  // Forge before 1.2.5 also needs ModLoader.
+  const legacyForge = !!mc && /^1\.([01](\.|$)|2(\.[0-4])?$)/.test(mc)
   const placeholder = makingPack
     ? t('ownPack.defaultName')
     : mc
@@ -108,6 +126,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       const created = from
         ? await api.instances.duplicate(from.id)
         : await api.instances.create({ name: name.trim() || placeholder, mcVersion: mc!, loader, loaderVersion, color, group: group.trim() || undefined })
+      const withLite = !makingPack && !from && lite && liteFits && liteVersion
+      const base = withLite ? await api.instances.update(created.id, { liteloader: liteVersion }) : created
       const inst = makingPack
         ? await api.instances.update(created.id, {
             ...(from && { name: packName, color }),
@@ -120,7 +140,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
               summary: pack.summary.trim()
             }
           })
-        : created
+        : base
       // Pictures are saved right after creating, so a bad picture never stops the instance being made.
       try {
         if (icon) await api.instances.setImage(inst.id, 'icon', icon)
@@ -271,7 +291,8 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
                 { value: 'fabric', label: 'Fabric' },
                 { value: 'quilt', label: 'Quilt' },
                 { value: 'forge', label: 'Forge' },
-                { value: 'neoforge', label: 'NeoForge' }
+                { value: 'neoforge', label: 'NeoForge' },
+                { value: 'liteloader', label: 'LiteLoader' }
               ]}
             />
             <span className="hint">
@@ -341,6 +362,18 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </>
+      )}
+
+      {liteFits && !makingPack && (
+        <div className="field">
+          <div className="row">
+            <label className="label grow">LiteLoader</label>
+            <Switch on={lite} onChange={setLite} label={t('newInstance.withLiteloader')} />
+          </div>
+          <span className="hint">
+            {lite && liteVersion === null ? t('newInstance.unsupported', { loader: 'LiteLoader', version: mc }) : t('version.liteloaderHint')}
+          </span>
+        </div>
       )}
 
       {optifineFits(loader) && !makingPack && (

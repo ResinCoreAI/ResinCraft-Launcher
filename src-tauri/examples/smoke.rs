@@ -3,6 +3,8 @@
 //! Creates a throwaway instance, downloads everything, boots the game with an offline profile and
 //! stops it as soon as Minecraft reports the user is set (or, for Forge/NeoForge, that LWJGL is up).
 //! RESIN_SMOKE_OPTIFINE=<path to an OptiFine jar you downloaded> also adds OptiFine and checks it loads.
+//! RESIN_SMOKE_LITELOADER=<version> adds LiteLoader next to Forge; RESIN_SMOKE_JARMOD=<zip>[;<zip>…] adds jar mods;
+//! RESIN_SMOKE_MARKER=<text> waits for that log line instead. RESIN_KEEP=1 keeps the instance afterwards.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -10,12 +12,14 @@ use std::time::{Duration, Instant};
 
 use resincraft_lib::core::types::{LoaderType, NewInstance};
 use resincraft_lib::core::{ctx, events, instances, paths, settings};
-use resincraft_lib::game::{launch, mojang, optifine};
+use resincraft_lib::game::{jarmods, launch, mojang, optifine};
 use resincraft_lib::player::accounts::LaunchAuth;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
 const BOOT_MARKERS: [&str; 2] = ["Setting user:", "Backend library: LWJGL"];
+/// Forge for Minecraft ≤1.12.2 logs the user before loading mods; wait until FML (or LiteLoader) says they're in.
+const LEGACY_MARKERS: [&str; 2] = ["Forge Mod Loader has successfully loaded", "LiteLoader begin POSTINIT"];
 
 #[tokio::main]
 async fn main() {
@@ -71,11 +75,26 @@ async fn run() -> anyhow::Result<bool> {
         None => false,
     };
     let optifine_seen = Arc::new(AtomicBool::new(false));
+    if let Ok(ll) = std::env::var("RESIN_SMOKE_LITELOADER") {
+        instances::update(&inst.id, serde_json::json!({ "liteloader": ll })).await?;
+        println!("added LiteLoader {ll}");
+    }
+    if let Ok(jars) = std::env::var("RESIN_SMOKE_JARMOD") {
+        let files: Vec<std::path::PathBuf> = jars.split(';').filter(|j| !j.is_empty()).map(Into::into).collect();
+        let i = jarmods::add(&inst.id, &files).await?;
+        println!("added jar mods {:?}", i.jar_mods.iter().map(|m| m.name.as_str()).collect::<Vec<_>>());
+    }
 
     let booted = Arc::new(AtomicBool::new(false));
+    let custom: Option<&'static str> = std::env::var("RESIN_SMOKE_MARKER").ok().map(|m| &*Box::leak(m.into_boxed_str()));
+    let markers: Vec<&'static str> = match custom {
+        Some(m) => vec![m],
+        None if matches!(loader, LoaderType::Forge | LoaderType::Liteloader) && resincraft_lib::game::loaders::is_legacy_mc(&mc) => LEGACY_MARKERS.to_vec(),
+        None => BOOT_MARKERS.to_vec(),
+    };
     let (stop_tx, mut stop_rx) = mpsc::unbounded_channel::<Option<i64>>();
     {
-        let (booted, id, optifine_seen) = (booted.clone(), inst.id.clone(), optifine_seen.clone());
+        let (booted, id, optifine_seen, markers) = (booted.clone(), inst.id.clone(), optifine_seen.clone(), markers.clone());
         events::set_sink(move |channel, payload| match channel {
             "task" => {
                 let state = payload["state"].as_str().unwrap_or_default();
@@ -91,7 +110,7 @@ async fn run() -> anyhow::Result<bool> {
                     if text.contains("[OptiFine]") {
                         optifine_seen.store(true, Ordering::SeqCst);
                     }
-                    if !booted.load(Ordering::SeqCst) && BOOT_MARKERS.iter().any(|m| text.contains(m)) {
+                    if !booted.load(Ordering::SeqCst) && markers.iter().any(|m| text.contains(m)) {
                         booted.store(true, Ordering::SeqCst);
                         launch::kill_instance(&id, None);
                     }
@@ -130,7 +149,11 @@ async fn run() -> anyhow::Result<bool> {
     tokio::time::sleep(Duration::from_millis(300)).await;
     let natives = std::fs::read_dir(paths::natives_dir(&inst.id)).map(|d| d.count()).unwrap_or(0);
     println!("natives extracted: {natives}");
-    let _ = tokio::fs::remove_dir_all(paths::instance_dir(&inst.id)).await;
+    if std::env::var_os("RESIN_KEEP").is_some() {
+        println!("kept at {}", paths::instance_dir(&inst.id).display());
+    } else {
+        let _ = tokio::fs::remove_dir_all(paths::instance_dir(&inst.id)).await;
+    }
     launched?;
 
     let mut ok = booted.load(Ordering::SeqCst);
@@ -142,7 +165,7 @@ async fn run() -> anyhow::Result<bool> {
     if ok {
         println!("SMOKE OK in {}s", t0.elapsed().as_secs());
     } else {
-        println!("SMOKE FAILED: game never reached \"Setting user\"");
+        println!("SMOKE FAILED: game never reached {markers:?}");
     }
     Ok(ok)
 }

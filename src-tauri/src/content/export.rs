@@ -219,7 +219,8 @@ fn loader_key(l: LoaderType) -> Option<&'static str> {
         LoaderType::Quilt => Some("quilt-loader"),
         LoaderType::Forge => Some("forge"),
         LoaderType::Neoforge => Some("neoforge"),
-        LoaderType::Vanilla => None,
+        // Neither pack format has LiteLoader.
+        LoaderType::Liteloader | LoaderType::Vanilla => None,
     }
 }
 

@@ -52,6 +52,7 @@ import WorldsTab from '../components/WorldsTab'
 import { OptifineSteps, optifineFits, optifineHow } from '../components/Optifine'
 import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 import { instanceOwner, PackChip, PackVersionSetting } from '../components/PackVersion'
+import { VersionSection } from '../components/VersionSettings'
 
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
 const FileManager = lazy(() => import('../components/FileManager'))
@@ -1038,6 +1039,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
       </div>
 
       <OptifineSection inst={inst} />
+
+      <VersionSection inst={inst} />
 
       <div className="settings-section">
         <h3>{t('commands.section')}</h3>

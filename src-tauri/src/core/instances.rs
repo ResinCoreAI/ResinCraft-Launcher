@@ -89,6 +89,9 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         own_pack: None,
         env: Vec::new(),
         commands: None,
+        liteloader: None,
+        jar_mods: Vec::new(),
+        version_patch: None,
     };
     extra(&mut inst);
     tokio::fs::create_dir_all(paths::game_dir(&id)).await?;
@@ -160,6 +163,9 @@ pub async fn duplicate(id: &str) -> Result<Instance> {
         i.modpack = s.modpack;
         i.optifine = s.optifine;
         i.own_pack = s.own_pack;
+        i.liteloader = s.liteloader;
+        i.jar_mods = s.jar_mods;
+        i.version_patch = s.version_patch;
     })
     .await?;
     // Copy everything except the metadata and per-launch natives (worlds, mods, notes, content index…).

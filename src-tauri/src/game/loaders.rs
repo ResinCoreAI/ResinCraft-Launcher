@@ -1,5 +1,5 @@
-//! Fabric / Quilt / Forge / NeoForge version lists and version resolution
-//! (the Forge/NeoForge installer itself lives in `forge.rs`).
+//! Fabric / Quilt / Forge / NeoForge / LiteLoader version lists and version resolution
+//! (the Forge/NeoForge installer itself lives in `forge.rs`, LiteLoader in `liteloader.rs`).
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -54,6 +54,7 @@ pub async fn loader_versions(loader: LoaderType, mc_version: &str) -> Result<Vec
         LoaderType::Vanilla => Ok(Vec::new()),
         LoaderType::Forge => forge_versions(mc_version).await,
         LoaderType::Neoforge => neoforge_versions(mc_version).await,
+        LoaderType::Liteloader => super::liteloader::versions(mc_version).await,
         LoaderType::Fabric | LoaderType::Quilt => {
             let mut list: Vec<MetaEntry> = fetch_json(&format!("{}/versions/loader/{}", meta(loader), enc(mc_version))).await?;
             // Quilt's meta isn't sorted (e.g. 0.20.0-beta.9 comes before 0.30.1); list newest first like Fabric's.
@@ -73,18 +74,20 @@ pub async fn loader_versions(loader: LoaderType, mc_version: &str) -> Result<Vec
     }
 }
 
+/// For servers: Forge servers before Minecraft 1.7.10 aren't supported.
 pub(crate) fn legacy_forge_error(mc: &str) -> anyhow::Error {
-    err_tr!(
-        "loader.tooOldForge",
-        "ResinCraft supports Forge for Minecraft 1.7.10 and newer. Minecraft {mc} needs an older Forge that isn't supported.",
-        mc = mc
-    )
+    err_tr!("loader.forgeServerTooOld", "Forge servers run Minecraft 1.7.10 and newer; Minecraft {mc} isn't supported.", mc = mc)
+}
+
+/// Forge before Minecraft 1.2.5 needs ModLoader, which nobody hosts any more.
+pub(crate) fn forge_floor_error(mc: &str) -> anyhow::Error {
+    err_tr!("loader.forgeNeedsModLoader", "Forge for Minecraft {mc} needs ModLoader, which ResinCraft can't install. Forge works from Minecraft 1.2.5.", mc = mc)
 }
 
 /// Newest stable loader version for a game version.
 pub async fn latest_loader(loader: LoaderType, mc_version: &str) -> Result<String> {
-    if loader == LoaderType::Forge && is_ancient_forge(mc_version) {
-        return Err(legacy_forge_error(mc_version));
+    if loader == LoaderType::Forge && forge_too_old(mc_version) {
+        return Err(forge_floor_error(mc_version));
     }
     let versions = loader_versions(loader, mc_version).await?;
     let pick = versions.iter().find(|v| v.stable).or(versions.first());
@@ -140,6 +143,15 @@ pub async fn resolve_version(mc_version: &str, loader: LoaderType, loader_versio
     let vanilla = get_vanilla_version(mc_version).await?;
     if loader == LoaderType::Vanilla {
         return Ok(vanilla);
+    }
+    if loader == LoaderType::Liteloader {
+        let ver = match loader_version {
+            Some(v) => v.to_string(),
+            None => latest_loader(loader, mc_version).await?,
+        };
+        let mut v = vanilla;
+        super::liteloader::apply(&mut v, mc_version, &ver, ctx).await?;
+        return Ok(v);
     }
 
     let ver = match loader_version {
@@ -265,9 +277,19 @@ pub fn is_legacy_mc(mc: &str) -> bool {
     is_legacy_forge(mc)
 }
 
-/// Forge for Minecraft ≤1.6 loads its libraries from servers that are gone; not supported.
+/// Minecraft ≤1.6: Forge servers for these aren't supported (clients are, see below).
 pub(crate) fn is_ancient_forge(mc: &str) -> bool {
     minor_of(mc).is_some_and(|n| n < 7)
+}
+
+/// Forge for Minecraft ≤1.5.2 is a jar mod: its universal zip is merged into the game jar (see jarmods.rs).
+pub fn is_jar_mod_forge(mc: &str) -> bool {
+    minor_of(mc).is_some_and(|n| n < 6)
+}
+
+/// Forge older than Minecraft 1.2.5 (before Forge Mod Loader) also needs ModLoader; not supported.
+pub(crate) fn forge_too_old(mc: &str) -> bool {
+    is_jar_mod_forge(mc) && compare_versions(mc, "1.2.5") == Ordering::Less
 }
 
 /// Old Forge builds carry a branch suffix in their Maven version ("10.13.4.1614-1.7.10"), which pack
@@ -302,7 +324,7 @@ async fn fetch_text(url: &str) -> Result<String> {
 }
 
 /// Fetches a (large) metadata file, keeping it for 10 minutes and on disk for offline use.
-async fn cached_text(url: &str, name: &str) -> Result<String> {
+pub(crate) async fn cached_text(url: &str, name: &str) -> Result<String> {
     if let Some((at, text)) = TEXT_CACHE.lock().unwrap().as_ref().and_then(|m| m.get(url)) {
         if at.elapsed() < Duration::from_secs(600) {
             return Ok(text.clone());
@@ -339,7 +361,7 @@ struct Promotions {
 }
 
 async fn forge_versions(mc: &str) -> Result<Vec<LoaderVersion>> {
-    if is_ancient_forge(mc) {
+    if forge_too_old(mc) {
         return Ok(Vec::new());
     }
     let metadata_url = format!("{FORGE_MAVEN}/maven-metadata.xml");
@@ -423,6 +445,8 @@ mod tests {
         assert_eq!(neoforge_game_version("21.0.5-beta"), Some("1.21".into()));
         assert!(is_legacy_forge("1.12.2") && !is_legacy_forge("1.13"));
         assert!(is_ancient_forge("1.6.4") && !is_ancient_forge("1.7.10") && !is_ancient_forge("1.12.2"));
+        assert!(is_jar_mod_forge("1.5.2") && is_jar_mod_forge("1.2.5") && !is_jar_mod_forge("1.6.4"));
+        assert!(forge_too_old("1.2.4") && forge_too_old("1.1") && !forge_too_old("1.2.5") && !forge_too_old("1.3.2") && !forge_too_old("1.6.4"));
     }
 
     #[test]

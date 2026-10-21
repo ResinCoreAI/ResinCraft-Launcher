@@ -1,5 +1,6 @@
 //! Forge & NeoForge installation: installer download, install_profile.json + version.json, processors run
-//! with Java, and a cached merged version JSON.
+//! with Java, and a cached merged version JSON. Forge for Minecraft 1.5.2 and older has no installer: its
+//! universal zip becomes a jar mod (see jarmods.rs).
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
@@ -18,7 +19,7 @@ use crate::core::types::LoaderType;
 use crate::{bail_tr, err_tr, tr};
 
 use super::java::{find_java, hidden_command};
-use super::loaders::{full_forge_version, installer_url, is_ancient_forge, legacy_forge_error, ResolveContext};
+use super::loaders::{forge_floor_error, forge_too_old, full_forge_version, installer_url, is_jar_mod_forge, ResolveContext, FORGE_MAVEN};
 use super::mojang::{client_jar, exists, get_vanilla_version, lib_path, maven_path, merge_versions, resolve_libraries, resolve_library_list, FileRef, Library, VersionJson};
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -62,8 +63,8 @@ fn path_str(p: &Path) -> String {
 }
 
 pub async fn resolve_forge_like(mc: &str, loader: LoaderType, ver: &str, ctx: &ResolveContext) -> Result<VersionJson> {
-    if loader == LoaderType::Forge && is_ancient_forge(mc) {
-        return Err(legacy_forge_error(mc));
+    if loader == LoaderType::Forge && forge_too_old(mc) {
+        return Err(forge_floor_error(mc));
     }
     let full = if loader == LoaderType::Forge { full_forge_version(mc, ver).await } else { ver.to_string() };
     let ver = full.as_str();
@@ -82,7 +83,11 @@ pub async fn resolve_forge_like(mc: &str, loader: LoaderType, ver: &str, ctx: &R
         }
     }
 
-    let installed = install_forge_like(mc, loader, ver, &dir, ctx).await?;
+    let installed = if loader == LoaderType::Forge && is_jar_mod_forge(mc) {
+        install_jar_mod_forge(mc, ver, ctx).await?
+    } else {
+        install_forge_like(mc, loader, ver, &dir, ctx).await?
+    };
     write_json(&cache_file, &installed).await?;
     Ok(installed.version)
 }
@@ -108,6 +113,33 @@ async fn install_forge_like(mc: &str, loader: LoaderType, ver: &str, dir: &Path,
     let _ = tokio::fs::remove_dir_all(&work).await;
     let _ = tokio::fs::remove_file(&installer).await;
     result
+}
+
+/// Forge for Minecraft 1.2.5–1.5.2: the vanilla version with Forge's universal (or, before 1.3, client) zip as a
+/// jar mod. FML's own libraries are laid out at launch (`jarmods::ensure_fml_libs`).
+async fn install_jar_mod_forge(mc: &str, ver: &str, ctx: &ResolveContext) -> Result<InstalledLoader> {
+    let name = format!("Forge {ver}");
+    update(ctx, tr!("forge.downloadingInstaller", "Downloading the {name} installer…", name = name), None);
+    let mut last = None;
+    for classifier in ["universal", "client"] {
+        let file = format!("forge-{mc}-{ver}-{classifier}.zip");
+        let dest = lib_path(&format!("net.minecraftforge:forge:{mc}-{ver}:{classifier}@zip"));
+        let item = DownloadItem::new(format!("{FORGE_MAVEN}/{mc}-{ver}/{file}"), &dest);
+        let got = if exists(&dest).await { Ok(()) } else { download_file(&item).await };
+        match got {
+            Ok(()) => {
+                let mut version = get_vanilla_version(mc).await?;
+                super::jarmods::set_loader_jar_mods(&mut version, &[dest.clone()]);
+                return Ok(InstalledLoader { version, files: vec![path_str(&dest)] });
+            }
+            Err(e) if status_of(&e) == Some(404) => last = Some(e),
+            Err(e) => return Err(e),
+        }
+    }
+    match last {
+        Some(_) => bail_tr!("forge.notFound", "{name} for Minecraft {mc} couldn't be found", name = name, mc = mc),
+        None => Err(anyhow!("{name} couldn't be downloaded")),
+    }
 }
 
 /// Runs blocking zip work off the async runtime.
@@ -409,6 +441,11 @@ async fn fetch_legacy_lib(mut lib: Library, forge_lib: &str) -> Result<Option<Li
         lib.url = None;
         lib.downloads = Some(super::mojang::LibDownloads { artifact: Some(FileRef { url: String::new(), path: Some(rel), ..Default::default() }), classifiers: None });
         return Ok(Some(lib));
+    }
+    // Forge 1.6 copies Minecraft's LWJGL and jinput entries, which are natives only (there's no plain jar to
+    // download); the game's own entries still bring the natives.
+    if lib.natives.is_some() {
+        return Ok(None);
     }
     let client = lib.extra.get("clientreq").and_then(Value::as_bool);
     let server_only = client != Some(true) && lib.extra.get("serverreq").and_then(Value::as_bool) == Some(true);

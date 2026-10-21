@@ -69,6 +69,16 @@ pub async fn pick_file(title: &str, filters: &[Filter<'_>]) -> Result<Option<Pat
     Ok(picked.and_then(|p| p.into_path().ok()))
 }
 
+/// Like `pick_file`, allowing several files. Empty if cancelled.
+pub async fn pick_files(title: &str, filters: &[Filter<'_>]) -> Result<Vec<PathBuf>> {
+    let mut dialog = app()?.dialog().file().set_title(title);
+    for (name, exts) in filters {
+        dialog = dialog.add_filter(*name, exts);
+    }
+    let picked = tokio::task::spawn_blocking(move || dialog.blocking_pick_files()).await?;
+    Ok(picked.unwrap_or_default().into_iter().filter_map(|p| p.into_path().ok()).collect())
+}
+
 /// Asks the user to pick a folder. None if cancelled.
 pub async fn pick_folder(title: &str) -> Result<Option<PathBuf>> {
     let dialog = app()?.dialog().file().set_title(title);

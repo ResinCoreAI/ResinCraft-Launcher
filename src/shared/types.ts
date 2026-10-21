@@ -1,7 +1,7 @@
 // Types shared by the main process, preload bridge and renderer UI.
 import type { MigrateApi } from './migrate'
 
-export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge'
+export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'liteloader'
 export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack'
 
 /**
@@ -104,6 +104,12 @@ export interface Instance {
   env?: EnvVar[]
   /** Commands run around a launch instead of the ones in Settings. */
   commands?: LaunchCommands
+  /** LiteLoader version loaded next to Forge (a LiteLoader-only instance has loader 'liteloader' instead). */
+  liteloader?: string
+  /** Zips merged into the game jar, in order (later ones win); files in the instance's jarmods/ folder. */
+  jarMods?: JarMod[]
+  /** The player's own changes to the version the game starts with (instance settings → Version). */
+  versionPatch?: VersionPatch
 }
 
 /** One environment variable for the game and its commands. */
@@ -120,6 +126,43 @@ export interface LaunchCommands {
   wrapper: string
   /** Runs after the game closes, with its exit code in $INST_EXIT_CODE. */
   postExit: string
+}
+
+export interface JarMod {
+  /** File name in the instance's jarmods/ folder. */
+  file: string
+  /** Shown name (the file the player picked). */
+  name: string
+  disabled?: boolean
+}
+
+/** Changes applied over the loader's version at launch. Empty values change nothing. */
+export interface VersionPatch {
+  mainClass?: string
+  /** Extra libraries, put in front of the classpath. */
+  libraries?: PatchLibrary[]
+  /** launchwrapper tweak classes (--tweakClass). */
+  tweakers?: string[]
+  jvmArgs?: string[]
+  gameArgs?: string[]
+}
+
+/** Maven coordinates with the repository to get them from, or a jar from disk (`file`, set by versions.addLibrary). */
+export interface PatchLibrary {
+  name: string
+  url?: string
+  file?: string
+}
+
+/** What an instance's game starts with (versions.resolved). */
+export interface ResolvedVersion {
+  mainClass: string
+  libraries: string[]
+  tweakers: string[]
+  jvmArgs: string[]
+  gameArgs: string[]
+  /** The loader's and the instance's jar mods, in the order they're merged. */
+  jarMods: string[]
 }
 
 /** The details of a modpack the player is making; the export dialog starts from them and saves them back. */
@@ -161,6 +204,10 @@ export interface NewInstance {
 }
 
 export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVersion' | 'pendingDownloads' | 'ownPack'>> & {
+  /** `null` takes LiteLoader off a Forge instance. */
+  liteloader?: string | null
+  /** `null` drops the player's version changes. */
+  versionPatch?: VersionPatch | null
   /** `null` goes back to the launcher default (undefined would be dropped on the way to the engine). */
   memoryMb?: number | null
   /** `null` goes back to automatic Java. */
@@ -1286,6 +1333,18 @@ export interface ResinApi {
   versions: {
     list(): Promise<McVersion[]>
     loaders(loader: LoaderType, mcVersion: string): Promise<LoaderVersion[]>
+    /** Resolves what an instance's game starts with (installs its loader first if needed). */
+    resolved(instanceId: string): Promise<ResolvedVersion>
+    /** File picker for jar mods (zip/jar); empty when cancelled. */
+    browseJars(): Promise<string[]>
+    /** Copies the files into the instance and adds them at the end of its jar mods. */
+    addJarMods(instanceId: string, paths: string[]): Promise<Instance>
+    /** Removes a jar mod (its file goes to the Recycle Bin). */
+    removeJarMod(instanceId: string, file: string): Promise<Instance>
+    /** Saves a new order and on/off state (same files as before). */
+    setJarMods(instanceId: string, list: JarMod[]): Promise<Instance>
+    /** File picker for a library jar, copied into the launcher's libraries; null when cancelled. */
+    addLibrary(): Promise<PatchLibrary | null>
   }
   /** OptiFine can't be downloaded for the player (its terms forbid mirroring it): they download it, these import it. */
   optifine: {
