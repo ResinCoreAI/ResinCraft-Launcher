@@ -18,7 +18,7 @@ fn samples() -> Vec<(&'static str, Option<Value>)> {
     let fabric = inst(json!({ "id": "a", "name": "Survival with friends", "mcVersion": "1.21.1", "loader": "fabric", "loaderVersion": "0.16.5", "color": "#5b8", "createdAt": 0 }));
     let pack = inst(json!({
         "id": "b", "name": "ATM10 (2)", "mcVersion": "1.21.1", "loader": "neoforge", "loaderVersion": "21.1.77", "color": "#a6f", "createdAt": 0,
-        "modpack": { "projectId": "925200", "name": "All the Mods 10" },
+        "modpack": { "projectId": "cf:925200", "name": "All the Mods 10" },
         "iconUrl": "https://media.forgecdn.net/avatars/thumbnails/1015/447/256/256/638551196442463380.png"
     }));
     let start = now_ms();

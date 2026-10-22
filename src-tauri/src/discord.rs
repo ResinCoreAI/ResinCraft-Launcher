@@ -56,6 +56,8 @@ pub struct Playing {
     pub icon: Option<String>,
     pub target: Option<Target>,
     pub started_ms: i64,
+    /// The modpack's page on Modrinth or CurseForge, for a "View modpack" button.
+    pub pack_url: Option<String>,
 }
 
 impl Playing {
@@ -72,6 +74,7 @@ impl Playing {
             icon: web(&inst.icon_url).or_else(|| web(&inst.pack_icon_url)),
             target: target.cloned(),
             started_ms,
+            pack_url: inst.modpack.as_ref().and_then(|m| m.project_id.as_deref()).and_then(pack_page),
         }
     }
 
@@ -110,6 +113,29 @@ fn field(s: &str) -> String {
     out
 }
 
+/// Where friends get the launcher (the presence's "Get ResinCraft" button).
+pub const DOWNLOAD_URL: &str = "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest";
+
+/// A modpack's page from its project id: bare for Modrinth, "cf:<id>" for CurseForge; other sites have none.
+fn pack_page(project_id: &str) -> Option<String> {
+    if let Some(id) = project_id.strip_prefix("cf:") {
+        return id.chars().all(|c| c.is_ascii_digit()).then(|| format!("https://www.curseforge.com/projects/{id}"));
+    }
+    (!project_id.contains(':') && project_id.chars().all(|c| c.is_ascii_alphanumeric()) && !project_id.is_empty())
+        .then(|| format!("https://modrinth.com/modpack/{project_id}"))
+}
+
+/// Buttons under the presence (Discord shows them to others, up to two): the modpack's page when there is one,
+/// and where to get the launcher.
+fn buttons(pack_url: Option<&str>) -> Value {
+    let mut out = Vec::new();
+    if let Some(url) = pack_url {
+        out.push(json!({ "label": "View modpack", "url": url }));
+    }
+    out.push(json!({ "label": "Get ResinCraft", "url": DOWNLOAD_URL }));
+    Value::Array(out)
+}
+
 /// "host:25565" reads as just "host".
 fn shown_address(addr: &str) -> &str {
     addr.trim().strip_suffix(":25565").unwrap_or(addr.trim())
@@ -127,6 +153,7 @@ pub fn activity(playing: Option<&Playing>, opts: Options, launcher_since_ms: i64
                 "details": field("In the launcher"),
                 "timestamps": { "start": launcher_since_ms },
                 "assets": { "large_image": LOGO, "large_text": LAUNCHER },
+                "buttons": buttons(None),
             })
         });
     };
@@ -146,6 +173,7 @@ pub fn activity(playing: Option<&Playing>, opts: Options, launcher_since_ms: i64
         "state": field(&state),
         "timestamps": { "start": p.started_ms },
         "assets": assets,
+        "buttons": buttons(p.pack_url.as_deref()),
     }))
 }
 
@@ -434,6 +462,25 @@ mod tests {
         assert_eq!(a["state"], "Minecraft 1.21.1 · Fabric 0.16.5");
         assert_eq!(a["timestamps"]["start"], 1_700_000_000_000i64);
         assert_eq!(a["assets"], json!({ "large_image": "logo", "large_text": "Minecraft 1.21.1 · Fabric 0.16.5" }));
+    }
+
+    #[test]
+    fn buttons_link_the_modpack_and_the_download() {
+        let get = json!({ "label": "Get ResinCraft", "url": DOWNLOAD_URL });
+        let a = activity(Some(&Playing::new("abc", &instance(), None, 0)), ON, 0).unwrap();
+        assert_eq!(a["buttons"], json!([get]));
+        let mut inst = instance();
+        for (id, page) in [("1KVo5zza", Some("https://modrinth.com/modpack/1KVo5zza")), ("cf:285109", Some("https://www.curseforge.com/projects/285109")), ("ftb:23", None)] {
+            inst.modpack = Some(ModpackRef { project_id: Some(id.into()), version_id: None, name: "Pack".into() });
+            let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0).unwrap();
+            let want = match page {
+                Some(url) => json!([{ "label": "View modpack", "url": url }, get]),
+                None => json!([get]),
+            };
+            assert_eq!(a["buttons"], want, "{id}");
+        }
+        let idle = activity(None, Options { in_launcher: true, ..ON }, 0).unwrap();
+        assert_eq!(idle["buttons"], json!([get]));
     }
 
     #[test]
