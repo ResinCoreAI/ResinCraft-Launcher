@@ -1,6 +1,6 @@
 [package]
 name = "resincraft"
-version = "1.2.1"
+version = "1.2.2"
 description = "ResinCraft Launcher: a modern Minecraft: Java Edition launcher by Puirkle"
 authors = ["Puirkle"]
 license = "MIT"
