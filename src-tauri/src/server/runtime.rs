@@ -324,7 +324,15 @@ pub async fn start(id: &str) -> Result<()> {
     }
     properties::set_values(&dir, &ports).await.map_err(fail)?;
     // Plugin/mod changes queued while the server last ran (normally applied when it stopped).
-    let applied = super::plugins::apply_pending(id).await.unwrap_or_default();
+    let mut applied = take_notes(id);
+    applied.extend(super::plugins::apply_pending(id).await.unwrap_or_default());
+    // Client-only mods crash a server (they reach for the game window), so they never start with it.
+    if meta.kind.modded() {
+        for title in super::clientmods::sweep(&dir).await {
+            applied.push(format!("Moved {title} to {} (it only runs on the game client)", super::clientmods::DISABLED_DIR));
+        }
+    }
+    let started_at = std::time::SystemTime::now();
 
     // Only Paperclip, Spigot and Forge 1.7.10–1.12.2 need it (old log4j cuts jar URLs at the first '!' and then
     // scans the whole drive); other loaders resolve real paths and break across drives.
@@ -444,6 +452,7 @@ pub async fn start(id: &str) -> Result<()> {
 
     let id = id.to_string();
     let port = meta.port;
+    let modded = meta.kind.modded();
     tokio::spawn(async move {
         let mut killed = false;
         let status = loop {
@@ -461,6 +470,28 @@ pub async fn start(id: &str) -> Result<()> {
         let code = status.as_ref().ok().and_then(|s| s.code());
         let stopping = with(|w| w.procs.get(&id).map(|p| p.stopping).unwrap_or(false));
         let crashed = !killed && !stopping && code != Some(0);
+        // A modded server that crashed while starting because a mod reached for the game client: move those mods
+        // out and start again (each round moves at least one jar, so this ends).
+        let mut retry = false;
+        if crashed && modded && with(|w| w.procs.get(&id).map(|p| p.state == "starting").unwrap_or(false)) {
+            let log: Vec<String> = with(|w| w.logs.get(&id).map(|l| l.iter().map(|x| x.text.clone()).collect()).unwrap_or_default());
+            let dir = store::dir(&id).ok();
+            if let Some(dir) = dir {
+                let mut notes = Vec::new();
+                for jar in super::clientmods::culprits(&dir, &log, started_at) {
+                    let name = jar.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    if super::clientmods::move_out(&dir, &jar).await {
+                        notes.push(format!("Moved {name} to {} (it crashed the server reaching for the game client)", super::clientmods::DISABLED_DIR));
+                    }
+                }
+                if !notes.is_empty() {
+                    notes.iter().for_each(|text| push(LogLine { text: text.clone(), level: "warn" }));
+                    push(LogLine { text: "Starting again without them…".into(), level: "info" });
+                    add_notes(&id, notes);
+                    retry = true;
+                }
+            }
+        }
         close_internet(&id, port).await;
         // Swap in plugin/mod changes that waited for the server to let go of its jars.
         match super::plugins::apply_pending(&id).await {
@@ -476,8 +507,34 @@ pub async fn start(id: &str) -> Result<()> {
             w.last.insert(id.clone(), if crashed { "crashed" } else { "stopped" });
         });
         emit_state(&id, code);
+        if retry {
+            tokio::spawn(start_again(id));
+        }
     });
     Ok(())
+}
+
+/// Starts a server again after client-only mods were moved out of a crashed start (boxed: start spawns this).
+fn start_again(id: String) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+    Box::pin(async move {
+        if let Err(e) = start(&id).await {
+            eprintln!("[server] couldn't start {id} again: {e:#}");
+        }
+    })
+}
+
+/// Console lines to show at the top of a server's next run (the run's own log is cleared when it starts).
+fn notes() -> &'static Mutex<HashMap<String, Vec<String>>> {
+    static N: OnceLock<Mutex<HashMap<String, Vec<String>>>> = OnceLock::new();
+    N.get_or_init(Default::default)
+}
+
+fn add_notes(id: &str, lines: Vec<String>) {
+    notes().lock().unwrap().entry(id.to_string()).or_default().extend(lines);
+}
+
+fn take_notes(id: &str) -> Vec<String> {
+    notes().lock().unwrap().remove(id).unwrap_or_default()
 }
 
 /// The folder the server runs in. Paperclip (Paper, Purpur, Folia) and Spigot refuse paths containing '!' or '+'

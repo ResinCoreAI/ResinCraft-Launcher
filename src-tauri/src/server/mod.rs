@@ -4,6 +4,7 @@
 //! can join. Servers live in `<dataDir>/servers/<id>/`.
 
 pub mod cloudflare;
+pub mod clientmods;
 pub mod create;
 pub mod domain;
 pub mod installers;

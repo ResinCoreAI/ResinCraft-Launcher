@@ -564,7 +564,6 @@ async fn fill_curseforge(dir: &Path, archive: &Path, server_pack: Option<&Path>,
         prefix.push('/');
     }
     extract_prefixes(archive, vec![prefix], dir).await?;
-    dropped.extend(drop_client_only(&dir.join("mods"), task).await);
     Ok((dropped, pending))
 }
 
@@ -706,7 +705,7 @@ async fn fill_instance(dir: &Path, inst: &Instance, task: &Arc<Task>) -> Result<
         Ok(())
     })
     .await??;
-    Ok(drop_client_only(&dir.join("mods"), task).await)
+    Ok(Vec::new())
 }
 
 // ---------- Client-only mods ----------
@@ -783,14 +782,19 @@ pub async fn client_only_sha1s(sha1s: &[String]) -> Result<HashMap<String, Strin
 // ---------- Filling ----------
 
 async fn fill(dir: &Path, content: Content, task: &Arc<Task>) -> Result<(Vec<String>, Vec<PendingDownload>)> {
-    match content {
-        Content::None => Ok((Vec::new(), Vec::new())),
+    let (mut dropped, pending) = match content {
+        Content::None => return Ok((Vec::new(), Vec::new())),
         Content::Mrpack(archive) => {
             fill_mrpack(dir, &archive, task).await?;
-            Ok((Vec::new(), Vec::new()))
+            (Vec::new(), Vec::new())
         }
-        Content::Curseforge { archive, server_pack } => fill_curseforge(dir, &archive, server_pack.as_deref(), task).await,
-        Content::Ftb(v) => Ok((Vec::new(), fill_ftb(dir, &v, task).await?)),
-        Content::Instance(inst) => Ok((fill_instance(dir, &inst, task).await?, Vec::new())),
-    }
+        Content::Curseforge { archive, server_pack } => fill_curseforge(dir, &archive, server_pack.as_deref(), task).await?,
+        Content::Ftb(v) => (Vec::new(), fill_ftb(dir, &v, task).await?),
+        Content::Instance(inst) => (fill_instance(dir, &inst, task).await?, Vec::new()),
+    };
+    // Every way in (official server packs too, which often still carry client mods) gets the same check.
+    dropped.extend(drop_client_only(&dir.join("mods"), task).await);
+    dropped.sort();
+    dropped.dedup();
+    Ok((dropped, pending))
 }
