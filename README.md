@@ -12,11 +12,12 @@ Get the newest version from [Releases](https://github.com/ResinCoreAI/ResinCraft
 
 | System | File |
 |---|---|
-| **Windows** 10/11 (x64) | `ResinCraft.Launcher_<version>_x64-setup.exe` |
-| **macOS** 10.15+ (Apple Silicon and Intel) | `ResinCraft.Launcher_<version>_universal.dmg` |
-| **Linux** x64, any distribution | `ResinCraft.Launcher_<version>_amd64.AppImage` (make it executable, then run it) |
-| **Linux** x64, Debian / Ubuntu / Mint | `ResinCraft.Launcher_<version>_amd64.deb` |
-| **Linux** ARM64 (e.g. Raspberry Pi 5) | `ResinCraft.Launcher_<version>_aarch64.AppImage` or `…_arm64.deb` |
+| **Windows** 10/11 (x64) | `ResinCraft.Launcher_<version>_amd64_windows.exe` |
+| **macOS** 10.15+ (Apple Silicon and Intel) | `ResinCraft.Launcher_<version>_universal_macos.dmg` |
+| **Linux** x64, any distribution | `ResinCraft.Launcher_<version>_amd64_linux.AppImage` (make it executable, then run it) |
+| **Linux** x64, Debian / Ubuntu / Mint | `ResinCraft.Launcher_<version>_amd64_linux.deb` |
+| **Linux** x64, as a plain folder | `ResinCraft.Launcher_<version>_amd64_linux.tar.gz` (unpack, run `./resincraft`; updated by hand) |
+| **Linux** ARM64 (e.g. Raspberry Pi 5) | the same three, with `_arm64_linux` |
 
 Every copy updates itself in place. The builds aren't code-signed yet: Windows may say the publisher is unverified, and macOS that the app is from an unidentified developer (right-click it and choose **Open** the first time).
 
@@ -112,7 +113,7 @@ set -a; . ./updater.local.env; set +a; export TAURI_SIGNING_PRIVATE_KEY="$PWD/up
 **Releasing an update.**
 
 1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
-2. Push a tag (`git tag v1.2.3 && git push origin v1.2.3`). CI builds on Windows, macOS and Linux (x64 and ARM) and makes a draft release with the downloads listed under [Download](#download), the macOS update file `…_universal.app.tar.gz`, and `latest.json`, which carries the signed update for every platform (`windows-x86_64`, `darwin-aarch64` / `darwin-x86_64`, `linux-x86_64`, `linux-aarch64`, and `-deb` entries for `.deb` installs). Running **Release** from the Actions tab builds the same files as the run's artifacts, with no release.
+2. Push a tag (`git tag v1.2.3 && git push origin v1.2.3`). CI builds on Windows, macOS and Linux (x64 and ARM) and makes a draft release with the downloads listed under [Download](#download), the macOS update file `…_universal_macos.app.tar.gz`, and `latest.json`, which carries the signed update for every platform (`windows-x86_64`, `darwin-aarch64` / `darwin-x86_64`, `linux-x86_64`, `linux-aarch64`, and `-deb` entries for `.deb` installs). Running **Release** from the Actions tab builds the same files as the run's artifacts, with no release.
 3. Publish the draft on GitHub. That is the rollout: **Publish update** copies `latest.json` to the `updates` branch, and players get the update at their next check (start, or within 6 hours). If that workflow fails, re-run it from the Actions tab (Run workflow, with the tag).
 
 **Testing an update locally.** Build an older and a newer copy under a separate name, so the test never touches a real install or its data (`RESINCRAFT_DATA_FOLDER` is read at build time):

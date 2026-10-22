@@ -5,10 +5,12 @@
 # Repository secrets RESINCRAFT_MS_CLIENT_ID and RESINCRAFT_CURSEFORGE_KEY are compiled into the app
 # (see src-tauri/build.rs); they are never stored in the code.
 #
-# What each platform ships:
-#   Windows  the NSIS installer (…_x64-setup.exe), which is also its update file
-#   macOS    one universal .dmg (Apple Silicon and Intel), and the .app.tar.gz the updater installs
-#   Linux    an .AppImage (also its update file) and a .deb, each for x64 (amd64) and ARM (aarch64/arm64)
+# Every file is named ResinCraft.Launcher_<version>_<arch>_<os>.<ext> (arch: amd64, arm64, or universal for the
+# one macOS app that runs on both). What each platform ships:
+#   Windows  …_amd64_windows.exe, the NSIS installer, which is also its update file
+#   macOS    …_universal_macos.dmg, and …_universal_macos.app.tar.gz, the file the updater installs
+#   Linux    …_<arch>_linux.AppImage (also its update file), .deb and .tar.gz (a plain folder, updated by hand),
+#            each for amd64 and arm64
 #
 # Updates: TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD sign every update file. The `release` job
 # puts all the signatures into one latest.json, which waits on the draft; the .sig files aren't uploaded. The
@@ -90,33 +92,16 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build ${{ matrix.args }}
-      # Collects the downloads and their update signatures under the names they get on the release (GitHub turns
-      # spaces into dots, so that's done here and latest.json can name them).
+      # Collects the downloads and their update signatures under the names they get on the release:
+      # ResinCraft.Launcher_<version>_<arch>_<os>.<ext>, which latest.json then names.
       - name: Collect the files
         shell: bash
         env:
           BUNDLE: ${{ matrix.bundle }}
+          PLATFORM: ${{ matrix.platform }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          version=$(jq -r .version src-tauri/tauri.conf.json)
-          mkdir -p out/release
-          take() { cp "$1" "out/release/$2"; [ -f "$1.sig" ] && cp "$1.sig" "out/release/$2.sig"; return 0; }
-          case "${{ matrix.platform }}" in
-            windows)
-              for f in "$BUNDLE"/nsis/*-setup.exe; do take "$f" "$(basename "$f" | tr ' ' '.')"; done ;;
-            macos)
-              for f in "$BUNDLE"/dmg/*.dmg; do take "$f" "$(basename "$f" | tr ' ' '.')"; done
-              for f in "$BUNDLE"/macos/*.app.tar.gz; do take "$f" "ResinCraft.Launcher_${version}_universal.app.tar.gz"; done ;;
-            linux*)
-              for f in "$BUNDLE"/appimage/*.AppImage "$BUNDLE"/deb/*.deb; do take "$f" "$(basename "$f" | tr ' ' '.')"; done
-              # The .deb updates installs made from it; sign it if the bundler didn't.
-              for f in out/release/*.deb; do
-                [ -f "$f.sig" ] || npx tauri signer sign "$f" > /dev/null
-              done ;;
-          esac
+        run: bash .github/scripts/collect.sh
           ls -l out/release
           n=$(ls out/release | grep -vc '\.sig$' || true)
           if [ "$n" -eq 0 ]; then echo "::error::The build made no files to ship."; exit 1; fi
@@ -135,7 +120,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       NOTES: |
-        Downloads: Windows, the `_x64-setup.exe` installer. macOS (Apple Silicon and Intel), the `_universal.dmg`. Linux, the `.AppImage` (any distribution) or the `.deb` (Debian, Ubuntu, Mint…): `amd64` for most PCs, `aarch64` / `arm64` for ARM ones such as a Raspberry Pi 5.
+        Downloads: Windows, `_amd64_windows.exe`. macOS (Apple Silicon and Intel), `_universal_macos.dmg`. Linux, the `.AppImage` (any distribution), the `.deb` (Debian, Ubuntu, Mint…) or the `.tar.gz` (a plain folder): `amd64` for most PCs, `arm64` for ARM ones such as a Raspberry Pi 5.
 
         Windows may warn that the publisher is unverified, and macOS that the app is from an unidentified developer, until releases are code-signed: on macOS, right-click the app and choose Open the first time. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.
 
@@ -160,8 +145,8 @@ jobs:
             [ -s "files/$f.sig" ] || { echo "::error::$f has no update signature."; exit 1; }
             jq -n --arg url "$base/$f" --rawfile sig "files/$f.sig" '{signature: ($sig | rtrimstr("\n")), url: $url}'
           }
-          win=$(one _x64-setup.exe); mac=$(one _universal.app.tar.gz)
-          appimage=$(one _amd64.AppImage); deb=$(one _amd64.deb); arm_appimage=$(one _aarch64.AppImage); arm_deb=$(one _arm64.deb)
+          win=$(one _amd64_windows.exe); mac=$(one _universal_macos.app.tar.gz)
+          appimage=$(one _amd64_linux.AppImage); deb=$(one _amd64_linux.deb); arm_appimage=$(one _arm64_linux.AppImage); arm_deb=$(one _arm64_linux.deb)
           jq -n --arg v "$version" --arg notes "$NOTES" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --argjson win "$win" --argjson mac "$mac" --argjson appimage "$appimage" --argjson deb "$deb" \
             --argjson arm_appimage "$arm_appimage" --argjson arm_deb "$arm_deb" '{

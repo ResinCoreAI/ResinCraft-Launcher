@@ -29,7 +29,7 @@ You are building the public website for **ResinCraft Launcher**, a desktop Minec
 | Repository | `https://github.com/ResinCoreAI/ResinCraft-Launcher` (public, **MIT licence**) |
 | Latest version when this brief was written | `v0.2.0`, published 2026-10-18 (v0.1.0 came out the same day) |
 | Platform | Windows 10/11, 64-bit. macOS and Linux are **not** available yet. |
-| Installer | `ResinCraft.Launcher_<version>_x64-setup.exe`, about 5 MB, installs per user (no admin rights) |
+| Installer | `ResinCraft.Launcher_<version>_amd64_windows.exe`, about 7 MB, installs per user (no admin rights) |
 | "Download" link | Resolve the newest installer from the GitHub API (§7). Fallback, and the no-JS `href`: `https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest` |
 | Built with | Tauri 2 and Rust, with a React interface. It's a small native app. |
 | Code signing | Not signed yet, so Windows SmartScreen shows "Windows protected your PC". Say so next to the downloads, with the fix: **More info → Run anyway**. |
@@ -332,7 +332,7 @@ Status labels: **[0.2.0]** is in the published v0.2.0. **[next]** is built or be
 ### 6.9 Updates [next, in progress]
 - **Update check** when the app starts and every 6 hours while it's open, plus a "Check for updates" button in Settings → About (shows the current version and when it last checked).
 - **When an update is found:** a small banner "ResinCraft X.Y.Z is ready to install" with *Update now*, *Release notes* and *Later*.
-- **The update file is the installer itself:** the same `…_x64-setup.exe` people download from the website, with a signature file. ResinCraft downloads it and runs it in a quiet "update in place" mode, so there's no reinstall wizard. Instances, worlds, accounts and settings stay, and the launcher reopens on the new version.
+- **The update file is the installer itself:** the same `…_amd64_windows.exe` people download from the website, with a signature file. ResinCraft downloads it and runs it in a quiet "update in place" mode, so there's no reinstall wizard. Instances, worlds, accounts and settings stay, and the launcher reopens on the new version.
 - If a game or a hosted server is running, it asks first and can wait until they stop.
 - An optional "Install updates automatically" setting, off by default.
 - Updates are signed: the launcher refuses an update whose signature doesn't match.
