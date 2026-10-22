@@ -38,6 +38,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "content:details" => json(details::details(&args.get::<String>(0)?).await?),
         "content:versionInfo" => json(details::version_info(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        // The mods in a modpack version: [projectId, versionId] → PackMod[].
+        "content:packMods" => json(details::pack_mods(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "content:install" => {
             sources::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?, args.get(3)?).await?;
             done()

@@ -544,3 +544,22 @@ pub(crate) fn forget_cache(project_id: &str) {
         m.remove(slug_of(project_id));
     }
 }
+
+/// The mods in a Technic pack build: a Solder pack lists them (as zips named after the mod); others don't.
+pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::core::types::PackMod>> {
+    use crate::core::types::PackMod;
+    let p = pack(slug_of(project_id)).await?;
+    if p.solder().is_none() {
+        return Ok(Vec::new());
+    }
+    let b: SolderBuild = fetch_json(&p.solder_url(&format!("/{}", enc(version_id)))).await?;
+    Ok(b.mods
+        .iter()
+        .filter_map(|m| {
+            let name = m.url.rsplit('/').next()?.split('?').next()?;
+            // "jei-1.12.2-4.16.zip" → "jei 1.12.2 4.16"
+            let title = name.strip_suffix(".zip").unwrap_or(name).replace(['-', '_'], " ");
+            Some(PackMod { title, id: None, source: None, icon_url: None, file: Some(name.to_string()) })
+        })
+        .collect())
+}

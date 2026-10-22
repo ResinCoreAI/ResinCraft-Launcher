@@ -426,6 +426,13 @@ export function mockApi(): ResinApi {
         // Modpacks list their mods, not dependencies.
         return wait(seen.get(projectId)?.kind === 'modpack' ? { ...info, dependencies: [] } : info, 350)
       },
+      packMods: (projectId) => {
+        const names = ['Sodium', 'Lithium', 'Iris Shaders', 'Fabric API', 'Mod Menu', 'JourneyMap', 'Farmer\'s Delight', 'Create', 'Supplementaries', 'Waystones', 'Xaero\'s Minimap', 'Jade']
+        return wait(
+          names.map((title, i) => (i % 4 === 3 ? { title, file: `${title.replace(/\W/g, '')}-1.0.jar` } : { title, id: `${projectId}-mod${i}`, source: 'modrinth' as const })),
+          600
+        )
+      },
       install: () => wait(undefined, 800),
       exportList: (_i, kind) =>
         wait(`C:\\Users\\you\\Downloads\\cozy-survival ${kind === 'mod' ? 'mods' : kind === 'shader' ? 'shaders' : 'resource-packs'}.json`, 500),

@@ -115,6 +115,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       versions: fn('content:versions'),
       details: fn('content:details'),
       versionInfo: fn('content:versionInfo'),
+      packMods: fn('content:packMods'),
       install: fn('content:install'),
       installFromLink: fn('content:installFromLink'),
       exportList: fn('content:exportList'),

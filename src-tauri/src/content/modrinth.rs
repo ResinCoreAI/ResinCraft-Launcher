@@ -956,3 +956,79 @@ pub(crate) async fn facts(ids: &[String]) -> Result<Vec<ModFacts>> {
     }
     Ok(out)
 }
+
+/// The mods a modpack version lists in its modrinth.index.json, named from Modrinth where the file is hosted there.
+pub async fn pack_mods(version_id: &str) -> Result<Vec<crate::core::types::PackMod>> {
+    use crate::core::types::PackMod;
+    #[derive(Deserialize)]
+    struct File {
+        url: String,
+        #[serde(default)]
+        size: u64,
+        #[serde(default)]
+        primary: bool,
+    }
+    #[derive(Deserialize)]
+    struct Version {
+        files: Vec<File>,
+    }
+    #[derive(Deserialize)]
+    struct IndexFile {
+        path: String,
+        #[serde(default)]
+        downloads: Vec<String>,
+    }
+    #[derive(Deserialize)]
+    struct Index {
+        #[serde(default)]
+        files: Vec<IndexFile>,
+    }
+    #[derive(Deserialize)]
+    struct Brief {
+        id: String,
+        title: String,
+        #[serde(default)]
+        icon_url: Option<String>,
+    }
+    let v: Version = fetch_json(&format!("{API}/version/{}", enc(version_id))).await?;
+    let Some(f) = v.files.iter().find(|f| f.primary && f.url.ends_with(".mrpack")).or(v.files.iter().find(|f| f.url.ends_with(".mrpack"))) else {
+        return Ok(Vec::new());
+    };
+    let texts = super::jarmeta::remote_zip_texts(&f.url, f.size, &["modrinth.index.json"]).await;
+    let Some(index) = texts.and_then(|t| t.get("modrinth.index.json").cloned()) else { return Ok(Vec::new()) };
+    let index: Index = serde_json::from_str(&index)?;
+    let re = regex::Regex::new(r"cdn\.modrinth\.com/data/([A-Za-z0-9]+)/").unwrap();
+    let mods: Vec<(String, Option<String>)> = index
+        .files
+        .iter()
+        .filter(|f| super::details::is_mod_path(&f.path))
+        .map(|f| (f.path.clone(), f.downloads.iter().find_map(|u| re.captures(u).map(|c| c[1].to_string()))))
+        .collect();
+    let ids: Vec<String> = {
+        let mut ids: Vec<String> = mods.iter().filter_map(|(_, id)| id.clone()).collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    };
+    let mut named: HashMap<String, Brief> = HashMap::new();
+    for chunk in ids.chunks(100) {
+        let q = serde_json::to_string(chunk)?;
+        if let Ok(list) = fetch_json::<Vec<Brief>>(&format!("{API}/projects?ids={}", enc(&q))).await {
+            named.extend(list.into_iter().map(|b| (b.id.clone(), b)));
+        }
+    }
+    Ok(mods
+        .into_iter()
+        .map(|(path, id)| {
+            let (title, file) = super::details::title_of_file(&path);
+            let brief = id.as_ref().and_then(|i| named.get(i));
+            PackMod {
+                title: brief.map(|b| b.title.clone()).unwrap_or(title),
+                id: brief.map(|b| b.id.clone()),
+                source: brief.map(|_| ContentSource::Modrinth),
+                icon_url: brief.and_then(|b| b.icon_url.clone()),
+                file: Some(file),
+            }
+        })
+        .collect())
+}

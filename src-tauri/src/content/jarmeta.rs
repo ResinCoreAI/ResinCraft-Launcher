@@ -305,8 +305,8 @@ fn find_directory(tail: &[u8], tail_start: u64) -> Option<(u64, u64)> {
     Some((u64_at(tail, rec + 48)?, u64_at(tail, rec + 40)?))
 }
 
-/// The metadata files listed in a central directory.
-fn find_entries(dir: &[u8]) -> Vec<Entry> {
+/// The `wanted` files listed in a central directory.
+fn find_entries(dir: &[u8], wanted: &[&'static str]) -> Vec<Entry> {
     let mut out = Vec::new();
     let mut i = 0;
     while dir.get(i..i + 4) == Some(&[0x50, 0x4b, 0x01, 0x02][..]) {
@@ -324,7 +324,7 @@ fn find_entries(dir: &[u8]) -> Vec<Entry> {
         };
         let (nlen, xlen) = (nlen as usize, xlen as usize);
         let name = dir.get(i + 46..i + 46 + nlen).and_then(|n| std::str::from_utf8(n).ok()).unwrap_or_default();
-        if let Some(&known) = META_FILES.iter().find(|f| **f == name) {
+        if let Some(&known) = wanted.iter().find(|f| **f == name) {
             // ZIP64 sizes and offsets live in an extra field, in this order, when the 32-bit ones are maxed out.
             let extra = dir.get(i + 46 + nlen..i + 46 + nlen + xlen).unwrap_or_default();
             let maxed = [uncompressed == MAX32, compressed == MAX32, offset == MAX32];
@@ -378,13 +378,55 @@ where
     F: Fn(u64, u64) -> Fut,
     Fut: Future<Output = Result<Option<Chunk>>>,
 {
+    match read_remote_texts(size, fetch, &META_FILES).await? {
+        RemoteTexts::Texts(texts) => Some(meta_from(|name| texts.get(name).cloned())),
+        RemoteTexts::Whole(all) => meta_of_bytes(all).await,
+    }
+}
+
+/// Text files out of a zip on a web server, read with byte ranges so a big modpack isn't downloaded for its list
+/// (modrinth.index.json, manifest.json). Entries bigger than 1 MB are skipped. None when it can't be read.
+pub async fn remote_zip_texts(url: &str, size: u64, wanted: &[&'static str]) -> Option<BTreeMap<&'static str, String>> {
+    // Some download hosts only redirect plain requests and answer 404 to ranged ones (CurseForge's edge server),
+    // so follow the redirects once and read the ranges from where they end.
+    let url = match http().head(url).send().await {
+        Ok(res) if res.status().is_success() => res.url().to_string(),
+        _ => url.to_string(),
+    };
+    let url = url.as_str();
+    match read_remote_texts(size, |start, end| get_range(url, start, end), wanted).await? {
+        RemoteTexts::Texts(t) => Some(t),
+        RemoteTexts::Whole(all) => {
+            let wanted: Vec<&'static str> = wanted.to_vec();
+            tokio::task::spawn_blocking(move || {
+                let mut z = zip::ZipArchive::new(Cursor::new(all)).ok()?;
+                Some(wanted.into_iter().filter_map(|n| read_zip_text(&mut z, n).ok().flatten().map(|t| (n, t))).collect())
+            })
+            .await
+            .ok()
+            .flatten()
+        }
+    }
+}
+
+/// What a ranged read brought back: the wanted texts, or the whole file when the server sent all of it.
+pub enum RemoteTexts {
+    Texts(BTreeMap<&'static str, String>),
+    Whole(Vec<u8>),
+}
+
+async fn read_remote_texts<F, Fut>(size: u64, fetch: F, wanted: &[&'static str]) -> Option<RemoteTexts>
+where
+    F: Fn(u64, u64) -> Fut,
+    Fut: Future<Output = Result<Option<Chunk>>>,
+{
     if size == 0 {
         return None;
     }
     let tail_start = size.saturating_sub(TAIL);
     let tail = match fetch(tail_start, size - 1).await.ok()?? {
         Chunk::Part(b) => b,
-        Chunk::Whole(all) => return meta_of_bytes(all).await,
+        Chunk::Whole(all) => return Some(RemoteTexts::Whole(all)),
     };
     let (dir_start, dir_size) = find_directory(&tail, tail_start)?;
     if dir_size > MAX_WHOLE || dir_start.checked_add(dir_size)? > size {
@@ -396,11 +438,11 @@ where
     } else {
         match fetch(dir_start, dir_start + dir_size - 1).await.ok()?? {
             Chunk::Part(b) => b,
-            Chunk::Whole(all) => return meta_of_bytes(all).await,
+            Chunk::Whole(all) => return Some(RemoteTexts::Whole(all)),
         }
     };
-    let mut texts: BTreeMap<&str, String> = BTreeMap::new();
-    for e in find_entries(&dir) {
+    let mut texts: BTreeMap<&'static str, String> = BTreeMap::new();
+    for e in find_entries(&dir, wanted) {
         // The local header repeats the name and may carry a different extra field; ask for some slack.
         let want = 30 + e.name.len() as u64 + e.compressed + 512;
         let end = (e.offset + want).min(size) - 1;
@@ -417,7 +459,7 @@ where
             texts.insert(e.name, t);
         }
     }
-    Some(meta_from(|name| texts.get(name).cloned()))
+    Some(RemoteTexts::Texts(texts))
 }
 
 #[cfg(test)]

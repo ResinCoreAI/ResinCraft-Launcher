@@ -507,3 +507,17 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
 pub(crate) async fn forget_cache() {
     *LIST.lock().await = None;
 }
+
+/// The mods in an ATLauncher pack version, by the names its Configs.json gives them.
+pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::core::types::PackMod>> {
+    use crate::core::types::PackMod;
+    let p = pack(atl_name(project_id)).await?;
+    let base = format!("{CDN}/packs/{}/versions/{}", enc(&p.safe_name), enc(version_id));
+    let cfg: AtlConfig = fetch_json(&format!("{base}/Configs.json")).await?;
+    Ok(cfg
+        .mods
+        .iter()
+        .filter(|m| m.client != Some(false) && matches!(m.kind.as_str(), "mods" | "forge" | "coremods" | "jar" | "dependency"))
+        .map(|m| PackMod { title: m.name.clone(), id: None, source: None, icon_url: None, file: Some(m.file.clone()).filter(|f| !f.is_empty()) })
+        .collect())
+}

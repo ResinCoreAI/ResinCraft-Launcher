@@ -1092,3 +1092,40 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
 pub(crate) async fn available() -> bool {
     has_key().await
 }
+
+/// The mods a CurseForge modpack file lists in its manifest.json, named from CurseForge.
+pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::core::types::PackMod>> {
+    use crate::core::types::PackMod;
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ManifestFile {
+        #[serde(rename = "projectID")]
+        project_id: u64,
+    }
+    #[derive(Deserialize)]
+    struct Manifest {
+        #[serde(default)]
+        files: Vec<ManifestFile>,
+    }
+    let file: CfFile = cf(&format!("/mods/{}/files/{}", cf_id(project_id), version_id.trim_start_matches("cf:")), None).await?;
+    // Some authors don't let other apps download the pack itself; then the list can't be read either.
+    let (Some(url), Some(size)) = (file.url().map(str::to_string), file.file_length) else { return Ok(Vec::new()) };
+    let Some(text) = super::jarmeta::remote_zip_texts(&url, size, &["manifest.json"]).await.and_then(|t| t.get("manifest.json").cloned()) else {
+        return Ok(Vec::new());
+    };
+    let manifest: Manifest = serde_json::from_str(text.trim_start_matches('\u{feff}'))?;
+    let ids: Vec<u64> = manifest.files.iter().map(|f| f.project_id).collect();
+    let mut mods: Vec<CfMod> = Vec::new();
+    for chunk in ids.chunks(500) {
+        mods.extend(cf::<Vec<CfMod>>("/mods", Some(json!({ "modIds": chunk }))).await.unwrap_or_default());
+    }
+    // classId 6 = mods; resource packs and shaders a pack lists aren't mods.
+    Ok(mods
+        .iter()
+        .filter(|m| m.class_id.is_none_or(|c| c == 6))
+        .map(|m| {
+            let h = to_hit(m);
+            PackMod { title: h.title, id: Some(h.id), source: Some(ContentSource::Curseforge), icon_url: h.icon_url, file: None }
+        })
+        .collect())
+}

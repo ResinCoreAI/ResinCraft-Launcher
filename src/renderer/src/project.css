@@ -284,6 +284,12 @@ button.dep:hover {
   flex: none;
 }
 
+.pack-mods {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* ---------- Gallery ---------- */
 
 .gallery {

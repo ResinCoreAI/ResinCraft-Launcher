@@ -34,6 +34,35 @@ pub async fn version_info(project_id: &str, version_id: &str) -> Result<VersionI
     }
 }
 
+/// The mods in version `version_id` of modpack `project_id`, sorted by name. Packs whose list lives inside their
+/// file have only that file's index read (ranged requests), not the whole download.
+pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::core::types::PackMod>> {
+    let mut list = match source_of(project_id) {
+        ContentSource::Modrinth => modrinth::pack_mods(version_id).await?,
+        ContentSource::Curseforge => curseforge::pack_mods(project_id, version_id).await?,
+        ContentSource::Ftb => ftb::pack_mods(project_id, version_id).await?,
+        ContentSource::Atlauncher => atlauncher::pack_mods(project_id, version_id).await?,
+        ContentSource::Technic => technic::pack_mods(project_id, version_id).await?,
+        ContentSource::Github => Vec::new(),
+    };
+    list.sort_by_key(|m| m.title.to_lowercase());
+    list.dedup_by(|a, b| a.title == b.title && a.id == b.id);
+    Ok(list)
+}
+
+/// "mods/Sodium-0.5.11.jar" → ("Sodium-0.5.11", "Sodium-0.5.11.jar").
+pub(crate) fn title_of_file(path: &str) -> (String, String) {
+    let file = path.rsplit(['/', '\\']).next().unwrap_or(path).to_string();
+    let title = file.strip_suffix(".jar").or_else(|| file.strip_suffix(".zip")).unwrap_or(&file).to_string();
+    (title, file)
+}
+
+/// Whether a pack file path is a mod (in mods/, a jar).
+pub(crate) fn is_mod_path(path: &str) -> bool {
+    let p = path.trim_start_matches("./").replace('\\', "/");
+    p.starts_with("mods/") && (p.ends_with(".jar") || p.ends_with(".jar.disabled"))
+}
+
 /// Sort order for a version's dependencies: what it needs first, what it can't run with last.
 pub fn dependency_rank(kind: &str) -> u8 {
     match kind {

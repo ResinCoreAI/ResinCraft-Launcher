@@ -582,6 +582,17 @@ export interface VersionInfo {
   dependencies: ProjectDependency[]
 }
 
+/** One mod in a modpack version (content.packMods). */
+export interface PackMod {
+  title: string
+  /** Its project, when the pack says which (opens its own details page). */
+  id?: string
+  source?: ContentSource
+  iconUrl?: string
+  /** The jar's file name, when the pack lists it. */
+  file?: string
+}
+
 export interface ProjectDependency {
   /** The project on the same source, when known (has its own details page). */
   id?: string
@@ -1448,6 +1459,8 @@ export interface ResinApi {
     details(projectId: string): Promise<ProjectDetails>
     /** A version's changelog and dependencies. */
     versionInfo(projectId: string, versionId: string): Promise<VersionInfo>
+    /** The mods a modpack version includes, read from its manifest without downloading the pack. */
+    packMods(projectId: string, versionId: string): Promise<PackMod[]>
     install(instanceId: string, projectId: string, kind: ContentKind, versionId?: string): Promise<void>
     /** Installs what a link points to (a Modrinth, CurseForge or GitHub page, or a .jar) into an instance. */
     installFromLink(instanceId: string, url: string, kind: ContentKind): Promise<void>

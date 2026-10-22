@@ -408,3 +408,19 @@ mod tests {
         assert_eq!(ids, [227083, 229323]);
     }
 }
+
+/// The mods in an FTB pack version, from the file list FTB publishes for it.
+pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::core::types::PackMod>> {
+    use crate::core::types::PackMod;
+    let version: FtbVersion = fetch_json(&format!("{API}/modpack/{}/{}", ftb_id(project_id), enc_id(version_id))).await?;
+    Ok(version
+        .files
+        .iter()
+        .filter(|f| !f.serveronly && super::details::is_mod_path(&format!("{}/{}", f.path.trim_matches(['.', '/']), f.name)))
+        .map(|f| {
+            let (title, file) = super::details::title_of_file(&f.name);
+            let cf = f.curseforge.as_ref().map(|c| format!("cf:{}", c.project));
+            PackMod { title, source: cf.as_ref().map(|_| ContentSource::Curseforge), id: cf, icon_url: None, file: Some(file) }
+        })
+        .collect())
+}

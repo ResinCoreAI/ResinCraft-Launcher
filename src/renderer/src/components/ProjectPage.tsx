@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
@@ -21,10 +21,11 @@ import {
   MessageCircle,
   Repeat,
   Scale,
+  Search,
   Star,
   X
 } from 'lucide-react'
-import type { ContentItem, GalleryImage, Instance, ProjectDetails, ProjectHit, ProjectLink, ProjectVersion, VersionInfo } from '@shared/types'
+import type { ContentItem, GalleryImage, Instance, PackMod, ProjectDetails, ProjectHit, ProjectLink, ProjectVersion, VersionInfo } from '@shared/types'
 import { api } from '../api'
 import { compact, timeAgo } from '../util'
 import { t, type Key } from '../i18n'
@@ -59,7 +60,7 @@ const DEP_KEYS: Record<VersionInfo['dependencies'][number]['type'], Key> = {
 /** How many versions show before "Show more". */
 const PAGE = 40
 
-type Tab = 'description' | 'gallery' | 'versions'
+type Tab = 'description' | 'mods' | 'gallery' | 'versions'
 
 /** Plain release numbers only ("1.21.4", not snapshots), oldest first. */
 function releases(list: string[]): string[] {
@@ -135,8 +136,25 @@ export function ProjectPage({ hit, site, target, installed, state, backLabel, on
   const allGames = useMemo(() => (versions ?? []).flatMap((v) => v.gameVersions), [versions])
   const loaders = useMemo(() => [...new Set((versions ?? []).flatMap((v) => v.loaders))], [versions])
 
+  const [packMods, setPackMods] = useState<{ version: string; list?: PackMod[]; error?: string }>()
+  // A modpack's mod list loads when its tab is first opened (it reads the pack's manifest from the site).
+  const packModsFor = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (tab !== 'mods' || !main || packModsFor.current === main.id) return
+    const version = main.id
+    packModsFor.current = version
+    setPackMods({ version })
+    api.content.packMods(hit.id, version).then(
+      (list) => packModsFor.current === version && setPackMods({ version, list }),
+      (e) => packModsFor.current === version && setPackMods({ version, error: (e as Error).message })
+    )
+  }, [tab, main, hit.id])
+
   const tabs: { value: Tab; label: React.ReactNode }[] = [
     { value: 'description', label: t('project.tab.description') },
+    ...(p.kind === 'modpack' && p.source !== 'github'
+      ? [{ value: 'mods' as Tab, label: packMods?.list ? t('project.tab.modsCount', { count: packMods.list.length }) : t('project.tab.mods') }]
+      : []),
     ...(gallery.length ? [{ value: 'gallery' as Tab, label: t('project.tab.gallery', { count: gallery.length }) }] : []),
     { value: 'versions', label: versions ? t('project.tab.versionsCount', { count: versions.length }) : t('project.tab.versions') }
   ]
@@ -257,6 +275,7 @@ export function ProjectPage({ hit, site, target, installed, state, backLabel, on
             ) : (
               <p className="faint">{t('project.noDescription', { source: site.label })}</p>
             ))}
+          {tab === 'mods' && <PackModList project={p} version={main} state={packMods} onOpen={onOpen} />}
           {tab === 'gallery' && (
             <div className="gallery">
               {gallery.map((g, i) => (
@@ -346,6 +365,93 @@ export function ProjectPage({ hit, site, target, installed, state, backLabel, on
       </div>
 
       {viewing !== undefined && gallery[viewing] && <Lightbox images={gallery} at={viewing} onMove={setViewing} onClose={() => setViewing(undefined)} />}
+    </div>
+  )
+}
+
+/** The mods in a modpack version, with a filter; mods the pack links to open their own page. */
+function PackModList({
+  project,
+  version,
+  state,
+  onOpen
+}: {
+  project: ProjectHit
+  version?: ProjectVersion
+  state?: { list?: PackMod[]; error?: string }
+  onOpen: (hit: ProjectHit) => void
+}) {
+  const [filter, setFilter] = useState('')
+  if (state?.error)
+    return (
+      <Empty icon={<X />} title={t('project.mods.failed')}>
+        {state.error}
+      </Empty>
+    )
+  if (!version && !state) return <p className="faint">{t('versionPicker.none', { title: project.title })}</p>
+  if (!state?.list)
+    return (
+      <div className="project-loading">
+        <div className="skeleton" />
+        <div className="skeleton" />
+        <div className="skeleton short" />
+      </div>
+    )
+  if (!state.list.length) return <p className="faint">{t('project.mods.none')}</p>
+  const q = filter.trim().toLowerCase()
+  const shown = q ? state.list.filter((m) => m.title.toLowerCase().includes(q) || m.file?.toLowerCase().includes(q)) : state.list
+  return (
+    <div className="pack-mods">
+      <div className="row" style={{ gap: 8 }}>
+        <div className="search grow">
+          <Search />
+          <input className="input" placeholder={t('project.mods.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        </div>
+        {version && <span className="faint small">{t('project.dependencies.for', { version: version.versionNumber })}</span>}
+      </div>
+      <div className="deps">
+        {shown.map((m, i) => {
+          const body = (
+            <>
+              <span className="thumb">{m.iconUrl ? <img src={m.iconUrl} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <Blocks />}</span>
+              <span className="grow ellipsis" title={m.file}>
+                {m.title}
+              </span>
+            </>
+          )
+          return m.id ? (
+            <button
+              key={`${m.id}${i}`}
+              className="dep"
+              title={t('project.dep.open', { title: m.title })}
+              onClick={() =>
+                onOpen({
+                  id: m.id!,
+                  slug: '',
+                  title: m.title,
+                  description: '',
+                  iconUrl: m.iconUrl,
+                  author: '',
+                  downloads: 0,
+                  follows: 0,
+                  categories: [],
+                  kind: 'mod',
+                  updated: '',
+                  source: m.source ?? project.source,
+                  url: ''
+                })
+              }
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={`${m.title}${i}`} className="dep">
+              {body}
+            </div>
+          )
+        })}
+        {!shown.length && <p className="faint small">{t('project.mods.noMatch')}</p>}
+      </div>
     </div>
   )
 }

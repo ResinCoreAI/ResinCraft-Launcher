@@ -670,6 +670,23 @@ pub struct VersionInfo {
     pub dependencies: Vec<ProjectDependency>,
 }
 
+/// One mod in a modpack, for its details page (content:packMods).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PackMod {
+    pub title: String,
+    /// Its project, when the pack says which (opens its own details page).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<ContentSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    /// The jar's file name, when the pack lists it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDependency {
