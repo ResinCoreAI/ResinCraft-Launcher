@@ -381,6 +381,8 @@ export interface Settings {
   discordShowServer: boolean
   /** Rich Presence shows "In the launcher" while ResinCraft is open. */
   discordInLauncher: boolean
+  /** Which changed defaults the settings file has had applied (engine-managed). */
+  defaultsVersion?: number
   /** Environment variables for every game (an instance's own win). */
   env: EnvVar[]
   /** Pre-launch, wrapper and post-exit commands for instances without their own. */

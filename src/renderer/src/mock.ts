@@ -127,7 +127,7 @@ export function mockApi(): ResinApi {
     showMemoryOnHome: false,
     discordPresence: true,
     discordShowServer: false,
-    discordInLauncher: false,
+    discordInLauncher: true,
     env: [],
     commands: { preLaunch: '', wrapper: '', postExit: '' }
   }

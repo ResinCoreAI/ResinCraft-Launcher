@@ -45,8 +45,11 @@ pub struct Settings {
     pub discord_presence: bool,
     /// Rich Presence names the server joined; off by default, the address can be private.
     pub discord_show_server: bool,
-    /// Rich Presence shows "In the launcher" while ResinCraft is open and no game runs.
+    /// Rich Presence shows "In the launcher" while ResinCraft is open and no game runs (on by default).
     pub discord_in_launcher: bool,
+    /// Which changed defaults this file has had applied (see `upgrade`). Missing in older files, so 0.
+    #[serde(default)]
+    pub defaults_version: u32,
     /// Environment variables for every game (an instance's own win; Settings → Commands).
     pub env: Vec<EnvVar>,
     /// Pre-launch, wrapper and post-exit commands for instances without their own (Settings → Commands).
@@ -84,7 +87,8 @@ impl Default for Settings {
             show_memory_on_home: false,
             discord_presence: true,
             discord_show_server: false,
-            discord_in_launcher: false,
+            discord_in_launcher: true,
+            defaults_version: DEFAULTS_VERSION,
             env: Vec::new(),
             commands: LaunchCommands::default(),
         }
@@ -124,12 +128,33 @@ pub fn redacted(mut s: Settings) -> Settings {
     s
 }
 
+/// Bumped when a default changes in a way that should also reach existing settings files, once.
+const DEFAULTS_VERSION: u32 = 1;
+
+/// Applies the default changes a settings file from an older version hasn't had yet. Returns whether anything changed.
+fn upgrade(s: &mut Settings) -> bool {
+    let from = s.defaults_version;
+    if from >= DEFAULTS_VERSION {
+        return false;
+    }
+    // 1: "In the launcher" on Discord became on by default (1.2.4 rebuild); before, settings files saved it as off.
+    if from < 1 {
+        s.discord_in_launcher = true;
+    }
+    s.defaults_version = DEFAULTS_VERSION;
+    true
+}
+
 pub async fn get() -> Settings {
     if let Some(s) = CACHE.lock().unwrap().clone() {
         return s;
     }
     // Missing fields fall back to defaults thanks to #[serde(default)].
-    let s: Settings = read_json(&paths::settings_file()).await.unwrap_or_default();
+    let file = paths::settings_file();
+    let mut s: Settings = read_json(&file).await.unwrap_or_default();
+    if upgrade(&mut s) && file.exists() {
+        let _ = write_json(&file, &s).await;
+    }
     *CACHE.lock().unwrap() = Some(s.clone());
     s
 }
@@ -147,4 +172,26 @@ pub async fn set(patch: Value) -> Result<Settings> {
     write_json(&paths::settings_file(), &s).await?;
     *CACHE.lock().unwrap() = Some(s.clone());
     Ok(s)
+}
+
+#[cfg(test)]
+mod defaults_tests {
+    use super::*;
+
+    #[test]
+    fn older_files_get_in_launcher_switched_on_once() {
+        // A 1.2.3 file: the field written as off, no defaultsVersion.
+        let mut old: Settings = serde_json::from_str(r#"{"discordInLauncher": false, "theme": "dark"}"#).unwrap();
+        assert_eq!(old.defaults_version, 0);
+        assert!(upgrade(&mut old));
+        assert!(old.discord_in_launcher);
+        // Turned off again afterwards: that choice stays.
+        old.discord_in_launcher = false;
+        let saved: Settings = serde_json::from_str(&serde_json::to_string(&old).unwrap()).unwrap();
+        let mut again = saved;
+        assert!(!upgrade(&mut again));
+        assert!(!again.discord_in_launcher);
+        // New installs start on.
+        assert!(Settings::default().discord_in_launcher);
+    }
 }
