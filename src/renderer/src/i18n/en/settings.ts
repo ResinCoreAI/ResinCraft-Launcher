@@ -57,6 +57,8 @@ export default {
   'settings.preferredSource.hint': 'When a mod is on both Modrinth and CurseForge, install it from here.',
   'settings.preferredSource.ask': 'Ask every time',
   'settings.preferredSource.reset': 'Reset “Don’t ask again”',
+  'settings.watchFolders': 'Watch folders',
+  'settings.watchFolders.hint': 'Where ResinCraft looks for files you download in your browser (mods whose authors only allow downloads from their website). Your Downloads folder is always included.',
   'settings.preferredSource.resetDone': 'ResinCraft will ask again when a mod is on both sites',
   'settings.about.credit': 'Made by Puirkle. Free and open source.',
   'settings.about.dataFolder': 'Data folder: {path}',

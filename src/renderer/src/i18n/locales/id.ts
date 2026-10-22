@@ -284,6 +284,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': 'Jika mod ada di Modrinth dan CurseForge, pasang dari sini.',
   'settings.preferredSource.ask': 'Selalu tanya',
   'settings.preferredSource.reset': 'Atur ulang “Jangan tanya lagi”',
+  'settings.watchFolders': 'Folder yang dipantau',
+  'settings.watchFolders.hint': 'Tempat ResinCraft mencari file yang Anda unduh di browser (mod yang hanya boleh diunduh dari situs pembuatnya). Folder Unduhan selalu disertakan.',
   'settings.preferredSource.resetDone': 'ResinCraft akan bertanya lagi jika mod ada di kedua situs',
   'settings.about.credit': 'Dibuat oleh Puirkle. Gratis dan sumber terbuka.',
   'settings.about.dataFolder': 'Folder data: {path}',

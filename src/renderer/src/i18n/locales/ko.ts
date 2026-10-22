@@ -284,6 +284,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': 'Modrinth와 CurseForge에 모두 있는 모드는 여기서 설치해요.',
   'settings.preferredSource.ask': '매번 묻기',
   'settings.preferredSource.reset': '“다시 묻지 않기” 초기화',
+  'settings.watchFolders': '감시 폴더',
+  'settings.watchFolders.hint': '브라우저에서 내려받은 파일(제작자 사이트에서만 받을 수 있는 모드)을 ResinCraft가 찾는 곳입니다. 다운로드 폴더는 항상 포함됩니다.',
   'settings.preferredSource.resetDone': '모드가 두 사이트에 모두 있으면 ResinCraft가 다시 물어봐요',
   'settings.about.credit': 'Puirkle이 만들었어요. 무료 오픈 소스예요.',
   'settings.about.dataFolder': '데이터 폴더: {path}',

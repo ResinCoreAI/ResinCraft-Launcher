@@ -284,6 +284,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': 'เมื่อม็อดมีทั้งใน Modrinth และ CurseForge จะติดตั้งจากที่นี่',
   'settings.preferredSource.ask': 'ถามทุกครั้ง',
   'settings.preferredSource.reset': 'รีเซ็ต “ไม่ต้องถามอีก”',
+  'settings.watchFolders': 'โฟลเดอร์ที่เฝ้าดู',
+  'settings.watchFolders.hint': 'ที่ที่ ResinCraft ค้นหาไฟล์ที่คุณดาวน์โหลดผ่านเบราว์เซอร์ (ม็อดที่ผู้สร้างอนุญาตให้ดาวน์โหลดจากเว็บไซต์ของตนเท่านั้น) โฟลเดอร์ดาวน์โหลดจะรวมอยู่เสมอ',
   'settings.preferredSource.resetDone': 'ResinCraft จะถามอีกครั้งเมื่อม็อดมีทั้งสองเว็บ',
   'settings.about.credit': 'สร้างโดย Puirkle ใช้ฟรีและเป็นโอเพนซอร์ส',
   'settings.about.dataFolder': 'โฟลเดอร์ข้อมูล: {path}',

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, Bug, Coffee, Download, FolderSearch, Gamepad2, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun, Terminal } from 'lucide-react'
+import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun, Terminal } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
@@ -399,6 +399,39 @@ export default function SettingsPage() {
                   <option value="modrinth">Modrinth</option>
                   <option value="curseforge">CurseForge</option>
                 </select>
+              </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.watchFolders')}</b>
+                  <span>{t('settings.watchFolders.hint')}</span>
+                  <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
+                    <span className="chip">{t('instance.pending.downloadsFolder')}</span>
+                    {(s.watchFolders ?? []).map((d) => (
+                      <span key={d} className="chip" title={d}>
+                        <span className="ellipsis mono" style={{ maxWidth: 260 }}>
+                          {d}
+                        </span>
+                        <button
+                          className="x"
+                          title={t('instance.pending.stopWatching')}
+                          aria-label={t('instance.pending.stopWatching')}
+                          onClick={() => set({ watchFolders: s.watchFolders.filter((w) => w !== d) })}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  className="btn sm"
+                  onClick={async () => {
+                    const list = await api.instances.addWatchFolder()
+                    if (list) set({ watchFolders: list })
+                  }}
+                >
+                  <FolderPlus /> {t('instance.pending.addWatchFolder')}
+                </button>
               </div>
             </div>
           </section>

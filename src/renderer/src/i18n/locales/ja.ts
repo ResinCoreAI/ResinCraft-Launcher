@@ -284,6 +284,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': 'ModrinthとCurseForgeの両方にあるModは、ここで選んだサイトからインストールします。',
   'settings.preferredSource.ask': '毎回確認する',
   'settings.preferredSource.reset': '「今後は確認しない」をリセット',
+  'settings.watchFolders': '監視フォルダー',
+  'settings.watchFolders.hint': 'ブラウザーでダウンロードしたファイル（作者のサイトからのみ入手できるMod）を ResinCraft が探す場所です。ダウンロードフォルダーは常に含まれます。',
   'settings.preferredSource.resetDone': 'Modが両方のサイトにあるとき、ResinCraftは再び確認します',
   'settings.about.credit': 'Puirkle製。無料のオープンソースです。',
   'settings.about.dataFolder': 'データフォルダー：{path}',

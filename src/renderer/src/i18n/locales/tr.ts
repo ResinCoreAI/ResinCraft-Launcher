@@ -284,6 +284,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': 'Bir mod hem Modrinth hem CurseForge’da varsa buradan yüklenir.',
   'settings.preferredSource.ask': 'Her seferinde sor',
   'settings.preferredSource.reset': '“Bir daha sorma” ayarını sıfırla',
+  'settings.watchFolders': 'İzlenen klasörler',
+  'settings.watchFolders.hint': 'ResinCraft’ın tarayıcında indirdiğin dosyaları (yalnızca yazarın sitesinden indirilebilen modlar) aradığı yerler. İndirilenler klasörün her zaman dahildir.',
   'settings.preferredSource.resetDone': 'Bir mod iki sitede de olduğunda ResinCraft yeniden soracak',
   'settings.about.credit': 'Puirkle tarafından yapıldı. Ücretsiz ve açık kaynak.',
   'settings.about.dataFolder': 'Veri klasörü: {path}',

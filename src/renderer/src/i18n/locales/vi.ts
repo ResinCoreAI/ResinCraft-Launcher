@@ -284,6 +284,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': 'Khi một mod có trên cả Modrinth và CurseForge, cài từ nguồn này.',
   'settings.preferredSource.ask': 'Luôn hỏi',
   'settings.preferredSource.reset': 'Đặt lại “Không hỏi lại”',
+  'settings.watchFolders': 'Thư mục theo dõi',
+  'settings.watchFolders.hint': 'Nơi ResinCraft tìm các tệp bạn tải bằng trình duyệt (mod chỉ được tải từ trang của tác giả). Thư mục Tải xuống luôn được bao gồm.',
   'settings.preferredSource.resetDone': 'ResinCraft sẽ hỏi lại khi một mod có trên cả hai trang',
   'settings.about.credit': 'Do Puirkle phát triển. Miễn phí và mã nguồn mở.',
   'settings.about.dataFolder': 'Thư mục dữ liệu: {path}',

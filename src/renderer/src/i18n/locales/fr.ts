@@ -291,6 +291,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': 'Quand un mod est sur Modrinth et sur CurseForge, il est installé depuis cette source.',
   'settings.preferredSource.ask': 'Toujours demander',
   'settings.preferredSource.reset': 'Réinitialiser « Ne plus demander »',
+  'settings.watchFolders': 'Dossiers surveillés',
+  'settings.watchFolders.hint': 'Où ResinCraft cherche les fichiers téléchargés dans votre navigateur (mods téléchargeables uniquement depuis le site de leur auteur). Votre dossier Téléchargements est toujours inclus.',
   'settings.preferredSource.resetDone': 'ResinCraft redemandera quand un mod est sur les deux sites',
   'settings.about.credit': 'Créé par Puirkle. Gratuit et open source.',
   'settings.about.dataFolder': 'Dossier de données : {path}',

@@ -284,6 +284,8 @@ const dict: Dict = {
   'settings.preferredSource.hint': '模組同時在 Modrinth 與 CurseForge 上時，從這裡安裝。',
   'settings.preferredSource.ask': '每次詢問',
   'settings.preferredSource.reset': '重設「不再詢問」',
+  'settings.watchFolders': '監視資料夾',
+  'settings.watchFolders.hint': 'ResinCraft 尋找你在瀏覽器中下載的檔案（只能從作者網站下載的模組）的位置。一律包含你的「下載」資料夾。',
   'settings.preferredSource.resetDone': '模組同時在兩個網站上時，ResinCraft 會再次詢問',
   'settings.about.credit': '由 Puirkle 製作。免費且開源。',
   'settings.about.dataFolder': '資料位置：{path}',
