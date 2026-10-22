@@ -80,3 +80,46 @@
   cursor: default;
   opacity: 0.6;
 }
+
+/* Home → RAM card (components/Memory.tsx); it reuses .storage-bar. */
+.memory-card {
+  margin-top: 16px;
+  padding: 14px 16px;
+}
+.memory-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.memory-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.memory-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.memory-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.memory-row b {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.memory-card .storage-bar {
+  max-width: none;
+}
+.memory-row .storage-bar {
+  margin-top: 4px;
+}
+.memory-pc {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+}

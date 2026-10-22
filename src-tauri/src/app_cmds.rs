@@ -34,6 +34,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         // Kept for older front ends: the window controls are drawn in the UI, so there's nothing to recolour.
         "app:setTitleBar" => done(),
+        "app:memory" => json(crate::core::memory::usage().await),
         "app:cancelTask" => json(crate::core::events::cancel(&args.get::<String>(0)?)),
 
         "settings:get" => json(settings::redacted(settings::get().await)),

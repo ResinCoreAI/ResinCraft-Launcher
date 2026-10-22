@@ -53,6 +53,7 @@ import { OptifineSteps, optifineFits, optifineHow } from '../components/Optifine
 import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 import { instanceOwner, PackChip, PackVersionSetting } from '../components/PackVersion'
 import { VersionSection } from '../components/VersionSettings'
+import { GameMemoryChip } from '../components/Memory'
 
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
 const FileManager = lazy(() => import('../components/FileManager'))
@@ -104,6 +105,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
             <span className="chip">
               <Clock /> {inst.lastPlayed ? timeAgo(inst.lastPlayed) : t('time.neverPlayed')}
             </span>
+            <GameMemoryChip instanceId={inst.id} running={games[inst.id] === 'running'} />
             {inst.modpack && !inst.ownPack && <PackChip owner={instanceOwner(inst, games)} />}
             {inst.ownPack && <OwnPackChip pack={inst.ownPack} />}
           </div>

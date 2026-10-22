@@ -40,6 +40,9 @@ struct Proc {
     /// Geyser next to a Java server: where Bedrock players join, and the UDP port opened on the router for it.
     bedrock: Option<String>,
     bedrock_port: Option<u16>,
+    /// The server's process once started, and its Java memory limit (none for Bedrock), for the RAM display.
+    pid: Option<u32>,
+    max_mb: Option<u32>,
 }
 
 #[derive(Default)]
@@ -65,6 +68,11 @@ pub fn is_running(id: &str) -> bool {
 
 pub fn running_ids() -> Vec<String> {
     with(|w| w.procs.keys().cloned().collect())
+}
+
+/// Running servers' processes: (server id, pid, Java memory limit), for the RAM display (see core/memory.rs).
+pub fn server_processes() -> Vec<(String, u32, Option<u32>)> {
+    with(|w| w.procs.iter().filter_map(|(id, p)| Some((id.clone(), p.pid?, p.max_mb))).collect())
 }
 
 pub fn state(id: &str) -> &'static str {
@@ -291,6 +299,8 @@ pub async fn start(id: &str) -> Result<()> {
                 lines: lines_tx.clone(),
                 bedrock: None,
                 bedrock_port: None,
+                pid: None,
+                max_mb: None,
             },
         );
         w.logs.insert(id.to_string(), VecDeque::new());
@@ -331,6 +341,13 @@ pub async fn start(id: &str) -> Result<()> {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| fail(anyhow!("Couldn't start {program}: {e}")))?;
+    let (pid, max_mb) = (child.id(), (meta.kind != ServerKind::Bedrock).then_some(meta.memory_mb));
+    with(|w| {
+        if let Some(p) = w.procs.get_mut(id) {
+            p.pid = pid;
+            p.max_mb = max_mb;
+        }
+    });
     store::touch_started(id).await;
 
     // Batch console lines so a chatty server doesn't flood the UI.

@@ -6,9 +6,10 @@ import { QuickJoinHome } from '../components/QuickJoin'
 import { useStore } from '../store'
 import { describe, greeting, playtime, timeAgo } from '../util'
 import { t } from '../i18n'
+import { MemoryCard } from '../components/Memory'
 
 export default function Home() {
-  const { instances, activeAccount, go, setNewInstanceOpen } = useStore()
+  const { instances, activeAccount, go, setNewInstanceOpen, settings } = useStore()
   const featured = instances.find((i) => i.lastPlayed) ?? instances[0]
   const total = instances.reduce((s, i) => s + i.playtime, 0)
   const versionCount = new Set(instances.map((i) => i.mcVersion)).size
@@ -100,6 +101,8 @@ export default function Home() {
           <span>{t('home.stats.discoverHint')}</span>
         </button>
       </div>
+
+      {settings?.showMemoryOnHome && <MemoryCard />}
 
       <QuickJoinHome />
 

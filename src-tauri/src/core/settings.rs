@@ -39,6 +39,8 @@ pub struct Settings {
     /// Look for newer versions of installed modpacks (and instances changed since a server synced) at start and every
     /// few hours (Settings → Updates).
     pub auto_check_packs: bool,
+    /// A RAM card on Home: the launcher, running games and servers, the PC (Settings → Appearance; off by default).
+    pub show_memory_on_home: bool,
     /// Discord Rich Presence while a game runs (only in builds with a Discord app ID).
     pub discord_presence: bool,
     /// Rich Presence names the server joined; off by default, the address can be private.
@@ -79,6 +81,7 @@ impl Default for Settings {
             preferred_mod_source: "ask".into(),
             watch_folders: Vec::new(),
             auto_check_packs: true,
+            show_memory_on_home: false,
             discord_presence: true,
             discord_show_server: false,
             discord_in_launcher: false,

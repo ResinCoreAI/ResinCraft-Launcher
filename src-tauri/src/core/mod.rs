@@ -3,6 +3,7 @@
 
 pub mod art;
 pub mod backup;
+pub mod memory;
 pub mod ctx;
 pub mod events;
 pub mod fsutil;

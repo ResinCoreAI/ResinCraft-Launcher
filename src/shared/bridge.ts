@@ -20,6 +20,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       info: fn('app:info'),
       openExternal: fn('app:openExternal'),
       setTitleBar: fn('app:setTitleBar'),
+      memory: fn('app:memory'),
       cancelTask: fn('app:cancelTask'),
       showItem: fn('app:showItem'),
       pathForFile

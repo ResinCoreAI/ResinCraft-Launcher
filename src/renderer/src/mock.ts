@@ -124,6 +124,7 @@ export function mockApi(): ResinApi {
     preferredModSource: 'ask',
     watchFolders: [],
     autoCheckPacks: true,
+    showMemoryOnHome: false,
     discordPresence: true,
     discordShowServer: false,
     discordInLauncher: false,
@@ -203,6 +204,22 @@ export function mockApi(): ResinApi {
 
   return {
     app: {
+      // Plausible, slowly moving numbers for the RAM chips and the Home card.
+      memory: async () => {
+        const wobble = (base: number) => Math.round(base * (0.92 + Math.random() * 0.12))
+        const games = (await runs.runs())
+          .filter((r) => r.state === 'running')
+          .map((r) => ({ instanceId: r.instanceId, runId: r.runId, username: r.username, bytes: wobble(2.7 * 2 ** 30), maxBytes: 4 * 2 ** 30 }))
+        const live = (await servers.server.list()).filter((s) => s.state === 'running' || s.state === 'starting')
+        return {
+          launcher: wobble(330 * 2 ** 20),
+          launcherProcesses: 6,
+          games,
+          servers: live.map((s) => ({ serverId: s.id, bytes: wobble(3.1 * 2 ** 30), maxBytes: s.type === 'bedrock' ? undefined : 6 * 2 ** 30 })),
+          systemTotal: 32 * 2 ** 30,
+          systemUsed: wobble(14 * 2 ** 30)
+        }
+      },
       info: () =>
         wait({
           version: '0.3.0',

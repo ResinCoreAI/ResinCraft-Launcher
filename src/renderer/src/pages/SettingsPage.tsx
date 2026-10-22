@@ -142,6 +142,13 @@ export default function SettingsPage() {
                   ))}
                 </select>
               </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('memory.setting')}</b>
+                  <span>{t('memory.settingHint')}</span>
+                </div>
+                <Switch on={s.showMemoryOnHome} onChange={(v) => set({ showMemoryOnHome: v })} label={t('memory.setting')} />
+              </div>
             </div>
           </section>
 

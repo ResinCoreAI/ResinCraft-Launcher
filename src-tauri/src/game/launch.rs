@@ -37,6 +37,30 @@ struct Run {
     username: String,
     /// Asks the watcher to stop the game; `None` while still preparing.
     kill: Option<mpsc::UnboundedSender<()>>,
+    /// The game's process (or its wrapper's) once started, and its memory limit, for the RAM display.
+    pid: Option<u32>,
+    max_mb: u32,
+}
+
+/// A running game's process, for the RAM display (see core/memory.rs).
+pub struct GameProcess {
+    pub instance_id: String,
+    pub run_id: String,
+    pub username: String,
+    pub pid: u32,
+    pub max_mb: u32,
+}
+
+pub fn game_processes() -> Vec<GameProcess> {
+    running(|m| {
+        m.iter()
+            .flat_map(|(id, runs)| {
+                runs.iter().filter_map(|r| {
+                    Some(GameProcess { instance_id: id.clone(), run_id: run_id(id, r.slot), username: r.username.clone(), pid: r.pid?, max_mb: r.max_mb })
+                })
+            })
+            .collect()
+    })
 }
 
 /// Instance id → its runs (preparing or running).
@@ -100,7 +124,7 @@ fn reserve(id: &str, auth: &LaunchAuth) -> Result<u32> {
             bail_tr!("launch.alreadyRunningAs", "{name} is already playing this instance. Pick another account to play it a second time.", name = r.username);
         }
         let slot = (1..).find(|n| !runs.iter().any(|r| r.slot == *n)).unwrap_or(1);
-        runs.push(Run { slot, account_id: auth.account_id.clone(), username: auth.username.clone(), kill: None });
+        runs.push(Run { slot, account_id: auth.account_id.clone(), username: auth.username.clone(), kill: None, pid: None, max_mb: 0 });
         Ok(slot)
     })
 }
@@ -761,9 +785,12 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         }
     };
     let (kill_tx, mut kill_rx) = mpsc::unbounded_channel::<()>();
+    let (pid, max_mb) = (child.id(), inst.memory_mb.unwrap_or(settings.memory_mb));
     running(|m| {
         if let Some(r) = m.get_mut(id).and_then(|runs| runs.iter_mut().find(|r| r.slot == slot)) {
             r.kill = Some(kill_tx);
+            r.pid = pid;
+            r.max_mb = max_mb;
         }
     });
     let started = Instant::now();

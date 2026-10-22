@@ -50,6 +50,7 @@ import { bytes, fixed, serverPath, timeAgo } from '../util'
 import { rich, t, tx, type Key } from '../i18n'
 import '../servers.css'
 import { hasBedrockApp } from '../platform'
+import { ServerMemoryChip } from '../components/Memory'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
 const MAX_LOG = 3000
@@ -400,6 +401,7 @@ function ServerDetail({
                 <Users /> {t('servers.playersOnline', { count: s.players.length })}
               </span>
             )}
+            <ServerMemoryChip serverId={s.id} running={live(s)} />
           </div>
         </div>
         <button className="btn lg icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id)}>

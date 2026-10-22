@@ -32,6 +32,17 @@ export interface PendingDownload {
   folder: string
 }
 
+/** RAM in use right now (`app:memory`); bytes. A process counts with everything it started. */
+export interface MemoryUsage {
+  /** The launcher itself (its window's helpers included, games and servers not). */
+  launcher: number
+  launcherProcesses: number
+  games: { instanceId: string; runId: string; username: string; bytes: number; maxBytes: number }[]
+  servers: { serverId: string; bytes: number; maxBytes?: number }[]
+  systemTotal: number
+  systemUsed: number
+}
+
 /** What a .resincraft backup holds. */
 export interface BackupInfo {
   path: string
@@ -359,6 +370,8 @@ export interface Settings {
   watchFolders: string[]
   /** Look for newer versions of installed modpacks (and instances changed since a server synced) on their own. */
   autoCheckPacks: boolean
+  /** A RAM card on Home: the launcher, running games and servers, the PC (off by default). */
+  showMemoryOnHome: boolean
   /** Discord Rich Presence while a game runs (needs a build with a Discord app ID, see AppInfo.discord). */
   discordPresence: boolean
   /** Rich Presence names the server joined (off by default: the address can be private). */
@@ -1268,6 +1281,8 @@ export interface StorageChange {
 export interface ResinApi {
   app: {
     info(): Promise<AppInfo>
+    /** RAM used by the launcher, running games and servers, and the PC. */
+    memory(): Promise<MemoryUsage>
     openExternal(url: string): Promise<void>
     showItem(path: string): Promise<void>
     /** Absolute path of a file dropped onto the window (synchronous, preload-side). */
