@@ -1117,6 +1117,8 @@ export interface ServerInfo {
   optimizedFlags: boolean
   /** Start with the server pack's own Java flags instead of ResinCraft's (ResinCraft's when the pack sets none). */
   packFlags?: boolean
+  /** Whitelist requests through the host's Discord bot or the relay's web page. */
+  joinRequests?: JoinRequestsConfig
   /** How the server is shared over the internet. The relay is always the last resort. */
   tunnel: ServerTunnel
   /** A bore relay instead of bore.pub ("host" or "host:port"), and its secret. */
@@ -1162,9 +1164,52 @@ export interface ServerCreated {
 export type ServerPatch = Partial<
   Pick<
     ServerInfo,
-    'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'packFlags' | 'tunnel' | 'relayHost' | 'relaySecret' | 'domain' | 'dnsAuto'
+    'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'packFlags' | 'joinRequests' | 'tunnel' | 'relayHost' | 'relaySecret' | 'domain' | 'dnsAuto'
   >
 >
+
+export interface JoinRequestsConfig {
+  enabled: boolean
+  /** From the web page at the server's ResinCraft Relay address (while it's online there). */
+  web: boolean
+  /** From the host's own Discord bot (/whitelist), while ResinCraft runs. */
+  discord: boolean
+}
+
+/** A player waiting to be whitelisted. */
+export interface JoinRequest {
+  id: string
+  username: string
+  source: 'web' | 'discord'
+  /** Their Discord name, for requests from the bot. */
+  from?: string
+  at: number
+}
+
+export interface DiscordBotStatus {
+  state: 'off' | 'connecting' | 'online' | 'error'
+  /** The bot's Discord name once connected. */
+  name?: string
+  /** Adds the bot to a Discord server. */
+  inviteUrl?: string
+  message?: string
+}
+
+export interface RequestsInfo {
+  requests: JoinRequest[]
+  hasBotToken: boolean
+  bot: DiscordBotStatus
+  /** Whether server.properties has the whitelist on (requests only matter then). */
+  whitelistOn: boolean
+  /** The web page at the server's relay address, and the one that works with the relay's plain certificate. */
+  webUrl?: string
+  webUrlFallback?: string
+}
+
+export interface ServerRequestsEvent {
+  serverId: string
+  info: RequestsInfo
+}
 
 export interface ServerEvent {
   serverId: string
@@ -1620,6 +1665,13 @@ export interface ResinApi {
     launchArgs(id: string): Promise<string[]>
     /** The Java flags the server pack sets for itself (user_jvm_args.txt, variables.txt, its start script). */
     packFlags(id: string): Promise<string[]>
+    /** Whitelist requests waiting, the Discord bot's state and the web page's address. */
+    requests(id: string): Promise<RequestsInfo>
+    /** Puts the player on the whitelist (and tells them on Discord). */
+    requestAccept(id: string, requestId: string): Promise<RequestsInfo>
+    requestReject(id: string, requestId: string): Promise<RequestsInfo>
+    /** Saves the server's Discord bot token (kept sealed, never shown again); null removes it. */
+    setBotToken(id: string, token: string | null): Promise<RequestsInfo>
     properties(id: string): Promise<PropEntry[]>
     setProperties(id: string, entries: PropEntry[]): Promise<void>
     playerList(id: string, kind: PlayerListKind): Promise<ServerListEntry[]>
@@ -1700,6 +1752,7 @@ export interface ResinApi {
     login(cb: (e: LoginEvent) => void): () => void
     server(cb: (e: ServerEvent) => void): () => void
     serverLog(cb: (e: ServerLogEvent) => void): () => void
+    serverRequests(cb: (e: ServerRequestsEvent) => void): () => void
     update(cb: (s: UpdateStatus) => void): () => void
   }
 }

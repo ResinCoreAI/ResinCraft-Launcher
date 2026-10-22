@@ -538,6 +538,6 @@ export function mockApi(): ResinApi {
     ...mockMigrate((inst) => {
       instances = [inst, ...instances]
     }),
-    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, update: updates.onUpdate }
+    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, update: updates.onUpdate }
   }
 }

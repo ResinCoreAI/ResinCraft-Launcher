@@ -58,6 +58,10 @@ tauri-plugin-updater = "2"
 resincraft-relay = { path = "../relay", default-features = false, features = ["agent"] }
 # Mod and modpack descriptions and changelogs (Markdown) for Discover's details page; the UI sanitizes the HTML.
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+# The host's own Discord bot for whitelist requests (server/discordbot.rs): Discord's gateway is a websocket.
+tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
 
 [dev-dependencies]
 # The relay server itself, for examples/check_relay.rs.

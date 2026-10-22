@@ -19,6 +19,7 @@ import { rich, t, tx, type Key } from '../i18n'
 import '../servers.css'
 import { hasBedrockApp } from '../platform'
 import { ServerMemoryChip } from '../components/Memory'
+import JoinRequests from '../components/JoinRequests'
 import { usePicturePicker } from '../components/ImagePicker'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
@@ -430,7 +431,7 @@ function ServerDetail({
       </div>
 
       {tab === 'console' && <ConsoleTab s={s} />}
-      {tab === 'players' && <PlayersTab s={s} />}
+      {tab === 'players' && <PlayersTab s={s} reload={reload} />}
       {tab === 'addons' && <ServerAddons key="plugins" s={s} area={isHybrid(s) ? 'plugins' : undefined} />}
       {tab === 'mods' && <ServerAddons key="mods" s={s} area="mods" />}
       {tab === 'properties' && <PropertiesTab s={s} onStart={onStart} />}
@@ -726,7 +727,7 @@ const LISTS: { value: PlayerListKind; label: Key; placeholder: Key }[] = [
   { value: 'ipBans', label: 'servers.players.ipBans', placeholder: 'servers.players.addIp' }
 ]
 
-function PlayersTab({ s }: { s: ServerInfo }) {
+function PlayersTab({ s, reload }: { s: ServerInfo; reload: () => Promise<void> }) {
   const { toast } = useStore()
   const [kind, setKind] = useState<PlayerListKind>('whitelist')
   const [entries, setEntries] = useState<ServerListEntry[]>()
@@ -801,6 +802,8 @@ function PlayersTab({ s }: { s: ServerInfo }) {
           </div>
         )}
       </div>
+
+      <JoinRequests s={s} reload={reload} onAccepted={() => void load()} />
 
       <div className="settings-section">
         <div className="toolbar">

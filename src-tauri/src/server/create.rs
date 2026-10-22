@@ -92,6 +92,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         public: true,
         optimized_flags: true,
         pack_flags: false,
+        join_requests: Default::default(),
         // New servers share through playit.gg: an address that never changes, with no router setup.
         tunnel: TunnelMode::Playit,
         relay_host: None,

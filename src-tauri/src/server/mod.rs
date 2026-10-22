@@ -6,6 +6,7 @@
 pub mod cloudflare;
 pub mod clientmods;
 pub mod create;
+pub mod discordbot;
 pub mod domain;
 pub mod installers;
 pub mod network;
@@ -14,6 +15,7 @@ pub mod playit;
 pub mod plugins;
 pub mod properties;
 pub mod relay;
+pub mod requests;
 pub mod runtime;
 pub mod store;
 pub mod tunnel;
@@ -54,7 +56,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             }
             if (meta.tunnel, &meta.relay_host, &meta.relay_secret) != (before.tunnel, &before.relay_host, &before.relay_secret) {
                 runtime::refresh_internet(&id).await;
-            } else if (&meta.domain, meta.dns_auto) != (&before.domain, before.dns_auto) {
+            }
+            if (&meta.join_requests, &meta.name) != (&before.join_requests, &before.name) {
+                discordbot::reconcile().await;
+            }
+            if (&meta.domain, meta.dns_auto) != (&before.domain, before.dns_auto) {
                 domain::forget(&id);
                 runtime::set_domain_ok(&id, None);
                 tokio::spawn(domain::on_open(id.clone()));
@@ -72,6 +78,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             runtime::forget_link(&id);
             shell::trash(&store::dir(&id)?).await?;
             let _ = cloudflare::set_token(&id, None).await;
+            requests::forget(&id).await;
             done()
         }
         "server:openFolder" => {
@@ -116,6 +123,14 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:log" => json(runtime::log(&args.get::<String>(0)?)),
         "server:launchArgs" => json(runtime::launch_args(&store::get(&args.get::<String>(0)?).await?)?),
+        "server:requests" => json(requests::info(&args.get::<String>(0)?).await?),
+        "server:requestAccept" => json(requests::accept(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:requestReject" => json(requests::reject(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:setBotToken" => {
+            let id: String = args.get(0)?;
+            requests::set_bot_token(&id, args.get::<Option<String>>(1)?).await?;
+            json(requests::info(&id).await?)
+        }
         "server:packFlags" => json(runtime::pack_flags(&store::dir(&args.get::<String>(0)?)?)),
         "server:properties" => json(properties::read(&store::dir(&args.get::<String>(0)?)?).await),
         "server:setProperties" => {

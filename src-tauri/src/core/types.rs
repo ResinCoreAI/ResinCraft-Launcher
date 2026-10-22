@@ -953,6 +953,9 @@ pub struct ServerMeta {
     /// Start Java with Aikar's tuned G1GC flags (and -Xms = -Xmx).
     #[serde(default = "yes")]
     pub optimized_flags: bool,
+    /// Whitelist requests through the host's Discord bot or the relay's web page (server/requests.rs).
+    #[serde(default)]
+    pub join_requests: JoinRequestsConfig,
     /// Start Java with the flags the server pack sets for itself (user_jvm_args.txt, variables.txt, its start
     /// script) instead of ResinCraft's; ResinCraft's are used when the pack sets none.
     #[serde(default)]
@@ -1215,6 +1218,34 @@ pub struct ServerInfo {
     pub online: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub net: Option<ServerNet>,
+}
+
+/// How a hosted server takes whitelist requests.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct JoinRequestsConfig {
+    pub enabled: bool,
+    /// From the web page at the server's ResinCraft Relay address (while it's online there).
+    pub web: bool,
+    /// From the host's own Discord bot (`/whitelist`), while ResinCraft runs.
+    pub discord: bool,
+}
+
+/// A player waiting to be whitelisted.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct JoinRequest {
+    pub id: String,
+    pub username: String,
+    /// "web" | "discord"
+    pub source: String,
+    /// Their Discord name, for requests from the bot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// Their Discord user id, to tell them the answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discord_user: Option<String>,
+    pub at: i64,
 }
 
 /// Where a new server's content comes from (besides plain server software).

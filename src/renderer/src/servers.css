@@ -697,3 +697,62 @@ a svg.inline {
 .sv-dns-check .bad > svg {
   color: var(--danger);
 }
+
+/* ---------- Whitelist requests ---------- */
+
+.join-requests .jr-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.jr-way {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+.jr-way.on {
+  border-color: var(--accent);
+}
+.jr-way input {
+  accent-color: var(--accent);
+  margin-top: 3px;
+}
+.jr-way svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-dim);
+}
+.jr-way .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.jr-way .chip.mono {
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jr-bot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.jr-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.jr-list {
+  margin-top: 4px;
+}

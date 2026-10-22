@@ -190,6 +190,10 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       log: fn('server:log'),
       launchArgs: fn('server:launchArgs'),
       packFlags: fn('server:packFlags'),
+      requests: fn('server:requests'),
+      requestAccept: fn('server:requestAccept'),
+      requestReject: fn('server:requestReject'),
+      setBotToken: fn('server:setBotToken'),
       properties: fn('server:properties'),
       setProperties: fn('server:setProperties'),
       playerList: fn('server:playerList'),
@@ -234,6 +238,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), update: on('update') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), update: on('update') }
   } as ResinApi
 }

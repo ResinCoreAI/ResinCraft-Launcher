@@ -88,6 +88,7 @@ pub async fn update(id: &str, patch: Value) -> Result<ServerMeta> {
             "public" => m.public = v.as_bool().unwrap_or(m.public),
             "optimizedFlags" => m.optimized_flags = v.as_bool().unwrap_or(m.optimized_flags),
             "packFlags" => m.pack_flags = v.as_bool().unwrap_or(m.pack_flags),
+            "joinRequests" => m.join_requests = serde_json::from_value(v).map_err(|_| anyhow!("Unknown whitelist request settings"))?,
             "tunnel" => m.tunnel = serde_json::from_value(v).map_err(|_| anyhow!("Unknown way to share the server"))?,
             "relayHost" => m.relay_host = text(&v),
             "relaySecret" => m.relay_secret = text(&v),

@@ -1,6 +1,7 @@
 // Fake server hosting for the browser preview (see mock.ts): a couple of servers, a simulated boot log,
 // console commands, players joining, and the router port opening.
 import type {
+  ServerRequestsEvent,
   AddonSource,
   BedrockJoin,
   DnsCheck,
@@ -23,6 +24,7 @@ import type {
 } from '@shared/types'
 
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
+import { mockRequests } from './mock-requests'
 
 type Listener<T> = (e: T) => void
 
@@ -39,7 +41,12 @@ function mockRelayBan(): EngineText | undefined {
   return { key: 'hostRelay.bannedReason', text: `${base.text} Reason: ${reason}`, params: { ban: base, reason } }
 }
 
-export function mockServers(): { server: ResinApi['server']; onServer: ResinApi['on']['server']; onServerLog: ResinApi['on']['serverLog'] } {
+export function mockServers(): {
+  server: ResinApi['server']
+  onServer: ResinApi['on']['server']
+  onServerLog: ResinApi['on']['serverLog']
+  onServerRequests: ResinApi['on']['serverRequests']
+} {
   const now = Date.now()
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
   const base = {
@@ -187,6 +194,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
   const logs: Record<string, LogLine[]> = {}
   const listeners: Listener<ServerEvent>[] = []
   const logListeners: Listener<ServerLogEvent>[] = []
+  const requestListeners: Listener<ServerRequestsEvent>[] = []
   const timers: Record<string, number[]> = {}
   let props: PropEntry[] = [
     ['motd', 'A Minecraft Server'],
@@ -569,6 +577,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       else say(id, `[${ts()}] [Server thread/INFO]: Unknown or incomplete command, see below for error`, 'warn')
     },
     log: async (id) => logs[id] ?? [],
+    ...mockRequests(find, (e) => requestListeners.forEach((l) => l(e))),
     packFlags: async (id) => (find(id).modpack ? ['-Xmx6G', '-Xms6G', '-XX:+UseG1GC', '-Dfml.readTimeout=180'] : []),
     launchArgs: async (id) => {
       const s = find(id)
@@ -837,5 +846,5 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       list.push(cb)
       return () => void list.splice(list.indexOf(cb), 1)
     }
-  return { server, onServer: subscribe(listeners), onServerLog: subscribe(logListeners) }
+  return { server, onServer: subscribe(listeners), onServerLog: subscribe(logListeners), onServerRequests: subscribe(requestListeners) }
 }

@@ -45,6 +45,7 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)?;
             core::ctx::init(data_dir, Some(app.handle().clone()));
             tauri::async_runtime::spawn(discord::init());
+            tauri::async_runtime::spawn(server::discordbot::init());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![ipc])
