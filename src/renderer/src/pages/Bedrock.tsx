@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Download, ExternalLink, FlaskConical, FolderOpen, Gamepad2, Globe, Loader2, Plus, RefreshCw, Server, Smartphone, Wrench, X } from 'lucide-react'
+import { AlertTriangle, Download, ExternalLink, FlaskConical, FolderOpen, Gamepad2, Globe, Loader2, Plus, RefreshCw, Server, Smartphone, Trash2, Wrench, X } from 'lucide-react'
 import type { BedrockEdition, BedrockEditionKind, BedrockInstallMode, BedrockStatus, ServerInfo } from '@shared/types'
 import { api } from '../api'
-import { Empty } from '../components/ui'
+import { ConfirmModal, Empty } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
 import { timeAgo } from '../util'
 import { EngineError, t, tx } from '../i18n'
@@ -28,6 +28,8 @@ type EditionProps = {
   dismiss: () => void
   /** Opens the Store's own install window for it. */
   openStore: () => void
+  /** Asks, then removes it from this PC. */
+  uninstall: () => void
 }
 
 /**
@@ -44,6 +46,7 @@ export default function Bedrock() {
   // Editions whose install was started in the Store: the page re-checks until they show up.
   const [installing, setInstalling] = useState<BedrockEditionKind[]>([])
   const [failures, setFailures] = useState<Partial<Record<BedrockEditionKind, Failure>>>({})
+  const [removing, setRemoving] = useState<BedrockEditionKind>()
 
   const refresh = useCallback(() => api.bedrock.status().then(setStatus), [])
 
@@ -103,6 +106,18 @@ export default function Bedrock() {
     }
   }
 
+  const uninstall = async (edition: BedrockEditionKind) => {
+    const name = t(edition === 'preview' ? 'bedrock.preview' : 'bedrock.release')
+    try {
+      const r = await api.bedrock.uninstall(edition)
+      toast(r.backup ? t('bedrock.uninstalledBackup', { name, count: r.worlds, folder: r.backup }) : t('bedrock.uninstalled', { name }), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      await refresh().catch(() => {})
+    }
+  }
+
   const openStore = (edition: BedrockEditionKind) =>
     void run(`g:${edition}`, async () => {
       await api.bedrock.get(edition)
@@ -149,6 +164,7 @@ export default function Bedrock() {
                     failure={failures[e.edition]}
                     dismiss={() => setFailures((f) => ({ ...f, [e.edition]: undefined }))}
                     openStore={() => openStore(e.edition)}
+                    uninstall={() => setRemoving(e.edition)}
                   />
                 )
             )}
@@ -227,11 +243,21 @@ export default function Bedrock() {
           <div className="callout">{t('bedrock.versionsNote')}</div>
         </>
       )}
+
+      {removing && (
+        <ConfirmModal
+          title={t('bedrock.uninstallTitle', { name: t(removing === 'preview' ? 'bedrock.preview' : 'bedrock.release') })}
+          body={t('bedrock.uninstallBody')}
+          confirm={t('bedrock.uninstall')}
+          onClose={() => setRemoving(undefined)}
+          onConfirm={() => void uninstall(removing)}
+        />
+      )}
     </div>
   )
 }
 
-function EditionCard({ e, opening, run, installing, install, failure, dismiss, openStore }: EditionProps) {
+function EditionCard({ e, opening, run, installing, install, failure, dismiss, openStore, uninstall }: EditionProps) {
   const preview = e.edition === 'preview'
   const task = useInstanceTask(`bedrock:${e.edition}`)
   return (
@@ -270,6 +296,9 @@ function EditionCard({ e, opening, run, installing, install, failure, dismiss, o
                 </button>
                 <button className="btn ghost icon" title={t('bedrock.repair')} aria-label={t('bedrock.repair')} onClick={() => install('repair')}>
                   <Wrench />
+                </button>
+                <button className="btn ghost icon" title={t('bedrock.uninstall')} aria-label={t('bedrock.uninstall')} onClick={uninstall}>
+                  <Trash2 />
                 </button>
               </>
             ) : installing ? (

@@ -1327,6 +1327,11 @@ export interface ResinApi {
     install(edition: BedrockEditionKind, mode: BedrockInstallMode): Promise<'done' | 'upToDate'>
     /** Opens the Microsoft Store's install window for it: the way out when installing from here fails. */
     get(edition: BedrockEditionKind): Promise<void>
+    /**
+     * Removes it from this PC for this Windows account (a task tied to `bedrock:<edition>`). Worlds in
+     * %APPDATA%\Minecraft Bedrock stay; worlds inside the app package (older versions) are backed up first.
+     */
+    uninstall(edition: BedrockEditionKind): Promise<{ backup?: string; worlds: number }>
     /** Opens Gaming Services in the Microsoft Store. */
     gamingServices(): Promise<void>
     /** Opens the Microsoft Store's Downloads and updates page. */

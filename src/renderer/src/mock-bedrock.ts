@@ -107,6 +107,14 @@ export function mockBedrock(now: number): ResinApi['bedrock'] {
     },
     play: () => sleep(300),
     install,
+    uninstall: async (edition) => {
+      const task: TaskInfo = { id: `bedrock-rm-${Date.now()}`, title: `Uninstalling ${NAME[edition]}`, state: 'running', instanceId: `bedrock:${edition}`, cancellable: false }
+      mockEngine.emitTask({ ...task, detail: `Removing ${NAME[edition]}…` })
+      await sleep(1500)
+      status = { ...status, editions: status.editions.map((e) => (e.edition === edition ? { ...e, installed: false, version: undefined } : e)) }
+      mockEngine.emitTask({ ...task, state: 'done', progress: 1 })
+      return { worlds: 0 }
+    },
     get: () => sleep(300),
     gamingServices: () => sleep(300),
     update: () => sleep(300),

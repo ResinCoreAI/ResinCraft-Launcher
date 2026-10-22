@@ -43,6 +43,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       status: fn('bedrock:status'),
       play: fn('bedrock:play'),
       install: fn('bedrock:install'),
+      uninstall: fn('bedrock:uninstall'),
       get: fn('bedrock:get'),
       gamingServices: fn('bedrock:gamingServices'),
       update: fn('bedrock:update'),

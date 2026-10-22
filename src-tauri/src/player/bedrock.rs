@@ -44,6 +44,12 @@ impl Edition {
             Edition::Preview => "9P5X4QVLC2XR",
         }
     }
+    fn key(self) -> &'static str {
+        match self {
+            Edition::Release => "release",
+            Edition::Preview => "preview",
+        }
+    }
     /// The app's name (the same in every language).
     pub(crate) fn name(self) -> &'static str {
         match self {
@@ -153,6 +159,81 @@ async fn installed_packages() -> Vec<(String, String)> {
 }
 
 /// Every `minecraftWorlds` folder of an edition (one per signed-in player, plus the older shared one).
+/// Worlds kept inside the app package (versions before Minecraft moved them to %APPDATA%): uninstalling deletes
+/// these, so they're copied out first.
+fn package_world_roots(edition: Edition) -> Vec<PathBuf> {
+    let Some(package_dir) = edition.data_dirs().into_iter().find(|d| d.components().any(|c| c.as_os_str() == "Packages")) else { return vec![] };
+    world_roots(edition).into_iter().filter(|r| r.starts_with(&package_dir)).collect()
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Uninstalled {
+    /// Where worlds from inside the app package were copied before it went (none when there were none).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup: Option<String>,
+    pub worlds: usize,
+}
+
+/// Removes the game for this Windows account, as Settings → Apps → Uninstall does. Worlds in %APPDATA% stay; worlds
+/// inside the app package (older versions) are copied to ResinCraft's bedrock-backups folder first.
+async fn uninstall(edition: Edition) -> Result<Uninstalled> {
+    if !cfg!(windows) {
+        bail!("Bedrock Edition only exists on Windows");
+    }
+    let title = crate::tr!("bedrock.uninstalling", "Uninstalling {name}", name = edition.name());
+    crate::core::events::Task::run(title, Some(format!("bedrock:{}", edition.key())), move |task| async move {
+        // 1. Worlds that would go with the package.
+        let roots = package_world_roots(edition);
+        let worlds: usize = roots.iter().map(|r| std::fs::read_dir(r).map(|d| d.flatten().filter(|e| e.path().is_dir()).count()).unwrap_or(0)).sum();
+        let mut backup = None;
+        if worlds > 0 {
+            task.update(crate::tr!("bedrock.backingUp", "Backing up {count} worlds…", count = worlds), None);
+            let dest = crate::core::paths::root()
+                .join("bedrock-backups")
+                .join(format!("{}-{}", edition.key(), chrono::Local::now().format("%Y-%m-%d_%H-%M-%S")));
+            let (from, to) = (roots.clone(), dest.clone());
+            tokio::task::spawn_blocking(move || -> Result<()> {
+                for (i, r) in from.iter().enumerate() {
+                    let target = if from.len() > 1 { to.join(i.to_string()) } else { to.clone() };
+                    crate::core::instances::copy_dir(r, &target, &[])?;
+                }
+                Ok(())
+            })
+            .await??;
+            backup = Some(dest.to_string_lossy().into_owned());
+        }
+
+        // 2. The app itself.
+        task.update(crate::tr!("bedrock.removing", "Removing {name}…", name = edition.name()), None);
+        let script = format!(
+            "$ErrorActionPreference = 'Stop'; $p = Get-AppxPackage -Name '{}'; if (-not $p) {{ 'missing'; exit }}; try {{ $p | Remove-AppxPackage; 'ok' }} catch {{ 'error ' + ('0x{{0:X8}}' -f $_.Exception.HResult) + ' ' + $_.Exception.Message }}",
+            edition.package()
+        );
+        let out = crate::game::java::hidden_command("powershell.exe").args(["-NoProfile", "-NonInteractive", "-Command", &script]).output().await?;
+        let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        match uninstall_result(&text) {
+            Ok(()) => Ok(Uninstalled { backup, worlds }),
+            Err(e) => Err(e),
+        }
+    })
+    .await
+}
+
+/// Reads the uninstall script's last line.
+fn uninstall_result(out: &str) -> Result<()> {
+    let last = out.lines().last().unwrap_or_default().trim();
+    if last == "ok" || last == "missing" {
+        return Ok(());
+    }
+    // 0x80073D02: the app is open.
+    if last.contains("0x80073D02") {
+        crate::bail_tr!("bedrock.closeFirst", "Close Minecraft first, then uninstall it.");
+    }
+    let detail = last.strip_prefix("error ").unwrap_or(last).to_string();
+    crate::bail_tr!("bedrock.uninstallFailed", "Windows couldn't uninstall it: {error}", error = detail)
+}
+
 fn world_roots(edition: Edition) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     for base in edition.data_dirs() {
@@ -237,6 +318,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         // Install, update or repair in a task: [edition, "install" | "update" | "repair"] → "done" | "upToDate".
         "bedrock:install" => json(super::bedrock_store::run(args.get(0)?, args.get(1)?).await?),
+        // Removes the game from this PC (worlds inside its app package are backed up first) → Uninstalled.
+        "bedrock:uninstall" => json(uninstall(args.get(0)?).await?),
         // The Store's own install window: the way out when installing from here fails.
         "bedrock:get" => {
             shell::open_app_link(&args.get::<Edition>(0)?.store())?;
@@ -271,6 +354,16 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_uninstall_results() {
+        assert!(uninstall_result("ok").is_ok());
+        assert!(uninstall_result("missing").is_ok(), "already gone counts as done");
+        let busy = uninstall_result("error 0x80073D02 The package could not be installed because resources it modifies are currently in use.").unwrap_err();
+        assert!(busy.to_string().contains("Close Minecraft first"));
+        let other = uninstall_result("error 0x80070005 Access is denied.").unwrap_err();
+        assert!(other.to_string().contains("Access is denied"));
+    }
 
     #[test]
     fn package_versions_read_as_game_versions() {
