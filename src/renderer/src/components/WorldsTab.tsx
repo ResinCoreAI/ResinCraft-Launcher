@@ -16,7 +16,7 @@ const MODE_LABEL: Record<GameMode, Key> = {
 }
 
 /** Minecraft 1.20+ (and the year-numbered releases, 26.1 on) can open a world from outside the game. Snapshots: try. */
-function hasQuickPlay(mc: string): boolean {
+export function hasQuickPlay(mc: string): boolean {
   const m = /^(\d+)\.(\d+)/.exec(mc)
   if (!m) return true
   return Number(m[1]) > 1 || Number(m[2]) >= 20

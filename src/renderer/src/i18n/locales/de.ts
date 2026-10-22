@@ -1786,6 +1786,7 @@ const dict: Dict = {
   'quickjoin.edit': "Server bearbeiten",
   'quickjoin.search': "Server suchen",
   'quickjoin.recent': "Zuletzt beigetreten",
+  'quickjoin.worlds': 'Welten',
   'quickjoin.clearRecent': "Leeren",
   'quickjoin.mine': "Deine Server",
   'quickjoin.dragHint': "Ziehe Server zwischen Gruppen oder eine Gruppe am Griff, um sie umzusortieren.",

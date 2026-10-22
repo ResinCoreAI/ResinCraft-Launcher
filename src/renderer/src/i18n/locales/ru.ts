@@ -1830,6 +1830,7 @@ const dict: Dict = {
   'quickjoin.edit': 'Изменить сервер',
   'quickjoin.search': 'Поиск серверов',
   'quickjoin.recent': 'Недавно заходили',
+  'quickjoin.worlds': 'Миры',
   'quickjoin.clearRecent': 'Очистить',
   'quickjoin.mine': 'Твои серверы',
   'quickjoin.dragHint': 'Перетаскивай серверы между группами, а группы — за ручку, чтобы изменить порядок.',

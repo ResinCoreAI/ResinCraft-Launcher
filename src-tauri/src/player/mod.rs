@@ -74,6 +74,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
 
         "worlds:list" => json(worlds::list_worlds(&args.get::<String>(0)?).await?),
+        // The most recently played worlds across every instance: [limit] → RecentWorld[].
+        "worlds:recent" => json(worlds::recent_worlds(args.get::<Option<usize>>(0)?.unwrap_or(8).min(50)).await?),
         "worlds:rename" => {
             let (id, folder, name): (String, String, Option<String>) = (args.get(0)?, args.get(1)?, args.get(2)?);
             worlds::rename_world(&id, &folder, name.as_deref().unwrap_or_default()).await?;

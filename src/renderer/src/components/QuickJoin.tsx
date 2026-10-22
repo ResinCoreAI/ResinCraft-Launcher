@@ -20,6 +20,7 @@ import type { Ping } from './ServersTab'
 import '../instance-tabs.css'
 import '../quickjoin.css'
 import { hasBedrockApp } from '../platform'
+import { WorldCard, useRecentWorlds } from './RecentWorlds'
 
 /** The same server however it was typed (as in the engine's quickjoin::address_key). */
 export const addressKey = (a: string) => {
@@ -631,6 +632,8 @@ export function QuickJoinHome() {
   const q = useQuickJoin()
   const { go } = useStore()
   const list = homeItems(q)
+  // The worlds played last sit next to the servers.
+  const worlds = useRecentWorlds(3) ?? []
   useEffect(
     () => list.forEach((i) => i.edition === 'java' && (!i.hosted || i.hosted.state === 'running') && pingAddress(i.address)),
     [list.map((i) => i.key).join()]
@@ -644,7 +647,7 @@ export function QuickJoinHome() {
           {t('home.instances.viewAll')}
         </button>
       </h2>
-      {list.length === 0 ? (
+      {list.length === 0 && worlds.length === 0 ? (
         <div className="qj-home-empty">
           <Zap size={18} />
           <span className="grow">{t('quickjoin.home.empty')}</span>
@@ -656,6 +659,9 @@ export function QuickJoinHome() {
         <div className="qj-home">
           {list.map((i) => (
             <QuickJoinCard key={i.key} item={i} q={q} />
+          ))}
+          {worlds.map((w) => (
+            <WorldCard key={`${w.instanceId}/${w.folder}`} w={w} />
           ))}
         </div>
       )}

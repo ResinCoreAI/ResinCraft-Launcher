@@ -136,6 +136,37 @@ pub async fn list_worlds(id: &str) -> Result<Vec<WorldInfo>> {
     Ok(worlds)
 }
 
+/// A world in one of the instances, for Quick join's Worlds.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentWorld {
+    pub instance_id: String,
+    #[serde(flatten)]
+    pub world: WorldInfo,
+}
+
+/// The `limit` most recently played worlds across every instance. Only level.dat's date is checked for all of them;
+/// the full details are read for the ones returned.
+pub async fn recent_worlds(limit: usize) -> Result<Vec<RecentWorld>> {
+    let mut found: Vec<(std::time::SystemTime, String, String, PathBuf)> = Vec::new();
+    for inst in crate::core::instances::list().await.unwrap_or_default() {
+        let Ok(dir) = saves_dir(&inst.id).await else { continue };
+        let Ok(mut rd) = tokio::fs::read_dir(&dir).await else { continue };
+        while let Ok(Some(e)) = rd.next_entry().await {
+            let path = e.path();
+            let Ok(meta) = tokio::fs::metadata(path.join("level.dat")).await else { continue };
+            let when = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
+            found.push((when, inst.id.clone(), e.file_name().to_string_lossy().into_owned(), path));
+        }
+    }
+    found.sort_by(|a, b| b.0.cmp(&a.0));
+    found.truncate(limit);
+    Ok(futures::future::join_all(found.into_iter().map(|(_, instance_id, folder, path)| async move {
+        RecentWorld { instance_id, world: read_world(&path, &folder).await }
+    }))
+    .await)
+}
+
 /// Changes the name shown in game. The folder keeps its name, as in vanilla.
 pub async fn rename_world(id: &str, folder: &str, name: &str) -> Result<()> {
     let name = name.trim();

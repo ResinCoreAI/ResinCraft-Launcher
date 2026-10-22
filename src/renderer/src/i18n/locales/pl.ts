@@ -1837,6 +1837,7 @@ const dict: Dict = {
   'quickjoin.edit': 'Edytuj serwer',
   'quickjoin.search': 'Szukaj serwerów',
   'quickjoin.recent': 'Ostatnio dołączone',
+  'quickjoin.worlds': 'Światy',
   'quickjoin.clearRecent': 'Wyczyść',
   'quickjoin.mine': 'Twoje serwery',
   'quickjoin.dragHint': 'Przeciągaj serwery między grupami albo grupę za uchwyt, aby zmienić kolejność.',

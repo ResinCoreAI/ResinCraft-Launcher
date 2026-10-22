@@ -8,6 +8,7 @@ export default {
   'quickjoin.edit': 'Edit server',
   'quickjoin.search': 'Search servers',
   'quickjoin.recent': 'Recently joined',
+  'quickjoin.worlds': 'Worlds',
   'quickjoin.clearRecent': 'Clear',
   'quickjoin.mine': 'Your servers',
   'quickjoin.dragHint': 'Drag servers between groups, or a group by its handle to reorder.',

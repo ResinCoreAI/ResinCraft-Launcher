@@ -1763,6 +1763,7 @@ const dict: Dict = {
   'quickjoin.edit': '서버 편집',
   'quickjoin.search': '서버 검색',
   'quickjoin.recent': '최근 참가',
+  'quickjoin.worlds': '월드',
   'quickjoin.clearRecent': '지우기',
   'quickjoin.mine': '내 서버',
   'quickjoin.dragHint': '서버를 그룹 사이로 끌어 옮기거나, 그룹을 핸들로 끌어 순서를 바꾸세요.',

@@ -231,3 +231,17 @@
   width: 14px;
   height: 14px;
 }
+
+/* Quick join → Worlds (components/RecentWorlds.tsx). */
+.qj-worlds {
+  margin-bottom: 20px;
+}
+.qj-worlds .list-row .ico img,
+.qj-card .ico img {
+  image-rendering: pixelated;
+}
+.qj-page .qj-worlds .btn.primary.sm {
+  background: var(--play);
+  border-color: var(--play);
+  color: var(--play-fg);
+}

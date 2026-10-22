@@ -1772,6 +1772,7 @@ const dict: Dict = {
   'quickjoin.edit': "Ubah server",
   'quickjoin.search': "Cari server",
   'quickjoin.recent': "Baru saja bergabung",
+  'quickjoin.worlds': 'Dunia',
   'quickjoin.clearRecent': "Hapus",
   'quickjoin.mine': "Server Anda",
   'quickjoin.dragHint': "Seret server antar grup, atau seret grup lewat gagangnya untuk mengurutkan ulang.",

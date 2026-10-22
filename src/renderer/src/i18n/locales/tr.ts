@@ -1782,6 +1782,7 @@ const dict: Dict = {
   'quickjoin.edit': 'Sunucuyu düzenle',
   'quickjoin.search': 'Sunucu ara',
   'quickjoin.recent': 'Son katılınanlar',
+  'quickjoin.worlds': 'Dünyalar',
   'quickjoin.clearRecent': 'Temizle',
   'quickjoin.mine': 'Sunucuların',
   'quickjoin.dragHint': 'Sunucuları gruplar arasında sürükle ya da sıralamak için bir grubu tutamacından sürükle.',

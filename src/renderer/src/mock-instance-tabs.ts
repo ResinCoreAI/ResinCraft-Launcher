@@ -84,6 +84,8 @@ export function mockInstanceTabs(setIcon: (instanceId: string, iconUrl: string) 
       remove: async (_id, folder) => void (worlds = worlds.filter((w) => w.folder !== folder)),
       openFolder: async () => {},
       play: (id, _folder, accountId) => launch(id, accountId),
+      // The preview's worlds all live in Cozy Survival.
+      recent: async (limit = 8) => (await wait(worlds)).slice(0, limit).map((w) => ({ ...w, instanceId: 'survival' })),
       import: async () => null
     },
     servers: {

@@ -145,6 +145,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       remove: fn('worlds:remove'),
       openFolder: fn('worlds:openFolder'),
       play: fn('worlds:play'),
+      recent: fn('worlds:recent'),
       import: fn('worlds:import')
     },
     servers: { list: fn('servers:list'), save: fn('servers:save'), ping: fn('servers:ping') },

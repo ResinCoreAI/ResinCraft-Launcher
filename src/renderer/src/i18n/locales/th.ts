@@ -1761,6 +1761,7 @@ const dict: Dict = {
   'quickjoin.edit': 'แก้ไขเซิร์ฟเวอร์',
   'quickjoin.search': 'ค้นหาเซิร์ฟเวอร์',
   'quickjoin.recent': 'เข้าล่าสุด',
+  'quickjoin.worlds': 'โลก',
   'quickjoin.clearRecent': 'ล้าง',
   'quickjoin.mine': 'เซิร์ฟเวอร์ของคุณ',
   'quickjoin.dragHint': 'ลากเซิร์ฟเวอร์ไประหว่างกลุ่ม หรือลากกลุ่มด้วยที่จับเพื่อจัดลำดับใหม่',

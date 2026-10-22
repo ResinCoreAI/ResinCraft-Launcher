@@ -1769,6 +1769,7 @@ const dict: Dict = {
   'quickjoin.edit': 'Sửa máy chủ',
   'quickjoin.search': 'Tìm máy chủ',
   'quickjoin.recent': 'Vào gần đây',
+  'quickjoin.worlds': 'Thế giới',
   'quickjoin.clearRecent': 'Xóa',
   'quickjoin.mine': 'Máy chủ của bạn',
   'quickjoin.dragHint': 'Kéo máy chủ giữa các nhóm, hoặc kéo nhóm bằng tay nắm để sắp xếp lại.',

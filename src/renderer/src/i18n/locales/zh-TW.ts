@@ -1759,6 +1759,7 @@ const dict: Dict = {
   'quickjoin.edit': '編輯伺服器',
   'quickjoin.search': '搜尋伺服器',
   'quickjoin.recent': '最近加入',
+  'quickjoin.worlds': '世界',
   'quickjoin.clearRecent': '清除',
   'quickjoin.mine': '你的伺服器',
   'quickjoin.dragHint': '在分組之間拖曳伺服器，或拖曳分組的把手來調整順序。',

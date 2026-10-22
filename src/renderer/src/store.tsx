@@ -6,7 +6,7 @@ import { t, type EngineError } from './i18n'
 export type Route =
   | { page: 'home' }
   | { page: 'library' }
-  | { page: 'instance'; id: string; tab?: 'content' | 'logs' | 'settings' }
+  | { page: 'instance'; id: string; tab?: 'content' | 'worlds' | 'logs' | 'settings' }
   | { page: 'discover'; kind?: ContentKind; instanceId?: string; build?: boolean }
   | { page: 'accounts' }
   | { page: 'servers'; id?: string; fromInstance?: string }

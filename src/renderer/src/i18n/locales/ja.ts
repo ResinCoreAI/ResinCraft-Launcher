@@ -1768,6 +1768,7 @@ const dict: Dict = {
   'quickjoin.edit': 'サーバーを編集',
   'quickjoin.search': 'サーバーを検索',
   'quickjoin.recent': '最近参加したサーバー',
+  'quickjoin.worlds': 'ワールド',
   'quickjoin.clearRecent': 'クリア',
   'quickjoin.mine': 'あなたのサーバー',
   'quickjoin.dragHint': 'サーバーはグループ間でドラッグできます。グループはハンドルをドラッグして並べ替えられます。',
