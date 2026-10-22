@@ -241,7 +241,8 @@ export function mockApi(): ResinApi {
       showItem: async () => {},
       pathForFile: (f: File) => f.name
     },
-    settings: { get: () => wait(settings, 0), set: async (p) => (settings = { ...settings, ...p }) },
+    // Saving takes a moment, as with the engine.
+    settings: { get: () => wait(settings, 0), set: (p) => wait((settings = { ...settings, ...p }), 150) },
     storage: mockStorage(),
     // The preview can't open file dialogs: it pretends a backup was saved, and that one was picked.
     backup: {

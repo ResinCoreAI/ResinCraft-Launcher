@@ -109,7 +109,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const refreshInstances = useCallback(async () => setInstances(await api.instances.list()), [])
   const refreshAccounts = useCallback(async () => setAccounts(await api.accounts.list()), [])
-  const updateSettings = useCallback(async (p: Partial<Settings>) => setSettings(await api.settings.set(p)), [])
+  // Shown at once (a switch flips as it's clicked), then saved; if saving fails, it goes back and the error is raised.
+  const updateSettings = useCallback(async (p: Partial<Settings>) => {
+    let before: Settings | undefined
+    setSettings((s) => {
+      before = s
+      return s ? { ...s, ...p } : s
+    })
+    try {
+      setSettings(await api.settings.set(p))
+    } catch (e) {
+      setSettings(before)
+      throw e
+    }
+  }, [])
 
   useEffect(() => {
     void api.app.info().then(setInfo)
