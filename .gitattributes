@@ -1,0 +1,2 @@
+# Shell scripts run in bash on every CI runner, Windows included: keep them LF there too.
+*.sh text eol=lf
