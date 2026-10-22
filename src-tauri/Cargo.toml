@@ -64,7 +64,7 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 resincraft-relay = { path = "../relay" }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns", "Win32_Storage_FileSystem"] }
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns", "Win32_Storage_FileSystem", "Win32_System_ProcessStatus", "Win32_System_Threading"] }
 
 [profile.release]
 codegen-units = 1

@@ -1,6 +1,10 @@
 //! How much RAM the launcher, each running game and each running server use (`app:memory`), for the instance page,
 //! the server page and the optional Home card. A process counts with everything it started (a wrapper's Java,
 //! WebView2's helpers); games and servers are left out of the launcher's own share even though it started them.
+//!
+//! On Windows each process counts its private working set, as Task Manager's Memory column does. The plain working
+//! set also holds the DLLs every process shares, so adding up the launcher's six processes counted those six times
+//! (≈500 MB instead of ≈320). Elsewhere it's the resident size.
 
 use std::collections::{HashMap, HashSet};
 
@@ -59,7 +63,27 @@ fn tree(root: u32, children: &HashMap<u32, Vec<u32>>, skip: &HashSet<u32>) -> Ve
     out
 }
 
-/// Sums memory over process trees. `procs`: pid → (parent, resident bytes).
+/// Memory only this process uses (Task Manager's "Memory"); None when it can't be read.
+#[cfg(windows)]
+fn private_bytes(pid: u32) -> Option<u64> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX2};
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut c = PROCESS_MEMORY_COUNTERS_EX2 { cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32, ..Default::default() };
+        let read = GetProcessMemoryInfo(handle, &mut c as *mut PROCESS_MEMORY_COUNTERS_EX2 as *mut PROCESS_MEMORY_COUNTERS, c.cb);
+        let _ = CloseHandle(handle);
+        read.ok().map(|_| c.PrivateWorkingSetSize as u64).filter(|b| *b > 0)
+    }
+}
+
+#[cfg(not(windows))]
+fn private_bytes(_pid: u32) -> Option<u64> {
+    None
+}
+
+/// Sums memory over process trees. `procs`: pid → (parent, bytes).
 fn sum_tree(root: u32, procs: &HashMap<u32, (Option<u32>, u64)>, children: &HashMap<u32, Vec<u32>>, skip: &HashSet<u32>) -> (u64, usize) {
     let pids = tree(root, children, skip);
     let bytes = pids.iter().filter_map(|p| procs.get(p).map(|(_, b)| *b)).sum();
@@ -79,6 +103,14 @@ fn measure(games: Vec<crate::game::launch::GameProcess>, servers: Vec<(String, u
     }
     let roots: HashSet<u32> = games.iter().map(|g| g.pid).chain(servers.iter().map(|s| s.1)).collect();
     let me = std::process::id();
+    // Only the processes shown get the slower, exact reading.
+    let mut procs = procs;
+    let shown: HashSet<u32> = std::iter::once(me).chain(roots.iter().copied()).flat_map(|r| tree(r, &children, &HashSet::new())).collect();
+    for pid in shown {
+        if let (Some(private), Some(entry)) = (private_bytes(pid), procs.get_mut(&pid)) {
+            entry.1 = private;
+        }
+    }
     let (launcher, launcher_processes) = sum_tree(me, &procs, &children, &roots);
     MemoryUsage {
         launcher,
