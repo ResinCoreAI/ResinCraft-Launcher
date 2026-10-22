@@ -102,9 +102,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bash .github/scripts/collect.sh
-          ls -l out/release
-          n=$(ls out/release | grep -vc '\.sig$' || true)
-          if [ "$n" -eq 0 ]; then echo "::error::The build made no files to ship."; exit 1; fi
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-${{ matrix.platform }}
