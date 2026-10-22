@@ -63,6 +63,10 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 # The relay server itself, for examples/check_relay.rs.
 resincraft-relay = { path = "../relay" }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# proc_pid_rusage for the RAM display (core/memory.rs).
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns", "Win32_Storage_FileSystem", "Win32_System_ProcessStatus", "Win32_System_Threading"] }
 

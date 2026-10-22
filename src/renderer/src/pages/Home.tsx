@@ -65,6 +65,8 @@ export default function Home() {
             ))}
           </div>
         </div>
+        {/* A hosted server can run before the first instance exists. */}
+        {settings?.showMemoryOnHome && <MemoryCard />}
         {instances.length > 0 && <InstanceRow />}
       </div>
     )

@@ -2,9 +2,13 @@
 //! the server page and the optional Home card. A process counts with everything it started (a wrapper's Java,
 //! WebView2's helpers); games and servers are left out of the launcher's own share even though it started them.
 //!
-//! On Windows each process counts its private working set, as Task Manager's Memory column does. The plain working
-//! set also holds the DLLs every process shares, so adding up the launcher's six processes counted those six times
-//! (≈500 MB instead of ≈320). Elsewhere it's the resident size.
+//! Each process counts the memory that's really its own, as the system's monitor shows it: on Windows the private
+//! working set (Task Manager's Memory column), on Linux the proportional set size (PSS, shared pages split between
+//! the processes sharing them), on macOS the physical footprint (Activity Monitor's Memory column). Plain resident
+//! sizes count shared libraries once per process, so a launcher with six processes looked half again as big.
+//!
+//! On Linux the process list also holds every thread, each reporting its whole process's memory; threads are left
+//! out, or a Java server with hundreds of them reads hundreds of times too much ("397 GB of 4 GB").
 
 use std::collections::{HashMap, HashSet};
 
@@ -78,7 +82,28 @@ fn private_bytes(pid: u32) -> Option<u64> {
     }
 }
 
-#[cfg(not(windows))]
+/// Linux: PSS from /proc/<pid>/smaps_rollup (kB), the kernel's fair share of a process's memory.
+#[cfg(target_os = "linux")]
+fn private_bytes(pid: u32) -> Option<u64> {
+    let text = std::fs::read_to_string(format!("/proc/{pid}/smaps_rollup")).ok()?;
+    parse_pss_kb(&text).map(|kb| kb * 1024)
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn parse_pss_kb(smaps_rollup: &str) -> Option<u64> {
+    let line = smaps_rollup.lines().find(|l| l.starts_with("Pss:"))?;
+    line.split_whitespace().nth(1)?.parse().ok()
+}
+
+/// macOS: the physical footprint (what Activity Monitor shows as Memory).
+#[cfg(target_os = "macos")]
+fn private_bytes(pid: u32) -> Option<u64> {
+    let mut info: libc::rusage_info_v2 = unsafe { std::mem::zeroed() };
+    let ok = unsafe { libc::proc_pid_rusage(pid as libc::c_int, libc::RUSAGE_INFO_V2, &mut info as *mut _ as *mut libc::rusage_info_t) };
+    (ok == 0 && info.ri_phys_footprint > 0).then_some(info.ri_phys_footprint)
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn private_bytes(_pid: u32) -> Option<u64> {
     None
 }
@@ -94,7 +119,13 @@ fn measure(games: Vec<crate::game::launch::GameProcess>, servers: Vec<(String, u
     let mut sys = System::new_with_specifics(RefreshKind::nothing());
     sys.refresh_memory();
     sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_memory());
-    let procs: HashMap<u32, (Option<u32>, u64)> = sys.processes().iter().map(|(pid, p)| (pid.as_u32(), (p.parent().map(Pid::as_u32), p.memory()))).collect();
+    // Threads (Linux lists them as processes) would count their process's memory again each.
+    let procs: HashMap<u32, (Option<u32>, u64)> = sys
+        .processes()
+        .iter()
+        .filter(|(_, p)| p.thread_kind().is_none())
+        .map(|(pid, p)| (pid.as_u32(), (p.parent().map(Pid::as_u32), p.memory())))
+        .collect();
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for (pid, (parent, _)) in &procs {
         if let Some(parent) = parent {
@@ -164,6 +195,13 @@ mod tests {
         }
         assert_eq!(sum_tree(1, &procs, &children, &HashSet::from([3])), (360, 2));
         assert_eq!(sum_tree(3, &procs, &children, &HashSet::new()), (2810, 2));
+    }
+
+    #[test]
+    fn reads_linux_pss() {
+        let rollup = "55d4c0a3e000-7ffd8a5f3000 ---p 00000000 00:00 0                          [rollup]\nRss:              209224 kB\nPss:              201337 kB\nPss_Anon:         190000 kB\n";
+        assert_eq!(parse_pss_kb(rollup), Some(201337));
+        assert_eq!(parse_pss_kb("Rss: 5 kB\n"), None);
     }
 
     #[test]

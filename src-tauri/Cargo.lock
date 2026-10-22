@@ -3775,6 +3775,7 @@ dependencies = [
  "idna",
  "igd-next",
  "image",
+ "libc",
  "md-5",
  "playit-agent-core",
  "playit-api-client",
