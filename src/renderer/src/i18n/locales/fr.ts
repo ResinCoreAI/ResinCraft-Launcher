@@ -856,6 +856,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': 'Instance',
   'ownPack.mode.pack': 'Créer un modpack',
+  'ownPack.mode.download': 'Télécharger un modpack',
+  'newInstance.download.title': 'Télécharger un modpack',
+  'newInstance.download.subtitle': 'Choisis un modpack sur Modrinth, CurseForge, FTB, ATLauncher ou Technic ; il devient une nouvelle instance.',
+  'newInstance.download.popular': 'Les plus téléchargés sur chaque site',
+  'newInstance.download.results': 'Meilleurs résultats de chaque site',
+  'newInstance.download.importHint': 'Installer un fichier de modpack téléchargé (.mrpack ou .zip CurseForge)',
+  'newInstance.download.browseAll': 'Voir tous les modpacks dans Découvrir',
   'ownPack.title': 'Créer un modpack',
   'ownPack.subtitle': 'Choisis la version du jeu et le loader, puis ajoute des mods, packs de ressources et shaders depuis tous les sites.',
   'ownPack.create': 'Créer et ajouter du contenu',

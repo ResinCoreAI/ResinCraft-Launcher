@@ -818,6 +818,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': 'Instalasi',
   'ownPack.mode.pack': 'Buat modpack',
+  'ownPack.mode.download': 'Unduh modpack',
+  'newInstance.download.title': 'Unduh modpack',
+  'newInstance.download.subtitle': 'Pilih modpack dari Modrinth, CurseForge, FTB, ATLauncher, atau Technic; modpack itu jadi instance baru.',
+  'newInstance.download.popular': 'Paling banyak diunduh di setiap situs',
+  'newInstance.download.results': 'Hasil terbaik dari setiap situs',
+  'newInstance.download.importHint': 'Pasang file modpack yang sudah diunduh (.mrpack atau .zip CurseForge)',
+  'newInstance.download.browseAll': 'Lihat semua modpack di Jelajahi',
   'ownPack.title': 'Buat modpack',
   'ownPack.subtitle': 'Pilih versi game dan loader, lalu tambahkan mod, resource pack, dan shader dari semua situs.',
   'ownPack.create': 'Buat & tambah konten',

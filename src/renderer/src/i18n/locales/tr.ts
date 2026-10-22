@@ -824,6 +824,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': 'Kurulum',
   'ownPack.mode.pack': 'Mod paketi oluştur',
+  'ownPack.mode.download': 'Mod paketi indir',
+  'newInstance.download.title': 'Mod paketi indir',
+  'newInstance.download.subtitle': "Modrinth, CurseForge, FTB, ATLauncher veya Technic'ten bir mod paketi seç; yeni bir örnek olur.",
+  'newInstance.download.popular': 'Her sitede en çok indirilenler',
+  'newInstance.download.results': 'Her siteden en iyi eşleşmeler',
+  'newInstance.download.importHint': 'İndirdiğin bir mod paketi dosyasını kur (.mrpack veya CurseForge .zip)',
+  'newInstance.download.browseAll': "Tüm mod paketlerine Keşfet'te göz at",
   'ownPack.title': 'Mod paketi oluştur',
   'ownPack.subtitle': 'Oyun sürümünü ve yükleyiciyi seç, sonra tüm sitelerden mod, kaynak paketi ve gölgelendirici ekle.',
   'ownPack.create': 'Oluştur ve içerik ekle',

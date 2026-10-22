@@ -815,6 +815,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': 'インスタンス',
   'ownPack.mode.pack': 'Modパックを作る',
+  'ownPack.mode.download': 'Modpack をダウンロード',
+  'newInstance.download.title': 'Modpack をダウンロード',
+  'newInstance.download.subtitle': 'Modrinth・CurseForge・FTB・ATLauncher・Technic から Modpack を選ぶと、新しいインスタンスになります。',
+  'newInstance.download.popular': '各サイトで人気の Modpack',
+  'newInstance.download.results': '各サイトの検索結果',
+  'newInstance.download.importHint': 'ダウンロード済みの Modpack ファイルをインストール（.mrpack または CurseForge の .zip）',
+  'newInstance.download.browseAll': '「見つける」ですべての Modpack を見る',
   'ownPack.title': 'Modパックを作る',
   'ownPack.subtitle': 'ゲームのバージョンとローダーを選んでから、すべてのサイトのMod・リソースパック・シェーダーを追加できます。',
   'ownPack.create': '作成してコンテンツを追加',

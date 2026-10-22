@@ -812,6 +812,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': '인스턴스',
   'ownPack.mode.pack': '모드팩 만들기',
+  'ownPack.mode.download': '모드팩 다운로드',
+  'newInstance.download.title': '모드팩 다운로드',
+  'newInstance.download.subtitle': 'Modrinth, CurseForge, FTB, ATLauncher, Technic에서 모드팩을 고르면 새 인스턴스가 됩니다.',
+  'newInstance.download.popular': '사이트별 인기 모드팩',
+  'newInstance.download.results': '사이트별 검색 결과',
+  'newInstance.download.importHint': '다운로드한 모드팩 파일 설치 (.mrpack 또는 CurseForge .zip)',
+  'newInstance.download.browseAll': '탐색에서 모든 모드팩 보기',
   'ownPack.title': '모드팩 만들기',
   'ownPack.subtitle': '게임 버전과 로더를 고른 다음, 모든 사이트에서 모드, 리소스 팩, 셰이더를 추가하세요.',
   'ownPack.create': '만들고 콘텐츠 추가',

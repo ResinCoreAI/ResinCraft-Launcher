@@ -171,6 +171,13 @@ export default {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': 'Instance',
   'ownPack.mode.pack': 'Create a modpack',
+  'ownPack.mode.download': 'Download a modpack',
+  'newInstance.download.title': 'Download a modpack',
+  'newInstance.download.subtitle': 'Pick a modpack from Modrinth, CurseForge, FTB, ATLauncher or Technic; it becomes a new instance.',
+  'newInstance.download.popular': 'Most downloaded on every site',
+  'newInstance.download.results': 'Best matches from every site',
+  'newInstance.download.importHint': 'Install a modpack file you downloaded (.mrpack or CurseForge .zip)',
+  'newInstance.download.browseAll': 'Browse all modpacks in Discover',
   'ownPack.title': 'Create a modpack',
   'ownPack.subtitle': 'Pick the game version and loader, then add mods, resource packs and shaders from every site.',
   'ownPack.create': 'Create & add content',

@@ -873,6 +873,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': 'Сборка',
   'ownPack.mode.pack': 'Создать модпак',
+  'ownPack.mode.download': 'Скачать сборку',
+  'newInstance.download.title': 'Скачать сборку',
+  'newInstance.download.subtitle': 'Выберите сборку с Modrinth, CurseForge, FTB, ATLauncher или Technic — она станет новой сборкой в лаунчере.',
+  'newInstance.download.popular': 'Самые популярные на каждом сайте',
+  'newInstance.download.results': 'Лучшие совпадения со всех сайтов',
+  'newInstance.download.importHint': 'Установить скачанный файл сборки (.mrpack или .zip с CurseForge)',
+  'newInstance.download.browseAll': 'Все сборки в «Обзоре»',
   'ownPack.title': 'Создать модпак',
   'ownPack.subtitle': 'Выберите версию игры и загрузчик, затем добавьте моды, ресурспаки и шейдеры со всех сайтов.',
   'ownPack.create': 'Создать и добавить контент',

@@ -812,6 +812,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': '實例',
   'ownPack.mode.pack': '建立模組包',
+  'ownPack.mode.download': '下載模組包',
+  'newInstance.download.title': '下載模組包',
+  'newInstance.download.subtitle': '從 Modrinth、CurseForge、FTB、ATLauncher 或 Technic 選一個模組包，它會成為新的實例。',
+  'newInstance.download.popular': '各站下載最多',
+  'newInstance.download.results': '各站最符合的結果',
+  'newInstance.download.importHint': '安裝已下載的模組包檔案（.mrpack 或 CurseForge 的 .zip）',
+  'newInstance.download.browseAll': '在「探索」中瀏覽所有模組包',
   'ownPack.title': '建立模組包',
   'ownPack.subtitle': '選擇遊戲版本和載入器，然後從所有網站加入模組、資源包和光影。',
   'ownPack.create': '建立並加入內容',

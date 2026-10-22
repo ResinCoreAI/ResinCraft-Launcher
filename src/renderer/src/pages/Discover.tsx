@@ -46,8 +46,8 @@ import { PackBuilderBanner } from '../components/OwnPack'
 import { ProjectPage } from '../components/ProjectPage'
 
 const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.ReactNode }[] = [
-  { value: 'mod', labelKey: 'discover.kind.mod', searchKey: 'discover.search.mod', icon: <Blocks size={15} /> },
   { value: 'modpack', labelKey: 'discover.kind.modpack', searchKey: 'discover.search.modpack', icon: <Package size={15} /> },
+  { value: 'mod', labelKey: 'discover.kind.mod', searchKey: 'discover.search.mod', icon: <Blocks size={15} /> },
   { value: 'resourcepack', labelKey: 'discover.kind.resourcepack', searchKey: 'discover.search.resourcepack', icon: <Image size={15} /> },
   { value: 'shader', labelKey: 'discover.kind.shader', searchKey: 'discover.search.shader', icon: <Sparkles size={15} /> }
 ]
@@ -201,7 +201,8 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
     // FTB only has modpacks, which can't go into an existing instance.
     return (target || (initialKind && initialKind !== 'modpack')) && modpackOnly(s) ? 'all' : s
   })
-  const [kind, setKind] = useState<ContentKind>(initialKind ?? (modpackOnly(source) ? 'modpack' : 'mod'))
+  // Discover opens on modpacks; opened for an instance (adding to it), on mods, since packs can't go into one.
+  const [kind, setKind] = useState<ContentKind>(initialKind ?? (target && !modpackOnly(source) ? 'mod' : 'modpack'))
   const sourceInfo =
     source === 'all'
       ? { value: 'all' as const, label: t('discover.allSites'), color: 'var(--accent)', kinds: ALL_KINDS }

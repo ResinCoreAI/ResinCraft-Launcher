@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Blocks, Hammer, Loader2, Search } from 'lucide-react'
+import { Blocks, Download, Hammer, Loader2, Search } from 'lucide-react'
 import type { LoaderType, LoaderVersion, McVersion, OptifineJar } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -11,12 +11,16 @@ import { useGroupNames } from '../pages/Library'
 import { OptifineSteps, optifineFits } from './Optifine'
 import { PackFields, type PackDraft } from './OwnPack'
 import { liteloaderFits } from './VersionSettings'
+import { ModpackFinder } from './ModpackFinder'
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const { settings, activeAccount, refreshInstances, go, toast, instances } = useStore()
   // 'pack': the player makes their own modpack, then fills it on Discover (see PackBuilderBanner).
-  const [mode, setMode] = useState<'instance' | 'pack'>('instance')
+  // 'download': an existing modpack from a site, installed straight from here.
+  const [mode, setMode] = useState<'instance' | 'pack' | 'download'>('instance')
   const makingPack = mode === 'pack'
+  const downloading = mode === 'download'
+  const [packBusy, setPackBusy] = useState(false)
   // A new modpack can start empty or as a copy of one of the player's instances (its mods, packs and configs).
   const [fromId, setFromId] = useState<string>()
   const from = makingPack ? instances.find((i) => i.id === fromId) : undefined
@@ -175,25 +179,31 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title={t(makingPack ? 'ownPack.title' : 'newInstance.title')}
-      subtitle={t(makingPack ? 'ownPack.subtitle' : 'newInstance.subtitle')}
+      title={t(makingPack ? 'ownPack.title' : downloading ? 'newInstance.download.title' : 'newInstance.title')}
+      subtitle={t(makingPack ? 'ownPack.subtitle' : downloading ? 'newInstance.download.subtitle' : 'newInstance.subtitle')}
       onClose={onClose}
       wide
       footer={
-        <>
-          <button className="btn ghost" onClick={onClose}>
+        downloading ? (
+          <button className="btn ghost" disabled={packBusy} onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={busy || (from ? false : !mc || unavailable || (loader !== 'vanilla' && !loaderVersion))} onClick={create}>
-            {busy && <Loader2 className="spin" />} {t(makingPack ? 'ownPack.create' : 'newInstance.create')}
-          </button>
-        </>
+        ) : (
+          <>
+            <button className="btn ghost" onClick={onClose}>
+              {t('common.cancel')}
+            </button>
+            <button className="btn primary" disabled={busy || (from ? false : !mc || unavailable || (loader !== 'vanilla' && !loaderVersion))} onClick={create}>
+              {busy && <Loader2 className="spin" />} {t(makingPack ? 'ownPack.create' : 'newInstance.create')}
+            </button>
+          </>
+        )
       }
     >
       <div className="new-mode">
-        <Segmented<'instance' | 'pack'>
+        <Segmented<'instance' | 'pack' | 'download'>
           value={mode}
-          onChange={setMode}
+          onChange={(m) => !packBusy && setMode(m)}
           options={[
             {
               value: 'instance',
@@ -210,185 +220,207 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
                   <Hammer /> {t('ownPack.mode.pack')}
                 </>
               )
+            },
+            {
+              value: 'download',
+              label: (
+                <>
+                  <Download /> {t('ownPack.mode.download')}
+                </>
+              )
             }
           ]}
         />
       </div>
-      <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
-        <IconPicker inst={{ name: name || placeholder, color, iconUrl: icon ?? undefined }} onChange={setIcon} onError={setError} />
-        <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="field">
-            <label htmlFor="inst-name">{t(makingPack ? 'ownPack.packName' : 'newInstance.name')}</label>
-            <input
-              id="inst-name"
-              className="input"
-              placeholder={from ? from.name : placeholder}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="inst-group">{t('library.group.label')}</label>
-            <input
-              id="inst-group"
-              className="input"
-              list="inst-groups"
-              placeholder={t('library.group.none')}
-              value={group}
-              onChange={(e) => setGroup(e.target.value)}
-            />
-            <datalist id="inst-groups">
-              {groups.map((g) => (
-                <option key={g} value={g} />
-              ))}
-            </datalist>
-          </div>
-          <div className="swatches">
-            {COLORS.map((c) => (
-              <button
-                key={c}
-                className={`swatch ${c === color ? 'on' : ''}`}
-                style={{ background: c }}
-                onClick={() => setColor(c)}
-                aria-label={t('newInstance.colorOption', { color: c })}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {makingPack && (
-        <div className="field">
-          <label htmlFor="pack-from">{t('ownPack.startFrom')}</label>
-          <select id="pack-from" className="select" value={fromId ?? ''} onChange={(e) => setFromId(e.target.value || undefined)}>
-            <option value="">{t('ownPack.startEmpty')}</option>
-            {instances
-              .filter((i) => !i.ownPack)
-              .map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} · {i.mcVersion} {i.loader === 'vanilla' ? '' : LOADER_LABEL[i.loader]}
-                </option>
-              ))}
-          </select>
-          <span className="hint">{t(from ? 'ownPack.startInstanceHint' : 'ownPack.startEmptyHint')}</span>
-        </div>
-      )}
-
-      {makingPack && <PackFields value={pack} onChange={setPack} />}
-
-      <BannerPicker value={banner ?? undefined} onChange={setBanner} onError={setError} />
-
-      {!from && (
+      {downloading ? (
+        <ModpackFinder
+          onBusy={setPackBusy}
+          onInstalled={(inst) => {
+            onClose()
+            go({ page: 'instance', id: inst.id })
+          }}
+        />
+      ) : (
         <>
-          <div className="field">
-            <label>{t('newInstance.modLoader')}</label>
-            <Segmented<LoaderType>
-              value={loader}
-              onChange={setLoader}
-              options={[
-                { value: 'vanilla', label: 'Vanilla' },
-                { value: 'fabric', label: 'Fabric' },
-                { value: 'quilt', label: 'Quilt' },
-                { value: 'forge', label: 'Forge' },
-                { value: 'neoforge', label: 'NeoForge' },
-                { value: 'liteloader', label: 'LiteLoader' }
-              ]}
-            />
-            <span className="hint">
-              {loader === 'vanilla'
-                ? t('newInstance.vanillaHint')
-                : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', { loader: LOADER_LABEL[loader] })}
-            </span>
-          </div>
-
-          <div className="field">
-            <div className="row">
-              <label className="label grow">{t('newInstance.mcVersion')}</label>
-              <span className="hint">{t('newInstance.snapshots')}</span>
-              <Switch on={snapshots} onChange={setSnapshots} label={t('newInstance.showSnapshots')} />
-            </div>
-            <div className="search">
-              <Search />
-              <input className="input" placeholder={t('newInstance.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
-            </div>
-            <div className="version-list">
-              {!versions && !error && (
-                <div className="empty" style={{ padding: 30 }}>
-                  <Loader2 className="spin" />
-                </div>
-              )}
-              {shown.map((v) => (
-                <button key={v.id} className={v.id === mc ? 'on' : ''} onClick={() => setMc(v.id)}>
-                  {v.id}
-                  {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
-                  <span className="date">
-                    {new Date(v.releaseTime).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })}
-                  </span>
-                </button>
-              ))}
+          <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
+            <IconPicker inst={{ name: name || placeholder, color, iconUrl: icon ?? undefined }} onChange={setIcon} onError={setError} />
+            <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="field">
+                <label htmlFor="inst-name">{t(makingPack ? 'ownPack.packName' : 'newInstance.name')}</label>
+                <input
+                  id="inst-name"
+                  className="input"
+                  placeholder={from ? from.name : placeholder}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="inst-group">{t('library.group.label')}</label>
+                <input
+                  id="inst-group"
+                  className="input"
+                  list="inst-groups"
+                  placeholder={t('library.group.none')}
+                  value={group}
+                  onChange={(e) => setGroup(e.target.value)}
+                />
+                <datalist id="inst-groups">
+                  {groups.map((g) => (
+                    <option key={g} value={g} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="swatches">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    className={`swatch ${c === color ? 'on' : ''}`}
+                    style={{ background: c }}
+                    onClick={() => setColor(c)}
+                    aria-label={t('newInstance.colorOption', { color: c })}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
-          {loader !== 'vanilla' && (
+          {makingPack && (
             <div className="field">
-              <label htmlFor="loader-ver">{t('newInstance.loaderVersion', { loader: LOADER_LABEL[loader] })}</label>
-              {unavailable ? (
-                <div className="callout danger">
-                  {loader === 'forge' && legacyForge
-                    ? t('newInstance.legacyForge')
-                    : t('newInstance.unsupported', { loader: LOADER_LABEL[loader], version: mc })}
-                </div>
-              ) : (
-                <select
-                  id="loader-ver"
-                  className="select"
-                  value={loaderVersion ?? ''}
-                  onChange={(e) => setLoaderVersion(e.target.value)}
-                  disabled={!loaderVersions}
-                >
-                  {!loaderVersions && <option>{t('common.loading')}</option>}
-                  {loaderVersions?.map((l, i) => (
-                    <option key={l.version} value={l.version}>
-                      {i === loaderVersions.findIndex((x) => x.stable)
-                        ? t('newInstance.optionRecommended', { version: l.version })
-                        : l.stable
-                          ? l.version
-                          : t('newInstance.optionBeta', { version: l.version })}
+              <label htmlFor="pack-from">{t('ownPack.startFrom')}</label>
+              <select id="pack-from" className="select" value={fromId ?? ''} onChange={(e) => setFromId(e.target.value || undefined)}>
+                <option value="">{t('ownPack.startEmpty')}</option>
+                {instances
+                  .filter((i) => !i.ownPack)
+                  .map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} · {i.mcVersion} {i.loader === 'vanilla' ? '' : LOADER_LABEL[i.loader]}
                     </option>
                   ))}
-                </select>
-              )}
+              </select>
+              <span className="hint">{t(from ? 'ownPack.startInstanceHint' : 'ownPack.startEmptyHint')}</span>
             </div>
           )}
+
+          {makingPack && <PackFields value={pack} onChange={setPack} />}
+
+          <BannerPicker value={banner ?? undefined} onChange={setBanner} onError={setError} />
+
+          {!from && (
+            <>
+              <div className="field">
+                <label>{t('newInstance.modLoader')}</label>
+                <Segmented<LoaderType>
+                  value={loader}
+                  onChange={setLoader}
+                  options={[
+                    { value: 'vanilla', label: 'Vanilla' },
+                    { value: 'fabric', label: 'Fabric' },
+                    { value: 'quilt', label: 'Quilt' },
+                    { value: 'forge', label: 'Forge' },
+                    { value: 'neoforge', label: 'NeoForge' },
+                    { value: 'liteloader', label: 'LiteLoader' }
+                  ]}
+                />
+                <span className="hint">
+                  {loader === 'vanilla'
+                    ? t('newInstance.vanillaHint')
+                    : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', {
+                        loader: LOADER_LABEL[loader]
+                      })}
+                </span>
+              </div>
+
+              <div className="field">
+                <div className="row">
+                  <label className="label grow">{t('newInstance.mcVersion')}</label>
+                  <span className="hint">{t('newInstance.snapshots')}</span>
+                  <Switch on={snapshots} onChange={setSnapshots} label={t('newInstance.showSnapshots')} />
+                </div>
+                <div className="search">
+                  <Search />
+                  <input className="input" placeholder={t('newInstance.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
+                </div>
+                <div className="version-list">
+                  {!versions && !error && (
+                    <div className="empty" style={{ padding: 30 }}>
+                      <Loader2 className="spin" />
+                    </div>
+                  )}
+                  {shown.map((v) => (
+                    <button key={v.id} className={v.id === mc ? 'on' : ''} onClick={() => setMc(v.id)}>
+                      {v.id}
+                      {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
+                      <span className="date">
+                        {new Date(v.releaseTime).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {loader !== 'vanilla' && (
+                <div className="field">
+                  <label htmlFor="loader-ver">{t('newInstance.loaderVersion', { loader: LOADER_LABEL[loader] })}</label>
+                  {unavailable ? (
+                    <div className="callout danger">
+                      {loader === 'forge' && legacyForge
+                        ? t('newInstance.legacyForge')
+                        : t('newInstance.unsupported', { loader: LOADER_LABEL[loader], version: mc })}
+                    </div>
+                  ) : (
+                    <select
+                      id="loader-ver"
+                      className="select"
+                      value={loaderVersion ?? ''}
+                      onChange={(e) => setLoaderVersion(e.target.value)}
+                      disabled={!loaderVersions}
+                    >
+                      {!loaderVersions && <option>{t('common.loading')}</option>}
+                      {loaderVersions?.map((l, i) => (
+                        <option key={l.version} value={l.version}>
+                          {i === loaderVersions.findIndex((x) => x.stable)
+                            ? t('newInstance.optionRecommended', { version: l.version })
+                            : l.stable
+                              ? l.version
+                              : t('newInstance.optionBeta', { version: l.version })}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {liteFits && !makingPack && (
+            <div className="field">
+              <div className="row">
+                <label className="label grow">LiteLoader</label>
+                <Switch on={lite} onChange={setLite} label={t('newInstance.withLiteloader')} />
+              </div>
+              <span className="hint">
+                {lite && liteVersion === null ? t('newInstance.unsupported', { loader: 'LiteLoader', version: mc }) : t('version.liteloaderHint')}
+              </span>
+            </div>
+          )}
+
+          {optifineFits(loader) && !makingPack && (
+            <div className="field">
+              <div className="row">
+                <label className="label grow">OptiFine</label>
+                <Switch on={optifine} onChange={setOptifine} label={t('optifine.add')} />
+              </div>
+              <span className="hint">{t('optifine.newHint')}</span>
+              {optifine && mc && <OptifineSteps mc={mc} loader={loader} jar={ofJar} onPick={pickOptifine} />}
+              {optifine && ofError && <div className="callout danger">{ofError}</div>}
+            </div>
+          )}
+
+          {error && <div className="callout danger">{error}</div>}
         </>
       )}
-
-      {liteFits && !makingPack && (
-        <div className="field">
-          <div className="row">
-            <label className="label grow">LiteLoader</label>
-            <Switch on={lite} onChange={setLite} label={t('newInstance.withLiteloader')} />
-          </div>
-          <span className="hint">
-            {lite && liteVersion === null ? t('newInstance.unsupported', { loader: 'LiteLoader', version: mc }) : t('version.liteloaderHint')}
-          </span>
-        </div>
-      )}
-
-      {optifineFits(loader) && !makingPack && (
-        <div className="field">
-          <div className="row">
-            <label className="label grow">OptiFine</label>
-            <Switch on={optifine} onChange={setOptifine} label={t('optifine.add')} />
-          </div>
-          <span className="hint">{t('optifine.newHint')}</span>
-          {optifine && mc && <OptifineSteps mc={mc} loader={loader} jar={ofJar} onPick={pickOptifine} />}
-          {optifine && ofError && <div className="callout danger">{ofError}</div>}
-        </div>
-      )}
-
-      {error && <div className="callout danger">{error}</div>}
     </Modal>
   )
 }

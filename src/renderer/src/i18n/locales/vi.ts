@@ -817,6 +817,13 @@ const dict: Dict = {
   // The player's own modpack: New instance → Create a modpack, then filled on Discover and exported
   'ownPack.mode.instance': 'Bản cài đặt',
   'ownPack.mode.pack': 'Tạo modpack',
+  'ownPack.mode.download': 'Tải modpack',
+  'newInstance.download.title': 'Tải modpack',
+  'newInstance.download.subtitle': 'Chọn một modpack từ Modrinth, CurseForge, FTB, ATLauncher hoặc Technic; nó sẽ thành một phiên bản mới.',
+  'newInstance.download.popular': 'Tải nhiều nhất trên mọi trang',
+  'newInstance.download.results': 'Kết quả phù hợp nhất từ mọi trang',
+  'newInstance.download.importHint': 'Cài tệp modpack đã tải (.mrpack hoặc .zip của CurseForge)',
+  'newInstance.download.browseAll': 'Xem tất cả modpack trong Khám phá',
   'ownPack.title': 'Tạo modpack',
   'ownPack.subtitle': 'Chọn phiên bản game và loader, rồi thêm mod, gói tài nguyên và shader từ mọi trang.',
   'ownPack.create': 'Tạo & thêm nội dung',
