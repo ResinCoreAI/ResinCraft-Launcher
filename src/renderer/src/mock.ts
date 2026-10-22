@@ -315,6 +315,8 @@ export function mockApi(): ResinApi {
         wait(
           {
             worlds: picks.worlds.map((w) => `${w} (2)`),
+            mods: picks.mods ? 3 : 0,
+            configs: picks.configs ? 14 : 0,
             shaders: picks.shaders ? 2 : 0,
             resourcePacks: picks.resourcePacks ? 1 : 0,
             settings: picks.settings ? 2 : 0

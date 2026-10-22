@@ -1,4 +1,4 @@
-//! Brings worlds, shader packs, resource packs and game settings over from another instance.
+//! Brings worlds, mods and their settings, shader packs, resource packs and game settings over from another instance.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -10,7 +10,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use super::files::{child_path, game_subdir, unique_name};
-use crate::content::index::{load_index, save_index};
+use crate::content::index::{index_key, load_index, save_index};
 use crate::core::events::Task;
 use crate::core::fsutil::{copy_many, list_copy};
 use crate::core::types::ContentKind;
@@ -20,12 +20,18 @@ use crate::{bail_tr, tr};
 /// The game's own settings files: video and controls, OptiFine's, and the chosen shader with its options.
 pub const SETTINGS_FILES: [&str; 3] = ["options.txt", "optionsof.txt", "optionsshaders.txt"];
 
+/// Where mods keep their settings (defaultconfigs/ is Forge's per-world defaults).
+pub const CONFIG_FOLDERS: [&str; 2] = ["config", "defaultconfigs"];
+
 /// What to bring over (`instances:copyFrom`).
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CopyPicks {
     /// World folders in the other instance's saves/.
     pub worlds: Vec<String>,
+    pub mods: bool,
+    /// The mods' settings (config/, defaultconfigs/): replace this instance's files of the same name.
+    pub configs: bool,
     pub shaders: bool,
     pub resource_packs: bool,
     pub settings: bool,
@@ -37,6 +43,9 @@ pub struct CopyPicks {
 pub struct CopyResult {
     /// The new world folders (renamed when the name was taken here).
     pub worlds: Vec<String>,
+    pub mods: usize,
+    /// Mod settings files copied.
+    pub configs: usize,
     pub shaders: usize,
     pub resource_packs: usize,
     /// Settings files replaced.
@@ -78,26 +87,47 @@ pub async fn copy_from(target: &str, source: &str, picks: CopyPicks) -> Result<C
         }
     }
 
-    // Packs this instance already has (by file name, with or without .disabled) stay as they are.
+    // Mods and packs this instance already has (by file name, with or without .disabled, or the same project in
+    // another version) stay as they are.
+    let from_index = load_index(&from.id).await;
+    let mut index = load_index(&to.id).await;
+    let have_projects: BTreeSet<String> = index.values().map(|e| e.project_id.clone()).filter(|p| !p.is_empty()).collect();
     let mut kinds: Vec<(ContentKind, Vec<String>)> = Vec::new();
-    for (kind, wanted) in [(ContentKind::Shader, picks.shaders), (ContentKind::Resourcepack, picks.resource_packs)] {
+    for (kind, wanted) in [(ContentKind::Mod, picks.mods), (ContentKind::Shader, picks.shaders), (ContentKind::Resourcepack, picks.resource_packs)] {
         let src = src_game.join(kind.folder());
         if !wanted || !src.is_dir() {
             continue;
         }
         let dst = game_subdir(&to.id, kind.folder()).await?;
         let have: BTreeSet<String> = names(&dst).await.iter().map(|n| base(n).to_lowercase()).collect();
-        let new: Vec<String> = names(&src).await.into_iter().filter(|n| !have.contains(&base(n).to_lowercase())).collect();
+        let project = |n: &str| from_index.get(&index_key(kind, n)).map(|e| e.project_id.clone()).filter(|p| !p.is_empty());
+        let new: Vec<String> = names(&src)
+            .await
+            .into_iter()
+            .filter(|n| !have.contains(&base(n).to_lowercase()) && !project(n).is_some_and(|p| have_projects.contains(&p)))
+            .collect();
         let skip: Vec<String> = names(&src).await.into_iter().filter(|n| !new.contains(n)).collect();
         let skip: Vec<&str> = skip.iter().map(String::as_str).collect();
         jobs.extend(list(&src, &dst, &skip).await?);
         // Shaders' own option files (<pack>.txt) come along but aren't packs.
         let count = new.iter().filter(|n| !(kind == ContentKind::Shader && n.to_lowercase().ends_with(".txt"))).count();
         match kind {
+            ContentKind::Mod => out.mods = count,
             ContentKind::Shader => out.shaders = count,
             _ => out.resource_packs = count,
         }
         kinds.push((kind, new));
+    }
+
+    if picks.configs {
+        for folder in CONFIG_FOLDERS {
+            let src = src_game.join(folder);
+            if src.is_dir() {
+                let found = list(&src, &dst_game.join(folder), &[]).await?;
+                out.configs += found.len();
+                jobs.extend(found);
+            }
+        }
     }
 
     if picks.settings {
@@ -146,12 +176,10 @@ pub async fn copy_from(target: &str, source: &str, picks: CopyPicks) -> Result<C
 
     // The packs keep their Discover links (updates, versions) in this instance too.
     if !kinds.is_empty() {
-        let from_index = load_index(&from.id).await;
-        let mut index = load_index(&to.id).await;
         let before = index.len();
         for (kind, new) in &kinds {
             for name in new {
-                let key = crate::content::index::index_key(*kind, name);
+                let key = index_key(*kind, name);
                 if let Some(entry) = from_index.get(&key) {
                     index.entry(key).or_insert_with(|| entry.clone());
                 }

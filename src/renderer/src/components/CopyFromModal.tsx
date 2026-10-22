@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Earth, Loader2, Palette, SlidersHorizontal, Sun } from 'lucide-react'
+import { AlertTriangle, Blocks, Earth, FileCog, Loader2, Palette, SlidersHorizontal, Sun } from 'lucide-react'
 import type { ContentItem, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
-import { bytes, describe } from '../util'
+import { bytes, describe, LOADER_LABEL } from '../util'
 import { t } from '../i18n'
 import { Modal } from './ui'
 
 interface SourceView {
   worlds?: WorldInfo[]
+  mods?: ContentItem[]
   shaders?: ContentItem[]
   packs?: ContentItem[]
 }
@@ -24,6 +25,8 @@ export default function CopyFromModal({ inst, onClose, onCopied }: { inst: Insta
   const source = others.find((i) => i.id === sourceId)
   const [view, setView] = useState<SourceView>({})
   const [worlds, setWorlds] = useState<Set<string>>(new Set())
+  const [mods, setMods] = useState(false)
+  const [configs, setConfigs] = useState(false)
   const [shaders, setShaders] = useState(true)
   const [packs, setPacks] = useState(false)
   const [settings, setSettings] = useState(true)
@@ -36,9 +39,10 @@ export default function CopyFromModal({ inst, onClose, onCopied }: { inst: Insta
     setWorlds(new Set())
     void Promise.all([
       api.worlds.list(sourceId).catch(() => []),
+      api.content.list(sourceId, 'mod').catch(() => []),
       api.content.list(sourceId, 'shader').catch(() => []),
       api.content.list(sourceId, 'resourcepack').catch(() => [])
-    ]).then(([w, s, p]) => live && setView({ worlds: w.filter((x) => !x.error), shaders: s, packs: p }))
+    ]).then(([w, m, s, p]) => live && setView({ worlds: w.filter((x) => !x.error), mods: m, shaders: s, packs: p }))
     return () => {
       live = false
     }
@@ -53,10 +57,12 @@ export default function CopyFromModal({ inst, onClose, onCopied }: { inst: Insta
     })
 
   const loading = !view.worlds
+  const nMods = view.mods?.length ?? 0
   const nShaders = view.shaders?.length ?? 0
   const nPacks = view.packs?.length ?? 0
-  const picked = worlds.size > 0 || (shaders && nShaders > 0) || (packs && nPacks > 0) || settings
+  const picked = worlds.size > 0 || (mods && nMods > 0) || configs || (shaders && nShaders > 0) || (packs && nPacks > 0) || settings
   const otherVersion = source && source.mcVersion !== inst.mcVersion
+  const otherLoader = source && source.loader !== inst.loader
 
   const run = async () => {
     if (!source) return
@@ -64,12 +70,16 @@ export default function CopyFromModal({ inst, onClose, onCopied }: { inst: Insta
     try {
       const r = await api.instances.copyFrom(inst.id, source.id, {
         worlds: [...worlds],
+        mods: mods && nMods > 0,
+        configs,
         shaders: shaders && nShaders > 0,
         resourcePacks: packs && nPacks > 0,
         settings
       })
       const parts = [
         r.worlds.length ? t('copyFrom.done.worlds', { count: r.worlds.length }) : '',
+        r.mods ? t('copyFrom.done.mods', { count: r.mods }) : '',
+        r.configs ? t('copyFrom.done.configs') : '',
         r.shaders ? t('copyFrom.done.shaders', { count: r.shaders }) : '',
         r.resourcePacks ? t('copyFrom.done.packs', { count: r.resourcePacks }) : '',
         r.settings ? t('copyFrom.done.settings') : ''
@@ -117,6 +127,11 @@ export default function CopyFromModal({ inst, onClose, onCopied }: { inst: Insta
                 <AlertTriangle size={13} /> {t('copyFrom.otherVersion', { name: source.name, version: source.mcVersion })}
               </span>
             )}
+            {otherLoader && (mods || configs) && (
+              <span className="hint warn">
+                <AlertTriangle size={13} /> {t('copyFrom.otherLoader', { name: source.name, loader: LOADER_LABEL[source.loader] })}
+              </span>
+            )}
           </div>
 
           {loading ? (
@@ -148,6 +163,18 @@ export default function CopyFromModal({ inst, onClose, onCopied }: { inst: Insta
               <div className="field">
                 <label>{t('copyFrom.also')}</label>
                 <div className="include-list">
+                  <label className={`include-row ${mods && nMods ? 'on' : ''}`}>
+                    <input type="checkbox" disabled={busy || !nMods} checked={mods && nMods > 0} onChange={(e) => setMods(e.target.checked)} />
+                    <Blocks size={15} />
+                    <span className="grow">{t('copyFrom.mods', { count: nMods })}</span>
+                    <span className="hint">{t('copyFrom.modsHint')}</span>
+                  </label>
+                  <label className={`include-row ${configs ? 'on' : ''}`}>
+                    <input type="checkbox" disabled={busy} checked={configs} onChange={(e) => setConfigs(e.target.checked)} />
+                    <FileCog size={15} />
+                    <span className="grow">{t('copyFrom.configs')}</span>
+                    <span className="hint">{t('copyFrom.configsHint')}</span>
+                  </label>
                   <label className={`include-row ${shaders && nShaders ? 'on' : ''}`}>
                     <input type="checkbox" disabled={busy || !nShaders} checked={shaders && nShaders > 0} onChange={(e) => setShaders(e.target.checked)} />
                     <Sun size={15} />

@@ -763,6 +763,10 @@ export type GameMode = 'survival' | 'creative' | 'adventure' | 'spectator'
 export interface CopyPicks {
   /** World folders in the other instance's saves/. */
   worlds: string[]
+  /** Mods this instance doesn't have yet (by file name, or the same project in another version). */
+  mods: boolean
+  /** The mods' settings (config/, defaultconfigs/): replace this instance's files of the same name. */
+  configs: boolean
   shaders: boolean
   resourcePacks: boolean
   /** options.txt, OptiFine's and the shader options: replace this instance's. */
@@ -773,6 +777,9 @@ export interface CopyPicks {
 export interface CopyResult {
   /** The new world folders (renamed when the name was taken). */
   worlds: string[]
+  mods: number
+  /** Mod settings files copied. */
+  configs: number
   shaders: number
   resourcePacks: number
   /** Settings files replaced. */
