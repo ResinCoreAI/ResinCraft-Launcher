@@ -29,6 +29,11 @@ const isHybrid = (s: ServerInfo) => HYBRID_SERVERS.includes(s.type)
 const isBedrock = (s: ServerInfo) => s.type === 'bedrock'
 const live = (s: ServerInfo) => s.state === 'starting' || s.state === 'running' || s.state === 'stopping'
 
+/** Players online: the server's own count when it's higher than the names known (it can hide names). */
+function onlineCount(s: ServerInfo): number {
+  return Math.max(s.players.length, s.online ?? 0)
+}
+
 type Tab = 'console' | 'players' | 'addons' | 'mods' | 'properties' | 'files' | 'settings'
 
 export default function Servers({ id, fromInstance }: { id?: string; fromInstance?: string }) {
@@ -51,7 +56,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
   useEffect(() => {
     void load()
     return api.on.server((e: ServerEvent) =>
-      setServers((list) => list?.map((s) => (s.id === e.serverId ? { ...s, state: e.state, players: e.players, net: e.net } : s)))
+      setServers((list) => list?.map((s) => (s.id === e.serverId ? { ...s, state: e.state, players: e.players, online: e.online, net: e.net } : s)))
     )
   }, [load])
 
@@ -325,7 +330,7 @@ function ServerList({
               </div>
               {live(s) && (
                 <span className="sv-players" title={s.players.join(', ')}>
-                  <Users /> {s.players.length}
+                  <Users /> {onlineCount(s)}
                 </span>
               )}
               <StatePill s={s} />
@@ -402,7 +407,7 @@ function ServerDetail({
             <StatePill s={s} />
             {live(s) && (
               <span className="chip">
-                <Users /> {t('servers.playersOnline', { count: s.players.length })}
+                <Users /> {t('servers.playersOnline', { count: onlineCount(s) })}
               </span>
             )}
             <ServerMemoryChip serverId={s.id} running={live(s)} />
@@ -762,11 +767,13 @@ function PlayersTab({ s }: { s: ServerInfo }) {
   return (
     <>
       <div className="settings-section">
-        <h3>{t('servers.players.online', { count: s.players.length })}</h3>
+        <h3>{t('servers.players.online', { count: onlineCount(s) })}</h3>
         {!running ? (
           <div className="hint">{t('servers.players.notRunning')}</div>
-        ) : s.players.length === 0 ? (
+        ) : onlineCount(s) === 0 ? (
           <div className="hint">{t('servers.players.nobody')}</div>
+        ) : s.players.length === 0 ? (
+          <div className="hint">{t('servers.players.hidden', { count: onlineCount(s) })}</div>
         ) : (
           <div className="list">
             {s.players.map((p) => (
@@ -790,6 +797,7 @@ function PlayersTab({ s }: { s: ServerInfo }) {
                 </button>
               </div>
             ))}
+            {onlineCount(s) > s.players.length && <div className="hint">{t('servers.players.more', { count: onlineCount(s) - s.players.length })}</div>}
           </div>
         )}
       </div>

@@ -192,6 +192,8 @@ export default {
   'servers.players.online': { one: 'Online now ({count})', other: 'Online now ({count})' },
   'servers.players.notRunning': "The server isn't running.",
   'servers.players.nobody': 'Nobody is online.',
+  'servers.players.hidden': { one: '{count} player is online; the server doesn\'t show names.', other: '{count} players are online; the server doesn\'t show names.' },
+  'servers.players.more': { one: 'And {count} more.', other: 'And {count} more.' },
   'servers.players.op': 'Op',
   'servers.players.kick': 'Kick',
   'servers.players.ban': 'Ban',

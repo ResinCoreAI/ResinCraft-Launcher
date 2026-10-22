@@ -34,6 +34,8 @@ struct Proc {
     kill: mpsc::UnboundedSender<()>,
     state: &'static str,
     players: BTreeSet<String>,
+    /// Players online by the server's own count (from the server-list ping), when it has answered.
+    online: Option<i64>,
     stopping: bool,
     net: Option<ServerNet>,
     lines: broadcast::Sender<String>,
@@ -83,6 +85,10 @@ pub fn players(id: &str) -> Vec<String> {
     with(|w| w.procs.get(id).map(|p| p.players.iter().cloned().collect()).unwrap_or_default())
 }
 
+pub fn online(id: &str) -> Option<i64> {
+    with(|w| w.procs.get(id).and_then(|p| p.online))
+}
+
 pub fn net(id: &str) -> Option<ServerNet> {
     with(|w| {
         let p = w.procs.get(id)?;
@@ -98,7 +104,7 @@ pub fn log(id: &str) -> Vec<LogLine> {
 }
 
 fn emit_state(id: &str, code: Option<i32>) {
-    let event = ServerEvent { server_id: id.to_string(), state: state(id), players: players(id), net: net(id), code };
+    let event = ServerEvent { server_id: id.to_string(), state: state(id), players: players(id), online: online(id), net: net(id), code };
     emit("server", event);
 }
 
@@ -140,6 +146,8 @@ struct Patterns {
     done: Regex,
     joined: Regex,
     left: Regex,
+    /// A real player name (not "Anonymous Player", which servers send when names are hidden).
+    player_name: Regex,
     list: Regex,
     /// Bedrock Dedicated Server: "Player connected: Name, xuid: …" (gamertags may have spaces).
     bedrock_joined: Regex,
@@ -153,6 +161,7 @@ fn patterns() -> &'static Patterns {
         done: Regex::new(r#"Done \(\d+[.,]?\d*m?s\)! For help, type|INFO\] Server started\."#).unwrap(),
         joined: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) joined the game\s*$").unwrap(),
         left: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) left the game\s*$").unwrap(),
+        player_name: Regex::new(r"^[A-Za-z0-9_.]{1,17}$").unwrap(),
         list: Regex::new(r"There are \d+ (?:of a max(?:imum)? of|out of maximum) \d+ players online[.:]?\s*(.*)$").unwrap(),
         bedrock_joined: Regex::new(r"Player connected: (.+?), xuid").unwrap(),
         bedrock_left: Regex::new(r"Player disconnected: (.+?), xuid").unwrap(),
@@ -285,15 +294,17 @@ pub async fn start(id: &str) -> Result<()> {
     let (stdin_tx, mut stdin_rx) = mpsc::unbounded_channel::<String>();
     let (kill_tx, mut kill_rx) = mpsc::unbounded_channel::<()>();
     let (lines_tx, _) = broadcast::channel::<String>(512);
+    let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     with(|w| {
         w.procs.insert(
             id.to_string(),
             Proc {
-                run: RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                run,
                 stdin: stdin_tx,
                 kill: kill_tx,
                 state: "starting",
                 players: BTreeSet::new(),
+                online: None,
                 stopping: false,
                 net: None,
                 lines: lines_tx.clone(),
@@ -450,6 +461,9 @@ pub async fn start(id: &str) -> Result<()> {
         })
     };
 
+    if !bedrock {
+        tokio::spawn(watch_players(id.to_string(), run, meta.port));
+    }
     let id = id.to_string();
     let port = meta.port;
     let modded = meta.kind.modded();
@@ -512,6 +526,48 @@ pub async fn start(id: &str) -> Result<()> {
         }
     });
     Ok(())
+}
+
+/// How often a running Java server is asked who's online.
+const PLAYER_POLL: Duration = Duration::from_secs(5);
+
+/// Asks the running server who's online every few seconds (the server-list ping, as the game's server list does), so
+/// the list stays right when join lines are missed or a modpack changes them. Ends with the run.
+async fn watch_players(id: String, run: u64, port: u16) {
+    let addr = format!("127.0.0.1:{port}");
+    loop {
+        tokio::time::sleep(PLAYER_POLL).await;
+        match with(|w| w.procs.get(&id).map(|p| (p.run == run, p.state))) {
+            Some((true, "running")) => {}
+            Some((true, _)) => continue,
+            _ => return,
+        }
+        let Ok(status) = crate::player::servers::ping_server(&addr, Duration::from_secs(3)).await else { continue };
+        let changed = with(|w| match w.procs.get_mut(&id) {
+            Some(p) if p.run == run => merge_players(&mut p.players, &mut p.online, status.players.online, &status.players.sample),
+            _ => false,
+        });
+        if changed {
+            emit_state(&id, None);
+        }
+    }
+}
+
+/// Folds a ping's answer into the names read from the console: a full list replaces them, nobody online clears them,
+/// and a partial list (names hidden, or more than the 12 a ping carries) only adds names. Returns whether anything
+/// changed.
+fn merge_players(players: &mut BTreeSet<String>, count: &mut Option<i64>, online: i64, sample: &[String]) -> bool {
+    let before = (players.clone(), *count);
+    let names: BTreeSet<String> = sample.iter().filter(|n| patterns().player_name.is_match(n)).cloned().collect();
+    if online <= 0 {
+        players.clear();
+    } else if names.len() as i64 == online {
+        *players = names;
+    } else {
+        players.extend(names);
+    }
+    *count = Some(online.max(0));
+    (players.clone(), *count) != before
 }
 
 /// Starts a server again after client-only mods were moved out of a crashed start (boxed: start spawns this).
@@ -1449,3 +1505,42 @@ async fn zip_worlds(dir: PathBuf, worlds: Vec<String>, target: PathBuf) -> Resul
     Ok(())
 }
 
+
+#[cfg(test)]
+mod player_tests {
+    use super::*;
+
+    fn set(names: &[&str]) -> BTreeSet<String> {
+        names.iter().map(|s| s.to_string()).collect()
+    }
+    fn names(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_full_list_replaces_what_the_console_said() {
+        let (mut p, mut c) = (set(&["Gone"]), None);
+        assert!(merge_players(&mut p, &mut c, 2, &names(&["Alex", "Steve"])));
+        assert_eq!((p.clone(), c), (set(&["Alex", "Steve"]), Some(2)));
+        // The same answer again changes nothing.
+        assert!(!merge_players(&mut p, &mut c, 2, &names(&["Alex", "Steve"])));
+    }
+
+    #[test]
+    fn nobody_online_clears_the_list() {
+        let (mut p, mut c) = (set(&["Alex"]), Some(1));
+        assert!(merge_players(&mut p, &mut c, 0, &[]));
+        assert!(p.is_empty());
+    }
+
+    #[test]
+    fn hidden_or_partial_lists_only_add_names() {
+        // Names hidden: the console's names stay, the count comes from the server.
+        let (mut p, mut c) = (set(&["Alex"]), None);
+        merge_players(&mut p, &mut c, 3, &names(&["Anonymous Player", "Anonymous Player", "Anonymous Player"]));
+        assert_eq!((p.clone(), c), (set(&["Alex"]), Some(3)));
+        // More than a ping carries: known names are added.
+        merge_players(&mut p, &mut c, 20, &names(&["Steve", ".PuirkleBE"]));
+        assert_eq!(p, set(&["Alex", "Steve", ".PuirkleBE"]));
+    }
+}

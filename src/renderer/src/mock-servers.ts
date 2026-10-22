@@ -331,7 +331,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
   const patch = (id: string, p: Partial<ServerInfo>) => (servers = servers.map((s) => (s.id === id ? { ...s, ...p } : s)))
   const fire = (id: string) => {
     const s = find(id)
-    listeners.forEach((l) => l({ serverId: id, state: s.state, players: s.players, net: s.net }))
+    listeners.forEach((l) => l({ serverId: id, state: s.state, players: s.players, online: s.online, net: s.net }))
   }
   const say = (id: string, text: string, level: LogLine['level'] = 'info') => {
     const line = { text, level }
@@ -444,7 +444,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     start: async (id) => {
       const s = find(id)
       logs[id] = []
-      patch(id, { state: 'starting', players: [], net: undefined })
+      patch(id, { state: 'starting', players: [], online: undefined, net: undefined })
       fire(id)
       say(id, `ResinCraft is starting ${s.name}`)
       const bedrock = s.type === 'bedrock'
@@ -534,7 +534,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       later(id, 6000, () => {
         if (find(id).state !== 'running') return
         say(id, bedrock ? line('Player connected: Cool Gamer 21, xuid: 2535411234567890') : `[${ts()}] [Server thread/INFO]: Steve joined the game`)
-        patch(id, { players: [bedrock ? 'Cool Gamer 21' : 'Steve'] })
+        patch(id, { players: [bedrock ? 'Cool Gamer 21' : 'Steve'], online: bedrock ? 1 : 3 })
         fire(id)
       })
     },
@@ -546,7 +546,7 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       later(id, 900, () => {
         ;(timers[id] ?? []).forEach((t) => clearTimeout(t))
         say(id, 'Server exited (0)')
-        patch(id, { state: 'stopped', players: [], net: undefined })
+        patch(id, { state: 'stopped', players: [], online: undefined, net: undefined })
         fire(id)
       })
     },

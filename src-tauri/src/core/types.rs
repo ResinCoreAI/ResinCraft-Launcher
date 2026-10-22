@@ -1206,6 +1206,9 @@ pub struct ServerInfo {
     /// "stopped" | "starting" | "running" | "stopping" | "crashed"
     pub state: &'static str,
     pub players: Vec<String>,
+    /// How many players the server says are online (its list can hide names, or hold only 12).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub online: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub net: Option<ServerNet>,
 }
@@ -1256,6 +1259,8 @@ pub struct ServerEvent {
     pub server_id: String,
     pub state: &'static str,
     pub players: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub online: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub net: Option<ServerNet>,
     #[serde(skip_serializing_if = "Option::is_none")]

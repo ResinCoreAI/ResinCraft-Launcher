@@ -120,7 +120,7 @@ pub async fn accept_eula(id: &str) -> Result<()> {
 
 pub async fn info(meta: ServerMeta) -> ServerInfo {
     let id = meta.id.clone();
-    ServerInfo { eula_accepted: eula_accepted(&id).await, state: runtime::state(&id), players: runtime::players(&id), net: runtime::net(&id), meta }
+    ServerInfo { eula_accepted: eula_accepted(&id).await, state: runtime::state(&id), players: runtime::players(&id), online: runtime::online(&id), net: runtime::net(&id), meta }
 }
 
 pub async fn touch_started(id: &str) {

@@ -1129,6 +1129,8 @@ export interface ServerInfo {
   eulaAccepted: boolean
   state: ServerState
   players: string[]
+  /** How many are online by the server's own count (its list can hide names, or hold only 12). */
+  online?: number
   net?: ServerNet
 }
 
@@ -1166,6 +1168,7 @@ export interface ServerEvent {
   serverId: string
   state: ServerState
   players: string[]
+  online?: number
   net?: ServerNet
   code?: number
 }
