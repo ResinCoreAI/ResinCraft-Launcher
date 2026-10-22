@@ -1967,6 +1967,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} artık yok, eşitlenecek bir şey yok",
   'engine.sync.notFromInstance': "{name} bir örnekten yapılmadı",
   'engine.sync.title': "{name} örneğinden eşitleniyor",
+  'servers.icon.title': 'Sunucu simgesi',
+  'servers.icon.hint': 'Herhangi bir resim (PNG, JPG, GIF, WebP…). Burada ve bir sonraki başlatmadan itibaren oyuncuların sunucu listesinde görünür.',
+  'servers.icon.hintBedrock': "Herhangi bir resim (PNG, JPG, GIF, WebP…), ResinCraft'ta görünür. Bedrock sunucuları oyunculara simge gösteremez.",
+  'servers.icon.choose': 'Resim seç',
+  'servers.icon.set': 'Sunucu simgesi kaydedildi.',
+  'servers.icon.setRestart': 'Simge kaydedildi. Oyuncular sunucu yeniden başlayınca görür.',
+  'servers.icon.removed': 'Sunucu simgesi kaldırıldı.',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "Komutlar",
   "commands.lead": "Oyun için ortam değişkenleri ve oyun başlarken ve kapandıktan sonra çalışan kendi komutların.",

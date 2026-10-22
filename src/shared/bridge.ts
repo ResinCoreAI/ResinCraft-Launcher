@@ -167,6 +167,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
     },
     server: {
       list: fn('server:list'),
+      setIcon: fn('server:setIcon'),
       get: fn('server:get'),
       switchPack: fn('server:switchPack'),
       origin: fn('server:origin'),

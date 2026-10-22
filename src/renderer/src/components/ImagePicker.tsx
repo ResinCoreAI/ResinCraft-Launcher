@@ -198,7 +198,7 @@ function CropModal({ src, kind, onDone, onCancel }: { src: string; kind: Instanc
 }
 
 /** Choose → crop → hand back. Shared by the icon and banner pickers. */
-function usePicturePicker(kind: InstanceImage, onChange: (dataUrl: string | null) => void, onError: (message: string) => void) {
+export function usePicturePicker(kind: InstanceImage, onChange: (dataUrl: string | null) => void, onError: (message: string) => void) {
   const [cropping, setCropping] = useState<string>()
   const open = async () => {
     const picture = await choosePicture(onError)

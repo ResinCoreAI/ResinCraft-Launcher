@@ -1957,6 +1957,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} sudah tidak ada, jadi tidak ada yang bisa disinkronkan",
   'engine.sync.notFromInstance': "{name} tidak dibuat dari instans",
   'engine.sync.title': "Menyinkronkan {name} dari instansnya",
+  'servers.icon.title': 'Ikon server',
+  'servers.icon.hint': 'Gambar apa saja (PNG, JPG, GIF, WebP…). Tampil di sini dan di daftar server pemain mulai start berikutnya.',
+  'servers.icon.hintBedrock': 'Gambar apa saja (PNG, JPG, GIF, WebP…), tampil di ResinCraft. Server Bedrock tidak bisa menampilkan ikon ke pemain.',
+  'servers.icon.choose': 'Pilih gambar',
+  'servers.icon.set': 'Ikon server disimpan.',
+  'servers.icon.setRestart': 'Ikon disimpan. Pemain melihatnya setelah server dimulai ulang.',
+  'servers.icon.removed': 'Ikon server dihapus.',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "Perintah",
   "commands.lead": "Variabel lingkungan untuk game, dan perintahmu sendiri yang berjalan saat game dimulai dan setelah ditutup.",

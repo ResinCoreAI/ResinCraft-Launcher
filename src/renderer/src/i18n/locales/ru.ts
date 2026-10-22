@@ -2016,6 +2016,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} больше не существует, синхронизировать не с чем",
   'engine.sync.notFromInstance': "{name} создан не из сборки",
   'engine.sync.title': "Синхронизация {name} с его сборкой",
+  'servers.icon.title': 'Значок сервера',
+  'servers.icon.hint': 'Любая картинка (PNG, JPG, GIF, WebP…). Видна здесь и, после следующего запуска, в списке серверов у игроков.',
+  'servers.icon.hintBedrock': 'Любая картинка (PNG, JPG, GIF, WebP…), видна в ResinCraft. Серверы Bedrock не умеют показывать значок игрокам.',
+  'servers.icon.choose': 'Выбрать картинку',
+  'servers.icon.set': 'Значок сервера сохранён.',
+  'servers.icon.setRestart': 'Значок сохранён. Игроки увидят его после перезапуска сервера.',
+  'servers.icon.removed': 'Значок сервера удалён.',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "Команды",
   "commands.lead": "Переменные окружения для игры и ваши команды, которые выполняются при запуске и после закрытия игры.",

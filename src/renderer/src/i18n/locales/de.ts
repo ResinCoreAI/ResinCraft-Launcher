@@ -1971,6 +1971,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} gibt es nicht mehr, es gibt nichts zu synchronisieren",
   'engine.sync.notFromInstance': "{name} wurde nicht aus einer Instanz erstellt",
   'engine.sync.title': "{name} wird aus seiner Instanz synchronisiert",
+  'servers.icon.title': 'Server-Symbol',
+  'servers.icon.hint': 'Ein beliebiges Bild (PNG, JPG, GIF, WebP …). Wird hier und ab dem nächsten Start in der Serverliste der Spieler gezeigt.',
+  'servers.icon.hintBedrock': 'Ein beliebiges Bild (PNG, JPG, GIF, WebP …), in ResinCraft gezeigt. Bedrock-Server können Spielern kein Symbol zeigen.',
+  'servers.icon.choose': 'Bild wählen',
+  'servers.icon.set': 'Server-Symbol gespeichert.',
+  'servers.icon.setRestart': 'Server-Symbol gespeichert. Spieler sehen es nach einem Neustart des Servers.',
+  'servers.icon.removed': 'Server-Symbol entfernt.',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "Befehle",
   "commands.lead": "Umgebungsvariablen für das Spiel und eigene Befehle, die beim Start und nach dem Beenden laufen.",

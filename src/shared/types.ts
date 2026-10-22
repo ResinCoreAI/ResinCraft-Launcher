@@ -1533,6 +1533,11 @@ export interface ResinApi {
   }
   server: {
     list(): Promise<ServerInfo[]>
+    /**
+     * Sets the server's picture from a PNG data URL (null removes it). The launcher shows it, and a Java server's
+     * server-icon.png (64×64, read at start) shows it to players in their server list.
+     */
+    setIcon(id: string, dataUrl: string | null): Promise<ServerInfo>
     /** Switches a server made from a modpack to another version of the pack (its server files). Stop it first. */
     switchPack(id: string, versionId: string): Promise<PackSwitch>
     /** The instance a server was made from, if any, and whether it changed since the last sync. */

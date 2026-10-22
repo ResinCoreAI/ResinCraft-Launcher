@@ -1944,6 +1944,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} 已不存在，沒有可同步的內容",
   'engine.sync.notFromInstance': "{name} 不是由實例建立的",
   'engine.sync.title': "正在從實例同步 {name}",
+  'servers.icon.title': '伺服器圖示',
+  'servers.icon.hint': '任意圖片（PNG、JPG、GIF、WebP…）。顯示在這裡，下次啟動後也會顯示在玩家的伺服器清單中。',
+  'servers.icon.hintBedrock': '任意圖片（PNG、JPG、GIF、WebP…），顯示在 ResinCraft 中。Bedrock 伺服器無法向玩家顯示圖示。',
+  'servers.icon.choose': '選擇圖片',
+  'servers.icon.set': '已儲存伺服器圖示。',
+  'servers.icon.setRestart': '已儲存圖示。伺服器重新啟動後玩家才看得到。',
+  'servers.icon.removed': '已移除伺服器圖示。',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "指令",
   "commands.lead": "遊戲的環境變數，以及在遊戲啟動時和關閉後執行的自訂指令。",

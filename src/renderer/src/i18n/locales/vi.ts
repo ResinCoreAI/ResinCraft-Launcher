@@ -1954,6 +1954,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} không còn nữa nên không có gì để đồng bộ",
   'engine.sync.notFromInstance': "{name} không được tạo từ phiên bản cài đặt",
   'engine.sync.title': "Đang đồng bộ {name} từ phiên bản cài đặt",
+  'servers.icon.title': 'Biểu tượng máy chủ',
+  'servers.icon.hint': 'Ảnh bất kỳ (PNG, JPG, GIF, WebP…). Hiện ở đây và trong danh sách máy chủ của người chơi từ lần khởi động sau.',
+  'servers.icon.hintBedrock': 'Ảnh bất kỳ (PNG, JPG, GIF, WebP…), hiện trong ResinCraft. Máy chủ Bedrock không hiện biểu tượng cho người chơi được.',
+  'servers.icon.choose': 'Chọn ảnh',
+  'servers.icon.set': 'Đã lưu biểu tượng máy chủ.',
+  'servers.icon.setRestart': 'Đã lưu biểu tượng. Người chơi sẽ thấy sau khi máy chủ khởi động lại.',
+  'servers.icon.removed': 'Đã xoá biểu tượng máy chủ.',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "Lệnh",
   "commands.lead": "Biến môi trường cho trò chơi và các lệnh riêng của bạn chạy khi khởi động và sau khi đóng trò chơi.",

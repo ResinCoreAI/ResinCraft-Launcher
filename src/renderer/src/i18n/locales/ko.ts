@@ -1949,6 +1949,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name}이(가) 더 이상 없어 동기화할 것이 없습니다",
   'engine.sync.notFromInstance': "{name}은(는) 인스턴스로 만든 서버가 아닙니다",
   'engine.sync.title': "인스턴스에서 {name} 동기화 중",
+  'servers.icon.title': '서버 아이콘',
+  'servers.icon.hint': '어떤 그림이든 괜찮아요(PNG, JPG, GIF, WebP…). 여기와, 다음 시작부터 플레이어의 서버 목록에 표시돼요.',
+  'servers.icon.hintBedrock': '어떤 그림이든 괜찮아요(PNG, JPG, GIF, WebP…). ResinCraft에 표시돼요. Bedrock 서버는 플레이어에게 아이콘을 보여 줄 수 없어요.',
+  'servers.icon.choose': '그림 고르기',
+  'servers.icon.set': '서버 아이콘을 저장했어요.',
+  'servers.icon.setRestart': '아이콘을 저장했어요. 서버를 다시 시작하면 플레이어에게 보여요.',
+  'servers.icon.removed': '서버 아이콘을 지웠어요.',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "명령어",
   "commands.lead": "게임용 환경 변수와, 게임을 시작할 때와 닫은 뒤에 실행되는 나만의 명령어예요.",

@@ -21,7 +21,7 @@ use anyhow::{bail, Result};
 use serde_json::{json, Value};
 
 use crate::core::router::{done, json};
-use crate::core::types::{NewServer, PropEntry, ServerKind};
+use crate::core::types::{NewServer, PropEntry, ServerKind, ServerMeta};
 use crate::core::{shell, Args};
 
 pub async fn handle(channel: &str, args: Args) -> Result<Value> {
@@ -60,6 +60,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             }
             json(store::info(meta).await)
         }
+        // A picture for the server: [id, data URL | null] (null removes it) → ServerInfo.
+        "server:setIcon" => json(store::info(set_icon(&args.get::<String>(0)?, args.get::<Option<String>>(1)?).await?).await),
         "server:remove" => {
             let id: String = args.get(0)?;
             if runtime::is_running(&id) {
@@ -212,5 +214,65 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         _ => bail!("Unknown request: {channel}"),
+    }
+}
+
+/// Sets or removes the server's picture. The launcher shows a 128×128 copy; a Java server also gets the 64×64
+/// server-icon.png Minecraft shows players in their server list (it's read when the server starts). Any picture the
+/// launcher's image picker can open works: it hands over a PNG.
+async fn set_icon(id: &str, data_url: Option<String>) -> Result<ServerMeta> {
+    let meta = store::get(id).await?;
+    let file = store::dir(id)?.join("server-icon.png");
+    let Some(url) = data_url.filter(|u| !u.trim().is_empty()) else {
+        let _ = tokio::fs::remove_file(&file).await;
+        return store::update(id, serde_json::json!({ "iconUrl": null })).await;
+    };
+    let bytes = {
+        use base64::Engine;
+        let b64 = url.split_once("base64,").map(|(_, b)| b).ok_or_else(|| anyhow::anyhow!("That picture couldn't be read"))?;
+        base64::engine::general_purpose::STANDARD.decode(b64.trim())?
+    };
+    let java = meta.kind != ServerKind::Bedrock;
+    let (small, icon) = tokio::task::spawn_blocking(move || icon_pngs(&bytes, java)).await??;
+    if let Some(icon) = icon {
+        tokio::fs::write(&file, icon).await?;
+    }
+    let shown = {
+        use base64::Engine;
+        format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(small))
+    };
+    store::update(id, serde_json::json!({ "iconUrl": shown })).await
+}
+
+/// The launcher's 128×128 copy and, for Java, the 64×64 server-icon.png Minecraft needs (exactly that size), both PNG.
+fn icon_pngs(picture: &[u8], java: bool) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
+    let img = image::load_from_memory(picture).map_err(|_| anyhow::anyhow!("That picture couldn't be read"))?;
+    let png = |size: u32| -> Result<Vec<u8>> {
+        let mut out = std::io::Cursor::new(Vec::new());
+        img.resize_to_fill(size, size, image::imageops::FilterType::Lanczos3).write_to(&mut out, image::ImageFormat::Png)?;
+        Ok(out.into_inner())
+    };
+    Ok((png(128)?, if java { Some(png(64)?) } else { None }))
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::*;
+
+    #[test]
+    fn server_icons_are_exact_squares() {
+        // A wide JPEG, as someone might pick.
+        let mut jpg = std::io::Cursor::new(Vec::new());
+        image::RgbImage::from_pixel(300, 120, image::Rgb([200, 40, 90])).write_to(&mut jpg, image::ImageFormat::Jpeg).unwrap();
+        let (small, icon) = icon_pngs(jpg.get_ref(), true).unwrap();
+        let dims = |b: &[u8]| {
+            let i = image::load_from_memory_with_format(b, image::ImageFormat::Png).unwrap();
+            (i.width(), i.height())
+        };
+        assert_eq!(dims(&small), (128, 128));
+        assert_eq!(dims(&icon.unwrap()), (64, 64));
+        // Bedrock: only the launcher's copy.
+        assert!(icon_pngs(jpg.get_ref(), false).unwrap().1.is_none());
+        assert!(icon_pngs(b"not a picture", true).is_err());
     }
 }

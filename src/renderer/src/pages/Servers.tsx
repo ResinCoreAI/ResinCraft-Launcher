@@ -1,37 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import {
-  Archive,
-  Ban,
-  Blocks,
-  ClipboardCopy,
-  Copy,
-  Crown,
-  Eraser,
-  ExternalLink,
-  FolderInput,
-  FolderOpen,
-  FolderTree,
-  Gamepad2,
-  Globe,
-  Home as HomeIcon,
-  Loader2,
-  Info,
-  Play,
-  Plus,
-  Puzzle,
-  RotateCw,
-  Search,
-  Send,
-  Server,
-  Settings2,
-  SlidersHorizontal,
-  Square,
-  Terminal,
-  Trash2,
-  UserMinus,
-  Users,
-  Wifi
-} from 'lucide-react'
+import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi } from 'lucide-react'
 import type { ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api } from '../api'
@@ -51,6 +19,7 @@ import { rich, t, tx, type Key } from '../i18n'
 import '../servers.css'
 import { hasBedrockApp } from '../platform'
 import { ServerMemoryChip } from '../components/Memory'
+import { usePicturePicker } from '../components/ImagePicker'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
 const MAX_LOG = 3000
@@ -167,6 +136,41 @@ function ServerIcon({ s, size = 48 }: { s: ServerInfo; size?: number }) {
   return (
     <div className="sv-icon" style={{ width: size, height: size }}>
       {s.iconUrl ? <img src={s.iconUrl} alt="" /> : <BlockArt seed={s.id} color={isPluginServer(s) ? '#22d3ee' : s.loader ? '#b26bff' : '#39e58c'} />}
+    </div>
+  )
+}
+
+/** Settings → the server's picture: click to choose one (cropped square), or remove it. */
+function ServerIconPicker({ s, onChanged }: { s: ServerInfo; onChanged: () => Promise<void> }) {
+  const { toast } = useStore()
+  const [busy, setBusy] = useState(false)
+  const apply = async (dataUrl: string | null) => {
+    setBusy(true)
+    try {
+      await api.server.setIcon(s.id, dataUrl)
+      await onChanged()
+      toast(t(dataUrl ? (live(s) ? 'servers.icon.setRestart' : 'servers.icon.set') : 'servers.icon.removed'), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const { open, modal } = usePicturePicker('icon', (url) => void apply(url), (m) => toast(m, 'error'))
+  return (
+    <div className="row" style={{ gap: 10 }}>
+      <button type="button" className="pic-icon-btn sv-icon-pick" disabled={busy} onClick={open} title={t('servers.icon.choose')} aria-label={t('servers.icon.choose')}>
+        <ServerIcon s={s} size={56} />
+        <span className="pic-overlay" aria-hidden="true">
+          {busy ? <Loader2 className="spin" /> : <ImagePlus />}
+        </span>
+      </button>
+      {s.iconUrl && (
+        <button type="button" className="link" disabled={busy} onClick={() => void apply(null)}>
+          {t('art.remove')}
+        </button>
+      )}
+      {modal}
     </div>
   )
 }
@@ -1120,6 +1124,15 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
       <div className="settings-section">
         <h3>{t('servers.settings.general')}</h3>
         <div className="card">
+          <div className="setting">
+            <div className="text">
+              <b>{t('servers.icon.title')}</b>
+              <span>{t(isBedrock(s) ? 'servers.icon.hintBedrock' : 'servers.icon.hint')}</span>
+            </div>
+            <div className="control">
+              <ServerIconPicker s={s} onChanged={reload} />
+            </div>
+          </div>
           <div className="setting">
             <div className="text">
               <b>{t('servers.settings.name')}</b>

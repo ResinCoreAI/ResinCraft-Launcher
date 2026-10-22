@@ -2023,6 +2023,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} już nie istnieje, więc nie ma z czego synchronizować",
   'engine.sync.notFromInstance': "{name} nie został utworzony z instancji",
   'engine.sync.title': "Synchronizowanie {name} z jego instancji",
+  'servers.icon.title': 'Ikona serwera',
+  'servers.icon.hint': 'Dowolny obraz (PNG, JPG, GIF, WebP…). Widoczny tutaj i od następnego startu na liście serwerów graczy.',
+  'servers.icon.hintBedrock': 'Dowolny obraz (PNG, JPG, GIF, WebP…), widoczny w ResinCraft. Serwery Bedrock nie mogą pokazywać ikony graczom.',
+  'servers.icon.choose': 'Wybierz obraz',
+  'servers.icon.set': 'Zapisano ikonę serwera.',
+  'servers.icon.setRestart': 'Zapisano ikonę. Gracze zobaczą ją po ponownym uruchomieniu serwera.',
+  'servers.icon.removed': 'Usunięto ikonę serwera.',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "Polecenia",
   "commands.lead": "Zmienne środowiskowe dla gry oraz własne polecenia uruchamiane przy starcie i po zamknięciu gry.",

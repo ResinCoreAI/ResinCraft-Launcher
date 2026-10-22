@@ -1946,6 +1946,13 @@ const dict: Dict = {
   'engine.sync.instanceGone': "{name} ไม่มีอยู่แล้ว จึงไม่มีอะไรให้ซิงก์",
   'engine.sync.notFromInstance': "{name} ไม่ได้สร้างจากอินสแตนซ์",
   'engine.sync.title': "กำลังซิงก์ {name} จากอินสแตนซ์",
+  'servers.icon.title': 'ไอคอนเซิร์ฟเวอร์',
+  'servers.icon.hint': 'ใช้รูปอะไรก็ได้ (PNG, JPG, GIF, WebP…) แสดงที่นี่ และในรายการเซิร์ฟเวอร์ของผู้เล่นตั้งแต่เปิดเซิร์ฟครั้งถัดไป',
+  'servers.icon.hintBedrock': 'ใช้รูปอะไรก็ได้ (PNG, JPG, GIF, WebP…) แสดงใน ResinCraft เซิร์ฟเวอร์ Bedrock แสดงไอคอนให้ผู้เล่นเห็นไม่ได้',
+  'servers.icon.choose': 'เลือกรูป',
+  'servers.icon.set': 'บันทึกไอคอนเซิร์ฟเวอร์แล้ว',
+  'servers.icon.setRestart': 'บันทึกไอคอนแล้ว ผู้เล่นจะเห็นหลังรีสตาร์ทเซิร์ฟเวอร์',
+  'servers.icon.removed': 'ลบไอคอนเซิร์ฟเวอร์แล้ว',
   // Custom commands and environment variables (Settings → Commands, instance settings)
   "commands.nav": "คำสั่ง",
   "commands.lead": "ตัวแปรสภาพแวดล้อมสำหรับเกม และคำสั่งของคุณเองที่ทำงานตอนเริ่มเกมและหลังปิดเกม",

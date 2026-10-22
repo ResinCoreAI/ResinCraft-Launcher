@@ -92,6 +92,7 @@ pub async fn update(id: &str, patch: Value) -> Result<ServerMeta> {
             "relaySecret" => m.relay_secret = text(&v),
             "domain" => m.domain = text(&v).map(|d| super::domain::normalize(&d)).transpose()?,
             "dnsAuto" => m.dns_auto = v.as_bool().unwrap_or(m.dns_auto),
+            "iconUrl" => m.icon_url = text(&v),
             _ => {}
         }
     }

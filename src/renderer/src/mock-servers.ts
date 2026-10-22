@@ -373,6 +373,10 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
     ),
     list: () => wait(servers, 150),
     get: async (id) => find(id),
+    setIcon: async (id, dataUrl) => {
+      servers = servers.map((s) => (s.id === id ? { ...s, iconUrl: dataUrl ?? undefined } : s))
+      return wait(find(id), 300)
+    },
     versions: (type) =>
       wait(
         type === 'vanilla'

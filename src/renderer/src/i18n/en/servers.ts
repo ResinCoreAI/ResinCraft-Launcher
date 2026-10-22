@@ -315,6 +315,13 @@ export default {
   'servers.properties.filter': 'Filter',
 
   'servers.settings.general': 'General',
+  'servers.icon.title': 'Server icon',
+  'servers.icon.hint': "Any picture (PNG, JPG, GIF, WebP…). Shown here and in players' server list, from the next start.",
+  'servers.icon.hintBedrock': "Any picture (PNG, JPG, GIF, WebP…), shown in ResinCraft. Bedrock servers can't show players an icon.",
+  'servers.icon.choose': 'Choose a picture',
+  'servers.icon.set': 'Server icon saved.',
+  'servers.icon.setRestart': 'Server icon saved. Players see it after the server restarts.',
+  'servers.icon.removed': 'Server icon removed.',
   'servers.settings.name': 'Name',
   'servers.settings.port': 'Port',
   'servers.settings.portHint': 'Usually 25565. Each server running at the same time needs its own port.',
