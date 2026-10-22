@@ -1115,6 +1115,8 @@ export interface ServerInfo {
   public: boolean
   /** Start with Aikar's tuned G1GC flags (-Xms = -Xmx). */
   optimizedFlags: boolean
+  /** Start with the server pack's own Java flags instead of ResinCraft's (ResinCraft's when the pack sets none). */
+  packFlags?: boolean
   /** How the server is shared over the internet. The relay is always the last resort. */
   tunnel: ServerTunnel
   /** A bore relay instead of bore.pub ("host" or "host:port"), and its secret. */
@@ -1160,7 +1162,7 @@ export interface ServerCreated {
 export type ServerPatch = Partial<
   Pick<
     ServerInfo,
-    'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'tunnel' | 'relayHost' | 'relaySecret' | 'domain' | 'dnsAuto'
+    'name' | 'memoryMb' | 'port' | 'javaPath' | 'jvmArgs' | 'public' | 'optimizedFlags' | 'packFlags' | 'tunnel' | 'relayHost' | 'relaySecret' | 'domain' | 'dnsAuto'
   >
 >
 
@@ -1616,6 +1618,8 @@ export interface ResinApi {
     log(id: string): Promise<LogLine[]>
     /** The Java arguments the next start uses (after "java"). */
     launchArgs(id: string): Promise<string[]>
+    /** The Java flags the server pack sets for itself (user_jvm_args.txt, variables.txt, its start script). */
+    packFlags(id: string): Promise<string[]>
     properties(id: string): Promise<PropEntry[]>
     setProperties(id: string, entries: PropEntry[]): Promise<void>
     playerList(id: string, kind: PlayerListKind): Promise<ServerListEntry[]>

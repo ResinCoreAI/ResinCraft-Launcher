@@ -189,6 +189,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       command: fn('server:command'),
       log: fn('server:log'),
       launchArgs: fn('server:launchArgs'),
+      packFlags: fn('server:packFlags'),
       properties: fn('server:properties'),
       setProperties: fn('server:setProperties'),
       playerList: fn('server:playerList'),

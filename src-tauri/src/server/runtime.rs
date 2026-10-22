@@ -4,7 +4,7 @@
 //! launcher quits.
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -234,7 +234,15 @@ pub fn optimized_flags(memory_mb: u32) -> Vec<String> {
 /// (after ours, so they can override), then the server jar or @argument file and `nogui`.
 pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
     let memory = meta.memory_mb.max(512);
-    let mut args = if meta.optimized_flags {
+    let pack = if meta.pack_flags { store::dir(&meta.id).map(|d| pack_flags(&d)).unwrap_or_default() } else { Vec::new() };
+    let mut args = if !pack.is_empty() {
+        // The pack's own flags; the server's memory setting fills in when the pack doesn't cap the heap.
+        let mut a = pack;
+        if !a.iter().any(|f| f.starts_with("-Xmx")) {
+            a.insert(0, format!("-Xmx{memory}M"));
+        }
+        a
+    } else if meta.optimized_flags {
         let mut a = vec![format!("-Xms{memory}M"), format!("-Xmx{memory}M")];
         a.extend(optimized_flags(memory));
         a
@@ -256,6 +264,50 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
         args.push("nogui".into());
     }
     Ok(args)
+}
+
+/// The Java flags a server pack sets for itself, in the order Java would read them: user_jvm_args.txt (Forge and
+/// NeoForge), JAVA_ARGS in variables.txt (the common server start scripts), then the -X flags on the java line of a
+/// start script. Repeated flags keep their first setting. Empty when the pack sets none.
+pub fn pack_flags(dir: &Path) -> Vec<String> {
+    let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap_or_default();
+    let mut found: Vec<String> = Vec::new();
+    for line in read("user_jvm_args.txt").lines() {
+        let l = line.trim();
+        if !l.is_empty() && !l.starts_with('#') {
+            found.extend(split_args(l));
+        }
+    }
+    for line in read("variables.txt").lines() {
+        if let Some(v) = line.trim().strip_prefix("JAVA_ARGS=") {
+            found.extend(split_args(v.trim().trim_matches(|c| c == '"' || c == '\'')));
+        }
+    }
+    for script in ["start.bat", "start.sh", "startserver.bat", "startserver.sh", "start.cmd", "ServerStart.bat", "ServerStart.sh"] {
+        for line in read(script).lines() {
+            let l = line.trim();
+            if l.starts_with('#') || l.to_lowercase().starts_with("rem ") || !l.to_lowercase().contains("java") {
+                continue;
+            }
+            // Only plain flags: anything built from the script's own variables can't be read here.
+            found.extend(split_args(l).into_iter().filter(|a| a.starts_with("-X") && !a.contains('%') && !a.contains('$')));
+        }
+    }
+    let key = |f: &str| -> String {
+        for p in ["-Xmx", "-Xms", "-Xss", "-Xmn"] {
+            if f.starts_with(p) {
+                return p.to_string();
+            }
+        }
+        // -XX:+Flag / -XX:-Flag / -XX:Flag=value, and -Dname=value, are one setting each.
+        f.trim_start_matches("-XX:").trim_start_matches(['+', '-']).split('=').next().unwrap_or(f).to_string()
+    };
+    let mut seen = BTreeSet::new();
+    found
+        .into_iter()
+        .filter(|f| f.starts_with('-') && f != "-jar" && f != "-cp" && !f.starts_with("-classpath"))
+        .filter(|f| seen.insert(key(f)))
+        .collect()
 }
 
 /// Starts a server. Returns once Java is running; the server is watched in the background and reports
@@ -1542,5 +1594,26 @@ mod player_tests {
         // More than a ping carries: known names are added.
         merge_players(&mut p, &mut c, 20, &names(&["Steve", ".PuirkleBE"]));
         assert_eq!(p, set(&["Alex", "Steve", ".PuirkleBE"]));
+    }
+}
+
+#[cfg(test)]
+mod pack_flag_tests {
+    use super::*;
+
+    #[test]
+    fn reads_the_flags_a_server_pack_sets() {
+        let dir = std::env::temp_dir().join(format!("resin-packflags-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Forge's untouched file sets nothing.
+        std::fs::write(dir.join("user_jvm_args.txt"), "# A good default for a modded server is 4GB.\n# -Xmx4G\n").unwrap();
+        assert!(pack_flags(&dir).is_empty());
+        std::fs::write(dir.join("user_jvm_args.txt"), "# memory\n-Xmx6G -Xms6G\n-XX:+UseZGC\n").unwrap();
+        std::fs::write(dir.join("variables.txt"), "MINECRAFT_VERSION=1.20.1\nJAVA_ARGS=\"-Xmx10G -XX:+UseG1GC -Dfml.readTimeout=180\"\n").unwrap();
+        std::fs::write(dir.join("start.sh"), "#!/bin/sh\njava -Xss4M -Xmx$RAM -jar server.jar nogui\n").unwrap();
+        let flags = pack_flags(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        // user_jvm_args.txt wins over variables.txt; a script's $RAM can't be read.
+        assert_eq!(flags, ["-Xmx6G", "-Xms6G", "-XX:+UseZGC", "-XX:+UseG1GC", "-Dfml.readTimeout=180", "-Xss4M"]);
     }
 }

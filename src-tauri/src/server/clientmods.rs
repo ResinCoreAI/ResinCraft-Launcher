@@ -71,14 +71,17 @@ pub async fn sweep(dir: &Path) -> Vec<String> {
         let hashes: Vec<String> = by_hash.keys().cloned().collect();
         let lookup = tokio::time::timeout(std::time::Duration::from_secs(15), super::create::client_only_sha1s(&hashes)).await;
         let Ok(Ok(client)) = lookup else { return moved };
+        let flagged: Vec<PathBuf> = by_hash.iter().filter(|(h, _)| client.contains_key(*h)).map(|(_, (_, p, _))| p.clone()).collect();
+        let removable: BTreeSet<PathBuf> = not_needed(&mods, flagged).into_iter().collect();
         for (hash, (name, path, st)) in by_hash {
             match client.get(&hash) {
-                Some(title) => {
+                Some(title) if removable.contains(&path) => {
                     if move_out(dir, &path).await {
                         moved.push(title.clone());
                     }
                 }
-                None => {
+                // Not client-only, or client-only but another mod here needs it: it stays.
+                _ => {
                     checked.ok.insert(name, st);
                 }
             }
@@ -106,6 +109,8 @@ struct Patterns {
     mixin_owner: Regex,
     mods_toml_id: Regex,
     fabric_id: Regex,
+    fabric_depends: Regex,
+    json_key: Regex,
 }
 
 fn patterns() -> &'static Patterns {
@@ -117,6 +122,8 @@ fn patterns() -> &'static Patterns {
         mixin_owner: Regex::new(r"\.(?:handler|redirect|modify|localvar|wrapOperation|wrapWithCondition|modifyExpressionValue|modifyReturnValue)\$[0-9a-z]+\$([a-z][a-z0-9_]{1,63})\$").unwrap(),
         mods_toml_id: Regex::new(r#"(?m)^\s*modId\s*=\s*"([^"]+)""#).unwrap(),
         fabric_id: Regex::new(r#""id"\s*:\s*"([^"]+)""#).unwrap(),
+        fabric_depends: Regex::new(r#""depends"\s*:\s*\{([^}]*)\}"#).unwrap(),
+        json_key: Regex::new(r#""([^"]+)"\s*:"#).unwrap(),
     })
 }
 
@@ -181,32 +188,110 @@ fn report_culprits(report: &str, mods: &Path) -> Vec<PathBuf> {
 
 /// Mod ids declared by each jar in `mods` (Forge/NeoForge mods.toml, Fabric/Quilt metadata).
 fn mod_ids(mods: &Path) -> Vec<(String, PathBuf)> {
-    let p = patterns();
     let mut out = Vec::new();
     for (_, path, _) in jars(mods) {
-        let Ok(file) = std::fs::File::open(&path) else { continue };
-        let Ok(mut zip) = zip::ZipArchive::new(file) else { continue };
-        let mut read = |name: &str| -> Option<String> {
-            let mut s = String::new();
-            zip.by_name(name).ok()?.take(256 * 1024).read_to_string(&mut s).ok()?;
-            Some(s)
-        };
-        for toml in ["META-INF/mods.toml", "META-INF/neoforge.mods.toml"] {
-            if let Some(text) = read(toml) {
-                // Ids before the first dependency table are the jar's own mods.
-                let own = text.split("[[dependencies").next().unwrap_or("");
-                out.extend(p.mods_toml_id.captures_iter(own).map(|c| (c[1].to_string(), path.clone())));
-            }
+        out.extend(jar_meta(&path).ids.into_iter().map(|id| (id, path.clone())));
+    }
+    out
+}
+
+/// What a jar says about itself: the mods it holds, and the mods they need on a server.
+#[derive(Default)]
+struct JarMods {
+    ids: Vec<String>,
+    needs: Vec<String>,
+}
+
+/// The game and its loaders, which every mod lists as a dependency.
+const NOT_MODS: [&str; 7] = ["minecraft", "forge", "neoforge", "java", "fabricloader", "quilt_loader", "fml"];
+
+fn jar_meta(path: &Path) -> JarMods {
+    let p = patterns();
+    let mut out = JarMods::default();
+    let Ok(file) = std::fs::File::open(path) else { return out };
+    let Ok(mut zip) = zip::ZipArchive::new(file) else { return out };
+    let mut read = |name: &str| -> Option<String> {
+        let mut s = String::new();
+        zip.by_name(name).ok()?.take(256 * 1024).read_to_string(&mut s).ok()?;
+        Some(s)
+    };
+    for toml in ["META-INF/mods.toml", "META-INF/neoforge.mods.toml"] {
+        if let Some(text) = read(toml) {
+            // Ids before the first dependency table are the jar's own mods.
+            let own = text.split("[[dependencies").next().unwrap_or("");
+            out.ids.extend(p.mods_toml_id.captures_iter(own).map(|c| c[1].to_string()));
+            out.needs.extend(toml_needs(&text));
         }
-        for json in ["fabric.mod.json", "quilt.mod.json"] {
-            if let Some(text) = read(json) {
-                if let Some(c) = p.fabric_id.captures(&text) {
-                    out.push((c[1].to_string(), path.clone()));
-                }
+    }
+    for json in ["fabric.mod.json", "quilt.mod.json"] {
+        if let Some(text) = read(json) {
+            if let Some(c) = p.fabric_id.captures(&text) {
+                out.ids.push(c[1].to_string());
+            }
+            if let Some(c) = p.fabric_depends.captures(&text) {
+                out.needs.extend(p.json_key.captures_iter(&c[1]).map(|k| k[1].to_string()));
             }
         }
     }
+    out.needs.retain(|n| !NOT_MODS.contains(&n.as_str()));
     out
+}
+
+/// The mods a mods.toml requires on a server: its [[dependencies.*]] tables that are mandatory (or of type
+/// "required") and not for the client side only.
+fn toml_needs(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let (mut in_dep, mut id, mut required, mut client) = (false, None::<String>, false, false);
+    let mut flush = |id: &mut Option<String>, required: &mut bool, client: &mut bool| {
+        if let Some(i) = id.take() {
+            if *required && !*client {
+                out.push(i);
+            }
+        }
+        *required = false;
+        *client = false;
+    };
+    for line in text.lines() {
+        let l = line.trim();
+        if l.starts_with('[') {
+            flush(&mut id, &mut required, &mut client);
+            in_dep = l.starts_with("[[dependencies");
+            continue;
+        }
+        if !in_dep {
+            continue;
+        }
+        let Some((k, v)) = l.split_once('=') else { continue };
+        let v = v.split('#').next().unwrap_or("").trim().trim_matches('"').to_lowercase();
+        match k.trim() {
+            "modId" => id = Some(v),
+            "mandatory" => required = v == "true",
+            "type" => required = v == "required",
+            "side" => client = v == "client",
+            _ => {}
+        }
+    }
+    flush(&mut id, &mut required, &mut client);
+    out
+}
+
+/// Of `candidates` (jars in `mods` to take off a server), those no mod staying there needs. A mod another mod
+/// requires stays even when Modrinth calls it client-only (a library a server-side mod builds on).
+pub fn not_needed(mods: &Path, candidates: Vec<PathBuf>) -> Vec<PathBuf> {
+    let all: Vec<(PathBuf, JarMods)> = jars(mods).into_iter().map(|(_, path, _)| (path.clone(), jar_meta(&path))).collect();
+    let mut going: BTreeSet<PathBuf> = candidates.into_iter().collect();
+    loop {
+        let needed: BTreeSet<&String> = all.iter().filter(|(p, _)| !going.contains(p)).flat_map(|(_, m)| m.needs.iter()).collect();
+        let keep: Vec<PathBuf> =
+            all.iter().filter(|(p, m)| going.contains(p) && m.ids.iter().any(|id| needed.contains(id))).map(|(p, _)| p.clone()).collect();
+        if keep.is_empty() {
+            break;
+        }
+        for p in keep {
+            going.remove(&p);
+        }
+    }
+    going.into_iter().collect()
 }
 
 #[cfg(test)]
@@ -236,6 +321,31 @@ Details:
         let found = report_culprits(REPORT, &mods);
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(found, vec![mods.join("zume-1.2.0.jar")]);
+    }
+
+    #[test]
+    fn mods_toml_dependencies_needed_on_a_server() {
+        let toml = r#"
+[[mods]]
+modId="tacz"
+[[dependencies.tacz]]
+    modId="forge"
+    mandatory=true
+    side="BOTH"
+[[dependencies.tacz]]
+    modId="searchables" # a library
+    mandatory=true
+    side="BOTH"
+[[dependencies.tacz]]
+    modId="jei"
+    mandatory=false
+    side="BOTH"
+[[dependencies.tacz]]
+    modId="embeddium"
+    type="required"
+    side="CLIENT"
+"#;
+        assert_eq!(toml_needs(toml), vec!["forge".to_string(), "searchables".to_string()]);
     }
 
     #[test]

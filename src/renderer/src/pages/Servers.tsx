@@ -1116,7 +1116,17 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
       .launchArgs(s.id)
       .then(setCommand)
       .catch(() => setCommand(undefined))
-  }, [s.id, s.type, s.optimizedFlags, s.memoryMb, s.jvmArgs])
+  }, [s.id, s.type, s.optimizedFlags, s.packFlags, s.memoryMb, s.jvmArgs])
+  // What the server pack sets for itself, for the Java flags choice.
+  const [packFlags, setPackFlags] = useState<string[]>()
+  useEffect(() => {
+    if (s.type === 'bedrock') return
+    void api.server
+      .packFlags(s.id)
+      .then(setPackFlags)
+      .catch(() => setPackFlags([]))
+  }, [s.id, s.type])
+  const usingPack = !!s.packFlags && !!packFlags?.length
 
   const save = async (patch: Parameters<typeof api.server.update>[1]) => {
     try {
@@ -1216,11 +1226,33 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               </div>
               <div className="setting">
                 <div className="text">
-                  <b>{t('servers.settings.optimized')}</b>
-                  <span>{t('servers.settings.optimizedHint')}</span>
+                  <b>{t('servers.settings.flags')}</b>
+                  <span>
+                    {!packFlags
+                      ? t('servers.settings.flagsHint')
+                      : packFlags.length
+                        ? t('servers.settings.flagsPack', { flags: packFlags.join(' ') })
+                        : t('servers.settings.flagsNone')}
+                  </span>
                 </div>
-                <Switch on={s.optimizedFlags} onChange={(v) => void save({ optimizedFlags: v })} label={t('servers.settings.optimized')} />
+                <Segmented<'resin' | 'pack'>
+                  value={s.packFlags ? 'pack' : 'resin'}
+                  onChange={(v) => void save({ packFlags: v === 'pack' })}
+                  options={[
+                    { value: 'resin', label: t('servers.settings.flagsResin') },
+                    { value: 'pack', label: t('servers.settings.flagsModpack') }
+                  ]}
+                />
               </div>
+              {!usingPack && (
+                <div className="setting">
+                  <div className="text">
+                    <b>{t('servers.settings.optimized')}</b>
+                    <span>{t('servers.settings.optimizedHint')}</span>
+                  </div>
+                  <Switch on={s.optimizedFlags} onChange={(v) => void save({ optimizedFlags: v })} label={t('servers.settings.optimized')} />
+                </div>
+              )}
               <div className="setting stack">
                 <div className="text">
                   <b>{t('servers.settings.jvmArgs')}</b>

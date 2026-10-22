@@ -116,6 +116,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:log" => json(runtime::log(&args.get::<String>(0)?)),
         "server:launchArgs" => json(runtime::launch_args(&store::get(&args.get::<String>(0)?).await?)?),
+        "server:packFlags" => json(runtime::pack_flags(&store::dir(&args.get::<String>(0)?)?)),
         "server:properties" => json(properties::read(&store::dir(&args.get::<String>(0)?)?).await),
         "server:setProperties" => {
             properties::write_all(&args.get::<String>(0)?, &args.get::<Vec<PropEntry>>(1)?).await?;

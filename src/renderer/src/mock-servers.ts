@@ -569,10 +569,14 @@ export function mockServers(): { server: ResinApi['server']; onServer: ResinApi[
       else say(id, `[${ts()}] [Server thread/INFO]: Unknown or incomplete command, see below for error`, 'warn')
     },
     log: async (id) => logs[id] ?? [],
+    packFlags: async (id) => (find(id).modpack ? ['-Xmx6G', '-Xms6G', '-XX:+UseG1GC', '-Dfml.readTimeout=180'] : []),
     launchArgs: async (id) => {
       const s = find(id)
       const mem = `${s.memoryMb}M`
-      const flags = s.optimizedFlags
+      const pack = s.packFlags && s.modpack ? ['-Xmx6G', '-Xms6G', '-XX:+UseG1GC', '-Dfml.readTimeout=180'] : undefined
+      const flags = pack
+        ? pack
+        : s.optimizedFlags
         ? [
             `-Xms${mem}`,
             `-Xmx${mem}`,

@@ -628,6 +628,7 @@ async fn import_server(f: Found, task: &std::sync::Arc<Task>, progress: &impl Fn
         launch: f.launch.clone().unwrap_or_default(),
         public: true,
         optimized_flags: true,
+        pack_flags: false,
         tunnel: TunnelMode::Playit,
         relay_host: None,
         relay_secret: None,

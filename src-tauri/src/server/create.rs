@@ -91,6 +91,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         launch: ServerLaunch::default(),
         public: true,
         optimized_flags: true,
+        pack_flags: false,
         // New servers share through playit.gg: an address that never changes, with no router setup.
         tunnel: TunnelMode::Playit,
         relay_host: None,
@@ -716,8 +717,10 @@ pub async fn drop_client_only(mods: &Path, task: &Arc<Task>) -> Vec<String> {
     task.update("Checking which mods are client-only…", None);
     match find_client_only(mods).await {
         Ok(found) => {
+            // Never one another mod on the server needs.
+            let removable = super::clientmods::not_needed(mods, found.iter().map(|(p, _)| p.clone()).collect());
             let mut names = Vec::new();
-            for (path, title) in found {
+            for (path, title) in found.into_iter().filter(|(p, _)| removable.contains(p)) {
                 if tokio::fs::remove_file(&path).await.is_ok() {
                     names.push(title);
                 }

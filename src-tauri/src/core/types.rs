@@ -953,6 +953,10 @@ pub struct ServerMeta {
     /// Start Java with Aikar's tuned G1GC flags (and -Xms = -Xmx).
     #[serde(default = "yes")]
     pub optimized_flags: bool,
+    /// Start Java with the flags the server pack sets for itself (user_jvm_args.txt, variables.txt, its start
+    /// script) instead of ResinCraft's; ResinCraft's are used when the pack sets none.
+    #[serde(default)]
+    pub pack_flags: bool,
     /// How the server is shared over the internet when `public` is on.
     #[serde(default)]
     pub tunnel: TunnelMode,
