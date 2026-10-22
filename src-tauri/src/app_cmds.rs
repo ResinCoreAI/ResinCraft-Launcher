@@ -51,6 +51,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "instances:collectPending" => json(crate::content::manual::collect(&args.get::<String>(0)?).await?),
         "instances:addWatchFolder" => json(crate::content::manual::add_watch_folder().await?),
         "instances:duplicate" => json(instances::duplicate(&args.get::<String>(0)?).await?),
+        "instances:copyFrom" => json(
+            crate::player::carry::copy_from(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<crate::player::carry::CopyPicks>(2)?).await?,
+        ),
         "instances:setImage" => {
             let id: String = args.get(0)?;
             crate::player::files::instance_root(&id).await?;

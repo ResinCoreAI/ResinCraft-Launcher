@@ -1926,6 +1926,15 @@ button.stat b {
   accent-color: var(--accent);
   margin: 0;
 }
+.field .hint.warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+}
+.field > label svg {
+  vertical-align: -2px;
+}
 .export-summary {
   list-style: none;
   margin: 0;

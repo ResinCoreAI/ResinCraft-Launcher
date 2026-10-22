@@ -311,6 +311,16 @@ export function mockApi(): ResinApi {
         instances = [copy, ...instances]
         return copy
       },
+      copyFrom: (_id, _from, picks) =>
+        wait(
+          {
+            worlds: picks.worlds.map((w) => `${w} (2)`),
+            shaders: picks.shaders ? 2 : 0,
+            resourcePacks: picks.resourcePacks ? 1 : 0,
+            settings: picks.settings ? 2 : 0
+          },
+          1200
+        ),
       resetIcon: async (id) => {
         instances = instances.map((i) => (i.id === id ? { ...i, iconUrl: i.packIconUrl, packIconUrl: undefined } : i))
         return instances.find((i) => i.id === id)!

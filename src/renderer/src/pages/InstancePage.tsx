@@ -44,7 +44,8 @@ import ExportModal from '../components/ExportModal'
 import { BannerPicker, IconPicker } from '../components/ImagePicker'
 import VersionPicker from '../components/VersionPicker'
 import { DeleteInstance } from './Library'
-import { Camera, Earth, FolderTree, NotebookPen, Server } from 'lucide-react'
+import { Camera, Earth, FolderInput, FolderTree, NotebookPen, Server } from 'lucide-react'
+import CopyFromModal from '../components/CopyFromModal'
 import NotesTab from '../components/NotesTab'
 import ScreenshotsTab from '../components/ScreenshotsTab'
 import ServersTab from '../components/ServersTab'
@@ -66,6 +67,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
   const [tab, setTab] = useState<Tab>(initialTab ?? 'content')
   const [exporting, setExporting] = useState(false)
   const [editingPack, setEditingPack] = useState(false)
+  const [copyingFrom, setCopyingFrom] = useState(false)
+  // Bumped after copying from another instance, so the open tab reads its lists again.
+  const [copies, setCopies] = useState(0)
 
   if (!inst)
     return (
@@ -124,6 +128,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <button className="btn lg" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
           <PackageOpen /> {t('instance.export')}
         </button>
+        <button className="btn lg icon" title={t('copyFrom.title')} aria-label={t('copyFrom.title')} onClick={() => setCopyingFrom(true)}>
+          <FolderInput />
+        </button>
         <button className="btn lg icon" title={t('servers.fromInstance')} onClick={() => go({ page: 'servers', fromInstance: inst.id })}>
           <Server />
         </button>
@@ -133,6 +140,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <PlayButton inst={inst} size="lg" />
       </div>
       {exporting && <ExportModal inst={inst} onClose={() => setExporting(false)} />}
+      {copyingFrom && <CopyFromModal inst={inst} onClose={() => setCopyingFrom(false)} onCopied={() => setCopies((n) => n + 1)} />}
       {editingPack && (
         <PackDetailsModal
           inst={{
@@ -170,9 +178,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         </button>
       </div>
 
-      {tab === 'content' && <ContentTab inst={inst} />}
+      {tab === 'content' && <ContentTab key={copies} inst={inst} />}
       {tab === 'logs' && <LogsTab inst={inst} />}
-      {tab === 'worlds' && <WorldsTab inst={inst} />}
+      {tab === 'worlds' && <WorldsTab key={copies} inst={inst} />}
       {tab === 'servers' && <ServersTab inst={inst} />}
       {tab === 'screenshots' && <ScreenshotsTab inst={inst} />}
       {tab === 'notes' && <NotesTab inst={inst} />}

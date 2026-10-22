@@ -759,6 +759,26 @@ export interface ExportResult {
 export type GameMode = 'survival' | 'creative' | 'adventure' | 'spectator'
 
 /** A single-player world in an instance's saves folder. */
+/** What to bring over from another instance (instances.copyFrom). */
+export interface CopyPicks {
+  /** World folders in the other instance's saves/. */
+  worlds: string[]
+  shaders: boolean
+  resourcePacks: boolean
+  /** options.txt, OptiFine's and the shader options: replace this instance's. */
+  settings: boolean
+}
+
+/** What instances.copyFrom brought over. */
+export interface CopyResult {
+  /** The new world folders (renamed when the name was taken). */
+  worlds: string[]
+  shaders: number
+  resourcePacks: number
+  /** Settings files replaced. */
+  settings: number
+}
+
 export interface WorldInfo {
   /** Folder name inside saves/, which is also the world's id. */
   folder: string
@@ -1402,6 +1422,11 @@ export interface ResinApi {
     /** Asks for another folder for Download all to look in; the updated list, or null if cancelled. */
     addWatchFolder(): Promise<string[] | null>
     duplicate(id: string): Promise<Instance>
+    /**
+     * Brings worlds, shader packs, resource packs and settings from instance `fromId` into `id`. Worlds come in beside
+     * the ones there (renamed when taken), packs only when missing; settings replace this instance's.
+     */
+    copyFrom(id: string, fromId: string, picks: CopyPicks): Promise<CopyResult>
     /** Drops a custom icon (see screenshots.setIcon): back to the modpack's icon, or the generated block art. */
     resetIcon(id: string): Promise<Instance>
     /** Sets a picture the player chose (a cropped image as a data URL), or removes it with null. */
