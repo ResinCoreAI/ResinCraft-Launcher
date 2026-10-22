@@ -14,10 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{
-    self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS,
-    PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION,
-};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -157,6 +154,8 @@ pub enum Event {
     /// A top-up: the answer to [`Command::TopUp`] (`refused` says why there's none), or the relay's admin added
     /// data (`by_admin`). `usage` is the account's data after it.
     TopUp { added_bytes: u64, by_admin: bool, refused: Option<ErrorCode>, usage: Usage },
+    /// A player asks on the web page to be whitelisted; answer with [`Command::JoinAnswer`].
+    JoinRequest { id: u64, username: String },
 }
 
 /// The answer to a top-up asked for outside [`Connection::serve`].
@@ -174,6 +173,10 @@ pub enum Command {
     /// More data for this month (once little is left); answered with [`Event::TopUp`]. Relays older than
     /// protocol 4 don't have top-ups: the answer is a refusal right away.
     TopUp,
+    /// Take whitelist requests from the web page, or stop. Relays older than protocol 5 have no web page: ignored.
+    JoinRequests(bool),
+    /// The answer to an [`Event::JoinRequest`] (ignored by relays older than protocol 5).
+    JoinAnswer { id: u64, outcome: JoinOutcome },
 }
 
 enum Target {
@@ -255,15 +258,19 @@ impl Drop for Connection {
 }
 
 impl Connection {
-    /// Connects and says hello. A relay that doesn't know this protocol yet (one not updated since Bedrock
-    /// tunnels came, protocol 3) is asked again with protocol 3: the newer features then stay off.
+    /// Connects and says hello. A relay that doesn't know this protocol yet is asked again with each older one
+    /// that matters (top-ups, then Bedrock tunnels): the newer features then stay off.
     pub async fn connect(cfg: &AgentConfig) -> Result<Connection, AgentError> {
-        match Self::over_version(Self::open(cfg).await?, &cfg.client, PROTOCOL_VERSION).await {
-            Err(AgentError::Refused(ErrorCode::Version, _)) if PROTOCOL_VERSION > BEDROCK_PROTOCOL_VERSION => {
-                Self::over_version(Self::open(cfg).await?, &cfg.client, BEDROCK_PROTOCOL_VERSION).await
+        let mut result = Self::over_version(Self::open(cfg).await?, &cfg.client, PROTOCOL_VERSION).await;
+        for older in [TOPUP_PROTOCOL_VERSION, BEDROCK_PROTOCOL_VERSION] {
+            match result {
+                Err(AgentError::Refused(ErrorCode::Version, _)) if older < PROTOCOL_VERSION => {
+                    result = Self::over_version(Self::open(cfg).await?, &cfg.client, older).await;
+                }
+                _ => break,
             }
-            other => other,
         }
+        result
     }
 
     /// The connection to the agent port (TLS unless the URL says tcp://).
@@ -420,6 +427,11 @@ impl Connection {
         }
     }
 
+    /// Whether this relay takes whitelist requests from its web page.
+    pub fn has_join_requests(&self) -> bool {
+        self.relay_version >= JOIN_REQUESTS_PROTOCOL_VERSION
+    }
+
     /// Whether this relay has data top-ups.
     pub fn has_top_ups(&self) -> bool {
         self.relay_version >= TOPUP_PROTOCOL_VERSION
@@ -512,6 +524,7 @@ impl Connection {
                         Ok(RelayMsg::SessionExtended { secs_left, continues }) => on_event(Event::Extended { secs_left, continues }),
                         Ok(RelayMsg::Service { state, message }) => on_event(Event::Service { state, message }),
                         Ok(RelayMsg::TopUp { added_bytes, by_admin, refused, usage }) => on_event(Event::TopUp { added_bytes, by_admin, refused, usage }),
+                        Ok(RelayMsg::JoinRequest { id, username }) => on_event(Event::JoinRequest { id, username }),
                         Ok(RelayMsg::Pong { .. }) => {}
                         Ok(RelayMsg::Error { code, message, ban }) => return refused(code, message, ban),
                         Ok(RelayMsg::Shutdown { .. }) => return AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into()),
@@ -539,6 +552,17 @@ impl Connection {
                             return e;
                         }
                     }
+                    Some(Command::JoinRequests(enabled)) if self.has_join_requests() => {
+                        if let Err(e) = self.send(&AgentMsg::JoinRequests { enabled }).await {
+                            return e;
+                        }
+                    }
+                    Some(Command::JoinAnswer { id, outcome }) if self.has_join_requests() => {
+                        if let Err(e) = self.send(&AgentMsg::JoinAnswer { id, outcome }).await {
+                            return e;
+                        }
+                    }
+                    Some(Command::JoinRequests(_) | Command::JoinAnswer { .. }) => {}
                     None => commands_open = false,
                 },
                 _ = ping.tick() => {
@@ -630,6 +654,55 @@ async fn forward_udp(stream: BufReader<StreamHandle>, local: SocketAddr) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A relay that speaks protocols up to `newest`: it refuses newer hellos as an old relay does, else welcomes.
+    async fn old_relay(newest: u32) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("tcp://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            while let Ok((tcp, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut session = Session::new_server(tcp, yamux_config());
+                    let Some(Ok(stream)) = session.next().await else { return };
+                    tokio::spawn(async move { while session.next().await.is_some() {} });
+                    let (r, mut w) = tokio::io::split(stream);
+                    let mut lines = FramedRead::new(r, LinesCodec::new());
+                    let Some(Ok(hello)) = lines.next().await else { return };
+                    let answer = match serde_json::from_str::<AgentMsg>(&hello) {
+                        Ok(AgentMsg::Hello { version, .. }) if version <= newest => RelayMsg::Welcome { version: newest, base_domain: "relay.test".into() },
+                        _ => RelayMsg::Error { code: ErrorCode::Version, message: "update ResinCraft Launcher".into(), ban: None },
+                    };
+                    let _ = w.write_all(format!("{}
+", serde_json::to_string(&answer).unwrap()).as_bytes()).await;
+                    let _ = w.flush().await;
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                });
+            }
+        });
+        url
+    }
+
+    #[tokio::test]
+    async fn steps_down_to_what_an_older_relay_speaks() {
+        for (relay, expect) in [(TOPUP_PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION), (BEDROCK_PROTOCOL_VERSION, BEDROCK_PROTOCOL_VERSION), (PROTOCOL_VERSION, PROTOCOL_VERSION)] {
+            let cfg = AgentConfig { url: old_relay(relay).await, extra_roots_pem: None, client: "test".into() };
+            let conn = Connection::connect(&cfg).await.unwrap();
+            assert_eq!(conn.relay_version, expect, "relay speaking {relay}");
+            // Top-ups stay on with a protocol 4 relay; web requests only from 5.
+            assert_eq!(conn.has_top_ups(), relay >= TOPUP_PROTOCOL_VERSION);
+            assert_eq!(conn.has_join_requests(), relay >= JOIN_REQUESTS_PROTOCOL_VERSION);
+        }
+    }
+
+    #[test]
+    fn join_messages_on_the_wire() {
+        let up = AgentMsg::JoinAnswer { id: 7, outcome: JoinOutcome::AlreadyListed };
+        assert_eq!(serde_json::to_string(&up).unwrap(), r#"{"t":"join_answer","id":7,"outcome":"already_listed"}"#);
+        let down: RelayMsg = serde_json::from_str(r#"{"t":"join_request","id":7,"username":"Steve"}"#).unwrap();
+        assert_eq!(down, RelayMsg::JoinRequest { id: 7, username: "Steve".into() });
+        let later: JoinOutcome = serde_json::from_str(r#""something_new""#).unwrap();
+        assert_eq!(later, JoinOutcome::Unknown);
+    }
 
     #[test]
     fn parses_relay_urls() {

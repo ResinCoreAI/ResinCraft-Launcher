@@ -59,6 +59,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             }
             if (&meta.join_requests, &meta.name) != (&before.join_requests, &before.name) {
                 discordbot::reconcile().await;
+                relay::send_join_requests(&id).await;
             }
             if (&meta.domain, meta.dns_auto) != (&before.domain, before.dns_auto) {
                 domain::forget(&id);

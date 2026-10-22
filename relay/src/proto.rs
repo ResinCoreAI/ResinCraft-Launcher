@@ -22,6 +22,10 @@
 //! account's own cap (top-ups and unlimited accounts included). Older launchers never get `top_up` and ignore
 //! the new [`Usage`] and [`Limits`] fields.
 //!
+//! Protocol 5 adds whitelist requests from the web page at a server's relay address: the agent says whether
+//! it takes them (`join_requests`), the relay passes each one on (`join_request`), and the agent answers
+//! (`join_answer`). The relay never sends `join_request` to older launchers.
+//!
 //! A `banned` error carries the ban itself ([`Ban`]: until when, and why) in `ban`. It needs no protocol version
 //! of its own: every launcher knows the `banned` code, and older ones skip the field.
 
@@ -29,11 +33,13 @@ use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 /// The first protocol with Bedrock (UDP) tunnels.
 pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The first protocol with data top-ups.
 pub const TOPUP_PROTOCOL_VERSION: u32 = 4;
+/// The first protocol with whitelist requests from the web page.
+pub const JOIN_REQUESTS_PROTOCOL_VERSION: u32 = 5;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
 pub const MIN_PROTOCOL_VERSION: u32 = 1;
 /// Longest control line either side accepts.
@@ -77,7 +83,28 @@ pub enum AgentMsg {
     Continue,
     /// More data for the rest of this month (when little or nothing is left). Protocol 4.
     TopUp,
+    /// Whether this tunnel takes whitelist requests from the web page; sent once online and whenever the host
+    /// changes it (the relay forgets it when the tunnel ends). Protocol 5.
+    JoinRequests { enabled: bool },
+    /// The answer to a `join_request`. Protocol 5.
+    JoinAnswer { id: u64, outcome: JoinOutcome },
     Ping { seq: u64 },
+}
+
+/// What became of a whitelist request (the web page shows a sentence for each).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum JoinOutcome {
+    /// The host will see it.
+    Received,
+    AlreadyListed,
+    AlreadyRequested,
+    /// The server isn't taking requests (switched off, or too many waiting).
+    Closed,
+    /// Not a Minecraft username.
+    Invalid,
+    #[serde(other)]
+    Unknown,
 }
 
 /// Relay → agent.
@@ -137,6 +164,8 @@ pub enum RelayMsg {
         usage: Usage,
     },
     Pong { seq: u64 },
+    /// A player asks on the web page to be whitelisted. Protocol 5, and only after `join_requests` turned on.
+    JoinRequest { id: u64, username: String },
     Error {
         code: ErrorCode,
         message: String,

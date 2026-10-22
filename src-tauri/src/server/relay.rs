@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use resincraft_relay::agent::{AgentConfig, AgentError, Command, Connection, Credentials, Event};
-use resincraft_relay::proto::{self, ErrorCode, Limits, ServiceState, Usage};
+use resincraft_relay::proto::{self, ErrorCode, JoinOutcome, Limits, ServiceState, Usage};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
@@ -334,6 +334,32 @@ fn paused_of(e: &AgentError) -> Option<(bool, Option<String>)> {
     }
 }
 
+/// Sends a command to the server's running tunnel; false when it isn't online through the relay.
+fn send(id: &str, cmd: Command) -> bool {
+    COMMANDS.lock().unwrap().as_ref().and_then(|m| m.get(id)).is_some_and(|tx| tx.send(cmd).is_ok())
+}
+
+/// Tells the relay whether the server takes whitelist requests from its web page (after the tunnel opens, and
+/// when the host changes it). Relays without the web page ignore it.
+pub async fn send_join_requests(id: &str) {
+    let on = store::get(id).await.is_ok_and(|m| m.join_requests.enabled && m.join_requests.web);
+    send(id, Command::JoinRequests(on));
+}
+
+/// A request from the relay's web page: kept like the bot's, and the answer goes back to the page.
+fn on_join_request(id: String, request: u64, username: String) {
+    tokio::spawn(async move {
+        let outcome = match super::requests::submit(&id, &username, super::requests::Via::Web).await {
+            super::requests::Outcome::Received => JoinOutcome::Received,
+            super::requests::Outcome::AlreadyListed => JoinOutcome::AlreadyListed,
+            super::requests::Outcome::AlreadyRequested => JoinOutcome::AlreadyRequested,
+            super::requests::Outcome::Closed => JoinOutcome::Closed,
+            super::requests::Outcome::Invalid => JoinOutcome::Invalid,
+        };
+        send(&id, Command::JoinAnswer { id: request, outcome });
+    });
+}
+
 /// Another full relay session for a server whose session is about to end (the Continue button, or `continue`
 /// typed in its console).
 pub fn continue_session(id: &str) -> Result<()> {
@@ -512,9 +538,12 @@ pub async fn open(
                                 status(Status::TopUp { added_bytes, by_admin, usage })
                             }
                         }
+                        Event::JoinRequest { id: request, username } => on_join_request(id.clone(), request, username),
                     },
                     &mut commands,
                 );
+                // Queued before serving starts, so the relay hears it as soon as the tunnel is up.
+                send_join_requests(&task_id).await;
                 tokio::pin!(serving);
                 let mut tick = tokio::time::interval(Duration::from_secs(5));
                 let ended = loop {
