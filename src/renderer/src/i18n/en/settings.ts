@@ -52,6 +52,8 @@ export default {
   'settings.jvmArgs.hint': 'Advanced: extra flags passed to Java for every instance.',
   'settings.downloads.lead': 'Lower this if your connection struggles when preparing games.',
   'settings.parallel': 'Parallel downloads',
+  'settings.tray': 'Keep running in the system tray',
+  'settings.tray.hint': 'Closing the window keeps ResinCraft in the background: hosted servers, the Discord bot and downloads go on. Quit from the tray icon.',
   'settings.parallel.hint': 'Files fetched at the same time.',
   'settings.preferredSource': 'Preferred source for mods',
   'settings.preferredSource.hint': 'When a mod is on both Modrinth and CurseForge, install it from here.',

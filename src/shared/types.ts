@@ -367,6 +367,10 @@ export interface Settings {
   showSnapshots: boolean
   /** Install a new ResinCraft version by itself when the launcher starts. */
   autoUpdate: boolean
+  /** Install found updates in the background without asking, once no game or hosted server runs. */
+  silentUpdate?: boolean
+  /** Closing the window keeps ResinCraft running in the system tray. */
+  tray?: boolean
   /** Which site wins when a mod is on both Modrinth and CurseForge ('ask' shows the duplicate dialog). */
   preferredModSource: ModSourcePreference
   /** Folders besides Downloads where Download all looks for files. */
@@ -1439,7 +1443,10 @@ export interface ResinApi {
     check(): Promise<UpdateStatus>
     blockers(): Promise<UpdateBlockers>
     /** Downloads and installs the found update (the app restarts). `waitForStop`: install once games and servers stop. */
-    install(waitForStop?: boolean): Promise<void>
+    /** true: once every game and server has stopped; 'close': stop servers and close games first. */
+    install(mode?: boolean | 'close'): Promise<void>
+    /** While an update waits: stop the hosted servers (saving their worlds) and close the games now. */
+    closeRunning(): Promise<void>
     /** Stops waiting for games and servers. */
     cancel(): Promise<void>
   }

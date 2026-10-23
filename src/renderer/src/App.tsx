@@ -4,7 +4,7 @@ import type { AccountView, Instance } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
-import { UpdateBanner } from './components/Updates'
+import { UpdateBanner, UpdateTitleButton } from './components/Updates'
 import { PackUpdatesBanner } from './components/PackUpdates'
 import { RelayWatcher } from './components/ServerRelay'
 import { isTauri } from './api'
@@ -186,7 +186,13 @@ export default function App() {
       <RelayWatcher />
       <ContextMenuHost />
       <DropImport />
-      {isTauri && <WindowControls />}
+      {isTauri ? (
+        <WindowControls />
+      ) : (
+        <div className="win-controls">
+          <UpdateTitleButton />
+        </div>
+      )}
     </div>
   )
 }

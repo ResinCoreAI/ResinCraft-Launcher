@@ -77,3 +77,36 @@
     animation: none;
   }
 }
+
+/* The title bar's Update button, left of the window buttons. */
+.win-controls .title-update {
+  width: auto;
+  height: calc(100% - 8px);
+  margin: 4px 6px 4px 0;
+  padding: 0 12px;
+  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--success, #39ff88) 16%, transparent);
+  color: var(--success, #39ff88);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.win-controls .title-update:hover {
+  background: color-mix(in srgb, var(--success, #39ff88) 26%, transparent);
+  color: var(--success, #39ff88);
+}
+.win-controls .title-update.waiting {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+}
+.win-controls .title-update:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.win-controls .title-update svg {
+  width: 14px;
+  height: 14px;
+}

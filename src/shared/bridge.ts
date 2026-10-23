@@ -54,6 +54,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       check: fn('update:check'),
       blockers: fn('update:blockers'),
       install: fn('update:install'),
+      closeRunning: fn('update:closeRunning'),
       cancel: fn('update:cancel')
     },
     versions: {

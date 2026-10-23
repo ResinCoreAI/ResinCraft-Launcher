@@ -422,6 +422,7 @@ export default {
   'engine.update.offline': "Couldn't reach the update server. Check your internet connection; ResinCraft will try again later.",
   'engine.update.rateLimited': 'The update server is busy right now. ResinCraft will try again later.',
   'engine.update.stillRunning': 'Close Minecraft and stop your hosted servers before updating.',
+  'engine.update.task.closing': 'Stopping hosted servers and closing Minecraft',
   'engine.update.task.downloading': 'Downloading the update',
   'engine.update.task.installing': 'Installing. ResinCraft will restart by itself.',
   'engine.update.task.title': 'Updating ResinCraft to {version}',

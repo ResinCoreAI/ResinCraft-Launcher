@@ -16,7 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["image-png"] }
+tauri = { version = "2", features = ["image-png", "tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -62,6 +62,8 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
+# A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead of opening another.
+tauri-plugin-single-instance = "2"
 
 [dev-dependencies]
 # The relay server itself, for examples/check_relay.rs.

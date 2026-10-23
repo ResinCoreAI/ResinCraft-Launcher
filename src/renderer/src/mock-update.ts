@@ -10,6 +10,7 @@ const text = (key: string, english: string, params?: Record<string, unknown>): E
 export function mockUpdate(): { update: ResinApi['update']; onUpdate: ResinApi['on']['update'] } {
   const mode = new URLSearchParams(location.search).get('update') ?? ''
   const listeners = new Set<(s: UpdateStatus) => void>()
+  let closing = false
   let cancelled = false
   let status: UpdateStatus = { current: '0.2.0', state: 'idle', lastChecked: Date.now() - 2 * 3600_000 }
   const set = (patch: Partial<UpdateStatus>) => {
@@ -41,7 +42,9 @@ export function mockUpdate(): { update: ResinApi['update']; onUpdate: ResinApi['
         return set({ state: 'idle', lastChecked: Date.now(), available, error: undefined })
       },
       blockers: async () => running(),
-      install: async (waitForStop) => {
+      install: async (how) => {
+        const waitForStop = !!how
+        closing = how === 'close'
         const version = status.available?.version ?? '0.3.0'
         cancelled = false
         const title = text('update.task.title', `Updating ResinCraft to ${version}`, { version })
@@ -58,7 +61,7 @@ export function mockUpdate(): { update: ResinApi['update']; onUpdate: ResinApi['
             const waiting = text('update.task.waiting', 'Waiting for Minecraft and hosted servers to stop')
             emit({ detail: waiting.text, detailText: waiting, progress: undefined })
             set({ state: 'waiting', waitingFor: running() })
-            for (let i = 0; i < 40 && !cancelled; i++) await sleep(250)
+            for (let i = 0; i < 40 && !cancelled && !closing; i++) await sleep(250)
             if (cancelled) {
               const error = text('update.cancelled', 'Update cancelled. It will be offered again later.')
               emit({ state: 'error', error: error.text, errorText: error })
@@ -74,6 +77,9 @@ export function mockUpdate(): { update: ResinApi['update']; onUpdate: ResinApi['
           emit({ state: 'done', progress: 1 })
           set({ state: 'idle', current: version, available: undefined })
         })()
+      },
+      closeRunning: async () => {
+        closing = true
       },
       cancel: async () => {
         cancelled = true

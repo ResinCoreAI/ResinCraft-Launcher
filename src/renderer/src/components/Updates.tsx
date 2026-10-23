@@ -1,8 +1,8 @@
-// ResinCraft's own updates: a quiet check at start and every 6 hours, the "ready to install" banner, the warning
-// when a game or hosted server is running, and Settings → Updates. The engine does the work (src-tauri/src/updater.rs);
+// ResinCraft's own updates: a quiet check at start and every 6 hours, the Update button in the title bar, the
+// choice when a game or hosted server is running, silent updates, and Settings → Updates. The engine does the work (src-tauri/src/updater.rs);
 // the download shows in the task dock.
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { CheckCircle2, Download, Hourglass, Info, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Download, Hourglass, Info, Loader2, Power, RefreshCw } from 'lucide-react'
 import type { UpdateBlockers, UpdateStatus } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -36,15 +36,22 @@ async function check(): Promise<UpdateStatus | undefined> {
 
 const blocked = (r: UpdateBlockers) => r.games.length > 0 || r.servers.length > 0
 
-/** Starts an install, first warning when a game or server is running (the restart would cut it off). */
+/**
+ * Starts an install, first asking when a game or server is running (the restart would cut it off): close them and
+ * update, update once they stop, or not now.
+ */
 function useInstall() {
   const { toast } = useStore()
   const [running, setRunning] = useState<UpdateBlockers>()
-  const install = (wait: boolean) => api.update.install(wait).catch((e) => toast((e as Error).message, 'error'))
+  const install = (how: boolean | 'close') => api.update.install(how).catch((e) => toast((e as Error).message, 'error'))
   const start = async () => {
     const now = await api.update.blockers().catch(() => ({ games: [], servers: [] }))
     if (blocked(now)) setRunning(now)
     else await install(false)
+  }
+  const choose = (how: boolean | 'close') => {
+    setRunning(undefined)
+    void install(how)
   }
   const dialog = running && (
     <Modal
@@ -55,20 +62,18 @@ function useInstall() {
           <button className="btn ghost" onClick={() => setRunning(undefined)}>
             {t('common.cancel')}
           </button>
-          <button
-            className="btn primary"
-            onClick={() => {
-              setRunning(undefined)
-              void install(true)
-            }}
-          >
+          <button className="btn" onClick={() => choose(true)}>
             <Hourglass /> {t('updates.busy.wait')}
+          </button>
+          <button className="btn primary" onClick={() => choose('close')}>
+            <Power /> {t('updates.busy.close')}
           </button>
         </>
       }
     >
-      <p className="muted">{t('updates.busy.body')}</p>
+      <p className="muted">{t('updates.busy.ask')}</p>
       <Running list={running} />
+      <p className="hint">{t('updates.busy.closeHint')}</p>
     </Modal>
   )
   return { start, dialog }
@@ -99,67 +104,75 @@ function startSchedule() {
   )
   setTimeout(async () => {
     const s = await check()
-    if (!s?.available || !(await api.settings.get()).autoUpdate) return
-    if (!blocked(await api.update.blockers())) void api.update.install(false).catch(() => {})
+    if (!s?.available) return
+    const settings = await api.settings.get()
+    if (settings.silentUpdate) return void installSilently(s)
+    if (settings.autoUpdate && !blocked(await api.update.blockers())) void api.update.install(false).catch(() => {})
   }, START_DELAY)
   // Every 15 minutes, look again once 6 hours have passed (also right after the computer wakes up).
-  setInterval(() => {
+  setInterval(async () => {
     const last = snapshot.status?.lastChecked ?? 0
-    if (Date.now() - last >= EVERY && snapshot.status?.state === 'idle') void check()
+    if (Date.now() - last < EVERY || snapshot.status?.state !== 'idle') return
+    const s = await check()
+    if (s?.available && (await api.settings.get()).silentUpdate) installSilently(s)
   }, 15 * 60_000)
 }
 
-/** Mounted in App: starts the schedule and offers a found update in a small banner. */
+/** Silent updates: download now and install by itself once no game or hosted server is running. */
+function installSilently(s: UpdateStatus) {
+  if (s.state === 'idle') void api.update.install(true).catch(() => {})
+}
+
+/** Mounted once in App: starts the update schedule (the Update button lives in the title bar). */
 export function UpdateBanner() {
-  const { status, later } = useUpdate()
-  const { start, dialog } = useInstall()
-
   useEffect(startSchedule, [])
+  return null
+}
 
+/**
+ * The title bar's Update button, next to the window buttons, while a new version is found: it installs (asking
+ * first when a game or server runs), shows the download, and, while the update waits for them, offers to close
+ * them now or cancel.
+ */
+export function UpdateTitleButton() {
+  const { status } = useUpdate()
+  const { start, dialog } = useInstall()
+  const [waitingOpen, setWaitingOpen] = useState(false)
   const available = status?.available
   if (!available) return dialog || null
-  const notes = () => void api.app.openExternal(available.notesUrl)
-
-  if (status.state === 'waiting') {
-    return (
-      <div className="update-banner" role="status">
-        <Hourglass className="icon" />
-        <div className="grow">
-          <b>{t('updates.waiting.title', { version: available.version })}</b>
-          <p>{t('updates.waiting.body')}</p>
-          {status.waitingFor && <Running list={status.waitingFor} />}
-          <div className="row actions">
-            <button className="btn sm ghost" onClick={() => void api.update.cancel()}>
-              {t('common.cancel')}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-  // While it downloads and installs, the task dock shows the progress.
-  if (status.state !== 'idle' || later === available.version) return dialog || null
-
+  const working = status.state === 'downloading' || status.state === 'installing'
+  const waiting = status.state === 'waiting'
   return (
     <>
-      <div className="update-banner" role="status">
-        <Download className="icon" />
-        <div className="grow">
-          <b>{t('updates.banner.ready', { version: available.version })}</b>
-          <p>{t('updates.banner.body')}</p>
-          <div className="row actions">
-            <button className="btn sm primary" onClick={() => void start()}>
-              {t('updates.updateNow')}
-            </button>
-            <button className="btn sm ghost" onClick={notes}>
-              {t('updates.releaseNotes')}
-            </button>
-            <button className="btn sm ghost" onClick={() => publish({ later: available.version })}>
-              {t('updates.later')}
-            </button>
-          </div>
-        </div>
-      </div>
+      <button
+        className={`title-update ${waiting ? 'waiting' : ''}`}
+        title={waiting ? t('updates.waiting.title', { version: available.version }) : t('updates.banner.ready', { version: available.version })}
+        disabled={working || status.state === 'checking'}
+        onClick={() => (waiting ? setWaitingOpen(true) : void start())}
+      >
+        {working ? <Loader2 className="spin" /> : waiting ? <Hourglass /> : <Download />}
+        <span>{working ? t('updates.title.working') : waiting ? t('updates.title.waiting') : t('updates.title.ready')}</span>
+      </button>
+      {waiting && waitingOpen && (
+        <Modal
+          title={t('updates.waiting.title', { version: available.version })}
+          onClose={() => setWaitingOpen(false)}
+          footer={
+            <>
+              <button className="btn ghost" onClick={() => (setWaitingOpen(false), void api.update.cancel())}>
+                {t('updates.title.cancel')}
+              </button>
+              <button className="btn primary" onClick={() => (setWaitingOpen(false), void api.update.closeRunning())}>
+                <Power /> {t('updates.busy.close')}
+              </button>
+            </>
+          }
+        >
+          <p className="muted">{t('updates.waiting.body')}</p>
+          {status.waitingFor && <Running list={status.waitingFor} />}
+          <p className="hint">{t('updates.busy.closeHint')}</p>
+        </Modal>
+      )}
       {dialog}
     </>
   )
@@ -232,6 +245,13 @@ export function UpdatesSection() {
             <span>{t('updates.auto.hint')}</span>
           </div>
           <Switch on={settings.autoUpdate} onChange={(v) => void updateSettings({ autoUpdate: v })} label={t('updates.auto')} />
+        </div>
+        <div className="setting">
+          <div className="text">
+            <b>{t('updates.silent')}</b>
+            <span>{t('updates.silent.hint')}</span>
+          </div>
+          <Switch on={!!settings.silentUpdate} onChange={(v) => void updateSettings({ silentUpdate: v })} label={t('updates.silent')} />
         </div>
         <div className="setting">
           <div className="row" style={{ gap: 18 }}>

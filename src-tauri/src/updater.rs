@@ -150,9 +150,20 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // Never fails because of the network: problems come back as `error` in the status.
         "update:check" => json(check().await?),
         "update:blockers" => json(blockers().await),
-        // `true`: download now and install once every game and hosted server has stopped.
+        // `true`: download now and install once every game and hosted server has stopped. "close": download, then
+        // stop the hosted servers (saving their worlds) and close the games, and install.
         "update:install" => {
-            install(args.get::<Option<bool>>(0)?.unwrap_or(false)).await?;
+            let mode = match args.raw(0) {
+                Value::String(s) if s == "close" => Mode::Close,
+                Value::Bool(true) => Mode::Wait,
+                _ => Mode::Now,
+            };
+            install(mode).await?;
+            done()
+        }
+        // An update waiting for games and servers: stop the servers (saving their worlds) and close the games now.
+        "update:closeRunning" => {
+            close_running().await;
             done()
         }
         "update:cancel" => {
@@ -221,10 +232,21 @@ pub async fn blockers() -> Blockers {
     out
 }
 
+/// When to install a downloaded update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    /// Right away (nothing may be running).
+    Now,
+    /// Once every game and hosted server has stopped.
+    Wait,
+    /// After stopping the hosted servers and closing the games.
+    Close,
+}
+
 /// Downloads the update found by the last check and installs it. Returns once the download has started; the
 /// task dock shows progress. On Windows the app closes when the installer starts, and the installer opens the
 /// new version.
-async fn install(wait_for_stop: bool) -> Result<()> {
+async fn install(mode: Mode) -> Result<()> {
     if ctx::app().is_none() {
         bail_tr!("update.noApp", "Updates only work in the installed app.");
     }
@@ -236,7 +258,7 @@ async fn install(wait_for_stop: bool) -> Result<()> {
     let Some(update) = update else {
         bail_tr!("update.nothing", "There's no update to install. Check for updates first.");
     };
-    if !wait_for_stop && !blockers().await.is_empty() {
+    if mode == Mode::Now && !blockers().await.is_empty() {
         bail_tr!("update.stillRunning", "Close Minecraft and stop your hosted servers before updating.");
     }
     if !begin() {
@@ -246,7 +268,7 @@ async fn install(wait_for_stop: bool) -> Result<()> {
     let version = update.version.clone();
     tauri::async_runtime::spawn(async move {
         let title = tr!("update.task.title", "Updating ResinCraft to {version}", version = version);
-        let result = Task::run(title, None, |task| run_install(update, task)).await;
+        let result = Task::run(title, None, |task| run_install(update, mode == Mode::Close, task)).await;
         with(|st| st.busy = false);
         if let Err(e) = result {
             eprintln!("[update] install failed: {e:#}");
@@ -269,7 +291,7 @@ async fn install(wait_for_stop: bool) -> Result<()> {
     Ok(())
 }
 
-async fn run_install(update: Update, task: std::sync::Arc<Task>) -> Result<()> {
+async fn run_install(update: Update, close_running: bool, task: std::sync::Arc<Task>) -> Result<()> {
     publish(|s| {
         s.state = "downloading";
         s.error = None;
@@ -289,6 +311,11 @@ async fn run_install(update: Update, task: std::sync::Arc<Task>) -> Result<()> {
         )
         .await
         .map_err(|e| anyhow::Error::from(calm(&e)))?;
+
+    if close_running {
+        task.update(tr!("update.task.closing", "Stopping hosted servers and closing Minecraft"), None);
+        self::close_running().await;
+    }
 
     // Wait for games and servers (the restart would cut them off), checking every couple of seconds.
     loop {
@@ -325,6 +352,14 @@ async fn run_install(update: Update, task: std::sync::Arc<Task>) -> Result<()> {
         app.restart()
     }
     Ok(())
+}
+
+/// Stops every hosted server (`stop`, which saves its world) and closes every running game.
+async fn close_running() {
+    crate::server::runtime::shutdown_all(Duration::from_secs(60)).await;
+    for id in crate::game::running_ids() {
+        crate::game::launch::kill_instance(&id, None);
+    }
 }
 
 /// A message for players instead of the updater's technical one.

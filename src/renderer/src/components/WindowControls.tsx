@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Copy, Minus, Square, X } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { t } from '../i18n'
+import { UpdateTitleButton } from './Updates'
 
 /**
  * Minimise / maximise / close for the frameless Tauri window. (Windows' own buttons are hidden,
@@ -21,6 +22,7 @@ export default function WindowControls() {
   const win = getCurrentWindow()
   return (
     <div className="win-controls">
+      <UpdateTitleButton />
       <button aria-label={t('common.minimise')} onClick={() => void win.minimize()}>
         <Minus />
       </button>

@@ -20,6 +20,7 @@ pub mod game;
 pub mod migrate;
 pub mod player;
 pub mod server;
+pub mod tray;
 pub mod updater;
 
 use serde_json::Value;
@@ -36,6 +37,8 @@ async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, Value> {
 
 pub fn run() {
     tauri::Builder::default()
+        // A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show(app)))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -46,12 +49,27 @@ pub fn run() {
             core::ctx::init(data_dir, Some(app.handle().clone()));
             tauri::async_runtime::spawn(discord::init());
             tauri::async_runtime::spawn(server::discordbot::init());
+            // Reads the settings once, so the close button knows about tray mode.
+            tauri::async_runtime::spawn(async {
+                tray::sync(core::settings::get().await.tray);
+            });
+            tray::build(app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![ipc])
         .build(tauri::generate_context!())
         .expect("error while running ResinCraft")
-        .run(|_, event| {
+        .run(|app, event| {
+            // Tray mode: the close button hides the window; ResinCraft goes on in the background.
+            if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::CloseRequested { api, .. }, .. } = &event {
+                if core::settings::tray_on() && !tray::quitting() {
+                    api.prevent_close();
+                    if let Some(w) = app.get_webview_window(label) {
+                        let _ = w.hide();
+                    }
+                    return;
+                }
+            }
             // Hosted servers would otherwise keep running (and holding their port) after the launcher closes.
             if let tauri::RunEvent::Exit = event {
                 discord::shutdown();
