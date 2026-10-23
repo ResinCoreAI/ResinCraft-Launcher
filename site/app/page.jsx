@@ -64,7 +64,7 @@ const STEPS = [
 ]
 
 const FAQ = [
-  ['Is ResinCraft free?', "Yes. It's free and open source under the MIT licence, and the code is on GitHub."],
+  ['Is ResinCraft free?', "Yes. It's free and open source under the GNU GPLv3, and the code is on GitHub."],
   [
     'Do I need to own Minecraft?',
     'To play Java online, yes: you sign in with the Microsoft account that owns Minecraft: Java Edition. An account with only Bedrock becomes a Bedrock profile for the Bedrock page and Bedrock servers. Offline profiles work for singleplayer, LAN and offline-mode servers.',
@@ -136,7 +136,7 @@ export default function Home() {
             </div>
             <p className="platforms">
               <Icon name="windows" small />
-              <span>Windows 10 &amp; 11 · free &amp; open source (MIT) ·</span>
+              <span>Windows 10 &amp; 11 · free &amp; open source (GPLv3) ·</span>
               <a href="#downloads">All downloads</a>
             </p>
           </div>

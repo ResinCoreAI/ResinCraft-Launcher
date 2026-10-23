@@ -137,3 +137,7 @@ Once you have one, add it to `src-tauri/tauri.conf.json` and every `npm run buil
 - Cloud signing (Azure Artifact Signing, SimplySign, …): use `"bundle": { "windows": { "signCommand": "<tool> sign … %1" } }`, where `%1` is the file to sign.
 
 Signed builds show "Puirkle" as the publisher immediately; SmartScreen's warning fades as the signed installer gains download reputation.
+
+## License
+
+ResinCraft Launcher is free software under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only). You may use, share and change it; if you share a changed version, it has to stay under the GPLv3 with its source available.

@@ -10,11 +10,11 @@ export default function Terms() {
   return (
     <article className="doc">
       <h1>Terms</h1>
-      <p className="updated">Last updated 18 October 2026</p>
+      <p className="updated">Last updated 23 October 2026</p>
 
       <h2>The software</h2>
       <p>
-        ResinCraft Launcher is free and open source under the <a href={`${GITHUB}/blob/main/LICENSE`}>MIT licence</a>. It is provided as is, without warranty
+        ResinCraft Launcher is free and open source under the <a href={`${GITHUB}/blob/main/LICENSE`}>GNU General Public License v3</a>. It is provided as is, without warranty
         of any kind.
       </p>
 

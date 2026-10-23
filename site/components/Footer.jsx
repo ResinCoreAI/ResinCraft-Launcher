@@ -37,7 +37,7 @@ export default function Footer() {
         </nav>
       </div>
       <div className="wrap foot-bottom">
-        <p>© 2026 ResinCore · ResinCraft Launcher · MIT licence</p>
+        <p>© 2026 ResinCore · ResinCraft Launcher · GPLv3</p>
         <p className="legal">{DISCLAIMER}</p>
       </div>
     </footer>

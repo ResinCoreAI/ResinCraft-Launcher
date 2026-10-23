@@ -26,7 +26,7 @@ You are building the public website for **ResinCraft Launcher**, a desktop Minec
 
 | Fact | Value |
 |---|---|
-| Repository | `https://github.com/ResinCoreAI/ResinCraft-Launcher` (public, **MIT licence**) |
+| Repository | `https://github.com/ResinCoreAI/ResinCraft-Launcher` (public, **GNU GPLv3**) |
 | Latest version when this brief was written | `v0.2.0`, published 2026-10-18 (v0.1.0 came out the same day) |
 | Platform | Windows 10/11, 64-bit. macOS and Linux are **not** available yet. |
 | Installer | `ResinCraft.Launcher_<version>_amd64_windows.exe`, about 7 MB, installs per user (no admin rights) |
@@ -201,7 +201,7 @@ A purple resin drop holding a green Minecraft-style block. The block's dark righ
 - **h1:** "Modded Minecraft, **all in one place**" (the bold part uses the gradient). `<<PUIRKLE_TO_CONFIRM>>` if you want a different line.
 - **Lede:** "ResinCraft Launcher gives every version and modpack its own instance, finds mods on Modrinth, CurseForge, FTB, ATLauncher and Technic, and hosts servers for your friends. Free and open source."
 - **Buttons:** **Download for Windows** (primary) and **View on GitHub**.
-- **Under the buttons:** a Windows icon · "Windows 10 & 11 · free & open source (MIT) ·" and an "All downloads" link.
+- **Under the buttons:** a Windows icon · "Windows 10 & 11 · free & open source (GPLv3) ·" and an "All downloads" link.
 - **Visual:** `assets/hero.webp` (Home screen, 2880×1800, with `hero@1x.webp` for srcset). The floating card is `shots/version-picker@1x.webp` with the chip "✓ Any mod version, any time".
 - **Stats** (all true; don't change them unless the app changes): **5** mod & modpack sources · **9** server types · **4** mod loaders · **16** languages.
 
@@ -227,7 +227,7 @@ A purple resin drop holding a green Minecraft-style block. The block's dark righ
 
 ### 5.4 FAQ (use `<details>`, 1–3 sentences each)
 
-- **Is ResinCraft free?** Yes, free and open source under the MIT licence; the code is on GitHub.
+- **Is ResinCraft free?** Yes, free and open source under the GNU GPLv3; the code is on GitHub.
 - **Do I need to own Minecraft?** To play online, yes: you sign in with the Microsoft account that owns Minecraft: Java Edition. Offline profiles (singleplayer, LAN and offline-mode servers) work without signing in.
 - **Is signing in safe?** You sign in on Microsoft's own website with a short code, so ResinCraft never sees your password. Sign-in tokens are stored encrypted on your PC.
 - **Which computers does it run on?** Windows 10 and 11 (64-bit) for now. macOS and Linux builds are planned.
@@ -405,7 +405,7 @@ Title "Privacy policy". Last updated `<<DATE>>`. Use plain language and short pa
 
 ## 10. Terms (`/terms`)
 
-- Provided as is, without warranty, under the MIT licence.
+- Provided as is, without warranty, under the GNU GPLv3.
 - You need a legitimate copy of Minecraft: Java Edition. ResinCraft doesn't provide or unlock the game. The Minecraft EULA and Microsoft's terms apply, including to servers you host.
 - Mods, modpacks and plugins belong to their authors and come under their own licences.
 - Don't use ResinCraft to break Mojang's or Microsoft's rules.
