@@ -140,4 +140,6 @@ Signed builds show "Puirkle" as the publisher immediately; SmartScreen's warning
 
 ## License
 
+Copyright © 2026 ResinCore by Puirkle
+
 ResinCraft Launcher is free software under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only). You may use, share and change it; if you share a changed version, it has to stay under the GPLv3 with its source available.
