@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, FileUp, Loader2, Plus, Trash2, Undo2 } from 'lucide-react'
-import type { Instance, JarMod, LoaderVersion, PatchLibrary, ResolvedVersion, VersionPatch } from '@shared/types'
+import type { Instance, JarMod, LoaderType, LoaderVersion, McVersion, PatchLibrary, ResolvedVersion, VersionPatch } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { LOADER_LABEL } from '../util'
 import { t } from '../i18n'
-import { Switch } from './ui'
+import { ConfirmModal, Segmented, Switch } from './ui'
 import '../version-settings.css'
 
 /** LiteLoader exists for Minecraft 1.5.2 – 1.12.2. */
@@ -53,6 +53,146 @@ const patchOf = (d: Draft): VersionPatch | null => {
  * Instance settings → Version: LiteLoader next to Forge, and (folded away until opened) jar mods and the player's
  * own changes to the version the game starts with, like Prism's Version tab.
  */
+const LOADERS: LoaderType[] = ['vanilla', 'fabric', 'quilt', 'forge', 'neoforge']
+
+/**
+ * Changes the instance's Minecraft version and mod loader, as Prism's Version page does: pick them, then Change version
+ * (asking first when mods or a modpack might not fit the new version). The next start installs what's needed.
+ */
+function GameVersion({ inst }: { inst: Instance }) {
+  const { refreshInstances, toast, settings, games } = useStore()
+  const [mc, setMc] = useState(inst.mcVersion)
+  const [loader, setLoader] = useState<LoaderType>(inst.loader === 'liteloader' ? 'forge' : inst.loader)
+  const [loaderVersion, setLoaderVersion] = useState(inst.loaderVersion ?? '')
+  const [mcList, setMcList] = useState<McVersion[]>()
+  const [loaderList, setLoaderList] = useState<LoaderVersion[]>()
+  const [asking, setAsking] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const running = games[inst.id] === 'running' || games[inst.id] === 'preparing'
+
+  useEffect(() => {
+    void api.versions.list().then(setMcList, () => setMcList([]))
+  }, [])
+  useEffect(() => {
+    if (loader === 'vanilla') return setLoaderList([])
+    let live = true
+    setLoaderList(undefined)
+    api.versions.loaders(loader, mc).then(
+      (l) => {
+        if (!live) return
+        setLoaderList(l)
+        // Keep the current loader version when it's on the list, else take the newest stable one.
+        setLoaderVersion((v) => (l.some((x) => x.version === v) ? v : (l.find((x) => x.stable) ?? l[0])?.version ?? ''))
+      },
+      () => live && setLoaderList([])
+    )
+    return () => {
+      live = false
+    }
+  }, [loader, mc])
+
+  const shown = (mcList ?? []).filter((v) => v.type === 'release' || settings?.showSnapshots || v.id === inst.mcVersion)
+  const changed = mc !== inst.mcVersion || loader !== inst.loader || (loader !== 'vanilla' && loaderVersion !== (inst.loaderVersion ?? ''))
+  const noLoader = loader !== 'vanilla' && loaderList?.length === 0
+
+  const save = async () => {
+    setAsking(false)
+    setSaving(true)
+    try {
+      const updated = await api.instances.setVersion(inst.id, mc, loader, loader === 'vanilla' ? null : loaderVersion || null)
+      await refreshInstances()
+      toast(
+        t('version.changedTo', {
+          version: `${updated.mcVersion}${updated.loader === 'vanilla' ? '' : ` · ${LOADER_LABEL[updated.loader]} ${updated.loaderVersion ?? ''}`}`
+        })
+      )
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="setting stack" id="instance-version">
+      <div className="text">
+        <b>{t('version.game')}</b>
+        <span>{running ? t('version.closeFirst') : t('version.gameHint')}</span>
+      </div>
+      <div className="version-pick">
+        <label className="field">
+          <span className="label">Minecraft</span>
+          <select className="select" value={mc} disabled={running || !mcList} onChange={(e) => setMc(e.target.value)}>
+            {!mcList && <option value={mc}>{mc}</option>}
+            {shown.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.id}
+                {v.type === 'release' ? '' : ` (${v.type.replace('_', ' ')})`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span className="label">{t('version.loader')}</span>
+          <Segmented<LoaderType>
+            value={loader}
+            onChange={(v) => !running && setLoader(v)}
+            options={LOADERS.map((l) => ({ value: l, label: LOADER_LABEL[l] }))}
+          />
+        </label>
+        {loader !== 'vanilla' && (
+          <label className="field">
+            <span className="label">{t('version.loaderVersion', { loader: LOADER_LABEL[loader] })}</span>
+            {noLoader ? (
+              <span className="hint warn">{t('version.noLoader', { loader: LOADER_LABEL[loader], version: mc })}</span>
+            ) : (
+              <select className="select" value={loaderVersion} disabled={running || !loaderList} onChange={(e) => setLoaderVersion(e.target.value)}>
+                {!loaderList && <option value={loaderVersion}>{t('common.loading')}</option>}
+                {loaderList?.map((l) => (
+                  <option key={l.version} value={l.version}>
+                    {l.stable ? l.version : t('newInstance.optionBeta', { version: l.version })}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+        )}
+      </div>
+      <div className="row" style={{ gap: 8 }}>
+        <button className="btn primary" disabled={!changed || running || saving || noLoader || (loader !== 'vanilla' && !loaderList)} onClick={() => setAsking(true)}>
+          {saving && <Loader2 className="spin" />} {t('version.change')}
+        </button>
+        {changed && !saving && (
+          <button
+            className="btn ghost"
+            onClick={() => {
+              setMc(inst.mcVersion)
+              setLoader(inst.loader === 'liteloader' ? 'forge' : inst.loader)
+              setLoaderVersion(inst.loaderVersion ?? '')
+            }}
+          >
+            <Undo2 /> {t('version.undo')}
+          </button>
+        )}
+      </div>
+      {asking && (
+        <ConfirmModal
+          title={t('version.confirmTitle')}
+          body={
+            <>
+              <p>{t('version.confirmBody', { from: inst.mcVersion, to: mc })}</p>
+              {inst.modpack && <p className="hint warn">{t('version.packWarn', { pack: inst.modpack.name })}</p>}
+            </>
+          }
+          confirm={t('version.change')}
+          onClose={() => setAsking(false)}
+          onConfirm={save}
+        />
+      )}
+    </div>
+  )
+}
+
 export function VersionSection({ inst }: { inst: Instance }) {
   const { refreshInstances, toast } = useStore()
   const jarMods = inst.jarMods ?? []
@@ -86,6 +226,7 @@ export function VersionSection({ inst }: { inst: Instance }) {
     <div className="settings-section">
       <h3>{t('version.title')}</h3>
       <div className="card">
+        <GameVersion inst={inst} />
         {withLite && (liteVersions?.length ?? 1) > 0 && (
           <div className="setting">
             <div className="text">

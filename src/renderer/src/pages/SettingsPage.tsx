@@ -335,6 +335,13 @@ export default function SettingsPage() {
                   {javas?.length === 0 && <div className="hint">{t('settings.noJava')}</div>}
                 </div>
               </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.flags')}</b>
+                  <span>{t('settings.flags.hint')}</span>
+                </div>
+                <Switch on={s.optimizedFlags} onChange={(v) => set({ optimizedFlags: v })} label={t('settings.flags')} />
+              </div>
               <div className="setting stack">
                 <div className="text">
                   <b>{t('settings.jvmArgs')}</b>
@@ -346,7 +353,7 @@ export default function SettingsPage() {
                   value={jvm}
                   onChange={(e) => setJvm(e.target.value)}
                   onBlur={() => set({ jvmArgs: jvm })}
-                  placeholder="-XX:+UseG1GC -XX:MaxGCPauseMillis=50"
+                  placeholder="-Dfile.encoding=UTF-8"
                 />
               </div>
             </div>

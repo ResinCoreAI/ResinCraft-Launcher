@@ -111,6 +111,7 @@ export function mockApi(): ResinApi {
     language: 'system',
     memoryMb: 4096,
     jvmArgs: '',
+    optimizedFlags: true,
     javaPath: '',
     autoJava: true,
     onLaunch: 'minimize',
@@ -305,6 +306,10 @@ export function mockApi(): ResinApi {
         return { found: [first.fileName], remaining: rest }
       },
       // Like the engine: a new instance (new id) with the same settings and content.
+      setVersion: async (id, mcVersion, loader, loaderVersion) => {
+        instances = instances.map((i) => (i.id === id ? { ...i, mcVersion, loader, loaderVersion: loader === 'vanilla' ? undefined : (loaderVersion ?? '0.16.10') } : i))
+        return wait(instances.find((i) => i.id === id)!, 500)
+      },
       duplicate: async (id) => {
         const src = instances.find((i) => i.id === id)!
         const copy: Instance = { ...src, id: String(Date.now()), name: `${src.name} (copy)`, createdAt: Date.now(), playtime: 0, lastPlayed: undefined }
@@ -339,6 +344,7 @@ export function mockApi(): ResinApi {
       remove: async (id) => void (instances = instances.filter((i) => i.id !== id)),
       openFolder: async () => {},
       launch: runs.launch,
+      crashFix: () => new Promise((r) => setTimeout(r, 600)),
       kill: runs.kill,
       running: runs.running,
       runs: runs.runs
@@ -538,6 +544,6 @@ export function mockApi(): ResinApi {
     ...mockMigrate((inst) => {
       instances = [inst, ...instances]
     }),
-    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, update: updates.onUpdate }
+    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, gameCrash: runs.onGameCrash, update: updates.onUpdate }
   }
 }

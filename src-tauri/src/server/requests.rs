@@ -25,7 +25,8 @@ const MAX_PENDING: usize = 100;
 
 /// Where a request came from.
 pub enum Via {
-    Web,
+    /// The relay's id for the request.
+    Web { relay_id: u64 },
     /// The Discord user's id (to message them the answer) and the name they go by.
     Discord { user_id: String, name: String },
 }
@@ -39,6 +40,10 @@ pub enum Outcome {
     /// The server isn't taking requests this way (switched off, or too many waiting).
     Closed,
     Invalid,
+    /// On the server's ban list.
+    Banned,
+    /// The host blocked this Discord user from asking.
+    Blocked,
 }
 
 /// The Players tab's view of requests (`server:requests`).
@@ -47,15 +52,14 @@ pub enum Outcome {
 pub struct RequestsInfo {
     pub requests: Vec<JoinRequest>,
     pub has_bot_token: bool,
+    /// Discord users the host blocked from asking (Reject and block).
+    pub blocked_on_discord: usize,
     pub bot: discordbot::BotStatus,
     /// Whether server.properties has the whitelist on (requests only matter then).
     pub whitelist_on: bool,
-    /// The web page, when the server has a ResinCraft Relay name: its own address, and the one that works with the
-    /// relay's plain certificate.
+    /// The web page players ask on, once the server has a ResinCraft Relay name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub web_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub web_url_fallback: Option<String>,
 }
 
 fn lock() -> &'static Mutex<()> {
@@ -65,6 +69,15 @@ fn lock() -> &'static Mutex<()> {
 
 fn requests_file() -> std::path::PathBuf {
     store::root().join("join-requests.json")
+}
+
+fn blocked_file() -> std::path::PathBuf {
+    store::root().join("join-blocked.json")
+}
+
+/// Discord user ids blocked per server.
+async fn blocked() -> HashMap<String, Vec<String>> {
+    read_json(&blocked_file()).await.unwrap_or_default()
 }
 
 fn tokens_file() -> std::path::PathBuf {
@@ -93,10 +106,11 @@ pub async fn info(id: &str) -> Result<RequestsInfo> {
     Ok(RequestsInfo {
         requests: list(id).await,
         has_bot_token: bot_token(id).await.is_some(),
+        blocked_on_discord: blocked().await.get(id).map_or(0, Vec::len),
         bot: discordbot::status(id),
         whitelist_on,
-        web_url_fallback: address.as_deref().and_then(|a| a.split_once('.')).map(|(name, domain)| format!("https://{domain}/join/{name}")),
-        web_url: address.map(|a| format!("https://{a}")),
+        // https://<relay domain>/join/<name>: on the relay's own address, so its certificate covers it.
+        web_url: address.as_deref().and_then(|a| a.split_once('.')).map(|(name, domain)| format!("https://{domain}/join/{name}")),
     })
 }
 
@@ -112,7 +126,7 @@ fn open_for(meta: &ServerMeta, via: &Via) -> bool {
     let r = &meta.join_requests;
     r.enabled
         && match via {
-            Via::Web => r.web,
+            Via::Web { .. } => r.web,
             Via::Discord { .. } => r.discord,
         }
 }
@@ -126,6 +140,16 @@ pub async fn submit(id: &str, username: &str, via: Via) -> Outcome {
     }
     if !valid_username(username) {
         return Outcome::Invalid;
+    }
+    if let Via::Discord { user_id, .. } = &via {
+        if blocked().await.get(id).is_some_and(|b| b.contains(user_id)) {
+            return Outcome::Blocked;
+        }
+    }
+    // Banned players never reach the host (a Bedrock name keeps Floodgate's leading dot, as the list does).
+    let banned = properties::list_entries(id, "bans").await.unwrap_or_default();
+    if banned.iter().any(|e| e.name.eq_ignore_ascii_case(username)) {
+        return Outcome::Banned;
     }
     let listed = properties::list_entries(id, "whitelist").await.unwrap_or_default();
     if listed.iter().any(|e| e.name.eq_ignore_ascii_case(username)) {
@@ -141,11 +165,19 @@ pub async fn submit(id: &str, username: &str, via: Via) -> Outcome {
         if pending.len() >= MAX_PENDING {
             return Outcome::Closed;
         }
-        let (source, from, discord_user) = match via {
-            Via::Web => ("web", None, None),
-            Via::Discord { user_id, name } => ("discord", Some(name), Some(user_id)),
+        let (source, from, discord_user, relay_id) = match via {
+            Via::Web { relay_id } => ("web", None, None, Some(relay_id)),
+            Via::Discord { user_id, name } => ("discord", Some(name), Some(user_id), None),
         };
-        pending.push(JoinRequest { id: uuid::Uuid::new_v4().to_string(), username: username.to_string(), source: source.into(), from, discord_user, at: now_ms() });
+        pending.push(JoinRequest {
+            id: uuid::Uuid::new_v4().to_string(),
+            username: username.to_string(),
+            source: source.into(),
+            from,
+            discord_user,
+            relay_id,
+            at: now_ms(),
+        });
         if write_json(&requests_file(), &every).await.is_err() {
             return Outcome::Closed;
         }
@@ -192,6 +224,43 @@ pub async fn reject(id: &str, request: &str) -> Result<RequestsInfo> {
     info(id).await
 }
 
+/// Rejects a request and blocks whoever sent it: on the web page, through the relay (which knows their address
+/// for a day); on Discord, that Discord user (until Unblock).
+pub async fn reject_and_block(id: &str, request: &str) -> Result<RequestsInfo> {
+    let r = take(id, request).await?;
+    if let Some(relay_id) = r.relay_id {
+        super::relay::send_join_block(id, relay_id);
+    }
+    if let Some(user) = r.discord_user.as_deref() {
+        {
+            let _guard = lock().lock().await;
+            let mut every = blocked().await;
+            let list = every.entry(id.to_string()).or_default();
+            if !list.iter().any(|u| u == user) {
+                list.push(user.to_string());
+            }
+            write_json(&blocked_file(), &every).await?;
+        }
+        let name = store::get(id).await.map(|m| m.name).unwrap_or_default();
+        discordbot::tell(id, user, &format!("Your request to join **{name}** as `{}` wasn't accepted.", r.username)).await;
+    }
+    changed(id).await;
+    info(id).await
+}
+
+/// Lets every blocked Discord user ask again.
+pub async fn unblock_all(id: &str) -> Result<RequestsInfo> {
+    {
+        let _guard = lock().lock().await;
+        let mut every = blocked().await;
+        if every.remove(id).is_some() {
+            write_json(&blocked_file(), &every).await?;
+        }
+    }
+    changed(id).await;
+    info(id).await
+}
+
 /// Drops a deleted server's requests and bot token.
 pub async fn forget(id: &str) {
     {
@@ -199,6 +268,10 @@ pub async fn forget(id: &str) {
         let mut every = all().await;
         if every.remove(id).is_some() {
             let _ = write_json(&requests_file(), &every).await;
+        }
+        let mut blocks = blocked().await;
+        if blocks.remove(id).is_some() {
+            let _ = write_json(&blocked_file(), &blocks).await;
         }
     }
     let _ = set_bot_token(id, None).await;

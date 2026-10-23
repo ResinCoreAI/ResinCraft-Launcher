@@ -104,6 +104,8 @@ export interface Instance {
   memoryMb?: number
   javaPath?: string
   jvmArgs?: string
+  /** ResinCraft's G1GC flags; unset follows Settings. */
+  optimizedFlags?: boolean
   modpack?: { projectId?: string; versionId?: string; name: string }
   pendingDownloads?: PendingDownload[]
   /** Library group; none = Ungrouped. */
@@ -228,6 +230,8 @@ export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVer
   javaPath?: string | null
   /** `null` clears the extra JVM arguments. */
   jvmArgs?: string | null
+  /** `null` follows Settings again. */
+  optimizedFlags?: boolean | null
   /** `null` moves the instance back to Ungrouped. */
   group?: string | null
   /** `null` clears the instance's own environment variables. */
@@ -356,6 +360,8 @@ export interface Settings {
   language: string
   memoryMb: number
   jvmArgs: string
+  /** ResinCraft's G1GC flags for games (skipped when the JVM arguments pick a collector). */
+  optimizedFlags: boolean
   javaPath: string
   autoJava: boolean
   onLaunch: CloseBehavior
@@ -1202,17 +1208,40 @@ export interface DiscordBotStatus {
 export interface RequestsInfo {
   requests: JoinRequest[]
   hasBotToken: boolean
+  /** Discord users the host blocked from asking (Reject and block). */
+  blockedOnDiscord: number
   bot: DiscordBotStatus
   /** Whether server.properties has the whitelist on (requests only matter then). */
   whitelistOn: boolean
-  /** The web page at the server's relay address, and the one that works with the relay's plain certificate. */
+  /** The web page players ask on (https://<relay domain>/join/<name>), once the server has a relay name. */
   webUrl?: string
-  webUrlFallback?: string
 }
 
 export interface ServerRequestsEvent {
   serverId: string
   info: RequestsInfo
+}
+
+/** What a Fix button in the "Minecraft crashed" window does. */
+export type CrashFix =
+  | { kind: 'installMod'; projectId: string; name: string }
+  | { kind: 'disableMod'; file: string }
+  | { kind: 'javaAuto' }
+  | { kind: 'memory'; mb: number }
+
+export interface CrashProblem {
+  title: EngineText
+  detail?: EngineText
+  fix?: CrashFix
+}
+
+/** What the crash fixer found after Minecraft crashed. */
+export interface GameCrashEvent {
+  instanceId: string
+  runId: string
+  problems: CrashProblem[]
+  /** The crash report file it read, if Minecraft wrote one. */
+  crashReport?: string
 }
 
 export interface ServerEvent {
@@ -1486,6 +1515,8 @@ export interface ResinApi {
     /** Asks for another folder for Download all to look in; the updated list, or null if cancelled. */
     addWatchFolder(): Promise<string[] | null>
     duplicate(id: string): Promise<Instance>
+    /** Changes the Minecraft version and mod loader (no loader version: the newest); the next start installs them. */
+    setVersion(id: string, mcVersion: string, loader: LoaderType, loaderVersion: string | null): Promise<Instance>
     /**
      * Brings worlds, shader packs, resource packs and settings from instance `fromId` into `id`. Worlds come in beside
      * the ones there (renamed when taken), packs only when missing; settings replace this instance's.
@@ -1501,6 +1532,8 @@ export interface ResinApi {
     launch(id: string, accountId?: string): Promise<void>
     /** `runId`: stop only that run; without it, every run of the instance stops. */
     kill(id: string, runId?: string): Promise<void>
+    /** Does what a Fix button in the "Minecraft crashed" window says. */
+    crashFix(id: string, fix: CrashFix): Promise<void>
     running(): Promise<string[]>
     runs(): Promise<RunView[]>
   }
@@ -1677,6 +1710,10 @@ export interface ResinApi {
     /** Puts the player on the whitelist (and tells them on Discord). */
     requestAccept(id: string, requestId: string): Promise<RequestsInfo>
     requestReject(id: string, requestId: string): Promise<RequestsInfo>
+    /** Rejects and blocks whoever sent it (on the web page through the relay, on Discord that user). */
+    requestBlock(id: string, requestId: string): Promise<RequestsInfo>
+    /** Lets every blocked Discord user ask again. */
+    requestUnblockAll(id: string): Promise<RequestsInfo>
     /** Saves the server's Discord bot token (kept sealed, never shown again); null removes it. */
     setBotToken(id: string, token: string | null): Promise<RequestsInfo>
     properties(id: string): Promise<PropEntry[]>
@@ -1760,6 +1797,7 @@ export interface ResinApi {
     server(cb: (e: ServerEvent) => void): () => void
     serverLog(cb: (e: ServerLogEvent) => void): () => void
     serverRequests(cb: (e: ServerRequestsEvent) => void): () => void
+    gameCrash(cb: (e: GameCrashEvent) => void): () => void
     update(cb: (s: UpdateStatus) => void): () => void
   }
 }

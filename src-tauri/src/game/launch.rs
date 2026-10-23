@@ -1,6 +1,6 @@
 //! Preparing (downloads, natives, Java), building the command line, running the game and streaming its log.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -425,12 +425,31 @@ fn with_target(mut game: Vec<String>, target: Option<&Target>, mc: &str) -> Resu
     Ok(game)
 }
 
-/// The memory flags and the player's JVM arguments (also `$INST_JAVA_ARGS` for commands).
+/// The servers' G1GC flags without the ones that only suit a server: AlwaysPreTouch (touches the whole heap
+/// before the window opens) and Aikar's marker properties.
+fn client_flags(memory_mb: u32) -> Vec<String> {
+    crate::server::runtime::optimized_flags(memory_mb)
+        .into_iter()
+        .filter(|f| f != "-XX:+AlwaysPreTouch" && !f.starts_with("-D"))
+        .collect()
+}
+
+/// Whether the arguments already pick a garbage collector (two would stop Java from starting).
+fn picks_gc(args: &[String]) -> bool {
+    args.iter().any(|a| a.starts_with("-XX:+Use") && a.ends_with("GC"))
+}
+
+/// The memory flags, ResinCraft's flags (if on and the player's arguments don't pick a collector) and the
+/// player's JVM arguments after them, so theirs win (also `$INST_JAVA_ARGS` for commands).
 fn memory_and_user_flags(inst: &Instance, settings: &Settings) -> Vec<String> {
     let memory = inst.memory_mb.unwrap_or(settings.memory_mb);
     let user_jvm = non_empty(inst.jvm_args.as_deref()).unwrap_or_else(|| settings.jvm_args.clone());
+    let user = split_args(&user_jvm);
     let mut args = vec![format!("-Xmx{memory}M"), format!("-Xms{}M", memory.min(1024))];
-    args.extend(split_args(&user_jvm));
+    if inst.optimized_flags.unwrap_or(settings.optimized_flags) && !picks_gc(&user) {
+        args.extend(client_flags(memory));
+    }
+    args.extend(user);
     args
 }
 
@@ -692,9 +711,37 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
             }
         }
     };
+    // The last console lines, for the crash fixer (a wrong Java fails before Minecraft writes any log).
+    let console: Arc<Mutex<VecDeque<String>>> = Arc::new(Mutex::new(VecDeque::new()));
+    let since = std::time::SystemTime::now();
+    // Set once the "Minecraft crashed" window was shown for this run (Fabric's own error window keeps the game open,
+    // so it's shown as soon as the loader says it gave up, not only when the game exits).
+    let crash_shown = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let push = {
-        let pending = pending.clone();
-        move |l: LogLine| pending.lock().unwrap().push(l)
+        let (pending, console, crash_shown) = (pending.clone(), console.clone(), crash_shown.clone());
+        let (instance_id, run_id) = (id.to_string(), run.run_id.clone());
+        move |l: LogLine| {
+            {
+                let mut c = console.lock().unwrap();
+                c.push_back(l.text.clone());
+                while c.len() > 400 {
+                    c.pop_front();
+                }
+            }
+            if super::crashfix::loader_gave_up(&l.text) && !crash_shown.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                let (console, instance_id, run_id) = (console.clone(), instance_id.clone(), run_id.clone());
+                tokio::spawn(async move {
+                    // The rest of the error (the mod and the cause) comes in the next lines.
+                    tokio::time::sleep(Duration::from_millis(1500)).await;
+                    let lines: Vec<String> = console.lock().unwrap().iter().cloned().collect();
+                    if let Ok(inst) = instances::get(&instance_id).await {
+                        let (problems, crash_report) = super::crashfix::diagnose(&inst, since, &lines).await;
+                        emit("gameCrash", super::crashfix::CrashReport { instance_id, run_id, problems, crash_report });
+                    }
+                });
+            }
+            pending.lock().unwrap().push(l)
+        }
     };
     push(LogLine { text: format!("ResinCraft is launching {} (Minecraft {}{})", inst.name, inst.mc_version, loader_label(&inst)), level: "info" });
     if slot > 1 {
@@ -883,6 +930,14 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         let _ = instances::update(&id, json!({ "playtime": playtime + secs })).await;
         let code = if signal { None } else { code };
         game_event(&run, if crashed { "crashed" } else { "stopped" }, code, None);
+        if crashed && !crash_shown.load(std::sync::atomic::Ordering::SeqCst) {
+            // Says what went wrong (and how to fix it) in the "Minecraft crashed" window.
+            let lines: Vec<String> = console.lock().unwrap().iter().cloned().collect();
+            if let Ok(inst) = instances::get(&id).await {
+                let (problems, crash_report) = super::crashfix::diagnose(&inst, since, &lines).await;
+                emit("gameCrash", super::crashfix::CrashReport { instance_id: id.clone(), run_id: run.run_id.clone(), problems, crash_report });
+            }
+        }
         crate::discord::stopped(&run.run_id).await;
         if slot > 1 {
             let _ = tokio::fs::remove_dir_all(natives_for(&id, slot)).await;
@@ -916,6 +971,15 @@ fn terminate(child: &mut tokio::process::Child, tree: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn client_flags_skip_server_only_ones_and_yield_to_a_chosen_gc() {
+        let f = client_flags(4096);
+        assert!(f.contains(&"-XX:+UseG1GC".to_string()));
+        assert!(!f.iter().any(|a| a == "-XX:+AlwaysPreTouch" || a.starts_with("-D")));
+        assert!(picks_gc(&["-XX:+UseZGC".to_string()]));
+        assert!(!picks_gc(&["-XX:MaxGCPauseMillis=50".to_string(), "-Dfoo=GC".to_string()]));
+    }
 
     fn auth(id: &str, name: &str) -> LaunchAuth {
         LaunchAuth { account_id: id.into(), username: name.into(), uuid: String::new(), access_token: "0".into(), user_type: "legacy", xuid: None }

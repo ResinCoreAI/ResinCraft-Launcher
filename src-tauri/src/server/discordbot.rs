@@ -307,6 +307,8 @@ async fn answer(d: Value, servers: &[(String, String)]) {
                 Outcome::AlreadyRequested => format!("There's already a request for `{username}` on **{name}**. The host will answer it."),
                 Outcome::Closed => format!("**{name}** isn't taking whitelist requests right now."),
                 Outcome::Invalid => format!("`{username}` isn't a valid Minecraft username."),
+                Outcome::Banned => format!("`{username}` is banned on **{name}**."),
+                Outcome::Blocked => format!("You can't send whitelist requests to **{name}**."),
             }
         }
     };

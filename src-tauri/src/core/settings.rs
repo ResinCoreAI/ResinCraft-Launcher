@@ -17,6 +17,9 @@ pub struct Settings {
     pub language: String,
     pub memory_mb: u32,
     pub jvm_args: String,
+    /// ResinCraft's G1GC flags for games (an instance can choose its own; skipped when the JVM arguments pick a
+    /// collector themselves).
+    pub optimized_flags: bool,
     pub java_path: String,
     pub auto_java: bool,
     /// "keep" | "minimize" | "hide"
@@ -77,6 +80,7 @@ impl Default for Settings {
             // A quarter of system RAM, kept between 2 GB and 6 GB, suits most packs.
             memory_mb: ((total / 4 / 512) * 512).clamp(2048, 6144),
             jvm_args: String::new(),
+            optimized_flags: true,
             java_path: String::new(),
             auto_java: true,
             on_launch: "minimize".into(),

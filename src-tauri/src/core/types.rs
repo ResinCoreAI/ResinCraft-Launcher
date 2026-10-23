@@ -154,6 +154,9 @@ pub struct Instance {
     pub java_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jvm_args: Option<String>,
+    /// ResinCraft's G1GC flags for this instance; None follows Settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optimized_flags: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modpack: Option<ModpackRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1245,6 +1248,9 @@ pub struct JoinRequest {
     /// Their Discord user id, to tell them the answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discord_user: Option<String>,
+    /// The relay's id for a web request (Reject and block names it; the relay knows who sent it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_id: Option<u64>,
     pub at: i64,
 }
 

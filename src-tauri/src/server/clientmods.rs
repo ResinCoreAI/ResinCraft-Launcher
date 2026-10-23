@@ -1,6 +1,8 @@
-//! Keeps client-only mods off modded servers. Before each start, jars Modrinth marks as client-only move from mods/ to
-//! mods-disabled/; when a start still crashes because a mod reached for the game client (one Modrinth doesn't know),
-//! the crash names it and it moves out the same way.
+//! Keeps client-only mods off modded servers. Before each start, new or changed jars are checked: Modrinth's
+//! server-side flag, a bundled list of known crashers (client_only_mods.txt), and the client-only marker of pure
+//! Fabric/Quilt jars. Client-only ones are turned off (renamed to `.jar.disabled`, so the Mods tab shows them with a
+//! switch), unless another mod on the server needs them. When a start still crashes because a mod reached for the
+//! game client, the crash names it and it's turned off the same way. A mod the host turns back on stays on.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
@@ -14,16 +16,51 @@ use serde::{Deserialize, Serialize};
 use crate::core::fsutil::{read_json, write_json};
 use crate::core::net::{hash_file, HashAlgo};
 
-/// Where client-only mods go: the server doesn't load it, and the files stay for anyone who wants them back.
-pub const DISABLED_DIR: &str = "mods-disabled";
-/// Jars already looked up, so a start only asks Modrinth about new or changed ones.
+/// What ResinCraft remembers per server (in the server's folder).
 const CHECKED_FILE: &str = ".resincraft-client-mods.json";
+
+/// Mod ids known to crash a dedicated server (see the file's own notes).
+const KNOWN: &str = include_str!("client_only_mods.txt");
+
+fn known_ids() -> &'static BTreeSet<String> {
+    static K: OnceLock<BTreeSet<String>> = OnceLock::new();
+    K.get_or_init(|| KNOWN.lines().map(|l| l.split('#').next().unwrap_or("").trim().to_lowercase()).filter(|l| !l.is_empty()).collect())
+}
 
 #[derive(Serialize, Deserialize, Default)]
 #[serde(default)]
 struct Checked {
-    /// File name → "size:modified" of jars Modrinth didn't call client-only.
+    /// File name → "size:modified" of jars found fine (not client-only, or needed by another mod).
     ok: BTreeMap<String, String>,
+    /// Jars ResinCraft turned off (by their .jar name), and why.
+    disabled: BTreeMap<String, Reason>,
+    /// Jars the host turned back on after ResinCraft turned them off: left alone from then on.
+    kept: BTreeSet<String>,
+    /// The bundled list the `ok` entries were checked against (a longer list checks them again).
+    known: String,
+}
+
+/// Why a mod was turned off.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Reason {
+    /// Modrinth says it doesn't run on servers.
+    Modrinth,
+    /// On ResinCraft's list of mods that crash servers.
+    KnownList,
+    /// A Fabric/Quilt mod that declares itself client-only.
+    ClientMarker,
+    /// It crashed the server reaching for the game client.
+    Crash,
+}
+
+/// A mod ResinCraft turned off on a server (`server:clientMods`).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DisabledMod {
+    /// The file as it is now (`….jar.disabled`).
+    pub file: String,
+    pub reason: Reason,
 }
 
 fn stamp(meta: &std::fs::Metadata) -> String {
@@ -47,43 +84,78 @@ fn jars(mods: &Path) -> Vec<(String, PathBuf, std::fs::Metadata)> {
     out
 }
 
-/// Before a start: moves the jars Modrinth marks as client-only out of mods/; returns their names. Offline or when
-/// Modrinth can't be reached, nothing moves (the crash check below still catches what breaks the start).
+/// Before a start: turns off the client-only jars in mods/ (see the module notes); returns their names. Offline,
+/// only the bundled list and the jars' own markers count (the crash check still catches what breaks the start).
 pub async fn sweep(dir: &Path) -> Vec<String> {
     let mods = dir.join("mods");
     let checked_path = dir.join(CHECKED_FILE);
     let mut checked: Checked = read_json(&checked_path).await.unwrap_or_default();
+    if checked.known != KNOWN {
+        checked.ok.clear();
+        checked.known = KNOWN.to_string();
+    }
     let all = jars(&mods);
-    let mut by_hash: BTreeMap<String, (String, PathBuf, String)> = BTreeMap::new();
-    for (name, path, meta) in &all {
-        let st = stamp(meta);
-        if checked.ok.get(name) == Some(&st) {
-            continue;
-        }
-        if let Ok(h) = hash_file(path, HashAlgo::Sha1).await {
-            by_hash.insert(h, (name.clone(), path.clone(), st));
+    // Turned off by ResinCraft, then back on by the host: theirs to decide now.
+    for (name, _, _) in &all {
+        if checked.disabled.remove(name).is_some() {
+            checked.kept.insert(name.clone());
         }
     }
     let present: BTreeSet<&String> = all.iter().map(|(n, _, _)| n).collect();
     checked.ok.retain(|n, _| present.contains(n));
-    let mut moved = Vec::new();
-    if !by_hash.is_empty() {
-        let hashes: Vec<String> = by_hash.keys().cloned().collect();
+
+    // Each new or changed jar: its own metadata first, then (together) Modrinth.
+    let mut flagged: BTreeMap<PathBuf, (String, String, Reason)> = BTreeMap::new();
+    let mut unknown: BTreeMap<String, (String, PathBuf, String)> = BTreeMap::new();
+    for (name, path, meta) in &all {
+        let st = stamp(meta);
+        if checked.kept.contains(name) || checked.ok.get(name) == Some(&st) {
+            continue;
+        }
+        let jm = jar_meta(path);
+        let title = jm.ids.first().cloned().unwrap_or_else(|| name.clone());
+        if jm.ids.iter().any(|id| known_ids().contains(&id.to_lowercase())) {
+            flagged.insert(path.clone(), (name.clone(), title, Reason::KnownList));
+        } else if jm.client_marker && !jm.forge {
+            // Multi-loader jars carry a Fabric marker too, while their Forge side may well run on servers.
+            flagged.insert(path.clone(), (name.clone(), title, Reason::ClientMarker));
+        } else if let Ok(h) = hash_file(path, HashAlgo::Sha1).await {
+            unknown.insert(h, (name.clone(), path.clone(), st));
+        }
+    }
+    if !unknown.is_empty() {
+        let hashes: Vec<String> = unknown.keys().cloned().collect();
         let lookup = tokio::time::timeout(std::time::Duration::from_secs(15), super::create::client_only_sha1s(&hashes)).await;
-        let Ok(Ok(client)) = lookup else { return moved };
-        let flagged: Vec<PathBuf> = by_hash.iter().filter(|(h, _)| client.contains_key(*h)).map(|(_, (_, p, _))| p.clone()).collect();
-        let removable: BTreeSet<PathBuf> = not_needed(&mods, flagged).into_iter().collect();
-        for (hash, (name, path, st)) in by_hash {
-            match client.get(&hash) {
-                Some(title) if removable.contains(&path) => {
-                    if move_out(dir, &path).await {
-                        moved.push(title.clone());
+        match lookup {
+            Ok(Ok(client)) => {
+                for (hash, (name, path, st)) in unknown {
+                    match client.get(&hash) {
+                        Some(title) => {
+                            flagged.insert(path, (name, title.clone(), Reason::Modrinth));
+                        }
+                        None => {
+                            checked.ok.insert(name, st);
+                        }
                     }
                 }
-                // Not client-only, or client-only but another mod here needs it: it stays.
-                _ => {
-                    checked.ok.insert(name, st);
+            }
+            // Offline: these get looked at again next start.
+            _ => {}
+        }
+    }
+
+    let mut moved = Vec::new();
+    if !flagged.is_empty() {
+        let removable: BTreeSet<PathBuf> = not_needed(&mods, flagged.keys().cloned().collect()).into_iter().collect();
+        for (path, (name, title, reason)) in flagged {
+            if removable.contains(&path) {
+                if turn_off(&path).await {
+                    checked.disabled.insert(name, reason);
+                    moved.push(title);
                 }
+            } else if let Ok(meta) = std::fs::metadata(&path) {
+                // Client-only, but another mod here needs it: it stays.
+                checked.ok.insert(name, stamp(&meta));
             }
         }
     }
@@ -91,16 +163,57 @@ pub async fn sweep(dir: &Path) -> Vec<String> {
     moved
 }
 
-/// Moves one jar from mods/ into mods-disabled/ (replacing an older copy there).
-pub async fn move_out(dir: &Path, jar: &Path) -> bool {
-    let Some(name) = jar.file_name() else { return false };
-    let to = dir.join(DISABLED_DIR);
-    if tokio::fs::create_dir_all(&to).await.is_err() {
+/// Renames `x.jar` to `x.jar.disabled` (replacing an older disabled copy).
+async fn turn_off(jar: &Path) -> bool {
+    let mut off = jar.as_os_str().to_owned();
+    off.push(".disabled");
+    let off = PathBuf::from(off);
+    let _ = tokio::fs::remove_file(&off).await;
+    tokio::fs::rename(jar, &off).await.is_ok()
+}
+
+/// Turns off a jar the crash named, and remembers why (even if the host had turned it back on: it crashed).
+pub async fn disable_crashed(dir: &Path, jar: &Path) -> bool {
+    if !turn_off(jar).await {
         return false;
     }
-    let dest = to.join(name);
-    let _ = tokio::fs::remove_file(&dest).await;
-    tokio::fs::rename(jar, &dest).await.is_ok()
+    let checked_path = dir.join(CHECKED_FILE);
+    let mut checked: Checked = read_json(&checked_path).await.unwrap_or_default();
+    if let Some(name) = jar.file_name().map(|n| n.to_string_lossy().into_owned()) {
+        checked.kept.remove(&name);
+        checked.ok.remove(&name);
+        checked.disabled.insert(name, Reason::Crash);
+    }
+    let _ = write_json(&checked_path, &checked).await;
+    true
+}
+
+/// Records mods turned off while the server was made (Modrinth's check), so they show with the others.
+pub async fn record_disabled(dir: &Path, names: &[String], reason: Reason) {
+    let checked_path = dir.join(CHECKED_FILE);
+    let mut checked: Checked = read_json(&checked_path).await.unwrap_or_default();
+    for n in names {
+        checked.disabled.insert(n.clone(), reason);
+    }
+    let _ = write_json(&checked_path, &checked).await;
+}
+
+/// Turns off a jar in mods/ (while the server is made) and returns its .jar name.
+pub async fn turn_off_named(jar: &Path) -> Option<String> {
+    let name = jar.file_name()?.to_string_lossy().into_owned();
+    turn_off(jar).await.then_some(name)
+}
+
+/// The mods ResinCraft turned off on a server and still off.
+pub async fn disabled(dir: &Path) -> Vec<DisabledMod> {
+    let checked: Checked = read_json(&dir.join(CHECKED_FILE)).await.unwrap_or_default();
+    let mods = dir.join("mods");
+    checked
+        .disabled
+        .into_iter()
+        .map(|(name, reason)| DisabledMod { file: format!("{name}.disabled"), reason })
+        .filter(|d| mods.join(&d.file).is_file())
+        .collect()
 }
 
 struct Patterns {
@@ -111,6 +224,8 @@ struct Patterns {
     fabric_id: Regex,
     fabric_depends: Regex,
     json_key: Regex,
+    fabric_client: Regex,
+    failed_mod: Regex,
 }
 
 fn patterns() -> &'static Patterns {
@@ -124,6 +239,9 @@ fn patterns() -> &'static Patterns {
         fabric_id: Regex::new(r#""id"\s*:\s*"([^"]+)""#).unwrap(),
         fabric_depends: Regex::new(r#""depends"\s*:\s*\{([^}]*)\}"#).unwrap(),
         json_key: Regex::new(r#""([^"]+)"\s*:"#).unwrap(),
+        fabric_client: Regex::new(r#""environment"\s*:\s*"client""#).unwrap(),
+        // Forge's own line when a mod can't be built: "Failed to create mod instance. ModID: citresewn, class …".
+        failed_mod: Regex::new(r"Failed to create mod instance\. ModID: ([a-z][a-z0-9_]{1,63})").unwrap(),
     })
 }
 
@@ -136,6 +254,22 @@ pub fn culprits(dir: &Path, log: &[String], since: SystemTime) -> Vec<PathBuf> {
         out.extend(report_culprits(&report, &mods));
     }
     let p = patterns();
+    // "Failed to create mod instance. ModID: x" followed (within its stack trace) by a client class.
+    let mut failed: BTreeSet<String> = BTreeSet::new();
+    for (i, line) in log.iter().enumerate() {
+        if let Some(c) = p.failed_mod.captures(line) {
+            if log.iter().skip(i).take(4).any(|l| p.client_class.is_match(l) && !l.contains("[mixin/]") && !l.contains("RuntimeDistCleaner")) {
+                failed.insert(c[1].to_string());
+            }
+        }
+    }
+    if !failed.is_empty() {
+        for (id, jar) in mod_ids(&mods) {
+            if failed.contains(&id) {
+                out.insert(jar);
+            }
+        }
+    }
     if log.iter().any(|l| p.fatal.is_match(l)) {
         let ids: BTreeSet<String> = log.iter().filter_map(|l| p.mixin_owner.captures(l)).map(|c| c[1].to_string()).collect();
         if !ids.is_empty() {
@@ -200,6 +334,10 @@ fn mod_ids(mods: &Path) -> Vec<(String, PathBuf)> {
 struct JarMods {
     ids: Vec<String>,
     needs: Vec<String>,
+    /// fabric.mod.json / quilt.mod.json says `"environment": "client"`.
+    client_marker: bool,
+    /// Has a mods.toml (a Forge or NeoForge mod, maybe besides a Fabric one).
+    forge: bool,
 }
 
 /// The game and its loaders, which every mod lists as a dependency.
@@ -221,6 +359,7 @@ fn jar_meta(path: &Path) -> JarMods {
             let own = text.split("[[dependencies").next().unwrap_or("");
             out.ids.extend(p.mods_toml_id.captures_iter(own).map(|c| c[1].to_string()));
             out.needs.extend(toml_needs(&text));
+            out.forge = true;
         }
     }
     for json in ["fabric.mod.json", "quilt.mod.json"] {
@@ -231,6 +370,7 @@ fn jar_meta(path: &Path) -> JarMods {
             if let Some(c) = p.fabric_depends.captures(&text) {
                 out.needs.extend(p.json_key.captures_iter(&c[1]).map(|k| k[1].to_string()));
             }
+            out.client_marker |= p.fabric_client.is_match(&text);
         }
     }
     out.needs.retain(|n| !NOT_MODS.contains(&n.as_str()));
@@ -310,6 +450,62 @@ Details:
 	Failure message: TACZ has failed to load correctly
 		java.lang.IllegalStateException: something on the server side
 ";
+
+    /// A jar with just a mods.toml (`forge`) or a fabric.mod.json for `id`.
+    fn jar(dir: &Path, file: &str, id: &str, fabric_client: bool) -> PathBuf {
+        use std::io::Write;
+        let path = dir.join(file);
+        let mut z = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        let opts = zip::write::SimpleFileOptions::default();
+        if fabric_client {
+            z.start_file("fabric.mod.json", opts).unwrap();
+            write!(z, r#"{{"schemaVersion":1,"id":"{id}","environment":"client"}}"#).unwrap();
+        } else {
+            z.start_file("META-INF/mods.toml", opts).unwrap();
+            write!(z, "modLoader=\"javafml\"
+[[mods]]
+modId=\"{id}\"
+").unwrap();
+        }
+        z.finish().unwrap();
+        path
+    }
+
+    /// The real console of a Connector server that CIT Resewn crashed, cut down to the lines that matter.
+    const CITRESEWN_LOG: &str = "[main/ERROR] [ne.mi.fm.lo.RuntimeDistCleaner/DISTXFORM]: Attempted to load class net/minecraft/client/gui/screens/Screen for invalid dist DEDICATED_SERVER
+[main/WARN] [mixin/]: @Mixin target net.minecraft.client.gui.screens.Screen was not found fabric-screen-api-v1.mixins.json:ScreenAccessor from mod fabric_screen_api_v1
+[main/WARN] [mixin/]: @Mixin target net.minecraft.client.main.Main was not found mixins.emibridge.json:MainEntrypointMixin from mod connectorextras_emi_bridge
+[modloading-worker-0/ERROR] [ne.mi.fm.ja.FMLModContainer/LOADING]: Failed to create mod instance. ModID: citresewn, class shcm.shsupercm.forge.citresewn.CITResewn
+java.lang.NoClassDefFoundError: net/minecraft/client/renderer/texture/atlas/SpriteSource
+	at shcm.shsupercm.forge.citresewn.CITResewn.<init>(CITResewn.java:28) ~[citresewn-1.20.1-5.jar%23243!/:?]
+[main/ERROR] [minecraft/Main]: Failed to start the minecraft server";
+
+    #[test]
+    fn the_citresewn_crash_names_only_citresewn() {
+        let dir = std::env::temp_dir().join(format!("resin-citresewn-{}", std::process::id()));
+        let mods = dir.join("mods");
+        std::fs::create_dir_all(&mods).unwrap();
+        let cit = jar(&mods, "citresewn-1.20.1-5.jar", "citresewn", false);
+        jar(&mods, "fabric-screen-api.jar", "fabric_screen_api_v1", false);
+        jar(&mods, "connectorextras.jar", "connectorextras_emi_bridge", false);
+        let log: Vec<String> = CITRESEWN_LOG.lines().map(str::to_string).collect();
+        // No crash report: the console alone names it.
+        let found = culprits(&dir, &log, SystemTime::now());
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(found, vec![cit]);
+    }
+
+    #[test]
+    fn bundled_list_and_client_markers() {
+        assert!(known_ids().contains("citresewn"));
+        let dir = std::env::temp_dir().join(format!("resin-markers-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let fabric = jar_meta(&jar(&dir, "chatanimation.jar", "chatanimation", true));
+        assert!(fabric.client_marker && !fabric.forge);
+        let forge = jar_meta(&jar(&dir, "tacz.jar", "tacz", false));
+        assert!(!forge.client_marker && forge.forge && forge.ids == ["tacz"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn crash_reports_name_the_client_only_jars() {

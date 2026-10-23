@@ -720,11 +720,17 @@ pub async fn drop_client_only(mods: &Path, task: &Arc<Task>) -> Vec<String> {
         Ok(found) => {
             // Never one another mod on the server needs.
             let removable = super::clientmods::not_needed(mods, found.iter().map(|(p, _)| p.clone()).collect());
+            // Turned off (.jar.disabled), not deleted: the Mods tab shows them with a switch.
             let mut names = Vec::new();
+            let mut files = Vec::new();
             for (path, title) in found.into_iter().filter(|(p, _)| removable.contains(p)) {
-                if tokio::fs::remove_file(&path).await.is_ok() {
+                if let Some(file) = super::clientmods::turn_off_named(&path).await {
                     names.push(title);
+                    files.push(file);
                 }
+            }
+            if let Some(dir) = mods.parent() {
+                super::clientmods::record_disabled(dir, &files, super::clientmods::Reason::Modrinth).await;
             }
             names.sort();
             names

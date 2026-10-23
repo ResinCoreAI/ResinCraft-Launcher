@@ -114,7 +114,7 @@ fn field(s: &str) -> String {
 }
 
 /// Where friends get the launcher (the presence's "Get ResinCraft" button).
-pub const DOWNLOAD_URL: &str = "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest";
+pub const DOWNLOAD_URL: &str = "https://rscraft.resincore.tech";
 
 /// A modpack's page from its project id: bare for Modrinth, "cf:<id>" for CurseForge; other sites have none.
 fn pack_page(project_id: &str) -> Option<String> {

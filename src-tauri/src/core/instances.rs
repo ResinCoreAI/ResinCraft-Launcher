@@ -81,6 +81,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         memory_mb: None,
         java_path: None,
         jvm_args: None,
+        optimized_flags: None,
         modpack: None,
         pending_downloads: None,
         group: data.group.map(|g| g.trim().to_string()).filter(|g| !g.is_empty()),
@@ -116,6 +117,33 @@ pub async fn update(id: &str, patch: Value) -> Result<Instance> {
     }
     let inst: Instance = serde_json::from_value(current)?;
     crate::game::commands::check_env(&inst.env)?;
+    save(&inst).await?;
+    Ok(inst)
+}
+
+/// Changes the instance's Minecraft version and mod loader (the next start installs what's needed). Without a loader
+/// version, the newest one for that Minecraft is picked. LiteLoader stays only on Forge, OptiFine only on the same
+/// Minecraft version.
+pub async fn set_version(id: &str, mc_version: &str, loader: LoaderType, loader_version: Option<String>) -> Result<Instance> {
+    if crate::game::running_ids().iter().any(|r| r == id) {
+        return Err(err_tr!("instances.closeToChangeVersion", "Close the game before changing its version."));
+    }
+    let mut inst = get(id).await?;
+    let mc = mc_version.trim().to_string();
+    let loader_version = match (loader, loader_version.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())) {
+        (LoaderType::Vanilla, _) => None,
+        (l, Some(v)) => Some(crate::game::loaders::normalize_loader_version(l, &mc, &v)),
+        (l, None) => Some(crate::game::loaders::latest_loader(l, &mc).await?),
+    };
+    if loader != LoaderType::Forge {
+        inst.liteloader = None;
+    }
+    if inst.mc_version != mc {
+        inst.optifine = None;
+    }
+    inst.mc_version = mc;
+    inst.loader = loader;
+    inst.loader_version = loader_version;
     save(&inst).await?;
     Ok(inst)
 }

@@ -1,0 +1,6 @@
+# Mod ids (from mods.toml or fabric.mod.json) known to crash a dedicated server, for mods that Modrinth doesn't
+# know and that don't mark themselves client-only. One per line; # starts a comment. Only add mods that crash a
+# server, not ones that merely do nothing there.
+
+# CIT Resewn (Forge port): loads client texture classes while mods are constructed.
+citresewn

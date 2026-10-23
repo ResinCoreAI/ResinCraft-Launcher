@@ -75,6 +75,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       collectPending: fn('instances:collectPending'),
       addWatchFolder: fn('instances:addWatchFolder'),
       duplicate: fn('instances:duplicate'),
+      setVersion: fn('instances:setVersion'),
       copyFrom: fn('instances:copyFrom'),
       resetIcon: fn('instances:resetIcon'),
       setImage: fn('instances:setImage'),
@@ -82,6 +83,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       openFolder: fn('instances:openFolder'),
       launch: fn('instances:launch'),
       kill: fn('instances:kill'),
+      crashFix: fn('instances:crashFix'),
       running: fn('instances:running'),
       runs: fn('instances:runs')
     },
@@ -194,6 +196,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       requests: fn('server:requests'),
       requestAccept: fn('server:requestAccept'),
       requestReject: fn('server:requestReject'),
+      requestBlock: fn('server:requestBlock'),
+      requestUnblockAll: fn('server:requestUnblockAll'),
       setBotToken: fn('server:setBotToken'),
       properties: fn('server:properties'),
       setProperties: fn('server:setProperties'),
@@ -239,6 +243,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), update: on('update') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update') }
   } as ResinApi
 }

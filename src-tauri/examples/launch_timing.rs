@@ -146,7 +146,7 @@ async fn run() -> anyhow::Result<()> {
             "log" => {
                 for l in payload["lines"].as_array().into_iter().flatten() {
                     let text = l["text"].as_str().unwrap_or_default();
-                    if text.starts_with("Command: ") && std::env::var_os("RESIN_TIMING_SHOW_COMMAND").is_some() {
+                    if (text.starts_with("Command: ") || text.starts_with("Java: ")) && std::env::var_os("RESIN_TIMING_SHOW_COMMAND").is_some() {
                         println!("{text}");
                     }
                     if text.starts_with("ResinCraft is launching") || text.starts_with("Java: ") || text.starts_with("Command: ") {

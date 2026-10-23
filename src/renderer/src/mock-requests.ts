@@ -1,6 +1,6 @@
 import type { JoinRequest, RequestsInfo, ResinApi, ServerInfo, ServerRequestsEvent } from '@shared/types'
 
-type RequestsApi = Pick<ResinApi['server'], 'requests' | 'requestAccept' | 'requestReject' | 'setBotToken'>
+type RequestsApi = Pick<ResinApi['server'], 'requests' | 'requestAccept' | 'requestReject' | 'requestBlock' | 'requestUnblockAll' | 'setBotToken'>
 
 /** Whitelist requests for the web preview: a couple waiting on the first server, and a bot that connects. */
 export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerRequestsEvent) => void): RequestsApi {
@@ -9,6 +9,7 @@ export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerR
   const pending = new Map<string, JoinRequest[]>()
   const tokens = new Set<string>()
   const online = new Set<string>()
+  const blocked = new Map<string, number>()
   const seed = (id: string) => {
     if (!pending.has(id))
       pending.set(id, [
@@ -24,14 +25,14 @@ export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerR
     return {
       requests: s.joinRequests?.enabled ? seed(id) : (pending.get(id) ?? []),
       hasBotToken,
+      blockedOnDiscord: blocked.get(id) ?? 0,
       bot: !s.joinRequests?.enabled || !s.joinRequests.discord || !hasBotToken
         ? { state: 'off' }
         : online.has(id)
           ? { state: 'online', name: 'SMP Helper', inviteUrl: 'https://discord.com/oauth2/authorize?client_id=1&scope=bot%20applications.commands&permissions=0' }
           : { state: 'connecting' },
       whitelistOn: true,
-      webUrl: relay && `https://${relay}`,
-      webUrlFallback: relay && `https://rscraft.resincore.tech/join/${s.relayName}`
+      webUrl: relay && `https://rscraft.resincore.tech/join/${s.relayName}`
     }
   }
   const answer = (id: string, requestId: string) => {
@@ -53,6 +54,16 @@ export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerR
     },
     requestAccept: answer,
     requestReject: answer,
+    requestBlock: (id, requestId) => {
+      if (seed(id).find((r) => r.id === requestId)?.source === 'discord') blocked.set(id, (blocked.get(id) ?? 0) + 1)
+      return answer(id, requestId)
+    },
+    requestUnblockAll: (id) => {
+      blocked.delete(id)
+      const i = info(id)
+      emit({ serverId: id, info: i })
+      return wait(i)
+    },
     setBotToken: (id, token) => {
       if (token) tokens.add(id)
       else {

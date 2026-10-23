@@ -1,6 +1,7 @@
 //! Minecraft versions, mod loaders, Java and launching (`versions:*`, `java:*`, `instances:launch|kill|running|runs`).
 
 pub mod commands;
+pub mod crashfix;
 pub mod forge;
 pub mod jarmods;
 pub mod java;
@@ -55,6 +56,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
 
         // (instance id, account id?): the account plays this once without becoming the active one.
+        // A Fix button in the "Minecraft crashed" window: [instance id, fix].
+        "instances:crashFix" => {
+            crashfix::apply(&args.get::<String>(0)?, &args.get::<crashfix::Fix>(1)?).await?;
+            done()
+        }
         "instances:launch" => {
             launch_as(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref(), None).await?;
             done()

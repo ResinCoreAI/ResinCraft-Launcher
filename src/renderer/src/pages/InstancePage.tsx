@@ -98,11 +98,19 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <div className="grow">
           <h1>{inst.name}</h1>
           <div className="row wrap">
-            <span className="chip">
+            {/* Opens Settings at the Minecraft and loader version (as Prism's Version page). */}
+            <button
+              className="chip chip-button"
+              title={t('version.game')}
+              onClick={() => {
+                setTab('settings')
+                setTimeout(() => document.getElementById('instance-version')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+              }}
+            >
               <Gamepad2 /> {describe(inst)}
               {inst.loaderVersion ? ` ${inst.loaderVersion}` : ''}
               {inst.optifine ? ' + OptiFine' : ''}
-            </span>
+            </button>
             <span className="chip">
               <Timer /> {playtime(inst.playtime)}
             </span>
@@ -322,14 +330,25 @@ function ContentTab({ inst }: { inst: Instance }) {
   const nameOf = (m: ContentItem) => m.title ?? m.filename.replace(/\.(jar|zip)(\.disabled)?$/, '')
   const picked = () => shown.filter((m) => selected.has(fileKey(m)))
 
-  /** Turns each file on or off (only the ones not already that way). */
-  const setEnabled = async (list: ContentItem[], enabled: boolean) => {
-    try {
-      for (const m of list) if (m.enabled !== enabled) await api.content.toggle(inst.id, kind, m.filename)
-    } catch (e) {
-      toast((e as Error).message, 'error')
-    }
-    await load()
+  // Renames run one after another, so quick clicks reach the disk in order while the switches move at once.
+  const toggles = useRef<Promise<void>>(Promise.resolve())
+  /** Turns each file on or off (only the ones not already that way): shown right away, renamed in the background. */
+  const setEnabled = (list: ContentItem[], enabled: boolean) => {
+    const changing = list.filter((m) => m.enabled !== enabled)
+    if (!changing.length) return
+    const keys = new Set(changing.map(fileKey))
+    const base = (f: string) => f.replace(/\.disabled$/, '')
+    setItems((prev) =>
+      prev?.map((i) => (keys.has(fileKey(i)) ? { ...i, enabled, filename: enabled ? base(i.filename) : `${base(i.filename)}.disabled` } : i))
+    )
+    toggles.current = toggles.current.then(async () => {
+      try {
+        for (const m of changing) await api.content.toggle(inst.id, kind, m.filename)
+      } catch (e) {
+        toast((e as Error).message, 'error')
+        await load()
+      }
+    })
   }
 
   /** Checks every mod (that's how the engine does it), then reports on the picked ones. */
@@ -570,14 +589,7 @@ function ContentTab({ inst }: { inst: Instance }) {
               <Switch
                 on={m.enabled}
                 label={m.enabled ? t('instance.content.disable') : t('instance.content.enable')}
-                onChange={async () => {
-                  try {
-                    await api.content.toggle(inst.id, kind, m.filename)
-                    await load()
-                  } catch (e) {
-                    toast((e as Error).message, 'error')
-                  }
-                }}
+                onChange={() => setEnabled([m], !m.enabled)}
               />
               <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving([m])}>
                 <Trash2 />
@@ -1031,6 +1043,21 @@ function SettingsTab({ inst }: { inst: Instance }) {
               </select>
             </div>
           </div>
+          <div className="setting">
+            <div className="text">
+              <b>{t('instance.settings.flags')}</b>
+              <span>{t('instance.settings.flagsHint')}</span>
+            </div>
+            <Segmented<'default' | 'resin' | 'off'>
+              value={inst.optimizedFlags == null ? 'default' : inst.optimizedFlags ? 'resin' : 'off'}
+              onChange={(v) => void save({ optimizedFlags: v === 'default' ? null : v === 'resin' })}
+              options={[
+                { value: 'default', label: t('instance.settings.flagsDefault') },
+                { value: 'resin', label: t('instance.settings.flagsResin') },
+                { value: 'off', label: t('instance.settings.flagsOff') }
+              ]}
+            />
+          </div>
           <div className="setting stack">
             <div className="text">
               <b>{t('instance.settings.jvmArgs')}</b>
@@ -1040,7 +1067,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
               className="input"
               rows={2}
               value={jvm}
-              placeholder={settings?.jvmArgs || '-XX:+UseG1GC'}
+              placeholder={settings?.jvmArgs || '-Dfile.encoding=UTF-8'}
               onChange={(e) => setJvm(e.target.value)}
               onBlur={() => jvm !== (inst.jvmArgs ?? '') && void save({ jvmArgs: jvm || null })}
             />

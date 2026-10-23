@@ -35,7 +35,7 @@ pub fn done() -> Result<Value> {
 pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
     let group = channel.split(':').next().unwrap_or_default();
     match (group, channel) {
-        (_, "instances:launch" | "instances:kill" | "instances:running" | "instances:runs") => crate::game::handle(channel, args).await,
+        (_, "instances:launch" | "instances:kill" | "instances:running" | "instances:runs" | "instances:crashFix") => crate::game::handle(channel, args).await,
         ("app" | "settings" | "instances", _) => crate::app_cmds::handle(channel, args).await,
         ("versions" | "java", _) => crate::game::handle(channel, args).await,
         ("optifine", _) => crate::game::optifine::handle(channel, args).await,

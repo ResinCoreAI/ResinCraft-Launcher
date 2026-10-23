@@ -49,6 +49,8 @@ export default {
   'settings.javaManaged': 'Installed by ResinCraft',
   'settings.noJava': "No Java found yet. That's fine: ResinCraft will download one when you first play.",
   'settings.jvmArgs': 'Default JVM arguments',
+  'settings.flags': 'ResinCraft Java flags',
+  'settings.flags.hint': 'Tuned garbage collection (G1GC) for smoother frames. Skipped when your JVM arguments choose a collector.',
   'settings.jvmArgs.hint': 'Advanced: extra flags passed to Java for every instance.',
   'settings.downloads.lead': 'Lower this if your connection struggles when preparing games.',
   'settings.parallel': 'Parallel downloads',

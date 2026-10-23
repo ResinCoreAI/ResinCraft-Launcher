@@ -127,11 +127,14 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:requests" => json(requests::info(&args.get::<String>(0)?).await?),
         "server:requestAccept" => json(requests::accept(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:requestReject" => json(requests::reject(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:requestBlock" => json(requests::reject_and_block(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:requestUnblockAll" => json(requests::unblock_all(&args.get::<String>(0)?).await?),
         "server:setBotToken" => {
             let id: String = args.get(0)?;
             requests::set_bot_token(&id, args.get::<Option<String>>(1)?).await?;
             json(requests::info(&id).await?)
         }
+        "server:clientMods" => json(clientmods::disabled(&store::dir(&args.get::<String>(0)?)?).await),
         "server:packFlags" => json(runtime::pack_flags(&store::dir(&args.get::<String>(0)?)?)),
         "server:properties" => json(properties::read(&store::dir(&args.get::<String>(0)?)?).await),
         "server:setProperties" => {

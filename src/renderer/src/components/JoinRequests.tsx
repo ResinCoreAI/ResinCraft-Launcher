@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, ExternalLink, Globe, Loader2, MessageCircle, Trash2, X } from 'lucide-react'
+import { Ban, Check, Copy, ExternalLink, Globe, Loader2, MessageCircle, Trash2, X } from 'lucide-react'
 import type { JoinRequestsConfig, RequestsInfo, ServerInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -77,17 +77,21 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
                 <b>Web page</b>
                 {info?.webUrl ? (
                   <>
-                    <span className="hint">Open while the server is online through ResinCraft Relay.</span>
-                    <div className="row wrap" style={{ gap: 6 }}>
-                      {[info.webUrl, info.webUrlFallback].filter(Boolean).map((u) => (
-                        <button key={u} type="button" className="chip mono" title="Copy" onClick={(e) => (e.preventDefault(), void copy(u!, 'Link copied'))}>
-                          {u} <Copy size={12} />
-                        </button>
-                      ))}
+                    <span className="hint">Share this link with players. It works while the server is online through ResinCraft Relay.</span>
+                    <div className="jr-link">
+                      <code className="grow ellipsis" title={info.webUrl}>
+                        {info.webUrl}
+                      </code>
+                      {/* Inside the row's label: keep the click from ticking the checkbox. */}
+                      <button type="button" className="btn sm" onClick={(e) => (e.preventDefault(), void copy(info.webUrl!, 'Link copied'))}>
+                        <Copy /> Copy link
+                      </button>
                     </div>
                   </>
+                ) : s.tunnel === 'resin' || s.tunnel === 'auto' ? (
+                  <span className="hint">Start the server once: its link appears here when it's online through ResinCraft Relay.</span>
                 ) : (
-                  <span className="hint">Needs ResinCraft Relay: share the server through it (Settings → Internet) to get the page.</span>
+                  <span className="hint">Needs ResinCraft Relay: choose it in Settings → How friends connect, then start the server to get the link.</span>
                 )}
               </div>
             </label>
@@ -113,6 +117,14 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
           {cfg.discord && info && (
             <div className="jr-bot">
               {bot?.message && <div className={`hint ${bot.state === 'error' ? 'warn' : ''}`}>{bot.message}</div>}
+              {info.blockedOnDiscord > 0 && (
+                <div className="hint">
+                  {info.blockedOnDiscord === 1 ? '1 Discord user is blocked from asking.' : `${info.blockedOnDiscord} Discord users are blocked from asking.`}{' '}
+                  <button className="link" disabled={busy === 'unblock'} onClick={() => void act('unblock', () => api.server.requestUnblockAll(s.id), 'They can ask again')}>
+                    Unblock all
+                  </button>
+                </div>
+              )}
               {info.hasBotToken ? (
                 <div className="row wrap" style={{ gap: 8 }}>
                   {bot?.inviteUrl && (
@@ -185,6 +197,14 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
                   </button>
                   <button className="btn sm" disabled={!!busy} onClick={() => void act(r.id, () => api.server.requestReject(s.id, r.id))}>
                     <X /> Reject
+                  </button>
+                  <button
+                    className="btn sm danger"
+                    disabled={!!busy}
+                    title={r.source === 'discord' ? 'Reject, and stop this Discord user from asking again' : 'Reject, and stop whoever sent it from asking again for a day'}
+                    onClick={() => void act(r.id, () => api.server.requestBlock(s.id, r.id), `${r.username} rejected and blocked`)}
+                  >
+                    <Ban /> Reject and block
                   </button>
                 </div>
               ))

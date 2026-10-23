@@ -50,6 +50,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // Files to download by hand: pick up the ones that arrived in Downloads.
         "instances:collectPending" => json(crate::content::manual::collect(&args.get::<String>(0)?).await?),
         "instances:addWatchFolder" => json(crate::content::manual::add_watch_folder().await?),
+        // [id, Minecraft version, loader, loader version | null (the newest)] → Instance.
+        "instances:setVersion" => json(
+            instances::set_version(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get(2)?, args.get::<Option<String>>(3)?).await?,
+        ),
         "instances:duplicate" => json(instances::duplicate(&args.get::<String>(0)?).await?),
         "instances:copyFrom" => json(
             crate::player::carry::copy_from(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<crate::player::carry::CopyPicks>(2)?).await?,

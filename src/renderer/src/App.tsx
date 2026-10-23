@@ -5,6 +5,7 @@ import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, open
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
 import { UpdateBanner, UpdateTitleButton } from './components/Updates'
+import CrashFixer from './components/CrashFixer'
 import { PackUpdatesBanner } from './components/PackUpdates'
 import { RelayWatcher } from './components/ServerRelay'
 import { isTauri } from './api'
@@ -182,6 +183,7 @@ export default function App() {
       {newInstanceOpen && <NewInstanceModal onClose={() => setNewInstanceOpen(false)} />}
       <Dock />
       <UpdateBanner />
+      <CrashFixer />
       <PackUpdatesBanner />
       <RelayWatcher />
       <ContextMenuHost />

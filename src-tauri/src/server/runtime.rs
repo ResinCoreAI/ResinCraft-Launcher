@@ -392,7 +392,7 @@ pub async fn start(id: &str) -> Result<()> {
     // Client-only mods crash a server (they reach for the game window), so they never start with it.
     if meta.kind.modded() {
         for title in super::clientmods::sweep(&dir).await {
-            applied.push(format!("Moved {title} to {} (it only runs on the game client)", super::clientmods::DISABLED_DIR));
+            applied.push(format!("Turned off {title}: it only runs on the game client (the Mods tab can turn it back on)"));
         }
     }
     let started_at = std::time::SystemTime::now();
@@ -546,8 +546,8 @@ pub async fn start(id: &str) -> Result<()> {
                 let mut notes = Vec::new();
                 for jar in super::clientmods::culprits(&dir, &log, started_at) {
                     let name = jar.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                    if super::clientmods::move_out(&dir, &jar).await {
-                        notes.push(format!("Moved {name} to {} (it crashed the server reaching for the game client)", super::clientmods::DISABLED_DIR));
+                    if super::clientmods::disable_crashed(&dir, &jar).await {
+                        notes.push(format!("Turned off {name}: it crashed the server reaching for the game client"));
                     }
                 }
                 if !notes.is_empty() {

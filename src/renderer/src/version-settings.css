@@ -78,3 +78,25 @@
   max-height: 220px;
   overflow: auto;
 }
+
+/* Minecraft version and loader (GameVersion). */
+.version-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin: 8px 0 10px;
+}
+.version-pick .field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.version-pick .field .label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.version-pick select {
+  min-width: 160px;
+}

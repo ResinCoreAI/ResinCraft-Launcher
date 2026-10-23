@@ -1,12 +1,12 @@
 //! Copies a server's jars into a scratch folder and runs the client-only checks on them, as a server start does:
 //!   cargo run --example check_clientmods -- <folder of jars> [crash report]
-//! Prints which jars the Modrinth check moves out, then which ones the crash report names.
+//! Prints which jars the check turns off (and why), then which ones the crash report names.
 
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use resincraft_lib::core::{ctx, paths};
-use resincraft_lib::server::clientmods::{culprits, sweep, DISABLED_DIR};
+use resincraft_lib::server::clientmods::{culprits, disabled, sweep};
 
 #[tokio::main]
 async fn main() {
@@ -21,16 +21,20 @@ async fn main() {
         std::fs::copy(e.path(), dir.join("mods").join(e.file_name())).unwrap();
     }
     let moved = sweep(&dir).await;
-    println!("moved by Modrinth check: {moved:?}");
-    let left: Vec<String> = std::fs::read_dir(dir.join("mods")).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
-    println!("left in mods/: {left:?}");
+    println!("turned off: {moved:?}");
+    let left: Vec<String> = std::fs::read_dir(dir.join("mods")).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.ends_with(".jar")).collect();
+    println!("still on: {left:?}");
+    println!("recorded: {:?}", disabled(&dir).await.iter().map(|d| format!("{} ({:?})", d.file, d.reason)).collect::<Vec<_>>());
     let again = sweep(&dir).await;
-    println!("second start moves: {again:?}");
+    println!("second start turns off: {again:?}");
 
     if let Some(report) = report {
         // Put the moved jars back so the crash check has them to find.
-        for e in std::fs::read_dir(dir.join(DISABLED_DIR)).unwrap().flatten() {
-            std::fs::rename(e.path(), dir.join("mods").join(e.file_name())).unwrap();
+        for e in std::fs::read_dir(dir.join("mods")).unwrap().flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if let Some(jar) = name.strip_suffix(".disabled") {
+                std::fs::rename(e.path(), dir.join("mods").join(jar)).unwrap();
+            }
         }
         std::fs::create_dir_all(dir.join("crash-reports")).unwrap();
         // Written fresh, as the server would (a copy keeps the old modified time).

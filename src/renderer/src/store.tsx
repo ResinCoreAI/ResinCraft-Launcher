@@ -151,7 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // A new start of this run slot begins with an empty log.
         if (e.state === 'preparing') setLogs((l) => ({ ...l, [e.runId]: [] }))
         if (e.state === 'stopped' || e.state === 'crashed') void refreshInstances()
-        if (e.state === 'crashed') toast(t('app.crashed', { code: e.code ?? '?' }), 'error')
+        // A crash opens the "Minecraft crashed" window (CrashFixer) instead of a toast.
       }),
       api.on.log((e) =>
         setLogs((l) => {

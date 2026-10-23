@@ -346,15 +346,22 @@ pub async fn send_join_requests(id: &str) {
     send(id, Command::JoinRequests(on));
 }
 
+/// Blocks whoever sent web request `request` from sending more (Reject and block).
+pub fn send_join_block(id: &str, request: u64) {
+    send(id, Command::JoinBlock { id: request });
+}
+
 /// A request from the relay's web page: kept like the bot's, and the answer goes back to the page.
 fn on_join_request(id: String, request: u64, username: String) {
+    use super::requests::{submit, Outcome, Via};
     tokio::spawn(async move {
-        let outcome = match super::requests::submit(&id, &username, super::requests::Via::Web).await {
-            super::requests::Outcome::Received => JoinOutcome::Received,
-            super::requests::Outcome::AlreadyListed => JoinOutcome::AlreadyListed,
-            super::requests::Outcome::AlreadyRequested => JoinOutcome::AlreadyRequested,
-            super::requests::Outcome::Closed => JoinOutcome::Closed,
-            super::requests::Outcome::Invalid => JoinOutcome::Invalid,
+        let outcome = match submit(&id, &username, Via::Web { relay_id: request }).await {
+            Outcome::Received => JoinOutcome::Received,
+            Outcome::AlreadyListed => JoinOutcome::AlreadyListed,
+            Outcome::AlreadyRequested => JoinOutcome::AlreadyRequested,
+            Outcome::Closed | Outcome::Blocked => JoinOutcome::Closed,
+            Outcome::Invalid => JoinOutcome::Invalid,
+            Outcome::Banned => JoinOutcome::Banned,
         };
         send(&id, Command::JoinAnswer { id: request, outcome });
     });

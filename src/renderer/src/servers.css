@@ -756,3 +756,17 @@ a svg.inline {
 .jr-list {
   margin-top: 4px;
 }
+.jr-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  min-width: 0;
+}
+.jr-link code {
+  font-size: 12.5px;
+  color: var(--accent-2, var(--text));
+}

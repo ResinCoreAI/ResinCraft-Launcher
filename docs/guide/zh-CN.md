@@ -1,0 +1,187 @@
+# ResinCraft Launcher：使用指南
+
+这里介绍在 ResinCraft 里最常做的事情。**粗体**名称就是你在屏幕上看到的名称。
+
+> NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+
+## 目录
+
+1. [安装与登录](#1-安装与登录)
+2. [创建第一个实例](#2-创建第一个实例)
+3. [添加模组、资源包和光影](#3-添加模组资源包和光影)
+4. [安装整合包](#4-安装整合包)
+5. [更改 Minecraft 版本或模组加载器](#5-更改-minecraft-版本或模组加载器)
+6. [Minecraft 崩溃时](#6-minecraft-崩溃时)
+7. [从其他实例复制内容](#7-从其他实例复制内容)
+8. [开设服务器](#8-开设服务器)
+9. [让好友加入你的服务器](#9-让好友加入你的服务器)
+10. [白名单申请（网页和 Discord 机器人）](#10-白名单申请网页和-discord-机器人)
+11. [基岩版](#11-基岩版)
+12. [从其他启动器迁移](#12-从其他启动器迁移)
+13. [更新与系统托盘](#13-更新与系统托盘)
+14. [故障排除](#14-故障排除)
+
+## 1. 安装与登录
+
+1. 从 [Releases 页面](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest)下载适合你系统的 ResinCraft：
+   - **Windows：** `…_amd64_windows.exe`
+   - **macOS：** `…_universal_macos.dmg`
+   - **Linux：** `.AppImage`、`.deb` 或 `.tar.gz`
+2. 安装并打开。Windows 可能会提示发布者未经验证；在 macOS 上，第一次打开时请右键点击应用并选择**打开**。
+3. 打开**账户** → **使用 Microsoft 登录**，在 Microsoft 自己的页面上登录。你的密码不会经过 ResinCraft。
+   - 没有 Microsoft 账户？可以添加一个**离线账户**，用于单人游戏和局域网。
+
+## 2. 创建第一个实例
+
+*实例*是一份独立的 Minecraft 安装，有自己的模组、世界和设置。
+
+1. 打开**游戏库** → **新建实例**。
+2. 选择 **Minecraft 版本**和**模组加载器**：
+   - **Vanilla：** 不装模组。
+   - **Fabric** 或 **Quilt：** 轻量模组、优化模组。
+   - **Forge** 或 **NeoForge：** 大型内容模组。
+3. 起个名字，然后点击**创建实例**。
+4. 点击**启动**。第一次启动会下载游戏和合适的 Java，之后启动就很快了。
+
+提示：左侧的**快速加入**会列出你最近玩过的服务器和世界，一键直接进入。
+
+## 3. 添加模组、资源包和光影
+
+1. 打开你的实例 → **内容**标签页 → **添加模组**。也可以从左侧栏打开**发现**。
+2. 搜索，或者浏览 Modrinth、CurseForge、FTB 等网站。只会显示适合你实例的版本。
+3. 点击**安装**。必需的模组（前置）会自动帮你添加。
+4. 回到**内容**：
+   - 用模组旁边的开关来开启或关闭它；
+   - 点击**检查更新**来更新模组（单个或全部）。
+
+有些 CurseForge 作者不允许启动器下载他们的文件。这时 ResinCraft 会把这些文件列在**全部下载**下面：在浏览器中下载它们，ResinCraft 会自动在你的下载文件夹里找到。浏览器保存到别的地方？请在**设置 → 下载 → 监视文件夹**中添加那个文件夹。
+
+## 4. 安装整合包
+
+1. 打开**发现** → **整合包**（或**游戏库** → **新建实例** → **下载整合包**）。
+2. 打开一个整合包，查看简介、版本以及其中包含的**模组**。
+3. 点击**安装整合包**。ResinCraft 会创建一个包含所有内容的新实例。
+4. 整合包有更新时，ResinCraft 会提醒你；你也可以在实例页面选择其他整合包版本。
+
+## 5. 更改 Minecraft 版本或模组加载器
+
+1. 在实例页面，点击顶部的版本标签（例如 **1.21.4 · Fabric 0.16.10**），会打开**设置 → 版本**。
+2. 选择 **Minecraft** 版本、**模组加载器**和加载器版本。
+3. 点击**更改版本**并确认。下次启动时会下载所需的文件。
+4. 为旧版本制作的模组可能无法使用：前往**内容**，点击**检查更新**。
+
+## 6. Minecraft 崩溃时
+
+游戏崩溃时，会弹出“**（实例名称） 崩溃了**”窗口。ResinCraft 会读取崩溃报告和日志，告诉你出了什么问题，例如（这些提示以英文显示）：
+
+- *Sodium Extra needs Sodium, which isn't installed*（Sodium Extra 需要 Sodium，但没有安装）→ **修复**会安装 Sodium。
+- *citresewn crashed the game*（citresewn 导致游戏崩溃）→ **修复**会关闭该模组（之后可以在**内容**中重新开启）。
+- *This needs Java 21 or newer*（需要 Java 21 或更高版本）→ **修复**会让 ResinCraft 选择合适的 Java。
+- *Minecraft ran out of memory*（Minecraft 内存不足）→ **修复**会给它更多内存。
+
+逐个点击**修复**，或者点击**全部修复并游玩**。在你点击按钮之前，什么都不会改变。如果 ResinCraft 找不到原因，可以用**打开日志**查看游戏最后输出的内容。
+
+## 7. 从其他实例复制内容
+
+1. 打开你要复制*到*的实例 → 点击顶部的**从其他实例复制**按钮。
+2. 选择要*从*哪个实例复制。
+3. 勾选你想要的内容：
+   - **世界**；
+   - **模组**和**模组设置**（config 文件夹）；
+   - **光影包**和**资源包**；
+   - **游戏设置**（视频、控制、按键绑定）。
+4. 点击**复制**。名称已存在的世界会换一个新名字。你已经有的模组和资源包会保持原样。
+
+## 8. 开设服务器
+
+服务器相关的界面目前部分仍为英文。
+
+1. 打开 **Servers**（服务器）→ **Create server**（创建服务器）。
+2. 选择创建方式：
+   - **Server software**（服务端软件）：Paper、Fabric、Forge、NeoForge、Vanilla、Bedrock…
+   - **Modpack**（整合包）：和你的好友玩同一个整合包。
+   - **From an instance**（从实例）：使用你已经在用的模组。
+   - **From a file**（从文件）。
+3. 点击 **Create**（创建）。窗口会关闭，下载在右下角继续进行。
+4. 提示时同意 Minecraft EULA，然后点击 **Start**（启动）。
+
+在服务器页面上：
+
+- **Console**（控制台）：服务器的输出；在底部输入命令。
+- **Players**（玩家）：当前在线的玩家，以及白名单、管理员和封禁列表。
+- **Mods** 或 **Plugins**（模组 / 插件）：添加、更新或关闭。
+- **Properties**（属性）：服务器设置（难度、白名单开关等）。
+- **Settings**（设置）：
+  - 内存、Java 和 **Java flags**（Java 参数：ResinCraft 的或整合包自带的）；
+  - 好友如何连接；
+  - 服务器图标。
+- **重新启动**和 **⋯** 菜单（复制地址、打开文件夹、立即备份、删除）。
+
+只在游戏客户端运行的模组（光影、小地图等）会在服务器上自动关闭。你可以在 **Mods** 标签页中看到它们，需要时再重新开启。
+
+## 9. 让好友加入你的服务器
+
+在服务器的 **Settings** → **How friends connect**（好友如何连接）中选择：
+
+- **Automatic**（自动，推荐）：先尝试 **ResinCraft Relay**，然后是 playit.gg，再然后是 bore。
+- **ResinCraft Relay：** 好友通过 `yourname.rscraft.resincore.tech` 加入。需要登录 Microsoft 账户。
+- **playit.gg：** 免费且固定不变的地址。第一次启动时会要求你关联一个 playit.gg 账户（访客账户也可以）。
+- **我已自行转发端口：** 如果你自己设置好了路由器。
+
+**Console** 标签页会显示要发给好友的地址。基岩版好友也能加入 Java 版服务器：打开 **Bedrock players can join**（允许基岩版玩家加入）。
+
+## 10. 白名单申请（网页和 Discord 机器人）
+
+让玩家申请加入，由你自己决定同意还是拒绝。
+
+1. 在 **Properties** 中，把 **white-list** 设为 **true**（否则任何人都能直接加入）。
+2. 打开服务器的 **Players** 标签页，开启 **Whitelist requests**（白名单申请）。
+3. 选择玩家申请的方式：
+   - **Web page**（网页）：
+     - 服务器通过 ResinCraft Relay 共享时可用。
+     - 点击 **Copy link**（复制链接），把链接发给玩家：`https://rscraft.resincore.tech/join/<name>`。
+     - 服务器在线时页面才可用。
+   - **Your Discord bot**（你的 Discord 机器人）：
+     1. 打开 [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → **Bot** → **Reset Token**，然后复制令牌。
+     2. 粘贴到 ResinCraft 中并点击 **Save**（保存）。令牌会被安全地保存在你的电脑上，不会再显示。
+     3. 显示 **Online as …** 后，点击 **Add the bot to your Discord**（把机器人添加到你的 Discord），然后选择你的 Discord 服务器。
+     4. 玩家在你的 Discord 中输入 `/whitelist TheirName`。
+4. 申请会显示在 **Players** 标签页中：
+   - **Accept**（同意）：把玩家加入白名单（机器人会私信通知对方）。
+   - **Reject**（拒绝）：拒绝这条申请。
+   - **Reject and block**（拒绝并屏蔽）：拒绝申请，并阻止此人再次申请。**Unblock all**（全部解除屏蔽）可以撤销 Discord 上的屏蔽。
+
+被封禁玩家的申请会被自动拒绝。Discord 机器人只在 ResinCraft 打开时工作；开启系统托盘（第 13 节），关闭窗口后它也能继续工作。
+
+## 11. 基岩版
+
+在 Windows 上，左侧的**基岩版**可以安装、打开和卸载 Minecraft for Windows 与 Minecraft Preview。卸载前会先备份你的世界。
+
+## 12. 从其他启动器迁移
+
+**游戏库** → **从其他启动器迁移**可以导入以下启动器的实例：
+
+- Prism Launcher 和 MultiMC
+- Modrinth App 和 CurseForge 应用
+- ATLauncher 和 GDLauncher
+- 官方 Minecraft Launcher
+
+模组、世界和设置会一起迁移过来。原来的文件保留在原处。
+
+## 13. 更新与系统托盘
+
+- **更新：**
+  - 有新的 ResinCraft 版本可用时，标题栏会出现**更新**按钮。
+  - 如果有游戏或服务器在运行，你可以选择**关闭并更新**（服务器会先保存世界）或**停止后更新**。
+- **静默更新**（设置 → 更新）：在没有任何东西运行时，不询问直接在后台安装新版本。
+- **在系统托盘中保持运行**（设置 → 外观）：
+  - 关闭窗口后 ResinCraft 仍会运行：服务器、Discord 机器人和下载都会继续。
+  - 点击托盘图标重新打开；右键 → **Quit ResinCraft**（退出 ResinCraft）才会真正退出。
+
+## 14. 故障排除
+
+- **游戏无法启动：** 查看“**（实例名称） 崩溃了**”窗口（第 6 节），或实例的**日志**标签页。
+- **在“发现”中找不到某个模组：** 它可能没有适用于你的 Minecraft 版本或加载器的版本。试试其他版本，或更改实例的版本（第 5 节）。
+- **好友无法加入：** 检查服务器 **Console** 标签页上的地址，并确认服务器显示 **Running**（运行中）。使用 ResinCraft Relay 时，请确保已登录 Microsoft 账户。
+- **服务器启动时崩溃：** ResinCraft 会自动关闭仅客户端模组并重新启动服务器。在 **Console** 中可以找到说明关闭了哪个模组的那一行。
+- **还是解决不了？** 带上**日志**标签页里的日志，到 [GitHub](https://github.com/ResinCoreAI/ResinCraft-Launcher/issues) 报告问题。
