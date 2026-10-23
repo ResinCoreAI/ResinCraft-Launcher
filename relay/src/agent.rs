@@ -177,6 +177,8 @@ pub enum Command {
     JoinRequests(bool),
     /// The answer to an [`Event::JoinRequest`] (ignored by relays older than protocol 5).
     JoinAnswer { id: u64, outcome: JoinOutcome },
+    /// Blocks whoever sent request `id` from sending more (ignored by relays older than protocol 5).
+    JoinBlock { id: u64 },
 }
 
 enum Target {
@@ -562,7 +564,12 @@ impl Connection {
                             return e;
                         }
                     }
-                    Some(Command::JoinRequests(_) | Command::JoinAnswer { .. }) => {}
+                    Some(Command::JoinBlock { id }) if self.has_join_requests() => {
+                        if let Err(e) = self.send(&AgentMsg::JoinBlock { id }).await {
+                            return e;
+                        }
+                    }
+                    Some(Command::JoinRequests(_) | Command::JoinAnswer { .. } | Command::JoinBlock { .. }) => {}
                     None => commands_open = false,
                 },
                 _ = ping.tick() => {
@@ -700,6 +707,8 @@ mod tests {
         assert_eq!(serde_json::to_string(&up).unwrap(), r#"{"t":"join_answer","id":7,"outcome":"already_listed"}"#);
         let down: RelayMsg = serde_json::from_str(r#"{"t":"join_request","id":7,"username":"Steve"}"#).unwrap();
         assert_eq!(down, RelayMsg::JoinRequest { id: 7, username: "Steve".into() });
+        assert_eq!(serde_json::to_string(&AgentMsg::JoinBlock { id: 7 }).unwrap(), r#"{"t":"join_block","id":7}"#);
+        assert_eq!(serde_json::to_string(&JoinOutcome::Banned).unwrap(), r#""banned""#);
         let later: JoinOutcome = serde_json::from_str(r#""something_new""#).unwrap();
         assert_eq!(later, JoinOutcome::Unknown);
     }

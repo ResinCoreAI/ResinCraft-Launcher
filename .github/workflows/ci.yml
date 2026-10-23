@@ -38,6 +38,6 @@ jobs:
         working-directory: src-tauri
       - run: cargo test --lib --locked
         working-directory: src-tauri
-      # ResinCraft Relay: unit tests and the end-to-end test on 127.0.0.1.
+      # The launcher's side of ResinCraft Relay (protocol and agent).
       - run: cargo test --locked
         working-directory: relay

@@ -88,6 +88,9 @@ pub enum AgentMsg {
     JoinRequests { enabled: bool },
     /// The answer to a `join_request`. Protocol 5.
     JoinAnswer { id: u64, outcome: JoinOutcome },
+    /// The host rejected request `id` and blocks whoever sent it (the relay knows their address for 24 hours;
+    /// the launcher never sees it). Protocol 5.
+    JoinBlock { id: u64 },
     Ping { seq: u64 },
 }
 
@@ -103,6 +106,8 @@ pub enum JoinOutcome {
     Closed,
     /// Not a Minecraft username.
     Invalid,
+    /// On the server's ban list.
+    Banned,
     #[serde(other)]
     Unknown,
 }
