@@ -14,7 +14,7 @@ export default function Terms() {
 
       <h2>The software</h2>
       <p>
-        ResinCraft Launcher is free and open source under the <a href={`${GITHUB}/blob/main/LICENSE`}>GNU General Public License v3</a>. It is provided as is, without warranty
+        ResinCraft Launcher is free and open source under the <a href={`${GITHUB}/blob/main/LICENSE`}>GNU Affero General Public License v3</a>. It is provided as is, without warranty
         of any kind.
       </p>
 

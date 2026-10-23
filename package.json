@@ -44,7 +44,7 @@
     "typescript": "^5.9.3",
     "vite": "^8.3.4"
   },
-  "license": "GPL-3.0-only",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/ResinCoreAI/ResinCraft-Launcher.git"
