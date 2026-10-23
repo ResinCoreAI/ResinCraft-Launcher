@@ -7,7 +7,8 @@
 #
 # Every file is named ResinCraft.Launcher_<version>_<arch>_<os>.<ext> (arch: amd64, arm64, or universal for the
 # one macOS app that runs on both). What each platform ships:
-#   Windows  …_amd64_windows.exe, the NSIS installer, which is also its update file
+#   Windows  …_amd64_windows.exe, the NSIS installer, and …_amd64_windows.msi; each is the update file for
+#            copies installed from it
 #   macOS    …_universal_macos.dmg, and …_universal_macos.app.tar.gz, the file the updater installs
 #   Linux    …_<arch>_linux.AppImage (also its update file), .deb and .tar.gz (a plain folder, updated by hand),
 #            each for amd64 and arm64
@@ -35,7 +36,7 @@ jobs:
         include:
           - platform: windows
             os: windows-latest
-            args: ''
+            args: --bundles nsis,msi
             bundle: src-tauri/target/release/bundle
           - platform: macos
             os: macos-latest
@@ -117,7 +118,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       NOTES: |
-        Downloads: Windows, `_amd64_windows.exe`. macOS (Apple Silicon and Intel), `_universal_macos.dmg`. Linux, the `.AppImage` (any distribution), the `.deb` (Debian, Ubuntu, Mint…) or the `.tar.gz` (a plain folder): `amd64` for most PCs, `arm64` for ARM ones such as a Raspberry Pi 5.
+        Downloads: Windows, `_amd64_windows.exe` (or the `_amd64_windows.msi` for managed installs). macOS (Apple Silicon and Intel), `_universal_macos.dmg`. Linux, the `.AppImage` (any distribution), the `.deb` (Debian, Ubuntu, Mint…) or the `.tar.gz` (a plain folder): `amd64` for most PCs, `arm64` for ARM ones such as a Raspberry Pi 5.
 
         Windows may warn that the publisher is unverified, and macOS that the app is from an unidentified developer, until releases are code-signed: on macOS, right-click the app and choose Open the first time. Already have ResinCraft? It offers this update by itself and installs it in place; your instances and accounts stay.
 
@@ -142,14 +143,14 @@ jobs:
             [ -s "files/$f.sig" ] || { echo "::error::$f has no update signature."; exit 1; }
             jq -n --arg url "$base/$f" --rawfile sig "files/$f.sig" '{signature: ($sig | rtrimstr("\n")), url: $url}'
           }
-          win=$(one _amd64_windows.exe); mac=$(one _universal_macos.app.tar.gz)
+          win=$(one _amd64_windows.exe); msi=$(one _amd64_windows.msi); mac=$(one _universal_macos.app.tar.gz)
           appimage=$(one _amd64_linux.AppImage); deb=$(one _amd64_linux.deb); arm_appimage=$(one _arm64_linux.AppImage); arm_deb=$(one _arm64_linux.deb)
           jq -n --arg v "$version" --arg notes "$NOTES" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --argjson win "$win" --argjson mac "$mac" --argjson appimage "$appimage" --argjson deb "$deb" \
+            --argjson win "$win" --argjson msi "$msi" --argjson mac "$mac" --argjson appimage "$appimage" --argjson deb "$deb" \
             --argjson arm_appimage "$arm_appimage" --argjson arm_deb "$arm_deb" '{
               version: $v, notes: ($notes | rtrimstr("\n")), pub_date: $date,
               platforms: {
-                "windows-x86_64": $win, "windows-x86_64-nsis": $win,
+                "windows-x86_64": $win, "windows-x86_64-nsis": $win, "windows-x86_64-msi": $msi,
                 "darwin-x86_64": $mac, "darwin-x86_64-app": $mac,
                 "darwin-aarch64": $mac, "darwin-aarch64-app": $mac,
                 "linux-x86_64": $appimage, "linux-x86_64-appimage": $appimage,

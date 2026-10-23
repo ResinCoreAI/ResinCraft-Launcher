@@ -88,6 +88,7 @@ Get the newest version from the [latest release](https://github.com/ResinCoreAI/
 | System | File |
 |---|---|
 | **Windows** x64 | `ResinCraft.Launcher_<version>_amd64_windows.exe` |
+| **Windows** x64, MSI (managed installs) | `ResinCraft.Launcher_<version>_amd64_windows.msi` |
 | **macOS** Intel and Apple Silicon | `ResinCraft.Launcher_<version>_universal_macos.dmg` |
 | **Linux** x64, AppImage | `ResinCraft.Launcher_<version>_amd64_linux.AppImage` |
 | **Linux** x64, Debian / Ubuntu / Mint | `ResinCraft.Launcher_<version>_amd64_linux.deb` |

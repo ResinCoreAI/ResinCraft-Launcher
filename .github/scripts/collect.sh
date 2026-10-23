@@ -24,7 +24,9 @@ take() {
 
 case "$os" in
   windows)
-    for f in "$BUNDLE"/nsis/*-setup.exe; do take "$f" exe; done ;;
+    for f in "$BUNDLE"/nsis/*-setup.exe; do take "$f" exe; done
+    for f in "$BUNDLE"/msi/*.msi; do take "$f" msi; done
+    [ -f "out/release/$stem.msi" ] || { echo "::error::No .msi was built."; exit 1; } ;;
   macos)
     for f in "$BUNDLE"/dmg/*.dmg; do take "$f" dmg; done
     for f in "$BUNDLE"/macos/*.app.tar.gz; do take "$f" app.tar.gz; done ;;
