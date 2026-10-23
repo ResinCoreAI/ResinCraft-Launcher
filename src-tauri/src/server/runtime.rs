@@ -389,12 +389,6 @@ pub async fn start(id: &str) -> Result<()> {
     // Plugin/mod changes queued while the server last ran (normally applied when it stopped).
     let mut applied = take_notes(id);
     applied.extend(super::plugins::apply_pending(id).await.unwrap_or_default());
-    // Client-only mods crash a server (they reach for the game window), so they never start with it.
-    if meta.kind.modded() {
-        for title in super::clientmods::sweep(&dir).await {
-            applied.push(format!("Turned off {title}: it only runs on the game client (the Mods tab can turn it back on)"));
-        }
-    }
     let started_at = std::time::SystemTime::now();
 
     // Only Paperclip, Spigot and Forge 1.7.10–1.12.2 need it (old log4j cuts jar URLs at the first '!' and then
@@ -536,8 +530,8 @@ pub async fn start(id: &str) -> Result<()> {
         let code = status.as_ref().ok().and_then(|s| s.code());
         let stopping = with(|w| w.procs.get(&id).map(|p| p.stopping).unwrap_or(false));
         let crashed = !killed && !stopping && code != Some(0);
-        // A modded server that crashed while starting because a mod reached for the game client: move those mods
-        // out and start again (each round moves at least one jar, so this ends).
+        // A modded server that crashed while starting because a mod reached for the game client: turn those mods
+        // off and start again (each round turns off at least one jar, so this ends). Until then they stay on.
         let mut retry = false;
         if crashed && modded && with(|w| w.procs.get(&id).map(|p| p.state == "starting").unwrap_or(false)) {
             let log: Vec<String> = with(|w| w.logs.get(&id).map(|l| l.iter().map(|x| x.text.clone()).collect()).unwrap_or_default());
@@ -548,6 +542,13 @@ pub async fn start(id: &str) -> Result<()> {
                     let name = jar.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                     if super::clientmods::disable_crashed(&dir, &jar).await {
                         notes.push(format!("Turned off {name}: it crashed the server reaching for the game client"));
+                    }
+                }
+                // The crash shows a reach for the game client but names no jar: turn off the mods known to be
+                // client-only instead (Modrinth, the bundled list, the jars' own markers).
+                if notes.is_empty() && super::clientmods::client_crash(&log) {
+                    for title in super::clientmods::sweep(&dir).await {
+                        notes.push(format!("Turned off {title}: it only runs on the game client and the server crashed reaching for it"));
                     }
                 }
                 if !notes.is_empty() {

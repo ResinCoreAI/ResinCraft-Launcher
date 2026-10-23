@@ -181,5 +181,5 @@ Their mods, worlds and settings come with them. The originals stay where they ar
 - **The game won't start:** look at the **Minecraft crashed** window (section 6), or the instance's **Logs** tab.
 - **A mod doesn't show in Discover:** it may not exist for your Minecraft version or loader. Try another version, or change the instance's version (section 5).
 - **Friends can't join:** check the address on the server's **Console** tab and that the server says **Running**. With ResinCraft Relay, make sure you're signed in with a Microsoft account.
-- **The server crashes on start:** ResinCraft turns off client-only mods by itself and starts it again. Look at the **Console** for the line that says which mod it turned off.
+- **The server crashes on start:** if a client-only mod caused it, ResinCraft turns that mod off and starts the server again. Look at the **Console** for the line that says which mod it turned off.
 - **Still stuck?** Report a problem on [GitHub](https://github.com/ResinCoreAI/ResinCraft-Launcher/issues) with the log from the **Logs** tab.

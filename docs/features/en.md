@@ -42,7 +42,7 @@ Items marked **(1.2.7)** are new in version 1.2.7.
 
 - **Server types:** Vanilla, Paper, Purpur, Folia, Spigot, Leaf, Fabric, Quilt, Forge, NeoForge, Arclight (mods and plugins together) and Bedrock Dedicated Server.
 - **From a modpack or an instance:** create a server from Modrinth, CurseForge (official server pack when there is one) or FTB, or from one of your instances.
-- **Client-only mods kept off:** mods that only run on the game client are found and turned off automatically, every time the server starts. A mod another mod needs stays on. If one still crashes the server, it's turned off and the server restarts by itself.
+- **Client-only mods turned off only when they crash:** client mods stay on the server as long as it starts fine. If a start crashes because a mod reached for the game client, that mod is turned off (`.jar.disabled`) and the server starts again by itself. A mod another mod needs stays on.
 - **Manage:** console, properties editor, plugin and mod manager with updates, whitelist, ops and bans, server icon, backups.
 - **Restart and more menu (1.2.7):** Restart next to Stop; a menu with copy address, open folder, back up, settings and delete.
 - **Online now:** the players on your server, checked live every few seconds **(1.2.7)**.

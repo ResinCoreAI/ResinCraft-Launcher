@@ -1073,27 +1073,10 @@ pub(crate) async fn switch_files(
         (l, _) => Some(crate::game::loaders::latest_loader(l, &target_.mc_version).await.map_err(unreachable)?),
     };
     let old = installed_files(&root, installed, project_id, &work.join("src-old"), task, side, keep).await;
-    let mut staged = stage_new(&target_, &game, &stage, task, keep).await?;
+    let staged = stage_new(&target_, &game, &stage, task, keep).await?;
 
-    // A server leaves out the mods Modrinth says don't run on servers (as when it was created).
-    let mut dropped = Vec::new();
-    if side == Side::Server {
-        let mods: Vec<(String, String)> = staged
-            .hashes
-            .iter()
-            .filter(|(p, _)| p.starts_with("mods/") && p.to_lowercase().ends_with(".jar"))
-            .filter_map(|(p, h)| h.as_ref().filter(|h| h.algo == HashAlgo::Sha1).map(|h| (p.clone(), h.value.clone())))
-            .collect();
-        if let Ok(found) = crate::server::create::client_only_sha1s(&mods.iter().map(|m| m.1.clone()).collect::<Vec<_>>()).await {
-            for (p, sha1) in mods {
-                if let Some(title) = found.get(&sha1) {
-                    staged.entries.remove(&p);
-                    staged.hashes.remove(&p);
-                    dropped.push(title.clone());
-                }
-            }
-        }
-    }
+    // A server keeps client-only mods too: one that crashes it is turned off then (server/clientmods.rs).
+    let dropped = Vec::new();
 
     // Which project each mod belongs to, so a mod the player switched off stays off under its new file name.
     let mut project_of: HashMap<String, String> = HashMap::new();

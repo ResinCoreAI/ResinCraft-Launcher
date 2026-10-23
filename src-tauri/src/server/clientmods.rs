@@ -1,8 +1,9 @@
-//! Keeps client-only mods off modded servers. Before each start, new or changed jars are checked: Modrinth's
-//! server-side flag, a bundled list of known crashers (client_only_mods.txt), and the client-only marker of pure
-//! Fabric/Quilt jars. Client-only ones are turned off (renamed to `.jar.disabled`, so the Mods tab shows them with a
-//! switch), unless another mod on the server needs them. When a start still crashes because a mod reached for the
-//! game client, the crash names it and it's turned off the same way. A mod the host turns back on stays on.
+//! Turns off client-only mods on a modded server, only after a start crashed because of one. Many client mods
+//! load fine on a server, so nothing is touched while it starts. When a start crashes reaching for the game client,
+//! the jars the crash names are turned off (renamed to `.jar.disabled`, so the Mods tab shows them with a switch)
+//! and the server starts again. If the crash names none, the jars known to be client-only are turned off instead:
+//! Modrinth's server-side flag, a bundled list of known crashers (client_only_mods.txt) and the client-only marker of
+//! pure Fabric/Quilt jars, unless another mod on the server needs them. A mod the host turns back on stays on.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
@@ -84,8 +85,8 @@ fn jars(mods: &Path) -> Vec<(String, PathBuf, std::fs::Metadata)> {
     out
 }
 
-/// Before a start: turns off the client-only jars in mods/ (see the module notes); returns their names. Offline,
-/// only the bundled list and the jars' own markers count (the crash check still catches what breaks the start).
+/// After a crash that names no jar: turns off the client-only jars in mods/ (see the module notes); returns their
+/// names. Offline, only the bundled list and the jars' own markers count.
 pub async fn sweep(dir: &Path) -> Vec<String> {
     let mods = dir.join("mods");
     let checked_path = dir.join(CHECKED_FILE);
@@ -243,6 +244,12 @@ fn patterns() -> &'static Patterns {
         // Forge's own line when a mod can't be built: "Failed to create mod instance. ModID: citresewn, class …".
         failed_mod: Regex::new(r"Failed to create mod instance\. ModID: ([a-z][a-z0-9_]{1,63})").unwrap(),
     })
+}
+
+/// Whether a crashed start's log shows a reach for the game client (the signs `culprits` looks for).
+pub fn client_crash(log: &[String]) -> bool {
+    let p = patterns();
+    log.iter().any(|l| p.fatal.is_match(l)) || log.iter().enumerate().any(|(i, l)| p.failed_mod.is_match(l) && log.iter().skip(i).take(4).any(|x| p.client_class.is_match(x)))
 }
 
 /// The jars in mods/ that a crashed start shows reaching for the game client: those a crash report written since
@@ -437,6 +444,17 @@ pub fn not_needed(mods: &Path, candidates: Vec<PathBuf>) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_client_side_crash_counts() {
+        let lines = |s: &[&str]| s.iter().map(|l| l.to_string()).collect::<Vec<_>>();
+        assert!(client_crash(&lines(&["Caused by: java.lang.NoClassDefFoundError: net/minecraft/client/Minecraft"])));
+        assert!(client_crash(&lines(&[
+            "Failed to create mod instance. ModID: citresewn, class shcm.CITResewn",
+            "java.lang.BootstrapMethodError: java.lang.RuntimeException: Attempted to load class net/minecraft/client/Minecraft for invalid dist DEDICATED_SERVER",
+        ])));
+        assert!(!client_crash(&lines(&["java.lang.OutOfMemoryError: Java heap space", "Failed to bind to port"])));
+    }
 
     const REPORT: &str = "---- Minecraft Crash Report ----
 -- Mod loading issue for: zume --

@@ -14,7 +14,7 @@ use crate::content::curseforge::cf;
 use crate::content::index::{extract_where, open_zip, read_zip_text, safe_name};
 use crate::core::events::Task;
 use crate::core::fsutil::{now_ms, safe_join};
-use crate::core::net::{download_all, download_file, fetch_json, hash_file, post_json, DownloadItem, Hash, HashAlgo};
+use crate::core::net::{download_all, download_file, fetch_json, post_json, DownloadItem, Hash};
 use crate::core::settings::{self, total_memory_mb};
 use crate::core::types::{
     source_of, ContentSource, Instance, LoaderType, ModpackRef, NewServer, PendingDownload, ServerCreated, ServerKind, ServerLaunch, ServerMeta,
@@ -535,7 +535,6 @@ async fn fill_curseforge(dir: &Path, archive: &Path, server_pack: Option<&Path>,
     }
     let mut items = Vec::new();
     let mut pending = Vec::new();
-    let mut dropped = Vec::new();
     for f in &files {
         let mod_id = f.get("modId").and_then(Value::as_u64).unwrap_or(0);
         let m = mods.iter().find(|m| m.get("id").and_then(Value::as_u64) == Some(mod_id));
@@ -545,12 +544,7 @@ async fn fill_curseforge(dir: &Path, archive: &Path, server_pack: Option<&Path>,
         if class != 6 {
             continue;
         }
-        // Newer files are tagged with the environments they run in.
-        let tags: Vec<String> = f.get("gameVersions").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_lowercase).collect()).unwrap_or_default();
-        if tags.iter().any(|t| t == "client") && !tags.iter().any(|t| t == "server") {
-            dropped.push(title);
-            continue;
-        }
+        // Client-only mods come along too: only one that crashes the server is turned off (see clientmods.rs).
         let file_name = cf_str(f, "fileName");
         let Some(url) = cf_url(f) else {
             let site = m.and_then(|m| m.get("links")).and_then(|l| l.get("websiteUrl")).and_then(Value::as_str).unwrap_or("https://www.curseforge.com");
@@ -566,7 +560,7 @@ async fn fill_curseforge(dir: &Path, archive: &Path, server_pack: Option<&Path>,
         prefix.push('/');
     }
     extract_prefixes(archive, vec![prefix], dir).await?;
-    Ok((dropped, pending))
+    Ok((Vec::new(), pending))
 }
 
 // ---------- FTB ----------
@@ -712,48 +706,6 @@ async fn fill_instance(dir: &Path, inst: &Instance, task: &Arc<Task>) -> Result<
 
 // ---------- Client-only mods ----------
 
-/// Removes mods Modrinth marks as not running on servers (server_side "unsupported"); returns their names.
-/// Mods Modrinth doesn't know are kept. Offline: nothing is removed.
-pub async fn drop_client_only(mods: &Path, task: &Arc<Task>) -> Vec<String> {
-    task.update("Checking which mods are client-only…", None);
-    match find_client_only(mods).await {
-        Ok(found) => {
-            // Never one another mod on the server needs.
-            let removable = super::clientmods::not_needed(mods, found.iter().map(|(p, _)| p.clone()).collect());
-            // Turned off (.jar.disabled), not deleted: the Mods tab shows them with a switch.
-            let mut names = Vec::new();
-            let mut files = Vec::new();
-            for (path, title) in found.into_iter().filter(|(p, _)| removable.contains(p)) {
-                if let Some(file) = super::clientmods::turn_off_named(&path).await {
-                    names.push(title);
-                    files.push(file);
-                }
-            }
-            if let Some(dir) = mods.parent() {
-                super::clientmods::record_disabled(dir, &files, super::clientmods::Reason::Modrinth).await;
-            }
-            names.sort();
-            names
-        }
-        Err(e) => {
-            eprintln!("[server] client-only check skipped: {e:#}");
-            Vec::new()
-        }
-    }
-}
-
-async fn find_client_only(mods: &Path) -> Result<Vec<(PathBuf, String)>> {
-    let mut by_hash: HashMap<String, PathBuf> = HashMap::new();
-    let Ok(mut rd) = tokio::fs::read_dir(mods).await else { return Ok(Vec::new()) };
-    while let Some(e) = rd.next_entry().await? {
-        if e.file_name().to_string_lossy().to_lowercase().ends_with(".jar") {
-            by_hash.insert(hash_file(&e.path(), HashAlgo::Sha1).await?, e.path());
-        }
-    }
-    let found = client_only_sha1s(&by_hash.keys().cloned().collect::<Vec<_>>()).await?;
-    Ok(found.into_iter().filter_map(|(hash, title)| by_hash.get(&hash).map(|p| (p.clone(), title))).collect())
-}
-
 /// Which of these mod files (by SHA-1) Modrinth marks as not running on servers, with their names. Mods Modrinth
 /// doesn't know are left out (kept on the server).
 pub async fn client_only_sha1s(sha1s: &[String]) -> Result<HashMap<String, String>> {
@@ -792,7 +744,7 @@ pub async fn client_only_sha1s(sha1s: &[String]) -> Result<HashMap<String, Strin
 // ---------- Filling ----------
 
 async fn fill(dir: &Path, content: Content, task: &Arc<Task>) -> Result<(Vec<String>, Vec<PendingDownload>)> {
-    let (mut dropped, pending) = match content {
+    let (dropped, pending) = match content {
         Content::None => return Ok((Vec::new(), Vec::new())),
         Content::Mrpack(archive) => {
             fill_mrpack(dir, &archive, task).await?;
@@ -802,9 +754,6 @@ async fn fill(dir: &Path, content: Content, task: &Arc<Task>) -> Result<(Vec<Str
         Content::Ftb(v) => (Vec::new(), fill_ftb(dir, &v, task).await?),
         Content::Instance(inst) => (fill_instance(dir, &inst, task).await?, Vec::new()),
     };
-    // Every way in (official server packs too, which often still carry client mods) gets the same check.
-    dropped.extend(drop_client_only(&dir.join("mods"), task).await);
-    dropped.sort();
-    dropped.dedup();
+    // Client-only mods stay: if one crashes the server, it's turned off then (see clientmods.rs).
     Ok((dropped, pending))
 }
