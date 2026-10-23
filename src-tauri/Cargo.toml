@@ -1,6 +1,6 @@
 [package]
 name = "resincraft"
-version = "1.2.6"
+version = "1.2.7"
 description = "ResinCraft Launcher: a modern Minecraft: Java Edition launcher by Puirkle"
 authors = ["Puirkle"]
 license = "MIT"
@@ -64,10 +64,6 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 webpki-roots = "1"
 # A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead of opening another.
 tauri-plugin-single-instance = "2"
-
-[dev-dependencies]
-# The relay server itself, for examples/check_relay.rs.
-resincraft-relay = { path = "../relay" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # proc_pid_rusage for the RAM display (core/memory.rs).
