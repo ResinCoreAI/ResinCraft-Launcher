@@ -121,10 +121,9 @@ export default function NewServerModal({
   onClose: () => void
   onCreated: (r: ServerCreated) => void
 }) {
-  const { instances, info } = useStore()
+  const { instances, info, toast } = useStore()
   const [mode, setMode] = useState<Mode>(fromInstance ? 'instance' : 'software')
   const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
   // Server software: first the software (tiles), then its versions.
@@ -266,27 +265,21 @@ export default function NewServerModal({
           ? !!instance
           : true
 
-  const create = async () => {
-    setBusy(true)
-    setError(undefined)
-    try {
-      let source: ServerSource | undefined
-      if (mode === 'modpack' && pack) source = { kind: 'modpack', projectId: pack.id, versionId: packVersion }
-      if (mode === 'instance' && instance) source = { kind: 'instance', instanceId: instance.id }
-      if (mode === 'file') source = { kind: 'file' }
-      const r = await api.server.create({
-        name: name.trim() || (mode === 'file' ? '' : placeholder),
-        type: mode === 'software' ? serverKind : undefined,
-        mcVersion: mode === 'software' ? mc : undefined,
-        loaderVersion: mode === 'software' ? (loader ? loaderVersion : build) : undefined,
-        source
-      })
-      onCreated(r)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
+  // The dialog closes right away: downloading and installing goes on in the background, shown at the bottom right.
+  const create = () => {
+    let source: ServerSource | undefined
+    if (mode === 'modpack' && pack) source = { kind: 'modpack', projectId: pack.id, versionId: packVersion }
+    if (mode === 'instance' && instance) source = { kind: 'instance', instanceId: instance.id }
+    if (mode === 'file') source = { kind: 'file' }
+    const request = api.server.create({
+      name: name.trim() || (mode === 'file' ? '' : placeholder),
+      type: mode === 'software' ? serverKind : undefined,
+      mcVersion: mode === 'software' ? mc : undefined,
+      loaderVersion: mode === 'software' ? (loader ? loaderVersion : build) : undefined,
+      source
+    })
+    onClose()
+    request.then(onCreated, (e) => toast((e as Error).message, 'error'))
   }
 
   return (
@@ -297,7 +290,6 @@ export default function NewServerModal({
       wide
       footer={
         <>
-          {busy && <span className="hint grow">{t('servers.create.working')}</span>}
           {mode === 'software' && step === 'pick' ? (
             <>
               <span className="hint grow">{t('servers.create.pickHint')}</span>
@@ -311,7 +303,7 @@ export default function NewServerModal({
           ) : (
             <>
               {mode === 'software' ? (
-                <button className="btn ghost" disabled={busy} onClick={() => setStep('pick')}>
+                <button className="btn ghost" onClick={() => setStep('pick')}>
                   <ChevronLeft /> {t('common.back')}
                 </button>
               ) : (
@@ -319,8 +311,8 @@ export default function NewServerModal({
                   {t('common.cancel')}
                 </button>
               )}
-              <button className="btn primary" disabled={!ready || busy} onClick={create}>
-                {busy && <Loader2 className="spin" />} {mode === 'file' ? t('servers.create.chooseAndCreate') : t('servers.create.create')}
+              <button className="btn primary" disabled={!ready} onClick={create}>
+                {mode === 'file' ? t('servers.create.chooseAndCreate') : t('servers.create.create')}
               </button>
             </>
           )}

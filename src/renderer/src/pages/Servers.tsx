@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi } from 'lucide-react'
+import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi } from 'lucide-react'
 import type { ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api } from '../api'
@@ -12,7 +12,7 @@ import { DomainAddress, DomainSettings } from '../components/ServerDomain'
 import { ServerOriginChips, ServerPackSettings } from '../components/ServerPacks'
 import { PackUpdateBadge } from '../components/PackUpdates'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
-import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
+import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, openMenuBelow, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useStore } from '../store'
 import { bytes, fixed, serverPath, timeAgo } from '../util'
 import { rich, t, tx, type Key } from '../i18n'
@@ -375,8 +375,33 @@ function ServerDetail({
   onStart: (s: ServerInfo) => void
   onStop: (s: ServerInfo) => void
 }) {
-  const { go } = useStore()
+  const { go, toast, info } = useStore()
+  const copy = useCopy()
   const [tab, setTab] = useState<Tab>('console')
+  const [deleting, setDeleting] = useState(false)
+  const address = s.net?.state === 'open' && s.net.address ? s.net.address : `localhost:${s.port}`
+  const more: ContextEntry[] = [
+    { label: t('menu.server.restart'), icon: <RotateCw />, disabled: s.state !== 'running', onSelect: () => void restart(s, onStart, onStop) },
+    s.state === 'stopping' && { label: t('servers.forceStop'), icon: <Square />, danger: true, onSelect: () => onStop(s) },
+    '-',
+    { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(address) },
+    { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
+    info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
+    '-',
+    {
+      label: t('servers.settings.backupButton'),
+      icon: <Archive />,
+      disabled: s.state === 'starting' || s.state === 'stopping',
+      onSelect: () =>
+        void api.server.backup(s.id).then(
+          (path) => toast(t('servers.settings.backedUp', { file: path.split(/[\/]/).pop() ?? path })),
+          (e) => toast((e as Error).message, 'error')
+        )
+    },
+    { label: t('servers.tab.settings'), icon: <Settings2 />, onSelect: () => setTab('settings') },
+    '-',
+    { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: live(s), onSelect: () => setDeleting(true) }
+  ]
   const tabs: { id: Tab; icon: ReactNode; label: string; hidden?: boolean }[] = [
     { id: 'console', icon: <Terminal />, label: t('servers.tab.console') },
     // Bedrock keeps its own allow list and permissions (by Xbox id): managed in the Console and Files for now.
@@ -414,11 +439,42 @@ function ServerDetail({
             <ServerMemoryChip serverId={s.id} running={live(s)} />
           </div>
         </div>
+        <button
+          className="btn lg icon"
+          title={t('common.moreActions')}
+          aria-label={t('common.moreActions')}
+          aria-haspopup="menu"
+          onClick={(e) => openMenuBelow(e.currentTarget, more, e.detail === 0)}
+        >
+          <MoreHorizontal />
+        </button>
         <button className="btn lg icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id)}>
           <FolderOpen />
         </button>
+        {s.state === 'running' && (
+          <button className="btn lg" onClick={() => void restart(s, onStart, onStop)}>
+            <RotateCw /> {t('menu.server.restart')}
+          </button>
+        )}
         <StartStop s={s} onStart={onStart} onStop={onStop} size="lg" />
       </div>
+      {deleting && (
+        <ConfirmModal
+          title={t('servers.settings.deleteTitle', { name: s.name })}
+          body={t('servers.settings.deleteBody')}
+          confirm={t('common.delete')}
+          onClose={() => setDeleting(false)}
+          onConfirm={async () => {
+            try {
+              await api.server.remove(s.id)
+              await reload()
+              go({ page: 'servers' })
+            } catch (e) {
+              toast((e as Error).message, 'error')
+            }
+          }}
+        />
+      )}
 
       <div className="tabs" role="tablist">
         {tabs
