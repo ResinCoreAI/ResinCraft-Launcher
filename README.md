@@ -269,6 +269,6 @@ Support creators at ResinCore:
 
 [AGPL-3.0-only](LICENSE) Copyright © 2026 ResinCore. All rights reserved. Created by Puirkle
 
-ResinCraft Launcher is licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only). Commercial use and paid hosting are permitted under the license. Source-code obligations apply as described in the license; contributions back to ResinCore are welcome.
+ResinCraft Launcher is licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only). Commercial use and paid hosting are permitted under the license. Source-code obligations apply as described in the license.
 
 > NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
