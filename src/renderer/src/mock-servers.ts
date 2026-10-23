@@ -146,7 +146,8 @@ export function mockServers(): {
       port: 25566,
       createdAt: now - 2e9,
       modpack: { name: 'Create: Above and Beyond', projectId: MOCK_PACK, versionId: 'tech-1.5.0' },
-      launch: { jar: 'fabric-server-launch.jar' }
+      launch: { jar: 'fabric-server-launch.jar' },
+      pendingDownloads: [{ title: 'Species', fileName: 'species-3.5.jar', url: 'https://www.curseforge.com/minecraft/mc-mods/species/files/5016536', folder: 'mods' }]
     },
     {
       ...base,
@@ -578,6 +579,12 @@ export function mockServers(): {
     },
     log: async (id) => logs[id] ?? [],
     ...mockRequests(find, (e) => requestListeners.forEach((l) => l(e))),
+    downloadsCheck: async (id) => ({ found: [], remaining: find(id).pendingDownloads ?? [] }),
+    downloadsForget: async (id, fileName) => {
+      const s = find(id)
+      s.pendingDownloads = (s.pendingDownloads ?? []).filter((p) => p.fileName !== fileName)
+      return s.pendingDownloads
+    },
     packFlags: async (id) => (find(id).modpack ? ['-Xmx6G', '-Xms6G', '-XX:+UseG1GC', '-Dfml.readTimeout=180'] : []),
     launchArgs: async (id) => {
       const s = find(id)

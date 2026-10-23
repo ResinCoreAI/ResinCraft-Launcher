@@ -70,6 +70,8 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
     let modded = plan.kind.modded();
     let total = total_memory_mb() as u32;
     let memory = req.memory_mb.or(plan.memory).unwrap_or(if modded { 4096 } else { 2048 }).min((total / 2).max(1024)).max(512);
+    // Nobody chose the memory: once the mods are in, a big pack gets more (see `memory_for`).
+    let memory_chosen = req.memory_mb.or(plan.memory).is_some();
     let meta = ServerMeta {
         id: id.clone(),
         name: name.clone(),
@@ -101,6 +103,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         dns_auto: false,
         relay_name: None,
         relay_account: None,
+        pending_downloads: Vec::new(),
     };
     tokio::fs::create_dir_all(&dir).await?;
     store::save(&meta).await?;
@@ -124,6 +127,10 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
             crate::content::packswitch::record_server_install(&dir2, v).await;
         }
         installers::install(&mut meta, &dir2, &task).await?;
+        meta.pending_downloads = pending.clone();
+        if !memory_chosen {
+            meta.memory_mb = memory_for(&dir2.join("mods"), meta.memory_mb, total);
+        }
         // Saving chunks asynchronously is much smoother on most disks; keep a value a pack brought along.
         if properties::get_value(&dir2, "sync-chunk-writes").await.is_none() {
             properties::set_values(&dir2, &[("sync-chunk-writes", "false".to_string())]).await?;
@@ -548,7 +555,16 @@ async fn fill_curseforge(dir: &Path, archive: &Path, server_pack: Option<&Path>,
         let file_name = cf_str(f, "fileName");
         let Some(url) = cf_url(f) else {
             let site = m.and_then(|m| m.get("links")).and_then(|l| l.get("websiteUrl")).and_then(Value::as_str).unwrap_or("https://www.curseforge.com");
-            pending.push(PendingDownload { title, file_name, url: format!("{site}/files/{}", f.get("id").and_then(Value::as_u64).unwrap_or(0)), folder: "mods".into(), ..Default::default() });
+            pending.push(PendingDownload {
+                title,
+                file_name,
+                url: format!("{site}/files/{}", f.get("id").and_then(Value::as_u64).unwrap_or(0)),
+                folder: "mods".into(),
+                size: f.get("fileLength").and_then(Value::as_u64).filter(|n| *n > 0),
+                sha1: cf_sha1(f),
+                project_id: Some(format!("cf:{mod_id}")),
+                version_id: f.get("id").and_then(Value::as_u64).map(|v| v.to_string()),
+            });
             continue;
         };
         items.push(DownloadItem::new(url, safe_join(&dir.join("mods"), safe_name(&file_name)?)?).hash(cf_sha1(f).map(Hash::sha1)));
@@ -664,6 +680,8 @@ async fn fill_ftb(dir: &Path, v: &FtbVersion, task: &Arc<Task>) -> Result<Vec<Pe
                 file_name: f.name.clone(),
                 url: f.curseforge.as_ref().map(|c| format!("https://www.curseforge.com/projects/{}", c.project)).unwrap_or_else(|| "https://www.feed-the-beast.com/".into()),
                 folder,
+                size: f.size.filter(|n| *n > 0),
+                sha1: Some(f.sha1.clone()).filter(|s| !s.is_empty()),
                 ..Default::default()
             });
             continue;
@@ -702,6 +720,18 @@ async fn fill_instance(dir: &Path, inst: &Instance, task: &Arc<Task>) -> Result<
     })
     .await??;
     Ok(Vec::new())
+}
+
+/// Memory for a new server by how many mods it has: 6 GB from 80 mods, 8 GB from 150 (big packs such as
+/// GregTech ones run out with less), never over half the PC's RAM, never under `base`.
+fn memory_for(mods: &Path, base: u32, total_mb: u32) -> u32 {
+    let count = std::fs::read_dir(mods).map(|rd| rd.flatten().filter(|e| e.file_name().to_string_lossy().to_lowercase().ends_with(".jar")).count()).unwrap_or(0);
+    let want = match count {
+        150.. => 8192,
+        80.. => 6144,
+        _ => base,
+    };
+    want.min((total_mb / 2).max(1024)).max(base)
 }
 
 // ---------- Client-only mods ----------
@@ -756,4 +786,25 @@ async fn fill(dir: &Path, content: Content, task: &Arc<Task>) -> Result<(Vec<Str
     };
     // Client-only mods stay: if one crashes the server, it's turned off then (see clientmods.rs).
     Ok((dropped, pending))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn big_packs_get_more_memory() {
+        let dir = std::env::temp_dir().join(format!("resincraft-memfor-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(memory_for(&dir, 4096, 32768), 4096);
+        for i in 0..160 {
+            std::fs::write(dir.join(format!("m{i}.jar")), b"x").unwrap();
+        }
+        std::fs::write(dir.join("off.jar.disabled"), b"x").unwrap();
+        assert_eq!(memory_for(&dir, 4096, 32768), 8192);
+        // Never more than half the PC's RAM.
+        assert_eq!(memory_for(&dir, 4096, 12288), 6144);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

@@ -770,3 +770,25 @@ a svg.inline {
   font-size: 12.5px;
   color: var(--accent-2, var(--text));
 }
+
+/* Files the server still needs from their authors' websites (Console tab). */
+.sv-downloads {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+}
+.sv-downloads > .row {
+  align-items: flex-start;
+  gap: 10px;
+}
+.sv-downloads .icon.warn {
+  color: var(--warning);
+  flex: none;
+  margin-top: 2px;
+}
+.sv-downloads .hint {
+  margin: 2px 0 0;
+}

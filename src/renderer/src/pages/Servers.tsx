@@ -6,6 +6,7 @@ import { api } from '../api'
 import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
 import FileManager from '../components/FileManager'
 import ServerAddons from '../components/ServerAddons'
+import ServerDownloads from '../components/ServerDownloads'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import MigrateModal from '../components/MigrateModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
@@ -709,6 +710,7 @@ function ConsoleTab({ s }: { s: ServerInfo }) {
 
   return (
     <>
+      <ServerDownloads s={s} />
       <ConnectCard s={s} />
       <RelaySessionBanner s={s} />
       <div className="toolbar">

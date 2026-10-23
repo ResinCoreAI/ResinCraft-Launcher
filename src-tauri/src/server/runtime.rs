@@ -230,6 +230,26 @@ pub fn optimized_flags(memory_mb: u32) -> Vec<String> {
     .to_vec()
 }
 
+/// Puts the files the server still needs by hand in place when they turn up (kept copies, the same pack's instances,
+/// Downloads), notes what it added and returns what's still missing. The server's list keeps only those.
+async fn collect_downloads(meta: &ServerMeta, dir: &Path, notes: &mut Vec<String>) -> Vec<crate::core::types::PendingDownload> {
+    if meta.pending_downloads.is_empty() {
+        return Vec::new();
+    }
+    let pack = meta.modpack.as_ref().and_then(|m| m.project_id.as_deref());
+    let Ok(got) = crate::content::manual::collect_for_server(dir, meta.pending_downloads.clone(), pack).await else {
+        return meta.pending_downloads.clone();
+    };
+    if !got.found.is_empty() {
+        if let Ok(mut m) = store::get(&meta.id).await {
+            m.pending_downloads = got.remaining.clone();
+            let _ = store::save(&m).await;
+        }
+    }
+    notes.extend(got.found.iter().map(|f| format!("Found {f}, which the pack needs from its author's website")));
+    got.remaining
+}
+
 /// The Java arguments a server starts with: memory, optimised flags (if on), the player's own JVM arguments
 /// (after ours, so they can override), then the server jar or @argument file and `nogui`.
 pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
@@ -249,6 +269,9 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
     } else {
         vec![format!("-Xmx{memory}M"), format!("-Xms{}M", memory.min(1024))]
     };
+    // A Thai system locale makes Java write Buddhist-era years (2569) in the server's logs and file dates; the
+    // player's own JVM arguments, added after, can still set another locale.
+    args.extend(["-Duser.language=en".to_string(), "-Duser.country=US".to_string()]);
     if let Some(extra) = meta.jvm_args.as_deref() {
         args.extend(split_args(extra));
     }
@@ -389,6 +412,7 @@ pub async fn start(id: &str) -> Result<()> {
     // Plugin/mod changes queued while the server last ran (normally applied when it stopped).
     let mut applied = take_notes(id);
     applied.extend(super::plugins::apply_pending(id).await.unwrap_or_default());
+    let missing = collect_downloads(&meta, &dir, &mut applied).await;
     let started_at = std::time::SystemTime::now();
 
     // Only Paperclip, Spigot and Forge 1.7.10–1.12.2 need it (old log4j cuts jar URLs at the first '!' and then
@@ -452,6 +476,12 @@ pub async fn start(id: &str) -> Result<()> {
     push(LogLine { text: format!("ResinCraft is starting {} ({})", meta.name, installers::describe(&meta)), level: "info" });
     for text in applied {
         push(LogLine { text, level: "info" });
+    }
+    for p in &missing {
+        push(LogLine {
+            text: format!("Missing {} ({}): its author only allows downloads from their website. Download it from {} and put it in {}/, or the server may crash.", p.title, p.file_name, p.url, p.folder),
+            level: "warn",
+        });
     }
     if !bedrock {
         push(LogLine { text: format!("Java: {program}"), level: "info" });
@@ -556,6 +586,15 @@ pub async fn start(id: &str) -> Result<()> {
                     push(LogLine { text: "Starting again without them…".into(), level: "info" });
                     add_notes(&id, notes);
                     retry = true;
+                }
+            }
+        }
+        // Without the files its author only allows from their website, a pack's other mods can fail on it.
+        if crashed && !retry {
+            if let Ok(m) = store::get(&id).await {
+                if !m.pending_downloads.is_empty() {
+                    let names: Vec<&str> = m.pending_downloads.iter().map(|p| p.file_name.as_str()).collect();
+                    push(LogLine { text: format!("The server is still missing files you need to download yourself: {}. Get them from the list above the console.", names.join(", ")), level: "warn" });
                 }
             }
         }

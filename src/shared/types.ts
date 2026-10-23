@@ -1127,6 +1127,8 @@ export interface ServerInfo {
   optimizedFlags: boolean
   /** Start with the server pack's own Java flags instead of ResinCraft's (ResinCraft's when the pack sets none). */
   packFlags?: boolean
+  /** Files the server needs whose authors only allow downloads from their website (looked for before each start). */
+  pendingDownloads?: PendingDownload[]
   /** Whitelist requests through the host's Discord bot or the relay's web page. */
   joinRequests?: JoinRequestsConfig
   /** How the server is shared over the internet. The relay is always the last resort. */
@@ -1705,6 +1707,10 @@ export interface ResinApi {
     launchArgs(id: string): Promise<string[]>
     /** The Java flags the server pack sets for itself (user_jvm_args.txt, variables.txt, its start script). */
     packFlags(id: string): Promise<string[]>
+    /** Looks for the files the server still needs by hand now; the ones found are put in place. */
+    downloadsCheck(id: string): Promise<{ found: string[]; remaining: PendingDownload[] }>
+    /** Takes one file off that list (the host doesn't want it); the rest. */
+    downloadsForget(id: string, fileName: string): Promise<PendingDownload[]>
     /** Whitelist requests waiting, the Discord bot's state and the web page's address. */
     requests(id: string): Promise<RequestsInfo>
     /** Puts the player on the whitelist (and tells them on Discord). */

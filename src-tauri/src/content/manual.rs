@@ -88,29 +88,22 @@ pub async fn add_watch_folder() -> Result<Option<Vec<String>>> {
     Ok(Some(list))
 }
 
-/// Looks for the instance's missing files (kept copies first, then Downloads) and puts the ones it finds in place.
-pub async fn collect(instance_id: &str) -> Result<Collected> {
-    let inst = instances::get(instance_id).await?;
-    let pending = inst.pending_downloads.clone().unwrap_or_default();
-    if pending.is_empty() {
-        return Ok(Collected::default());
-    }
-    let game = paths::game_dir(instance_id);
+/// Puts the pending files found in the kept copies, `extra` folders, Downloads or the watch folders into `root`
+/// (each under its own folder). Returns them with where each went, and the ones still missing.
+async fn place(pending: Vec<PendingDownload>, root: &Path, extra: Vec<PathBuf>) -> Result<(Vec<(PendingDownload, PathBuf)>, Vec<PendingDownload>)> {
     let kept = kept_dir();
-    // Kept copies first, then Downloads, then the player's own watch folders.
-    let mut dirs = vec![kept.clone(), shell::downloads_dir()];
+    // Kept copies first, then the caller's folders, Downloads and the player's own watch folders.
+    let mut dirs = vec![kept.clone()];
+    dirs.extend(extra);
+    dirs.push(shell::downloads_dir());
     dirs.extend(settings::get().await.watch_folders.iter().map(PathBuf::from).filter(|d| !d.as_os_str().is_empty()));
-    let listed: Vec<(PathBuf, Vec<String>)> = {
-        let mut v = Vec::new();
-        for d in dirs {
-            let names = file_names(&d).await;
-            v.push((d, names));
-        }
-        v
-    };
+    let mut listed: Vec<(PathBuf, Vec<String>)> = Vec::new();
+    for d in dirs {
+        let names = file_names(&d).await;
+        listed.push((d, names));
+    }
 
-    let mut out = Collected::default();
-    let mut idx = None;
+    let (mut placed, mut remaining) = (Vec::new(), Vec::new());
     for p in pending {
         let mut source = None;
         'search: for (dir, names) in &listed {
@@ -123,11 +116,11 @@ pub async fn collect(instance_id: &str) -> Result<Collected> {
             }
         }
         let Some(source) = source else {
-            out.remaining.push(p);
+            remaining.push(p);
             continue;
         };
         let name = safe_name(&p.file_name)?;
-        let dest = safe_join(&safe_join(&game, &p.folder)?, name)?;
+        let dest = safe_join(&safe_join(root, &p.folder)?, name)?;
         if let Some(parent) = dest.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
@@ -137,6 +130,22 @@ pub async fn collect(instance_id: &str) -> Result<Collected> {
             let _ = tokio::fs::create_dir_all(&kept).await;
             let _ = tokio::fs::copy(&source, kept.join(name)).await;
         }
+        placed.push((p, dest));
+    }
+    Ok((placed, remaining))
+}
+
+/// Looks for the instance's missing files (kept copies first, then Downloads) and puts the ones it finds in place.
+pub async fn collect(instance_id: &str) -> Result<Collected> {
+    let inst = instances::get(instance_id).await?;
+    let pending = inst.pending_downloads.clone().unwrap_or_default();
+    if pending.is_empty() {
+        return Ok(Collected::default());
+    }
+    let (placed, remaining) = place(pending, &paths::game_dir(instance_id), Vec::new()).await?;
+    let mut out = Collected { found: Vec::new(), remaining };
+    let mut idx = None;
+    for (p, dest) in placed {
         // Tracked like any CurseForge file, so update checks and the content list know it.
         if let (Some(project_id), Some(version_id)) = (&p.project_id, &p.version_id) {
             let idx = match idx.as_mut() {
@@ -170,6 +179,39 @@ pub async fn collect(instance_id: &str) -> Result<Collected> {
     Ok(out)
 }
 
+/// The same for a server (in `dir`): also looks in the game folders of instances of the same modpack, where the
+/// player may have downloaded these files already. Files already in place count as found.
+pub async fn collect_for_server(dir: &Path, pending: Vec<PendingDownload>, pack: Option<&str>) -> Result<Collected> {
+    let mut out = Collected::default();
+    let mut missing = Vec::new();
+    for p in pending {
+        let here = safe_join(&safe_join(dir, &p.folder)?, safe_name(&p.file_name)?)?;
+        if here.is_file() || here.with_file_name(format!("{}.disabled", p.file_name)).is_file() {
+            out.found.push(p.file_name);
+        } else {
+            missing.push(p);
+        }
+    }
+    if missing.is_empty() {
+        return Ok(out);
+    }
+    let mut extra = Vec::new();
+    if let Some(pack) = pack.filter(|p| !p.is_empty()) {
+        for inst in instances::list().await.unwrap_or_default() {
+            if inst.modpack.as_ref().and_then(|m| m.project_id.as_deref()) == Some(pack) {
+                let game = paths::game_dir(&inst.id);
+                for folder in missing.iter().map(|p| p.folder.clone()).collect::<std::collections::BTreeSet<_>>() {
+                    extra.push(game.join(folder));
+                }
+            }
+        }
+    }
+    let (placed, remaining) = place(missing, dir, extra).await?;
+    out.found.extend(placed.into_iter().map(|(p, _)| p.file_name));
+    out.remaining = remaining;
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,6 +226,19 @@ mod tests {
             assert!(!same_file_name(bad, want), "{bad}");
         }
         assert!(same_file_name("TFC_Ambiental_Refreshed_1.18-1.21.1 (2).zip", "TFC_Ambiental_Refreshed_1.18-1.21.1.zip"));
+    }
+
+    #[tokio::test]
+    async fn server_files_already_in_place_count_as_found() {
+        let dir = std::env::temp_dir().join(format!("resincraft-manual-srv-{}", std::process::id()));
+        tokio::fs::create_dir_all(dir.join("mods")).await.unwrap();
+        tokio::fs::write(dir.join("mods/species-3.5.jar"), b"x").await.unwrap();
+        tokio::fs::write(dir.join("mods/off.jar.disabled"), b"x").await.unwrap();
+        let p = |f: &str| PendingDownload { title: f.into(), file_name: f.into(), folder: "mods".into(), ..Default::default() };
+        let got = collect_for_server(&dir, vec![p("species-3.5.jar"), p("off.jar")], None).await.unwrap();
+        assert_eq!(got.found, ["species-3.5.jar", "off.jar"]);
+        assert!(got.remaining.is_empty());
+        let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 
     #[tokio::test]

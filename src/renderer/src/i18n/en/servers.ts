@@ -99,6 +99,12 @@ export default {
   'servers.created.pending': { one: '{count} file to download yourself', other: '{count} files to download yourself' },
   'servers.created.pendingHint': 'Their authors only allow downloads from their website. Download each one and put it in the folder shown.',
   'servers.created.getFile': 'Get file',
+  'servers.downloads.title': { one: '{count} file to download yourself', other: '{count} files to download yourself' },
+  'servers.downloads.hint': "Their authors only allow downloads from their website, and the server may crash without them. Download each one: ResinCraft finds it in Downloads (or in an instance of the same modpack) when the server starts, or now with Look again.",
+  'servers.downloads.look': 'Look again',
+  'servers.downloads.found': { one: 'Added {count} file to the server', other: 'Added {count} files to the server' },
+  'servers.downloads.none': 'None of them are in Downloads yet',
+  'servers.downloads.forget': "Remove from the list (the server doesn't need it)",
 
   'servers.eula.title': 'Minecraft EULA',
   'servers.eula.body':

@@ -135,6 +135,24 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(requests::info(&id).await?)
         }
         "server:clientMods" => json(clientmods::disabled(&store::dir(&args.get::<String>(0)?)?).await),
+        "server:downloadsCheck" => {
+            let id: String = args.get(0)?;
+            let meta = store::get(&id).await?;
+            let pack = meta.modpack.as_ref().and_then(|m| m.project_id.clone());
+            let got = crate::content::manual::collect_for_server(&store::dir(&id)?, meta.pending_downloads.clone(), pack.as_deref()).await?;
+            let mut m = store::get(&id).await?;
+            m.pending_downloads = got.remaining.clone();
+            store::save(&m).await?;
+            json(got)
+        }
+        "server:downloadsForget" => {
+            let id: String = args.get(0)?;
+            let file: String = args.get(1)?;
+            let mut m = store::get(&id).await?;
+            m.pending_downloads.retain(|p| p.file_name != file);
+            store::save(&m).await?;
+            json(m.pending_downloads)
+        }
         "server:packFlags" => json(runtime::pack_flags(&store::dir(&args.get::<String>(0)?)?)),
         "server:properties" => json(properties::read(&store::dir(&args.get::<String>(0)?)?).await),
         "server:setProperties" => {

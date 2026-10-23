@@ -193,6 +193,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       log: fn('server:log'),
       launchArgs: fn('server:launchArgs'),
       packFlags: fn('server:packFlags'),
+      downloadsCheck: fn('server:downloadsCheck'),
+      downloadsForget: fn('server:downloadsForget'),
       requests: fn('server:requests'),
       requestAccept: fn('server:requestAccept'),
       requestReject: fn('server:requestReject'),

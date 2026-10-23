@@ -963,6 +963,10 @@ pub struct ServerMeta {
     /// script) instead of ResinCraft's; ResinCraft's are used when the pack sets none.
     #[serde(default)]
     pub pack_flags: bool,
+    /// Files the server needs whose authors only allow downloads from their website. Before each start ResinCraft
+    /// looks for them (kept copies, the same pack's instances, Downloads) and puts the ones it finds in place.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pending_downloads: Vec<PendingDownload>,
     /// How the server is shared over the internet when `public` is on.
     #[serde(default)]
     pub tunnel: TunnelMode,
