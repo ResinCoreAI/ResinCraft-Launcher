@@ -1,49 +1,159 @@
+<div align="center">
+
+<img src="src-tauri/icons/icon.png" width="96" alt="ResinCraft Launcher icon">
+
 # ResinCraft Launcher
 
-A modern, friendly Minecraft: Java Edition launcher by **Puirkle**.
+A modern, friendly Minecraft: Java Edition launcher by **Puirkle of ResinCore**.
+
+[![Latest release](https://img.shields.io/github/v/release/ResinCoreAI/ResinCraft-Launcher?label=download&color=8b5cf6)](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest)
+![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-8b5cf6)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-green)](LICENSE)
+
+<img src="resources/screenshots/home.png" width="880" alt="ResinCraft home page with your instances and a quick way to continue playing">
+
+</div>
 
 A small native app built with Tauri 2 and Rust, with a React interface. It talks directly to the public Mojang, Microsoft, Fabric, Quilt, Forge, NeoForge, Modrinth, CurseForge and Adoptium APIs. No telemetry and no ResinCraft account.
 
-> NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+> [!NOTE]
+> ResinCraft supports **English and 15 more languages**, including the engine's error messages.
 
-## Download
+[Feature documentation in 16 languages](https://github.com/ResinCoreAI/ResinCraft-Launcher/tree/main/docs/features) · [English user guide](https://github.com/ResinCoreAI/ResinCraft-Launcher/blob/main/docs/guide/en.md)
 
-Get the newest version from [Releases](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
+## Why
 
-| System | File |
-|---|---|
-| **Windows** 10/11 (x64) | `ResinCraft.Launcher_<version>_amd64_windows.exe` |
-| **macOS** 10.15+ (Apple Silicon and Intel) | `ResinCraft.Launcher_<version>_universal_macos.dmg` |
-| **Linux** x64, any distribution | `ResinCraft.Launcher_<version>_amd64_linux.AppImage` (make it executable, then run it) |
-| **Linux** x64, Debian / Ubuntu / Mint | `ResinCraft.Launcher_<version>_amd64_linux.deb` |
-| **Linux** x64, as a plain folder | `ResinCraft.Launcher_<version>_amd64_linux.tar.gz` (unpack, run `./resincraft`; updated by hand) |
-| **Linux** ARM64 (e.g. Raspberry Pi 5) | the same three, with `_arm64_linux` |
+Switching between a vanilla world, a modpack and a server with friends should be straightforward. ResinCraft keeps the setup in one place:
 
-Every copy updates itself in place. The builds aren't code-signed yet: Windows may say the publisher is unverified, and macOS that the app is from an unidentified developer (right-click it and choose **Open** the first time).
-
-On Apple Silicon, Minecraft 1.19 and newer run natively; older versions run as Intel through Rosetta 2 (ResinCraft says so if it isn't installed). On ARM Linux, Minecraft 1.19 and newer are supported (older versions have no ARM build of their graphics library). Bedrock Edition is a Microsoft Store app, so its page is Windows-only.
+- **Keep each world separate.** Every instance has its own mods, saves, Java version and settings.
+- **Find content without the extra steps.** Browse mods and modpacks across providers, with versions and dependencies handled for you.
+- **Let Java take care of itself.** ResinCraft finds a compatible runtime or downloads one for your system.
+- **Bring your friends.** Host a server on your computer and share an address through ResinCraft Relay or another supported route.
 
 ## Features
 
+Feature overview for **[1.2.8](https://github.com/ResinCoreAI/ResinCraft-Launcher/commit/6fb49f47d70db49c4b083f88378ef168347b7bdc)**. See the [full English feature list](https://github.com/ResinCoreAI/ResinCraft-Launcher/blob/main/docs/features/en.md) for details.
+
 | | |
 |---|---|
-| **Instances** | Separate installs per version or modpack, each with its own mods, worlds, Java, memory and JVM arguments. Groups, your own order (drag to arrange), icons, banners and colours. Duplicate, open folder, delete to the Recycle Bin / Trash. |
-| **Any version** | Every release and snapshot from Mojang's manifest, back to the classic alphas (legacy asset layouts handled). |
-| **Mod loaders** | Fabric, Quilt, Forge (back to Minecraft 1.2.5, where it's a jar mod), NeoForge and LiteLoader (on its own or next to Forge), with a loader version picker. Jar mods and your own version changes (main class, libraries, tweakers, arguments) in an instance's settings. |
-| **Discover** | Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher, Technic and GitHub releases, filtered to the instance's version and loader. "All" searches every site at once; paste a link to install it directly. |
-| **Smart installs** | Pick any version, install several at once, required dependencies added automatically, duplicate-mod check across sources. |
-| **Mod management** | Enable/disable, remove, recognise hand-added jars by hash, check for and apply updates (one or all). Export the mods, resource packs or shaders as a list, and install everything on a list into another instance. |
-| **Modpacks** | Import Modrinth `.mrpack`, CurseForge, FTB, ATLauncher and Technic packs; export an instance as `.mrpack` or a CurseForge `.zip`. |
-| **Java** | Auto-detects installed Javas (including the official launcher's runtimes), picks the right major version per game, and downloads Eclipse Temurin for your system and CPU when none fits. |
-| **Accounts** | Microsoft sign-in via device code (no password ever enters the app), tokens encrypted with Windows' data protection (on macOS and Linux, kept in a file only your user can read), skins, capes and name changes, multiple accounts. Offline profiles for singleplayer and LAN, no Microsoft account needed. |
-| **Server hosting** | Vanilla (releases and snapshots), Paper, Purpur, Folia, Spigot, Leaf, Fabric, Quilt, Forge, NeoForge, Arclight (mods and plugins together) and Bedrock Dedicated Server (Windows and x64 Linux), or a server from a modpack. Console, players, plugin and mod manager with updates (Modrinth, Hangar, SpigotMC, dev.bukkit.org, CurseForge, GitHub, or a link), optimised startup flags, and "Bedrock players can join" (Geyser + Floodgate). Friends join through the router, playit.gg, ResinCraft Relay (`<name>.rscraft.resincore.tech`) or bore.pub, or your own domain. |
-| **Bedrock Edition** | Windows: shows the installed Minecraft for Windows and Minecraft Preview with their worlds, opens them, and joins your Bedrock servers. |
-| **Files** | A file manager and editor on every instance and server. |
-| **Play** | Download progress (any download or install can be cancelled from its card), live colour-coded log console with filter/copy, crash notice, play-time tracking, minimize/hide launcher while playing. |
-| **Updates** | Signed in-app updates from GitHub releases. |
-| **Languages** | English and 15 more, including the engine's error messages. |
+| 🗂️ **Instances** | Separate installs per version or modpack, each with its own mods, worlds, Java, memory and JVM arguments. Groups, drag to arrange, icons, banners and colours. Copy worlds, mods, configs, packs and game settings between instances. Duplicate, open folder, delete to the Recycle Bin / Trash. |
+| 🎮 **Any version** | Every release and snapshot from Mojang's manifest, back to the classic alphas, with legacy asset layouts handled. |
+| 🧩 **Mod loaders** | Fabric, Quilt, Forge (back to Minecraft 1.2.5), NeoForge and LiteLoader, with a loader version picker. OptiFine, jar mods and custom version settings for main class, libraries, tweakers and arguments. Change an instance's Minecraft version or loader from Settings; the version chip opens it directly. |
+| ⚡ **Quick join and worlds** | Jump straight into recent servers and singleplayer worlds. Play a world directly, rename it, back it up or import it from a zip. |
+| 🔎 **Discover** | Mods, modpacks, resource packs and shaders from Modrinth, CurseForge, FTB, ATLauncher, Technic and GitHub releases, filtered to your instance. Search all providers at once or paste a link to install directly. |
+| 📦 **Smart installs** | Install several items at once, add required dependencies automatically and check for duplicate mods across sources. |
+| 🔧 **Mod management** | Enable or disable mods instantly, remove and update them, and recognise jars added by hand. Export mods, resource packs or shaders as a list and install that list into another instance. |
+| 📥 **Manual downloads** | When CurseForge authors require a browser download, ResinCraft picks up the files from Downloads or your own watch folders in Settings → Downloads. |
+| 🌍 **Modpacks** | Import Modrinth `.mrpack`, CurseForge, FTB, ATLauncher and Technic packs; export an instance as `.mrpack` or a CurseForge `.zip`, or make your own modpack. Pack pages show descriptions, galleries, versions, changelogs and included mods. Update packs or switch their versions. |
+| 🚚 **Move from another launcher** | Import instances from Prism Launcher, MultiMC, Modrinth App, CurseForge, ATLauncher, GDLauncher or the official Minecraft Launcher, including mods, worlds, packs and settings. Import servers too. |
+| ☕ **Java** | Detect installed runtimes, including the official launcher's, choose the right major version and download Eclipse Temurin for your system and CPU when needed. |
+| 👤 **Accounts** | Microsoft sign-in on Microsoft's own page, without entering your password in ResinCraft. Multiple accounts, skins, capes and name changes. Tokens use Windows' data protection; on macOS and Linux, they stay in a file only your user can read. Offline profiles support singleplayer and LAN. |
+| 🖥️ **Server hosting** | Vanilla, Paper, Purpur, Folia, Spigot, Leaf, Fabric, Quilt, Forge, NeoForge, Arclight and Bedrock Dedicated Server (Windows and x64 Linux), or a server from a modpack or instance. Console, properties, live players, plugin and mod updates, whitelist, ops, bans, icons and backups. Restart and more-actions menus, tuned Java flags or the modpack's own flags. |
+| 🛡️ **Server mod handling** | Detect and disable client-only mods at each server start while preserving needed dependencies. If a remaining client-only mod crashes the server, disable it and restart automatically. |
+| 🤝 **Share and approve players** | Share through your router, ResinCraft Relay, playit.gg, bore.pub or your own domain, with optional Cloudflare DNS automation. Bedrock players can join Java servers through Geyser + Floodgate. Accept or reject whitelist requests from a Relay web page or your own Discord bot (`/whitelist`); accepting adds the player to the whitelist, and Reject and block prevents further requests. |
+| 🟩 **Bedrock Edition** | On Windows, install, launch and uninstall Minecraft for Windows or Minecraft Preview, with worlds backed up before uninstalling. View worlds and join your Bedrock servers. |
+| 📁 **Files and notes** | Instance tabs for Content, Worlds, Servers, Screenshots, Notes, Files, Logs and Settings. A file manager and editor for every instance and server, plus launch/exit commands and environment variables. |
+| ▶️ **Play** | Launch with another account or run the same instance twice with two accounts. Cancellable downloads, a live colour-coded log console with filter and copy, play-time tracking, and options to minimise or hide the launcher while playing. |
+| 🩹 **Crash fixer** | Read crash reports and logs, explain likely causes and offer fixes: install a missing dependency, disable a crashing mod, choose the right Java or increase memory. Apply a fix only when you choose it. |
+| 📊 **Memory and Discord** | See RAM use for the launcher, games and servers, optionally on Home. Discord Rich Presence shows the pack, version, play time and whether you are in singleplayer or on a server, with View modpack and Get ResinCraft buttons. |
+| 🎨 **App and storage** | Light and dark themes, a storage manager to move data to another drive, and settings backup and restore. Keep running in the system tray so servers, your Discord bot and downloads continue after closing the window. |
+| ⬆️ **Updates** | Signed in-app updates from GitHub releases, an Update button in the title bar, a choice to close running games and servers or wait, and optional silent updates. |
+| 🌐 **Languages** | English and 15 more, including the engine's error messages. |
 
-## Getting started
+<p align="center">
+  <img src="resources/screenshots/library.png" width="430" alt="Instance library in ResinCraft Launcher">
+  &nbsp;
+  <img src="resources/screenshots/discover.png" width="430" alt="Browse mods and modpacks in Discover">
+</p>
+
+## Requirements
+
+| System | Supported platforms |
+|---|---|
+| **Windows** | Windows 10/11, x64, with Microsoft Edge WebView2. |
+| **macOS** | macOS 10.15 or newer, Intel or Apple Silicon. |
+| **Linux** | x64 or ARM64; choose the package for your distribution and architecture. |
+
+- **Minecraft: Java Edition:** a Microsoft account that owns the game for online play. Offline profiles are available for singleplayer and LAN.
+- **Java:** a compatible runtime for your Minecraft version. ResinCraft can find or download it for you.
+- **Internet:** needed for sign-in, downloads, updates and sharing a server through a relay.
+- **Apple Silicon:** Minecraft 1.19 and newer run natively; older versions use Rosetta 2. ResinCraft tells you if it is missing.
+- **ARM Linux:** Minecraft 1.19 and newer are supported; older versions lack an ARM build of their graphics library.
+- **Bedrock:** the Minecraft for Windows and Minecraft Preview page is Windows-only.
+
+## Download
+
+Get the newest version from the [latest release](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
+
+| System | File |
+|---|---|
+| **Windows** x64 | `ResinCraft.Launcher_<version>_amd64_windows.exe` |
+| **macOS** Intel and Apple Silicon | `ResinCraft.Launcher_<version>_universal_macos.dmg` |
+| **Linux** x64, AppImage | `ResinCraft.Launcher_<version>_amd64_linux.AppImage` |
+| **Linux** x64, Debian / Ubuntu / Mint | `ResinCraft.Launcher_<version>_amd64_linux.deb` |
+| **Linux** x64, plain folder | `ResinCraft.Launcher_<version>_amd64_linux.tar.gz` |
+| **Linux** ARM64 | The same three formats, with `_arm64_linux` instead of `_amd64_linux`. |
+
+### Install
+
+1. Download the file for your system and CPU.
+2. On **Windows**, run the installer. On **macOS**, open the `.dmg` and move ResinCraft to Applications. On **Linux**, install the `.deb`, make the AppImage executable and run it, or unpack the `.tar.gz` and run `./resincraft`.
+3. Open ResinCraft, add an account and create your first instance.
+
+> [!IMPORTANT]
+> Builds are not code-signed yet. Windows may show an unverified publisher or a SmartScreen warning; macOS may report an unidentified developer. On macOS, right-click the app and choose **Open** the first time. In-app updates are checked against ResinCraft's update signing key.
+
+The installer, macOS app, AppImage and `.deb` support in-app updates. The Linux `.tar.gz` folder is updated by hand.
+
+## Using it
+
+| To… | Do this |
+|---|---|
+| **Start playing** | Create an instance in **Library**, choose a Minecraft version and loader, then press **Play**. |
+| **Find mods or a modpack** | Open **Discover**, choose a provider or search all of them, then install into your instance. |
+| **Manage an instance** | Open its settings to adjust Java, memory and JVM arguments, or manage its mods, worlds and files. |
+| **Change the game or loader** | Click the instance's version chip to open **Settings → Version**, choose versions and press **Change version**. Check your mods for compatibility afterwards. |
+| **Fix a crash** | Review the crash fixer's suggestions, then choose **Fix** or **Fix all and play again**. |
+| **Play offline** | Add an offline profile for singleplayer or LAN. |
+| **Host for friends** | Create a server under **Servers**, start it and choose a supported sharing route. |
+| **Approve new players** | Open the server's **Players** tab to accept or reject requests from the Relay web page or your Discord bot. |
+| **Move from another launcher** | Import its instances or servers, including their mods, worlds, packs and settings. |
+| **Check for updates** | Use **Update** in the title bar or **Settings → Updates** to check, read release notes and choose automatic or silent updates. |
+
+## ResinCraft Relay
+
+**ResinCraft Relay is a ResinCore service**, operated through ResinCore's cloud infrastructure. It connects friends to a Minecraft server running on your computer without requiring you to forward router ports or asking players to install extra software.
+
+Friends join using an address such as **`<name>.rscraft.resincore.tech`**. Their game traffic passes through the cloud relay to reach your local server; the world and server files stay on your computer. The launcher connects to the relay over TLS.
+
+- **Game content:** the relay forwards connections without storing gameplay traffic, chat messages or world files.
+- **Sign-in:** to claim an address, the launcher sends a Minecraft access token so the relay can verify ownership with Minecraft services. The relay does not store or log that token; it issues its own session token and stores only its hash.
+- **Service records:** the relay stores Minecraft UUIDs and usernames, reserved addresses, session records, monthly traffic totals and bans to operate the service and enforce limits. Operational events include IP addresses in the admin dashboard; debug logs may include them too.
+
+ResinCraft has no telemetry or ResinCraft account. Relay service records are used for running the relay, rather than launcher analytics. You can also share through your router, playit.gg or bore.pub.
+
+This repository includes the [launcher-side relay client](relay/src/agent.rs). The hosted relay server is maintained separately from the launcher repository.
+
+## Privacy & security
+
+Your instances, worlds, mods, settings and saved accounts stay on your computer. The launcher contacts the services needed for the features you use, such as Microsoft for sign-in, content providers for downloads and GitHub for updates. Those services have their own privacy policies.
+
+| | |
+|---|---|
+| **Microsoft sign-in** | You authenticate on Microsoft's own page. ResinCraft receives tokens, never your password. |
+| **Local accounts** | Saved tokens use Windows' data protection on Windows; on macOS and Linux, the account file is restricted to your user. |
+| **Cloud relay** | When you use ResinCraft Relay, connections pass through ResinCore's cloud service. Its content handling and service records are described [above](#resincraft-relay). |
+| **Signed updates** | Downloads are checked against ResinCraft's update key and the version they were signed for before installation. |
+
+Game data is stored in `%APPDATA%\ResinCraft Launcher` on Windows, `~/Library/Application Support/ResinCraft Launcher` on macOS and `~/.config/ResinCraft Launcher` on Linux.
+
+## Updates
+
+ResinCraft checks for updates shortly after it starts and every 6 hours. An **Update** button appears in the title bar when a version is available. **Settings → Updates** lets you check manually, read release notes and choose automatic or silent updates.
+
+Updates replace the program while keeping your instances, accounts and settings. If a game or hosted server is running, choose **Close them and update**, wait until they stop, or cancel. **Update silently** downloads in the background and installs once no game or hosted server is running. ResinCraft restarts after installation.
+
+## Build from source
 
 Needs Node.js 24 and Rust (stable), plus per system:
 
@@ -61,11 +171,14 @@ npm run dev
 - `npm run dev:web` serves the UI alone at http://localhost:1420 with a mock engine and sample data, which is handy for design work.
 - `npm run typecheck` / `npm run format`. Translations: `npx tsx tools/check-i18n.ts` and `npx tsx tools/engine-strings.ts --check`.
 - Headless engine checks (inside `src-tauri/`): `cargo run --example smoke -- 1.21.1 fabric` creates a throwaway instance, downloads everything and boots Minecraft with an offline profile; also `check_content`, `check_player` and `check_server`.
-- ResinCraft Relay (`relay/`, friends join hosted servers as `<name>.rscraft.resincore.tech`): `cargo test` inside `relay/`, and `cargo run --example check_relay` inside `src-tauri/` runs the relay locally with a real vanilla server and a headless Minecraft client. Deployment: [relay/README.md](relay/README.md).
+- The ResinCraft Relay client is in `relay/`; run its library checks with `cargo test` there. The hosted Relay server is maintained separately. Headless checks for the newer launcher features include `check_crashfix`, `check_setversion`, `check_requests` and `check_discordbot` in `src-tauri/examples/`.
 
-## Microsoft sign-in setup (required once)
+<details>
+<summary>Developer setup, project layout and release notes</summary>
 
-Minecraft only accepts sign-ins from Azure apps that Mojang has approved. ResinCraft doesn't ship anyone else's client ID, so you need your own:
+### Microsoft sign-in setup
+
+Source builds need a Mojang-approved Azure application client ID for Microsoft sign-in. Official release builds can include ResinCraft's ID through `RESINCRAFT_MS_CLIENT_ID`; if your build has none, configure your own:
 
 1. In the [Azure portal](https://portal.azure.com) go to **App registrations → New registration**.
    - Supported account types: **Personal Microsoft accounts only**.
@@ -75,7 +188,7 @@ Minecraft only accepts sign-ins from Azure apps that Mojang has approved. ResinC
 4. Submit the ID to Mojang for Minecraft API access: <https://aka.ms/mce-reviewappid>. Until it's approved, sign-in fails with a "rejected this app's Client ID" message.
 5. Paste the ID in **Settings → Microsoft sign-in**, or set `RESINCRAFT_MS_CLIENT_ID` before launching.
 
-## Project layout
+### Project layout
 
 ```
 src/
@@ -89,18 +202,19 @@ src-tauri/             Tauri app and the Rust engine
   src/game             Versions, loaders, Java, launching
   src/content          Modrinth, CurseForge, FTB, ATLauncher, Technic, import/export
   src/player           Accounts, worlds, servers list, screenshots, notes
-  src/server           Server hosting, tunnels, the relay client
+  src/server           Server hosting, tunnels, relay client, join requests and Discord bots
   src/files            File manager and editor
   examples/            Headless checks
-relay/                 ResinCraft Relay
+relay/                 Launcher-side ResinCraft Relay client library
 site/                  Website (Next.js)
-deploy/windows/        Windows Server deploy for the website and the relay
+deploy/windows/        Windows Server deployment for the website
+docs/                  Features and user guides in 16 languages
 tools/                 Translation checks
 ```
 
-## Updates
+### Update internals and releasing
 
-Installed copies update themselves with Tauri's updater (`src-tauri/src/updater.rs`, UI in `src/renderer/src/components/Updates.tsx`): a quiet check when ResinCraft starts and every 6 hours, a small "ResinCraft x.y is ready to install" banner (Update now / Release notes / Later), and **Settings → Updates** (check now, last checked, "Install updates automatically", release notes). The update file is the release's NSIS installer itself on Windows, the `.app.tar.gz` on macOS and the `.AppImage` (or the `.deb`, for installs made from it) on Linux (`bundle.createUpdaterArtifacts`). It is checked against the public key in `tauri.conf.json` (and must carry the version it was signed for, `requireSignedVersion`, so a tampered latest.json can't pass off an older release as new), then installs over the program only (on Windows the installer runs in passive mode), so the data folder (instances, accounts, settings: `%APPDATA%\ResinCraft Launcher`, `~/Library/Application Support/ResinCraft Launcher` or `~/.config/ResinCraft Launcher`) stays, and the new version starts by itself. If a game or a hosted server is running, ResinCraft offers to wait until they stop.
+Installed copies use Tauri's updater (`src-tauri/src/updater.rs`, UI in `src/renderer/src/components/Updates.tsx`), the title-bar Update button and **Settings → Updates**. The update file is the release's NSIS installer itself on Windows, the `.app.tar.gz` on macOS and the `.AppImage` (or the `.deb`, for installs made from it) on Linux (`bundle.createUpdaterArtifacts`). It is checked against the public key in `tauri.conf.json` and must carry the version it was signed for (`requireSignedVersion`), so a tampered `latest.json` cannot pass off an older release as new. It installs over the program only (on Windows the installer runs in passive mode), preserving the data folder and restarting the new version. Manual updates offer to close running games and servers or wait; silent updates wait until none are running.
 
 Where it looks (`plugins.updater.endpoints`): `https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/updates/latest.json`. The `updates` branch holds only that file. It's written by `.github/workflows/publish-update.yml` when a release is published (not a draft, not a pre-release, and only if it's the latest release), so a release reaches players only once its draft is published. The release itself then shows just the installer: the `.sig` is removed (its text is inside `latest.json`), and so is `latest.json`, except on releases up to 1.2.9, because launcher 0.3.0 still looks for it on the newest release.
 
@@ -124,7 +238,7 @@ RESINCRAFT_DATA_FOLDER="ResinCraft Update Test" npx tauri build --config update-
 
 with `update-test.json` setting `productName`, `mainBinaryName`, `identifier`, `version`, and `plugins.updater` = `{ "endpoints": ["http://127.0.0.1:18765/latest.json"], "dangerousInsecureTransportProtocol": true }`. Install the older one, put the newer setup.exe and a `latest.json` (version, url, and the `.sig` text as `signature`) in a folder served on that port, and start the older copy.
 
-## Code signing (Windows "Publisher: unverified")
+### Code signing (Windows "Publisher: unverified")
 
 Windows shows **Publisher: unverified** and SmartScreen warnings for unsigned installers. Fixing it needs a code-signing certificate issued to you (Puirkle); no app setting can do it. Options: SignPath Foundation (free, open-source projects), Certum Open Source Code Signing (individuals), Microsoft Azure Artifact Signing (cheapest commercial, limited regions for individuals), or a standard OV/EV certificate.
 
@@ -138,8 +252,23 @@ Once you have one, add it to `src-tauri/tauri.conf.json` and every `npm run buil
 
 Signed builds show "Puirkle" as the publisher immediately; SmartScreen's warning fades as the signed installer gains download reputation.
 
-## License
+</details>
 
-Copyright © 2026 ResinCore by Puirkle
+## ☕ Support our work
 
-ResinCraft Launcher is free software under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You may use, share and change it. If you share a changed version, or run one as a service people use over a network, it has to stay under the AGPLv3 with its source available to them.
+However, if you enjoy my software and would like to directly support Puirkle, you can do so here:
+
+- 🇹🇭 **Thai support** (Thai only): [https://ezdn.app/puirkle](https://ezdn.app/puirkle)
+- ☕ **Buy Me a Coffee:** [https://buymeacoffee.com/puirkle](https://buymeacoffee.com/puirkle)
+
+Support creators at ResinCore:
+
+- ☕ **Buy Me a Coffee:** [https://buymeacoffee.com/resincore](https://buymeacoffee.com/resincore)
+
+## 📜 License
+
+[AGPL-3.0-only](LICENSE) Copyright © 2026 ResinCore. All rights reserved. Created by Puirkle
+
+ResinCraft Launcher is licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only). Commercial use and paid hosting are permitted under the license. Source-code obligations apply as described in the license.
+
+> NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
