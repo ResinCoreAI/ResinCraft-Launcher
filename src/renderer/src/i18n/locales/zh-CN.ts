@@ -1572,6 +1572,7 @@ const dict: Dict = {
   'updates.silent': '静默更新',
   'updates.silent.hint': '在没有游戏或服务器运行时，无需询问即在后台下载并安装新版本。',
   'updates.nav': '更新',
+  'updates.store': "从 Microsoft Store 安装，ResinCraft 由 Store 负责更新。",
   'updates.lead': 'ResinCraft 会在启动时以及每 6 小时检查一次新版本。',
   'updates.version': '版本 {version}',
   'updates.upToDate': '已是最新版本。',

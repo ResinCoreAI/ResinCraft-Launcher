@@ -50,6 +50,25 @@ pub struct UpdateStatus {
     /// While waiting to install: what is still running.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub waiting_for: Option<Blockers>,
+    /// Installed from the Microsoft Store (an MSIX package): the Store updates it, so ResinCraft never looks.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub store: bool,
+}
+
+/// Whether this copy runs from an MSIX package (the Microsoft Store), which Windows updates itself.
+pub fn packaged() -> bool {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::APPMODEL_ERROR_NO_PACKAGE;
+        use windows::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;
+        let mut len = 0u32;
+        // Unpackaged processes get APPMODEL_ERROR_NO_PACKAGE; packaged ones "buffer too small".
+        unsafe { GetCurrentPackageFullName(&mut len, windows::core::PWSTR::null()) != APPMODEL_ERROR_NO_PACKAGE }
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -134,6 +153,7 @@ async fn status() -> UpdateStatus {
     let saved: Saved = read_json(&state_file()).await.unwrap_or_default();
     with(|st| {
         st.status.current = current_version();
+        st.status.store = packaged();
         if st.status.state.is_empty() {
             st.status.state = "idle";
         }
@@ -177,6 +197,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
 /// Asks the update server whether a newer version exists.
 pub async fn check() -> Result<UpdateStatus> {
     let Some(app) = ctx::app() else { bail_tr!("update.noApp", "Updates only work in the installed app.") };
+    if packaged() {
+        return Ok(status().await);
+    }
     if !begin() {
         return Ok(status().await);
     }
@@ -249,6 +272,9 @@ enum Mode {
 async fn install(mode: Mode) -> Result<()> {
     if ctx::app().is_none() {
         bail_tr!("update.noApp", "Updates only work in the installed app.");
+    }
+    if packaged() {
+        bail_tr!("update.store", "The Microsoft Store updates this copy of ResinCraft.");
     }
     // A dev build would replace the installed copy rather than itself.
     if cfg!(debug_assertions) {

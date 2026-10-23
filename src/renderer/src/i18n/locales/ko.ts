@@ -1575,6 +1575,7 @@ const dict: Dict = {
   'updates.silent': '조용히 업데이트',
   'updates.silent.hint': '게임이나 서버가 실행 중이 아닐 때 묻지 않고 백그라운드에서 새 버전을 내려받아 설치합니다.',
   'updates.nav': '업데이트',
+  'updates.store': "Microsoft Store에서 설치했어요. ResinCraft 업데이트는 Store가 해 줘요.",
   'updates.lead': 'ResinCraft는 시작할 때와 6시간마다 새 버전을 확인해요.',
   'updates.version': '버전 {version}',
   'updates.upToDate': '최신 버전이에요.',

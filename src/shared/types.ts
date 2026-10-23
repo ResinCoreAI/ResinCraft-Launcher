@@ -429,6 +429,8 @@ export interface UpdateStatus {
   error?: EngineText
   /** While waiting to install: what is still running. */
   waitingFor?: UpdateBlockers
+  /** Installed from the Microsoft Store: the Store updates it, so ResinCraft never looks. */
+  store?: boolean
 }
 
 export interface AppInfo {

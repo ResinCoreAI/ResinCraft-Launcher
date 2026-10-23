@@ -1642,6 +1642,7 @@ const dict: Dict = {
   'updates.silent': 'Тихое обновление',
   'updates.silent.hint': 'Скачивать и устанавливать новые версии в фоне без вопросов, когда не запущены игры и серверы.',
   'updates.nav': 'Обновления',
+  'updates.store': "Установлено из Microsoft Store — он сам обновляет ResinCraft.",
   'updates.lead': 'ResinCraft ищет новую версию при запуске и каждые 6 часов.',
   'updates.version': 'Версия {version}',
   'updates.upToDate': 'У тебя последняя версия.',

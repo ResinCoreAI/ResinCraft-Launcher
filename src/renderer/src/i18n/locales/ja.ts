@@ -1580,6 +1580,7 @@ const dict: Dict = {
   'updates.silent': 'サイレントアップデート',
   'updates.silent.hint': 'ゲームやサーバーが動いていないときに、確認なしでバックグラウンドで新しいバージョンをダウンロード・インストールします。',
   'updates.nav': 'アップデート',
+  'updates.store': "Microsoft Store からインストールされています。ResinCraft の更新は Store が行います。",
   'updates.lead': 'ResinCraft は起動時と 6 時間ごとに新しいバージョンを確認します。',
   'updates.version': 'バージョン {version}',
   'updates.upToDate': '最新の状態です。',

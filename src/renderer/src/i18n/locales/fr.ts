@@ -1630,6 +1630,7 @@ const dict: Dict = {
   'updates.silent': 'Mettre à jour en silence',
   'updates.silent.hint': 'Télécharger et installer les nouvelles versions en arrière-plan sans demander, dès qu’aucun jeu ni serveur ne tourne.',
   'updates.nav': 'Mises à jour',
+  'updates.store': "Installé depuis le Microsoft Store, qui garde ResinCraft à jour.",
   'updates.lead': 'ResinCraft cherche une nouvelle version au démarrage, puis toutes les 6 heures.',
   'updates.version': 'Version {version}',
   'updates.upToDate': 'Vous êtes à jour.',

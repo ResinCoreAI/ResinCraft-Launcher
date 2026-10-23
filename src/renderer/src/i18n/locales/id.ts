@@ -1585,6 +1585,7 @@ const dict: Dict = {
   'updates.silent': 'Perbarui diam-diam',
   'updates.silent.hint': 'Unduh dan pasang versi baru di latar belakang tanpa bertanya, segera setelah tidak ada game atau server yang berjalan.',
   'updates.nav': 'Pembaruan',
+  'updates.store': "Dipasang dari Microsoft Store, yang menjaga ResinCraft tetap terbaru.",
   'updates.lead': 'ResinCraft mencari versi baru saat dibuka dan setiap 6 jam.',
   'updates.version': 'Versi {version}',
   'updates.upToDate': 'Anda sudah memakai versi terbaru.',

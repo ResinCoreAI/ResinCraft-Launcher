@@ -193,6 +193,20 @@ export function UpdatesSection() {
   }, [])
 
   if (!settings || !status) return null
+  if (status.store)
+    return (
+      <section className="settings-section" id="updates">
+        <h3>{t('updates.nav')}</h3>
+        <div className="card">
+          <div className="setting">
+            <div className="text">
+              <b>{t('updates.version', { version: status.current })}</b>
+              <span>{t('updates.store')}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
   const { available, state } = status
   const busy = state !== 'idle'
   const line =

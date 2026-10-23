@@ -22,6 +22,7 @@ export default {
   'updates.silent': 'Update silently',
   'updates.silent.hint': 'Download and install new versions in the background without asking, as soon as no game or hosted server is running.',
   'updates.nav': 'Updates',
+  'updates.store': 'Installed from the Microsoft Store, which keeps ResinCraft up to date.',
   'updates.lead': 'ResinCraft looks for a new version when it starts and every 6 hours.',
   'updates.version': 'Version {version}',
   'updates.upToDate': 'You’re up to date.',

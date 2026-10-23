@@ -1595,6 +1595,7 @@ const dict: Dict = {
   'updates.silent': 'Sessiz güncelle',
   'updates.silent.hint': 'Hiçbir oyun veya sunucu çalışmıyorken yeni sürümleri sormadan arka planda indir ve kur.',
   'updates.nav': 'Güncellemeler',
+  'updates.store': "Microsoft Store'dan yüklendi; ResinCraft'ı Store güncel tutar.",
   'updates.lead': 'ResinCraft açılışta ve her 6 saatte bir yeni sürüm arar.',
   'updates.version': 'Sürüm {version}',
   'updates.upToDate': 'Güncelsin.',

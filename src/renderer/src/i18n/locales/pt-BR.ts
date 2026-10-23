@@ -1609,6 +1609,7 @@ const dict: Dict = {
   'updates.silent': 'Atualizar em silêncio',
   'updates.silent.hint': 'Baixa e instala novas versões em segundo plano sem perguntar, assim que nenhum jogo ou servidor estiver rodando.',
   'updates.nav': 'Atualizações',
+  'updates.store': "Instalado pela Microsoft Store, que mantém o ResinCraft atualizado.",
   'updates.lead': 'O ResinCraft procura uma nova versão ao iniciar e a cada 6 horas.',
   'updates.version': 'Versão {version}',
   'updates.upToDate': 'Você está com a versão mais recente.',

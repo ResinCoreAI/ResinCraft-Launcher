@@ -1582,6 +1582,7 @@ const dict: Dict = {
   'updates.silent': 'Cập nhật âm thầm',
   'updates.silent.hint': 'Tải và cài phiên bản mới trong nền mà không hỏi, ngay khi không có game hay máy chủ nào chạy.',
   'updates.nav': 'Cập nhật',
+  'updates.store': "Được cài từ Microsoft Store, nơi giữ ResinCraft luôn mới nhất.",
   'updates.lead': 'ResinCraft tìm phiên bản mới khi khởi động và cứ mỗi 6 giờ.',
   'updates.version': 'Phiên bản {version}',
   'updates.upToDate': 'Bạn đang dùng bản mới nhất.',
