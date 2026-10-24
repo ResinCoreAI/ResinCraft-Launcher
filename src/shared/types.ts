@@ -1179,6 +1179,12 @@ export interface NewServer {
   source?: ServerSource
 }
 
+/** Paper's anti-xray: mode 1 hides ores as stone, mode 2 also shows fake ores everywhere (stronger, more CPU). */
+export interface AntiXray {
+  enabled: boolean
+  mode: 1 | 2
+}
+
 export interface ServerCreated {
   server: ServerInfo
   /** Client-only mods that were left out. */
@@ -1732,6 +1738,9 @@ export interface ResinApi {
     launchArgs(id: string): Promise<string[]>
     /** The Java flags the server pack sets for itself (user_jvm_args.txt, variables.txt, its start script). */
     packFlags(id: string): Promise<string[]>
+    /** Paper's built-in anti-xray (null on servers that don't have it). Applies on the next start. */
+    antiXray(id: string): Promise<AntiXray | null>
+    setAntiXray(id: string, value: AntiXray): Promise<void>
     /** Looks for the files the server still needs by hand now; the ones found are put in place. */
     downloadsCheck(id: string): Promise<{ found: string[]; remaining: PendingDownload[] }>
     /** Takes one file off that list (the host doesn't want it); the rest. */
@@ -1830,5 +1839,7 @@ export interface ResinApi {
     serverRequests(cb: (e: ServerRequestsEvent) => void): () => void
     gameCrash(cb: (e: GameCrashEvent) => void): () => void
     update(cb: (s: UpdateStatus) => void): () => void
+    /** A list changed on disk (an install made an entry, or one went): fetch it again. */
+    listChanged(cb: (what: 'instances' | 'servers') => void): () => void
   }
 }

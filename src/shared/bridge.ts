@@ -198,6 +198,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       log: fn('server:log'),
       launchArgs: fn('server:launchArgs'),
       packFlags: fn('server:packFlags'),
+      antiXray: fn('server:antiXray'),
+      setAntiXray: fn('server:setAntiXray'),
       downloadsCheck: fn('server:downloadsCheck'),
       downloadsForget: fn('server:downloadsForget'),
       requests: fn('server:requests'),
@@ -250,6 +252,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged') }
   } as ResinApi
 }

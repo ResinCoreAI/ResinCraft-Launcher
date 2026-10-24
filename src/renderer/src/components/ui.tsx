@@ -163,7 +163,15 @@ export function PlayButton({ inst, size = '' }: { inst: Instance; size?: 'lg' | 
   const state = games[inst.id]
   const several = (store.runs[inst.id] ?? []).filter((r) => r.state === 'running').length > 1
   let main: ReactNode
-  if (state === 'running')
+  // Installing its modpack, reinstalling or switching versions: Play waits for that.
+  const working = task && state !== 'preparing' && state !== 'running' ? task : undefined
+  if (working)
+    main = (
+      <button className={`btn primary play-btn ${size}`} disabled title={working.title}>
+        <Loader2 className="spin" /> {working.progress != null ? <span className="pct">{Math.round(working.progress * 100)}%</span> : null}
+      </button>
+    )
+  else if (state === 'running')
     main = (
       <button className={`btn play-btn running ${size}`} onClick={() => void stop(inst.id)} title={several ? t('play.stopAllHint') : t('common.forceStop')}>
         <Square /> {t('common.stop')}

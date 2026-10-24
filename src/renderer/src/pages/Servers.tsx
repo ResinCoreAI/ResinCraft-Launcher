@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
-import type { ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
+import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api } from '../api'
 import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
@@ -15,7 +15,7 @@ import { ServerOriginChips, ServerPackSettings } from '../components/ServerPacks
 import { PackUpdateBadge } from '../components/PackUpdates'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
 import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, openMenuBelow, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
-import { useStore } from '../store'
+import { useInstanceTask, useStore } from '../store'
 import { bytes, fixed, serverPath, timeAgo } from '../util'
 import { rich, t, tx, type Key } from '../i18n'
 import '../servers.css'
@@ -39,9 +39,38 @@ function onlineCount(s: ServerInfo): number {
 
 type Tab = 'console' | 'players' | 'addons' | 'mods' | 'properties' | 'files' | 'settings'
 
+// Servers deleted in the UI and still being moved to the Recycle Bin: hidden from the list until the engine is done.
+const removing = new Set<string>()
+const removingListeners = new Set<() => void>()
+let removingVersion = 0
+const notifyRemoving = () => (removingVersion++, removingListeners.forEach((l) => l()))
+function useRemoving(): number {
+  return useSyncExternalStore(
+    (l) => (removingListeners.add(l), () => removingListeners.delete(l)),
+    () => removingVersion
+  )
+}
+
+/** Deletes a server without waiting: it leaves the list at once; if the engine refuses, it comes back with why. */
+function removeServer(s: ServerInfo, toast: (text: string, kind?: 'success' | 'error' | 'info') => void, reload: () => Promise<void>) {
+  removing.add(s.id)
+  notifyRemoving()
+  toast(t('servers.settings.deleted', { name: s.name }))
+  void api.server
+    .remove(s.id)
+    .catch((e) => toast((e as Error).message, 'error'))
+    .finally(async () => {
+      await reload().catch(() => {})
+      removing.delete(s.id)
+      notifyRemoving()
+    })
+}
+
 export default function Servers({ id, fromInstance }: { id?: string; fromInstance?: string }) {
   const { go, toast } = useStore()
-  const [servers, setServers] = useState<ServerInfo[]>()
+  const [allServers, setServers] = useState<ServerInfo[]>()
+  const removingNow = useRemoving()
+  const servers = useMemo(() => allServers?.filter((s) => !removing.has(s.id)), [allServers, removingNow])
   const [creating, setCreating] = useState(!!fromInstance)
   const [importing, setImporting] = useState(false)
   const [created, setCreated] = useState<ServerCreated>()
@@ -55,6 +84,9 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
       toast((e as Error).message, 'error')
     }
   }, [toast])
+
+  // A server being made is listed at once (with its task's progress); one that failed to make goes again.
+  useEffect(() => api.on.listChanged((what) => what === 'servers' && void load()), [load])
 
   useEffect(() => {
     void load()
@@ -197,6 +229,14 @@ function describeServer(s: ServerInfo): string {
 }
 
 function StartStop({ s, onStart, onStop, size = '' }: { s: ServerInfo; onStart: (s: ServerInfo) => void; onStop: (s: ServerInfo) => void; size?: 'lg' | '' }) {
+  // Being made, reinstalled or switched to another pack version: Start waits for that, and shows how far it is.
+  const task = useInstanceTask(s.id)
+  if (task && s.state === 'stopped')
+    return (
+      <button className={`play-btn primary btn ${size}`} disabled title={task.title}>
+        <Loader2 className="spin" /> {task.progress != null ? `${Math.round(task.progress * 100)}%` : t('servers.working')}
+      </button>
+    )
   if (s.state === 'starting' || s.state === 'running')
     return (
       <button className={`btn ${size} sv-stop`} onClick={() => onStop(s)}>
@@ -350,14 +390,7 @@ function ServerList({
           body={t('servers.settings.deleteBody')}
           confirm={t('common.delete')}
           onClose={() => setDeleting(undefined)}
-          onConfirm={async () => {
-            try {
-              await api.server.remove(deleting.id)
-              await reload()
-            } catch (e) {
-              toast((e as Error).message, 'error')
-            }
-          }}
+          onConfirm={() => removeServer(deleting, toast, reload)}
         />
       )}
     </>
@@ -477,14 +510,9 @@ function ServerDetail({
           body={t('servers.settings.deleteBody')}
           confirm={t('common.delete')}
           onClose={() => setDeleting(false)}
-          onConfirm={async () => {
-            try {
-              await api.server.remove(s.id)
-              await reload()
-              go({ page: 'servers' })
-            } catch (e) {
-              toast((e as Error).message, 'error')
-            }
+          onConfirm={() => {
+            removeServer(s, toast, reload)
+            go({ page: 'servers' })
           }}
         />
       )}
@@ -1356,6 +1384,8 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
 
       <ServerPackSettings s={s} reload={reload} />
 
+      <AntiXraySection s={s} />
+
       <div className="settings-section">
         <h3>{t('servers.settings.internet')}</h3>
         <div className="card">
@@ -1483,14 +1513,9 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
           body={t('servers.settings.deleteBody')}
           confirm={t('common.delete')}
           onClose={() => setDeleting(false)}
-          onConfirm={async () => {
-            try {
-              await api.server.remove(s.id)
-              await reload()
-              onDeleted()
-            } catch (e) {
-              toast((e as Error).message, 'error')
-            }
+          onConfirm={() => {
+            removeServer(s, toast, reload)
+            onDeleted()
           }}
         />
       )}
@@ -1604,5 +1629,64 @@ function CreatedSummary({ result, onClose }: { result: ServerCreated; onClose: (
         </div>
       )}
     </Modal>
+  )
+}
+
+/** Settings → Anti-xray: Paper's own (Paper, Purpur, Folia, Leaf); servers without it don't show the section. */
+function AntiXraySection({ s }: { s: ServerInfo }) {
+  const { toast } = useStore()
+  const [ax, setAx] = useState<AntiXray | null>()
+  useEffect(() => {
+    let live = true
+    void api.server.antiXray(s.id).then((v) => live && setAx(v), () => live && setAx(null))
+    return () => void (live = false)
+  }, [s.id])
+  if (!ax) return null
+  const save = async (next: AntiXray) => {
+    const before = ax
+    setAx(next)
+    try {
+      await api.server.setAntiXray(s.id, next)
+      if (s.state === 'running') toast(t('servers.antiXray.restart'), 'info')
+    } catch (e) {
+      setAx(before)
+      toast((e as Error).message, 'error')
+    }
+  }
+  return (
+    <div className="settings-section">
+      <h3>{t('servers.antiXray.section')}</h3>
+      <div className="card">
+        <div className="setting">
+          <div className="text">
+            <b>{t('servers.antiXray.title')}</b>
+            <span>{t('servers.antiXray.hint')}</span>
+          </div>
+          <Switch on={ax.enabled} onChange={(v) => void save({ ...ax, enabled: v })} label={t('servers.antiXray.title')} />
+        </div>
+        {ax.enabled && (
+          <div className="setting">
+            <div className="text">
+              <b>{t('servers.antiXray.mode')}</b>
+              <span>{t(ax.mode === 1 ? 'servers.antiXray.mode1Hint' : 'servers.antiXray.mode2Hint')}</span>
+            </div>
+            <Segmented<'1' | '2'>
+              value={ax.mode === 2 ? '2' : '1'}
+              onChange={(mode) => void save({ ...ax, mode: mode === '2' ? 2 : 1 })}
+              options={[
+                { value: '1', label: t('servers.antiXray.mode1') },
+                { value: '2', label: t('servers.antiXray.mode2') }
+              ]}
+            />
+          </div>
+        )}
+        <div className="setting">
+          <div className="text">
+            <b>{t('servers.antiXray.cheat')}</b>
+            <span>{t('servers.antiXray.cheatHint')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

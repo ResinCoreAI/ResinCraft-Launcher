@@ -90,7 +90,7 @@ const live = (state: string | undefined) => state === 'running' || state === 'pr
  * right-click menu, their dialogs, and the one cancellable progress line they share.
  */
 export function useBulkActions(picked: Instance[], clear: () => void) {
-  const { games, stop, refreshInstances, toast, activeAccount } = useStore()
+  const { games, stop, refreshInstances, removeInstances, toast, activeAccount } = useStore()
   const names = useGroupNames()
   const [dialog, setDialog] = useState<'delete' | 'newGroup' | 'export'>()
   const [progress, setProgress] = useState<Progress>()
@@ -186,11 +186,12 @@ export function useBulkActions(picked: Instance[], clear: () => void) {
     toast(summary(count ? t('library.sel.updated', { count }) : t('library.sel.upToDate'), modded.length - updatable.length), count ? 'success' : 'info')
   }
 
+  // Gone at once; the folders go to the Recycle Bin in the background (any that fail come back, with the reason).
   const remove = async () => {
     const skipped = running.length
-    const r = await each(t('library.sel.deleting'), idle, (i) => api.instances.remove(i.id))
-    if (r.ok.length) toast(summary(t('library.sel.deleted', { count: r.ok.length }), skipped))
+    if (idle.length) toast(summary(t('library.sel.deleted', { count: idle.length }), skipped))
     clear()
+    void removeInstances(idle.map((i) => i.id))
   }
 
   const exportAll = async (format: PackFormat) => {

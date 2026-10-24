@@ -411,6 +411,9 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         })
         .await?;
         let guard = InstanceGuard::new(&inst.id);
+        // On the Library at once, with this task's progress on its card.
+        task.set_instance(&inst.id);
+        crate::core::events::list_changed("instances");
         if let Some(bytes) = jar_mod {
             if let Err(e) = add_modpack_jar(&inst.id, bytes).await {
                 discard_instance(&inst.id).await;

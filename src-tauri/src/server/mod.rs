@@ -3,6 +3,7 @@
 //! the player lists, install plugins and mods, back up worlds, and open the port on the router so friends
 //! can join. Servers live in `<dataDir>/servers/<id>/`.
 
+pub mod antixray;
 pub mod cloudflare;
 pub mod clientmods;
 pub mod create;
@@ -169,6 +170,18 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         // Installs the server software again (Server → Reinstall), and the modpack's server files.
+        // Paper's built-in anti-xray: [id] → { enabled, mode } (null for servers without it); [id, { enabled, mode }].
+        "server:antiXray" => {
+            let meta = store::get(&args.get::<String>(0)?).await?;
+            let dir = store::dir(&meta.id)?;
+            json(if antixray::supported(meta.kind) { Some(antixray::get(&meta, &dir).await) } else { None })
+        }
+        "server:setAntiXray" => {
+            let meta = store::get(&args.get::<String>(0)?).await?;
+            let want: antixray::AntiXray = args.get(1)?;
+            antixray::set(&meta, &store::dir(&meta.id)?, &want).await?;
+            done()
+        }
         "server:reinstall" => {
             packs::reinstall(&args.get::<String>(0)?).await?;
             done()

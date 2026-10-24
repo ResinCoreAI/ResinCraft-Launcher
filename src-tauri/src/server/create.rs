@@ -108,6 +108,8 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
     };
     tokio::fs::create_dir_all(&dir).await?;
     store::save(&meta).await?;
+    // On the server list at once, with the "Creating" task's progress (the task carries the server's id).
+    crate::core::events::list_changed("servers");
 
     let temp = plan.temp.clone();
     // Remembered so the server can sync from its instance, or switch its pack's version, later.
@@ -151,6 +153,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         Ok((meta, dropped, pending)) => Ok(ServerCreated { server: store::info(meta).await, dropped, pending, built_pack }),
         Err(e) => {
             let _ = tokio::fs::remove_dir_all(&dir).await;
+            crate::core::events::list_changed("servers");
             Err(e)
         }
     }

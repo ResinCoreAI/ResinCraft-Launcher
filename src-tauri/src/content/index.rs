@@ -225,6 +225,8 @@ pub fn lenient_u64_zero<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<
 /// Removes a half-installed instance after a failed modpack install.
 pub async fn discard_instance(id: &str) {
     let _ = tokio::fs::remove_dir_all(paths::instance_dir(id)).await;
+    // Its card went up when the install began.
+    crate::core::events::list_changed("instances");
 }
 
 /// Removes a half-installed modpack instance when its install is cancelled (the work is dropped, so the install's

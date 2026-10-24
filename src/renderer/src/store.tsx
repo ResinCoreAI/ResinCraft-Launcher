@@ -48,6 +48,11 @@ interface Store {
   updateSettings: (p: Partial<Settings>) => Promise<void>
   instances: Instance[]
   refreshInstances: () => Promise<void>
+  /**
+   * Deletes instances without waiting: they leave every list at once and go to the Recycle Bin in the background.
+   * One the engine refuses (its game is running) comes back, with the reason. Resolves with the ids that failed.
+   */
+  removeInstances: (ids: string[]) => Promise<string[]>
   accounts: AccountView[]
   activeAccount?: AccountView
   refreshAccounts: () => Promise<void>
@@ -83,7 +88,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>({ page: 'home' })
   const [info, setInfo] = useState<AppInfo>()
   const [settings, setSettings] = useState<Settings>()
-  const [instances, setInstances] = useState<Instance[]>([])
+  const [allInstances, setInstances] = useState<Instance[]>([])
+  // Deleted from the UI, still being moved to the Recycle Bin: hidden everywhere until the engine is done.
+  const [removing, setRemoving] = useState<Set<string>>(new Set())
+  const instances = useMemo(() => (removing.size ? allInstances.filter((i) => !removing.has(i.id)) : allInstances), [allInstances, removing])
   const [accounts, setAccounts] = useState<AccountView[]>([])
   const [runs, setRuns] = useState<Record<string, Run[]>>({})
   // Play pressed, no "preparing" from the engine yet (it may be refreshing the account's token first).
@@ -109,7 +117,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const refreshInstances = useCallback(async () => setInstances(await api.instances.list()), [])
+  const removeInstances = useCallback(
+    async (ids: string[]) => {
+      setRemoving((r) => new Set([...r, ...ids]))
+      const failed: string[] = []
+      for (const id of ids) {
+        try {
+          await api.instances.remove(id)
+        } catch (e) {
+          failed.push(id)
+          toast((e as Error).message, 'error')
+        }
+      }
+      await refreshInstances().catch(() => {})
+      setRemoving((r) => new Set([...r].filter((id) => !ids.includes(id))))
+      return failed
+    },
+    [refreshInstances, toast]
+  )
   const refreshAccounts = useCallback(async () => setAccounts(await api.accounts.list()), [])
+  // An install put a new instance on disk (its card shows the install's progress), or a failed one took it away.
+  useEffect(() => api.on.listChanged((what) => what === 'instances' && void refreshInstances().catch(() => {})), [refreshInstances])
   // Shown at once (a switch flips as it's clicked), then saved; if saving fails, it goes back and the error is raised.
   const updateSettings = useCallback(async (p: Partial<Settings>) => {
     let before: Settings | undefined
@@ -263,6 +291,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateSettings,
       instances,
       refreshInstances,
+      removeInstances,
       accounts,
       activeAccount: accounts.find((a) => a.active) ?? accounts[0],
       refreshAccounts,
@@ -290,6 +319,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateSettings,
       instances,
       refreshInstances,
+      removeInstances,
       accounts,
       refreshAccounts,
       switchAccount,

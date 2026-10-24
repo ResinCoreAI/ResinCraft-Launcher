@@ -1,6 +1,7 @@
 // Fake server hosting for the browser preview (see mock.ts): a couple of servers, a simulated boot log,
 // console commands, players joining, and the router port opening.
 import type {
+  AntiXray,
   ServerRequestsEvent,
   AddonSource,
   BedrockJoin,
@@ -198,6 +199,7 @@ export function mockServers(): {
   const logListeners: Listener<ServerLogEvent>[] = []
   const requestListeners: Listener<ServerRequestsEvent>[] = []
   const timers: Record<string, number[]> = {}
+  const antiXray: Record<string, AntiXray> = {}
   let props: PropEntry[] = [
     ['motd', 'A Minecraft Server'],
     ['max-players', '20'],
@@ -588,6 +590,8 @@ export function mockServers(): {
       s.pendingDownloads = (s.pendingDownloads ?? []).filter((p) => p.fileName !== fileName)
       return s.pendingDownloads
     },
+    antiXray: async (id) => (['paper', 'purpur', 'folia', 'leaf'].includes(find(id).type) ? (antiXray[id] ?? { enabled: false, mode: 1 }) : null),
+    setAntiXray: async (id, v) => void (antiXray[id] = v),
     packFlags: async (id) => (find(id).modpack ? ['-Xmx6G', '-Xms6G', '-XX:+UseG1GC', '-Dfml.readTimeout=180'] : []),
     launchArgs: async (id) => {
       const s = find(id)

@@ -572,6 +572,8 @@ export function InstanceCard({
   // On a card in a selection of several, the menu (right-click and "…") is the selection's.
   const bulkItems = sel?.menuFor(inst)
   const state = games[inst.id]
+  // Work on the instance that isn't a launch: installing its modpack, reinstalling, switching its pack version.
+  const working = task && state !== 'preparing' && state !== 'running' ? task : undefined
   const ref = useRef<HTMLDivElement>(null)
   const dragged = useRef(false)
 
@@ -651,22 +653,28 @@ export function InstanceCard({
         )}
         {state === 'running' && <span className="chip success badge-live">● {t('library.card.running')}</span>}
         <button
-          className={`quick ${state === 'running' ? 'running busy' : state === 'preparing' ? 'busy' : ''}`}
-          title={state === 'running' ? t('common.stop') : t('common.play')}
+          className={`quick ${state === 'running' ? 'running busy' : state === 'preparing' || working ? 'busy' : ''}`}
+          title={working ? working.title : state === 'running' ? t('common.stop') : t('common.play')}
+          disabled={!!working}
           onClick={(e) => {
             e.stopPropagation()
             if (state === 'running') void stop(inst.id)
-            else if (state !== 'preparing') void play(inst.id)
+            else if (state !== 'preparing' && !working) void play(inst.id)
           }}
         >
-          {state === 'preparing' ? <Loader2 className="spin" /> : state === 'running' ? <Square fill="currentColor" /> : <Play fill="currentColor" />}
+          {state === 'preparing' || working ? <Loader2 className="spin" /> : state === 'running' ? <Square fill="currentColor" /> : <Play fill="currentColor" />}
         </button>
         <div className="body">
           <div className="row">
             <div className="grow">
               <div className="name ellipsis">{inst.name}</div>
               <div className="sub">
-                {state === 'preparing' ? (
+                {working ? (
+                  <span className="ellipsis" style={{ color: 'var(--accent)' }}>
+                    {working.title}
+                    {working.progress != null && ` · ${Math.round(working.progress * 100)}%`}
+                  </span>
+                ) : state === 'preparing' ? (
                   <span style={{ color: 'var(--accent)' }}>
                     {task?.progress != null ? t('library.card.preparingProgress', { percent: Math.round(task.progress * 100) }) : t('library.card.preparing')}
                   </span>
@@ -840,22 +848,18 @@ export function useInstanceMenu(inst: Instance) {
 }
 
 export function DeleteInstance({ inst, onClose, onDeleted }: { inst: Instance; onClose: () => void; onDeleted?: () => void }) {
-  const { refreshInstances, toast } = useStore()
+  const { removeInstances, toast } = useStore()
   return (
     <ConfirmModal
       title={t('library.delete.title', { name: inst.name })}
       body={<>{t('library.delete.body')}</>}
       confirm={t('library.delete.confirm')}
       onClose={onClose}
-      onConfirm={async () => {
-        try {
-          await api.instances.remove(inst.id)
-          await refreshInstances()
-          toast(t('library.delete.done', { name: inst.name }))
-          onDeleted?.()
-        } catch (e) {
-          toast((e as Error).message, 'error')
-        }
+      // Gone at once; the folder goes to the Recycle Bin in the background (it comes back if that fails).
+      onConfirm={() => {
+        toast(t('library.delete.done', { name: inst.name }))
+        onDeleted?.()
+        void removeInstances([inst.id])
       }}
     />
   )

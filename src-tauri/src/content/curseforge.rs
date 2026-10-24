@@ -914,6 +914,9 @@ pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance
         })
         .await?;
         let guard = InstanceGuard::new(&inst.id);
+        // On the Library at once, with this task's progress on its card.
+        task.set_instance(&inst.id);
+        crate::core::events::list_changed("instances");
         let result: Result<Instance> = async {
             let pending = fill_pack(&inst, &manifest, &archive, &task).await?;
             if !pending.is_empty() {

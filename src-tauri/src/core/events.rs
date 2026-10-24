@@ -75,6 +75,12 @@ pub fn emit<S: Serialize + Clone>(channel: &str, payload: S) {
     }
 }
 
+/// Tells the UI a list changed on disk ("instances" or "servers"): an install made a new entry, or one went. The UI
+/// fetches the list again.
+pub fn list_changed(what: &'static str) {
+    emit("listChanged", what);
+}
+
 /// A long-running job shown in the UI's task dock. Progress updates are throttled to ~10/s.
 pub struct Task {
     info: Mutex<TaskInfo>,
@@ -117,6 +123,17 @@ impl Task {
                 return;
             }
             *last = Instant::now();
+            info.clone()
+        };
+        emit("task", snapshot);
+    }
+
+    /// Ties the task to the instance (or server) it is making, once that has an id: the UI shows the task's progress
+    /// on its card, which appears at once (see `list_changed`).
+    pub fn set_instance(&self, id: &str) {
+        let snapshot = {
+            let mut info = self.info.lock().unwrap();
+            info.instance_id = Some(id.to_string());
             info.clone()
         };
         emit("task", snapshot);
