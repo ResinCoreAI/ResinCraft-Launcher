@@ -3058,3 +3058,262 @@ textarea.custom-css {
 .remote-dot.wait {
   background: var(--warning);
 }
+
+/* ---------- Halloween decorations (components/ThemeDecor.tsx) ----------
+ * Slow and occasional on purpose: the web draws itself in once and barely sways; the spider spends most of its
+ * cycle still, then lowers itself and climbs back; the pumpkin's candle flickers. Transforms and opacity only, no
+ * clicks taken, and nothing moves with reduced motion. */
+
+.hw-web-wrap {
+  position: fixed;
+  top: var(--titlebar);
+  right: 0;
+  width: 150px;
+  height: 260px;
+  pointer-events: none;
+  z-index: 5;
+}
+.hw-web {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform-origin: 100% 0;
+  animation: hw-sway 11s ease-in-out infinite alternate;
+}
+.hw-web path {
+  fill: none;
+  stroke: rgba(230, 218, 240, 0.28);
+  stroke-width: 0.8;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hw-spin-in 2.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s forwards;
+}
+@keyframes hw-spin-in {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes hw-sway {
+  from {
+    transform: rotate(-0.8deg);
+  }
+  to {
+    transform: rotate(0.6deg);
+  }
+}
+
+/* The spider hangs from a strand of the web, 58px in from the right. */
+.hw-spider {
+  position: absolute;
+  top: 34px;
+  right: 58px;
+  width: 26px;
+  opacity: 0;
+  animation: hw-appear 0.6s ease-out 2.2s forwards;
+}
+.hw-thread {
+  position: absolute;
+  left: 12.5px;
+  top: 0;
+  width: 1px;
+  height: 18px;
+  background: rgba(230, 218, 240, 0.45);
+  transform-origin: 50% 0;
+  animation: hw-thread 17s ease-in-out 3s infinite;
+}
+.hw-spider-move {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  display: block;
+  color: #c9b3d6;
+  animation: hw-drop 17s ease-in-out 3s infinite;
+  will-change: transform;
+}
+.hw-abdomen {
+  fill: #2a1833;
+  stroke: #c084fc;
+  stroke-width: 0.8;
+}
+.hw-head {
+  fill: #331e3d;
+  stroke: #c084fc;
+  stroke-width: 0.7;
+}
+.hw-eye {
+  fill: #9dff4f;
+  animation: hw-blink 6.5s steps(1) infinite;
+}
+/* A small, steady twitch of the legs, so it reads as alive even while it hangs still. */
+.hw-legs {
+  transform-origin: 13px 12px;
+  animation: hw-scuttle 0.9s ease-in-out infinite alternate;
+}
+@keyframes hw-appear {
+  to {
+    opacity: 1;
+  }
+}
+/* Still for a while, lower slowly, a little bounce at the bottom, rest, climb back, rest. */
+@keyframes hw-drop {
+  0%,
+  22% {
+    transform: translateY(0);
+  }
+  42% {
+    transform: translateY(92px);
+  }
+  47% {
+    transform: translateY(84px);
+  }
+  52%,
+  66% {
+    transform: translateY(90px);
+  }
+  86%,
+  100% {
+    transform: translateY(0);
+  }
+}
+/* The silk grows with the drop: 18px at rest, 18 + drop at the bottom (scaleY of an 18px line). */
+@keyframes hw-thread {
+  0%,
+  22% {
+    transform: scaleY(1);
+  }
+  42% {
+    transform: scaleY(6.1);
+  }
+  47% {
+    transform: scaleY(5.67);
+  }
+  52%,
+  66% {
+    transform: scaleY(6);
+  }
+  86%,
+  100% {
+    transform: scaleY(1);
+  }
+}
+@keyframes hw-scuttle {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes hw-blink {
+  0%,
+  92% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.1;
+  }
+  96% {
+    opacity: 1;
+  }
+}
+
+/* The jack-o'-lantern: its own row in the sidebar, above the account. */
+.hw-pumpkin {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+  pointer-events: none;
+}
+.hw-pumpkin svg {
+  position: relative;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+.hw-pumpkin-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90px;
+  height: 60px;
+  margin: -28px 0 0 -45px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 150, 40, 0.32), rgba(255, 150, 40, 0));
+  animation: hw-glow 3.4s ease-in-out infinite;
+}
+.hw-shell ellipse {
+  fill: #e8741a;
+}
+.hw-shell ellipse:nth-child(3) {
+  fill: #ff8c1a;
+}
+.hw-ribs path {
+  stroke: rgba(120, 45, 0, 0.45);
+  stroke-width: 1.2;
+}
+.hw-stem {
+  fill: #5a7d2a;
+}
+.hw-leaf {
+  fill: #8bd14e;
+}
+.hw-face path {
+  fill: #ffe08a;
+  animation: hw-candle 2.3s linear infinite;
+}
+/* An uneven flicker, the way a candle does it. */
+@keyframes hw-candle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 0.82;
+  }
+  22% {
+    opacity: 0.95;
+  }
+  51% {
+    opacity: 0.74;
+  }
+  55% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 0.88;
+  }
+}
+@keyframes hw-glow {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 0.6;
+    transform: scale(0.94);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hw-web,
+  .hw-web path,
+  .hw-spider,
+  .hw-thread,
+  .hw-spider-move,
+  .hw-eye,
+  .hw-legs,
+  .hw-face path,
+  .hw-pumpkin-glow {
+    animation: none;
+  }
+  .hw-web path {
+    stroke-dashoffset: 0;
+  }
+  .hw-spider {
+    opacity: 1;
+  }
+}

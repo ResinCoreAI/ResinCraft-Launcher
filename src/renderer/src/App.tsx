@@ -6,6 +6,7 @@ import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
 import { UpdateBanner, UpdateTitleButton } from './components/Updates'
 import { useRemoteActions } from './components/RemoteControl'
+import ThemeDecor, { SidebarPumpkin } from './components/ThemeDecor'
 import EasterEgg from './components/EasterEgg'
 import CrashFixer from './components/CrashFixer'
 import { PackUpdatesBanner } from './components/PackUpdates'
@@ -124,6 +125,7 @@ export default function App() {
           ))}
         </div>
 
+        <SidebarPumpkin />
         <button
           className="account-chip"
           title={accounts.length ? t('account.switch') : undefined}
@@ -188,6 +190,7 @@ export default function App() {
       <UpdateBanner />
       <CrashFixer />
       <EasterEgg />
+      <ThemeDecor />
       <PackUpdatesBanner />
       <RelayWatcher />
       <ContextMenuHost />
