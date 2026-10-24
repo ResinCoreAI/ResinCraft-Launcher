@@ -1131,6 +1131,8 @@ export interface ServerInfo {
   packFlags?: boolean
   /** Files the server needs whose authors only allow downloads from their website (looked for before each start). */
   pendingDownloads?: PendingDownload[]
+  /** Made from a modpack with no official server pack: ResinCraft built the server from the pack's file list. */
+  builtPack?: boolean
   /** Whitelist requests through the host's Discord bot or the relay's web page. */
   joinRequests?: JoinRequestsConfig
   /** How the server is shared over the internet. The relay is always the last resort. */
@@ -1173,6 +1175,8 @@ export interface ServerCreated {
   /** Client-only mods that were left out. */
   dropped: string[]
   pending: PendingDownload[]
+  /** The pack has no official server pack, so ResinCraft built the server from its file list. */
+  builtPack: boolean
 }
 
 export type ServerPatch = Partial<

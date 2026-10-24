@@ -500,6 +500,7 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
         layers,
         pending,
         index: vec![],
+        server_pack: false,
     })
 }
 

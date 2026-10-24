@@ -78,6 +78,8 @@ pub async fn switch_pack(id: &str, version_id: &str) -> Result<PackSwitch> {
         if let Some(m) = meta.modpack.as_mut() {
             m.version_id = Some(sw.target.version_id.clone());
         }
+        meta.built_pack = !sw.target.server_pack;
+        meta.pending_downloads = sw.pending();
         store::save(&meta).await?;
         // The pack's own loader version, as when the server was created.
         set_software(&mut meta, &d, &sw.target.mc_version, sw.target.loader, sw.target.loader_version.clone(), &task).await?;

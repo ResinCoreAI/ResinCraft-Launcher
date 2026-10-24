@@ -883,6 +883,7 @@ pub(crate) async fn pack_target(version_id: &str, work: &Path, task: &Arc<Task>,
         layers: vec![Layer::new(dest.clone(), "overrides/"), Layer::new(dest, if side == Side::Server { "server-overrides/" } else { "client-overrides/" })],
         pending: vec![],
         index: vec![],
+        server_pack: false,
     })
 }
 

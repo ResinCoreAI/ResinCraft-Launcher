@@ -525,6 +525,7 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
         layers: zips.into_iter().map(|zip| Layer { zip, prefix: String::new(), to: String::new(), skip_bin: true }).collect(),
         pending: vec![],
         index: vec![],
+        server_pack: false,
     })
 }
 

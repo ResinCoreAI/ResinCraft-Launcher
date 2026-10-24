@@ -379,6 +379,7 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, side: Side) 
         layers: vec![],
         pending,
         index: vec![],
+        server_pack: false,
     })
 }
 

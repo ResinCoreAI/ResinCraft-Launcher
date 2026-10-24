@@ -147,6 +147,7 @@ export function mockServers(): {
       createdAt: now - 2e9,
       modpack: { name: 'Create: Above and Beyond', projectId: MOCK_PACK, versionId: 'tech-1.5.0' },
       launch: { jar: 'fabric-server-launch.jar' },
+      builtPack: true,
       pendingDownloads: [{ title: 'Species', fileName: 'species-3.5.jar', url: 'https://www.curseforge.com/minecraft/mc-mods/species/files/5016536', folder: 'mods' }]
     },
     {
@@ -437,11 +438,13 @@ export function mockServers(): {
         createdAt: Date.now(),
         eulaAccepted: false,
         tunnel: 'playit',
-        ...(data.source ? { modpack: { name: data.name || 'Modpack' } } : {})
+        ...(data.source ? { modpack: { name: data.name || 'Modpack' } } : {}),
+        // Modpacks from the mock catalogue have no official server pack.
+        ...(data.source && data.source.kind !== 'instance' ? { builtPack: true } : {})
       }
       await wait(null, 1500)
       servers = [s, ...servers]
-      return { server: s, dropped: data.source?.kind === 'instance' ? ['Sodium', 'Iris Shaders', 'Mod Menu'] : [], pending: [] }
+      return { server: s, dropped: data.source?.kind === 'instance' ? ['Sodium', 'Iris Shaders', 'Mod Menu'] : [], pending: [], builtPack: !!s.builtPack }
     },
     update: async (id, p) => {
       patch(id, p)

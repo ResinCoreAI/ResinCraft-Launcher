@@ -104,6 +104,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         relay_name: None,
         relay_account: None,
         pending_downloads: Vec::new(),
+        built_pack: false,
     };
     tokio::fs::create_dir_all(&dir).await?;
     store::save(&meta).await?;
@@ -115,6 +116,9 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         _ => None,
     };
     let pack_version = plan.modpack.as_ref().and_then(|m| m.version_id.clone()).filter(|_| from_instance.is_none());
+    // A modpack without an official server pack: ResinCraft builds the server from the pack's file list.
+    let built_pack = plan.modpack.is_some()
+        && matches!(&plan.content, Content::Mrpack(_) | Content::Ftb(_) | Content::Curseforge { server_pack: None, .. });
     let content = plan.content;
     let dir2 = dir.clone();
     let result = Task::run(format!("Creating {name}"), Some(id.clone()), move |task| async move {
@@ -128,6 +132,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         }
         installers::install(&mut meta, &dir2, &task).await?;
         meta.pending_downloads = pending.clone();
+        meta.built_pack = built_pack;
         if !memory_chosen {
             meta.memory_mb = memory_for(&dir2.join("mods"), meta.memory_mb, total);
         }
@@ -143,7 +148,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         let _ = tokio::fs::remove_file(t).await;
     }
     match result {
-        Ok((meta, dropped, pending)) => Ok(ServerCreated { server: store::info(meta).await, dropped, pending }),
+        Ok((meta, dropped, pending)) => Ok(ServerCreated { server: store::info(meta).await, dropped, pending, built_pack }),
         Err(e) => {
             let _ = tokio::fs::remove_dir_all(&dir).await;
             Err(e)

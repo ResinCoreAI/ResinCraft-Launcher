@@ -1035,6 +1035,7 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
         layers: vec![],
         pending: vec![],
         index: vec![],
+        server_pack: false,
     };
     if side == Side::Server {
         if let Some(sp_id) = pack.server_pack_file_id.filter(|v| *v > 0) {
@@ -1051,7 +1052,7 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
                     Ok(if tops.len() == 1 && names.iter().all(|n| n.contains('/')) { format!("{}/", tops.into_iter().next().unwrap_or_default()) } else { String::new() })
                 })
                 .await??;
-                return Ok(PackTarget { layers: vec![Layer::new(zip, prefix)], ..base });
+                return Ok(PackTarget { layers: vec![Layer::new(zip, prefix)], server_pack: true, ..base });
             }
         }
     }
@@ -1064,12 +1065,10 @@ pub(crate) async fn pack_target(project_id: &str, version_id: &str, work: &Path,
     for f in &file_list {
         let m = mod_list.iter().find(|m| m.id == f.mod_id);
         let class = m.and_then(|m| m.class_id).unwrap_or(class_of(ContentKind::Mod));
-        if side == Side::Server {
-            // Only mods go to a server, and not those tagged as client-only.
-            let tags: Vec<String> = f.game_versions.iter().map(|t| t.to_lowercase()).collect();
-            if class != class_of(ContentKind::Mod) || (tags.iter().any(|t| t == "client") && !tags.iter().any(|t| t == "server")) {
-                continue;
-            }
+        // Only mods go to a server; client-only ones too (one that crashes the server is turned off then, see
+        // server/clientmods.rs).
+        if side == Side::Server && class != class_of(ContentKind::Mod) {
+            continue;
         }
         let folder = folder_of_class(class);
         let path = format!("{folder}/{}", safe_name(&f.file_name)?);

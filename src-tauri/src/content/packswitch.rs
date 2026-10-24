@@ -83,6 +83,8 @@ pub struct PackTarget {
     pub pending: Vec<PendingDownload>,
     /// Content index entries for downloaded files, by path (CurseForge knows them up front).
     pub index: Vec<(String, IndexEntry)>,
+    /// The files are the pack author's own server pack (else ResinCraft builds the server from the pack's list).
+    pub server_pack: bool,
 }
 
 /// Which side of the game a pack version is wanted for: an instance (client) or a hosted server.

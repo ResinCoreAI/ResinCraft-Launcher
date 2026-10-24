@@ -967,6 +967,10 @@ pub struct ServerMeta {
     /// looks for them (kept copies, the same pack's instances, Downloads) and puts the ones it finds in place.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pending_downloads: Vec<PendingDownload>,
+    /// Made from a modpack that has no official server pack: ResinCraft built the server from the pack's own
+    /// file list, client-only mods included (the server page says so).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub built_pack: bool,
     /// How the server is shared over the internet when `public` is on.
     #[serde(default)]
     pub tunnel: TunnelMode,
@@ -1296,6 +1300,8 @@ pub struct ServerCreated {
     pub dropped: Vec<String>,
     /// Files the pack author only allows from their website.
     pub pending: Vec<PendingDownload>,
+    /// The pack has no official server pack, so ResinCraft built the server from its file list.
+    pub built_pack: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

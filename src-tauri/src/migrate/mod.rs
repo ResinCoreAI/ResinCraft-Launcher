@@ -638,6 +638,7 @@ async fn import_server(f: Found, task: &std::sync::Arc<Task>, progress: &impl Fn
         relay_name: None,
         relay_account: None,
         pending_downloads: Vec::new(),
+        built_pack: false,
     };
     if port != wanted {
         let _ = crate::server::properties::set_values(&dir, &[("server-port", port.to_string())]).await;

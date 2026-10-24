@@ -114,7 +114,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
             setCreating(false)
             await load()
             toast(t('servers.create.done', { name: r.server.name }))
-            if (r.dropped.length || r.pending.length) setCreated(r)
+            if (r.dropped.length || r.pending.length || r.builtPack) setCreated(r)
             go({ page: 'servers', id: r.server.id })
           }}
         />
@@ -1551,6 +1551,12 @@ function CreatedSummary({ result, onClose }: { result: ServerCreated; onClose: (
         </button>
       }
     >
+      {result.builtPack && (
+        <div className="field">
+          <label>{t('servers.builtPack.title')}</label>
+          <span className="hint">{t('servers.builtPack.body')}</span>
+        </div>
+      )}
       {result.dropped.length > 0 && (
         <div className="field">
           <label>{t('servers.created.dropped', { count: result.dropped.length })}</label>

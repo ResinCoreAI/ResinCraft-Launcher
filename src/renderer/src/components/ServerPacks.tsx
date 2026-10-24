@@ -1,7 +1,7 @@
 // A hosted server and what it was made from: a modpack (change its version, like an instance) or an instance
 // ("Sync from <instance>", with a preview of what changes). The engine side is src-tauri/src/server/packs.rs.
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowUpCircle, Gamepad2, Loader2, RefreshCw } from 'lucide-react'
+import { ArrowUpCircle, Gamepad2, Hammer, Loader2, RefreshCw } from 'lucide-react'
 import type { ServerInfo, ServerOrigin, SyncPreview } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -52,7 +52,17 @@ export function ServerOriginChips({ s, reload }: { s: ServerInfo; reload: () => 
         )}
       </>
     )
-  if (s.modpack) return <PackChip owner={serverOwner(s)} after={reload} />
+  if (s.modpack)
+    return (
+      <>
+        <PackChip owner={serverOwner(s)} after={reload} />
+        {s.builtPack && (
+          <span className="chip" title={t('servers.builtPack.body')}>
+            <Hammer /> {t('servers.builtPack.chip')}
+          </span>
+        )}
+      </>
+    )
   return null
 }
 
