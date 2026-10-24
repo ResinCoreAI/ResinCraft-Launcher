@@ -19,12 +19,15 @@ How to do the most common things in ResinCraft. Names in **bold** are what you'l
 11. [Bedrock Edition](#11-bedrock-edition)
 12. [Move from another launcher](#12-move-from-another-launcher)
 13. [Updates and the system tray](#13-updates-and-the-system-tray)
-14. [Troubleshooting](#14-troubleshooting)
+14. [Themes and custom CSS](#14-themes-and-custom-css)
+15. [Remote control (web console)](#15-remote-control-web-console)
+16. [Reinstall and repair](#16-reinstall-and-repair)
+17. [Troubleshooting](#17-troubleshooting)
 
 ## 1. Install and sign in
 
 1. Download ResinCraft for your system from the [Releases page](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
-   - **Windows:** `…_amd64_windows.exe`
+   - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (always installs the newest version), or `…_amd64_windows.exe` / `…_amd64_windows.msi`
    - **macOS:** `…_universal_macos.dmg`
    - **Linux:** `.AppImage`, `.deb` or `.tar.gz`
 2. Install and open it. Windows may say the publisher is unverified; on macOS, right-click the app and choose **Open** the first time.
@@ -60,7 +63,7 @@ Some CurseForge authors don't allow launchers to download their files. ResinCraf
 
 1. Open **Discover** → **Modpacks** (or **Library** → **New instance** → **Download a modpack**).
 2. Open a pack to see its description, its versions and the **Mods** it contains.
-3. Press **Install pack**. ResinCraft makes a new instance with everything in it.
+3. Press **Install pack**. The new instance shows in the **Library** straight away, with the install's progress on its card; **Play** works once it's done.
 4. When the pack gets an update, ResinCraft tells you; you can also pick another pack version on the instance page.
 
 ## 5. Change the Minecraft version or mod loader
@@ -115,7 +118,11 @@ On a server's page:
   - the server icon.
 - **Restart** and the **⋯** menu (copy address, open folder, back up now, delete).
 
-Mods that only run on the game client (shaders, minimaps…) are turned off on servers automatically. You can see them in the **Mods** tab and turn them back on if you need.
+- **Settings → Anti-xray** (Paper, Purpur, Folia, Leaf): hide ores from x-ray mods and texture packs. **Hide ores** is light on the server; **Fake ores** is stronger. It takes effect on the next start.
+
+Mods that only run on the game client (shaders, minimaps…) stay on the server as long as it starts fine. If one crashes it, ResinCraft turns that mod off and starts the server again; the **Mods** tab can turn it back on.
+
+When a modpack has no official server pack, ResinCraft builds the server from the pack's own mod list: the window after **Create** says so, and the server shows a **Built by ResinCraft** badge. Some pack files can only be downloaded from their author's website. They're listed at the top of the **Console** tab, with **Get file**. Download them in your browser and ResinCraft puts them in place before the next start, or press **Look again**.
 
 ## 9. Let friends join your server
 
@@ -176,10 +183,41 @@ Their mods, worlds and settings come with them. The originals stay where they ar
   - Closing the window keeps ResinCraft running: servers, the Discord bot and downloads go on.
   - Click the tray icon to open it again; right-click → **Quit ResinCraft** to quit for real.
 
-## 14. Troubleshooting
+## 14. Themes and custom CSS
 
-- **The game won't start:** look at the **Minecraft crashed** window (section 6), or the instance's **Logs** tab.
+1. Open **Settings → Appearance → Theme** and pick a card: **System**, Dark, Light, Obsidian, Deepslate, Cherry, Nether, The End, Halloween or Christmas.
+2. **Holiday themes:**
+   - Halloween turns on by itself from 16 to 31 October, Christmas from 10 to 25 December. Your own theme comes back the day after.
+   - Rather keep yours? Press **Use my theme** on the banner, or pick another card: it stays yours for that holiday.
+   - Turn **Holiday themes** off to stop it altogether.
+3. **Custom CSS:** press **Insert current colours**, change any colour, then **Apply**. It works over any theme; **Clear** removes it.
+
+Psst: try the Konami code (↑ ↑ ↓ ↓ ← → ← → B A), or click the ResinCraft logo seven times.
+
+## 15. Remote control (web console)
+
+Run your servers from any browser, or from your phone.
+
+1. Sign in with a Microsoft account in **Accounts**.
+2. Turn on **Settings → Remote control → Allow remote control**. When it says **Connected as …**, you're ready.
+3. Turn on **Keep running in the system tray** (section 13), so it keeps working after you close the window.
+4. Open `https://console.rscraft.resincore.tech` (or press **Open the web console**) and sign in with the **same Minecraft account**.
+
+From the console you can start, stop and restart servers, watch the console and type commands, manage players, back up, and make new servers. It can't reach your files, Java settings or anything else on your PC. Each change shows as a note in ResinCraft.
+
+## 16. Reinstall and repair
+
+- **An instance won't start because files are missing or broken:**
+  - Right-click it in the **Library** → **Reinstall** → **Game files**, or open its **Settings → Repair**.
+  - Minecraft, the mod loader, libraries and assets download again. Worlds, mods and settings stay.
+- **A modpack's files were changed or deleted:** **Reinstall** → **Modpack files** puts the pack's mods, configs and scripts back. Files you changed are backed up first; worlds and your own mods stay.
+- **A server:** its **⋯** menu → **Reinstall** → **Server software** (or **Modpack files** for a modpack server). The world, settings and player lists stay.
+- **ResinCraft itself:** **Settings → Updates → Reinstall ResinCraft** installs the app again over itself.
+
+## 17. Troubleshooting
+
+- **The game won't start:** look at the **Minecraft crashed** window (section 6), or the instance's **Logs** tab. Files missing or broken? Reinstall them (section 16).
 - **A mod doesn't show in Discover:** it may not exist for your Minecraft version or loader. Try another version, or change the instance's version (section 5).
 - **Friends can't join:** check the address on the server's **Console** tab and that the server says **Running**. With ResinCraft Relay, make sure you're signed in with a Microsoft account.
-- **The server crashes on start:** if a client-only mod caused it, ResinCraft turns that mod off and starts the server again. Look at the **Console** for the line that says which mod it turned off.
+- **The server crashes on start:** if a client-only mod caused it, ResinCraft turns that mod off and starts the server again. Look at the **Console** for the line that says which mod it turned off. If it says files are missing, get them from the list at the top of the **Console** tab.
 - **Still stuck?** Report a problem on [GitHub](https://github.com/ResinCoreAI/ResinCraft-Launcher/issues) with the log from the **Logs** tab.

@@ -19,12 +19,15 @@ Come fare le cose più comuni in ResinCraft. I nomi in **grassetto** sono quelli
 11. [Bedrock Edition](#11-bedrock-edition)
 12. [Trasferisciti da un altro launcher](#12-trasferisciti-da-un-altro-launcher)
 13. [Aggiornamenti e area di notifica](#13-aggiornamenti-e-area-di-notifica)
-14. [Risoluzione dei problemi](#14-risoluzione-dei-problemi)
+14. [Temi e CSS personalizzato](#14-temi-e-css-personalizzato)
+15. [Controllo remoto (console web)](#15-controllo-remoto-console-web)
+16. [Reinstalla e ripara](#16-reinstalla-e-ripara)
+17. [Risoluzione dei problemi](#17-risoluzione-dei-problemi)
 
 ## 1. Installa e accedi
 
 1. Scarica ResinCraft per il tuo sistema dalla [pagina delle release](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
-   - **Windows:** `…_amd64_windows.exe`
+   - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (installa sempre la versione più recente), oppure `…_amd64_windows.exe` / `…_amd64_windows.msi`
    - **macOS:** `…_universal_macos.dmg`
    - **Linux:** `.AppImage`, `.deb` o `.tar.gz`
 2. Installalo e aprilo. Windows potrebbe dire che l’editore non è verificato; su macOS, la prima volta fai clic destro sull’app e scegli **Apri**.
@@ -60,7 +63,7 @@ Alcuni autori di CurseForge non permettono ai launcher di scaricare i loro file.
 
 1. Apri **Scopri** → **Modpack** (oppure **Libreria** → **Nuova istanza** → **Scarica un modpack**).
 2. Apri un pack per vedere la descrizione, le versioni e le **Mod** che contiene.
-3. Premi **Installa modpack**. ResinCraft crea una nuova istanza con tutto dentro.
+3. Premi **Installa modpack**. La nuova istanza compare subito nella **Libreria**, con l’avanzamento dell’installazione sulla sua scheda; **Gioca** funziona quando ha finito.
 4. Quando il pack riceve un aggiornamento, ResinCraft te lo dice; puoi anche scegliere un’altra versione del pack nella pagina dell’istanza.
 
 ## 5. Cambia la versione di Minecraft o il mod loader
@@ -115,7 +118,11 @@ Nella pagina di un server:
   - l’icona del server.
 - **Riavvia** e il menu **⋯** (copia indirizzo, apri cartella, backup ora, elimina).
 
-Le mod che funzionano solo sul client del gioco (shader, minimappe…) vengono disattivate in automatico sui server. Le vedi nella scheda **Mods** e puoi riattivarle se ti servono.
+- **Settings → Anti-xray** (impostazioni → anti-xray; Paper, Purpur, Folia, Leaf): nascondi i minerali alle mod e ai pacchetti di texture x-ray. **Hide ores** (nascondi minerali) pesa poco sul server; **Fake ores** (minerali finti) è più efficace. Vale dal prossimo avvio.
+
+Le mod che funzionano solo sul client del gioco (shader, minimappe…) restano sul server finché si avvia senza problemi. Se una lo manda in crash, ResinCraft disattiva quella mod e riavvia il server; dalla scheda **Mods** puoi riattivarla.
+
+Quando un modpack non ha un server pack ufficiale, ResinCraft costruisce il server dall’elenco di mod del pack: la finestra dopo **Create** (crea) te lo dice, e il server mostra il badge **Built by ResinCraft** (creato da ResinCraft). Alcuni file del pack si possono scaricare solo dal sito del loro autore. Sono elencati in cima alla scheda **Console**, con **Get file** (scarica il file). Scaricali con il browser e ResinCraft li mette al loro posto prima del prossimo avvio, oppure premi **Look again** (cerca di nuovo).
 
 ## 9. Fai entrare gli amici nel tuo server
 
@@ -176,10 +183,41 @@ Mod, mondi e impostazioni vengono con loro. Gli originali restano dove sono.
   - Chiudendo la finestra ResinCraft resta attivo: server, bot Discord e download continuano.
   - Fai clic sull’icona nell’area di notifica per riaprirlo; clic destro → **Quit ResinCraft** (esci da ResinCraft) per chiuderlo davvero.
 
-## 14. Risoluzione dei problemi
+## 14. Temi e CSS personalizzato
 
-- **Il gioco non parte:** guarda la finestra **Minecraft si è chiuso per errore** (sezione 6) o la scheda **Log** dell’istanza.
+1. Apri **Impostazioni → Aspetto → Tema** e scegli una scheda: **Sistema**, Scuro, Chiaro, Ossidiana, Ardesia abissale, Ciliegio, Nether, L’End, Halloween o Natale.
+2. **Temi delle feste:**
+   - Halloween si attiva da solo dal 16 al 31 ottobre, Natale dal 10 al 25 dicembre. Il tuo tema torna il giorno dopo.
+   - Preferisci tenere il tuo? Premi **Usa il mio tema** sul banner, oppure scegli un’altra scheda: resta la tua per quella festa.
+   - Disattiva **Temi delle feste** per non averli più.
+3. **CSS personalizzato:** premi **Inserisci i colori attuali**, cambia i colori che vuoi, poi premi **Applica**. Funziona sopra qualsiasi tema; **Svuota** lo rimuove.
+
+Psst: prova il codice Konami (↑ ↑ ↓ ↓ ← → ← → B A), oppure fai clic sette volte sul logo di ResinCraft.
+
+## 15. Controllo remoto (console web)
+
+Gestisci i tuoi server da qualsiasi browser, o dal telefono.
+
+1. Accedi con un account Microsoft in **Account**.
+2. Attiva **Impostazioni → Controllo remoto → Consenti il controllo remoto**. Quando dice **Connesso come …**, sei pronto.
+3. Attiva **Resta nell’area di notifica** (sezione 13), così continua a funzionare anche dopo che chiudi la finestra.
+4. Apri `https://console.rscraft.resincore.tech` (oppure premi **Apri la console web**) e accedi con **lo stesso account Minecraft**.
+
+Dalla console puoi avviare, fermare e riavviare i server, seguire la console e scrivere comandi, gestire i giocatori, fare backup e creare nuovi server. Non può arrivare ai tuoi file, alle impostazioni di Java o a nient’altro sul tuo PC. Ogni modifica compare come notifica in ResinCraft.
+
+## 16. Reinstalla e ripara
+
+- **Un’istanza non parte perché mancano file o sono danneggiati:**
+  - Fai clic destro su di essa nella **Libreria** → **Reinstalla** → **File del gioco**, oppure apri le sue **Impostazioni → Ripara**.
+  - Minecraft, il mod loader, le librerie e le risorse vengono scaricati di nuovo. Mondi, mod e impostazioni restano.
+- **I file di un modpack sono stati modificati o eliminati:** **Reinstalla** → **File del modpack** rimette le mod, le configurazioni e gli script del pack. I file che hai modificato vengono salvati prima; i mondi e le tue mod restano.
+- **Un server:** il suo menu **⋯** → **Reinstalla** → **Software del server** (oppure **File del modpack** per un server da modpack). Mondo, impostazioni e liste dei giocatori restano.
+- **ResinCraft stesso:** **Impostazioni → Aggiornamenti → Reinstalla ResinCraft** reinstalla l’app sopra sé stessa.
+
+## 17. Risoluzione dei problemi
+
+- **Il gioco non parte:** guarda la finestra **Minecraft si è chiuso per errore** (sezione 6) o la scheda **Log** dell’istanza. Mancano file o sono danneggiati? Reinstallali (sezione 16).
 - **Una mod non compare in Scopri:** forse non esiste per la tua versione di Minecraft o per il tuo loader. Prova un’altra versione, o cambia la versione dell’istanza (sezione 5).
 - **Gli amici non riescono a entrare:** controlla l’indirizzo nella scheda **Console** del server e che il server dica **Running** (in esecuzione). Con ResinCraft Relay, assicurati di aver fatto l’accesso con un account Microsoft.
-- **Il server va in crash all’avvio:** ResinCraft disattiva da solo le mod solo client e lo riavvia. Cerca nella **Console** la riga che dice quale mod ha disattivato.
+- **Il server va in crash all’avvio:** ResinCraft disattiva da solo le mod solo client e lo riavvia. Cerca nella **Console** la riga che dice quale mod ha disattivato. Se dice che mancano dei file, prendili dall’elenco in cima alla scheda **Console**.
 - **Ancora bloccato?** Segnala un problema su [GitHub](https://github.com/ResinCoreAI/ResinCraft-Launcher/issues) allegando il log della scheda **Log**.

@@ -19,12 +19,15 @@ Cara melakukan hal-hal yang paling umum di ResinCraft. Nama yang **ditebalkan** 
 11. [Bedrock Edition](#11-bedrock-edition)
 12. [Pindah dari launcher lain](#12-pindah-dari-launcher-lain)
 13. [Pembaruan dan system tray](#13-pembaruan-dan-system-tray)
-14. [Pemecahan masalah](#14-pemecahan-masalah)
+14. [Tema dan CSS kustom](#14-tema-dan-css-kustom)
+15. [Kendali jarak jauh (konsol web)](#15-kendali-jarak-jauh-konsol-web)
+16. [Instal ulang dan perbaiki](#16-instal-ulang-dan-perbaiki)
+17. [Pemecahan masalah](#17-pemecahan-masalah)
 
 ## 1. Pasang dan masuk
 
 1. Unduh ResinCraft untuk sistem Anda dari [halaman Releases](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
-   - **Windows:** `…_amd64_windows.exe`
+   - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (selalu memasang versi terbaru), atau `…_amd64_windows.exe` / `…_amd64_windows.msi`
    - **macOS:** `…_universal_macos.dmg`
    - **Linux:** `.AppImage`, `.deb`, atau `.tar.gz`
 2. Pasang lalu buka. Windows mungkin bilang penerbitnya belum terverifikasi; di macOS, klik kanan aplikasinya dan pilih **Buka** saat pertama kali.
@@ -60,7 +63,7 @@ Beberapa pembuat mod di CurseForge tidak mengizinkan launcher mengunduh file mer
 
 1. Buka **Jelajahi** → **Modpack** (atau **Pustaka** → **Instalasi baru** → **Unduh modpack**).
 2. Buka sebuah paket untuk melihat deskripsi, versi, dan **Mod** yang ada di dalamnya.
-3. Tekan **Pasang paket**. ResinCraft membuat instalasi baru yang sudah berisi semuanya.
+3. Tekan **Pasang paket**. Instalasi baru langsung muncul di **Pustaka**, dengan progres pemasangan di kartunya; **Main** bisa dipakai setelah selesai.
 4. Saat paket mendapat pembaruan, ResinCraft akan memberi tahu Anda; Anda juga bisa memilih versi paket lain di halaman instalasi.
 
 ## 5. Ganti versi Minecraft atau pemuat mod
@@ -115,7 +118,11 @@ Di halaman server:
   - ikon server.
 - **Mulai ulang** dan menu **⋯** (salin alamat, buka folder, cadangkan sekarang, hapus).
 
-Mod yang hanya berjalan di klien game (shader, minimap…) otomatis dimatikan di server. Anda bisa melihatnya di tab **Mods** dan menyalakannya lagi jika perlu.
+- **Settings → Anti-xray** (pengaturan → anti-xray; Paper, Purpur, Folia, Leaf): sembunyikan bijih dari mod dan texture pack x-ray. **Hide ores** (sembunyikan bijih) ringan untuk server; **Fake ores** (bijih palsu) lebih kuat. Berlaku saat server dimulai berikutnya.
+
+Mod yang hanya berjalan di klien game (shader, minimap…) tetap ada di server selama server bisa mulai dengan baik. Jika salah satunya membuat server crash, ResinCraft mematikan mod itu dan memulai server lagi; tab **Mods** bisa menyalakannya kembali.
+
+Jika modpack tidak punya paket server resmi, ResinCraft membangun server dari daftar mod paket itu sendiri: jendela setelah **Create** memberi tahu hal ini, dan server menampilkan lencana **Built by ResinCraft** (dibangun oleh ResinCraft). Beberapa file paket hanya bisa diunduh dari situs web pembuatnya. File-file itu tercantum di bagian atas tab **Console**, dengan **Get file** (ambil file). Unduh lewat browser Anda dan ResinCraft menaruhnya di tempatnya sebelum server dimulai berikutnya, atau tekan **Look again** (cari lagi).
 
 ## 9. Ajak teman masuk ke server Anda
 
@@ -176,10 +183,41 @@ Mod, dunia, dan pengaturannya ikut terbawa. Yang asli tetap di tempatnya.
   - Menutup jendela tidak menghentikan ResinCraft: server, bot Discord, dan unduhan tetap berjalan.
   - Klik ikon tray untuk membukanya lagi; klik kanan → **Quit ResinCraft** (keluar dari ResinCraft) untuk benar-benar keluar.
 
-## 14. Pemecahan masalah
+## 14. Tema dan CSS kustom
 
-- **Game tidak mau mulai:** lihat jendela **(nama instalasi) crash** (bagian 6), atau tab **Log** instalasi.
+1. Buka **Pengaturan → Tampilan → Tema** dan pilih kartu: **Sistem**, Gelap, Terang, Obsidian, Deepslate, Ceri, Nether, The End, Halloween, atau Natal.
+2. **Tema hari raya:**
+   - Halloween aktif sendiri dari 16 sampai 31 Oktober, Natal dari 10 sampai 25 Desember. Tema Anda sendiri kembali sehari setelahnya.
+   - Lebih suka tema Anda sendiri? Tekan **Pakai temaku** di banner, atau pilih kartu lain: tema itu tetap milik Anda selama hari raya tersebut.
+   - Matikan **Tema hari raya** untuk menghentikannya sama sekali.
+3. **CSS kustom:** tekan **Sisipkan warna saat ini**, ubah warna mana saja, lalu tekan **Terapkan**. Ini berlaku di atas tema apa pun; **Hapus** menghilangkannya.
+
+Psst: coba kode Konami (↑ ↑ ↓ ↓ ← → ← → B A), atau klik logo ResinCraft tujuh kali.
+
+## 15. Kendali jarak jauh (konsol web)
+
+Jalankan server Anda dari browser mana saja, atau dari ponsel.
+
+1. Masuk dengan akun Microsoft di **Akun**.
+2. Nyalakan **Pengaturan → Kendali jarak jauh → Izinkan kendali jarak jauh**. Saat muncul **Terhubung sebagai …**, semuanya siap.
+3. Nyalakan **Tetap berjalan di system tray** (bagian 13), agar tetap berfungsi setelah jendela ditutup.
+4. Buka `https://console.rscraft.resincore.tech` (atau tekan **Buka konsol web**) dan masuk dengan **akun Minecraft yang sama**.
+
+Dari konsol, Anda bisa memulai, menghentikan, dan memulai ulang server, memantau konsol dan mengetik perintah, mengelola pemain, membuat cadangan, dan membuat server baru. Konsol ini tidak bisa mengakses file, pengaturan Java, atau apa pun di PC Anda. Setiap perubahan muncul sebagai catatan di ResinCraft.
+
+## 16. Instal ulang dan perbaiki
+
+- **Instalasi tidak mau mulai karena file hilang atau rusak:**
+  - Klik kanan instalasi itu di **Pustaka** → **Instal ulang** → **File game**, atau buka **Pengaturan → Perbaiki**-nya.
+  - Minecraft, pemuat mod, library, dan aset diunduh lagi. Dunia, mod, dan pengaturan tetap ada.
+- **File modpack diubah atau dihapus:** **Instal ulang** → **File modpack** mengembalikan mod, config, dan skrip paket. File yang Anda ubah dicadangkan dulu; dunia dan mod Anda sendiri tetap ada.
+- **Server:** menu **⋯**-nya → **Instal ulang** → **Software server** (atau **File modpack** untuk server modpack). Dunia, pengaturan, dan daftar pemain tetap ada.
+- **ResinCraft itu sendiri:** **Pengaturan → Pembaruan → Instal ulang ResinCraft** memasang ulang aplikasi di atas dirinya sendiri.
+
+## 17. Pemecahan masalah
+
+- **Game tidak mau mulai:** lihat jendela **(nama instalasi) crash** (bagian 6), atau tab **Log** instalasi. File hilang atau rusak? Instal ulang (bagian 16).
 - **Mod tidak muncul di Jelajahi:** mungkin mod itu tidak tersedia untuk versi Minecraft atau loader Anda. Coba versi lain, atau ganti versi instalasi (bagian 5).
 - **Teman tidak bisa bergabung:** periksa alamat di tab **Console** server dan pastikan server menunjukkan **Running** (berjalan). Dengan ResinCraft Relay, pastikan Anda sudah masuk dengan akun Microsoft.
-- **Server crash saat dimulai:** ResinCraft mematikan mod khusus klien dengan sendirinya lalu memulainya lagi. Cari baris di **Console** yang menyebutkan mod mana yang dimatikan.
+- **Server crash saat dimulai:** ResinCraft mematikan mod khusus klien dengan sendirinya lalu memulainya lagi. Cari baris di **Console** yang menyebutkan mod mana yang dimatikan. Jika disebutkan ada file yang hilang, ambil dari daftar di bagian atas tab **Console**.
 - **Masih buntu?** Laporkan masalah di [GitHub](https://github.com/ResinCoreAI/ResinCraft-Launcher/issues) beserta log dari tab **Log**.

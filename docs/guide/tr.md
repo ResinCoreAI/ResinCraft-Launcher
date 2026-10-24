@@ -19,12 +19,15 @@ ResinCraft'ta en sık yapılan işler nasıl yapılır. **Kalın** yazılan adla
 11. [Bedrock Edition](#11-bedrock-edition)
 12. [Başka bir başlatıcıdan taşı](#12-başka-bir-başlatıcıdan-taşı)
 13. [Güncellemeler ve sistem tepsisi](#13-güncellemeler-ve-sistem-tepsisi)
-14. [Sorun giderme](#14-sorun-giderme)
+14. [Temalar ve özel CSS](#14-temalar-ve-özel-css)
+15. [Uzaktan kontrol (web konsolu)](#15-uzaktan-kontrol-web-konsolu)
+16. [Yeniden kurma ve onarma](#16-yeniden-kurma-ve-onarma)
+17. [Sorun giderme](#17-sorun-giderme)
 
 ## 1. Yükle ve giriş yap
 
 1. Sistemine uygun ResinCraft'ı [Releases sayfasından](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest) indir:
-   - **Windows:** `…_amd64_windows.exe`
+   - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (her zaman en yeni sürümü yükler) ya da `…_amd64_windows.exe` / `…_amd64_windows.msi`
    - **macOS:** `…_universal_macos.dmg`
    - **Linux:** `.AppImage`, `.deb` veya `.tar.gz`
 2. Yükle ve aç. Windows yayıncının doğrulanmadığını söyleyebilir; macOS'ta ilk seferde uygulamaya sağ tıklayıp **Aç**'ı seç.
@@ -60,7 +63,7 @@ Bazı CurseForge yazarları, başlatıcıların dosyalarını indirmesine izin v
 
 1. **Keşfet** → **Mod paketleri**'ni aç (ya da **Kitaplık** → **Yeni kurulum** → **Mod paketi indir**).
 2. Açıklamasını, sürümlerini ve içindeki **Modlar**'ı görmek için bir paketi aç.
-3. **Paketi yükle**'ye bas. ResinCraft içinde her şey hazır olan yeni bir kurulum oluşturur.
+3. **Paketi yükle**'ye bas. Yeni kurulum hemen **Kitaplık**'ta görünür ve yüklemenin ilerlemesi kartında gösterilir; bittiğinde **Oyna** çalışır.
 4. Paket güncellendiğinde ResinCraft sana haber verir; kurulum sayfasından başka bir paket sürümü de seçebilirsin.
 
 ## 5. Minecraft sürümünü veya mod yükleyiciyi değiştir
@@ -115,7 +118,11 @@ Bir sunucunun sayfasında:
   - sunucu simgesi.
 - **Yeniden başlat** ve **⋯** menüsü (adresi kopyala, klasörü aç, şimdi yedekle, sil).
 
-Sadece oyun istemcisinde çalışan modlar (gölgelendiriciler, mini haritalar…) sunucularda otomatik olarak kapatılır. Onları **Mods** sekmesinde görebilir, gerekirse tekrar açabilirsin.
+- **Settings → Anti-xray** (ayarlar → x-ray önleme; Paper, Purpur, Folia, Leaf): cevherleri x-ray modlarından ve doku paketlerinden gizle. **Hide ores** (cevherleri gizle) sunucuyu az yorar; **Fake ores** (sahte cevherler) daha güçlüdür. Bir sonraki başlatmada etkinleşir.
+
+Sadece oyun istemcisinde çalışan modlar (gölgelendiriciler, mini haritalar…) sunucu sorunsuz başladığı sürece sunucuda açık kalır. Biri sunucuyu çökertirse ResinCraft o modu kapatır ve sunucuyu yeniden başlatır; **Mods** sekmesinden tekrar açabilirsin.
+
+Bir mod paketinin resmi sunucu paketi yoksa ResinCraft sunucuyu paketin kendi mod listesinden kurar: **Create**'ten sonra açılan pencere bunu söyler ve sunucuda bir **Built by ResinCraft** (ResinCraft tarafından kuruldu) rozeti görünür. Bazı paket dosyaları yalnızca yazarlarının sitesinden indirilebilir. Bunlar **Console** sekmesinin en üstünde, **Get file** (dosyayı al) ile listelenir. Onları tarayıcında indir, ResinCraft bir sonraki başlatmadan önce yerlerine koyar; ya da **Look again**'e (tekrar bak) bas.
 
 ## 9. Arkadaşlarını sunucuna al
 
@@ -176,10 +183,41 @@ Modları, dünyaları ve ayarları da onlarla birlikte gelir. Orijinaller oldukl
   - Pencereyi kapatınca ResinCraft çalışmaya devam eder: sunucular, Discord botu ve indirmeler sürer.
   - Tekrar açmak için tepsi simgesine tıkla; gerçekten çıkmak için sağ tık → **Quit ResinCraft** (ResinCraft'tan çık).
 
-## 14. Sorun giderme
+## 14. Temalar ve özel CSS
 
-- **Oyun açılmıyor:** **(kurulum adı) çöktü** penceresine (bölüm 6) ya da kurulumun **Günlükler** sekmesine bak.
+1. **Ayarlar → Görünüm → Tema**'yı aç ve bir kart seç: **Sistem**, Koyu, Açık, Obsidyen, Derin Arduvaz, Kiraz, Nether, End, Cadılar Bayramı ya da Noel.
+2. **Tatil temaları:**
+   - Cadılar Bayramı 16-31 Ekim, Noel 10-25 Aralık arasında kendiliğinden açılır. Ertesi gün kendi temana dönersin.
+   - Kendi temanda kalmak mı istiyorsun? Afişteki **Kendi temamı kullan**'a bas ya da başka bir kart seç: o tatil boyunca senin kalır.
+   - Tamamen durdurmak için **Tatil temaları**'nı kapat.
+3. **Özel CSS:** **Şu anki renkleri ekle**'ye bas, istediğin rengi değiştir, sonra **Uygula**'ya bas. Her temanın üstünde çalışır; **Temizle** onu kaldırır.
+
+Pst: Konami kodunu dene (↑ ↑ ↓ ↓ ← → ← → B A) ya da ResinCraft logosuna yedi kez tıkla.
+
+## 15. Uzaktan kontrol (web konsolu)
+
+Sunucularını herhangi bir tarayıcıdan ya da telefonundan yönet.
+
+1. **Hesaplar**'da bir Microsoft hesabıyla giriş yap.
+2. **Ayarlar → Uzaktan kontrol → Uzaktan kontrole izin ver**'i aç. **… olarak bağlı** yazısını gördüğünde hazırsın.
+3. Pencereyi kapattıktan sonra da çalışması için **Sistem tepsisinde çalışmaya devam et**'i aç (bölüm 13).
+4. `https://console.rscraft.resincore.tech` adresini aç (ya da **Web konsolunu aç**'a bas) ve **aynı Minecraft hesabıyla** giriş yap.
+
+Web konsolundan sunucuları başlatabilir, durdurabilir ve yeniden başlatabilir, konsolu izleyip komut yazabilir, oyuncuları yönetebilir, yedek alabilir ve yeni sunucular oluşturabilirsin. Web konsolu dosyalarına, Java ayarlarına ya da bilgisayarındaki başka hiçbir şeye erişemez. Her değişiklik ResinCraft'ta bir bildirim olarak görünür.
+
+## 16. Yeniden kurma ve onarma
+
+- **Bir kurulum eksik ya da bozuk dosyalar yüzünden başlamıyor:**
+  - **Kitaplık**'ta ona sağ tıkla → **Yeniden kur** → **Oyun dosyaları**, ya da kurulumun **Ayarlar → Onar** bölümünü aç.
+  - Minecraft, mod yükleyici, kütüphaneler ve varlıklar yeniden indirilir. Dünyalar, modlar ve ayarlar kalır.
+- **Bir mod paketinin dosyaları değiştirildi ya da silindi:** **Yeniden kur** → **Mod paketi dosyaları**, paketin modlarını, ayarlarını ve betiklerini geri getirir. Değiştirdiğin dosyalar önce yedeklenir; dünyalar ve kendi modların kalır.
+- **Bir sunucu:** **⋯** menüsü → **Yeniden kur** → **Sunucu yazılımı** (mod paketi sunucusu için **Mod paketi dosyaları**). Dünya, ayarlar ve oyuncu listeleri kalır.
+- **ResinCraft'ın kendisi:** **Ayarlar → Güncellemeler → ResinCraft'ı yeniden kur**, uygulamayı kendi üstüne yeniden kurar.
+
+## 17. Sorun giderme
+
+- **Oyun açılmıyor:** **(kurulum adı) çöktü** penceresine (bölüm 6) ya da kurulumun **Günlükler** sekmesine bak. Dosyalar eksik ya da bozuk mu? Onları yeniden kur (bölüm 16).
 - **Bir mod Keşfet'te görünmüyor:** Minecraft sürümün veya yükleyicin için olmayabilir. Başka bir sürüm dene ya da kurulumun sürümünü değiştir (bölüm 5).
 - **Arkadaşların katılamıyor:** sunucunun **Console** sekmesindeki adresi ve sunucunun **Running** (çalışıyor) dediğini kontrol et. ResinCraft Relay kullanıyorsan bir Microsoft hesabıyla giriş yaptığından emin ol.
-- **Sunucu açılırken çöküyor:** ResinCraft yalnızca istemci modlarını kendisi kapatır ve sunucuyu yeniden başlatır. Hangi modu kapattığını söyleyen satır için **Console**'a bak.
+- **Sunucu açılırken çöküyor:** ResinCraft yalnızca istemci modlarını kendisi kapatır ve sunucuyu yeniden başlatır. Hangi modu kapattığını söyleyen satır için **Console**'a bak. Dosyaların eksik olduğunu söylüyorsa onları **Console** sekmesinin en üstündeki listeden al.
 - **Hâlâ çözemedin mi?** Sorunu **Günlükler** sekmesindeki günlükle birlikte [GitHub](https://github.com/ResinCoreAI/ResinCraft-Launcher/issues) üzerinden bildir.

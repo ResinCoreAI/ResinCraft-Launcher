@@ -19,12 +19,15 @@ Cách làm những việc thường gặp nhất trong ResinCraft. Tên **in đ�
 11. [Bedrock Edition](#11-bedrock-edition)
 12. [Chuyển từ launcher khác](#12-chuyển-từ-launcher-khác)
 13. [Cập nhật và khay hệ thống](#13-cập-nhật-và-khay-hệ-thống)
-14. [Khắc phục sự cố](#14-khắc-phục-sự-cố)
+14. [Chủ đề và CSS tùy chỉnh](#14-chủ-đề-và-css-tùy-chỉnh)
+15. [Điều khiển từ xa (web console)](#15-điều-khiển-từ-xa-web-console)
+16. [Cài lại và sửa chữa](#16-cài-lại-và-sửa-chữa)
+17. [Khắc phục sự cố](#17-khắc-phục-sự-cố)
 
 ## 1. Cài đặt và đăng nhập
 
 1. Tải ResinCraft cho hệ điều hành của bạn từ [trang Releases](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
-   - **Windows:** `…_amd64_windows.exe`
+   - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (luôn cài phiên bản mới nhất), hoặc `…_amd64_windows.exe` / `…_amd64_windows.msi`
    - **macOS:** `…_universal_macos.dmg`
    - **Linux:** `.AppImage`, `.deb` hoặc `.tar.gz`
 2. Cài đặt rồi mở lên. Windows có thể báo nhà phát hành chưa được xác minh; trên macOS, lần đầu hãy nhấp chuột phải vào ứng dụng và chọn **Mở**.
@@ -60,7 +63,7 @@ Một số tác giả trên CurseForge không cho launcher tải tệp của h�
 
 1. Mở **Khám phá** → **Gói mod** (hoặc **Thư viện** → **Bản cài đặt mới** → **Tải modpack**).
 2. Mở một gói để xem mô tả, các phiên bản và **Mod** có trong gói.
-3. Nhấn **Cài gói**. ResinCraft tạo một bản cài mới với đầy đủ mọi thứ.
+3. Nhấn **Cài gói**. Bản cài mới hiện ngay trong **Thư viện**, kèm tiến độ cài đặt trên thẻ của nó; **Chơi** dùng được khi cài xong.
 4. Khi gói có bản cập nhật, ResinCraft sẽ báo cho bạn; bạn cũng có thể chọn phiên bản khác của gói ngay trên trang bản cài.
 
 ## 5. Đổi phiên bản Minecraft hoặc trình tải mod
@@ -115,7 +118,11 @@ Trên trang của máy chủ:
   - biểu tượng máy chủ.
 - **Khởi động lại** và menu **⋯** (sao chép địa chỉ, mở thư mục, sao lưu ngay, xóa).
 
-Mod chỉ chạy trên client game (shader, minimap…) được tự động tắt trên máy chủ. Bạn xem chúng trong thẻ **Mods** và có thể bật lại nếu cần.
+- **Settings → Anti-xray** (cài đặt → chống x-ray; Paper, Purpur, Folia, Leaf): giấu quặng khỏi mod và gói texture x-ray. **Hide ores** (giấu quặng) nhẹ cho máy chủ; **Fake ores** (quặng giả) mạnh hơn. Có tác dụng từ lần khởi động sau.
+
+Mod chỉ chạy trên client game (shader, minimap…) vẫn được giữ trên máy chủ, miễn là máy chủ khởi động bình thường. Nếu một mod làm máy chủ crash, ResinCraft tắt mod đó và khởi động lại máy chủ; bạn có thể bật lại nó trong thẻ **Mods**.
+
+Khi modpack không có gói máy chủ chính thức, ResinCraft dựng máy chủ từ danh sách mod của chính gói: cửa sổ hiện ra sau khi nhấn **Create** sẽ báo điều này, và máy chủ có huy hiệu **Built by ResinCraft** (do ResinCraft dựng). Một số tệp của gói chỉ tải được từ trang web của tác giả. Chúng được liệt kê ở đầu thẻ **Console**, kèm **Get file** (lấy tệp). Hãy tải chúng bằng trình duyệt, ResinCraft sẽ đặt chúng vào đúng chỗ trước lần khởi động sau, hoặc nhấn **Look again** (tìm lại).
 
 ## 9. Cho bạn bè vào máy chủ của bạn
 
@@ -176,10 +183,41 @@ Mod, thế giới và cài đặt của chúng được chuyển theo. Bản g�
   - Đóng cửa sổ thì ResinCraft vẫn chạy: máy chủ, bot Discord và tải xuống vẫn tiếp tục.
   - Nhấp vào biểu tượng ở khay để mở lại; nhấp chuột phải → **Quit ResinCraft** (thoát ResinCraft) để thoát hẳn.
 
-## 14. Khắc phục sự cố
+## 14. Chủ đề và CSS tùy chỉnh
 
-- **Game không khởi động:** xem cửa sổ **Minecraft bị crash** (mục 6), hoặc thẻ **Nhật ký** của bản cài.
+1. Mở **Cài đặt → Giao diện → Chủ đề** và chọn một thẻ: **Hệ thống**, Tối, Sáng, Hắc thạch, Đá phiến sâu, Anh đào, Nether, The End, Halloween hoặc Giáng sinh.
+2. **Giao diện dịp lễ:**
+   - Halloween tự bật từ 16 đến 31/10, Giáng sinh từ 10 đến 25/12. Chủ đề của bạn sẽ trở lại vào ngày hôm sau.
+   - Muốn giữ chủ đề của mình? Nhấn **Dùng giao diện của tôi** trên banner, hoặc chọn thẻ khác: nó sẽ là của bạn suốt dịp lễ đó.
+   - Tắt **Giao diện dịp lễ** để dừng hẳn.
+3. **CSS tùy chỉnh:** nhấn **Chèn màu hiện tại**, đổi màu bất kỳ, rồi nhấn **Áp dụng**. Nó hoạt động trên mọi chủ đề; **Xóa** sẽ gỡ nó đi.
+
+Suỵt: thử mã Konami (↑ ↑ ↓ ↓ ← → ← → B A), hoặc nhấp vào logo ResinCraft bảy lần.
+
+## 15. Điều khiển từ xa (web console)
+
+Điều khiển máy chủ từ bất kỳ trình duyệt nào, hoặc từ điện thoại.
+
+1. Đăng nhập bằng tài khoản Microsoft trong **Tài khoản**.
+2. Bật **Cài đặt → Điều khiển từ xa → Cho phép điều khiển từ xa**. Khi thấy **Đã kết nối với tên …** là bạn đã sẵn sàng.
+3. Bật **Tiếp tục chạy ở khay hệ thống** (mục 13) để nó vẫn hoạt động sau khi bạn đóng cửa sổ.
+4. Mở `https://console.rscraft.resincore.tech` (hoặc nhấn **Mở web console**) và đăng nhập bằng **cùng tài khoản Minecraft**.
+
+Từ web console, bạn có thể khởi động, dừng và khởi động lại máy chủ, xem console và gõ lệnh, quản lý người chơi, sao lưu và tạo máy chủ mới. Nó không thể chạm vào tệp, cài đặt Java hay bất cứ thứ gì khác trên máy tính của bạn. Mỗi thay đổi đều hiện thành một thông báo trong ResinCraft.
+
+## 16. Cài lại và sửa chữa
+
+- **Bản cài không khởi động vì thiếu hoặc hỏng tệp:**
+  - Nhấp chuột phải vào nó trong **Thư viện** → **Cài lại** → **Tệp trò chơi**, hoặc mở **Cài đặt → Sửa chữa** của nó.
+  - Minecraft, trình tải mod, thư viện và tài nguyên được tải lại. Thế giới, mod và cài đặt vẫn còn.
+- **Tệp của modpack bị sửa hoặc bị xóa:** **Cài lại** → **Tệp modpack** đưa mod, cấu hình và script của gói trở lại. Tệp bạn đã sửa được sao lưu trước; thế giới và mod bạn tự thêm vẫn còn.
+- **Máy chủ:** menu **⋯** của nó → **Cài lại** → **Phần mềm máy chủ** (hoặc **Tệp modpack** với máy chủ modpack). Thế giới, cài đặt và danh sách người chơi vẫn còn.
+- **Chính ResinCraft:** **Cài đặt → Cập nhật → Cài lại ResinCraft** cài lại ứng dụng đè lên chính nó.
+
+## 17. Khắc phục sự cố
+
+- **Game không khởi động:** xem cửa sổ **Minecraft bị crash** (mục 6), hoặc thẻ **Nhật ký** của bản cài. Thiếu hoặc hỏng tệp? Hãy cài lại chúng (mục 16).
 - **Mod không hiện trong Khám phá:** có thể mod đó không có bản cho phiên bản Minecraft hoặc trình tải của bạn. Thử phiên bản khác, hoặc đổi phiên bản của bản cài (mục 5).
 - **Bạn bè không vào được:** kiểm tra địa chỉ trong thẻ **Console** của máy chủ và xem máy chủ có báo **Running** (đang chạy) không. Nếu dùng ResinCraft Relay, nhớ đăng nhập bằng tài khoản Microsoft.
-- **Máy chủ crash khi khởi động:** ResinCraft tự tắt các mod chỉ dành cho client và khởi động lại. Xem trong **Console** dòng cho biết mod nào đã bị tắt.
+- **Máy chủ crash khi khởi động:** ResinCraft tự tắt các mod chỉ dành cho client và khởi động lại. Xem trong **Console** dòng cho biết mod nào đã bị tắt. Nếu nó báo thiếu tệp, hãy lấy chúng từ danh sách ở đầu thẻ **Console**.
 - **Vẫn chưa được?** Báo lỗi trên [GitHub](https://github.com/ResinCoreAI/ResinCraft-Launcher/issues) kèm log từ thẻ **Nhật ký**.
