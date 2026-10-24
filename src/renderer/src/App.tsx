@@ -5,6 +5,7 @@ import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, open
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
 import { UpdateBanner, UpdateTitleButton } from './components/Updates'
+import EasterEgg from './components/EasterEgg'
 import CrashFixer from './components/CrashFixer'
 import { PackUpdatesBanner } from './components/PackUpdates'
 import { RelayWatcher } from './components/ServerRelay'
@@ -184,6 +185,7 @@ export default function App() {
       <Dock />
       <UpdateBanner />
       <CrashFixer />
+      <EasterEgg />
       <PackUpdatesBanner />
       <RelayWatcher />
       <ContextMenuHost />

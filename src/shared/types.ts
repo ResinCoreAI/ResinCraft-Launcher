@@ -355,7 +355,14 @@ export interface JavaInstall {
 export type CloseBehavior = 'keep' | 'minimize' | 'hide'
 
 export interface Settings {
-  theme: 'dark' | 'light' | 'system'
+  /** 'system' (light or dark, as the OS), or a theme id from themes.ts. */
+  theme: string
+  /** Holiday themes turn on by themselves for the 15 days before the holiday (on unless switched off). */
+  seasonalThemes?: boolean
+  /** This year's holiday the player chose their own theme for ("halloween-2026"): it stays theirs. */
+  seasonOff?: string
+  /** The player's own CSS, applied over any theme (Settings → Appearance → Custom CSS). */
+  customCss?: string
   /** 'system' follows the OS locale; otherwise a locale code such as 'de' or 'pt-BR'. */
   language: string
   memoryMb: number
@@ -409,6 +416,8 @@ export interface UpdateAvailable {
   date?: string
   /** The release page with the full notes. */
   notesUrl: string
+  /** The version already installed, offered again by Reinstall (not shown as an update). */
+  reinstall?: boolean
 }
 
 /** Games and hosted servers (their names) that installing an update would cut off. */
@@ -1478,6 +1487,8 @@ export interface ResinApi {
     status(): Promise<UpdateStatus>
     /** Asks the update server; network problems come back as `error`, not as a rejection. */
     check(): Promise<UpdateStatus>
+    /** Reinstall: the newest release even when it's the one installed; then `install()` as for an update. */
+    checkReinstall(): Promise<UpdateStatus>
     blockers(): Promise<UpdateBlockers>
     /** Downloads and installs the found update (the app restarts). `waitForStop`: install once games and servers stop. */
     /** true: once every game and server has stopped; 'close': stop servers and close games first. */
@@ -1523,6 +1534,8 @@ export interface ResinApi {
     /** Asks for another folder for Download all to look in; the updated list, or null if cancelled. */
     addWatchFolder(): Promise<string[] | null>
     duplicate(id: string): Promise<Instance>
+    /** Downloads the game files again (Minecraft, loader, libraries, assets); worlds, mods and settings stay. */
+    reinstall(id: string): Promise<void>
     /** Changes the Minecraft version and mod loader (no loader version: the newest); the next start installs them. */
     setVersion(id: string, mcVersion: string, loader: LoaderType, loaderVersion: string | null): Promise<Instance>
     /**
@@ -1613,6 +1626,8 @@ export interface ResinApi {
      * player's worlds, settings, own mods and changes stay. A cancellable task; a failure leaves the instance as it was.
      */
     switchPack(instanceId: string, versionId: string): Promise<PackSwitch>
+    /** Puts a modpack instance's own files back as its current version has them. */
+    reinstallPack(instanceId: string): Promise<PackSwitch>
     /** Newer modpack versions for installed packs and servers (cached for a few hours unless `force`). */
     packUpdates(force?: boolean): Promise<PackUpdates>
     installModpack(projectId: string, versionId?: string): Promise<InstalledPack>
@@ -1683,6 +1698,10 @@ export interface ResinApi {
     setIcon(id: string, dataUrl: string | null): Promise<ServerInfo>
     /** Switches a server made from a modpack to another version of the pack (its server files). Stop it first. */
     switchPack(id: string, versionId: string): Promise<PackSwitch>
+    /** Installs the server software again; the world, mods, settings and player lists stay. */
+    reinstall(id: string): Promise<void>
+    /** Puts a modpack server's own files back as its current version has them. */
+    reinstallPack(id: string): Promise<PackSwitch>
     /** The instance a server was made from, if any, and whether it changed since the last sync. */
     origin(id: string): Promise<ServerOrigin>
     /** What syncing from that instance would change, without changing anything. */

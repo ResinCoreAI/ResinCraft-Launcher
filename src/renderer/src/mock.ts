@@ -108,6 +108,9 @@ export function mockApi(): ResinApi {
   )
   let settings: Settings = {
     theme: 'dark',
+    seasonalThemes: true,
+    seasonOff: '',
+    customCss: '',
     language: 'system',
     memoryMb: 4096,
     jvmArgs: '',
@@ -310,6 +313,7 @@ export function mockApi(): ResinApi {
         instances = instances.map((i) => (i.id === id ? { ...i, mcVersion, loader, loaderVersion: loader === 'vanilla' ? undefined : (loaderVersion ?? '0.16.10') } : i))
         return wait(instances.find((i) => i.id === id)!, 500)
       },
+      reinstall: () => wait(undefined, 1500),
       duplicate: async (id) => {
         const src = instances.find((i) => i.id === id)!
         const copy: Instance = { ...src, id: String(Date.now()), name: `${src.name} (copy)`, createdAt: Date.now(), playtime: 0, lastPlayed: undefined }
@@ -475,6 +479,7 @@ export function mockApi(): ResinApi {
       update: () => wait(undefined, 500),
       changeVersion: () => wait(undefined, 700),
       packUpdates: async () => mockPackUpdates(instances, await servers.server.list()),
+      reinstallPack: () => wait({ versionName: 'current', added: 0, updated: 3, removed: 0, kept: [], pending: 0 } as never, 1500),
       switchPack: async (id, versionId) =>
         mockSwitchPack(
           instances.find((i) => i.id === id),

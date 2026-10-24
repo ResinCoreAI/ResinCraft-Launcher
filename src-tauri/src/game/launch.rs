@@ -140,6 +140,38 @@ fn release(id: &str, slot: u32) {
     });
 }
 
+/// Instance → Reinstall: downloads the instance's Minecraft, mod loader, libraries and assets again. Every file is
+/// checked against its hash again (a broken one is downloaded again) and the loader is installed again; worlds, mods,
+/// settings and screenshots stay. Libraries and assets are shared, so other instances get the fresh copies too.
+pub async fn reinstall(id: &str) -> Result<()> {
+    if running_instances().iter().any(|r| r == id) {
+        bail_tr!("reinstall.closeGame", "Close the game first, then reinstall.");
+    }
+    let inst = instances::get(id).await?;
+    let settings = crate::core::settings::get().await;
+    crate::core::net::forget_all_verified().await;
+    // The loader's own install record (Forge/NeoForge `installed.json`, Fabric/Quilt `profile.json`) and the game's
+    // version files: both are fetched again. A file another running game has open is left as it is.
+    let versions = paths::versions();
+    let mut gone = vec![versions.join(&inst.mc_version)];
+    if let (Some(ver), true) = (inst.loader_version.as_deref(), inst.loader != LoaderType::Vanilla) {
+        let prefix = format!("{}-{}-", inst.loader.as_str(), inst.mc_version);
+        if let Ok(rd) = std::fs::read_dir(&versions) {
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                if name.starts_with(&prefix) && name.ends_with(ver) {
+                    gone.push(e.path());
+                }
+            }
+        }
+    }
+    for dir in gone {
+        let _ = tokio::fs::remove_dir_all(&dir).await;
+    }
+    let title = tr!("reinstall.instance", "Reinstalling {name}", name = inst.name);
+    Task::run(title, Some(id.to_string()), |t| async move { prepare(&inst, &settings, natives_for(&inst.id, 1), &t).await.map(|_| ()) }).await
+}
+
 /// Where a run unpacks native libraries. Run 1 uses the instance's own folder; later runs get their own, because
 /// re-unpacking would delete DLLs the first game has loaded (Windows refuses, and the second launch fails).
 fn natives_for(id: &str, slot: u32) -> PathBuf {

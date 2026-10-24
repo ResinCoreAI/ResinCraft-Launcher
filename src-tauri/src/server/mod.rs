@@ -168,6 +168,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             properties::remove(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?;
             done()
         }
+        // Installs the server software again (Server → Reinstall), and the modpack's server files.
+        "server:reinstall" => {
+            packs::reinstall(&args.get::<String>(0)?).await?;
+            done()
+        }
+        "server:reinstallPack" => json(packs::reinstall_pack(&args.get::<String>(0)?).await?),
         "server:backup" => json(runtime::backup(&args.get::<String>(0)?).await?),
         // The add-on calls end with an optional area ("plugins" / "mods") for hybrid servers.
         "server:addonSources" => json(plugins::sources(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),

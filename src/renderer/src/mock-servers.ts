@@ -616,6 +616,8 @@ export function mockServers(): {
     playerAdd: async (_id, kind, name) => void (lists[kind] = [...lists[kind], { name, level: kind === 'ops' ? 4 : undefined }]),
     playerRemove: async (_id, kind, name) => void (lists[kind] = lists[kind].filter((e) => e.name !== name)),
     backup: () => wait('C:/…/servers/smp/backups/2026-10-18_14-02-11_world.zip', 1200),
+    reinstall: () => wait(undefined, 1500),
+    reinstallPack: () => wait({ versionName: 'current', added: 0, updated: 2, removed: 0, kept: [], pending: 0 } as never, 1500),
     addonSources: async (id, area) => sourcesOf(id, area),
     addons: (_id, area) => wait(listOf(area)),
     addonSearch: (_id, _q, source, offset = 0, area) => {

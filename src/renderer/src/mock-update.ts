@@ -41,6 +41,11 @@ export function mockUpdate(): { update: ResinApi['update']; onUpdate: ResinApi['
               }
         return set({ state: 'idle', lastChecked: Date.now(), available, error: undefined })
       },
+      checkReinstall: async () => {
+        await sleep(500)
+        const version = status.current
+        return set({ state: 'idle', lastChecked: Date.now(), error: undefined, available: { version, notesUrl: `https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/tag/v${version}`, reinstall: true } })
+      },
       blockers: async () => running(),
       install: async (how) => {
         const waitForStop = !!how

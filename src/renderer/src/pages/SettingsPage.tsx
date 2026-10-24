@@ -4,6 +4,7 @@ import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
 import { StorageSection } from '../components/Storage'
+import { ThemePicker } from '../components/ThemePicker'
 import { BackupSection } from '../components/Backup'
 import { UpdatesSection } from '../components/Updates'
 import { PackUpdatesSetting } from '../components/PackUpdates'
@@ -90,42 +91,7 @@ export default function SettingsPage() {
             <h3>{t('settings.nav.appearance')}</h3>
             <p>{t('settings.appearance.lead')}</p>
             <div className="card">
-              <div className="setting">
-                <div className="text">
-                  <b>{t('settings.theme')}</b>
-                  <span>{t('settings.theme.hint')}</span>
-                </div>
-                <Segmented
-                  value={s.theme}
-                  onChange={(theme) => set({ theme })}
-                  options={[
-                    {
-                      value: 'dark',
-                      label: (
-                        <>
-                          <Moon size={14} /> {t('settings.theme.dark')}
-                        </>
-                      )
-                    },
-                    {
-                      value: 'light',
-                      label: (
-                        <>
-                          <Sun size={14} /> {t('settings.theme.light')}
-                        </>
-                      )
-                    },
-                    {
-                      value: 'system',
-                      label: (
-                        <>
-                          <Monitor size={14} /> {t('settings.theme.system')}
-                        </>
-                      )
-                    }
-                  ]}
-                />
-              </div>
+              <ThemePicker s={s} set={set} />
               <div className="setting">
                 <div className="text">
                   <b>{t('settings.language')}</b>

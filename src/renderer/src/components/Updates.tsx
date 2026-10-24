@@ -4,6 +4,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { CheckCircle2, Download, Hourglass, Info, Loader2, Power, RefreshCw } from 'lucide-react'
 import type { UpdateBlockers, UpdateStatus } from '@shared/types'
+import { ReinstallLauncherSetting } from './Reinstall'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t, tx } from '../i18n'
@@ -138,8 +139,9 @@ export function UpdateTitleButton() {
   const { status } = useUpdate()
   const { start, dialog } = useInstall()
   const [waitingOpen, setWaitingOpen] = useState(false)
-  const available = status?.available
-  if (!available) return dialog || null
+  // A reinstall of the installed version isn't an update to offer in the title bar.
+  const available = status?.available?.reinstall ? undefined : status?.available
+  if (!available || !status) return dialog || null
   const working = status.state === 'downloading' || status.state === 'installing'
   const waiting = status.state === 'waiting'
   return (
@@ -207,7 +209,9 @@ export function UpdatesSection() {
         </div>
       </section>
     )
-  const { available, state } = status
+  // A reinstall of the installed version isn't shown as an update.
+  const available = status.available?.reinstall ? undefined : status.available
+  const { state } = status
   const busy = state !== 'idle'
   const line =
     state === 'downloading'
@@ -267,6 +271,7 @@ export function UpdatesSection() {
           </div>
           <Switch on={!!settings.silentUpdate} onChange={(v) => void updateSettings({ silentUpdate: v })} label={t('updates.silent')} />
         </div>
+        <ReinstallLauncherSetting start={() => void start()} busy={busy} />
         <div className="setting">
           <div className="row" style={{ gap: 18 }}>
             <button className="link" onClick={() => void api.app.openExternal(notesUrl)}>

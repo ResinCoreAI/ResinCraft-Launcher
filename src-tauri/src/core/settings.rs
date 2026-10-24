@@ -11,8 +11,14 @@ use super::types::{EnvVar, LaunchCommands};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    /// "dark" | "light" | "system"
+    /// "system" or a theme id (see src/renderer/src/themes.ts).
     pub theme: String,
+    /// Holiday themes turn on by themselves for the 15 days before Halloween and Christmas.
+    pub seasonal_themes: bool,
+    /// The year's holiday the player picked their own theme for (e.g. "halloween-2026"), so it isn't forced.
+    pub season_off: String,
+    /// The player's own CSS, applied over any theme.
+    pub custom_css: String,
     /// UI language: "system" (follow the OS) or a locale code such as "de" or "pt-BR".
     pub language: String,
     pub memory_mb: u32,
@@ -76,6 +82,9 @@ impl Default for Settings {
         let total = total_memory_mb() as u32;
         Settings {
             theme: "dark".into(),
+            seasonal_themes: true,
+            season_off: String::new(),
+            custom_css: String::new(),
             language: "system".into(),
             // A quarter of system RAM, kept between 2 GB and 6 GB, suits most packs.
             memory_mb: ((total / 4 / 512) * 512).clamp(2048, 6144),

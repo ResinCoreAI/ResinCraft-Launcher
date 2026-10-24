@@ -1121,6 +1121,22 @@ pub(crate) async fn switch_files(
 /// Switches modpack instance `instance_id` to `version_id` of its pack (see the module docs). A cancellable task;
 /// any failure or Cancel leaves the instance exactly as it was.
 pub async fn switch_version(instance_id: &str, version_id: &str) -> Result<PackSwitch> {
+    switch_or_reinstall(instance_id, version_id, false).await
+}
+
+/// Instance → Reinstall modpack: puts the pack's own files back as its current version has them (mods, configs,
+/// scripts), as if installing it fresh. Files the player changed are backed up first; worlds, options, screenshots
+/// and mods the player added stay.
+pub async fn reinstall_pack(instance_id: &str) -> Result<PackSwitch> {
+    let inst = instances::get(instance_id).await?;
+    let Some(version_id) = inst.modpack.as_ref().and_then(|m| m.version_id.clone()) else {
+        bail_tr!("packswitch.notModpack", "{name} wasn't installed from a modpack", name = inst.name)
+    };
+    switch_or_reinstall(instance_id, &version_id, true).await
+}
+
+/// `reinstall`: the same version again, compared with nothing installed, so every file the pack has is put back.
+async fn switch_or_reinstall(instance_id: &str, version_id: &str, reinstall: bool) -> Result<PackSwitch> {
     let inst = instances::get(instance_id).await?;
     let Some(pack) = inst.modpack.clone() else {
         bail_tr!("packswitch.notModpack", "{name} wasn't installed from a modpack", name = inst.name)
@@ -1128,7 +1144,7 @@ pub async fn switch_version(instance_id: &str, version_id: &str) -> Result<PackS
     let Some(project_id) = pack.project_id.clone().filter(|p| !p.is_empty() && source_of(p) != ContentSource::Github) else {
         bail_tr!("packswitch.noSource", "ResinCraft doesn't know where {name} came from, so it can't switch its version", name = pack.name)
     };
-    if pack.version_id.as_deref() == Some(version_id) {
+    if !reinstall && pack.version_id.as_deref() == Some(version_id) {
         return Ok(PackSwitch::default());
     }
     if crate::game::running_ids().iter().any(|r| r == instance_id) {
@@ -1136,12 +1152,16 @@ pub async fn switch_version(instance_id: &str, version_id: &str) -> Result<PackS
     }
 
     let (id, vid) = (instance_id.to_string(), version_id.to_string());
-    let title = tr!("packswitch.title", "Switching {name} to another version", name = pack.name.clone());
+    let title = if reinstall {
+        tr!("packswitch.reinstallTitle", "Reinstalling {name}", name = pack.name.clone())
+    } else {
+        tr!("packswitch.title", "Switching {name} to another version", name = pack.name.clone())
+    };
     let busy = tr!("packswitch.busy", "{name} is already switching versions", name = inst.name.clone());
     let (out, listed) = guarded(Site::instance(instance_id), title, busy, move |task, work, applier| async move {
         let idx = load_index(&id).await;
-        let sw = switch_files(&task, &work, &applier, &project_id, pack.version_id.as_deref(), &vid, &pack.name, Side::Client, &Keep::client(), Some(&idx))
-            .await?;
+        let installed = if reinstall { None } else { pack.version_id.as_deref() };
+        let sw = switch_files(&task, &work, &applier, &project_id, installed, &vid, &pack.name, Side::Client, &Keep::client(), Some(&idx)).await?;
 
         // The content index: drop entries of files that changed or went, add what the source knows.
         let mut idx = load_index(&id).await;

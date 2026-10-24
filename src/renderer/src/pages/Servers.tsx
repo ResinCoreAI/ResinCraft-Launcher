@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi } from 'lucide-react'
+import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api } from '../api'
@@ -7,6 +7,7 @@ import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../comp
 import FileManager from '../components/FileManager'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
+import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import MigrateModal from '../components/MigrateModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
@@ -380,6 +381,7 @@ function ServerDetail({
   const copy = useCopy()
   const [tab, setTab] = useState<Tab>('console')
   const [deleting, setDeleting] = useState(false)
+  const [reinstalling, setReinstalling] = useState<ServerReinstall>()
   const address = s.net?.state === 'open' && s.net.address ? s.net.address : `localhost:${s.port}`
   const more: ContextEntry[] = [
     { label: t('menu.server.restart'), icon: <RotateCw />, disabled: s.state !== 'running', onSelect: () => void restart(s, onStart, onStop) },
@@ -400,6 +402,15 @@ function ServerDetail({
         )
     },
     { label: t('servers.tab.settings'), icon: <Settings2 />, onSelect: () => setTab('settings') },
+    {
+      label: t('reinstall.menu'),
+      icon: <Wrench />,
+      disabled: live(s),
+      items: [
+        { label: t('reinstall.menu.server'), onSelect: () => setReinstalling('software') },
+        !!s.modpack && { label: t('reinstall.menu.pack'), onSelect: () => setReinstalling('pack') }
+      ]
+    },
     '-',
     { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: live(s), onSelect: () => setDeleting(true) }
   ]
@@ -459,6 +470,7 @@ function ServerDetail({
         )}
         <StartStop s={s} onStart={onStart} onStop={onStop} size="lg" />
       </div>
+      {reinstalling && <ReinstallServerModal s={s} what={reinstalling} onClose={() => setReinstalling(undefined)} after={reload} />}
       {deleting && (
         <ConfirmModal
           title={t('servers.settings.deleteTitle', { name: s.name })}

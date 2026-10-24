@@ -72,6 +72,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "content:packUpdates" => json(packupdates::check(args.get::<Option<bool>>(0)?.unwrap_or(false)).await?),
+        // Puts a modpack instance's own files back as its current version has them (Instance → Reinstall modpack).
+        "content:reinstallPack" => json(packswitch::reinstall_pack(&args.get::<String>(0)?).await?),
         "content:switchPack" => json(packswitch::switch_version(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "content:installModpack" => dupes::pack_result(sources::install_modpack(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:importModpack" => {

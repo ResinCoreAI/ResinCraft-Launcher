@@ -34,6 +34,52 @@ async fn level_name(dir: &Path) -> String {
     properties::get_value(dir, "level-name").await.unwrap_or_default()
 }
 
+/// Files a server installer may write over that belong to the host (Bedrock's zip carries its own defaults).
+const HOST_FILES: &[&str] = &["server.properties", "allowlist.json", "permissions.json", "whitelist.json", "ops.json", "banned-players.json", "banned-ips.json"];
+
+/// Server → Reinstall: installs the server software again (the Minecraft server, its loader and libraries). The
+/// world, mods, plugins, settings and player lists stay. Downloads without a hash to check are fetched fresh.
+pub async fn reinstall(id: &str) -> Result<()> {
+    let mut meta = store::get(id).await?;
+    if runtime::is_running(id) {
+        return Err(stop_first(&meta));
+    }
+    let dir = store::dir(id)?;
+    let mut kept = Vec::new();
+    for f in HOST_FILES {
+        if let Ok(bytes) = tokio::fs::read(dir.join(f)).await {
+            kept.push((*f, bytes));
+        }
+    }
+    // Kept as they are by a normal install because nothing says what they should be: fetch them fresh.
+    let installers = paths::cache().join("server-installers");
+    let ver = meta.loader_version.clone().unwrap_or_default();
+    let mut stale = vec![dir.join("fabric-server-launch.jar")];
+    if let Some(loader) = meta.loader {
+        stale.push(installers.join(format!("{}-{}-{ver}-installer.jar", loader.as_str(), meta.mc_version)));
+    }
+    stale.push(installers.join(format!("quilt-installer-{ver}.jar")));
+    for f in stale {
+        let _ = tokio::fs::remove_file(f).await;
+    }
+    crate::core::net::forget_all_verified().await;
+    let title = tr!("reinstall.server", "Reinstalling {name}", name = meta.name.clone());
+    let d = dir.clone();
+    let result = crate::core::events::Task::run(title, Some(id.to_string()), |task| {
+        let mut m = meta.clone();
+        async move {
+            installers::install(&mut m, &d, &task).await?;
+            Ok(m)
+        }
+    })
+    .await;
+    for (f, bytes) in kept {
+        let _ = tokio::fs::write(dir.join(f), bytes).await;
+    }
+    meta = result?;
+    store::save(&meta).await
+}
+
 /// Applies a new Minecraft / loader version to a server and installs that server software.
 async fn set_software(meta: &mut ServerMeta, dir: &Path, mc: &str, loader: LoaderType, loader_version: Option<String>, task: &std::sync::Arc<crate::core::events::Task>) -> Result<()> {
     let kind = ServerKind::from_loader(loader);
@@ -54,6 +100,20 @@ async fn set_software(meta: &mut ServerMeta, dir: &Path, mc: &str, loader: Loade
 
 /// Switches a server made from a modpack to `version_id` of the pack, using the pack's server files.
 pub async fn switch_pack(id: &str, version_id: &str) -> Result<PackSwitch> {
+    switch_or_reinstall(id, version_id, false).await
+}
+
+/// Server → Reinstall modpack: puts the pack's server files back as its current version has them. The world,
+/// server.properties, the player lists and mods the host added stay; changed files are backed up first.
+pub async fn reinstall_pack(id: &str) -> Result<PackSwitch> {
+    let meta = store::get(id).await?;
+    let Some(version_id) = meta.modpack.as_ref().and_then(|m| m.version_id.clone()) else {
+        bail_tr!("packswitch.notModpack", "{name} wasn't installed from a modpack", name = meta.name.clone())
+    };
+    switch_or_reinstall(id, &version_id, true).await
+}
+
+async fn switch_or_reinstall(id: &str, version_id: &str, reinstall: bool) -> Result<PackSwitch> {
     let meta = store::get(id).await?;
     let Some(pack) = meta.modpack.clone() else {
         bail_tr!("packswitch.notModpack", "{name} wasn't installed from a modpack", name = meta.name.clone())
@@ -61,7 +121,7 @@ pub async fn switch_pack(id: &str, version_id: &str) -> Result<PackSwitch> {
     let Some(project_id) = pack.project_id.clone().filter(|p| !p.is_empty() && source_of(p) != ContentSource::Github) else {
         bail_tr!("packswitch.noSource", "ResinCraft doesn't know where {name} came from, so it can't switch its version", name = pack.name.clone())
     };
-    if pack.version_id.as_deref() == Some(version_id) {
+    if !reinstall && pack.version_id.as_deref() == Some(version_id) {
         return Ok(PackSwitch::default());
     }
     if runtime::is_running(id) {
@@ -70,10 +130,15 @@ pub async fn switch_pack(id: &str, version_id: &str) -> Result<PackSwitch> {
     let dir = store::dir(id)?;
     let keep = Keep::server(&level_name(&dir).await);
     let (sid, vid, d) = (id.to_string(), version_id.to_string(), dir.clone());
-    let title = tr!("packswitch.title", "Switching {name} to another version", name = meta.name.clone());
+    let title = if reinstall {
+        tr!("packswitch.reinstallTitle", "Reinstalling {name}", name = meta.name.clone())
+    } else {
+        tr!("packswitch.title", "Switching {name} to another version", name = meta.name.clone())
+    };
     let busy = tr!("packswitch.busy", "{name} is already switching versions", name = meta.name.clone());
     guarded(Site::server(id, dir), title, busy, move |task, work, applier| async move {
-        let sw = packswitch::switch_files(&task, &work, &applier, &project_id, pack.version_id.as_deref(), &vid, &pack.name, Side::Server, &keep, None).await?;
+        let installed = if reinstall { None } else { pack.version_id.as_deref() };
+        let sw = packswitch::switch_files(&task, &work, &applier, &project_id, installed, &vid, &pack.name, Side::Server, &keep, None).await?;
         let mut meta = store::get(&sid).await?;
         if let Some(m) = meta.modpack.as_mut() {
             m.version_id = Some(sw.target.version_id.clone());

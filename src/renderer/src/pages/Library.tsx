@@ -25,12 +25,14 @@ import {
   Settings2,
   Square,
   Trash2,
-  UserRound
+  UserRound,
+  Wrench
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import type { Instance, InstancePatch } from '@shared/types'
 import { api } from '../api'
 import ExportModal from '../components/ExportModal'
+import { ReinstallInstanceModal } from '../components/Reinstall'
 import MigrateModal from '../components/MigrateModal'
 import { packDupesNote } from '../components/DuplicatesDialog'
 import {
@@ -696,7 +698,7 @@ export function useInstanceMenu(inst: Instance) {
   const { go, games, runs, accounts, play, stop, refreshInstances, toast, info } = useStore()
   const names = useGroupNames()
   const copy = useCopy()
-  const [dialog, setDialog] = useState<'delete' | 'rename' | 'newGroup' | 'export'>()
+  const [dialog, setDialog] = useState<'delete' | 'rename' | 'newGroup' | 'export' | 'reinstallGame' | 'reinstallPack'>()
   const close = () => setDialog(undefined)
   const state = games[inst.id]
 
@@ -774,6 +776,15 @@ export function useInstanceMenu(inst: Instance) {
       hasCustomIcon(inst) && { label: t('menu.instance.resetIcon'), icon: <RotateCcw />, onSelect: () => void resetIcon() },
       { label: t('library.card.duplicate'), icon: <Copy />, onSelect: () => void duplicate() },
       { label: t('menu.instance.export'), icon: <PackageOpen />, onSelect: () => setDialog('export') },
+      {
+        label: t('reinstall.menu'),
+        icon: <Wrench />,
+        disabled: state === 'running' || state === 'preparing',
+        items: [
+          { label: t('reinstall.menu.game'), onSelect: () => setDialog('reinstallGame') },
+          inst.modpack && { label: t('reinstall.menu.pack'), onSelect: () => setDialog('reinstallPack') }
+        ]
+      },
       '-',
       { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id) },
       info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(instancePath(info.dataDir, inst.id)) },
@@ -785,6 +796,8 @@ export function useInstanceMenu(inst: Instance) {
   const dialogs = (
     <>
       {dialog === 'delete' && <DeleteInstance inst={inst} onClose={close} />}
+      {dialog === 'reinstallGame' && <ReinstallInstanceModal inst={inst} what="game" onClose={close} />}
+      {dialog === 'reinstallPack' && <ReinstallInstanceModal inst={inst} what="pack" onClose={close} />}
       {dialog === 'rename' && (
         <NameModal
           title={t('menu.instance.renameTitle')}

@@ -31,7 +31,8 @@ import {
   Timer,
   ToggleLeft,
   ToggleRight,
-  Trash2
+  Trash2,
+  Wrench
 } from 'lucide-react'
 import type { ContentItem, ContentKind, Instance, InstanceImage, JavaInstall } from '@shared/types'
 import { api } from '../api'
@@ -41,6 +42,7 @@ import { isLive, useStore } from '../store'
 import { bytes, COLORS, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
 import { engineError, t } from '../i18n'
 import ExportModal from '../components/ExportModal'
+import { ReinstallInstanceModal, type InstanceReinstall } from '../components/Reinstall'
 import { BannerPicker, IconPicker } from '../components/ImagePicker'
 import VersionPicker from '../components/VersionPicker'
 import { DeleteInstance } from './Library'
@@ -1079,6 +1081,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
 
       <VersionSection inst={inst} />
 
+      <RepairSection inst={inst} />
+
       <div className="settings-section">
         <h3>{t('commands.section')}</h3>
         <CommandsWarning />
@@ -1208,6 +1212,42 @@ function OptifineSection({ inst }: { inst: Instance }) {
           onClose={() => setRemoving(false)}
         />
       )}
+    </div>
+  )
+}
+
+/** Settings → Repair: reinstall the game files, or a modpack's own files. */
+function RepairSection({ inst }: { inst: Instance }) {
+  const { games } = useStore()
+  const [what, setWhat] = useState<InstanceReinstall>()
+  const busy = games[inst.id] === 'running' || games[inst.id] === 'preparing'
+  return (
+    <div className="settings-section">
+      <h3>{t('reinstall.section')}</h3>
+      <p>{t('reinstall.section.hint')}</p>
+      <div className="card">
+        <div className="setting">
+          <div className="text">
+            <b>{t('reinstall.menu.game')}</b>
+            <span>{t('reinstall.game.body')}</span>
+          </div>
+          <button className="btn" disabled={busy} onClick={() => setWhat('game')}>
+            <Wrench /> {t('reinstall.confirm')}
+          </button>
+        </div>
+        {inst.modpack && (
+          <div className="setting">
+            <div className="text">
+              <b>{t('reinstall.menu.pack')}</b>
+              <span>{t('reinstall.pack.body')}</span>
+            </div>
+            <button className="btn" disabled={busy} onClick={() => setWhat('pack')}>
+              <Wrench /> {t('reinstall.confirm')}
+            </button>
+          </div>
+        )}
+      </div>
+      {what && <ReinstallInstanceModal inst={inst} what={what} onClose={() => setWhat(undefined)} />}
     </div>
   )
 }

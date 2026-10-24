@@ -15,6 +15,7 @@ import library from './library'
 import menu from './menu'
 import migrate from './migrate'
 import quickjoin from './quickjoin'
+import reinstall from './reinstall'
 import servers from './servers'
 import settings from './settings'
 import storage from './storage'
@@ -26,6 +27,7 @@ const en = {
   ...app,
   ...accounts,
   ...settings,
+  ...reinstall,
   ...storage,
   ...home,
   ...library,

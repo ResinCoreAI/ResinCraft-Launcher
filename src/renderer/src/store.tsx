@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { AccountView, AppInfo, ContentKind, GameEvent, Instance, LogLine, QuickJoinRequest, Settings, TaskInfo } from '@shared/types'
 import { api } from './api'
 import { t, type EngineError } from './i18n'
+import { effectiveTheme } from './themes'
 
 export type Route =
   | { page: 'home' }
@@ -164,20 +165,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => offs.forEach((off) => off())
   }, [refreshInstances, refreshAccounts, toast])
 
-  // Theme: follow the setting, or the OS when set to "system".
+  // Theme: the holiday's while it lasts, else the setting (the OS's light or dark for "system"). Checked again
+  // every hour, so a launcher left open switches when the holiday starts or ends.
   useEffect(() => {
     if (!settings) return
     const media = window.matchMedia('(prefers-color-scheme: light)')
     const apply = () => {
-      const theme = settings.theme === 'system' ? (media.matches ? 'light' : 'dark') : settings.theme
+      const theme = effectiveTheme(settings, media.matches)
       document.documentElement.dataset.theme = theme
       const css = getComputedStyle(document.documentElement)
       void api.app.setTitleBar(css.getPropertyValue('--bg').trim(), css.getPropertyValue('--text-dim').trim()).catch(() => {})
     }
     apply()
     media.addEventListener('change', apply)
-    return () => media.removeEventListener('change', apply)
-  }, [settings?.theme])
+    const hourly = window.setInterval(apply, 60 * 60 * 1000)
+    return () => (media.removeEventListener('change', apply), window.clearInterval(hourly))
+  }, [settings?.theme, settings?.seasonalThemes, settings?.seasonOff])
+
+  // The player's own CSS, after the app's so it wins.
+  useEffect(() => {
+    let tag = document.getElementById('custom-theme') as HTMLStyleElement | null
+    if (!tag) {
+      tag = document.createElement('style')
+      tag.id = 'custom-theme'
+      document.head.appendChild(tag)
+    }
+    // A plain `:root` loses to the themes' `:root[data-theme='…']`; as `:root[data-theme]` it ties, and comes later.
+    tag.textContent = (settings?.customCss ?? '').replace(/:root(?![\w[-])/g, ':root[data-theme]')
+  }, [settings?.customCss])
 
   /** Runs a launch, showing the instance as preparing until the engine reports in. */
   const start = useCallback(

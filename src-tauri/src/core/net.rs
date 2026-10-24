@@ -232,6 +232,18 @@ fn forget_verified(path: &Path) {
     });
 }
 
+/// Forgets every file checked so far, so each one is hashed again (and downloaded again if it no longer matches)
+/// the next time it's needed: Reinstall.
+pub async fn forget_all_verified() {
+    with_verified(|(map, dirty)| {
+        if !map.is_empty() {
+            map.clear();
+            *dirty = true;
+        }
+    });
+    save_verified().await;
+}
+
 /// Writes the verified-file cache if it changed. Losing it only means files get hashed again.
 async fn save_verified() {
     let Some(file) = verified_file() else { return };

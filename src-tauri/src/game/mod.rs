@@ -61,6 +61,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             crashfix::apply(&args.get::<String>(0)?, &args.get::<crashfix::Fix>(1)?).await?;
             done()
         }
+        // Downloads the instance's game files again (Instance → Reinstall).
+        "instances:reinstall" => {
+            launch::reinstall(&args.get::<String>(0)?).await?;
+            done()
+        }
         "instances:launch" => {
             launch_as(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref(), None).await?;
             done()

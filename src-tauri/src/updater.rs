@@ -82,6 +82,9 @@ pub struct Available {
     pub date: Option<String>,
     /// The release page with the full notes.
     pub notes_url: String,
+    /// The version already installed, offered again by Reinstall.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub reinstall: bool,
 }
 
 /// Games and hosted servers that would be cut off by the restart (their names, for the warning).
@@ -169,6 +172,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "update:status" => json(status().await),
         // Never fails because of the network: problems come back as `error` in the status.
         "update:check" => json(check().await?),
+        // Settings → Updates → Reinstall: offers the newest release even when it's the one installed, then the
+        // UI installs it like an update (signature checked, same installer type).
+        "update:checkReinstall" => json(check_with(true).await?),
         "update:blockers" => json(blockers().await),
         // `true`: download now and install once every game and hosted server has stopped. "close": download, then
         // stop the hosted servers (saving their worlds) and close the games, and install.
@@ -196,6 +202,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
 
 /// Asks the update server whether a newer version exists.
 pub async fn check() -> Result<UpdateStatus> {
+    check_with(false).await
+}
+
+/// `reinstall`: the newest release counts as an update even when it's the version running.
+async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     let Some(app) = ctx::app() else { bail_tr!("update.noApp", "Updates only work in the installed app.") };
     if packaged() {
         return Ok(status().await);
@@ -206,7 +217,11 @@ pub async fn check() -> Result<UpdateStatus> {
     status().await;
     publish(|s| s.state = "checking");
 
-    let result = match app.updater_builder().timeout(Duration::from_secs(30)).build() {
+    let mut builder = app.updater_builder().timeout(Duration::from_secs(30));
+    if reinstall {
+        builder = builder.version_comparator(|current, remote| remote.version >= current);
+    }
+    let result = match builder.build() {
         Ok(updater) => updater.check().await,
         Err(e) => Err(e),
     };
@@ -225,6 +240,7 @@ pub async fn check() -> Result<UpdateStatus> {
         notes: u.body.clone().filter(|b| !b.trim().is_empty()),
         date: u.raw_json.get("pub_date").and_then(Value::as_str).map(str::to_string),
         notes_url: format!("{RELEASES}/tag/v{}", u.version.trim_start_matches('v')),
+        reinstall: u.version.trim_start_matches('v') == current_version(),
     });
     with(|st| {
         st.busy = false;
@@ -292,8 +308,13 @@ async fn install(mode: Mode) -> Result<()> {
     }
     CANCEL.store(false, Ordering::SeqCst);
     let version = update.version.clone();
+    let reinstall = version.trim_start_matches('v') == current_version();
     tauri::async_runtime::spawn(async move {
-        let title = tr!("update.task.title", "Updating ResinCraft to {version}", version = version);
+        let title = if reinstall {
+            tr!("update.task.reinstall", "Reinstalling ResinCraft {version}", version = version)
+        } else {
+            tr!("update.task.title", "Updating ResinCraft to {version}", version = version)
+        };
         let result = Task::run(title, None, |task| run_install(update, mode == Mode::Close, task)).await;
         with(|st| st.busy = false);
         if let Err(e) = result {

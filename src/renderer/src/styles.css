@@ -74,6 +74,152 @@
   color-scheme: light;
 }
 
+/*
+ * More themes. Each keeps the same jobs for its colours (accent = clickable, data = versions and progress,
+ * play = play and status); only the palette changes. Settings → Appearance lists them (see themes.ts).
+ */
+
+/* Obsidian: true black, for OLED screens and dark rooms. */
+:root[data-theme='obsidian'] {
+  --bg: #000000;
+  --bg-sidebar: #050407;
+  --surface: #0b0a0f;
+  --surface-2: #121018;
+  --surface-3: #1a1722;
+  --border: #1d1a26;
+  --border-strong: #2c2738;
+}
+
+/* Deepslate: cool grey stone with a blue accent. */
+:root[data-theme='deepslate'] {
+  --bg: #0e1116;
+  --bg-sidebar: #11151b;
+  --surface: #161b22;
+  --surface-2: #1d232c;
+  --surface-3: #262d38;
+  --border: #2a313c;
+  --border-strong: #3a4352;
+  --text: #e8edf3;
+  --text-dim: #a3adbb;
+  --text-faint: #768090;
+  --accent: #6ea8ff;
+  --accent-hover: #8fbcff;
+  --accent-soft: rgba(110, 168, 255, 0.14);
+  --accent-fg: #06101f;
+  --data: #7fe0d0;
+}
+
+/* Cherry: cherry-blossom pink on a dark plum. */
+:root[data-theme='cherry'] {
+  --bg: #120a10;
+  --bg-sidebar: #160c13;
+  --surface: #1c1018;
+  --surface-2: #251520;
+  --surface-3: #301b2a;
+  --border: #33202d;
+  --border-strong: #4a2d40;
+  --text: #f6ebf2;
+  --text-dim: #c3a7b8;
+  --text-faint: #917589;
+  --accent: #ff8cc6;
+  --accent-hover: #ffa8d4;
+  --accent-soft: rgba(255, 140, 198, 0.14);
+  --accent-fg: #1d0614;
+  --data: #ffd1e6;
+  --play: #9dffb5;
+  --play-hover: #bdffcc;
+  --success: #9dffb5;
+}
+
+/* Nether: netherrack red with a lava accent. */
+:root[data-theme='nether'] {
+  --bg: #120807;
+  --bg-sidebar: #160a09;
+  --surface: #1d0d0b;
+  --surface-2: #27120f;
+  --surface-3: #331813;
+  --border: #3a1d17;
+  --border-strong: #552a20;
+  --text: #f6e9e4;
+  --text-dim: #c6a59b;
+  --text-faint: #957368;
+  --accent: #ff7a3d;
+  --accent-hover: #ff9663;
+  --accent-soft: rgba(255, 122, 61, 0.14);
+  --accent-fg: #1c0700;
+  --data: #ffc85c;
+  --play: #5cf2c8;
+  --play-hover: #85f6d6;
+  --play-fg: #02150f;
+  --success: #5cf2c8;
+  --success-soft: rgba(92, 242, 200, 0.12);
+}
+
+/* The End: pale end stone on void purple. */
+:root[data-theme='end'] {
+  --bg: #0b0a10;
+  --bg-sidebar: #0e0c14;
+  --surface: #14121c;
+  --surface-2: #1b1826;
+  --surface-3: #242032;
+  --border: #29243a;
+  --border-strong: #3b3452;
+  --accent: #e6e58c;
+  --accent-hover: #f0efa9;
+  --accent-soft: rgba(230, 229, 140, 0.13);
+  --accent-fg: #15140a;
+  --data: #c79bff;
+}
+
+/* Halloween (on by itself from 16 to 31 October): pumpkin orange, potion purple, slime green. */
+:root[data-theme='halloween'] {
+  --bg: #0c0710;
+  --bg-sidebar: #100914;
+  --surface: #170e1c;
+  --surface-2: #201326;
+  --surface-3: #2b1a33;
+  --border: #33203b;
+  --border-strong: #4a2e55;
+  --text: #f5ecf2;
+  --text-dim: #bda8c4;
+  --text-faint: #8c7494;
+  --accent: #ff8c1a;
+  --accent-hover: #ffa64d;
+  --accent-soft: rgba(255, 140, 26, 0.15);
+  --accent-fg: #1a0b00;
+  --data: #c084fc;
+  --play: #9dff4f;
+  --play-hover: #b8ff7d;
+  --play-fg: #0c1600;
+  --success: #9dff4f;
+  --success-soft: rgba(157, 255, 79, 0.12);
+}
+
+/* Christmas (on by itself from 10 to 25 December): pine green, holly red, gold. */
+:root[data-theme='christmas'] {
+  --bg: #07110c;
+  --bg-sidebar: #091510;
+  --surface: #0d1b14;
+  --surface-2: #12241b;
+  --surface-3: #192f24;
+  --border: #1d3529;
+  --border-strong: #2a4b3a;
+  --text: #f1f6f2;
+  --text-dim: #a9c0b2;
+  --text-faint: #7a9384;
+  --accent: #ff5a6a;
+  --accent-hover: #ff7c89;
+  --accent-soft: rgba(255, 90, 106, 0.15);
+  --accent-fg: #1e0306;
+  --data: #f2cf6b;
+  --play: #6ff0a0;
+  --play-hover: #95f5ba;
+  --play-fg: #02150a;
+  --success: #6ff0a0;
+  --success-soft: rgba(111, 240, 160, 0.12);
+  --danger: #ff8a5c;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -2744,4 +2890,156 @@ button.chip-button {
 button.chip-button:hover {
   border-color: var(--accent);
   color: var(--text);
+}
+
+/* ---------- Theme picker (Settings → Appearance) ---------- */
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+}
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.theme-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+.theme-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.theme-card.on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.theme-swatch {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 44px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(127, 127, 127, 0.25);
+}
+.theme-swatch i {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+.theme-swatch.system {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  background: linear-gradient(135deg, #0a0912 50%, #f4f3f8 50%);
+}
+.theme-swatch.system svg {
+  color: #b26bff;
+}
+.theme-name {
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.theme-season {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.theme-season svg {
+  color: var(--accent);
+  flex: none;
+}
+textarea.custom-css {
+  font-size: 12.5px;
+  min-height: 110px;
+  resize: vertical;
+  user-select: text;
+}
+
+/* ---------- Easter egg (components/EasterEgg.tsx) ---------- */
+
+.egg {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+}
+.egg-piece {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+.egg-bats .egg-piece {
+  left: -60px !important;
+  color: #c9b3d6;
+  filter: drop-shadow(0 0 3px rgba(255, 140, 26, 0.9));
+  animation-name: egg-fly;
+}
+.egg-snow .egg-piece {
+  border-radius: 50%;
+  background: #ffffff;
+  animation-name: egg-fall;
+}
+.egg-resin .egg-piece {
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: var(--accent);
+  animation-name: egg-fall;
+  animation-timing-function: cubic-bezier(0.5, 0, 1, 1);
+}
+@keyframes egg-fall {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.9;
+    transform: translate(30px, 115vh);
+  }
+}
+@keyframes egg-fly {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scaleY(1);
+  }
+  8% {
+    opacity: 1;
+  }
+  25% {
+    transform: translate(28vw, -4vh) scaleY(0.78);
+  }
+  50% {
+    transform: translate(56vw, 3vh) scaleY(1);
+  }
+  75% {
+    transform: translate(84vw, -3vh) scaleY(0.78);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(115vw, 2vh) scaleY(1);
+  }
 }
