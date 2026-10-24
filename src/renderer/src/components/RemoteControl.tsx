@@ -1,0 +1,83 @@
+import { useEffect, useState } from 'react'
+import { ExternalLink, Globe } from 'lucide-react'
+import type { RemoteStatus } from '@shared/types'
+import { api } from '../api'
+import { useStore } from '../store'
+import { t, type Key } from '../i18n'
+import { Switch } from './ui'
+
+const STATE_TEXT: Record<RemoteStatus['state'], Key> = {
+  off: 'settings.remote.state.off',
+  connecting: 'settings.remote.state.connecting',
+  online: 'settings.remote.state.online',
+  noAccount: 'settings.remote.state.noAccount',
+  unavailable: 'settings.remote.state.unavailable',
+  relayTooOld: 'settings.remote.state.relayTooOld',
+  error: 'settings.remote.state.error'
+}
+
+/**
+ * Settings → Remote control: run hosted servers from the web console (console.<relay domain>) while ResinCraft is
+ * open or in the tray. The engine keeps the relay connection (remote.rs); this shows how it's doing.
+ */
+export function RemoteControlSection() {
+  const { settings, updateSettings, toast } = useStore()
+  const [status, setStatus] = useState<RemoteStatus>()
+  useEffect(() => {
+    void api.remote.status().then(setStatus, () => {})
+    return api.on.remote((s) => setStatus((old) => ({ ...s, url: s.url ?? old?.url })))
+  }, [])
+  if (!settings) return null
+  const on = !!settings.remoteControl
+  // Just switched on: the engine's first status is on its way.
+  const state = !on ? 'off' : !status || status.state === 'off' ? 'connecting' : status.state
+  const line =
+    state === 'online'
+      ? status?.viewers
+        ? t('settings.remote.viewers', { name: status.account ?? '', count: status.viewers })
+        : t('settings.remote.state.online', { name: status?.account ?? '' })
+      : t(STATE_TEXT[state], { name: status?.account ?? '' })
+
+  return (
+    <section className="settings-section" id="remote">
+      <h3>{t('settings.remote')}</h3>
+      <p>{t('settings.remote.lead')}</p>
+      <div className="card">
+        <div className="setting">
+          <div className="text">
+            <b>{t('settings.remote.switch')}</b>
+            <span>{t('settings.remote.hint')}</span>
+          </div>
+          <Switch
+            on={on}
+            onChange={(v) => void updateSettings({ remoteControl: v }).catch((e) => toast((e as Error).message, 'error'))}
+            label={t('settings.remote.switch')}
+          />
+        </div>
+        {on && (
+          <div className="setting">
+            <div className="text">
+              <b className="row" style={{ gap: 8 }}>
+                <span className={`remote-dot ${state === 'online' ? 'on' : state === 'connecting' ? 'wait' : 'off'}`} aria-hidden />
+                {line}
+              </b>
+              {state === 'error' && status?.error && <span>{status.error}</span>}
+              {!settings.tray && <span>{t('settings.remote.tray')}</span>}
+            </div>
+            {status?.url && (
+              <button className="btn" onClick={() => void api.app.openExternal(status.url!)}>
+                <Globe /> {t('settings.remote.open')} <ExternalLink size={13} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/** A small note in the launcher whenever the web console changes something. */
+export function useRemoteActions() {
+  const { toast } = useStore()
+  useEffect(() => api.on.remoteAction(() => toast(t('settings.remote.action'), 'info')), [toast])
+}

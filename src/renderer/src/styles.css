@@ -3043,3 +3043,18 @@ textarea.custom-css {
     transform: translate(115vw, 2vh) scaleY(1);
   }
 }
+
+/* Settings → Remote control: the connection's dot. */
+.remote-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: none;
+}
+.remote-dot.on {
+  background: var(--play);
+}
+.remote-dot.wait {
+  background: var(--warning);
+}

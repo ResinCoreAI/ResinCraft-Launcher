@@ -49,6 +49,9 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       update: fn('bedrock:update'),
       openFolder: fn('bedrock:openFolder')
     },
+    remote: {
+      status: fn('remote:status')
+    },
     update: {
       status: fn('update:status'),
       check: fn('update:check'),
@@ -252,6 +255,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction') }
   } as ResinApi
 }

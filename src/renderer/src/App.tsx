@@ -5,6 +5,7 @@ import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, open
 import DropImport from './components/DropImport'
 import WindowControls from './components/WindowControls'
 import { UpdateBanner, UpdateTitleButton } from './components/Updates'
+import { useRemoteActions } from './components/RemoteControl'
 import EasterEgg from './components/EasterEgg'
 import CrashFixer from './components/CrashFixer'
 import { PackUpdatesBanner } from './components/PackUpdates'
@@ -85,6 +86,7 @@ function accountMenu(accounts: AccountView[], pick: (a: AccountView) => void, ma
 
 export default function App() {
   const { route, go, instances, games, accounts, activeAccount, switchAccount, toast, newInstanceOpen, setNewInstanceOpen } = useStore()
+  useRemoteActions()
   const current = route.page === 'instance' ? 'library' : route.page
   const instance = route.page === 'instance' ? instances.find((i) => i.id === route.id) : undefined
   const recent = instances.filter((i) => i.lastPlayed || games[i.id]).slice(0, 6)

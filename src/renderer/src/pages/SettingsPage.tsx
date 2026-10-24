@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun, Terminal } from 'lucide-react'
+import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun, Terminal } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { Logo, Segmented, Switch } from '../components/ui'
 import { StorageSection } from '../components/Storage'
 import { ThemePicker } from '../components/ThemePicker'
+import { RemoteControlSection } from '../components/RemoteControl'
 import { BackupSection } from '../components/Backup'
 import { UpdatesSection } from '../components/Updates'
 import { PackUpdatesSetting } from '../components/PackUpdates'
@@ -42,6 +43,7 @@ const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
   { id: 'storage', label: 'storage.nav', icon: <HardDrive size={16} /> },
   { id: 'backup', label: 'backup.nav', icon: <ArrowLeftRight size={16} /> },
+  { id: 'remote', label: 'settings.remote', icon: <Globe size={16} /> },
   { id: 'updates', label: 'updates.nav', icon: <RefreshCw size={16} /> },
   { id: 'about', label: 'settings.nav.about', icon: <Info size={16} /> }
 ]
@@ -419,6 +421,8 @@ export default function SettingsPage() {
           <StorageSection />
 
           <BackupSection />
+
+          <RemoteControlSection />
 
           <UpdatesSection />
 

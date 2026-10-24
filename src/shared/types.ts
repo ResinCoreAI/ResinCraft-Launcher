@@ -363,6 +363,8 @@ export interface Settings {
   seasonOff?: string
   /** The player's own CSS, applied over any theme (Settings → Appearance → Custom CSS). */
   customCss?: string
+  /** Remote control from the web console while ResinCraft runs (Settings → Remote control; off by default). */
+  remoteControl?: boolean
   /** 'system' follows the OS locale; otherwise a locale code such as 'de' or 'pt-BR'. */
   language: string
   memoryMb: number
@@ -1185,6 +1187,18 @@ export interface AntiXray {
   mode: 1 | 2
 }
 
+/** Settings → Remote control: the connection to the web console. */
+export interface RemoteStatus {
+  state: 'off' | 'connecting' | 'online' | 'noAccount' | 'unavailable' | 'relayTooOld' | 'error'
+  /** Console tabs open on this launcher. */
+  viewers: number
+  /** The Minecraft account the console signs in with. */
+  account?: string
+  /** The console's address. */
+  url?: string
+  error?: string
+}
+
 export interface ServerCreated {
   server: ServerInfo
   /** Client-only mods that were left out. */
@@ -1489,6 +1503,9 @@ export interface ResinApi {
     openFolder(edition: BedrockEditionKind, worldId?: string): Promise<void>
   }
   /** ResinCraft's own updates. */
+  remote: {
+    status(): Promise<RemoteStatus>
+  }
   update: {
     status(): Promise<UpdateStatus>
     /** Asks the update server; network problems come back as `error`, not as a rejection. */
@@ -1841,5 +1858,8 @@ export interface ResinApi {
     update(cb: (s: UpdateStatus) => void): () => void
     /** A list changed on disk (an install made an entry, or one went): fetch it again. */
     listChanged(cb: (what: 'instances' | 'servers') => void): () => void
+    remote(cb: (s: RemoteStatus) => void): () => void
+    /** The web console changed something (started a server, made one…). */
+    remoteAction(cb: (e: { method: string; serverId?: string }) => void): () => void
   }
 }

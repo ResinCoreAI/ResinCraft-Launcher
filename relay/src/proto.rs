@@ -26,6 +26,12 @@
 //! it takes them (`join_requests`), the relay passes each one on (`join_request`), and the agent answers
 //! (`join_answer`). The relay never sends `join_request` to older launchers.
 //!
+//! Protocol 6 adds remote control from the web console (console.<base domain>): a connection that sends `remote`
+//! (never alongside `online`) offers this launcher to its own account's browsers. The relay passes each browser
+//! request on as `call` and the launcher answers with `call_result`; `watch` turns live updates for a topic on or off,
+//! and they come as `push`. `viewers` says how many console tabs are open. The launcher keeps its own allowlist of
+//! methods (src-tauri/src/remote.rs); the relay never sends protocol-6 messages to older launchers.
+//!
 //! A `banned` error carries the ban itself ([`Ban`]: until when, and why) in `ban`. It needs no protocol version
 //! of its own: every launcher knows the `banned` code, and older ones skip the field.
 
@@ -33,13 +39,17 @@ use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 5;
+pub const PROTOCOL_VERSION: u32 = 6;
 /// The first protocol with Bedrock (UDP) tunnels.
 pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The first protocol with data top-ups.
 pub const TOPUP_PROTOCOL_VERSION: u32 = 4;
 /// The first protocol with whitelist requests from the web page.
 pub const JOIN_REQUESTS_PROTOCOL_VERSION: u32 = 5;
+/// The first protocol with remote control from the web console.
+pub const REMOTE_PROTOCOL_VERSION: u32 = 6;
+/// Longest `call_result` / `push` line (results and log batches can be bigger than other messages).
+pub const MAX_REMOTE_LINE: usize = 1024 * 1024;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
 pub const MIN_PROTOCOL_VERSION: u32 = 1;
 /// Longest control line either side accepts.
@@ -50,7 +60,7 @@ pub const ALPN: &[u8] = b"resincraft-relay/1";
 pub const PING_SECS: u64 = 20;
 
 /// Agent → relay.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum AgentMsg {
     Hello { version: u32, client: String },
@@ -91,6 +101,13 @@ pub enum AgentMsg {
     /// The host rejected request `id` and blocks whoever sent it (the relay knows their address for 24 hours;
     /// the launcher never sees it). Protocol 5.
     JoinBlock { id: u64 },
+    /// Offer (or withdraw) this launcher for remote control from the web console: `device` is the PC's name.
+    /// Only after `authed`, and only on a connection that never sent `online`. Protocol 6.
+    Remote { enabled: bool, device: String, app_version: String },
+    /// The answer to `call` `id`: `value` when `ok`, else `error` (worded for players). Protocol 6.
+    CallResult { id: u64, ok: bool, value: Option<serde_json::Value>, error: Option<String> },
+    /// A live update for a topic the relay asked to `watch`. Protocol 6.
+    Push { topic: String, data: serde_json::Value },
     Ping { seq: u64 },
 }
 
@@ -113,7 +130,7 @@ pub enum JoinOutcome {
 }
 
 /// Relay → agent.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum RelayMsg {
     Welcome { version: u32, base_domain: String },
@@ -169,6 +186,14 @@ pub enum RelayMsg {
         usage: Usage,
     },
     Pong { seq: u64 },
+    /// The answer to `remote {enabled: true}`: this launcher is listed for its account's console. Protocol 6.
+    RemoteReady {},
+    /// A request from the web console; `params` is a JSON array. Protocol 6.
+    Call { id: u64, method: String, params: serde_json::Value },
+    /// Start or stop sending `push`es for a topic. Protocol 6.
+    Watch { topic: String, on: bool },
+    /// How many console tabs this account has open on this launcher. Protocol 6.
+    Viewers { count: u32 },
     /// A player asks on the web page to be whitelisted. Protocol 5, and only after `join_requests` turned on.
     JoinRequest { id: u64, username: String },
     Error {
@@ -482,6 +507,22 @@ pub fn now_secs() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remote_messages_have_the_agreed_json() {
+        let remote = AgentMsg::Remote { enabled: true, device: "PC".into(), app_version: "1.2.12".into() };
+        assert_eq!(serde_json::to_value(&remote).unwrap(), serde_json::json!({"t": "remote", "enabled": true, "device": "PC", "app_version": "1.2.12"}));
+        let result = AgentMsg::CallResult { id: 7, ok: true, value: Some(serde_json::json!([1])), error: None };
+        assert_eq!(serde_json::to_value(&result).unwrap(), serde_json::json!({"t": "call_result", "id": 7, "ok": true, "value": [1], "error": null}));
+        let push = AgentMsg::Push { topic: "servers".into(), data: serde_json::json!({"event": "list"}) };
+        assert_eq!(serde_json::to_value(&push).unwrap()["t"], "push");
+        let call: RelayMsg = serde_json::from_str(r#"{"t":"call","id":3,"method":"servers.list","params":[]}"#).unwrap();
+        assert_eq!(call, RelayMsg::Call { id: 3, method: "servers.list".into(), params: serde_json::json!([]) });
+        let watch: RelayMsg = serde_json::from_str(r#"{"t":"watch","topic":"log:smp","on":true}"#).unwrap();
+        assert_eq!(watch, RelayMsg::Watch { topic: "log:smp".into(), on: true });
+        assert_eq!(serde_json::from_str::<RelayMsg>(r#"{"t":"remote_ready"}"#).unwrap(), RelayMsg::RemoteReady {});
+        assert_eq!(serde_json::from_str::<RelayMsg>(r#"{"t":"viewers","count":2}"#).unwrap(), RelayMsg::Viewers { count: 2 });
+    }
 
     #[test]
     fn validates_names() {

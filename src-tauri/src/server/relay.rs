@@ -253,6 +253,15 @@ async fn connect(s: &Settings, account: &MicrosoftAccount) -> Result<Connection,
     Err(Failure::Relay(AgentError::Refused(ErrorCode::AuthFailed, String::new())))
 }
 
+/// Connects and signs in as `account` for remote control (remote.rs), with the same saved session as tunnels.
+pub(crate) async fn connect_for_remote(account: &MicrosoftAccount) -> Result<Connection, AgentError> {
+    let s = settings().ok_or_else(|| AgentError::Config("no relay in this build".into()))?;
+    connect(&s, account).await.map_err(|f| match f {
+        Failure::Relay(e) => e,
+        Failure::Account(e) => AgentError::Refused(ErrorCode::AuthFailed, e.to_string()),
+    })
+}
+
 /// A name for a server that has none yet: from its name, with a short suffix when that's taken.
 async fn pick_name(conn: &mut Connection, server_name: &str) -> Result<String, Failure> {
     let base = proto::suggest_name(server_name);

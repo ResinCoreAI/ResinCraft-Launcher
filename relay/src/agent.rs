@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -585,6 +585,101 @@ impl Connection {
     }
 }
 
+// ---------- Remote control (protocol 6) ----------
+
+/// Something the web console asked for, on a remote-control connection.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RemoteEvent {
+    /// Answer with [`RemoteCommand::Result`] and the same `id`. `params` is a JSON array.
+    Call { id: u64, method: String, params: serde_json::Value },
+    /// Start or stop sending [`RemoteCommand::Push`]es for `topic`.
+    Watch { topic: String, on: bool },
+    /// How many console tabs are open on this launcher.
+    Viewers(u32),
+}
+
+/// What the launcher sends on a remote-control connection.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RemoteCommand {
+    /// The answer to [`RemoteEvent::Call`] `id`: a value, or an error worded for players.
+    Result { id: u64, result: Result<serde_json::Value, String> },
+    Push { topic: String, data: serde_json::Value },
+}
+
+impl Connection {
+    /// Whether this relay has the web console (protocol 6).
+    pub fn has_remote(&self) -> bool {
+        self.relay_version >= REMOTE_PROTOCOL_VERSION
+    }
+
+    /// Offers this launcher to its account's web console and serves it until the connection ends (returning why):
+    /// calls and watches go to `on_event`, answers and pushes come from `commands`. The connection must be
+    /// signed in and must not be serving a tunnel.
+    pub async fn remote(
+        mut self,
+        device: &str,
+        app_version: &str,
+        mut on_event: impl FnMut(RemoteEvent) + Send,
+        commands: &mut mpsc::UnboundedReceiver<RemoteCommand>,
+    ) -> AgentError {
+        if !self.has_remote() {
+            return AgentError::Refused(ErrorCode::BadRequest, "this relay has no web console yet".into());
+        }
+        if let Err(e) = self.send(&AgentMsg::Remote { enabled: true, device: device.to_string(), app_version: app_version.to_string() }).await {
+            return e;
+        }
+        match self.recv().await {
+            Ok(RelayMsg::RemoteReady {}) => {}
+            Ok(other) => return unexpected(&other),
+            Err(e) => return e,
+        }
+        let mut ping = tokio::time::interval(Duration::from_secs(PING_SECS));
+        ping.tick().await;
+        let silence = Duration::from_secs(PING_SECS * 3);
+        let mut deadline = tokio::time::Instant::now() + silence;
+        loop {
+            tokio::select! {
+                biased;
+                line = self.lines.next() => {
+                    deadline = tokio::time::Instant::now() + silence;
+                    match parse_line(line) {
+                        Ok(RelayMsg::Call { id, method, params }) => on_event(RemoteEvent::Call { id, method, params }),
+                        Ok(RelayMsg::Watch { topic, on }) => on_event(RemoteEvent::Watch { topic, on }),
+                        Ok(RelayMsg::Viewers { count }) => on_event(RemoteEvent::Viewers(count)),
+                        Ok(RelayMsg::Error { code, message, ban }) => return refused(code, message, ban),
+                        Ok(RelayMsg::Shutdown { .. }) => return AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into()),
+                        Ok(_) => {}
+                        Err(e) => return e,
+                    }
+                }
+                cmd = commands.recv() => {
+                    let msg = match cmd {
+                        Some(RemoteCommand::Result { id, result: Ok(value) }) => AgentMsg::CallResult { id, ok: true, value: Some(value), error: None },
+                        Some(RemoteCommand::Result { id, result: Err(error) }) => AgentMsg::CallResult { id, ok: false, value: None, error: Some(error) },
+                        Some(RemoteCommand::Push { topic, data }) => AgentMsg::Push { topic, data },
+                        // The launcher turned remote control off: say so, then hang up.
+                        None => {
+                            let _ = self.send(&AgentMsg::Remote { enabled: false, device: device.to_string(), app_version: app_version.to_string() }).await;
+                            return AgentError::Refused(ErrorCode::BadRequest, "remote control was switched off".into());
+                        }
+                    };
+                    if let Err(e) = self.send(&msg).await {
+                        return e;
+                    }
+                }
+                _ = ping.tick() => {
+                    self.seq += 1;
+                    let seq = self.seq;
+                    if let Err(e) = self.send(&AgentMsg::Ping { seq }).await {
+                        return e;
+                    }
+                }
+                _ = tokio::time::sleep_until(deadline) => return net("the relay stopped answering"),
+            }
+        }
+    }
+}
+
 fn parse_line(line: Option<Result<String, tokio_util::codec::LinesCodecError>>) -> Result<RelayMsg, AgentError> {
     match line {
         Some(Ok(text)) => serde_json::from_str(&text).map_err(|e| AgentError::Protocol(e.to_string())),
@@ -699,6 +794,66 @@ mod tests {
             assert_eq!(conn.has_top_ups(), relay >= TOPUP_PROTOCOL_VERSION);
             assert_eq!(conn.has_join_requests(), relay >= JOIN_REQUESTS_PROTOCOL_VERSION);
         }
+    }
+
+    /// A protocol-6 relay that signs anyone in, takes `remote`, sends one `call` and hands back the agent's answer.
+    async fn console_relay() -> (String, tokio::sync::oneshot::Receiver<AgentMsg>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("tcp://{}", listener.local_addr().unwrap());
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let (tcp, _) = listener.accept().await.unwrap();
+            let mut session = Session::new_server(tcp, yamux_config());
+            let Some(Ok(stream)) = session.next().await else { return };
+            tokio::spawn(async move { while session.next().await.is_some() {} });
+            let (r, mut w) = tokio::io::split(stream);
+            let mut lines = FramedRead::new(r, LinesCodec::new());
+            let say = |m: RelayMsg| format!("{}
+", serde_json::to_string(&m).unwrap());
+            macro_rules! next {
+                () => {
+                    serde_json::from_str::<AgentMsg>(&lines.next().await.unwrap().unwrap()).unwrap()
+                };
+            }
+            assert!(matches!(next!(), AgentMsg::Hello { version: 6, .. }));
+            w.write_all(say(RelayMsg::Welcome { version: 6, base_domain: "relay.test".into() }).as_bytes()).await.unwrap();
+            assert!(matches!(next!(), AgentMsg::Login { .. }));
+            w.write_all(say(RelayMsg::Authed { uuid: "u".into(), username: "Steve".into(), session: None }).as_bytes()).await.unwrap();
+            assert_eq!(next!(), AgentMsg::Remote { enabled: true, device: "PC".into(), app_version: "9".into() });
+            w.write_all(say(RelayMsg::RemoteReady {}).as_bytes()).await.unwrap();
+            w.write_all(say(RelayMsg::Call { id: 5, method: "servers.list".into(), params: serde_json::json!([]) }).as_bytes()).await.unwrap();
+            w.flush().await.unwrap();
+            let answer = loop {
+                match next!() {
+                    AgentMsg::Ping { .. } => continue,
+                    other => break other,
+                }
+            };
+            let _ = tx.send(answer);
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        });
+        (url, rx)
+    }
+
+    #[tokio::test]
+    async fn answers_web_console_calls() {
+        let (url, answered) = console_relay().await;
+        let mut conn = Connection::connect(&AgentConfig { url, extra_roots_pem: None, client: "test".into() }).await.unwrap();
+        assert!(conn.has_remote());
+        conn.auth(Credentials::Minecraft("token".into())).await.unwrap();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let serving = tokio::spawn(async move {
+            conn.remote("PC", "9", move |e| {
+                if let RemoteEvent::Call { id, method, .. } = e {
+                    assert_eq!(method, "servers.list");
+                    tx.send(RemoteCommand::Result { id, result: Ok(serde_json::json!(["smp"])) }).unwrap();
+                }
+            }, &mut rx)
+            .await
+        });
+        let answer = tokio::time::timeout(Duration::from_secs(5), answered).await.unwrap().unwrap();
+        assert_eq!(answer, AgentMsg::CallResult { id: 5, ok: true, value: Some(serde_json::json!(["smp"])), error: None });
+        serving.abort();
     }
 
     #[test]

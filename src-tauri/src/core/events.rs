@@ -66,8 +66,21 @@ pub fn set_sink(f: impl Fn(&str, Value) + Send + Sync + 'static) {
     let _ = SINK.set(Box::new(f));
 }
 
+/// A copy of every event, for remote control (the web console's live updates; see remote.rs).
+static TAP: OnceLock<tokio::sync::broadcast::Sender<(String, Value)>> = OnceLock::new();
+
+/// Every event from now on, as (channel, payload). Nothing is copied while nobody listens.
+pub fn tap() -> tokio::sync::broadcast::Receiver<(String, Value)> {
+    TAP.get_or_init(|| tokio::sync::broadcast::channel(1024).0).subscribe()
+}
+
 /// Sends `payload` to the UI as `resin:<channel>`.
 pub fn emit<S: Serialize + Clone>(channel: &str, payload: S) {
+    if let Some(tap) = TAP.get().filter(|t| t.receiver_count() > 0) {
+        if let Ok(v) = serde_json::to_value(&payload) {
+            let _ = tap.send((channel.to_string(), v));
+        }
+    }
     if let Some(app) = ctx::app() {
         let _ = app.emit(&format!("resin:{channel}"), payload);
     } else if let Some(sink) = SINK.get() {

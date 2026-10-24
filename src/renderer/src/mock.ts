@@ -111,6 +111,7 @@ export function mockApi(): ResinApi {
     seasonalThemes: true,
     seasonOff: '',
     customCss: '',
+    remoteControl: false,
     language: 'system',
     memoryMb: 4096,
     jvmArgs: '',
@@ -549,6 +550,7 @@ export function mockApi(): ResinApi {
     ...mockMigrate((inst) => {
       instances = [inst, ...instances]
     }),
-    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop() }
+    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop() },
+    remote: { status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }) }
   }
 }

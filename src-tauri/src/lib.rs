@@ -20,6 +20,7 @@ pub mod game;
 pub mod migrate;
 pub mod player;
 pub mod server;
+pub mod remote;
 pub mod tray;
 pub mod updater;
 
@@ -49,6 +50,7 @@ pub fn run() {
             core::ctx::init(data_dir, Some(app.handle().clone()));
             tauri::async_runtime::spawn(discord::init());
             tauri::async_runtime::spawn(server::discordbot::init());
+            tauri::async_runtime::spawn(remote::init());
             // Reads the settings once, so the close button knows about tray mode.
             tauri::async_runtime::spawn(async {
                 tray::sync(core::settings::get().await.tray);
