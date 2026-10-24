@@ -1,0 +1,4 @@
+# The same source builds the same exe, byte for byte (no timestamps): Windows SmartScreen judges a download by
+# its exact file, so a Setup that doesn't change between releases keeps the reputation it has built.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/Brepro"]

@@ -1,0 +1,45 @@
+# Builds ResinCraft Setup (setup/), the small installer that always installs the newest ResinCraft Launcher, and puts
+# it on the `setup` release, so this link never changes:
+#   https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe
+# It runs when setup/ changes on main, or by hand. The build is reproducible (setup/.cargo/config.toml), so the file
+# only changes when its source does, and Windows SmartScreen keeps the reputation it has built. The release is a
+# pre-release: it never becomes the "latest release", and publish-update.yml ignores it.
+name: Setup
+
+on:
+  push:
+    branches: [main]
+    paths: ['setup/**', '.github/workflows/setup.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: setup -> target
+      - name: Build
+        working-directory: setup
+        run: cargo build --release --locked
+      - name: Put it on the setup release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          exe=setup/target/release/ResinCraft-Setup.exe
+          sha256sum "$exe"
+          if ! gh release view setup > /dev/null 2>&1; then
+            gh release create setup --prerelease --latest=false --target "$GITHUB_SHA" --title "ResinCraft Setup" \
+              --notes "Download **ResinCraft-Setup.exe** to install the newest ResinCraft Launcher on Windows. It always installs the latest version, so this link never changes.
+
+          NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT."
+          fi
+          gh release upload setup "$exe" --clobber

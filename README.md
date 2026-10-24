@@ -87,6 +87,7 @@ Get the newest version from the [latest release](https://github.com/ResinCoreAI/
 
 | System | File |
 |---|---|
+| **Windows** x64, always the newest | [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe): a small installer that downloads and installs the newest version (the link never changes) |
 | **Windows** x64 | `ResinCraft.Launcher_<version>_amd64_windows.exe` |
 | **Windows** x64, MSI (managed installs) | `ResinCraft.Launcher_<version>_amd64_windows.msi` |
 | **macOS** Intel and Apple Silicon | `ResinCraft.Launcher_<version>_universal_macos.dmg` |
