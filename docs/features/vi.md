@@ -56,7 +56,7 @@ Các mục có đánh dấu **(mới)** là mới trong phiên bản mới nhấ
 - **Anti-xray (mới)** (chống x-ray): máy chủ Paper, Purpur, Folia và Leaf có thể giấu quặng khỏi mod và gói texture x-ray (Settings → Anti-xray của máy chủ).
 - **Cài lại (mới):** cài lại phần mềm của máy chủ, hoặc đưa tệp modpack của nó về như cũ. Thế giới và cài đặt vẫn còn.
 - **Xóa và tạo tức thì (mới):** máy chủ bị xóa biến mất ngay; máy chủ đang được tạo hiện ngay trong danh sách, kèm tiến độ.
-- **Điều khiển từ xa (mới):** điều khiển máy chủ từ bất kỳ trình duyệt nào hoặc từ điện thoại bằng web console tại `console.rscraft.resincore.tech`, đăng nhập bằng cùng tài khoản Minecraft, khi ResinCraft đang mở hoặc đang ở khay hệ thống (Cài đặt → Điều khiển từ xa). Nó có thể khởi động, dừng, theo dõi và tạo máy chủ, nhưng không bao giờ chạm được vào tệp hay các cài đặt khác của bạn.
+- **Điều khiển từ xa (mới):** điều khiển máy chủ từ bất kỳ trình duyệt nào hoặc từ điện thoại bằng web console tại `console.rscraft.resincore.tech`, đăng nhập bằng cùng tài khoản Minecraft, khi ResinCraft đang mở hoặc đang ở khay hệ thống (Cài đặt → Điều khiển từ xa). Nó làm được mọi việc mà trình quản lý máy chủ làm được. Trình quản lý tệp, cài đặt Java và plugin từ bất kỳ liên kết nào cần thêm một công tắc thứ hai, **Cho phép toàn quyền điều khiển**.
 - **Chơi cùng bạn bè:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Các mục có đánh dấu **(mới)** là mới trong phiên bản mới nhấ
   - **Cập nhật âm thầm** ở nền.
 - **Tiếp tục chạy ở khay hệ thống:** đóng cửa sổ thì máy chủ, bot Discord, điều khiển từ xa và tải xuống vẫn tiếp tục.
 - **Cài lại ResinCraft (mới):** Cài đặt → Cập nhật cài lại ứng dụng đè lên chính nó để sửa lỗi. Bản cài, tài khoản và cài đặt vẫn còn.
-- **Chủ đề (mới):** Tối, Sáng, Hắc thạch, Đá phiến sâu, Anh đào, Nether, The End, Halloween và Giáng sinh, hoặc Hệ thống.
-  - Halloween tự bật từ 16 đến 31/10, Giáng sinh từ 10 đến 25/12. Chọn chủ đề khác thì nó vẫn là của bạn; hoặc tắt hẳn giao diện dịp lễ.
-  - **CSS tùy chỉnh:** CSS của riêng bạn phủ lên bất kỳ chủ đề nào, bắt đầu từ màu hiện tại.
+- **Chủ đề (mới):** Tối, Sáng, Hắc thạch, Đá phiến sâu, Anh đào, Nether và The End, hoặc Hệ thống.
+  - **CSS tùy chỉnh:** CSS của riêng bạn phủ lên bất kỳ chủ đề nào, bắt đầu từ màu hiện tại, kèm hướng dẫn có sẵn về màu sắc, các phần của ứng dụng và ví dụ dùng ngay.
   - Và một bất ngờ được giấu kín. Thử mã Konami xem.
 - **16 ngôn ngữ:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Quản lý lưu trữ** (chuyển dữ liệu sang ổ khác), **sao lưu và khôi phục** cài đặt.

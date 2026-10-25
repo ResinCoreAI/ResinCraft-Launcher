@@ -56,7 +56,7 @@
 - **Anti-xray (yeni)** (x-ray önleme): Paper, Purpur, Folia ve Leaf sunucuları cevherleri x-ray modlarından ve doku paketlerinden gizleyebilir (sunucunun Settings → Anti-xray bölümü).
 - **Yeniden kur (yeni):** bir sunucunun yazılımını yeniden kur ya da mod paketi dosyalarını geri getir. Dünya ve ayarlar kalır.
 - **Anında silme ve oluşturma (yeni):** silinen bir sunucu hemen kaybolur; oluşturulmakta olan bir sunucu, ilerlemesiyle birlikte hemen listede görünür.
-- **Uzaktan kontrol (yeni):** ResinCraft açıkken ya da sistem tepsisindeyken, sunucularını herhangi bir tarayıcıdan veya telefonundan `console.rscraft.resincore.tech` adresindeki web konsoluyla, aynı Minecraft hesabıyla giriş yaparak yönet (Ayarlar → Uzaktan kontrol). Sunucu başlatabilir, durdurabilir, izleyebilir ve oluşturabilir, ama dosyalarına ya da diğer ayarlarına asla erişemez.
+- **Uzaktan kontrol (yeni):** ResinCraft açıkken ya da sistem tepsisindeyken, sunucularını herhangi bir tarayıcıdan veya telefonundan `console.rscraft.resincore.tech` adresindeki web konsoluyla, aynı Minecraft hesabıyla giriş yaparak yönet (Ayarlar → Uzaktan kontrol). Sunucu yöneticisinin yaptığı her şeyi yapabilir. Dosya yöneticisi, Java ayarları ve herhangi bir bağlantıdan eklentiler için ikinci bir anahtar gerekir: **Tam kontrole izin ver**.
 - **Arkadaşlarınla paylaşma:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@
   - Arka planda **Sessiz güncelle**.
 - **Sistem tepsisinde çalışmaya devam et:** pencereyi kapatınca sunucular, Discord botu, uzaktan kontrol ve indirmeler çalışmaya devam eder.
 - **ResinCraft'ı yeniden kur (yeni):** Ayarlar → Güncellemeler, uygulamayı onarmak için onu kendi üstüne yeniden kurar. Kurulumlar, hesaplar ve ayarlar kalır.
-- **Temalar (yeni):** Koyu, Açık, Obsidyen, Derin Arduvaz, Kiraz, Nether, End, Cadılar Bayramı ve Noel ya da Sistem.
-  - Cadılar Bayramı 16-31 Ekim, Noel 10-25 Aralık arasında kendiliğinden açılır. Başka bir tema seçersen o tema senin kalır; istersen tatil temalarını tamamen kapat.
-  - **Özel CSS:** istediğin temanın üstüne kendi CSS'in, şu anki renklerden başlayarak.
+- **Temalar (yeni):** Koyu, Açık, Obsidyen, Derin Arduvaz, Kiraz, Nether ve End ya da Sistem.
+  - **Özel CSS:** istediğin temanın üstüne kendi CSS'in, şu anki renklerden başlayarak; renkleri, uygulamanın bölümlerini ve hazır örnekleri anlatan yerleşik bir rehberle.
   - Bir de gizli bir sürpriz var. Konami kodunu dene.
 - **16 dil:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Depolama yöneticisi** (verileri başka bir sürücüye taşı) ve ayarların **yedeklenmesi ve geri yüklenmesi**.

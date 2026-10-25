@@ -185,12 +185,9 @@ Leurs mods, mondes et réglages viennent avec. Les originaux restent là où ils
 
 ## 14. Thèmes et CSS personnalisé
 
-1. Ouvrez **Paramètres → Apparence → Thème** et choisissez une carte : **Système**, Sombre, Clair, Obsidienne, Ardoise des abîmes, Cerisier, Nether, L’End, Halloween ou Noël.
-2. **Thèmes de fêtes :**
-   - Halloween s’active tout seul du 16 au 31 octobre, Noël du 10 au 25 décembre. Votre thème revient le lendemain.
-   - Vous préférez garder le vôtre ? Cliquez sur **Utiliser mon thème** dans le bandeau, ou choisissez une autre carte : elle reste la vôtre pendant cette fête.
-   - Désactivez **Thèmes de fêtes** pour ne plus du tout les avoir.
-3. **CSS personnalisé :** cliquez sur **Insérer les couleurs actuelles**, modifiez les couleurs que vous voulez, puis cliquez sur **Appliquer**. Cela marche par-dessus n’importe quel thème ; **Effacer** le retire.
+1. Ouvrez **Paramètres → Apparence → Thème** et choisissez une carte : **Système**, Sombre, Clair, Obsidienne, Ardoise des abîmes, Cerisier, Nether ou L’End.
+2. **CSS personnalisé :** cliquez sur **Insérer les couleurs actuelles**, modifiez les couleurs que vous voulez, puis cliquez sur **Appliquer**. Cela marche par-dessus n’importe quel thème ; **Effacer** le retire.
+3. Ouvrez **Comment personnaliser** sous la zone : vous y trouverez les couleurs et formes modifiables, les parties de l’application que vous pouvez styliser, et des exemples (une image de fond, des coins plus arrondis, un texte plus grand…). Cliquez sur l’un d’eux pour l’ajouter à votre CSS.
 
 Psst : essayez le code Konami (↑ ↑ ↓ ↓ ← → ← → B A), ou cliquez sept fois sur le logo ResinCraft.
 
@@ -203,7 +200,9 @@ Pilotez vos serveurs depuis n’importe quel navigateur, ou depuis votre télép
 3. Activez **Rester dans la zone de notification** (section 13), pour que cela continue de marcher après la fermeture de la fenêtre.
 4. Ouvrez `https://console.rscraft.resincore.tech` (ou cliquez sur **Ouvrir la console web**) et connectez-vous avec **le même compte Minecraft**.
 
-Depuis la console, vous pouvez démarrer, arrêter et redémarrer les serveurs, suivre la console et taper des commandes, gérer les joueurs, sauvegarder et créer de nouveaux serveurs. Elle ne peut pas accéder à vos fichiers, à vos réglages Java ni à quoi que ce soit d’autre sur votre PC. Chaque modification s’affiche sous forme de notification dans ResinCraft.
+Depuis la console, vous pouvez faire tout ce que fait le gestionnaire de serveurs : démarrer, arrêter et redémarrer les serveurs, suivre la console et taper des commandes, gérer les joueurs et les demandes de whitelist, ajouter et mettre à jour des plugins et des mods, modifier les propriétés et les réglages, changer la version du modpack, réinstaller, sauvegarder et créer de nouveaux serveurs. Chaque modification s’affiche sous forme de notification dans ResinCraft.
+
+Le gestionnaire de fichiers, les réglages Java et les plugins depuis n’importe quel lien de téléchargement peuvent lancer des programmes sur votre PC ; ils demandent donc un second interrupteur : **Autoriser le contrôle total**. Activez-le seulement si votre compte Minecraft (Microsoft) a la vérification en deux étapes. Sans lui, la console ne peut jamais accéder à quoi que ce soit d’autre sur votre PC.
 
 ## 16. Réinstaller et réparer
 

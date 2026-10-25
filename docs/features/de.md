@@ -56,7 +56,7 @@ Mit **(neu)** markierte Punkte sind neu in der neuesten Version.
 - **Anti-xray (neu):** Paper-, Purpur-, Folia- und Leaf-Server können Erze vor X-Ray-Mods und Texturpaketen verstecken (Settings → Anti-xray).
 - **Neu installieren (neu):** die Software eines Servers neu installieren oder seine Modpack-Dateien wieder ablegen. Welt und Einstellungen bleiben.
 - **Sofort löschen und erstellen (neu):** Ein gelöschter Server verschwindet sofort; ein Server, der gerade erstellt wird, erscheint direkt in der Liste, mit seinem Fortschritt.
-- **Fernsteuerung (neu):** Steuere deine Server aus jedem Browser oder vom Handy mit der Web-Konsole unter `console.rscraft.resincore.tech`, angemeldet mit demselben Minecraft-Konto, solange ResinCraft offen ist oder im Infobereich läuft (Einstellungen → Fernsteuerung). Sie kann Server starten, stoppen, beobachten und erstellen, kommt aber nie an deine Dateien oder andere Einstellungen.
+- **Fernsteuerung (neu):** Steuere deine Server aus jedem Browser oder vom Handy mit der Web-Konsole unter `console.rscraft.resincore.tech`, angemeldet mit demselben Minecraft-Konto, solange ResinCraft offen ist oder im Infobereich läuft (Einstellungen → Fernsteuerung). Sie kann alles, was die Serververwaltung kann. Dateimanager, Java-Einstellungen und Plugins von beliebigen Links brauchen einen zweiten Schalter, **Volle Kontrolle erlauben**.
 - **Mit Freunden teilen:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Mit **(neu)** markierte Punkte sind neu in der neuesten Version.
   - **Still aktualisieren** im Hintergrund.
 - **Im Infobereich weiterlaufen:** Wenn du das Fenster schließt, laufen Server, der Discord-Bot, die Fernsteuerung und Downloads weiter.
 - **ResinCraft neu installieren (neu):** Unter Einstellungen → Updates installiert sich die App über sich selbst neu, um sie zu reparieren. Instanzen, Konten und Einstellungen bleiben.
-- **Designs (neu):** Dunkel, Hell, Obsidian, Tiefenschiefer, Kirsche, Nether, Das Ende, Halloween und Weihnachten, oder System.
-  - Halloween schaltet sich vom 16. bis 31. Oktober von selbst ein, Weihnachten vom 10. bis 25. Dezember. Wählst du ein anderes Design, bleibt es deins; oder schalte die Feiertags-Themes aus.
-  - **Eigenes CSS:** dein eigenes CSS über jedem Design, ausgehend von den aktuellen Farben.
+- **Designs (neu):** Dunkel, Hell, Obsidian, Tiefenschiefer, Kirsche, Nether und Das Ende, oder System.
+  - **Eigenes CSS:** dein eigenes CSS über jedem Design, ausgehend von den aktuellen Farben, mit eingebauter Anleitung zu den Farben, den Teilen der App und fertigen Beispielen.
   - Und eine versteckte Überraschung. Probier den Konami-Code.
 - **16 Sprachen:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Speicher** verwalten (Daten auf ein anderes Laufwerk verschieben), **Sichern und Wiederherstellen** der Einstellungen.

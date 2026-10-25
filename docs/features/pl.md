@@ -56,7 +56,7 @@ Pozycje oznaczone **(nowość)** są nowe w najnowszej wersji.
 - **Anti-xray (nowość)** (ochrona przed x-rayem): serwery Paper, Purpur, Folia i Leaf mogą ukrywać rudy przed modami i paczkami tekstur typu x-ray (Settings → Anti-xray).
 - **Ponowna instalacja (nowość):** zainstaluj ponownie oprogramowanie serwera albo przywróć pliki jego modpacka. Świat i ustawienia zostają.
 - **Błyskawiczne usuwanie i tworzenie (nowość):** usunięty serwer znika od razu; tworzony serwer od razu pojawia się na liście, z postępem.
-- **Zdalne sterowanie (nowość):** steruj serwerami z dowolnej przeglądarki lub telefonu przez konsolę webową pod `console.rscraft.resincore.tech`, zalogowany tym samym kontem Minecraft, gdy ResinCraft jest otwarty lub w zasobniku systemowym (Ustawienia → Zdalne sterowanie). Może uruchamiać, zatrzymywać, podglądać i tworzyć serwery, ale nigdy nie ma dostępu do twoich plików ani innych ustawień.
+- **Zdalne sterowanie (nowość):** steruj serwerami z dowolnej przeglądarki lub telefonu przez konsolę webową pod `console.rscraft.resincore.tech`, zalogowany tym samym kontem Minecraft, gdy ResinCraft jest otwarty lub w zasobniku systemowym (Ustawienia → Zdalne sterowanie). Potrafi wszystko, co menedżer serwerów. Menedżer plików, ustawienia Javy i pluginy z dowolnego linku wymagają drugiego przełącznika, **Zezwól na pełną kontrolę**.
 - **Granie ze znajomymi:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Pozycje oznaczone **(nowość)** są nowe w najnowszej wersji.
   - **Aktualizuj po cichu** w tle.
 - **Działaj w zasobniku systemowym:** po zamknięciu okna serwery, bot Discord, zdalne sterowanie i pobieranie dalej działają.
 - **Ponowna instalacja ResinCraft (nowość):** Ustawienia → Aktualizacje instaluje aplikację ponownie na sobie, żeby ją naprawić. Instancje, konta i ustawienia zostają.
-- **Motywy (nowość):** Ciemny, Jasny, Obsydian, Łupek, Wiśnia, Nether, Kres, Halloween i Boże Narodzenie albo Systemowy.
-  - Halloween włącza się sam od 16 do 31 października, a Boże Narodzenie od 10 do 25 grudnia. Wybierz inny motyw, a zostanie twój; możesz też wyłączyć motywy świąteczne.
-  - **Własny CSS:** twój własny CSS na dowolnym motywie, zaczynając od obecnych kolorów.
+- **Motywy (nowość):** Ciemny, Jasny, Obsydian, Łupek, Wiśnia, Nether i Kres albo Systemowy.
+  - **Własny CSS:** twój własny CSS na dowolnym motywie, zaczynając od obecnych kolorów, z wbudowanym przewodnikiem po kolorach, częściach aplikacji i gotowych przykładach.
   - I ukryta niespodzianka. Spróbuj kodu Konami.
 - **16 języków:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Menedżer miejsca na dysku** (przenieś dane na inny dysk), **kopia zapasowa i przywracanie** ustawień.

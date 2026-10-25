@@ -56,7 +56,7 @@ Item bertanda **(baru)** adalah fitur baru di versi terbaru.
 - **Anti-xray (baru):** server Paper, Purpur, Folia, dan Leaf bisa menyembunyikan bijih dari mod dan texture pack x-ray (Settings → Anti-xray).
 - **Instal ulang (baru):** pasang ulang software server, atau kembalikan file modpack-nya. Dunia dan pengaturan tetap ada.
 - **Hapus dan buat instan (baru):** server yang dihapus langsung hilang; server yang sedang dibuat langsung muncul di daftar, dengan progresnya.
-- **Kendali jarak jauh (baru):** jalankan server Anda dari browser mana saja atau dari ponsel dengan konsol web di `console.rscraft.resincore.tech`, masuk dengan akun Minecraft yang sama, selama ResinCraft terbuka atau ada di system tray (Pengaturan → Kendali jarak jauh). Konsol ini bisa memulai, menghentikan, memantau, dan membuat server, tetapi tidak pernah bisa mengakses file atau pengaturan Anda yang lain.
+- **Kendali jarak jauh (baru):** jalankan server Anda dari browser mana saja atau dari ponsel dengan konsol web di `console.rscraft.resincore.tech`, masuk dengan akun Minecraft yang sama, selama ResinCraft terbuka atau ada di system tray (Pengaturan → Kendali jarak jauh). Konsol ini bisa melakukan semua yang bisa dilakukan pengelola server. Pengelola file, pengaturan Java, dan plugin dari tautan mana pun memerlukan sakelar kedua, **Izinkan kendali penuh**.
 - **Berbagi dengan teman:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Item bertanda **(baru)** adalah fitur baru di versi terbaru.
   - **Perbarui diam-diam** di latar belakang.
 - **Tetap berjalan di system tray:** menutup jendela tetap membuat server, bot Discord, kendali jarak jauh, dan unduhan berjalan.
 - **Instal ulang ResinCraft (baru):** Pengaturan → Pembaruan memasang ulang aplikasi di atas dirinya sendiri untuk memperbaikinya. Instalasi, akun, dan pengaturan tetap ada.
-- **Tema (baru):** Gelap, Terang, Obsidian, Deepslate, Ceri, Nether, The End, Halloween, dan Natal, atau Sistem.
-  - Halloween aktif sendiri dari 16 sampai 31 Oktober, Natal dari 10 sampai 25 Desember. Pilih tema lain dan tema itu tetap milik Anda; atau matikan tema hari raya.
-  - **CSS kustom:** CSS Anda sendiri di atas tema apa pun, dimulai dari warna saat ini.
+- **Tema (baru):** Gelap, Terang, Obsidian, Deepslate, Ceri, Nether, dan The End, atau Sistem.
+  - **CSS kustom:** CSS Anda sendiri di atas tema apa pun, dimulai dari warna saat ini, dengan panduan bawaan tentang warna, bagian-bagian aplikasi, dan contoh siap pakai.
   - Dan ada kejutan tersembunyi. Coba kode Konami.
 - **16 bahasa:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Pengelola penyimpanan** (pindahkan data ke drive lain), **cadangkan dan pulihkan** pengaturan.

@@ -185,12 +185,9 @@ Their mods, worlds and settings come with them. The originals stay where they ar
 
 ## 14. Themes and custom CSS
 
-1. Open **Settings → Appearance → Theme** and pick a card: **System**, Dark, Light, Obsidian, Deepslate, Cherry, Nether, The End, Halloween or Christmas.
-2. **Holiday themes:**
-   - Halloween turns on by itself from 16 to 31 October, Christmas from 10 to 25 December. Your own theme comes back the day after.
-   - Rather keep yours? Press **Use my theme** on the banner, or pick another card: it stays yours for that holiday.
-   - Turn **Holiday themes** off to stop it altogether.
-3. **Custom CSS:** press **Insert current colours**, change any colour, then **Apply**. It works over any theme; **Clear** removes it.
+1. Open **Settings → Appearance → Theme** and pick a card: **System**, Dark, Light, Obsidian, Deepslate, Cherry, Nether or The End.
+2. **Custom CSS:** press **Insert current colours**, change any colour, then **Apply**. It works over any theme; **Clear** removes it.
+3. Open **How to customize** under the box: it lists the colours and shapes you can change, the parts of the app you can style, and examples (a background picture, rounder corners, bigger text…). Click one to add it to your CSS.
 
 Psst: try the Konami code (↑ ↑ ↓ ↓ ← → ← → B A), or click the ResinCraft logo seven times.
 
@@ -203,7 +200,9 @@ Run your servers from any browser, or from your phone.
 3. Turn on **Keep running in the system tray** (section 13), so it keeps working after you close the window.
 4. Open `https://console.rscraft.resincore.tech` (or press **Open the web console**) and sign in with the **same Minecraft account**.
 
-From the console you can start, stop and restart servers, watch the console and type commands, manage players, back up, and make new servers. It can't reach your files, Java settings or anything else on your PC. Each change shows as a note in ResinCraft.
+From the console you can do everything the server manager does: start, stop and restart servers, watch the console and type commands, manage players and whitelist requests, add and update plugins and mods, change properties and settings, switch the modpack version, reinstall, back up, and make new servers. Each change shows as a note in ResinCraft.
+
+The file manager, Java settings and plugins from any download link can run programs on your PC, so they need a second switch: **Allow full control**. Turn it on only if your Minecraft (Microsoft) account has two-step verification. Without it, the console can never reach anything else on your PC.
 
 ## 16. Reinstall and repair
 

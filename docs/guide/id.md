@@ -185,12 +185,9 @@ Mod, dunia, dan pengaturannya ikut terbawa. Yang asli tetap di tempatnya.
 
 ## 14. Tema dan CSS kustom
 
-1. Buka **Pengaturan → Tampilan → Tema** dan pilih kartu: **Sistem**, Gelap, Terang, Obsidian, Deepslate, Ceri, Nether, The End, Halloween, atau Natal.
-2. **Tema hari raya:**
-   - Halloween aktif sendiri dari 16 sampai 31 Oktober, Natal dari 10 sampai 25 Desember. Tema Anda sendiri kembali sehari setelahnya.
-   - Lebih suka tema Anda sendiri? Tekan **Pakai temaku** di banner, atau pilih kartu lain: tema itu tetap milik Anda selama hari raya tersebut.
-   - Matikan **Tema hari raya** untuk menghentikannya sama sekali.
-3. **CSS kustom:** tekan **Sisipkan warna saat ini**, ubah warna mana saja, lalu tekan **Terapkan**. Ini berlaku di atas tema apa pun; **Hapus** menghilangkannya.
+1. Buka **Pengaturan → Tampilan → Tema** dan pilih kartu: **Sistem**, Gelap, Terang, Obsidian, Deepslate, Ceri, Nether, atau The End.
+2. **CSS kustom:** tekan **Sisipkan warna saat ini**, ubah warna mana saja, lalu tekan **Terapkan**. Ini berlaku di atas tema apa pun; **Hapus** menghilangkannya.
+3. Buka **Cara kustomisasi** di bawah kotak: di sana ada daftar warna dan bentuk yang bisa diubah, bagian-bagian aplikasi yang bisa diberi gaya, dan contoh (gambar latar, sudut lebih bulat, teks lebih besar…). Klik salah satunya untuk menambahkannya ke CSS Anda.
 
 Psst: coba kode Konami (↑ ↑ ↓ ↓ ← → ← → B A), atau klik logo ResinCraft tujuh kali.
 
@@ -203,7 +200,9 @@ Jalankan server Anda dari browser mana saja, atau dari ponsel.
 3. Nyalakan **Tetap berjalan di system tray** (bagian 13), agar tetap berfungsi setelah jendela ditutup.
 4. Buka `https://console.rscraft.resincore.tech` (atau tekan **Buka konsol web**) dan masuk dengan **akun Minecraft yang sama**.
 
-Dari konsol, Anda bisa memulai, menghentikan, dan memulai ulang server, memantau konsol dan mengetik perintah, mengelola pemain, membuat cadangan, dan membuat server baru. Konsol ini tidak bisa mengakses file, pengaturan Java, atau apa pun di PC Anda. Setiap perubahan muncul sebagai catatan di ResinCraft.
+Dari konsol, Anda bisa melakukan semua yang bisa dilakukan pengelola server: memulai, menghentikan, dan memulai ulang server, memantau konsol dan mengetik perintah, mengelola pemain dan permintaan whitelist, menambah dan memperbarui plugin dan mod, mengubah properti dan pengaturan, mengganti versi modpack, menginstal ulang, membuat cadangan, dan membuat server baru. Setiap perubahan muncul sebagai catatan di ResinCraft.
+
+Pengelola file, pengaturan Java, dan plugin dari tautan unduhan mana pun bisa menjalankan program di PC Anda, jadi semuanya memerlukan sakelar kedua: **Izinkan kendali penuh**. Nyalakan hanya jika akun Minecraft (Microsoft) Anda memakai verifikasi dua langkah. Tanpa sakelar itu, konsol tidak akan pernah bisa mengakses apa pun lainnya di PC Anda.
 
 ## 16. Instal ulang dan perbaiki
 

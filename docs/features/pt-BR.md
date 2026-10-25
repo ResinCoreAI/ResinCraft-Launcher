@@ -56,7 +56,7 @@ Os itens marcados com **(novo)** são novos na versão mais recente.
 - **Anti-xray (novo)** (anti-raio-x): servidores Paper, Purpur, Folia e Leaf podem esconder minérios de mods e pacotes de textura de x-ray (Settings → Anti-xray).
 - **Reinstalar (novo):** instale de novo o software de um servidor ou devolva os arquivos do modpack dele. O mundo e as configurações ficam.
 - **Excluir e criar na hora (novo):** um servidor excluído some na hora; um servidor sendo criado aparece na lista imediatamente, com o progresso.
-- **Controle remoto (novo):** gerencie seus servidores de qualquer navegador ou do celular com o console web em `console.rscraft.resincore.tech`, entrando com a mesma conta do Minecraft, enquanto o ResinCraft estiver aberto ou na bandeja do sistema (Configurações → Controle remoto). Ele pode iniciar, parar, acompanhar e criar servidores, mas nunca acessar seus arquivos ou outras configurações.
+- **Controle remoto (novo):** gerencie seus servidores de qualquer navegador ou do celular com o console web em `console.rscraft.resincore.tech`, entrando com a mesma conta do Minecraft, enquanto o ResinCraft estiver aberto ou na bandeja do sistema (Configurações → Controle remoto). Ele faz tudo o que o gerenciador de servidores faz. O gerenciador de arquivos, as configurações do Java e plugins de qualquer link precisam de uma segunda chave, **Permitir controle total**.
 - **Compartilhando com amigos:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Os itens marcados com **(novo)** são novos na versão mais recente.
   - **Atualizar em silêncio** em segundo plano.
 - **Continuar na bandeja do sistema:** fechar a janela mantém os servidores, o bot do Discord, o controle remoto e os downloads funcionando.
 - **Reinstalar o ResinCraft (novo):** Configurações → Atualizações instala o app de novo por cima dele mesmo, para repará-lo. Instâncias, contas e configurações ficam.
-- **Temas (novo):** Escuro, Claro, Obsidiana, Ardósia, Cerejeira, Nether, O End, Halloween e Natal, ou Sistema.
-  - O Halloween liga sozinho de 16 a 31 de outubro, e o Natal de 10 a 25 de dezembro. Escolha outro tema e ele continua sendo o seu; ou desligue os temas de feriados.
-  - **CSS personalizado:** seu próprio CSS sobre qualquer tema, começando pelas cores atuais.
+- **Temas (novo):** Escuro, Claro, Obsidiana, Ardósia, Cerejeira, Nether e O End, ou Sistema.
+  - **CSS personalizado:** seu próprio CSS sobre qualquer tema, começando pelas cores atuais, com um guia embutido das cores, das partes do app e exemplos prontos.
   - E uma surpresa escondida. Tente o código Konami.
 - **16 idiomas:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Gerenciador de armazenamento** (mova os dados para outro disco), **backup e restauração** das configurações.

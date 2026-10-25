@@ -185,12 +185,9 @@ Ich mody, światy i ustawienia przechodzą razem z nimi. Oryginały zostają tam
 
 ## 14. Motywy i własny CSS
 
-1. Otwórz **Ustawienia → Wygląd → Motyw** i wybierz kartę: **Systemowy**, Ciemny, Jasny, Obsydian, Łupek, Wiśnia, Nether, Kres, Halloween lub Boże Narodzenie.
-2. **Motywy świąteczne:**
-   - Halloween włącza się sam od 16 do 31 października, a Boże Narodzenie od 10 do 25 grudnia. Twój motyw wraca następnego dnia.
-   - Wolisz zostać przy swoim? Naciśnij **Użyj mojego motywu** na banerze albo wybierz inną kartę: zostanie twój na całe te święta.
-   - Wyłącz **Motywy świąteczne**, żeby w ogóle się nie włączały.
-3. **Własny CSS:** naciśnij **Wstaw obecne kolory**, zmień dowolny kolor, a potem **Zastosuj**. Działa na każdym motywie; **Wyczyść** go usuwa.
+1. Otwórz **Ustawienia → Wygląd → Motyw** i wybierz kartę: **Systemowy**, Ciemny, Jasny, Obsydian, Łupek, Wiśnia, Nether lub Kres.
+2. **Własny CSS:** naciśnij **Wstaw obecne kolory**, zmień dowolny kolor, a potem **Zastosuj**. Działa na każdym motywie; **Wyczyść** go usuwa.
+3. Otwórz **Jak dostosować** pod polem: znajdziesz tam kolory i kształty, które możesz zmienić, części aplikacji, które możesz ostylować, i przykłady (obraz w tle, bardziej zaokrąglone rogi, większy tekst…). Kliknij jeden, żeby dodać go do swojego CSS.
 
 Psst: spróbuj kodu Konami (↑ ↑ ↓ ↓ ← → ← → B A) albo kliknij logo ResinCraft siedem razy.
 
@@ -203,7 +200,9 @@ Steruj swoimi serwerami z dowolnej przeglądarki albo z telefonu.
 3. Włącz **Działaj w zasobniku systemowym** (sekcja 13), żeby działało też po zamknięciu okna.
 4. Otwórz `https://console.rscraft.resincore.tech` (albo naciśnij **Otwórz konsolę webową**) i zaloguj się **tym samym kontem Minecraft**.
 
-Z konsoli możesz uruchamiać, zatrzymywać i restartować serwery, podglądać konsolę i wpisywać polecenia, zarządzać graczami, robić kopie zapasowe i tworzyć nowe serwery. Konsola nie ma dostępu do twoich plików, ustawień Javy ani niczego innego na twoim PC. Każda zmiana pojawia się w ResinCraft jako powiadomienie.
+Z konsoli możesz robić wszystko, co menedżer serwerów: uruchamiać, zatrzymywać i restartować serwery, podglądać konsolę i wpisywać polecenia, zarządzać graczami i prośbami o whitelistę, dodawać i aktualizować pluginy i mody, zmieniać właściwości i ustawienia, zmieniać wersję modpacka, instalować ponownie, robić kopie zapasowe i tworzyć nowe serwery. Każda zmiana pojawia się w ResinCraft jako powiadomienie.
+
+Menedżer plików, ustawienia Javy i pluginy z dowolnego linku do pobrania mogą uruchamiać programy na twoim PC, dlatego wymagają drugiego przełącznika: **Zezwól na pełną kontrolę**. Włącz go tylko wtedy, gdy twoje konto Minecraft (Microsoft) ma weryfikację dwuetapową. Bez niego konsola nigdy nie ma dostępu do niczego innego na twoim PC.
 
 ## 16. Ponowna instalacja i naprawa
 

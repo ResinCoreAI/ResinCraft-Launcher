@@ -185,12 +185,9 @@ Sus mods, mundos y ajustes vienen con ellas. Los originales se quedan donde est�
 
 ## 14. Temas y CSS propio
 
-1. Abre **Ajustes → Apariencia → Tema** y elige una tarjeta: **Sistema**, Oscuro, Claro, Obsidiana, Pizarra profunda, Cerezo, Nether, El End, Halloween o Navidad.
-2. **Temas festivos:**
-   - Halloween se activa solo del 16 al 31 de octubre, y Navidad del 10 al 25 de diciembre. Tu tema vuelve al día siguiente.
-   - ¿Prefieres quedarte con el tuyo? Pulsa **Usar mi tema** en el aviso, o elige otra tarjeta: se queda el tuyo durante esa fiesta.
-   - Desactiva **Temas festivos** para quitarlos del todo.
-3. **CSS propio:** pulsa **Insertar colores actuales**, cambia el color que quieras y luego pulsa **Aplicar**. Funciona sobre cualquier tema; **Borrar** lo quita.
+1. Abre **Ajustes → Apariencia → Tema** y elige una tarjeta: **Sistema**, Oscuro, Claro, Obsidiana, Pizarra profunda, Cerezo, Nether o El End.
+2. **CSS propio:** pulsa **Insertar colores actuales**, cambia el color que quieras y luego pulsa **Aplicar**. Funciona sobre cualquier tema; **Borrar** lo quita.
+3. Abre **Cómo personalizar** debajo del cuadro: muestra los colores y formas que puedes cambiar, las partes de la app a las que puedes dar estilo y ejemplos (una imagen de fondo, esquinas más redondas, texto más grande…). Haz clic en uno para añadirlo a tu CSS.
 
 Psst: prueba el código Konami (↑ ↑ ↓ ↓ ← → ← → B A), o haz clic siete veces en el logo de ResinCraft.
 
@@ -203,7 +200,9 @@ Maneja tus servidores desde cualquier navegador, o desde el móvil.
 3. Activa **Seguir en la bandeja del sistema** (sección 13), para que siga funcionando después de cerrar la ventana.
 4. Abre `https://console.rscraft.resincore.tech` (o pulsa **Abrir la consola web**) e inicia sesión con **la misma cuenta de Minecraft**.
 
-Desde la consola puedes iniciar, detener y reiniciar servidores, ver la consola y escribir comandos, gestionar jugadores, hacer copias de seguridad y crear servidores nuevos. No puede llegar a tus archivos, a los ajustes de Java ni a nada más de tu PC. Cada cambio aparece como un aviso en ResinCraft.
+Desde la consola puedes hacer todo lo que hace el gestor de servidores: iniciar, detener y reiniciar servidores, ver la consola y escribir comandos, gestionar jugadores y solicitudes de whitelist, añadir y actualizar plugins y mods, cambiar propiedades y ajustes, cambiar la versión del modpack, reinstalar, hacer copias de seguridad y crear servidores nuevos. Cada cambio aparece como un aviso en ResinCraft.
+
+El gestor de archivos, los ajustes de Java y los plugins desde cualquier enlace de descarga pueden ejecutar programas en tu PC, así que necesitan un segundo interruptor: **Permitir control total**. Actívalo solo si tu cuenta de Minecraft (Microsoft) tiene la verificación en dos pasos. Sin él, la consola nunca puede llegar a nada más de tu PC.
 
 ## 16. Reinstalar y reparar
 

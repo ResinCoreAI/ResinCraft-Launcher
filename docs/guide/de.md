@@ -185,12 +185,9 @@ Ihre Mods, Welten und Einstellungen kommen mit. Die Originale bleiben, wo sie si
 
 ## 14. Designs und eigenes CSS
 
-1. Öffne **Einstellungen → Darstellung → Design** und wähle eine Karte: **System**, Dunkel, Hell, Obsidian, Tiefenschiefer, Kirsche, Nether, Das Ende, Halloween oder Weihnachten.
-2. **Feiertags-Themes:**
-   - Halloween schaltet sich vom 16. bis 31. Oktober von selbst ein, Weihnachten vom 10. bis 25. Dezember. Am Tag danach kommt dein eigenes Design zurück.
-   - Lieber deins behalten? Klicke im Banner auf **Mein Theme nutzen** oder wähle eine andere Karte: Sie bleibt dann für diesen Feiertag deine.
-   - Schalte **Feiertags-Themes** aus, um es ganz abzustellen.
-3. **Eigenes CSS:** Klicke auf **Aktuelle Farben einfügen**, ändere beliebige Farben und dann auf **Anwenden**. Es wirkt über jedem Design; **Leeren** entfernt es.
+1. Öffne **Einstellungen → Darstellung → Design** und wähle eine Karte: **System**, Dunkel, Hell, Obsidian, Tiefenschiefer, Kirsche, Nether oder Das Ende.
+2. **Eigenes CSS:** Klicke auf **Aktuelle Farben einfügen**, ändere beliebige Farben und dann auf **Anwenden**. Es wirkt über jedem Design; **Leeren** entfernt es.
+3. Öffne **So passt du es an** unter dem Feld: Dort stehen die Farben und Formen, die du ändern kannst, die Teile der App, die du gestalten kannst, und Beispiele (ein Hintergrundbild, rundere Ecken, größere Schrift …). Klicke auf eins, um es zu deinem CSS hinzuzufügen.
 
 Psst: Probier den Konami-Code (↑ ↑ ↓ ↓ ← → ← → B A) oder klicke siebenmal auf das ResinCraft-Logo.
 
@@ -203,7 +200,9 @@ Steuere deine Server aus jedem Browser oder vom Handy.
 3. Schalte **Im Infobereich weiterlaufen** ein (Abschnitt 13), damit es auch nach dem Schließen des Fensters weiterläuft.
 4. Öffne `https://console.rscraft.resincore.tech` (oder klicke auf **Web-Konsole öffnen**) und melde dich mit **demselben Minecraft-Konto** an.
 
-In der Konsole kannst du Server starten, stoppen und neu starten, die Konsole verfolgen und Befehle eintippen, Spieler verwalten, sichern und neue Server erstellen. Sie kommt nicht an deine Dateien, Java-Einstellungen oder sonst etwas auf deinem PC. Jede Änderung erscheint in ResinCraft als Hinweis.
+In der Konsole kannst du alles, was die Serververwaltung kann: Server starten, stoppen und neu starten, die Konsole verfolgen und Befehle eintippen, Spieler und Whitelist-Anfragen verwalten, Plugins und Mods hinzufügen und aktualisieren, Properties und Einstellungen ändern, die Modpack-Version wechseln, neu installieren, sichern und neue Server erstellen. Jede Änderung erscheint in ResinCraft als Hinweis.
+
+Dateimanager, Java-Einstellungen und Plugins von beliebigen Download-Links können Programme auf deinem PC ausführen, deshalb brauchen sie einen zweiten Schalter: **Volle Kontrolle erlauben**. Schalte ihn nur ein, wenn dein Minecraft-(Microsoft-)Konto die zweistufige Überprüfung nutzt. Ohne ihn kommt die Konsole nie an etwas anderes auf deinem PC.
 
 ## 16. Neu installieren und reparieren
 

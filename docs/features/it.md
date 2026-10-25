@@ -56,7 +56,7 @@ Le voci segnate con **(novità)** sono nuove nell’ultima versione.
 - **Anti-xray (novità):** i server Paper, Purpur, Folia e Leaf possono nascondere i minerali alle mod e ai pacchetti di texture x-ray (Settings → Anti-xray).
 - **Reinstalla (novità):** reinstalla il software di un server, o rimetti i file del suo modpack. Il mondo e le impostazioni restano.
 - **Eliminazione e creazione istantanee (novità):** un server eliminato sparisce subito; un server in fase di creazione compare subito nell’elenco, con il suo avanzamento.
-- **Controllo remoto (novità):** gestisci i tuoi server da qualsiasi browser o dal telefono con la console web su `console.rscraft.resincore.tech`, con lo stesso account Minecraft, mentre ResinCraft è aperto o nell’area di notifica (Impostazioni → Controllo remoto). Può avviare, fermare, seguire e creare server, ma non arriva mai ai tuoi file né ad altre impostazioni.
+- **Controllo remoto (novità):** gestisci i tuoi server da qualsiasi browser o dal telefono con la console web su `console.rscraft.resincore.tech`, con lo stesso account Minecraft, mentre ResinCraft è aperto o nell’area di notifica (Impostazioni → Controllo remoto). Può fare tutto quello che fa la gestione server. Il file manager, le impostazioni di Java e i plugin da qualsiasi link richiedono un secondo interruttore, **Consenti il controllo completo**.
 - **Condividi con gli amici:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Le voci segnate con **(novità)** sono nuove nell’ultima versione.
   - **Aggiorna in silenzio** in background.
 - **Resta nell’area di notifica:** chiudendo la finestra, server, bot Discord, controllo remoto e download continuano a funzionare.
 - **Reinstalla ResinCraft (novità):** Impostazioni → Aggiornamenti reinstalla l’app sopra sé stessa, per ripararla. Istanze, account e impostazioni restano.
-- **Temi (novità):** Scuro, Chiaro, Ossidiana, Ardesia abissale, Ciliegio, Nether, L’End, Halloween e Natale, oppure Sistema.
-  - Halloween si attiva da solo dal 16 al 31 ottobre, Natale dal 10 al 25 dicembre. Scegli un altro tema e resta il tuo; oppure disattiva i temi delle feste.
-  - **CSS personalizzato:** il tuo CSS sopra qualsiasi tema, partendo dai colori attuali.
+- **Temi (novità):** Scuro, Chiaro, Ossidiana, Ardesia abissale, Ciliegio, Nether e L’End, oppure Sistema.
+  - **CSS personalizzato:** il tuo CSS sopra qualsiasi tema, partendo dai colori attuali, con una guida integrata ai colori, alle parti dell’app e a esempi pronti.
   - E una sorpresa nascosta. Prova il codice Konami.
 - **16 lingue:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Archiviazione** (sposta i dati su un altro disco), **backup e ripristino** delle impostazioni.

@@ -185,12 +185,9 @@ Mod, thế giới và cài đặt của chúng được chuyển theo. Bản g�
 
 ## 14. Chủ đề và CSS tùy chỉnh
 
-1. Mở **Cài đặt → Giao diện → Chủ đề** và chọn một thẻ: **Hệ thống**, Tối, Sáng, Hắc thạch, Đá phiến sâu, Anh đào, Nether, The End, Halloween hoặc Giáng sinh.
-2. **Giao diện dịp lễ:**
-   - Halloween tự bật từ 16 đến 31/10, Giáng sinh từ 10 đến 25/12. Chủ đề của bạn sẽ trở lại vào ngày hôm sau.
-   - Muốn giữ chủ đề của mình? Nhấn **Dùng giao diện của tôi** trên banner, hoặc chọn thẻ khác: nó sẽ là của bạn suốt dịp lễ đó.
-   - Tắt **Giao diện dịp lễ** để dừng hẳn.
-3. **CSS tùy chỉnh:** nhấn **Chèn màu hiện tại**, đổi màu bất kỳ, rồi nhấn **Áp dụng**. Nó hoạt động trên mọi chủ đề; **Xóa** sẽ gỡ nó đi.
+1. Mở **Cài đặt → Giao diện → Chủ đề** và chọn một thẻ: **Hệ thống**, Tối, Sáng, Hắc thạch, Đá phiến sâu, Anh đào, Nether hoặc The End.
+2. **CSS tùy chỉnh:** nhấn **Chèn màu hiện tại**, đổi màu bất kỳ, rồi nhấn **Áp dụng**. Nó hoạt động trên mọi chủ đề; **Xóa** sẽ gỡ nó đi.
+3. Mở **Cách tùy chỉnh** bên dưới ô: ở đó có các màu và hình dạng bạn đổi được, các phần của ứng dụng bạn tạo kiểu được, và ví dụ (ảnh nền, góc bo tròn hơn, chữ to hơn…). Nhấp vào một mục để thêm nó vào CSS của bạn.
 
 Suỵt: thử mã Konami (↑ ↑ ↓ ↓ ← → ← → B A), hoặc nhấp vào logo ResinCraft bảy lần.
 
@@ -203,7 +200,9 @@ Suỵt: thử mã Konami (↑ ↑ ↓ ↓ ← → ← → B A), hoặc nhấp v�
 3. Bật **Tiếp tục chạy ở khay hệ thống** (mục 13) để nó vẫn hoạt động sau khi bạn đóng cửa sổ.
 4. Mở `https://console.rscraft.resincore.tech` (hoặc nhấn **Mở web console**) và đăng nhập bằng **cùng tài khoản Minecraft**.
 
-Từ web console, bạn có thể khởi động, dừng và khởi động lại máy chủ, xem console và gõ lệnh, quản lý người chơi, sao lưu và tạo máy chủ mới. Nó không thể chạm vào tệp, cài đặt Java hay bất cứ thứ gì khác trên máy tính của bạn. Mỗi thay đổi đều hiện thành một thông báo trong ResinCraft.
+Từ web console, bạn làm được mọi việc mà trình quản lý máy chủ làm được: khởi động, dừng và khởi động lại máy chủ, xem console và gõ lệnh, quản lý người chơi và yêu cầu vào whitelist, thêm và cập nhật plugin và mod, đổi properties và cài đặt, chuyển phiên bản modpack, cài lại, sao lưu và tạo máy chủ mới. Mỗi thay đổi đều hiện thành một thông báo trong ResinCraft.
+
+Trình quản lý tệp, cài đặt Java và plugin từ bất kỳ liên kết tải xuống nào có thể chạy chương trình trên máy tính của bạn, nên chúng cần thêm một công tắc thứ hai: **Cho phép toàn quyền điều khiển**. Chỉ bật nó nếu tài khoản Minecraft (Microsoft) của bạn đã bật xác minh hai bước. Nếu không bật, web console không bao giờ chạm được vào bất cứ thứ gì khác trên máy tính của bạn.
 
 ## 16. Cài lại và sửa chữa
 

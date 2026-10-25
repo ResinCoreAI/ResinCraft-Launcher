@@ -56,7 +56,7 @@ Les éléments marqués **(nouveau)** sont nouveaux dans la dernière version.
 - **Anti-xray (nouveau) :** les serveurs Paper, Purpur, Folia et Leaf peuvent cacher les minerais aux mods et packs de textures de rayons X (Settings → Anti-xray).
 - **Réinstaller (nouveau) :** réinstallez le logiciel d’un serveur, ou remettez les fichiers de son modpack. Le monde et les réglages restent.
 - **Suppression et création instantanées (nouveau) :** un serveur supprimé disparaît aussitôt ; un serveur en cours de création apparaît tout de suite dans la liste, avec sa progression.
-- **Contrôle à distance (nouveau) :** pilotez vos serveurs depuis n’importe quel navigateur ou votre téléphone avec la console web sur `console.rscraft.resincore.tech`, connecté avec le même compte Minecraft, tant que ResinCraft est ouvert ou dans la zone de notification (Paramètres → Contrôle à distance). Elle peut démarrer, arrêter, surveiller et créer des serveurs, mais n’accède jamais à vos fichiers ni à vos autres réglages.
+- **Contrôle à distance (nouveau) :** pilotez vos serveurs depuis n’importe quel navigateur ou votre téléphone avec la console web sur `console.rscraft.resincore.tech`, connecté avec le même compte Minecraft, tant que ResinCraft est ouvert ou dans la zone de notification (Paramètres → Contrôle à distance). Elle peut faire tout ce que fait le gestionnaire de serveurs. Le gestionnaire de fichiers, les réglages Java et les plugins depuis n’importe quel lien demandent un second interrupteur, **Autoriser le contrôle total**.
 - **Partager avec vos amis :**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Les éléments marqués **(nouveau)** sont nouveaux dans la dernière version.
   - **Mettre à jour en silence** en arrière-plan.
 - **Rester dans la zone de notification :** fermer la fenêtre laisse tourner les serveurs, le bot Discord, le contrôle à distance et les téléchargements.
 - **Réinstaller ResinCraft (nouveau) :** Paramètres → Mises à jour réinstalle l’application par-dessus elle-même, pour la réparer. Les instances, comptes et réglages restent.
-- **Thèmes (nouveau) :** Sombre, Clair, Obsidienne, Ardoise des abîmes, Cerisier, Nether, L’End, Halloween et Noël, ou Système.
-  - Halloween s’active tout seul du 16 au 31 octobre, Noël du 10 au 25 décembre. Choisissez un autre thème et il reste le vôtre ; ou désactivez les thèmes de fêtes.
-  - **CSS personnalisé :** votre propre CSS par-dessus n’importe quel thème, en partant des couleurs actuelles.
+- **Thèmes (nouveau) :** Sombre, Clair, Obsidienne, Ardoise des abîmes, Cerisier, Nether et L’End, ou Système.
+  - **CSS personnalisé :** votre propre CSS par-dessus n’importe quel thème, en partant des couleurs actuelles, avec un guide intégré des couleurs, des parties de l’application et des exemples prêts à l’emploi.
   - Et une surprise cachée. Essayez le code Konami.
 - **16 langues :** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Stockage** (déplacer les données vers un autre disque), **sauvegarde et restauration** des paramètres.

@@ -185,12 +185,9 @@ Modları, dünyaları ve ayarları da onlarla birlikte gelir. Orijinaller oldukl
 
 ## 14. Temalar ve özel CSS
 
-1. **Ayarlar → Görünüm → Tema**'yı aç ve bir kart seç: **Sistem**, Koyu, Açık, Obsidyen, Derin Arduvaz, Kiraz, Nether, End, Cadılar Bayramı ya da Noel.
-2. **Tatil temaları:**
-   - Cadılar Bayramı 16-31 Ekim, Noel 10-25 Aralık arasında kendiliğinden açılır. Ertesi gün kendi temana dönersin.
-   - Kendi temanda kalmak mı istiyorsun? Afişteki **Kendi temamı kullan**'a bas ya da başka bir kart seç: o tatil boyunca senin kalır.
-   - Tamamen durdurmak için **Tatil temaları**'nı kapat.
-3. **Özel CSS:** **Şu anki renkleri ekle**'ye bas, istediğin rengi değiştir, sonra **Uygula**'ya bas. Her temanın üstünde çalışır; **Temizle** onu kaldırır.
+1. **Ayarlar → Görünüm → Tema**'yı aç ve bir kart seç: **Sistem**, Koyu, Açık, Obsidyen, Derin Arduvaz, Kiraz, Nether ya da End.
+2. **Özel CSS:** **Şu anki renkleri ekle**'ye bas, istediğin rengi değiştir, sonra **Uygula**'ya bas. Her temanın üstünde çalışır; **Temizle** onu kaldırır.
+3. Kutunun altındaki **Nasıl özelleştirilir**'i aç: değiştirebileceğin renkleri ve şekilleri, stil verebileceğin uygulama bölümlerini ve örnekleri (bir arka plan resmi, daha yuvarlak köşeler, daha büyük yazı…) listeler. Birine tıkla, CSS'ine eklensin.
 
 Pst: Konami kodunu dene (↑ ↑ ↓ ↓ ← → ← → B A) ya da ResinCraft logosuna yedi kez tıkla.
 
@@ -203,7 +200,9 @@ Sunucularını herhangi bir tarayıcıdan ya da telefonundan yönet.
 3. Pencereyi kapattıktan sonra da çalışması için **Sistem tepsisinde çalışmaya devam et**'i aç (bölüm 13).
 4. `https://console.rscraft.resincore.tech` adresini aç (ya da **Web konsolunu aç**'a bas) ve **aynı Minecraft hesabıyla** giriş yap.
 
-Web konsolundan sunucuları başlatabilir, durdurabilir ve yeniden başlatabilir, konsolu izleyip komut yazabilir, oyuncuları yönetebilir, yedek alabilir ve yeni sunucular oluşturabilirsin. Web konsolu dosyalarına, Java ayarlarına ya da bilgisayarındaki başka hiçbir şeye erişemez. Her değişiklik ResinCraft'ta bir bildirim olarak görünür.
+Web konsolundan sunucu yöneticisinin yaptığı her şeyi yapabilirsin: sunucuları başlatabilir, durdurabilir ve yeniden başlatabilir, konsolu izleyip komut yazabilir, oyuncuları ve beyaz liste isteklerini yönetebilir, eklenti ve mod ekleyip güncelleyebilir, özellikleri ve ayarları değiştirebilir, mod paketi sürümünü değiştirebilir, yeniden kurabilir, yedek alabilir ve yeni sunucular oluşturabilirsin. Her değişiklik ResinCraft'ta bir bildirim olarak görünür.
+
+Dosya yöneticisi, Java ayarları ve herhangi bir indirme bağlantısından eklentiler bilgisayarında program çalıştırabilir, bu yüzden ikinci bir anahtar gerekir: **Tam kontrole izin ver**. Bunu yalnızca Minecraft (Microsoft) hesabında iki adımlı doğrulama açıksa aç. Bu anahtar kapalıyken web konsolu bilgisayarındaki başka hiçbir şeye asla erişemez.
 
 ## 16. Yeniden kurma ve onarma
 

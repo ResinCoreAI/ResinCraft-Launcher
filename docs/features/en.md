@@ -56,7 +56,7 @@ Items marked **(new)** are new in the latest version.
 - **Anti-xray (new):** Paper, Purpur, Folia and Leaf servers can hide ores from x-ray mods and texture packs (Settings → Anti-xray).
 - **Reinstall (new):** install a server's software again, or put its modpack files back. The world and settings stay.
 - **Instant delete and create (new):** a deleted server disappears at once; a server being made shows on the list straight away with its progress.
-- **Remote control (new):** run your servers from any browser or your phone with the web console at `console.rscraft.resincore.tech`, signed in with the same Minecraft account, while ResinCraft is open or in the system tray (Settings → Remote control). It can start, stop, watch and make servers, but never reach your files or other settings.
+- **Remote control (new):** run your servers from any browser or your phone with the web console at `console.rscraft.resincore.tech`, signed in with the same Minecraft account, while ResinCraft is open or in the system tray (Settings → Remote control). It can do everything the server manager does. The file manager, Java settings and plugins from any link need a second switch, **Allow full control**.
 - **Sharing with friends:**
   - ResinCraft Relay (`<name>.rscraft.resincore.tech`)
   - playit.gg
@@ -93,9 +93,8 @@ Items marked **(new)** are new in the latest version.
   - **Update silently** in the background.
 - **Keep running in the system tray:** closing the window keeps servers, the Discord bot, remote control and downloads going.
 - **Reinstall ResinCraft (new):** Settings → Updates installs the app again over itself, to repair it. Instances, accounts and settings stay.
-- **Themes (new):** Dark, Light, Obsidian, Deepslate, Cherry, Nether, The End, Halloween and Christmas, or System.
-  - Halloween turns on by itself from 16 to 31 October, Christmas from 10 to 25 December. Pick another theme and it stays yours; or switch holiday themes off.
-  - **Custom CSS:** your own CSS over any theme, starting from the current colours.
+- **Themes (new):** Dark, Light, Obsidian, Deepslate, Cherry, Nether and The End, or System.
+  - **Custom CSS:** your own CSS over any theme, starting from the current colours, with a built-in guide to the colours, the parts of the app and ready-made examples.
   - And a hidden surprise. Try the Konami code.
 - **16 languages:** English, Deutsch, Español, Français, Bahasa Indonesia, Italiano, 日本語, 한국어, Polski, Português (Brasil), Русский, ไทย, Türkçe, Tiếng Việt, 简体中文, 繁體中文.
 - **Storage manager** (move data to another drive), **backup and restore** of settings.
