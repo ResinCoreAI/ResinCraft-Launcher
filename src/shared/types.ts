@@ -354,6 +354,36 @@ export interface JavaInstall {
 
 export type CloseBehavior = 'keep' | 'minimize' | 'hide'
 
+/** A theme the player made (Settings → Appearance → Create theme); applied by customTheme.ts. */
+export interface CustomTheme {
+  /** Letters, digits and `-`; the setting `theme` is `custom:<id>`. */
+  id: string
+  name: string
+  description?: string
+  /** How panels look: solid with thin borders, frosted glass, or borderless with soft shadows. */
+  style: 'flat' | 'glass' | 'soft'
+  bg: string
+  panel: string
+  text: string
+  accent: string
+  /** Corner radius, px. */
+  radius: number
+  /** Blur behind panels, px (shows with a picture or panel opacity under 100). */
+  blur: number
+  /** Panel opacity, 0–100: lower shows the background through panels. */
+  panelOpacity: number
+  /** A font id from customTheme.ts FONTS ('' = the launcher's own). */
+  font: string
+  /** A background picture from the web (https: or data:). */
+  imageUrl?: string
+  /** A background picture the player uploaded, kept by the engine (`app:themeImage`); wins over imageUrl. */
+  imageFile?: boolean
+  imageFit: 'cover' | 'contain' | 'tile' | 'center'
+  /** Darkens the picture, 0–90 %, so text stays readable. */
+  darken: number
+  effect: 'none' | 'snow' | 'petals' | 'embers' | 'fireflies' | 'rain'
+}
+
 export interface Settings {
   /** 'system' (light or dark, as the OS), or a theme id from themes.ts. */
   theme: string
@@ -363,6 +393,8 @@ export interface Settings {
   seasonOff?: string
   /** The player's own CSS, applied over any theme (Settings → Appearance → Custom CSS). */
   customCss?: string
+  /** Themes the player made (Settings → Appearance → Create theme). */
+  customThemes?: CustomTheme[]
   /** Remote control from the web console while ResinCraft runs (Settings → Remote control; off by default). */
   remoteControl?: boolean
   /** Remote control may also use the file manager, Java settings and plugins from any link (off by default). */
@@ -1455,6 +1487,10 @@ export interface ResinApi {
     setTitleBar(bg: string, fg: string): Promise<void>
     /** Stops a running task: its downloads stop and anything half-made is removed. False if it already ended. */
     cancelTask(id: string): Promise<boolean>
+    /** A custom theme's background picture (a data URL, up to 8 MB), or null to remove it. */
+    saveThemeImage(themeId: string, dataUrl: string | null): Promise<void>
+    /** A custom theme's background picture as a data URL, or null. */
+    themeImage(themeId: string): Promise<string | null>
   }
   settings: {
     get(): Promise<Settings>

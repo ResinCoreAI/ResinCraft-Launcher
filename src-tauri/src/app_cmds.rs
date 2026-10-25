@@ -36,6 +36,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:setTitleBar" => done(),
         "app:memory" => json(crate::core::memory::usage().await),
         "app:cancelTask" => json(crate::core::events::cancel(&args.get::<String>(0)?)),
+        // A custom theme's background picture: [theme id, data URL | null (remove)], and reading it back.
+        "app:saveThemeImage" => {
+            save_theme_image(&args.get::<String>(0)?, args.get::<Option<String>>(1)?).await?;
+            done()
+        }
+        "app:themeImage" => json(theme_image(&args.get::<String>(0)?).await),
 
         "settings:get" => json(settings::redacted(settings::get().await)),
         "settings:set" => {
@@ -92,4 +98,52 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         _ => bail!("Unknown request: {channel}"),
     }
+}
+
+/// Biggest picture a theme may use (the creator says 8 MB too).
+const THEME_IMAGE_MAX: usize = 8 * 1024 * 1024;
+
+/// `<data>/themes/<id>.<ext>`: ids come from the UI, so only letters, digits and `-` make it into a file name.
+fn theme_image_stem(id: &str) -> Result<std::path::PathBuf> {
+    if id.is_empty() || id.len() > 64 || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        bail!("That theme can't have a picture.");
+    }
+    Ok(paths::root().join("themes").join(id))
+}
+
+const THEME_IMAGE_TYPES: [(&str, &str); 5] =
+    [("png", "image/png"), ("jpg", "image/jpeg"), ("webp", "image/webp"), ("gif", "image/gif"), ("avif", "image/avif")];
+
+async fn save_theme_image(id: &str, data_url: Option<String>) -> Result<()> {
+    let stem = theme_image_stem(id)?;
+    for (ext, _) in THEME_IMAGE_TYPES {
+        let _ = tokio::fs::remove_file(stem.with_extension(ext)).await;
+    }
+    let Some(url) = data_url.filter(|u| !u.trim().is_empty()) else { return Ok(()) };
+    let (head, b64) = url.split_once(";base64,").ok_or_else(|| anyhow::anyhow!("That picture couldn't be read"))?;
+    let mime = head.trim_start_matches("data:");
+    let Some((ext, _)) = THEME_IMAGE_TYPES.iter().find(|(_, m)| *m == mime) else {
+        bail!("Use a PNG, JPG, WebP, GIF or AVIF picture.");
+    };
+    let bytes = {
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD.decode(b64.trim())?
+    };
+    if bytes.len() > THEME_IMAGE_MAX {
+        bail!("That picture is over 8 MB.");
+    }
+    tokio::fs::create_dir_all(stem.parent().unwrap()).await?;
+    tokio::fs::write(stem.with_extension(ext), bytes).await?;
+    Ok(())
+}
+
+async fn theme_image(id: &str) -> Option<String> {
+    let stem = theme_image_stem(id).ok()?;
+    for (ext, mime) in THEME_IMAGE_TYPES {
+        if let Ok(bytes) = tokio::fs::read(stem.with_extension(ext)).await {
+            use base64::Engine;
+            return Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)));
+        }
+    }
+    None
 }

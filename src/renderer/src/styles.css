@@ -3663,3 +3663,234 @@ textarea.custom-css {
 .css-guide-dot.none {
   border-style: dashed;
 }
+
+/* ---------- Custom themes (customTheme.ts sets the colours; these are the picture, panel style and effects) ---------- */
+
+:root[data-theme='custom'][data-theme-image] body {
+  background: var(--bg) var(--theme-image) center / cover no-repeat fixed;
+}
+:root[data-theme='custom'][data-theme-image][data-theme-fit='contain'] body {
+  background-size: contain;
+}
+:root[data-theme='custom'][data-theme-image][data-theme-fit='tile'] body {
+  background-size: auto;
+  background-repeat: repeat;
+  background-position: top left;
+}
+:root[data-theme='custom'][data-theme-image][data-theme-fit='center'] body {
+  background-size: auto;
+}
+/* Darkens the picture so text stays readable; under the app (#root comes later and is positioned). */
+:root[data-theme='custom'][data-theme-image] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, var(--theme-darken));
+  pointer-events: none;
+}
+:root[data-theme='custom'][data-theme-image] #root {
+  position: relative;
+}
+
+:root[data-theme='custom'][data-theme-blur] :is(.card, .sidebar, .ihead, .modal, .menu, .dock) {
+  backdrop-filter: blur(var(--theme-blur));
+}
+
+/* Glass: light edges and a soft lift. */
+:root[data-theme-style='glass'] :is(.card, .ihead, .modal) {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+:root[data-theme-style='glass'] .sidebar {
+  border-right-color: rgba(255, 255, 255, 0.1);
+}
+/* Soft: no borders, panels float on shadows. */
+:root[data-theme-style='soft'] :is(.card, .ihead) {
+  border-color: transparent;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.2);
+}
+:root[data-theme-style='soft'] .sidebar {
+  border-right-color: transparent;
+}
+
+/* Ambient effects (components/ThemeAmbient.tsx): a few pieces drifting over the page, never in the way. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ambient i {
+  position: absolute;
+  top: -5vh;
+  display: block;
+  opacity: 0;
+  animation: ambient-fall var(--dur) linear var(--delay) infinite;
+  will-change: transform, opacity;
+}
+.ambient.snow i {
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: #fff;
+  filter: blur(0.5px);
+}
+.ambient.petals i {
+  width: var(--size);
+  height: calc(var(--size) * 0.7);
+  border-radius: 80% 0 80% 0;
+  background: linear-gradient(135deg, #ffd1e6, #ff8cc6);
+  animation-name: ambient-petal;
+}
+.ambient.rain i {
+  width: 1.5px;
+  height: calc(var(--size) * 3);
+  background: linear-gradient(transparent, rgba(190, 215, 255, 0.55));
+  animation-name: ambient-rain;
+}
+.ambient.embers i,
+.ambient.fireflies i {
+  top: auto;
+  bottom: -5vh;
+  width: calc(var(--size) * 0.5);
+  height: calc(var(--size) * 0.5);
+  border-radius: 50%;
+  animation-name: ambient-rise;
+}
+.ambient.embers i {
+  background: #ffb347;
+  box-shadow: 0 0 6px 2px rgba(255, 120, 40, 0.6);
+}
+.ambient.fireflies i {
+  background: var(--accent);
+  box-shadow: 0 0 8px 3px var(--accent-soft);
+  animation-name: ambient-firefly;
+}
+@keyframes ambient-fall {
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  to { transform: translate3d(var(--drift), 110vh, 0); opacity: 0; }
+}
+@keyframes ambient-petal {
+  10% { opacity: 0.9; }
+  50% { transform: translate3d(calc(var(--drift) * 0.5), 55vh, 0) rotate(200deg); }
+  90% { opacity: 0.9; }
+  to { transform: translate3d(var(--drift), 110vh, 0) rotate(420deg); opacity: 0; }
+}
+@keyframes ambient-rain {
+  10% { opacity: 0.7; }
+  to { transform: translate3d(calc(var(--drift) * 0.2), 112vh, 0); opacity: 0.7; }
+}
+@keyframes ambient-rise {
+  15% { opacity: 0.9; }
+  70% { opacity: 0.7; }
+  to { transform: translate3d(var(--drift), -70vh, 0); opacity: 0; }
+}
+@keyframes ambient-firefly {
+  20% { opacity: 0.9; }
+  40% { opacity: 0.2; }
+  60% { opacity: 0.9; transform: translate3d(calc(var(--drift) * -0.6), -30vh, 0); }
+  to { transform: translate3d(var(--drift), -60vh, 0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambient {
+    display: none;
+  }
+}
+
+/* The theme creator (Settings → Appearance). */
+.theme-swatch.add {
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-3);
+  color: var(--accent);
+}
+.theme-swatch.has-picture {
+  background-size: cover !important;
+  background-position: center !important;
+}
+.theme-maker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.theme-maker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.theme-maker-head h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+.theme-maker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.theme-maker-grid .wide {
+  grid-column: span 2;
+}
+.theme-maker label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.theme-maker input[type='color'] {
+  width: 100%;
+  height: 36px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+.theme-maker input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.theme-maker .range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.theme-maker .range-row output {
+  min-width: 42px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.theme-maker-picture {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.theme-maker-picture .thumb {
+  width: 54px;
+  height: 36px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface) center / cover no-repeat;
+}
+.theme-maker-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .theme-maker-grid .wide {
+    grid-column: auto;
+  }
+}

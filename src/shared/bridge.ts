@@ -22,6 +22,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       setTitleBar: fn('app:setTitleBar'),
       memory: fn('app:memory'),
       cancelTask: fn('app:cancelTask'),
+      saveThemeImage: fn('app:saveThemeImage'),
+      themeImage: fn('app:themeImage'),
       showItem: fn('app:showItem'),
       pathForFile
     },

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { AccountView, AppInfo, ContentKind, GameEvent, Instance, LogLine, QuickJoinRequest, Settings, TaskInfo } from '@shared/types'
 import { api } from './api'
 import { t, type EngineError } from './i18n'
-import { effectiveTheme } from './themes'
+import { showTheme } from './customTheme'
 
 export type Route =
   | { page: 'home' }
@@ -199,8 +199,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!settings) return
     const media = window.matchMedia('(prefers-color-scheme: light)')
     const apply = () => {
-      const theme = effectiveTheme(settings, media.matches)
-      document.documentElement.dataset.theme = theme
+      showTheme(settings, media.matches)
       const css = getComputedStyle(document.documentElement)
       void api.app.setTitleBar(css.getPropertyValue('--bg').trim(), css.getPropertyValue('--text-dim').trim()).catch(() => {})
     }
@@ -208,7 +207,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     media.addEventListener('change', apply)
     const hourly = window.setInterval(apply, 60 * 60 * 1000)
     return () => (media.removeEventListener('change', apply), window.clearInterval(hourly))
-  }, [settings?.theme, settings?.seasonalThemes, settings?.seasonOff])
+  }, [settings?.theme, settings?.seasonalThemes, settings?.seasonOff, settings?.customThemes])
 
   // The player's own CSS, after the app's so it wins.
   useEffect(() => {

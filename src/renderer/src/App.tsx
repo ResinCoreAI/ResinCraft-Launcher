@@ -8,6 +8,7 @@ import { UpdateBanner, UpdateTitleButton } from './components/Updates'
 import { useRemoteActions } from './components/RemoteControl'
 import ThemeDecor, { SidebarPumpkin } from './components/ThemeDecor'
 import EasterEgg from './components/EasterEgg'
+import ThemeAmbient from './components/ThemeAmbient'
 import CrashFixer from './components/CrashFixer'
 import { PackUpdatesBanner } from './components/PackUpdates'
 import { RelayWatcher } from './components/ServerRelay'
@@ -191,6 +192,7 @@ export default function App() {
       <CrashFixer />
       <EasterEgg />
       <ThemeDecor />
+      <ThemeAmbient />
       <PackUpdatesBanner />
       <RelayWatcher />
       <ContextMenuHost />

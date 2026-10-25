@@ -91,6 +91,7 @@ export function mockApi(): ResinApi {
   ]
   // Files the mock browser has "downloaded" from CurseForge, waiting to be picked up.
   let mockBrowserDownloads = 0
+  const mockThemeImages = new Map<string, string>()
   let accounts: AccountView[] = [
     { id: 'a1', type: 'msa', username: 'Puirkle', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', active: true },
     // A Microsoft account without Java Edition.
@@ -244,6 +245,8 @@ export function mockApi(): ResinApi {
       },
       setTitleBar: async () => {},
       cancelTask: async (id) => mockEngine.cancelTask(id),
+      saveThemeImage: async (id, url) => void (url ? mockThemeImages.set(id, url) : mockThemeImages.delete(id)),
+      themeImage: async (id) => mockThemeImages.get(id) ?? null,
       showItem: async () => {},
       pathForFile: (f: File) => f.name
     },

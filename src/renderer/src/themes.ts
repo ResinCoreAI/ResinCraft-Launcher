@@ -56,13 +56,15 @@ export function themesNow(now = new Date()): ThemeInfo[] {
 
 /** The theme to show: the holiday's while it lasts (unless turned off), else the player's, with "system" resolved. */
 export function effectiveTheme(
-  s: { theme: string; seasonalThemes?: boolean; seasonOff?: string },
+  s: { theme: string; seasonalThemes?: boolean; seasonOff?: string; customThemes?: { id: string }[] },
   prefersLight: boolean,
   now = new Date()
 ): string {
   const season = activeSeason(now)
   if (season && s.seasonalThemes !== false && s.seasonOff !== season.key) return season.theme
   if (s.theme === 'system') return prefersLight ? 'light' : 'dark'
+  // The player's own themes (customTheme.ts); a deleted one falls back to dark.
+  if (s.theme.startsWith('custom:')) return s.customThemes?.some((c) => `custom:${c.id}` === s.theme) ? s.theme : 'dark'
   // A holiday theme picked during the holiday ends with it.
   return themesNow(now).some((t) => t.id === s.theme) ? s.theme : 'dark'
 }

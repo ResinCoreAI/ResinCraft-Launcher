@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Monitor, Sparkles } from 'lucide-react'
-import type { Settings } from '@shared/types'
+import { Monitor, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
+import type { CustomTheme, Settings } from '@shared/types'
+import { api } from '../api'
+import { draftFromScreen, forgetPicture, pictureFor } from '../customTheme'
+import { ThemeMaker } from './ThemeMaker'
 import { t, type Key } from '../i18n'
 import { activeSeason, effectiveTheme, THEMES, themesNow } from '../themes'
-import { Switch } from './ui'
+import { ConfirmModal, Switch } from './ui'
 
 /** The colour variables a custom theme usually changes, filled in with the current theme's values. */
 const TEMPLATE_VARS = ['--bg', '--bg-sidebar', '--surface', '--surface-2', '--surface-3', '--border', '--text', '--text-dim', '--accent', '--accent-hover', '--accent-fg', '--data', '--play']
@@ -12,6 +15,26 @@ function template(): string {
   const css = getComputedStyle(document.documentElement)
   const lines = TEMPLATE_VARS.map((v) => `  ${v}: ${css.getPropertyValue(v).trim()};`)
   return `/* ${t('settings.customCss.templateNote')} */\n:root {\n${lines.join('\n')}\n}\n`
+}
+
+/** A custom theme's card picture: its background (or picture) with its accent, panel and text colours. */
+function CustomSwatch({ th }: { th: CustomTheme }) {
+  const [picture, setPicture] = useState<string>()
+  useEffect(() => {
+    let alive = true
+    void pictureFor(th).then((u) => alive && setPicture(u))
+    return () => void (alive = false)
+  }, [th.id, th.imageFile, th.imageUrl])
+  return (
+    <span
+      className={`theme-swatch ${picture ? 'has-picture' : ''}`}
+      style={{ background: picture ? `linear-gradient(rgba(0,0,0,${th.darken / 100}), rgba(0,0,0,${th.darken / 100})), url("${picture}")` : th.bg }}
+    >
+      {[th.accent, th.panel, th.text].map((c, i) => (
+        <i key={i} style={{ background: c, outline: '1px solid rgba(127,127,127,0.35)' }} />
+      ))}
+    </span>
+  )
 }
 
 /** Settings → Appearance: the theme cards, the holiday themes, and the player's own CSS. */
@@ -24,9 +47,24 @@ export function ThemePicker({ s, set }: { s: Settings; set: (patch: Partial<Sett
 
   // Picking a theme while a holiday's is on keeps the pick for this holiday; picking the holiday's own theme
   // brings the holiday back without changing the theme for the rest of the year.
-  const pick = (id: string) => {
-    if (season && id === season.theme) return set({ seasonOff: '' })
-    set({ theme: id, ...(season ? { seasonOff: season.key } : {}) })
+  const pick = (id: string, extra: Partial<Settings> = {}) => {
+    if (season && id === season.theme) return set({ seasonOff: '', ...extra })
+    set({ theme: id, ...(season ? { seasonOff: season.key } : {}), ...extra })
+  }
+
+  // The player's own themes (ThemeMaker): made, edited and deleted here.
+  const mine = s.customThemes ?? []
+  const [making, setMaking] = useState<{ theme: CustomTheme; isNew: boolean }>()
+  const [deleting, setDeleting] = useState<CustomTheme>()
+  const current = shown.startsWith('custom:') ? mine.find((c) => `custom:${c.id}` === shown) : undefined
+  const saveTheme = (th: CustomTheme) => {
+    const list = mine.some((c) => c.id === th.id) ? mine.map((c) => (c.id === th.id ? th : c)) : [...mine, th]
+    pick(`custom:${th.id}`, { customThemes: list })
+  }
+  const deleteTheme = async (th: CustomTheme) => {
+    if (th.imageFile) await api.app.saveThemeImage(th.id, null).catch(() => {})
+    forgetPicture(th.id)
+    set({ customThemes: mine.filter((c) => c.id !== th.id), ...(s.theme === `custom:${th.id}` ? { theme: 'dark' } : {}) })
   }
 
   return (
@@ -77,7 +115,54 @@ export function ThemePicker({ s, set }: { s: Settings; set: (patch: Partial<Sett
               </button>
             )
           })}
+          {mine.map((th) => {
+            const on = shown === `custom:${th.id}`
+            return (
+              <button
+                key={th.id}
+                role="radio"
+                aria-checked={on}
+                className={`theme-card ${on ? 'on' : ''}`}
+                title={th.description || th.name}
+                onClick={() => pick(`custom:${th.id}`)}
+                onDoubleClick={() => setMaking({ theme: th, isNew: false })}
+              >
+                <CustomSwatch th={th} />
+                <span className="theme-name">{th.name}</span>
+              </button>
+            )
+          })}
+          <button className="theme-card" onClick={() => setMaking({ theme: draftFromScreen(), isNew: true })} disabled={!!making}>
+            <span className="theme-swatch add">
+              <Plus size={18} />
+            </span>
+            <span className="theme-name">{t('settings.themeMaker.new')}</span>
+          </button>
         </div>
+        {current && !making && (
+          <div className="row" style={{ gap: 8 }}>
+            <span className="grow muted ellipsis">
+              <b>{current.name}</b>
+              {current.description && ` · ${current.description}`}
+            </span>
+            <button className="btn sm" onClick={() => setMaking({ theme: current, isNew: false })}>
+              <Pencil /> {t('common.edit')}
+            </button>
+            <button className="btn sm ghost" onClick={() => setDeleting(current)}>
+              <Trash2 /> {t('common.delete')}
+            </button>
+          </div>
+        )}
+        {making && <ThemeMaker key={making.theme.id} initial={making.theme} isNew={making.isNew} s={s} onSave={saveTheme} onClose={() => setMaking(undefined)} />}
+        {deleting && (
+          <ConfirmModal
+            title={t('settings.themeMaker.deleteTitle', { name: deleting.name })}
+            body={t('settings.themeMaker.deleteBody')}
+            confirm={t('common.delete')}
+            onConfirm={() => deleteTheme(deleting)}
+            onClose={() => setDeleting(undefined)}
+          />
+        )}
       </div>
       {/* Only while a holiday lasts: the rest of the year its theme is a surprise. */}
       {season && (

@@ -19,6 +19,9 @@ pub struct Settings {
     pub season_off: String,
     /// The player's own CSS, applied over any theme.
     pub custom_css: String,
+    /// Themes the player made in Settings → Appearance → Create theme (the UI owns their shape; see themes.ts).
+    /// A theme's uploaded background picture is a file in `<data>/themes` (`app:themeImage`).
+    pub custom_themes: Vec<Value>,
     /// Remote control from the web console (console.<relay domain>) while ResinCraft runs, signed in with the same
     /// Minecraft account (Settings → Remote control; off by default).
     pub remote_control: bool,
@@ -91,6 +94,7 @@ impl Default for Settings {
             seasonal_themes: true,
             season_off: String::new(),
             custom_css: String::new(),
+            custom_themes: Vec::new(),
             remote_control: false,
             remote_full_control: false,
             language: "system".into(),
