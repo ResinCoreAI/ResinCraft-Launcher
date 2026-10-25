@@ -28,8 +28,9 @@ export function ThemeMaker({
 }) {
   const { toast } = useStore()
   const [d, setD] = useState(initial)
-  /** A picture picked in this form (a data URL), not saved yet. */
+  /** A picture picked in this form (a data URL, to save), not saved yet; `preview` shows it (a blob: URL). */
   const [upload, setUpload] = useState<string>()
+  const [preview, setPreview] = useState<string>()
   const [dropPicture, setDropPicture] = useState(false)
   const [thumb, setThumb] = useState<string>()
   const [busy, setBusy] = useState(false)
@@ -42,7 +43,8 @@ export function ThemeMaker({
   const shown: CustomTheme = { ...d, imageFile: !dropPicture && (!!upload || !!d.imageFile) }
 
   // Live preview, and the old theme back when the form closes without saving.
-  useEffect(() => showCustom(shown, upload), [JSON.stringify(shown), upload])
+  useEffect(() => showCustom(shown, preview), [JSON.stringify(shown), preview])
+  useEffect(() => () => void (preview && setTimeout(() => URL.revokeObjectURL(preview), 5000)), [preview])
   useEffect(
     () => () => {
       if (!saved.current) showTheme(latest.current, window.matchMedia('(prefers-color-scheme: light)').matches)
@@ -51,9 +53,9 @@ export function ThemeMaker({
   )
   useEffect(() => {
     let alive = true
-    void pictureFor(shown, upload).then((u) => alive && setThumb(u))
+    void pictureFor(shown, preview).then((u) => alive && setThumb(u))
     return () => void (alive = false)
-  }, [upload, shown.imageFile, d.imageUrl])
+  }, [preview, shown.imageFile, d.imageUrl])
 
   const pick = (f: File | undefined) => {
     if (!f) return
@@ -61,12 +63,14 @@ export function ThemeMaker({
     const reader = new FileReader()
     reader.onload = () => {
       setUpload(String(reader.result))
+      setPreview(URL.createObjectURL(f))
       setDropPicture(false)
     }
     reader.readAsDataURL(f)
   }
   const removePicture = () => {
     setUpload(undefined)
+    setPreview(undefined)
     setDropPicture(true)
     edit({ imageUrl: '' })
     if (file.current) file.current.value = ''

@@ -106,8 +106,14 @@ function vars(th: CustomTheme): Record<string, string> {
 /** Uploaded pictures as blob: URLs (a data URL of a few MB in a style would be parsed on every change). */
 const pictures = new Map<string, Promise<string | undefined>>()
 
-async function blobUrl(dataUrl: string): Promise<string> {
-  return URL.createObjectURL(await (await fetch(dataUrl)).blob())
+/** Decoded here: the app's CSP doesn't let fetch() read data: URLs, and Chromium drops URLs over 2 MB in CSS. */
+export function blobUrl(dataUrl: string): string {
+  const [head, b64 = ''] = dataUrl.split(',', 2)
+  const type = /^data:([^;,]+)/.exec(head)?.[1] ?? 'image/png'
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return URL.createObjectURL(new Blob([bytes], { type }))
 }
 
 function uploaded(id: string): Promise<string | undefined> {
@@ -128,12 +134,12 @@ export function forgetPicture(id: string) {
   pictures.delete(id)
 }
 
-/** The picture a theme shows: `draft` (a data URL being edited) first, then its uploaded one, then its link. */
+/** The picture a theme shows: `draft` (a blob: URL of a picture being edited) first, then its uploaded one, then its link. */
 export async function pictureFor(th: CustomTheme, draft?: string): Promise<string | undefined> {
   if (draft) return draft
   if (th.imageFile) return (await uploaded(th.id)) ?? undefined
   const url = th.imageUrl?.trim()
-  return url && /^(https:|data:image\/)/i.test(url) ? url : undefined
+  return url && /^https:/i.test(url) ? url : undefined
 }
 
 // ---------- Showing it ----------
