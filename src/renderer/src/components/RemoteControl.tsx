@@ -57,6 +57,19 @@ export function RemoteControlSection() {
         {on && (
           <div className="setting">
             <div className="text">
+              <b>{t('settings.remote.full')}</b>
+              <span>{t('settings.remote.fullHint')}</span>
+            </div>
+            <Switch
+              on={!!settings.remoteFullControl}
+              onChange={(v) => void updateSettings({ remoteFullControl: v }).catch((e) => toast((e as Error).message, 'error'))}
+              label={t('settings.remote.full')}
+            />
+          </div>
+        )}
+        {on && (
+          <div className="setting">
+            <div className="text">
               <b className="row" style={{ gap: 8 }}>
                 <span className={`remote-dot ${state === 'online' ? 'on' : state === 'connecting' ? 'wait' : 'off'}`} aria-hidden />
                 {line}

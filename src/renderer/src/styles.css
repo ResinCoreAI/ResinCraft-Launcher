@@ -3317,3 +3317,349 @@ textarea.custom-css {
     opacity: 1;
   }
 }
+
+/* The monster: offstage most of the time; every 45 s it shambles across the bottom, bobbing, and walks off. */
+.hw-monster {
+  position: fixed;
+  left: var(--sidebar-w);
+  bottom: 6px;
+  z-index: 5;
+  pointer-events: none;
+  transform: translateX(-60px);
+  animation: hw-walk 45s linear 6s infinite;
+}
+.hw-monster svg {
+  display: block;
+  animation: hw-bob 0.6s ease-in-out infinite alternate;
+}
+.hw-m-body {
+  fill: #5f8f3a;
+  stroke: #2b4419;
+  stroke-width: 1.2;
+}
+.hw-m-patch {
+  fill: #7a4bb0;
+  opacity: 0.9;
+}
+.hw-m-arm rect {
+  fill: #6fa344;
+  stroke: #2b4419;
+  stroke-width: 1;
+}
+.hw-m-arm {
+  transform-origin: 27px 27px;
+  animation: hw-arm 1.2s ease-in-out infinite alternate;
+}
+.hw-m-leg rect {
+  fill: #3d2a52;
+}
+.hw-m-leg {
+  transform-origin: 50% 38px;
+  animation: hw-step 0.6s ease-in-out infinite alternate;
+}
+.hw-m-leg-b {
+  animation-direction: alternate-reverse;
+}
+.hw-m-eye {
+  fill: #f6f2d8;
+}
+.hw-m-pupil {
+  fill: #1a0f22;
+}
+.hw-m-mouth {
+  fill: none;
+  stroke: #1a0f22;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+.hw-m-bolt {
+  stroke: #9aa3ad;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+@keyframes hw-walk {
+  0% {
+    transform: translateX(-60px);
+  }
+  40% {
+    transform: translateX(calc(100vw - var(--sidebar-w) + 20px));
+  }
+  40.01%,
+  100% {
+    transform: translateX(-60px);
+    visibility: hidden;
+  }
+}
+@keyframes hw-bob {
+  from {
+    transform: translateY(0) rotate(-2deg);
+  }
+  to {
+    transform: translateY(-2px) rotate(2deg);
+  }
+}
+@keyframes hw-step {
+  from {
+    transform: rotate(-14deg);
+  }
+  to {
+    transform: rotate(14deg);
+  }
+}
+@keyframes hw-arm {
+  from {
+    transform: rotate(-6deg);
+  }
+  to {
+    transform: rotate(4deg);
+  }
+}
+
+/* ---------- Christmas decorations ---------- */
+
+/* Santa's sleigh: crosses the top of the page on a soft arc every 40 s, then stays away. */
+.xm-sleigh {
+  position: fixed;
+  top: calc(var(--titlebar) + 6px);
+  left: var(--sidebar-w);
+  z-index: 5;
+  pointer-events: none;
+  transform: translate(-170px, 30px);
+  animation: xm-fly 40s linear 5s infinite;
+}
+.xm-sleigh svg {
+  display: block;
+  filter: drop-shadow(0 0 4px rgba(242, 207, 107, 0.35));
+}
+@keyframes xm-fly {
+  0% {
+    transform: translate(-170px, 34px);
+  }
+  12% {
+    transform: translate(calc((100vw - var(--sidebar-w)) * 0.35), 4px);
+  }
+  24% {
+    transform: translate(calc((100vw - var(--sidebar-w)) * 0.7), 16px);
+  }
+  34% {
+    transform: translate(calc(100vw - var(--sidebar-w) + 20px), 0);
+  }
+  34.01%,
+  100% {
+    transform: translate(-170px, 34px);
+    visibility: hidden;
+  }
+}
+.xm-rein {
+  fill: none;
+  stroke: rgba(242, 207, 107, 0.6);
+  stroke-width: 0.9;
+}
+.xm-deer-body {
+  fill: #9b6a43;
+}
+.xm-antler {
+  fill: none;
+  stroke: #e9d6b0;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+.xm-nose {
+  fill: #ff4d5e;
+  filter: drop-shadow(0 0 3px #ff4d5e);
+}
+.xm-deer-legs path {
+  fill: none;
+  stroke: #7a5232;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.xm-deer-legs {
+  transform-origin: 11px 18px;
+  animation: xm-gallop 0.45s ease-in-out infinite alternate;
+}
+.xm-deer-1 .xm-deer-legs {
+  animation-delay: -0.22s;
+}
+.xm-runner {
+  fill: none;
+  stroke: #f2cf6b;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.xm-sled {
+  fill: #d8343f;
+}
+.xm-trim {
+  stroke: #f2cf6b;
+  stroke-width: 2;
+}
+.xm-santa {
+  fill: #f3d1b5;
+}
+.xm-hat {
+  fill: #d8343f;
+}
+.xm-pom {
+  fill: #ffffff;
+}
+.xm-sack {
+  fill: #8a5a2b;
+}
+@keyframes xm-gallop {
+  from {
+    transform: rotate(-10deg);
+  }
+  to {
+    transform: rotate(10deg);
+  }
+}
+
+/* The tree: its own row in the sidebar, above the account. */
+.xm-tree {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+  pointer-events: none;
+}
+.xm-tree svg {
+  position: relative;
+}
+.xm-tree-glow {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 40px;
+  height: 30px;
+  margin-left: -20px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(242, 207, 107, 0.45), rgba(242, 207, 107, 0));
+  animation: xm-glow 2.8s ease-in-out infinite;
+}
+.xm-star {
+  fill: #f2cf6b;
+}
+.xm-leaves {
+  fill: #2f8a4f;
+  stroke: #1d5a33;
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.xm-garland {
+  stroke: rgba(242, 207, 107, 0.7);
+  stroke-width: 1;
+}
+.xm-trunk {
+  fill: #7a5232;
+}
+.xm-light {
+  animation: xm-twinkle 2.6s ease-in-out infinite;
+}
+.xm-r {
+  fill: #ff5a6a;
+}
+.xm-g {
+  fill: #6ff0a0;
+}
+.xm-y {
+  fill: #ffd86b;
+}
+.xm-b {
+  fill: #7cc7ff;
+}
+@keyframes xm-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes xm-glow {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hw-monster,
+  .xm-sleigh {
+    display: none;
+  }
+  .xm-light,
+  .xm-tree-glow,
+  .xm-deer-legs {
+    animation: none;
+  }
+}
+
+/* Settings → Custom CSS → How to customize. */
+.css-guide {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  background: var(--surface-2);
+}
+.css-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+.css-guide h4 {
+  margin: 12px 0 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.css-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 4px;
+}
+.css-guide-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.css-guide-row:hover,
+.css-guide-row:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+.css-guide-row code {
+  font-family: var(--mono);
+  color: var(--data);
+  white-space: nowrap;
+}
+.css-guide-row .grow {
+  color: var(--text-dim);
+}
+.css-guide-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  flex: none;
+}
+.css-guide-dot.none {
+  border-style: dashed;
+}

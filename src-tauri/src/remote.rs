@@ -190,19 +190,60 @@ async fn forward_events(tx: mpsc::UnboundedSender<RemoteCommand>, watched: Arc<M
     }
 }
 
-/// What the console sees of a server: no secrets, no paths on this PC, no Java arguments.
-fn public_server(mut v: Value) -> Value {
+/// What the console sees of a server: never the relay secret; Java settings only with full control.
+fn public_server(mut v: Value, full: bool) -> Value {
     if let Some(o) = v.as_object_mut() {
-        for key in ["relaySecret", "jvmArgs", "javaPath", "relayAccount"] {
-            o.remove(key);
+        o.remove("relaySecret");
+        o.remove("relayAccount");
+        if !full {
+            o.remove("jvmArgs");
+            o.remove("javaPath");
         }
     }
     v
 }
 
 const KINDS: &[&str] = &["vanilla", "paper", "purpur", "folia", "spigot", "leaf", "fabric", "quilt", "forge", "neoforge", "arclight", "bedrock"];
-/// The server settings the console may change; the rest (Java, sharing secrets, commands) only change here.
-const SAFE_PATCH: &[&str] = &["name", "memoryMb", "port", "public", "joinRequests"];
+
+/// Server-manager actions the console may run as `server.<name>` (the engine's `server:<name>`, same arguments).
+const SERVER: &[&str] = &[
+    "get", "start", "stop", "kill", "command", "log", "acceptEula", "remove", "backup", "setIcon", "update",
+    // Players and whitelist requests.
+    "playerList", "playerAdd", "playerRemove", "requests", "requestAccept", "requestReject", "requestBlock", "requestUnblockAll",
+    // Properties, anti-xray, Bedrock players, files to download yourself, client-only mods.
+    "properties", "setProperties", "antiXray", "setAntiXray", "bedrockJoin", "setBedrockJoin", "downloadsCheck", "downloadsForget", "clientMods",
+    // Plugins and mods from the built-in sources.
+    "addonSources", "addons", "addonSearch", "addonVersions", "addonChangeVersion", "addonCheckUpdates", "addonCancelPending", "addonInstall", "addonToggle",
+    "addonRemove",
+    // Modpack: versions, sync from its instance, reinstall.
+    "switchPack", "origin", "syncPreview", "syncFromInstance", "reinstall", "reinstallPack", "packFlags",
+    // Sharing: ResinCraft Relay, domain.
+    "relayInfo", "relayCheck", "relayName", "relayContinue", "relayTopUp", "relayRestart", "domain", "checkDns", "network",
+    // Making servers.
+    "versions", "builds", "softwareIcons", "create",
+];
+
+/// Only with "Allow full control": these can run programs on this PC (Java and its arguments, any downloaded jar) or
+/// hand over secrets, so a stolen console sign-in alone can't use them.
+const SERVER_FULL: &[&str] = &["launchArgs", "addonFromLink", "setBotToken", "setDnsToken"];
+
+/// The file manager, on a server's own folder only, with full control.
+const FILES_FULL: &[&str] = &["list", "readText", "writeText", "mkdir", "rename", "move", "copy", "trash"];
+
+/// Server settings the console may change; the rest need full control.
+const SAFE_PATCH: &[&str] = &["name", "memoryMb", "port", "public", "joinRequests", "optimizedFlags", "packFlags", "tunnel", "domain", "dnsAuto"];
+const FULL_PATCH: &[&str] = &["javaPath", "jvmArgs", "relayHost", "relaySecret"];
+
+/// Names from the first console (kept so it keeps working) → the engine's names.
+fn alias(method: &str) -> &str {
+    match method {
+        "servers.list" => "server.list",
+        "server.players" => "server.playerList",
+        "create.versions" => "server.versions",
+        "create.builds" => "server.builds",
+        other => other,
+    }
+}
 
 fn arg(params: &Value, i: usize) -> Value {
     params.get(i).cloned().unwrap_or(Value::Null)
@@ -215,46 +256,59 @@ fn id_of(params: &Value) -> Result<String> {
     }
 }
 
-/// Every method the console may call (the relay only passes these on, too).
-const METHODS: &[&str] = &[
-    "servers.list", "server.get", "server.start", "server.stop", "server.kill", "server.restart", "server.command", "server.log",
-    "server.players", "server.playerAdd", "server.playerRemove", "server.requests", "server.requestAccept", "server.requestReject",
-    "server.backup", "server.update", "server.remove", "server.acceptEula", "create.options", "create.versions", "create.builds",
-    "create.searchPacks", "create.packVersions", "server.create",
-];
+fn needs_full() -> anyhow::Error {
+    anyhow::anyhow!("That needs full control. Turn on Settings → Remote control → Allow full control in ResinCraft on your PC.")
+}
 
 /// Refuses what the console may not do, before anything runs.
-fn check(method: &str, params: &Value) -> Result<()> {
-    if !METHODS.contains(&method) {
-        bail!("The web console can't do that ({method}).");
-    }
-    // A server is made from a pack or an instance on this PC; never from a file path sent from the web.
-    if method == "server.create" {
-        match params.get(0).and_then(|r| r["source"]["kind"].as_str()) {
-            None | Some("modpack") | Some("instance") => {}
-            Some(_) => bail!("The web console can make a server from a modpack or an instance, not from a file."),
+fn check(method: &str, params: &Value, full: bool) -> Result<()> {
+    let method = alias(method);
+    if let Some(name) = method.strip_prefix("server.") {
+        if name == "list" || name == "restart" || SERVER.contains(&name) {
+            // A server is made from a pack or an instance on this PC; never from a file path sent from the web.
+            if name == "create" {
+                match params.get(0).and_then(|r| r["source"]["kind"].as_str()) {
+                    None | Some("modpack") | Some("instance") => {}
+                    Some(_) => bail!("The web console can make a server from a modpack or an instance, not from a file."),
+                }
+            }
+            return Ok(());
+        }
+        if SERVER_FULL.contains(&name) {
+            return if full { Ok(()) } else { Err(needs_full()) };
         }
     }
-    Ok(())
+    if let Some(name) = method.strip_prefix("files.") {
+        if FILES_FULL.contains(&name) {
+            if !full {
+                return Err(needs_full());
+            }
+            // Only a server's folder: an instance's files are out of reach from the web.
+            if params.get(0).map(|r| r["kind"].as_str()) != Some(Some("server")) {
+                bail!("The web console can only open a server's own files.");
+            }
+            return Ok(());
+        }
+    }
+    if matches!(method, "create.options" | "create.searchPacks" | "create.packVersions") {
+        return Ok(());
+    }
+    bail!("The web console can't do that ({method}).")
 }
 
 /// Runs one console request (after `check`).
 async fn call(method: &str, params: Value) -> Result<Value> {
+    let full = crate::core::settings::get().await.remote_full_control;
     let params = if params.is_array() { params } else { json!([]) };
-    check(method, &params)?;
-    let server = |channel: &'static str, n: usize| {
-        let a: Vec<Value> = (0..n).map(|i| arg(&params, i)).collect();
-        async move { dispatch(channel, Args::new(a)).await }
-    };
+    check(method, &params, full)?;
+    let method = alias(method);
+    let all: Vec<Value> = params.as_array().cloned().unwrap_or_default();
     let out = match method {
-        "servers.list" => {
+        "server.list" => {
             let list = dispatch("server:list", Args::new(vec![])).await?;
-            Value::Array(list.as_array().cloned().unwrap_or_default().into_iter().map(public_server).collect())
+            Value::Array(list.as_array().cloned().unwrap_or_default().into_iter().map(|s| public_server(s, full)).collect())
         }
-        "server.get" => public_server(server("server:get", 1).await?),
-        "server.start" => server("server:start", 1).await?,
-        "server.stop" => server("server:stop", 1).await?,
-        "server.kill" => server("server:kill", 1).await?,
+        "server.get" => public_server(dispatch("server:get", Args::new(all)).await?, full),
         "server.restart" => {
             let id = id_of(&params)?;
             if crate::server::runtime::is_running(&id) {
@@ -263,27 +317,23 @@ async fn call(method: &str, params: Value) -> Result<Value> {
             }
             dispatch("server:start", Args::new(vec![json!(id)])).await?
         }
-        "server.command" => server("server:command", 2).await?,
         "server.log" => {
-            let lines = server("server:log", 1).await?;
+            let lines = dispatch("server:log", Args::new(all)).await?;
             let all = lines.as_array().cloned().unwrap_or_default();
             json!({ "lines": all[all.len().saturating_sub(200)..] })
         }
-        "server.players" => server("server:playerList", 2).await?,
-        "server.playerAdd" => server("server:playerAdd", 3).await?,
-        "server.playerRemove" => server("server:playerRemove", 3).await?,
-        "server.requests" => server("server:requests", 1).await?,
-        "server.requestAccept" => server("server:requestAccept", 2).await?,
-        "server.requestReject" => server("server:requestReject", 2).await?,
-        "server.backup" => server("server:backup", 1).await?,
         "server.update" => {
             let id = id_of(&params)?;
+            let allowed = |k: &str| SAFE_PATCH.contains(&k) || (full && FULL_PATCH.contains(&k));
             let patch: serde_json::Map<String, Value> =
-                arg(&params, 1).as_object().map(|o| o.iter().filter(|(k, _)| SAFE_PATCH.contains(&k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
-            public_server(dispatch("server:update", Args::new(vec![json!(id), Value::Object(patch)])).await?)
+                arg(&params, 1).as_object().map(|o| o.iter().filter(|(k, _)| allowed(k)).map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
+            public_server(dispatch("server:update", Args::new(vec![json!(id), Value::Object(patch)])).await?, full)
         }
-        "server.remove" => server("server:remove", 1).await?,
-        "server.acceptEula" => server("server:acceptEula", 1).await?,
+        "server.create" => {
+            let mut created = dispatch("server:create", Args::new(all)).await?;
+            created["server"] = public_server(created["server"].take(), full);
+            created
+        }
         "create.options" => {
             let instances: Vec<Value> = crate::core::instances::list()
                 .await
@@ -292,26 +342,26 @@ async fn call(method: &str, params: Value) -> Result<Value> {
                 .map(|i| json!({ "id": i.id, "name": i.name, "mcVersion": i.mc_version, "loader": i.loader }))
                 .collect();
             let settings = crate::core::settings::get().await;
-            json!({ "kinds": KINDS, "instances": instances, "memoryMb": settings.memory_mb, "totalMemoryMb": crate::core::settings::total_memory_mb() })
+            json!({ "kinds": KINDS, "instances": instances, "memoryMb": settings.memory_mb, "totalMemoryMb": crate::core::settings::total_memory_mb(), "fullControl": full })
         }
-        "create.versions" => server("server:versions", 1).await?,
-        "create.builds" => server("server:builds", 2).await?,
         "create.searchPacks" => {
             let source = arg(&params, 1);
             let query = json!({ "query": arg(&params, 0).as_str().unwrap_or(""), "kind": "modpack", "source": if source.is_string() { source } else { json!("modrinth") }, "limit": 20 });
             dispatch("content:search", Args::new(vec![query])).await?
         }
         "create.packVersions" => dispatch("content:versions", Args::new(vec![arg(&params, 0)])).await?,
-        "server.create" => {
-            let req = arg(&params, 0);
-            let mut created = dispatch("server:create", Args::new(vec![req])).await?;
-            created["server"] = public_server(created["server"].take());
-            created
+        m => {
+            // The rest are the engine's own channels with the same arguments: server.<x> → server:<x>, files.<x> → files:<x>.
+            let channel = m.replacen('.', ":", 1);
+            dispatch(&channel, Args::new(all)).await?
         }
-        _ => bail!("The web console can't do that ({method})."),
     };
     // The launcher's own screens follow changes made from the console.
-    if !method.starts_with("create.") && !matches!(method, "servers.list" | "server.get" | "server.log" | "server.players" | "server.requests") {
+    let reads = ["server.list", "server.get", "server.log", "server.playerList", "server.requests", "server.properties", "server.addons", "server.addonSources",
+        "server.addonSearch", "server.addonVersions", "server.addonCheckUpdates", "server.antiXray", "server.bedrockJoin", "server.origin", "server.syncPreview",
+        "server.relayInfo", "server.relayCheck", "server.domain", "server.checkDns", "server.network", "server.versions", "server.builds", "server.softwareIcons",
+        "server.packFlags", "server.clientMods", "server.launchArgs", "files.list", "files.readText"];
+    if !method.starts_with("create.") && !reads.contains(&method) {
         emit("remoteAction", json!({ "method": method, "serverId": params.get(0).and_then(Value::as_str) }));
         crate::core::events::list_changed("servers");
     }
@@ -330,18 +380,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_console_never_sees_secrets_or_paths() {
-        let v = public_server(json!({ "id": "smp", "name": "SMP", "relaySecret": "s", "jvmArgs": "-x", "javaPath": "C:/Users/me/java.exe", "relayAccount": "u" }));
-        assert_eq!(v, json!({ "id": "smp", "name": "SMP" }));
+    fn the_console_never_sees_secrets_and_java_only_with_full_control() {
+        let s = json!({ "id": "smp", "name": "SMP", "relaySecret": "s", "jvmArgs": "-x", "javaPath": "C:/Users/me/java.exe", "relayAccount": "u" });
+        assert_eq!(public_server(s.clone(), false), json!({ "id": "smp", "name": "SMP" }));
+        assert_eq!(public_server(s, true), json!({ "id": "smp", "name": "SMP", "jvmArgs": "-x", "javaPath": "C:/Users/me/java.exe" }));
     }
 
     #[test]
     fn only_listed_methods_run() {
-        assert!(check("app:openExternal", &json!(["https://example.com"])).unwrap_err().to_string().contains("can't do that"));
-        assert!(check("server:start", &json!(["smp"])).is_err(), "engine channel names aren't methods");
+        let no = |m: &str, p: Value, full: bool| check(m, &p, full).unwrap_err().to_string();
+        assert!(no("app:openExternal", json!(["https://example.com"]), true).contains("can't do that"));
+        assert!(no("server:start", json!(["smp"]), true).contains("can't do that"), "engine channel names aren't methods");
+        assert!(no("server.openFolder", json!(["smp"]), true).contains("can't do that"));
+        assert!(no("server.play", json!(["smp"]), true).contains("can't do that"));
         let file = json!([{ "name": "x", "source": { "kind": "file", "path": "C:/evil.zip" } }]);
-        assert!(check("server.create", &file).unwrap_err().to_string().contains("not from a file"));
-        assert!(check("server.create", &json!([{ "name": "x", "source": { "kind": "modpack", "projectId": "p" } }])).is_ok());
-        assert!(check("servers.list", &json!([])).is_ok());
+        assert!(no("server.create", file, true).contains("not from a file"));
+        // Everyday server management, the first console's names included.
+        for m in ["servers.list", "server.players", "server.addonInstall", "server.setProperties", "server.switchPack", "server.restart", "create.versions"] {
+            assert!(check(m, &json!(["smp"]), false).is_ok(), "{m}");
+        }
+        // What can run programs or reveal secrets needs full control.
+        assert!(no("server.addonFromLink", json!(["smp", "https://x/a.jar"]), false).contains("full control"));
+        assert!(no("files.writeText", json!([{ "kind": "server", "id": "smp" }, "a.txt", "x"]), false).contains("full control"));
+        assert!(check("files.writeText", &json!([{ "kind": "server", "id": "smp" }, "a.txt", "x"]), true).is_ok());
+        assert!(no("files.list", json!([{ "kind": "instance", "id": "i" }, ""]), true).contains("server's own files"));
+        assert!(no("files.import", json!([{ "kind": "server", "id": "smp" }, "", []]), true).contains("can't do that"));
     }
 }

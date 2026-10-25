@@ -112,6 +112,7 @@ export function mockApi(): ResinApi {
     seasonOff: '',
     customCss: '',
     remoteControl: false,
+    remoteFullControl: false,
     language: 'system',
     memoryMb: 4096,
     jvmArgs: '',

@@ -365,6 +365,8 @@ export interface Settings {
   customCss?: string
   /** Remote control from the web console while ResinCraft runs (Settings → Remote control; off by default). */
   remoteControl?: boolean
+  /** Remote control may also use the file manager, Java settings and plugins from any link (off by default). */
+  remoteFullControl?: boolean
   /** 'system' follows the OS locale; otherwise a locale code such as 'de' or 'pt-BR'. */
   language: string
   memoryMb: number

@@ -82,9 +82,10 @@ function HalloweenWeb() {
 
 // ---------- Halloween: a jack-o'-lantern in the sidebar ----------
 
-/** A carved pumpkin with a candle flickering inside; it sits in the sidebar's own space, above the account. */
+/** The sidebar's holiday piece, in its own space above the account: a jack-o'-lantern or a Christmas tree. */
 export function SidebarPumpkin() {
   const theme = useShownTheme()
+  if (theme === 'christmas') return <ChristmasTree />
   if (theme !== 'halloween') return null
   return (
     <div className="hw-pumpkin" aria-hidden>
@@ -112,9 +113,96 @@ export function SidebarPumpkin() {
   )
 }
 
-/** Decorations for themes that have them (Halloween), behind everything and never in the way of a click. */
+// ---------- Halloween: a little monster that shambles across the bottom now and then ----------
+
+function Monster() {
+  return (
+    <div className="hw-monster" aria-hidden>
+      <svg width="44" height="56" viewBox="0 0 44 56">
+        <g className="hw-m-leg hw-m-leg-a">
+          <rect x="13" y="38" width="7" height="15" rx="3" />
+        </g>
+        <g className="hw-m-leg hw-m-leg-b">
+          <rect x="24" y="38" width="7" height="15" rx="3" />
+        </g>
+        <path className="hw-m-body" d="M10 22c0-9 5-15 12-15s12 6 12 15v18c0 3-2 4-4 4H14c-2 0-4-1-4-4z" />
+        <path className="hw-m-patch" d="M14 30h8v6h-8z" />
+        <g className="hw-m-arm">
+          <rect x="26" y="24" width="17" height="6" rx="3" />
+        </g>
+        <circle className="hw-m-eye" cx="18" cy="17" r="3" />
+        <circle className="hw-m-eye" cx="27" cy="17" r="3.6" />
+        <circle className="hw-m-pupil" cx="19" cy="17.5" r="1.2" />
+        <circle className="hw-m-pupil" cx="28.3" cy="17.5" r="1.4" />
+        <path className="hw-m-mouth" d="M16 25l2 2 2-2 2 2 2-2 2 2 2-2" />
+        <path className="hw-m-bolt" d="M9 19h-3M38 19h3" />
+      </svg>
+    </div>
+  )
+}
+
+// ---------- Christmas: Santa's sleigh across the top, and a tree in the sidebar ----------
+
+function Sleigh() {
+  return (
+    <div className="xm-sleigh" aria-hidden>
+      <svg width="150" height="44" viewBox="0 0 150 44">
+        <path className="xm-rein" d="M40 22 70 26M40 22 104 24" />
+        {[0, 1].map((i) => (
+          <g key={i} className={`xm-deer xm-deer-${i}`} transform={`translate(${i * 34 + 74} 8)`}>
+            <path className="xm-antler" d="M20 6l2-6M20 6l-3-5M22 1l3-1M17 2l-3-1" />
+            <ellipse cx="11" cy="15" rx="10" ry="5.5" className="xm-deer-body" />
+            <path className="xm-deer-body" d="M18 13l4-7 4 2-5 7z" />
+            <circle cx="24" cy="7" r="1.3" className={i === 1 ? 'xm-nose' : 'xm-deer-body'} />
+            <g className="xm-deer-legs">
+              <path d="M4 18l-3 8M8 19l-1 8M15 19l3 7M18 18l4 7" />
+            </g>
+          </g>
+        ))}
+        <path className="xm-runner" d="M2 34c6 4 30 4 40-2" />
+        <path className="xm-sled" d="M6 18h30l4 12H10c-4 0-6-6-4-12z" />
+        <path className="xm-trim" d="M6 18h30" />
+        <circle className="xm-santa" cx="22" cy="12" r="6" />
+        <path className="xm-hat" d="M17 9c2-6 8-7 11-3l3 4-4-1c-3-2-6-1-10 0z" />
+        <circle className="xm-pom" cx="31" cy="10" r="1.6" />
+        <path className="xm-sack" d="M8 6c4-3 9-2 10 3l-1 9H7z" />
+      </svg>
+    </div>
+  )
+}
+
+/** A Christmas tree with lights that twinkle one after another and a star that glows. */
+function ChristmasTree() {
+  const lights = [
+    [29, 18, 'r'], [22, 25, 'g'], [35, 27, 'y'], [18, 33, 'b'], [29, 34, 'r'], [40, 35, 'g'],
+    [15, 42, 'y'], [25, 43, 'b'], [36, 44, 'r'], [45, 42, 'y']
+  ] as const
+  return (
+    <div className="xm-tree" aria-hidden>
+      <span className="xm-tree-glow" />
+      <svg width="60" height="62" viewBox="0 0 60 62">
+        <path className="xm-star" d="M30 1l2.6 5.4 5.9.8-4.3 4.1 1 5.8L30 14.4l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z" />
+        <path className="xm-leaves" d="M30 11 18 26h6L12 39h7L6 51h48L41 39h7L36 26h6z" />
+        <path className="xm-garland" d="M20 30c6 3 14 3 20-1M15 41c10 4 22 4 31-1" fill="none" />
+        <rect className="xm-trunk" x="26" y="51" width="8" height="7" rx="1" />
+        {lights.map(([x, y, c], i) => (
+          <circle key={i} className={`xm-light xm-${c}`} cx={x} cy={y} r="1.9" style={{ animationDelay: `${(i * 0.37).toFixed(2)}s` }} />
+        ))}
+      </svg>
+    </div>
+  )
+}
+
+/** Decorations for themes that have them (Halloween, Christmas), behind everything and never in the way of a click. */
 export default function ThemeDecor() {
   const theme = useShownTheme()
-  if (theme === 'halloween') return <HalloweenWeb />
+  if (theme === 'halloween')
+    return (
+      <>
+        <HalloweenWeb />
+        <Monster />
+      </>
+    )
+  if (theme === 'christmas') return <Sleigh />
   return null
 }
