@@ -14,7 +14,9 @@
     "build:web": "vite build --config vite.web.config.ts",
     "tauri": "tauri",
     "dev:tauri": "tauri dev",
-    "build:tauri": "tauri build"
+    "build:tauri": "tauri build",
+    "build:console": "vite build --config vite.console.config.ts",
+    "dev:console": "vite --config vite.console.config.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4"

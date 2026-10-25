@@ -1,0 +1,120 @@
+/* The web console: the launcher's own look (styles.css), with a top bar instead of the sidebar, and room for phones. */
+
+html.web-console,
+html.web-console body {
+  overflow: auto;
+}
+.console-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+}
+.console-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 54px;
+  padding: 0 16px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+}
+.console-logo {
+  width: 26px;
+  height: 26px;
+}
+.console-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.01em;
+}
+.console-device {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.console-device .select {
+  min-width: 140px;
+}
+.console-offline-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--warning) 18%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  color: var(--text);
+  font-size: 13px;
+}
+.console-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow: visible;
+}
+.console-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 80px 16px;
+  text-align: center;
+}
+.console-empty-logo {
+  width: 64px;
+  height: 64px;
+}
+.console-empty h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+}
+.console-empty p {
+  max-width: 460px;
+  margin: 0;
+}
+
+/* Things that only work on the PC itself: opening its folders, playing from its own instances. */
+html.web-console [data-pc-only],
+html.web-console .sv-connect > .cell:first-child {
+  display: none;
+}
+
+/* Phones: the Servers page stacks, and nothing scrolls sideways. */
+@media (max-width: 720px) {
+  .console-top {
+    padding: 0 12px;
+  }
+  .console-title {
+    display: none;
+  }
+  .console-content {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  html.web-console .sv-connect {
+    grid-template-columns: 1fr;
+  }
+  /* The server's header wraps instead of squeezing the name to a letter per line. */
+  html.web-console .ihead {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px;
+  }
+  html.web-console .ihead .tile {
+    width: 56px;
+    height: 56px;
+  }
+  html.web-console .ihead > .grow {
+    flex: 1 1 calc(100% - 68px);
+    min-width: 0;
+  }
+  html.web-console .ihead h1 {
+    font-size: 21px;
+  }
+}

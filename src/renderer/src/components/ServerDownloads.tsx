@@ -48,7 +48,7 @@ export default function ServerDownloads({ s }: { s: ServerInfo }) {
             <span className="grow ellipsis">
               <b>{p.title}</b> <span className="faint mono">{p.fileName}</span>
             </span>
-            <button className="btn sm" onClick={() => void api.server.openFolder(s.id, p.folder)}>
+            <button data-pc-only className="btn sm" onClick={() => void api.server.openFolder(s.id, p.folder)}>
               <FolderOpen /> {p.folder}
             </button>
             <button className="btn sm primary" onClick={() => void api.app.openExternal(p.url)}>

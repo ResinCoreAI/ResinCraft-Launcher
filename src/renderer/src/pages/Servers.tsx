@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
-import { api } from '../api'
+import { api, isConsole } from '../api'
 import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
 import FileManager from '../components/FileManager'
 import ServerAddons from '../components/ServerAddons'
@@ -303,7 +303,7 @@ function ServerList({
       { label: t('menu.server.openConsole'), icon: <Terminal />, shortcut: 'Enter', onSelect: () => go({ page: 'servers', id: s.id }) },
       '-',
       { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(address) },
-      { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
+      !isConsole && { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
       info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
       '-',
       { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: live(s), onSelect: () => setDeleting(s) }
@@ -318,7 +318,7 @@ function ServerList({
           <p>{t('servers.subtitle')}</p>
         </div>
         <div className="spacer" />
-        <button className="btn lg" onClick={onImport}>
+        <button data-pc-only className="btn lg" onClick={onImport}>
           <FolderInput /> {t('migrate.serverButton')}
         </button>
         <button className="btn primary lg" onClick={onCreate}>
@@ -340,7 +340,7 @@ function ServerList({
               <button className="btn primary" onClick={onCreate}>
                 <Plus /> {t('servers.create.button')}
               </button>
-              <button className="btn" onClick={onImport}>
+              <button data-pc-only className="btn" onClick={onImport}>
                 <FolderInput /> {t('migrate.serverButton')}
               </button>
             </div>
@@ -421,7 +421,7 @@ function ServerDetail({
     s.state === 'stopping' && { label: t('servers.forceStop'), icon: <Square />, danger: true, onSelect: () => onStop(s) },
     '-',
     { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(address) },
-    { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
+    !isConsole && { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
     info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
     '-',
     {
@@ -493,7 +493,7 @@ function ServerDetail({
         >
           <MoreHorizontal />
         </button>
-        <button className="btn lg icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id)}>
+        <button data-pc-only className="btn lg icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id)}>
           <FolderOpen />
         </button>
         {s.state === 'running' && (
@@ -773,7 +773,7 @@ function ConsoleTab({ s }: { s: ServerInfo }) {
         <button className="btn icon" title={t('servers.console.clear')} onClick={clear}>
           <Eraser />
         </button>
-        <button className="btn icon" title={t('servers.console.openLogs')} onClick={() => void api.server.openFolder(s.id, 'logs')}>
+        <button data-pc-only className="btn icon" title={t('servers.console.openLogs')} onClick={() => void api.server.openFolder(s.id, 'logs')}>
           <FolderOpen />
         </button>
       </div>
@@ -1468,7 +1468,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               <span>{t('servers.settings.backupHint')}</span>
             </div>
             <div className="row">
-              <button className="btn icon" title={t('servers.settings.openBackups')} onClick={() => void api.server.openFolder(s.id, 'backups')}>
+              <button data-pc-only className="btn icon" title={t('servers.settings.openBackups')} onClick={() => void api.server.openFolder(s.id, 'backups')}>
                 <FolderOpen />
               </button>
               <button
@@ -1617,7 +1617,7 @@ function CreatedSummary({ result, onClose }: { result: ServerCreated; onClose: (
                 <span className="grow ellipsis">
                   <b>{p.title}</b> <span className="faint mono">{p.fileName}</span>
                 </span>
-                <button className="btn sm" onClick={() => void api.server.openFolder(result.server.id, p.folder)}>
+                <button data-pc-only className="btn sm" onClick={() => void api.server.openFolder(result.server.id, p.folder)}>
                   <FolderOpen /> {p.folder}
                 </button>
                 <button className="btn sm primary" onClick={() => void api.app.openExternal(p.url)}>

@@ -256,7 +256,7 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
             {checking ? <Loader2 className="spin" /> : <RefreshCw />} {t('servers.addons.checkUpdates')}
           </button>
         )}
-        <button className="btn icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id, plugins ? 'plugins' : 'mods')}>
+        <button data-pc-only className="btn icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id, plugins ? 'plugins' : 'mods')}>
           <FolderOpen />
         </button>
         <button className="btn primary" onClick={() => setBrowsing(true)}>

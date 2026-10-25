@@ -290,8 +290,20 @@ fn check(method: &str, params: &Value, full: bool) -> Result<()> {
             return Ok(());
         }
     }
-    if matches!(method, "create.options" | "create.searchPacks" | "create.packVersions") {
+    // What the launcher's own server pages read while making a server (the console is that same UI).
+    if matches!(method, "create.options" | "create.searchPacks" | "create.packVersions" | "versions.list" | "content.versions") {
         return Ok(());
+    }
+    if method == "content.search" {
+        // Modpacks only: the console makes servers from them; mods and plugins go through server.addonSearch.
+        return match params.get(0).and_then(|q| q["kind"].as_str()) {
+            Some("modpack") => Ok(()),
+            _ => bail!("The web console can only search modpacks here."),
+        };
+    }
+    if method == "java.list" {
+        // Shows where Java is installed on this PC.
+        return if full { Ok(()) } else { Err(needs_full()) };
     }
     bail!("The web console can't do that ({method}).")
 }
@@ -360,7 +372,8 @@ async fn call(method: &str, params: Value) -> Result<Value> {
     let reads = ["server.list", "server.get", "server.log", "server.playerList", "server.requests", "server.properties", "server.addons", "server.addonSources",
         "server.addonSearch", "server.addonVersions", "server.addonCheckUpdates", "server.antiXray", "server.bedrockJoin", "server.origin", "server.syncPreview",
         "server.relayInfo", "server.relayCheck", "server.domain", "server.checkDns", "server.network", "server.versions", "server.builds", "server.softwareIcons",
-        "server.packFlags", "server.clientMods", "server.launchArgs", "files.list", "files.readText"];
+        "server.packFlags", "server.clientMods", "server.launchArgs", "files.list", "files.readText", "versions.list", "content.search",
+        "content.versions", "java.list", "server.downloadsCheck"];
     if !method.starts_with("create.") && !reads.contains(&method) {
         emit("remoteAction", json!({ "method": method, "serverId": params.get(0).and_then(Value::as_str) }));
         crate::core::events::list_changed("servers");
@@ -405,5 +418,11 @@ mod tests {
         assert!(check("files.writeText", &json!([{ "kind": "server", "id": "smp" }, "a.txt", "x"]), true).is_ok());
         assert!(no("files.list", json!([{ "kind": "instance", "id": "i" }, ""]), true).contains("server's own files"));
         assert!(no("files.import", json!([{ "kind": "server", "id": "smp" }, "", []]), true).contains("can't do that"));
+        // The launcher's own server pages read these while making a server.
+        assert!(check("versions.list", &json!([]), false).is_ok());
+        assert!(check("content.search", &json!([{ "query": "atm", "kind": "modpack" }]), false).is_ok());
+        assert!(no("content.search", json!([{ "query": "x", "kind": "mod" }]), true).contains("only search modpacks"));
+        assert!(no("java.list", json!([]), false).contains("full control"));
+        assert!(no("instances.launch", json!(["i"]), true).contains("can't do that"));
     }
 }
