@@ -248,6 +248,8 @@ pub struct Connection {
     pub base_domain: String,
     /// The relay's protocol version (3 and later can carry Bedrock servers).
     pub relay_version: u32,
+    /// Whitelist pages live at `https://<name>.<base_domain>/` (the relay's certificate covers its names).
+    pub name_pages: bool,
     /// Where Bedrock players' datagrams go when it isn't the served address (a Java server's Geyser port).
     udp_target: Option<SocketAddr>,
     seq: u64,
@@ -336,13 +338,15 @@ impl Connection {
             driver,
             base_domain: String::new(),
             relay_version: 0,
+            name_pages: false,
             udp_target: None,
             seq: 0,
         };
         conn.send(&AgentMsg::Hello { version, client: client.to_string() }).await?;
         match conn.recv().await? {
-            RelayMsg::Welcome { base_domain, version: relay_version } => {
+            RelayMsg::Welcome { base_domain, version: relay_version, name_pages } => {
                 conn.base_domain = base_domain;
+                conn.name_pages = name_pages;
                 // What both sides speak: an older launcher protocol keeps the newer features off.
                 conn.relay_version = relay_version.min(version);
             }
@@ -808,7 +812,7 @@ mod tests {
                     let mut lines = FramedRead::new(r, LinesCodec::new());
                     let Some(Ok(hello)) = lines.next().await else { return };
                     let answer = match serde_json::from_str::<AgentMsg>(&hello) {
-                        Ok(AgentMsg::Hello { version, .. }) if version <= newest => RelayMsg::Welcome { version: newest, base_domain: "relay.test".into() },
+                        Ok(AgentMsg::Hello { version, .. }) if version <= newest => RelayMsg::Welcome { version: newest, base_domain: "relay.test".into(), name_pages: false },
                         _ => RelayMsg::Error { code: ErrorCode::Version, message: "update ResinCraft Launcher".into(), ban: None },
                     };
                     let _ = w.write_all(format!("{}
@@ -852,8 +856,8 @@ mod tests {
                     serde_json::from_str::<AgentMsg>(&lines.next().await.unwrap().unwrap()).unwrap()
                 };
             }
-            assert!(matches!(next!(), AgentMsg::Hello { version: 6, .. }));
-            w.write_all(say(RelayMsg::Welcome { version: 6, base_domain: "relay.test".into() }).as_bytes()).await.unwrap();
+            assert!(matches!(next!(), AgentMsg::Hello { version, .. } if version == PROTOCOL_VERSION));
+            w.write_all(say(RelayMsg::Welcome { version: 6, base_domain: "relay.test".into(), name_pages: false }).as_bytes()).await.unwrap();
             assert!(matches!(next!(), AgentMsg::Login { .. }));
             w.write_all(say(RelayMsg::Authed { uuid: "u".into(), username: "Steve".into(), session: None }).as_bytes()).await.unwrap();
             assert_eq!(next!(), AgentMsg::Remote { enabled: true, device: "PC".into(), app_version: "9".into() });

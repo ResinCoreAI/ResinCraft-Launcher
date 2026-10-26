@@ -1241,6 +1241,8 @@ pub struct DomainOwnership {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub txt: Option<DnsRecord>,
     pub route_ok: bool,
+    /// The relay serves the whitelist page at `https://<domain>/` (it has a certificate for the domain).
+    pub https: bool,
     /// Another account has the domain verified; it moves here once this TXT shows up.
     pub elsewhere: bool,
     /// When the relay last looked (Unix seconds).

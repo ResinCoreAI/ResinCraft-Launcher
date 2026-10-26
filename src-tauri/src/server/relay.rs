@@ -225,10 +225,31 @@ impl Failure {
     }
 }
 
+/// The relay said (at the last connection) that each name's whitelist page is `https://<name>.<base domain>/`.
+static NAME_PAGES: AtomicBool = AtomicBool::new(false);
+
+/// The web page where players ask to be whitelisted, at its best address: the player's own domain once the relay
+/// verified it and has a certificate for it, else the name's own address when the relay serves pages there, else
+/// `https://<base domain>/join/<name>` (always covered by the relay's certificate).
+pub fn join_page(meta: &ServerMeta) -> Option<String> {
+    let address = address_of(meta)?;
+    if let (Some(domain), Some(o)) = (meta.domain.as_deref(), super::domain::ownership(&meta.id)) {
+        if o.state == "verified" && o.https {
+            return Some(format!("https://{domain}/"));
+        }
+    }
+    if NAME_PAGES.load(Ordering::Relaxed) {
+        return Some(format!("https://{address}/"));
+    }
+    let (name, base) = address.split_once('.')?;
+    Some(format!("https://{base}/join/{name}"))
+}
+
 /// Connects and signs in: with the saved relay session, else with the account's Minecraft token (refreshed
 /// once if the relay doesn't accept it).
 async fn connect(s: &Settings, account: &MicrosoftAccount) -> Result<Connection, Failure> {
     let mut conn = Connection::connect(&agent_config(s)).await.map_err(Failure::Relay)?;
+    NAME_PAGES.store(conn.name_pages, Ordering::Relaxed);
     if let Some(session) = saved_session(s, &account.uuid).await {
         match conn.auth(Credentials::Session(session)).await {
             Ok(_) => return Ok(conn),
@@ -714,6 +735,7 @@ pub async fn domain_ownership(id: &str) -> Result<Option<DomainOwnership>> {
         state: "unknown",
         txt: meta.domain_txt.as_ref().map(txt_record),
         route_ok: false,
+        https: false,
         elsewhere: false,
         checked_at: None,
         message: None,
@@ -747,6 +769,7 @@ pub async fn domain_ownership(id: &str) -> Result<Option<DomainOwnership>> {
         },
         txt: Some(txt_record(&txt)),
         route_ok: st.route_ok,
+        https: st.https,
         elsewhere: st.elsewhere,
         checked_at: st.checked_at,
         message: st.message,

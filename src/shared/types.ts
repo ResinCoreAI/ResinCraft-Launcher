@@ -1164,6 +1164,8 @@ export interface DomainOwnership {
   /** The TXT record that proves ownership. */
   txt?: DnsRecord
   routeOk: boolean
+  /** The relay serves the whitelist page at https://<domain>/ (it has a certificate for the domain). */
+  https: boolean
   /** Another account has it verified; it moves here once this TXT shows up. */
   elsewhere: boolean
   /** Unix seconds. */

@@ -147,7 +147,14 @@ pub enum JoinOutcome {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum RelayMsg {
-    Welcome { version: u32, base_domain: String },
+    Welcome {
+        version: u32,
+        base_domain: String,
+        /// The relay's certificate also covers `*.<base_domain>`, so each name's whitelist page is `https://<name>.<base_domain>/`;
+        /// without it, `https://<base_domain>/join/<name>`. Protocol 7 (older relays leave it out).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        name_pages: bool,
+    },
     Authed {
         uuid: String,
         username: String,
@@ -237,6 +244,10 @@ pub struct DomainStatus {
     pub txt_value: String,
     /// The domain's CNAME (or SRV) points at the name's address, so players arrive.
     pub route_ok: bool,
+    /// The relay serves the whitelist page at `https://<domain>/` with a certificate of its own for the domain (it gets
+    /// one once the domain is verified).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub https: bool,
     /// Another account has this domain verified; it moves here once this account's TXT shows up.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub elsewhere: bool,
@@ -682,6 +693,7 @@ mod tests {
             txt_name: "_rscraft.play.example.com".into(),
             txt_value: "rscraft-verify=abc".into(),
             route_ok: false,
+            https: false,
             elsewhere: false,
             checked_at: Some(1),
             message: None,

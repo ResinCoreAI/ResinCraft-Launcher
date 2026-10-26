@@ -846,6 +846,7 @@ export function mockServers(): {
           state: verified ? 'verified' : 'pending',
           txt: { kind: 'TXT', name: `_rscraft.${s.domain}`, value: 'rscraft-verify=7f3c9a1e2b' },
           routeOk: verified,
+          https: verified,
           elsewhere: false,
           checkedAt: Math.floor(Date.now() / 1000),
           message: verified ? undefined : 'No TXT record found yet.'

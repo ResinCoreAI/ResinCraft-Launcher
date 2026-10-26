@@ -497,6 +497,11 @@ pub async fn on_open(id: String) {
     remember(&CHECKS, &id, Some(result));
 }
 
+/// ResinCraft Relay's last word on the domain (None until asked).
+pub fn ownership(id: &str) -> Option<DomainOwnership> {
+    recall(&OWNERSHIP, id)
+}
+
 /// Forgets cached results, e.g. when the domain changed.
 pub fn forget(id: &str) {
     remember(&CHECKS, id, None);

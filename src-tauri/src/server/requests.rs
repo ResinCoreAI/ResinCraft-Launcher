@@ -109,8 +109,8 @@ pub async fn info(id: &str) -> Result<RequestsInfo> {
         blocked_on_discord: blocked().await.get(id).map_or(0, Vec::len),
         bot: discordbot::status(id),
         whitelist_on,
-        // https://<relay domain>/join/<name>: on the relay's own address, so its certificate covers it.
-        web_url: address.as_deref().and_then(|a| a.split_once('.')).map(|(name, domain)| format!("https://{domain}/join/{name}")),
+        // The player's verified domain, the name's own address, or /join/<name> on the relay (relay::join_page).
+        web_url: address.and(super::relay::join_page(&meta)),
     })
 }
 
