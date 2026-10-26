@@ -1660,6 +1660,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'DNS가 없나요? 각 플레이어가 자기 기기의 hosts 파일에 이 줄을 추가하면 이름을 연결할 수 있습니다:',
   'servers.domain.hostsPort': 'DNS가 없나요? 각 플레이어가 자기 기기의 hosts 파일에 이 줄을 추가한 뒤 {domain}:{port}(으)로 접속할 수 있습니다:',
   'servers.domain.check': 'DNS 확인',
+  'servers.domain.mapResin': '내 도메인을 ResinCraft Relay에 연결',
+  'servers.domain.mapResinHint': 'play.example.com처럼 내가 가진 도메인으로도 친구가 접속할 수 있습니다. ResinCraft가 추가할 DNS 레코드를 보여 주고 도메인이 내 것인지 확인합니다.',
   'servers.domain.own.title': '도메인 소유권',
   'servers.domain.own.verified': '인증됨',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay가 TXT 레코드를 찾았으므로 이 도메인의 플레이어를 내 서버로 보냅니다. 레코드를 지우지 마세요. 릴레이가 몇 시간마다 다시 확인합니다.',

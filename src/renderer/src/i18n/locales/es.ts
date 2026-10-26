@@ -1698,6 +1698,8 @@ const dict: Dict = {
   'servers.domain.hosts': '¿Sin DNS? Cada jugador puede asignar el nombre en su propio dispositivo añadiendo esta línea al archivo hosts del dispositivo:',
   'servers.domain.hostsPort': '¿Sin DNS? Cada jugador puede asignar el nombre en su propio dispositivo añadiendo esta línea al archivo hosts del dispositivo y luego entrar con {domain}:{port}:',
   'servers.domain.check': 'Comprobar DNS',
+  'servers.domain.mapResin': 'Conectar tu propio dominio a ResinCraft Relay',
+  'servers.domain.mapResinHint': 'Tus amigos también pueden entrar con un dominio tuyo, como play.example.com. ResinCraft muestra los registros DNS que debes añadir y comprueba que el dominio es tuyo.',
   'servers.domain.own.title': 'Propiedad del dominio',
   'servers.domain.own.verified': 'Verificado',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay encontró tu registro TXT, así que envía a tu servidor a los jugadores de este dominio. Conserva el registro: el relay lo vuelve a comprobar cada pocas horas.',

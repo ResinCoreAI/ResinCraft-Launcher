@@ -1659,6 +1659,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'ไม่มี DNS? ผู้เล่นแต่ละคนสามารถแมปชื่อนี้บนอุปกรณ์ของตัวเองได้ โดยเพิ่มบรรทัดนี้ลงในไฟล์ hosts ของอุปกรณ์:',
   'servers.domain.hostsPort': 'ไม่มี DNS? ผู้เล่นแต่ละคนสามารถแมปชื่อนี้บนอุปกรณ์ของตัวเองได้ โดยเพิ่มบรรทัดนี้ลงในไฟล์ hosts ของอุปกรณ์ แล้วเข้าร่วมด้วย {domain}:{port}:',
   'servers.domain.check': 'ตรวจสอบ DNS',
+  'servers.domain.mapResin': 'เชื่อมโดเมนของคุณกับ ResinCraft Relay',
+  'servers.domain.mapResinHint': 'เพื่อนเข้าร่วมด้วยโดเมนของคุณเองได้ด้วย เช่น play.example.com ResinCraft จะแสดงเรคคอร์ด DNS ที่ต้องเพิ่ม และตรวจว่าโดเมนเป็นของคุณ',
   'servers.domain.own.title': 'ความเป็นเจ้าของโดเมน',
   'servers.domain.own.verified': 'ยืนยันแล้ว',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay พบเรคคอร์ด TXT ของคุณแล้ว จึงส่งผู้เล่นของโดเมนนี้ไปยังเซิร์ฟเวอร์ของคุณ อย่าลบเรคคอร์ดนี้ รีเลย์จะตรวจสอบซ้ำทุกๆ ไม่กี่ชั่วโมง',

@@ -1684,6 +1684,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'Kein DNS? Jeder Spieler kann den Namen auf seinem eigenen Gerät zuordnen, indem er diese Zeile in die hosts-Datei des Geräts einträgt:',
   'servers.domain.hostsPort': 'Kein DNS? Jeder Spieler kann den Namen auf seinem eigenen Gerät zuordnen, indem er diese Zeile in die hosts-Datei des Geräts einträgt, und dann mit {domain}:{port} beitreten:',
   'servers.domain.check': 'DNS prüfen',
+  'servers.domain.mapResin': 'Eigene Domain mit ResinCraft Relay verbinden',
+  'servers.domain.mapResinHint': 'Freunde können auch über eine Domain beitreten, die dir gehört, z. B. play.example.com. ResinCraft zeigt die DNS-Einträge zum Anlegen und prüft, ob die Domain dir gehört.',
   'servers.domain.own.title': 'Domain-Inhaberschaft',
   'servers.domain.own.verified': 'Verifiziert',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay hat deinen TXT-Eintrag gefunden und leitet Spieler dieser Domain an deinen Server weiter. Lass den Eintrag bestehen: Das Relay prüft ihn alle paar Stunden erneut.',

@@ -95,8 +95,8 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         optimized_flags: true,
         pack_flags: false,
         join_requests: Default::default(),
-        // New servers share through playit.gg: an address that never changes, with no router setup.
-        tunnel: TunnelMode::Playit,
+        // New servers pick by themselves (router, then ResinCraft Relay, then playit.gg; see TunnelMode::Auto).
+        tunnel: TunnelMode::Auto,
         relay_host: None,
         relay_secret: None,
         domain: None,

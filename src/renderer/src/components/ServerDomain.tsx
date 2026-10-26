@@ -166,8 +166,34 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
     return () => window.clearInterval(timer)
   }, [s.id, s.domain, viaRelayName, !!info, !!info?.ownership, ownState])
 
+  // With ResinCraft Relay, a domain of your own is optional: a switch shows its setup, and switching it off
+  // removes the domain (the relay stops routing it).
+  const resin = s.tunnel === 'resin'
+  const [mapping, setMapping] = useState(!!s.domain)
+  useEffect(() => {
+    if (s.domain) setMapping(true)
+  }, [s.domain])
+  const mapSwitch = resin && (
+    <div className="setting">
+      <div className="text">
+        <b>{t('servers.domain.mapResin')}</b>
+        <span>{t('servers.domain.mapResinHint')}</span>
+      </div>
+      <Switch
+        on={mapping}
+        onChange={(v) => {
+          setMapping(v)
+          if (!v && s.domain) void save({ domain: '' })
+        }}
+        label={t('servers.domain.mapResin')}
+      />
+    </div>
+  )
+  if (resin && !mapping) return mapSwitch
+
   return (
     <>
+      {mapSwitch}
       <div className="setting">
         <div className="text">
           <b>{t('servers.domain.title')}</b>

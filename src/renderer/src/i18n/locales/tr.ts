@@ -1680,6 +1680,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'DNS yok mu? Her oyuncu bu satırı kendi cihazının hosts dosyasına ekleyerek adı kendi cihazında eşleyebilir:',
   'servers.domain.hostsPort': 'DNS yok mu? Her oyuncu bu satırı kendi cihazının hosts dosyasına ekleyerek adı eşleyebilir, sonra {domain}:{port} ile katılabilir:',
   'servers.domain.check': 'DNS\'i kontrol et',
+  'servers.domain.mapResin': "Kendi alan adını ResinCraft Relay'e bağla",
+  'servers.domain.mapResinHint': 'Arkadaşların play.example.com gibi sana ait bir alan adıyla da katılabilir. ResinCraft eklemen gereken DNS kayıtlarını gösterir ve alan adının senin olduğunu doğrular.',
   'servers.domain.own.title': 'Alan adı sahipliği',
   'servers.domain.own.verified': 'Doğrulandı',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay TXT kaydınızı buldu, bu yüzden bu alan adının oyuncularını sunucunuza gönderiyor. Kaydı silmeyin: aktarıcı onu birkaç saatte bir yeniden kontrol eder.',

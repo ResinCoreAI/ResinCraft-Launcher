@@ -1727,6 +1727,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'Нет DNS? Каждый игрок может привязать имя на своём устройстве, добавив эту строку в файл hosts:',
   'servers.domain.hostsPort': 'Нет DNS? Каждый игрок может привязать имя на своём устройстве, добавив эту строку в файл hosts, а затем подключаться по {domain}:{port}:',
   'servers.domain.check': 'Проверить DNS',
+  'servers.domain.mapResin': 'Привязать свой домен к ResinCraft Relay',
+  'servers.domain.mapResinHint': 'Друзья смогут заходить и по твоему домену, например play.example.com. ResinCraft покажет DNS-записи, которые нужно добавить, и проверит, что домен твой.',
   'servers.domain.own.title': 'Владение доменом',
   'servers.domain.own.verified': 'Подтверждён',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay нашёл вашу TXT-запись и направляет игроков этого домена на ваш сервер. Не удаляйте запись: ретранслятор перепроверяет её каждые несколько часов.',

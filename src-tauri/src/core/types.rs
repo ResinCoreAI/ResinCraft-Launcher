@@ -1006,7 +1006,7 @@ pub struct DomainTxt {
 }
 
 /// How a public server reaches the internet. The bore relay (bore.pub or `relay_host`) is always the last resort.
-/// New servers start on playit.gg; `Auto` is what older server.json files without the field mean.
+/// New servers (and older server.json files without the field) use `Auto`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TunnelMode {

@@ -443,6 +443,8 @@ export default {
   'servers.domain.hostsPort':
     "No DNS? Each player can map the name on their own device by adding this line to the device's hosts file, then join with {domain}:{port}:",
   'servers.domain.check': 'Check DNS',
+  'servers.domain.mapResin': 'Map your own domain to ResinCraft Relay',
+  'servers.domain.mapResinHint': 'Friends can also join with a domain you own, like play.example.com. ResinCraft shows the DNS records to add and checks that the domain is yours.',
   'servers.domain.own.title': 'Domain ownership',
   'servers.domain.own.verified': 'Verified',
   'servers.domain.own.verifiedHint': "ResinCraft Relay found your TXT record, so it sends this domain's players to your server. Keep the record: the relay checks it again every few hours.",

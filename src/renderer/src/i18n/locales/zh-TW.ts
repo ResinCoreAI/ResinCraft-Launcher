@@ -1657,6 +1657,8 @@ const dict: Dict = {
   'servers.domain.hosts': '沒有 DNS？每位玩家都可以在自己裝置的 hosts 檔案中加入這一行，在本機對應這個名稱：',
   'servers.domain.hostsPort': '沒有 DNS？每位玩家都可以在自己裝置的 hosts 檔案中加入這一行來對應名稱，然後用 {domain}:{port} 加入：',
   'servers.domain.check': '檢查 DNS',
+  'servers.domain.mapResin': '將自己的網域連到 ResinCraft Relay',
+  'servers.domain.mapResinHint': '朋友也能用你自己的網域加入，例如 play.example.com。ResinCraft 會列出要新增的 DNS 記錄，並確認網域屬於你。',
   'servers.domain.own.title': '網域擁有權',
   'servers.domain.own.verified': '已驗證',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay 已找到你的 TXT 記錄，因此會把這個網域的玩家導向你的伺服器。請保留這筆記錄：中繼每隔幾小時會重新檢查一次。',

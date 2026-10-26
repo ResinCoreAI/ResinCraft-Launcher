@@ -444,7 +444,7 @@ export function mockServers(): {
         ...(data.type === 'bedrock' ? { launch: { exe: 'bedrock_server.exe' } } : {}),
         createdAt: Date.now(),
         eulaAccepted: false,
-        tunnel: 'playit',
+        tunnel: 'auto',
         ...(data.source ? { modpack: { name: data.name || 'Modpack' } } : {}),
         // Modpacks from the mock catalogue have no official server pack.
         ...(data.source && data.source.kind !== 'instance' ? { builtPack: true } : {})

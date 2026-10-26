@@ -1667,6 +1667,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'Không có DNS? Mỗi người chơi có thể gán tên trên thiết bị của mình bằng cách thêm dòng này vào file hosts của thiết bị:',
   'servers.domain.hostsPort': 'Không có DNS? Mỗi người chơi có thể gán tên trên thiết bị của mình bằng cách thêm dòng này vào file hosts của thiết bị, rồi vào bằng {domain}:{port}:',
   'servers.domain.check': 'Kiểm tra DNS',
+  'servers.domain.mapResin': 'Gắn tên miền riêng vào ResinCraft Relay',
+  'servers.domain.mapResinHint': 'Bạn bè cũng có thể vào bằng tên miền của bạn, như play.example.com. ResinCraft hiện các bản ghi DNS cần thêm và kiểm tra tên miền là của bạn.',
   'servers.domain.own.title': 'Quyền sở hữu tên miền',
   'servers.domain.own.verified': 'Đã xác minh',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay đã tìm thấy bản ghi TXT của bạn nên sẽ đưa người chơi của tên miền này vào máy chủ của bạn. Hãy giữ bản ghi: relay sẽ kiểm tra lại vài giờ một lần.',

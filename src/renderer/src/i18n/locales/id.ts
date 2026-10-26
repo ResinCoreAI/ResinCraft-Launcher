@@ -1670,6 +1670,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'Tanpa DNS? Setiap pemain bisa memetakan nama ini di perangkatnya sendiri dengan menambahkan baris ini ke file hosts perangkat:',
   'servers.domain.hostsPort': 'Tanpa DNS? Setiap pemain bisa memetakan nama ini di perangkatnya sendiri dengan menambahkan baris ini ke file hosts perangkat, lalu bergabung dengan {domain}:{port}:',
   'servers.domain.check': 'Periksa DNS',
+  'servers.domain.mapResin': 'Hubungkan domain sendiri ke ResinCraft Relay',
+  'servers.domain.mapResinHint': 'Teman juga bisa bergabung lewat domain milikmu, seperti play.example.com. ResinCraft menampilkan record DNS yang perlu ditambahkan dan memeriksa bahwa domain itu milikmu.',
   'servers.domain.own.title': 'Kepemilikan domain',
   'servers.domain.own.verified': 'Terverifikasi',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay menemukan record TXT kamu, jadi pemain domain ini dikirim ke server kamu. Jangan hapus record-nya: relay memeriksanya lagi setiap beberapa jam.',

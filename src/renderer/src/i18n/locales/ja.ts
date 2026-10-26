@@ -1665,6 +1665,8 @@ const dict: Dict = {
   'servers.domain.hosts': 'DNS がない場合：各プレイヤーが自分のデバイスの hosts ファイルにこの行を追加すると、名前を割り当てられます：',
   'servers.domain.hostsPort': 'DNS がない場合：各プレイヤーが自分のデバイスの hosts ファイルにこの行を追加し、{domain}:{port} で参加できます：',
   'servers.domain.check': 'DNS を確認',
+  'servers.domain.mapResin': '自分のドメインを ResinCraft Relay につなぐ',
+  'servers.domain.mapResinHint': 'play.example.com のような自分のドメインでもフレンドが参加できます。ResinCraft が追加する DNS レコードを表示し、ドメインがあなたのものか確認します。',
   'servers.domain.own.title': 'ドメインの所有権',
   'servers.domain.own.verified': '検証済み',
   'servers.domain.own.verifiedHint': 'ResinCraft Relay が TXT レコードを確認したため、このドメインのプレイヤーをあなたのサーバーに送ります。レコードは消さないでください。リレーが数時間ごとに再確認します。',

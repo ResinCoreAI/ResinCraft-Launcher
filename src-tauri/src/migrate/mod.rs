@@ -630,7 +630,7 @@ async fn import_server(f: Found, task: &std::sync::Arc<Task>, progress: &impl Fn
         optimized_flags: true,
         pack_flags: false,
         join_requests: Default::default(),
-        tunnel: TunnelMode::Playit,
+        tunnel: TunnelMode::Auto,
         relay_host: None,
         relay_secret: None,
         domain: None,
