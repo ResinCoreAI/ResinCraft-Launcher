@@ -15,14 +15,14 @@ use std::time::Duration;
 
 use anyhow::Result;
 use resincraft_relay::agent::{AgentConfig, AgentError, Command, Connection, Credentials, Event};
-use resincraft_relay::proto::{self, ErrorCode, JoinOutcome, Limits, ServiceState, Usage};
+use resincraft_relay::proto::{self, DomainState, ErrorCode, JoinOutcome, Limits, ServiceState, Usage};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::core::fsutil::{read_json, write_json};
 use crate::core::paths;
 use crate::core::text::{text_of, Text};
-use crate::core::types::{RelayInfo, RelayNameCheck, ServerMeta};
+use crate::core::types::{DnsRecord, DomainOwnership, DomainTxt, RelayInfo, RelayNameCheck, ServerMeta};
 use crate::player::accounts::{self, MicrosoftAccount};
 use crate::{err_tr, tr};
 
@@ -164,6 +164,7 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ErrorCode::Paused => err_tr!("hostRelay.paused", "ResinCraft Relay is paused by its admin: {message}", message = admin_message(e)),
         ErrorCode::ServiceOff => err_tr!("hostRelay.off", "ResinCraft Relay is switched off by its admin: {message}", message = admin_message(e)),
         ErrorCode::SessionEnded => err_tr!("hostRelay.sessionEnded", "The ResinCraft Relay session ended."),
+        ErrorCode::DomainInvalid => err_tr!("hostRelay.domainInvalid", "ResinCraft Relay can't take this domain: {error}", error = admin_message(e)),
         ErrorCode::BedrockUnavailable => err_tr!(
             "hostRelay.noBedrock",
             "ResinCraft Relay can't carry Bedrock servers right now (it has no free Bedrock ports, or hasn't been updated for them yet)."
@@ -698,3 +699,73 @@ pub fn address_of(meta: &ServerMeta) -> Option<String> {
     meta.relay_name.as_deref().map(|n| proto::address(n, &s.domain))
 }
 
+
+// ---------- The player's own domain (relay protocol 7) ----------
+
+/// Registers the server's domain with ResinCraft Relay (or looks again, which `domain_add` also does) and says whether
+/// the relay has seen the TXT record that proves it's the player's. None when there's no domain or relay name.
+pub async fn domain_ownership(id: &str) -> Result<Option<DomainOwnership>> {
+    let meta = store::get(id).await?;
+    let (Some(domain), Some(name)) = (meta.domain.clone(), meta.relay_name.clone()) else { return Ok(None) };
+    let Some(s) = settings() else { return Ok(None) };
+    // Without an answer: `error` says why (the relay may well verify domains); no error means it doesn't (protocol < 7).
+    let unknown = |error: Option<Text>| DomainOwnership {
+        supported: error.is_some(),
+        state: "unknown",
+        txt: meta.domain_txt.as_ref().map(txt_record),
+        route_ok: false,
+        elsewhere: false,
+        checked_at: None,
+        message: None,
+        error,
+    };
+    let Some(account) = accounts::microsoft_account(meta.relay_account.as_deref()).await else {
+        return Ok(Some(unknown(Some(as_text(&needs_microsoft())))));
+    };
+    let mut conn = match connect(&s, &account).await {
+        Ok(c) => c,
+        Err(f) => return Ok(Some(unknown(Some(as_text(&f.into_error(&name)))))),
+    };
+    if !conn.has_domains() {
+        return Ok(Some(unknown(None)));
+    }
+    let st = match conn.domain_add(&name, &domain).await {
+        Ok(st) => st,
+        Err(e) => return Ok(Some(unknown(Some(as_text(&describe(&e, &name)))))),
+    };
+    let txt = DomainTxt { name: st.txt_name.clone(), value: st.txt_value.clone() };
+    if meta.domain_txt.as_ref() != Some(&txt) {
+        store::update(id, serde_json::json!({ "domainTxt": txt })).await?;
+    }
+    Ok(Some(DomainOwnership {
+        supported: true,
+        state: match st.state {
+            DomainState::Pending => "pending",
+            DomainState::Verified => "verified",
+            DomainState::Misconfigured => "misconfigured",
+            DomainState::Unknown => "unknown",
+        },
+        txt: Some(txt_record(&txt)),
+        route_ok: st.route_ok,
+        elsewhere: st.elsewhere,
+        checked_at: st.checked_at,
+        message: st.message,
+        error: None,
+    }))
+}
+
+/// The TXT record as the Settings tab and the Cloudflare updates use it.
+pub fn txt_record(txt: &DomainTxt) -> DnsRecord {
+    DnsRecord { kind: "TXT", name: txt.name.clone(), value: txt.value.clone(), port: None, priority: None, weight: None }
+}
+
+/// Tells the relay `name` no longer has a domain (the player cleared it). Best effort.
+pub async fn domain_detach(id: String, name: String) {
+    let Some(s) = settings() else { return };
+    let Ok(meta) = store::get(&id).await else { return };
+    let Some(account) = accounts::microsoft_account(meta.relay_account.as_deref()).await else { return };
+    if let Ok(mut conn) = connect(&s, &account).await {
+        let _ = conn.domain_remove(&name).await;
+    }
+    let _ = store::update(&id, serde_json::json!({ "domainTxt": null })).await;
+}

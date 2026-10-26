@@ -13,10 +13,10 @@ use tokio::net::UdpSocket;
 
 use crate::core::fsutil::now_ms;
 use crate::core::text::{text_of, Text};
-use crate::core::types::{DnsCheck, DnsRecord, DnsRecordCheck, DomainInfo};
+use crate::core::types::{DnsCheck, DnsRecord, DnsRecordCheck, DomainInfo, DomainOwnership, ServerMeta, TunnelMode};
 use crate::{err_tr, tr};
 
-use super::{cloudflare, playit, runtime, store};
+use super::{cloudflare, playit, relay, runtime, store};
 
 /// Minecraft's default port: no SRV record needed for it.
 const DEFAULT_PORT: u16 = 25565;
@@ -331,6 +331,8 @@ fn as_text(e: &anyhow::Error) -> Text {
 
 static CHECKS: Mutex<Option<HashMap<String, DnsCheck>>> = Mutex::new(None);
 static CF_STATUS: Mutex<Option<HashMap<String, Text>>> = Mutex::new(None);
+/// ResinCraft Relay's last word on whether the domain is the player's.
+static OWNERSHIP: Mutex<Option<HashMap<String, DomainOwnership>>> = Mutex::new(None);
 
 fn remember<T>(map: &Mutex<Option<HashMap<String, T>>>, id: &str, v: Option<T>) {
     let mut m = map.lock().unwrap();
@@ -411,7 +413,19 @@ pub async fn info(id: &str) -> Result<DomainInfo> {
         check,
         cloudflare_token: cloudflare::has_token(id).await,
         cloudflare_status: recall(&CF_STATUS, id),
+        ownership: recall(&OWNERSHIP, id),
     })
+}
+
+/// The domain leads to a ResinCraft Relay name: running through it now, or set to use it while stopped.
+fn via_relay_name(meta: &ServerMeta, route: &Route) -> bool {
+    meta.relay_name.is_some() && (matches!(route, Route::Resin { .. }) || (matches!(route, Route::None) && meta.tunnel == TunnelMode::Resin))
+}
+
+/// Asks ResinCraft Relay whether it has seen the TXT record proving the domain is the player's (registering it first).
+async fn check_ownership(id: &str, meta: &ServerMeta, route: &Route) {
+    let ownership = if meta.domain.is_some() && via_relay_name(meta, route) { relay::domain_ownership(id).await.ok().flatten() } else { None };
+    remember(&OWNERSHIP, id, ownership);
 }
 
 /// Checks the domain against the public DNS now ("Check DNS").
@@ -419,6 +433,7 @@ pub async fn check_now(id: &str) -> Result<DomainInfo> {
     let meta = store::get(id).await?;
     let Some(domain) = meta.domain.as_deref() else { return info(id).await };
     let route = route_of(id).await;
+    check_ownership(id, &meta, &route).await;
     let expected = expected_records(domain, &route);
     if expected.is_empty() {
         remember(&CHECKS, id, None);
@@ -439,9 +454,16 @@ pub async fn on_open(id: String) {
         return;
     };
     let route = route_of(&id).await;
-    let expected = expected_records(&domain, &route);
+    check_ownership(&id, &meta, &route).await;
+    let mut expected = expected_records(&domain, &route);
     if expected.is_empty() {
         return;
+    }
+    // The relay's ownership TXT goes along, so Cloudflare users have nothing to add by hand (re-read: just asked).
+    if matches!(route, Route::Resin { .. }) {
+        if let Some(txt) = store::get(&id).await.ok().and_then(|m| m.domain_txt) {
+            expected.push(relay::txt_record(&txt));
+        }
     }
     if meta.dns_auto {
         let status = match cloudflare::token(&id).await {
@@ -469,6 +491,7 @@ pub async fn on_open(id: String) {
 pub fn forget(id: &str) {
     remember(&CHECKS, id, None);
     remember(&CF_STATUS, id, None);
+    remember(&OWNERSHIP, id, None);
 }
 
 #[cfg(test)]

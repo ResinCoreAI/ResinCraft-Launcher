@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -429,6 +429,43 @@ impl Connection {
         }
     }
 
+    /// Whether this relay verifies and routes players' own domains (protocol 7).
+    pub fn has_domains(&self) -> bool {
+        self.relay_version >= DOMAINS_PROTOCOL_VERSION
+    }
+
+    /// Attaches `domain` to the account's name `name` (replacing a domain it had) and says where it stands.
+    pub async fn domain_add(&mut self, name: &str, domain: &str) -> Result<DomainStatus, AgentError> {
+        self.domain_request(AgentMsg::DomainAdd { name: name.to_string(), domain: domain.to_string() }).await
+    }
+
+    /// Looks up `domain`'s DNS again now.
+    pub async fn domain_check(&mut self, domain: &str) -> Result<DomainStatus, AgentError> {
+        self.domain_request(AgentMsg::DomainCheck { domain: domain.to_string() }).await
+    }
+
+    /// Detaches `name`'s domain.
+    pub async fn domain_remove(&mut self, name: &str) -> Result<(), AgentError> {
+        if !self.has_domains() {
+            return Ok(());
+        }
+        self.send(&AgentMsg::DomainRemove { name: name.to_string() }).await?;
+        match self.recv().await? {
+            RelayMsg::DomainRemoved { .. } => Ok(()),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    async fn domain_request(&mut self, msg: AgentMsg) -> Result<DomainStatus, AgentError> {
+        if !self.has_domains() {
+            return Err(AgentError::Refused(ErrorCode::DomainInvalid, "this relay doesn't verify domains yet".into()));
+        }
+        self.send(&msg).await?;
+        match self.recv().await? {
+            RelayMsg::DomainStatus(status) => Ok(status),
+            other => Err(unexpected(&other)),
+        }
+    }
     /// Whether this relay takes whitelist requests from its web page.
     pub fn has_join_requests(&self) -> bool {
         self.relay_version >= JOIN_REQUESTS_PROTOCOL_VERSION

@@ -90,6 +90,7 @@ pub fn record_body(r: &DnsRecord) -> Value {
             "ttl": TTL_AUTO,
             "data": { "priority": r.priority.unwrap_or(0), "weight": r.weight.unwrap_or(5), "port": r.port.unwrap_or(25565), "target": r.value },
         }),
+        "TXT" => json!({ "type": "TXT", "name": r.name, "content": r.value, "ttl": TTL_AUTO }),
         kind => json!({ "type": kind, "name": r.name, "content": r.value, "ttl": TTL_AUTO, "proxied": false }),
     }
 }
@@ -104,6 +105,8 @@ pub fn matches(existing: &Value, r: &DnsRecord) -> bool {
                 && d.get("weight").and_then(Value::as_u64) == r.weight.map(u64::from)
                 && d.get("target").and_then(Value::as_str).is_some_and(|t| t.trim_end_matches('.').eq_ignore_ascii_case(&r.value))
         }
+        // Cloudflare may hand TXT content back in quotes.
+        "TXT" => existing.get("content").and_then(Value::as_str).map(|c| c.trim_matches('"')) == Some(r.value.as_str()),
         _ => existing.get("content").and_then(Value::as_str) == Some(r.value.as_str()) && existing.get("proxied").and_then(Value::as_bool) != Some(true),
     }
 }

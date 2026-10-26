@@ -32,6 +32,11 @@
 //! and they come as `push`. `viewers` says how many console tabs are open. The launcher keeps its own allowlist of
 //! methods (src-tauri/src/remote.rs); the relay never sends protocol-6 messages to older launchers.
 //!
+//! Protocol 7 adds players' own domains, verified the way Vercel does it: `domain_add` attaches a domain to one of the
+//! account's names and the relay answers `domain_status` with a TXT record (`_rscraft.<domain>`) that proves ownership.
+//! The relay routes a domain's players to the name only while that TXT is there; `domain_check` looks again now, and
+//! `domain_remove` detaches it. A domain verified by another account moves when this one's TXT shows up.
+//!
 //! A `banned` error carries the ban itself ([`Ban`]: until when, and why) in `ban`. It needs no protocol version
 //! of its own: every launcher knows the `banned` code, and older ones skip the field.
 
@@ -39,7 +44,7 @@ use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 /// The first protocol with Bedrock (UDP) tunnels.
 pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The first protocol with data top-ups.
@@ -48,6 +53,8 @@ pub const TOPUP_PROTOCOL_VERSION: u32 = 4;
 pub const JOIN_REQUESTS_PROTOCOL_VERSION: u32 = 5;
 /// The first protocol with remote control from the web console.
 pub const REMOTE_PROTOCOL_VERSION: u32 = 6;
+/// The first protocol with players' own, verified domains.
+pub const DOMAINS_PROTOCOL_VERSION: u32 = 7;
 /// Longest `call_result` / `push` line (results and log batches can be bigger than other messages).
 pub const MAX_REMOTE_LINE: usize = 1024 * 1024;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
@@ -108,6 +115,13 @@ pub enum AgentMsg {
     CallResult { id: u64, ok: bool, value: Option<serde_json::Value>, error: Option<String> },
     /// A live update for a topic the relay asked to `watch`. Protocol 6.
     Push { topic: String, data: serde_json::Value },
+    /// Attach `domain` (e.g. `play.example.com`) to the account's name `name`, replacing a domain it had; answered with
+    /// `domain_status`. Protocol 7.
+    DomainAdd { name: String, domain: String },
+    /// Look up `domain`'s DNS again now; answered with `domain_status`. Protocol 7.
+    DomainCheck { domain: String },
+    /// Detach `name`'s domain; answered with `domain_removed`. Protocol 7.
+    DomainRemove { name: String },
     Ping { seq: u64 },
 }
 
@@ -194,6 +208,10 @@ pub enum RelayMsg {
     Watch { topic: String, on: bool },
     /// How many console tabs this account has open on this launcher. Protocol 6.
     Viewers { count: u32 },
+    /// Where a domain stands (the answer to `domain_add` and `domain_check`). Protocol 7.
+    DomainStatus(DomainStatus),
+    /// The answer to `domain_remove`. Protocol 7.
+    DomainRemoved { name: String },
     /// A player asks on the web page to be whitelisted. Protocol 5, and only after `join_requests` turned on.
     JoinRequest { id: u64, username: String },
     Error {
@@ -207,6 +225,41 @@ pub enum RelayMsg {
     Shutdown { reconnect_ms: u64 },
 }
 
+/// Where a player's own domain stands on the relay (protocol 7).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DomainStatus {
+    pub domain: String,
+    /// The relay name it leads to.
+    pub name: String,
+    pub state: DomainState,
+    /// The TXT record that proves the account owns the domain: `_rscraft.<domain>` = `rscraft-verify=<token>`.
+    pub txt_name: String,
+    pub txt_value: String,
+    /// The domain's CNAME (or SRV) points at the name's address, so players arrive.
+    pub route_ok: bool,
+    /// Another account has this domain verified; it moves here once this account's TXT shows up.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub elsewhere: bool,
+    /// When the relay last looked up the domain's DNS (Unix seconds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checked_at: Option<u64>,
+    /// What's wrong, for players (e.g. "No TXT record found yet").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainState {
+    /// Waiting for the TXT record: players aren't routed yet.
+    Pending,
+    /// Owned and pointing here: players are routed.
+    Verified,
+    /// Owned, but the CNAME/SRV points elsewhere (Vercel's "Invalid Configuration").
+    Misconfigured,
+    #[serde(other)]
+    Unknown,
+}
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
@@ -247,6 +300,8 @@ pub enum ErrorCode {
     TopUpNotYet,
     /// No top-ups left this month (or the relay has none): only its admin can add data. Protocol 4.
     TopUpLimit,
+    /// Not a domain the relay can take: malformed, the relay's own, or too many for the account. Protocol 7.
+    DomainInvalid,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -617,4 +672,26 @@ mod tests {
         let svc = RelayMsg::Service { state: ServiceState::Paused, message: Some("Maintenance until 20:00".into()) };
         assert_eq!(serde_json::from_str::<RelayMsg>(&serde_json::to_string(&svc).unwrap()).unwrap(), svc);
     }
-}
+
+    #[test]
+    fn domain_status_round_trips() {
+        let st = DomainStatus {
+            domain: "play.example.com".into(),
+            name: "smp".into(),
+            state: DomainState::Pending,
+            txt_name: "_rscraft.play.example.com".into(),
+            txt_value: "rscraft-verify=abc".into(),
+            route_ok: false,
+            elsewhere: false,
+            checked_at: Some(1),
+            message: None,
+        };
+        let line = serde_json::to_string(&RelayMsg::DomainStatus(st.clone())).unwrap();
+        assert!(line.starts_with(r#"{"t":"domain_status","#), "{line}");
+        assert_eq!(serde_json::from_str::<RelayMsg>(&line).unwrap(), RelayMsg::DomainStatus(st));
+        // A state from a newer relay reads as unknown.
+        let newer = line.replace(r#""pending""#, r#""quarantined""#);
+        assert!(matches!(serde_json::from_str::<RelayMsg>(&newer).unwrap(), RelayMsg::DomainStatus(DomainStatus { state: DomainState::Unknown, .. })));
+        let add = serde_json::to_string(&AgentMsg::DomainAdd { name: "smp".into(), domain: "play.example.com".into() }).unwrap();
+        assert_eq!(add, r#"{"t":"domain_add","name":"smp","domain":"play.example.com"}"#);
+    }}

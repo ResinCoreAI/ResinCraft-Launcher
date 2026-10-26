@@ -8,6 +8,7 @@ import type {
   DnsCheck,
   DnsRecord,
   DomainInfo,
+  DomainOwnership,
   EngineText,
   LogLine,
   PlayerListKind,
@@ -77,6 +78,7 @@ export function mockServers(): {
   }
   const checks: Record<string, DnsCheck | undefined> = {}
   const cfTokens: Record<string, boolean> = {}
+  const owns: Record<string, DomainOwnership> = {}
   /** Mirrors domain.rs: the records the server's domain needs for its current route. */
   const domainInfo = (id: string): DomainInfo => {
     const s = find(id)
@@ -113,6 +115,7 @@ export function mockServers(): {
           ? checks[id]
           : undefined,
       cloudflareToken: !!cfTokens[id],
+      ownership: d && s.relayName && (route === 'resin' || (route === 'none' && s.tunnel === 'resin')) ? owns[id] : undefined,
       cloudflareStatus:
         s.dnsAuto && route !== 'none'
           ? cfTokens[id]
@@ -831,6 +834,21 @@ export function mockServers(): {
     },
     domain: async (id) => domainInfo(id),
     checkDns: async (id) => {
+      const s = find(id)
+      // ResinCraft Relay's ownership check: pending at first, verified once the (pretend) TXT record shows up.
+      if (s.domain && s.relayName && (s.net?.via === 'resin' || s.tunnel === 'resin')) {
+        await wait(null, 500)
+        const verified = !!owns[id] && owns[id]!.state !== 'unknown'
+        owns[id] = {
+          supported: true,
+          state: verified ? 'verified' : 'pending',
+          txt: { kind: 'TXT', name: `_rscraft.${s.domain}`, value: 'rscraft-verify=7f3c9a1e2b' },
+          routeOk: verified,
+          elsewhere: false,
+          checkedAt: Math.floor(Date.now() / 1000),
+          message: verified ? undefined : 'No TXT record found yet.'
+        }
+      }
       const info = domainInfo(id)
       if (!info.records.length) return info
       await wait(null, 900)

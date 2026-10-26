@@ -4082,3 +4082,44 @@ textarea.custom-css {
     animation: none;
   }
 }
+/* Domain ownership through ResinCraft Relay (components/ServerDomain.tsx): Vercel-style status. */
+.sv-own {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.sv-own-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+.sv-own-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sv-own-badge svg {
+  width: 13px;
+  height: 13px;
+}
+.sv-own-badge.ok {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.sv-own-badge.warn {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+.sv-own-badge.bad {
+  color: var(--danger);
+  background: var(--danger-soft);
+}

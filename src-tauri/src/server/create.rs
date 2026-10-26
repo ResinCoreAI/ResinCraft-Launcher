@@ -103,6 +103,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         dns_auto: false,
         relay_name: None,
         relay_account: None,
+        domain_txt: None,
         pending_downloads: Vec::new(),
         built_pack: false,
     };

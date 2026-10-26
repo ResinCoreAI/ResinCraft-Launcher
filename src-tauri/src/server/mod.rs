@@ -65,6 +65,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             if (&meta.domain, meta.dns_auto) != (&before.domain, before.dns_auto) {
                 domain::forget(&id);
                 runtime::set_domain_ok(&id, None);
+                // Cleared: the relay stops routing it (a new domain simply replaces the old one there).
+                if let (None, Some(name)) = (&meta.domain, before.relay_name.clone().filter(|_| before.domain.is_some())) {
+                    tokio::spawn(relay::domain_detach(id.clone(), name));
+                }
                 tokio::spawn(domain::on_open(id.clone()));
             }
             json(store::info(meta).await)

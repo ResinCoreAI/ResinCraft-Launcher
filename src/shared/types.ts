@@ -1115,10 +1115,10 @@ export interface RelayNameCheck {
 
 /** A DNS record the player should have for their own domain. */
 export interface DnsRecord {
-  kind: 'A' | 'AAAA' | 'CNAME' | 'SRV'
+  kind: 'A' | 'AAAA' | 'CNAME' | 'SRV' | 'TXT'
   /** Full name, e.g. "play.example.com" or "_minecraft._tcp.play.example.com". */
   name: string
-  /** A/AAAA: the IP. SRV: the target host. */
+  /** A/AAAA: the IP. CNAME, SRV: the target host. TXT: its text. */
   value: string
   port?: number
   priority?: number
@@ -1148,6 +1148,26 @@ export interface DomainInfo {
   check?: DnsCheck
   cloudflareToken: boolean
   cloudflareStatus?: EngineText
+  /** ResinCraft Relay's ownership check (relay name and domain set). */
+  ownership?: DomainOwnership
+}
+
+/** Whether ResinCraft Relay accepts the domain as the player's, the way Vercel verifies domains. */
+export interface DomainOwnership {
+  /** The relay verifies domains (older relays just follow the CNAME). */
+  supported: boolean
+  state: 'pending' | 'verified' | 'misconfigured' | 'unknown'
+  /** The TXT record that proves ownership. */
+  txt?: DnsRecord
+  routeOk: boolean
+  /** Another account has it verified; it moves here once this TXT shows up. */
+  elsewhere: boolean
+  /** Unix seconds. */
+  checkedAt?: number
+  /** The relay's own words. */
+  message?: string
+  /** Couldn't ask the relay. */
+  error?: EngineText
 }
 
 /** A hosted server: server.json plus live state. */

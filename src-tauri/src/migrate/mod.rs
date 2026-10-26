@@ -637,6 +637,7 @@ async fn import_server(f: Found, task: &std::sync::Arc<Task>, progress: &impl Fn
         dns_auto: false,
         relay_name: None,
         relay_account: None,
+        domain_txt: None,
         pending_downloads: Vec::new(),
         built_pack: false,
     };

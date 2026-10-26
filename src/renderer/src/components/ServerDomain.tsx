@@ -1,9 +1,11 @@
 // A hosted server's own domain (Settings → Internet access): the DNS records to create for the current route,
 // a "Check DNS" against a public resolver, a hosts-file line for players without DNS, and optional Cloudflare
-// automation. Also the address the Connect card shares once the domain checks out.
+// automation. Through ResinCraft Relay the domain is also verified as the player's, the way Vercel does it: a TXT record
+// proves ownership before the relay sends players to the server. Also the address the Connect card shares once the
+// domain checks out.
 import { useEffect, useState, type ReactNode } from 'react'
-import { CircleCheck, CircleX, Copy, ExternalLink, KeyRound, Loader2, RefreshCw, TriangleAlert } from 'lucide-react'
-import type { DnsRecord, DomainInfo, ServerInfo, ServerPatch } from '@shared/types'
+import { CircleCheck, CircleDashed, CircleX, Copy, ExternalLink, KeyRound, Loader2, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
+import type { DnsRecord, DomainInfo, DomainOwnership, ServerInfo, ServerPatch } from '@shared/types'
 import { api } from '../api'
 import { Switch } from './ui'
 import { useRelayInfo } from './ServerRelay'
@@ -51,6 +53,66 @@ function RecordRow({ r }: { r: DnsRecord }) {
   )
 }
 
+/** How often a pending domain is looked at again while the Settings tab is open (the relay also checks by itself). */
+const OWNERSHIP_POLL_MS = 60_000
+
+/** ResinCraft Relay's verdict on the domain: a status badge, the TXT record to add, and what's still wrong. */
+function Ownership({ o, checking, verify }: { o: DomainOwnership; checking: boolean; verify: () => void }) {
+  const badge =
+    o.state === 'verified'
+      ? { cls: 'ok', icon: <CircleCheck />, label: t('servers.domain.own.verified') }
+      : o.state === 'misconfigured'
+        ? { cls: 'bad', icon: <CircleX />, label: t('servers.domain.own.misconfigured') }
+        : o.state === 'pending'
+          ? { cls: 'warn', icon: <CircleDashed />, label: t('servers.domain.own.pending') }
+          : { cls: 'bad', icon: <TriangleAlert />, label: t('servers.domain.own.unknown') }
+  return (
+    <div className="sv-own">
+      <div className="row">
+        <ShieldCheck className="sv-own-icon" />
+        <b className="grow">{t('servers.domain.own.title')}</b>
+        <span className={`sv-own-badge ${badge.cls}`}>
+          {badge.icon} {badge.label}
+        </span>
+      </div>
+      {o.error ? (
+        <span className="hint bad">{tx(o.error)}</span>
+      ) : (
+        <>
+          <span className="hint">
+            {t(
+              o.state === 'verified'
+                ? 'servers.domain.own.verifiedHint'
+                : o.state === 'misconfigured'
+                  ? 'servers.domain.own.misconfiguredHint'
+                  : 'servers.domain.own.pendingHint'
+            )}
+          </span>
+          {o.txt && (
+            <div className="sv-dns-records">
+              <RecordRow r={o.txt} />
+            </div>
+          )}
+          {o.elsewhere && (
+            <span className="hint warn">
+              <TriangleAlert /> {t('servers.domain.own.elsewhere')}
+            </span>
+          )}
+          {o.message && o.state !== 'verified' && <span className="hint">{o.message}</span>}
+          <div className="row wrap">
+            {o.state !== 'verified' && (
+              <button className="btn sm" disabled={checking} onClick={verify}>
+                {checking ? <Loader2 className="spin" /> : <RefreshCw />} {t('servers.domain.own.verify')}
+              </button>
+            )}
+            {o.checkedAt && <span className="hint">{t('servers.domain.own.checked', { time: timeAgo(o.checkedAt * 1000, true) })}</span>}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /** The domain field and everything under it, inside the Internet access card. */
 export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: ServerPatch) => Promise<void> }) {
   const { toast } = useStore()
@@ -89,6 +151,21 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
     setChecking(false)
   }
 
+  // Through ResinCraft Relay: register the domain (which brings the TXT record to add) as soon as there's one, then
+  // look again every minute until the relay has verified it.
+  const viaRelayName = !!s.relayName && (info?.route === 'resin' || (info?.route === 'none' && s.tunnel === 'resin'))
+  const ownState = info?.ownership?.state
+  useEffect(() => {
+    if (!s.domain || !info || !viaRelayName) return
+    if (!info.ownership) {
+      void api.server.checkDns(s.id).then(setInfo).catch(() => {})
+      return
+    }
+    if (!info.ownership.supported || ownState === 'verified') return
+    const timer = window.setInterval(() => void api.server.checkDns(s.id).then(setInfo).catch(() => {}), OWNERSHIP_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [s.id, s.domain, viaRelayName, !!info, !!info?.ownership, ownState])
+
   return (
     <>
       <div className="setting">
@@ -110,6 +187,7 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
 
       {s.domain && info && (
         <div className="setting stack sv-domain">
+          {info.ownership?.supported && <Ownership o={info.ownership} checking={checking} verify={() => void check()} />}
           {info.route === 'none' ? (
             <span className="hint">{t('servers.domain.startFirst')}</span>
           ) : info.route === 'relay' ? (

@@ -186,6 +186,7 @@ export default {
   'engine.hostRelay.bannedForever': "You're banned from ResinCraft Relay permanently.",
   'engine.hostRelay.bannedReason': '{ban} Reason: {reason}',
   'engine.hostRelay.bannedUntil': "You're banned from ResinCraft Relay until {date} ({left}).",
+  'engine.hostRelay.domainInvalid': "ResinCraft Relay can't take this domain: {error}",
   'engine.hostRelay.mojangDown': "Minecraft's account service didn't answer. Try again in a moment.",
   'engine.hostRelay.nameInvalid': 'Use 3 to 24 lowercase letters, numbers and dashes, not starting or ending with a dash.',
   'engine.hostRelay.nameReserved': '"{name}" is reserved. Pick another name.',

@@ -992,6 +992,17 @@ pub struct ServerMeta {
     /// The Minecraft account (UUID) that name is reserved for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relay_account: Option<String>,
+    /// The TXT record ResinCraft Relay asked for to prove the domain is the player's (relay protocol 7), kept so the
+    /// Cloudflare updates can create it too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain_txt: Option<DomainTxt>,
+}
+
+/// A TXT record proving a domain is the player's: `_rscraft.<domain>` = `rscraft-verify=<token>`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainTxt {
+    pub name: String,
+    pub value: String,
 }
 
 /// How a public server reaches the internet. The bore relay (bore.pub or `relay_host`) is always the last resort.
@@ -1152,11 +1163,11 @@ pub struct RelayNameCheck {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsRecord {
-    /// "A" | "AAAA" | "CNAME" | "SRV"
+    /// "A" | "AAAA" | "CNAME" | "SRV" | "TXT"
     pub kind: &'static str,
     /// The full record name, e.g. "play.example.com" or "_minecraft._tcp.play.example.com".
     pub name: String,
-    /// A/AAAA: the IP address. CNAME, SRV: the target host.
+    /// A/AAAA: the IP address. CNAME, SRV: the target host. TXT: its text.
     pub value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
@@ -1212,6 +1223,35 @@ pub struct DomainInfo {
     /// What the last automatic Cloudflare update did (or why it failed).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cloudflare_status: Option<Text>,
+    /// ResinCraft Relay's ownership check of the domain, once asked (relay name and domain set).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ownership: Option<DomainOwnership>,
+}
+
+/// Whether ResinCraft Relay accepts the domain as the player's, the way Vercel verifies domains: a TXT record proves
+/// ownership, then the CNAME (or SRV) sends players to the relay name.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainOwnership {
+    /// The relay verifies domains (protocol 7). Older relays follow the CNAME without asking.
+    pub supported: bool,
+    /// "pending" (no TXT seen yet) | "verified" (players are routed) | "misconfigured" (owned, but the CNAME/SRV
+    /// points elsewhere) | "unknown".
+    pub state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub txt: Option<DnsRecord>,
+    pub route_ok: bool,
+    /// Another account has the domain verified; it moves here once this TXT shows up.
+    pub elsewhere: bool,
+    /// When the relay last looked (Unix seconds).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checked_at: Option<u64>,
+    /// The relay's explanation, for players.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// Couldn't ask the relay (offline, signed out…).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Text>,
 }
 
 /// A server as the UI sees it: its metadata plus live state.
