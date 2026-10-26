@@ -3240,25 +3240,38 @@ textarea.custom-css {
   background: radial-gradient(closest-side, rgba(255, 150, 40, 0.32), rgba(255, 150, 40, 0));
   animation: hw-glow 3.4s ease-in-out infinite;
 }
-.hw-shell ellipse {
-  fill: #e8741a;
+/* Pixel-art colours (components/ThemeDecor.tsx draws the blocks from rectangles). */
+.px-pk {
+  fill: #e07818;
 }
-.hw-shell ellipse:nth-child(3) {
-  fill: #ff8c1a;
+.px-pk-rib {
+  fill: #c4600f;
 }
-.hw-ribs path {
-  stroke: rgba(120, 45, 0, 0.45);
-  stroke-width: 1.2;
+.px-pk-top {
+  fill: #f39a2e;
 }
-.hw-stem {
-  fill: #5a7d2a;
+.px-pk-toprib {
+  fill: #d97f1e;
 }
-.hw-leaf {
-  fill: #8bd14e;
+.px-pk-side {
+  fill: #a9500c;
 }
-.hw-face path {
-  fill: #ffe08a;
+.px-pk-side2 {
+  fill: #8a3f08;
+}
+.px-stem {
+  fill: #5a4a22;
+}
+.px-leaf {
+  fill: #6aa83a;
+}
+.px-lit {
+  fill: #ffcf4a;
   animation: hw-candle 2.3s linear infinite;
+}
+.px-flame {
+  fill: #fff3b0;
+  animation: hw-candle 1.7s linear infinite;
 }
 /* An uneven flicker, the way a candle does it. */
 @keyframes hw-candle {
@@ -3306,7 +3319,8 @@ textarea.custom-css {
   .hw-spider-move,
   .hw-eye,
   .hw-legs,
-  .hw-face path,
+  .px-lit,
+  .px-flame,
   .hw-pumpkin-glow {
     animation: none;
   }
@@ -3332,50 +3346,48 @@ textarea.custom-css {
   display: block;
   animation: hw-bob 0.6s ease-in-out infinite alternate;
 }
-.hw-m-body {
-  fill: #5f8f3a;
-  stroke: #2b4419;
-  stroke-width: 1.2;
+.hw-monster svg {
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
 }
-.hw-m-patch {
-  fill: #7a4bb0;
-  opacity: 0.9;
+.px-shirt {
+  fill: #2f9a9a;
 }
-.hw-m-arm rect {
-  fill: #6fa344;
-  stroke: #2b4419;
-  stroke-width: 1;
+.px-shirt2 {
+  fill: #237676;
 }
+.px-skin {
+  fill: #5d9b3c;
+}
+.px-skin2 {
+  fill: #477a2d;
+}
+.px-pants {
+  fill: #3c3f9a;
+}
+.px-pants2 {
+  fill: #2d2f78;
+}
+.px-shoe {
+  fill: #4a4a52;
+}
+/* Arms swing a little from the shoulder; legs step from the hip (viewBox units, the zombie is 16 × 33). */
 .hw-m-arm {
-  transform-origin: 27px 27px;
+  transform-origin: 8px 12px;
   animation: hw-arm 1.2s ease-in-out infinite alternate;
 }
-.hw-m-leg rect {
-  fill: #3d2a52;
+.hw-m-arm-b {
+  animation-delay: -0.6s;
 }
 .hw-m-leg {
-  transform-origin: 50% 38px;
+  transform-origin: 7px 21px;
   animation: hw-step 0.6s ease-in-out infinite alternate;
 }
 .hw-m-leg-b {
   animation-direction: alternate-reverse;
 }
-.hw-m-eye {
-  fill: #f6f2d8;
-}
-.hw-m-pupil {
-  fill: #1a0f22;
-}
-.hw-m-mouth {
-  fill: none;
-  stroke: #1a0f22;
-  stroke-width: 1.3;
-  stroke-linejoin: round;
-}
-.hw-m-bolt {
-  stroke: #9aa3ad;
-  stroke-width: 3;
-  stroke-linecap: round;
+.hw-m-head {
+  transform-origin: 7px 9px;
+  animation: hw-arm 1.8s ease-in-out infinite alternate-reverse;
 }
 @keyframes hw-walk {
   0% {
@@ -3516,76 +3528,125 @@ textarea.custom-css {
 }
 
 /* The tree: its own row in the sidebar, above the account. */
-.xm-tree {
+/* The Christmas chest: wrapped like a present; every 7 s the lid lifts, light spills out and sparkles rise. */
+.xm-chest {
   position: relative;
   display: flex;
   justify-content: center;
-  padding: 4px 0 2px;
+  padding: 8px 0 2px;
   pointer-events: none;
 }
-.xm-tree svg {
+.xm-chest svg {
   position: relative;
+  overflow: visible;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
 }
-.xm-tree-glow {
+.xm-chest-glow {
   position: absolute;
   left: 50%;
-  top: 6px;
-  width: 40px;
-  height: 30px;
-  margin-left: -20px;
+  top: 4px;
+  width: 70px;
+  height: 40px;
+  margin-left: -38px;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(242, 207, 107, 0.45), rgba(242, 207, 107, 0));
-  animation: xm-glow 2.8s ease-in-out infinite;
+  background: radial-gradient(closest-side, rgba(255, 216, 107, 0.55), rgba(255, 216, 107, 0));
+  opacity: 0;
+  animation: xm-chest-glow 7s ease-in-out infinite;
 }
-.xm-star {
-  fill: #f2cf6b;
+.px-ch {
+  fill: #c8303c;
 }
-.xm-leaves {
-  fill: #2f8a4f;
-  stroke: #1d5a33;
-  stroke-width: 1;
-  stroke-linejoin: round;
+.px-ch-light {
+  fill: #de4652;
 }
-.xm-garland {
-  stroke: rgba(242, 207, 107, 0.7);
-  stroke-width: 1;
+.px-ch-dark {
+  fill: #9c2230;
 }
-.xm-trunk {
-  fill: #7a5232;
+.px-ch-top {
+  fill: #e24d58;
 }
-.xm-light {
-  animation: xm-twinkle 2.6s ease-in-out infinite;
+.px-ch-side {
+  fill: #9a2430;
 }
-.xm-r {
-  fill: #ff5a6a;
+.px-ch-side2 {
+  fill: #7a1a25;
 }
-.xm-g {
-  fill: #6ff0a0;
+.px-ribbon {
+  fill: #f2c94c;
 }
-.xm-y {
-  fill: #ffd86b;
+.px-ribbon2 {
+  fill: #c99a26;
 }
-.xm-b {
-  fill: #7cc7ff;
+.px-latch {
+  fill: #dfe3ea;
 }
-@keyframes xm-twinkle {
+.px-inside {
+  fill: #ffe9a0;
+}
+.xm-lid {
+  animation: xm-lid 7s ease-in-out infinite;
+}
+.xm-sparkle {
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  width: 4px;
+  height: 4px;
+  background: #fff6c8;
+  box-shadow: 0 0 6px 2px rgba(255, 216, 107, 0.7);
+  opacity: 0;
+  animation: xm-sparkle 7s ease-out infinite;
+}
+.xm-sparkle-0 {
+  margin-left: -14px;
+}
+.xm-sparkle-1 {
+  margin-left: -4px;
+  animation-delay: 0.15s;
+}
+.xm-sparkle-2 {
+  margin-left: 6px;
+  animation-delay: 0.3s;
+}
+@keyframes xm-lid {
   0%,
+  72%,
   100% {
+    transform: translateY(0);
+  }
+  77%,
+  90% {
+    transform: translateY(-3px);
+  }
+  80% {
+    transform: translateY(-3.6px);
+  }
+}
+@keyframes xm-chest-glow {
+  0%,
+  72%,
+  95%,
+  100% {
+    opacity: 0;
+  }
+  78%,
+  88% {
     opacity: 1;
   }
-  50% {
-    opacity: 0.25;
-  }
 }
-@keyframes xm-glow {
+@keyframes xm-sparkle {
   0%,
-  100% {
-    opacity: 0.7;
-    transform: scale(1);
+  76% {
+    opacity: 0;
+    transform: translateY(0);
   }
-  50% {
+  80% {
     opacity: 1;
-    transform: scale(1.12);
+  }
+  95%,
+  100% {
+    opacity: 0;
+    transform: translateY(-26px);
   }
 }
 
@@ -3594,10 +3655,13 @@ textarea.custom-css {
   .xm-sleigh {
     display: none;
   }
-  .xm-light,
-  .xm-tree-glow,
+  .xm-lid,
+  .xm-chest-glow,
   .xm-deer-legs {
     animation: none;
+  }
+  .xm-sparkle {
+    display: none;
   }
 }
 

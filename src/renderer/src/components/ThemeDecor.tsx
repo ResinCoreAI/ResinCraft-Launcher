@@ -80,68 +80,124 @@ function HalloweenWeb() {
   )
 }
 
-// ---------- Halloween: a jack-o'-lantern in the sidebar ----------
+// ---------- Pixel art: blocks drawn from rectangles, kept crisp ----------
 
-/** The sidebar's holiday piece, in its own space above the account: a jack-o'-lantern or a Christmas tree. */
+/** [x, y, w, h, class]: one flat-coloured run of pixels. */
+type Px = readonly [number, number, number, number, string]
+
+function Pixels({ px }: { px: readonly Px[] }) {
+  return (
+    <>
+      {px.map(([x, y, w, h, c], i) => (
+        <rect key={i} x={x} y={y} width={w} height={h} className={c} />
+      ))}
+    </>
+  )
+}
+
+/** A carved face on a pumpkin, at (x, y): eyes, a nose and a toothy grin, lit from inside. */
+function carved(x: number, y: number): Px[] {
+  return [
+    [x + 1, y, 2, 2, 'px-lit'],
+    [x + 7, y, 2, 2, 'px-lit'],
+    [x + 2, y + 1, 1, 1, 'px-flame'],
+    [x + 7, y + 1, 1, 1, 'px-flame'],
+    [x + 4, y + 3, 2, 1, 'px-lit'],
+    [x + 1, y + 5, 8, 1, 'px-lit'],
+    [x + 1, y + 6, 2, 1, 'px-lit'],
+    [x + 4, y + 6, 2, 1, 'px-lit'],
+    [x + 7, y + 6, 2, 1, 'px-lit'],
+    [x + 3, y + 5, 4, 1, 'px-flame']
+  ]
+}
+
+// ---------- Halloween: a carved pumpkin block in the sidebar ----------
+
+/** A pumpkin block seen from the front, with its top and right side: ribs, a stem, a candle-lit face. */
+const PUMPKIN: Px[] = [
+  [6, 0, 1, 2, 'px-stem'],
+  [7, 0, 2, 1, 'px-leaf'],
+  [3, 1, 10, 1, 'px-pk-top'],
+  [2, 2, 10, 1, 'px-pk-top'],
+  [1, 3, 10, 1, 'px-pk-top'],
+  [5, 1, 1, 3, 'px-pk-toprib'],
+  [12, 3, 1, 12, 'px-pk-side'],
+  [13, 2, 1, 12, 'px-pk-side'],
+  [14, 1, 1, 12, 'px-pk-side2'],
+  [0, 4, 12, 12, 'px-pk'],
+  [0, 4, 1, 12, 'px-pk-rib'],
+  [4, 4, 1, 12, 'px-pk-rib'],
+  [7, 4, 1, 12, 'px-pk-rib'],
+  [11, 4, 1, 12, 'px-pk-rib'],
+  ...carved(1, 6)
+]
+
+/** The sidebar's holiday piece, in its own space above the account: a pumpkin block or a Christmas chest. */
 export function SidebarPumpkin() {
   const theme = useShownTheme()
-  if (theme === 'christmas') return <ChristmasTree />
+  if (theme === 'christmas') return <ChristmasChest />
   if (theme !== 'halloween') return null
   return (
     <div className="hw-pumpkin" aria-hidden>
       <span className="hw-pumpkin-glow" />
-      <svg width="58" height="50" viewBox="0 0 58 50">
-        <path className="hw-stem" d="M28 9c0-4 1-7 4-8l2 2c-2 1-3 3-3 6z" />
-        <path className="hw-leaf" d="M31 6c4-3 9-3 12 0-4 2-8 2-12 0z" />
-        <g className="hw-shell">
-          <ellipse cx="18" cy="29" rx="13" ry="18" />
-          <ellipse cx="40" cy="29" rx="13" ry="18" />
-          <ellipse cx="29" cy="29" rx="12" ry="19.5" />
-        </g>
-        <g className="hw-ribs" fill="none">
-          <path d="M22 12c-4 10-4 25 0 35" />
-          <path d="M36 12c4 10 4 25 0 35" />
-        </g>
-        <g className="hw-face">
-          <path d="M16 24l6-5 2 7z" />
-          <path d="M42 24l-6-5-2 7z" />
-          <path d="M27 28l2-4 2 4z" />
-          <path d="M14 33c5 8 25 8 30 0l-4 1-3 3-3-3-4 4-4-4-3 3-3-3z" />
-        </g>
+      <svg width="60" height="64" viewBox="0 0 15 16" shapeRendering="crispEdges">
+        <Pixels px={PUMPKIN} />
       </svg>
     </div>
   )
 }
 
-// ---------- Halloween: a little monster that shambles across the bottom now and then ----------
+// ---------- Halloween: a zombie with a pumpkin for a head shambles across the bottom now and then ----------
+
+/** The pumpkin head: a smaller block, face to the front. */
+const HEAD: Px[] = [
+  [6, 0, 1, 1, 'px-stem'],
+  [3, 1, 9, 8, 'px-pk'],
+  [3, 1, 1, 8, 'px-pk-rib'],
+  [7, 1, 1, 2, 'px-pk-rib'],
+  [11, 1, 1, 8, 'px-pk-rib'],
+  [4, 3, 2, 1, 'px-lit'],
+  [9, 3, 2, 1, 'px-lit'],
+  [5, 3, 1, 1, 'px-flame'],
+  [9, 3, 1, 1, 'px-flame'],
+  [4, 6, 7, 1, 'px-lit'],
+  [5, 7, 1, 1, 'px-lit'],
+  [7, 7, 1, 1, 'px-lit'],
+  [9, 7, 1, 1, 'px-lit']
+]
+
+/** Arms held straight out in front, the way zombies walk: a short sleeve, then green hands. */
+const arm = (shade: string): Px[] => [
+  [7, 10, 3, 4, `px-shirt${shade}`],
+  [10, 10, 6, 4, `px-skin${shade}`]
+]
 
 function Monster() {
   return (
     <div className="hw-monster" aria-hidden>
-      <svg width="44" height="56" viewBox="0 0 44 56">
-        <g className="hw-m-leg hw-m-leg-a">
-          <rect x="13" y="38" width="7" height="15" rx="3" />
-        </g>
+      <svg width="34" height="70" viewBox="0 0 16 33" shapeRendering="crispEdges">
         <g className="hw-m-leg hw-m-leg-b">
-          <rect x="24" y="38" width="7" height="15" rx="3" />
+          <Pixels px={[[5, 21, 4, 10, 'px-pants2'], [5, 31, 4, 2, 'px-shoe']]} />
         </g>
-        <path className="hw-m-body" d="M10 22c0-9 5-15 12-15s12 6 12 15v18c0 3-2 4-4 4H14c-2 0-4-1-4-4z" />
-        <path className="hw-m-patch" d="M14 30h8v6h-8z" />
+        <g className="hw-m-arm hw-m-arm-b">
+          <Pixels px={arm('2')} />
+        </g>
+        <g className="hw-m-leg hw-m-leg-a">
+          <Pixels px={[[5, 21, 4, 10, 'px-pants'], [5, 31, 4, 2, 'px-shoe']]} />
+        </g>
+        <Pixels px={[[5, 9, 4, 12, 'px-shirt'], [5, 19, 4, 2, 'px-pants']]} />
         <g className="hw-m-arm">
-          <rect x="26" y="24" width="17" height="6" rx="3" />
+          <Pixels px={arm('')} />
         </g>
-        <circle className="hw-m-eye" cx="18" cy="17" r="3" />
-        <circle className="hw-m-eye" cx="27" cy="17" r="3.6" />
-        <circle className="hw-m-pupil" cx="19" cy="17.5" r="1.2" />
-        <circle className="hw-m-pupil" cx="28.3" cy="17.5" r="1.4" />
-        <path className="hw-m-mouth" d="M16 25l2 2 2-2 2 2 2-2 2 2 2-2" />
-        <path className="hw-m-bolt" d="M9 19h-3M38 19h3" />
+        <g className="hw-m-head">
+          <Pixels px={HEAD} />
+        </g>
       </svg>
     </div>
   )
 }
 
-// ---------- Christmas: Santa's sleigh across the top, and a tree in the sidebar ----------
+// ---------- Christmas: Santa's sleigh across the top, and a chest in the sidebar ----------
 
 function Sleigh() {
   return (
@@ -171,23 +227,51 @@ function Sleigh() {
   )
 }
 
-/** A Christmas tree with lights that twinkle one after another and a star that glows. */
-function ChristmasTree() {
-  const lights = [
-    [29, 18, 'r'], [22, 25, 'g'], [35, 27, 'y'], [18, 33, 'b'], [29, 34, 'r'], [40, 35, 'g'],
-    [15, 42, 'y'], [25, 43, 'b'], [36, 44, 'r'], [45, 42, 'y']
-  ] as const
+/** The chest's lid: its front and top, the ribbon over both and a bow on top. It pops open now and then. */
+const LID: Px[] = [
+  [3, 2, 11, 1, 'px-ch-top'],
+  [2, 3, 11, 1, 'px-ch-top'],
+  [1, 4, 11, 1, 'px-ch-top'],
+  [6, 2, 2, 3, 'px-ribbon2'],
+  [13, 3, 1, 3, 'px-ch-side'],
+  [14, 2, 1, 3, 'px-ch-side2'],
+  [0, 5, 13, 3, 'px-ch'],
+  [0, 5, 13, 1, 'px-ch-light'],
+  [5, 5, 3, 3, 'px-ribbon'],
+  [3, 0, 3, 2, 'px-ribbon'],
+  [8, 0, 3, 2, 'px-ribbon'],
+  [4, 1, 1, 1, 'px-ribbon2'],
+  [9, 1, 1, 1, 'px-ribbon2'],
+  [6, 1, 2, 2, 'px-ribbon2']
+]
+
+/** The chest's body, with the ribbon going round it and the latch. */
+const BOX: Px[] = [
+  [13, 6, 1, 9, 'px-ch-side'],
+  [14, 5, 1, 9, 'px-ch-side2'],
+  [0, 8, 13, 8, 'px-ch'],
+  [0, 8, 13, 1, 'px-ch-dark'],
+  [0, 15, 13, 1, 'px-ch-dark'],
+  [5, 8, 3, 8, 'px-ribbon'],
+  [0, 11, 13, 2, 'px-ribbon'],
+  [5, 11, 3, 2, 'px-ribbon2'],
+  [6, 8, 1, 2, 'px-latch']
+]
+
+/** A Christmas chest, wrapped like a present; every few seconds its lid lifts, light spills out and sparkles rise. */
+function ChristmasChest() {
   return (
-    <div className="xm-tree" aria-hidden>
-      <span className="xm-tree-glow" />
-      <svg width="60" height="62" viewBox="0 0 60 62">
-        <path className="xm-star" d="M30 1l2.6 5.4 5.9.8-4.3 4.1 1 5.8L30 14.4l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z" />
-        <path className="xm-leaves" d="M30 11 18 26h6L12 39h7L6 51h48L41 39h7L36 26h6z" />
-        <path className="xm-garland" d="M20 30c6 3 14 3 20-1M15 41c10 4 22 4 31-1" fill="none" />
-        <rect className="xm-trunk" x="26" y="51" width="8" height="7" rx="1" />
-        {lights.map(([x, y, c], i) => (
-          <circle key={i} className={`xm-light xm-${c}`} cx={x} cy={y} r="1.9" style={{ animationDelay: `${(i * 0.37).toFixed(2)}s` }} />
-        ))}
+    <div className="xm-chest" aria-hidden>
+      <span className="xm-chest-glow" />
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={`xm-sparkle xm-sparkle-${i}`} />
+      ))}
+      <svg width="60" height="64" viewBox="0 0 15 16" shapeRendering="crispEdges">
+        <rect x="1" y="7" width="11" height="1" className="px-inside" />
+        <Pixels px={BOX} />
+        <g className="xm-lid">
+          <Pixels px={LID} />
+        </g>
       </svg>
     </div>
   )
