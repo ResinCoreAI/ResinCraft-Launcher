@@ -82,7 +82,9 @@ export function mockServers(): {
   /** Mirrors domain.rs: the records the server's domain needs for its current route. */
   const domainInfo = (id: string): DomainInfo => {
     const s = find(id)
-    const net = s.net?.state === 'open' ? s.net : undefined
+    // Stopped but set to ResinCraft Relay with a reserved name: the address is known in advance (domain.rs stopped_route).
+    const stoppedResin = s.net?.state !== 'open' && s.tunnel === 'resin' && s.relayName ? `${s.relayName}.${RELAY_DOMAIN}` : undefined
+    const net = s.net?.state === 'open' ? s.net : stoppedResin ? { ...s.net, via: 'resin', address: stoppedResin } : undefined
     const route: DomainInfo['route'] = !net
       ? 'none'
       : net.via === 'playit'

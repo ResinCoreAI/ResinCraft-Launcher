@@ -123,7 +123,7 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
   const relay = useRelayInfo(s)
   const net = s.net
   // Records depend on the live address; refresh whenever it (or the domain) changes.
-  const liveKey = `${s.domain}|${s.dnsAuto}|${net?.state}|${net?.via}|${net?.address}|${net?.domainOk}`
+  const liveKey = `${s.domain}|${s.dnsAuto}|${s.tunnel}|${s.relayName}|${net?.state}|${net?.via}|${net?.address}|${net?.domainOk}`
 
   useEffect(() => setDomain(s.domain ?? ''), [s.domain])
   useEffect(() => {

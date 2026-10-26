@@ -377,7 +377,7 @@ async fn check_route(domain: &str, route: &Route) -> DnsCheck {
 
 /// The server's current route, from its live internet state.
 pub async fn route_of(id: &str) -> Route {
-    let Some(net) = runtime::net(id).filter(|n| n.state == "open") else { return Route::None };
+    let Some(net) = runtime::net(id).filter(|n| n.state == "open") else { return stopped_route(id).await };
     let Some(address) = net.address else { return Route::None };
     match net.via {
         Some("router" | "manual") => match address.parse::<SocketAddr>() {
@@ -390,6 +390,16 @@ pub async fn route_of(id: &str) -> Route {
         }
         Some("resin") => Route::Resin { target: address },
         Some("relay") => Route::Relay,
+        _ => Route::None,
+    }
+}
+
+/// A stopped server set to ResinCraft Relay with a reserved name: its address is known in advance, so the domain's
+/// records can be set up before the first start.
+async fn stopped_route(id: &str) -> Route {
+    let Ok(meta) = store::get(id).await else { return Route::None };
+    match (meta.tunnel, relay::address_of(&meta)) {
+        (TunnelMode::Resin, Some(target)) => Route::Resin { target },
         _ => Route::None,
     }
 }

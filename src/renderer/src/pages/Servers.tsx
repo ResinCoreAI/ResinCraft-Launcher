@@ -1420,6 +1420,8 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
             />
           </div>
           {(s.tunnel === 'auto' || s.tunnel === 'resin') && <RelaySettings s={s} info={relay} reload={reload} />}
+          {/* Right under the ResinCraft address: a domain of your own can point at it. */}
+          {!isBedrock(s) && <DomainSettings s={s} save={save} />}
           {!isBedrock(s) && (
             <div className="setting">
               <div className="text">
@@ -1455,7 +1457,6 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               </div>
             </div>
           )}
-          {!isBedrock(s) && <DomainSettings s={s} save={save} />}
           <div className="setting stack">
             <span className="hint">{rich('servers.settings.publicHelp', { b: (x) => <b>{x}</b> })}</span>
           </div>
