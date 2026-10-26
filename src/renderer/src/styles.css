@@ -3965,3 +3965,120 @@ textarea.custom-css {
     grid-column: auto;
   }
 }
+
+/* ---------- Minecraft models for the holiday decorations (components/McModel.tsx) ---------- */
+
+.mc-holder {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 66px;
+}
+.mc-scene,
+.mc-node,
+.mc-box {
+  position: absolute;
+  transform-style: preserve-3d;
+}
+.mc-scene,
+.mc-node {
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+.mc-scene {
+  left: 50%;
+  top: 50%;
+}
+/* Seen like an inventory icon: from a little above, turned to show the front and one side. */
+.mc-iso {
+  transform: rotateX(-28deg) rotateY(-38deg);
+}
+.mc-face {
+  position: absolute;
+  backface-visibility: hidden;
+}
+.mc-face i {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.hw-m-walk.mc {
+  position: relative;
+  width: 40px;
+  height: 72px;
+}
+/* The walker's origin is its feet; it heads right, turned toward you enough to show the pumpkin's face. */
+.mc-walker {
+  top: 70px;
+  transform: rotateX(-10deg) rotateY(32deg);
+}
+.mc-leg-a,
+.mc-leg-b {
+  animation: mc-leg 0.6s ease-in-out infinite alternate;
+}
+.mc-leg-b {
+  animation-direction: alternate-reverse;
+}
+.mc-arm-a,
+.mc-arm-b {
+  transform: rotateX(90deg);
+  animation: mc-arm 1.2s ease-in-out infinite alternate;
+}
+.mc-arm-b {
+  animation-delay: -0.6s;
+}
+.mc-head {
+  animation: mc-head 1.8s ease-in-out infinite alternate;
+}
+.mc-lid {
+  animation: mc-lid 7s ease-in-out infinite;
+}
+@keyframes mc-leg {
+  from {
+    transform: rotateX(-28deg);
+  }
+  to {
+    transform: rotateX(28deg);
+  }
+}
+@keyframes mc-arm {
+  from {
+    transform: rotateX(84deg);
+  }
+  to {
+    transform: rotateX(96deg);
+  }
+}
+@keyframes mc-head {
+  from {
+    transform: rotateY(-7deg);
+  }
+  to {
+    transform: rotateY(7deg);
+  }
+}
+/* Closed most of the time; every 7 s it swings open on the back hinge, stays a moment, and shuts. */
+@keyframes mc-lid {
+  0%,
+  72%,
+  100% {
+    transform: rotateX(0deg);
+  }
+  78%,
+  90% {
+    transform: rotateX(52deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mc-leg-a,
+  .mc-leg-b,
+  .mc-arm-a,
+  .mc-arm-b,
+  .mc-head,
+  .mc-lid {
+    animation: none;
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChestModel, LanternBlock, PumpkinZombie, useGameTextures } from './McModel'
 
 /** The theme on screen (`data-theme` on <html>), followed as it changes (holidays switch it by themselves). */
 export function useShownTheme(): string | undefined {
@@ -135,14 +136,21 @@ const PUMPKIN: Px[] = [
 /** The sidebar's holiday piece, in its own space above the account: a pumpkin block or a Christmas chest. */
 export function SidebarPumpkin() {
   const theme = useShownTheme()
+  const tex = useGameTextures()
   if (theme === 'christmas') return <ChristmasChest />
   if (theme !== 'halloween') return null
   return (
     <div className="hw-pumpkin" aria-hidden>
       <span className="hw-pumpkin-glow" />
-      <svg width="60" height="64" viewBox="0 0 15 16" shapeRendering="crispEdges">
-        <Pixels px={PUMPKIN} />
-      </svg>
+      {tex ? (
+        <span className="mc-holder">
+          <LanternBlock tex={tex} />
+        </span>
+      ) : (
+        <svg width="60" height="64" viewBox="0 0 15 16" shapeRendering="crispEdges">
+          <Pixels px={PUMPKIN} />
+        </svg>
+      )}
     </div>
   )
 }
@@ -173,6 +181,15 @@ const arm = (shade: string): Px[] => [
 ]
 
 function Monster() {
+  const tex = useGameTextures()
+  if (tex)
+    return (
+      <div className="hw-monster" aria-hidden>
+        <div className="hw-m-walk mc">
+          <PumpkinZombie tex={tex} />
+        </div>
+      </div>
+    )
   return (
     <div className="hw-monster" aria-hidden>
       <div className="hw-m-walk">
@@ -262,19 +279,26 @@ const BOX: Px[] = [
 
 /** A Christmas chest, wrapped like a present; every few seconds its lid lifts, light spills out and sparkles rise. */
 function ChristmasChest() {
+  const tex = useGameTextures()
   return (
     <div className="xm-chest" aria-hidden>
       <span className="xm-chest-glow" />
       {[0, 1, 2].map((i) => (
         <span key={i} className={`xm-sparkle xm-sparkle-${i}`} />
       ))}
-      <svg width="60" height="64" viewBox="0 0 15 16" shapeRendering="crispEdges">
-        <rect x="1" y="7" width="11" height="1" className="px-inside" />
-        <Pixels px={BOX} />
-        <g className="xm-lid">
-          <Pixels px={LID} />
-        </g>
-      </svg>
+      {tex ? (
+        <span className="mc-holder">
+          <ChestModel tex={tex} />
+        </span>
+      ) : (
+        <svg width="60" height="64" viewBox="0 0 15 16" shapeRendering="crispEdges">
+          <rect x="1" y="7" width="11" height="1" className="px-inside" />
+          <Pixels px={BOX} />
+          <g className="xm-lid">
+            <Pixels px={LID} />
+          </g>
+        </svg>
+      )}
     </div>
   )
 }

@@ -24,6 +24,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       cancelTask: fn('app:cancelTask'),
       saveThemeImage: fn('app:saveThemeImage'),
       themeImage: fn('app:themeImage'),
+      gameTexture: fn('app:gameTexture'),
       showItem: fn('app:showItem'),
       pathForFile
     },

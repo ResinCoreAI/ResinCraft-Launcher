@@ -247,6 +247,7 @@ export function mockApi(): ResinApi {
       cancelTask: async (id) => mockEngine.cancelTask(id),
       saveThemeImage: async (id, url) => void (url ? mockThemeImages.set(id, url) : mockThemeImages.delete(id)),
       themeImage: async (id) => mockThemeImages.get(id) ?? null,
+      gameTexture: async () => null,
       showItem: async () => {},
       pathForFile: (f: File) => f.name
     },

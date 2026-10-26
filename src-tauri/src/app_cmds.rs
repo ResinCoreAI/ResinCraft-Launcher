@@ -42,6 +42,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "app:themeImage" => json(theme_image(&args.get::<String>(0)?).await),
+        // A few textures for the holiday decorations, from the player's own Minecraft (never shipped with ResinCraft).
+        "app:gameTexture" => json(game_texture(&args.get::<String>(0)?).await),
 
         "settings:get" => json(settings::redacted(settings::get().await)),
         "settings:set" => {
@@ -144,6 +146,62 @@ async fn theme_image(id: &str) -> Option<String> {
             use base64::Engine;
             return Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)));
         }
+    }
+    None
+}
+
+/// The textures the holiday decorations (ThemeDecor.tsx) draw with. They come from a Minecraft game file the player
+/// already downloaded, so ResinCraft never ships Mojang's art; with none downloaded yet, the UI draws its own.
+const GAME_TEXTURES: [&str; 6] = [
+    "block/carved_pumpkin",
+    "block/jack_o_lantern",
+    "block/pumpkin_side",
+    "block/pumpkin_top",
+    "entity/zombie/zombie",
+    "entity/chest/christmas",
+];
+
+static GAME_TEXTURE_CACHE: std::sync::Mutex<Option<std::collections::HashMap<&'static str, Option<String>>>> =
+    std::sync::Mutex::new(None);
+
+async fn game_texture(name: &str) -> Option<String> {
+    let name: &'static str = GAME_TEXTURES.iter().find(|n| **n == name)?;
+    if let Some(hit) = GAME_TEXTURE_CACHE.lock().unwrap().as_ref().and_then(|c| c.get(name)) {
+        return hit.clone();
+    }
+    let found = tokio::task::spawn_blocking(move || read_game_texture(name)).await.ok().flatten();
+    GAME_TEXTURE_CACHE.lock().unwrap().get_or_insert_with(Default::default).insert(name, found.clone());
+    found
+}
+
+/// The texture as a PNG data URL, from the newest vanilla client jar in the shared versions folder.
+fn read_game_texture(name: &str) -> Option<String> {
+    use std::io::Read;
+    // Vanilla client jars are several MB; loader profiles (Fabric, Forge) have tiny or empty ones.
+    let mut jars: Vec<(std::time::SystemTime, std::path::PathBuf)> = std::fs::read_dir(paths::versions())
+        .ok()?
+        .flatten()
+        .filter_map(|e| {
+            let dir = e.path();
+            let jar = dir.join(format!("{}.jar", dir.file_name()?.to_str()?));
+            let meta = jar.metadata().ok()?;
+            if meta.len() < 1_000_000 {
+                return None;
+            }
+            Some((meta.modified().ok()?, jar))
+        })
+        .collect();
+    jars.sort_by(|a, b| b.0.cmp(&a.0));
+    for (_, jar) in jars {
+        let Ok(file) = std::fs::File::open(&jar) else { continue };
+        let Ok(mut zip) = zip::ZipArchive::new(file) else { continue };
+        let Ok(entry) = zip.by_name(&format!("assets/minecraft/textures/{name}.png")) else { continue };
+        let mut bytes = Vec::new();
+        if entry.take(256 * 1024).read_to_end(&mut bytes).is_err() || bytes.is_empty() {
+            continue;
+        }
+        use base64::Engine;
+        return Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)));
     }
     None
 }

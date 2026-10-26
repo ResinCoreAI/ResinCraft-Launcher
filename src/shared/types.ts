@@ -1491,6 +1491,8 @@ export interface ResinApi {
     saveThemeImage(themeId: string, dataUrl: string | null): Promise<void>
     /** A custom theme's background picture as a data URL, or null. */
     themeImage(themeId: string): Promise<string | null>
+    /** A texture from the player's own Minecraft (e.g. 'block/pumpkin_side') as a PNG data URL, or null. */
+    gameTexture(name: string): Promise<string | null>
   }
   settings: {
     get(): Promise<Settings>
