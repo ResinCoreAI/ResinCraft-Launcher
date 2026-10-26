@@ -3333,12 +3333,19 @@ textarea.custom-css {
 }
 
 /* The monster: offstage most of the time; every 45 s it shambles across the bottom, bobbing, and walks off. */
+/* A strip along the bottom of the page: the walker steps out from behind the sidebar's edge, not over it. */
 .hw-monster {
   position: fixed;
   left: var(--sidebar-w);
+  right: 0;
   bottom: 6px;
+  height: 72px;
+  overflow: hidden;
   z-index: 5;
   pointer-events: none;
+}
+.hw-m-walk {
+  width: 34px;
   transform: translateX(-60px);
   animation: hw-walk 45s linear 6s infinite;
 }

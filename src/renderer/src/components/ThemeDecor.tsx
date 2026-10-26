@@ -175,6 +175,7 @@ const arm = (shade: string): Px[] => [
 function Monster() {
   return (
     <div className="hw-monster" aria-hidden>
+      <div className="hw-m-walk">
       <svg width="34" height="70" viewBox="0 0 16 33" shapeRendering="crispEdges">
         <g className="hw-m-leg hw-m-leg-b">
           <Pixels px={[[5, 21, 4, 10, 'px-pants2'], [5, 31, 4, 2, 'px-shoe']]} />
@@ -193,6 +194,7 @@ function Monster() {
           <Pixels px={HEAD} />
         </g>
       </svg>
+      </div>
     </div>
   )
 }
