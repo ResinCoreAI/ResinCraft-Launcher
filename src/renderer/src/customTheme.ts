@@ -98,7 +98,60 @@ function vars(th: CustomTheme): Record<string, string> {
       '--danger-soft': 'rgba(220, 38, 38, 0.08)',
       '--shadow': '0 10px 28px rgba(22, 19, 31, 0.14)'
     })
+  // Fine-tuned colours win; panels keep the theme's opacity so the picture still shows through.
+  for (const [k, value] of Object.entries(th.vars ?? {})) {
+    if (!/^--[a-z0-9-]+$/.test(k) || !safeValue(value)) continue
+    v[k] = SEE_THROUGH.includes(k) && /^#[0-9a-f]{6}$/i.test(value) ? alpha(value, op) : value
+  }
+  // A fine-tuned colour brings its softer and hover shades along.
+  const tuned = (k: string) => (/^#[0-9a-f]{6}$/i.test(th.vars?.[k] ?? '') ? th.vars![k] : undefined)
+  const danger = tuned('--danger')
+  if (danger) v['--danger-soft'] = alpha(danger, 0.12)
+  const play = tuned('--play')
+  if (play) Object.assign(v, { '--play-hover': mix(play, light ? '#000000' : '#ffffff', 0.2), '--success': play, '--success-soft': alpha(play, 0.12) })
   return v
+}
+
+/** Panels that let the background picture show through at the theme's panel opacity. */
+const SEE_THROUGH = ['--bg-sidebar', '--surface', '--surface-2', '--surface-3']
+
+/** A value that stays inside its declaration (no `;`, braces or comment tricks). */
+function safeValue(v: string): boolean {
+  return v.length < 200 && !/[;{}<>]|\/\*|\*\//.test(v)
+}
+
+/** Any CSS colour the browser shows (`#abc`, `rgb()`, `rgba()`) as `#rrggbb`, for colour pickers. */
+export function toHex(color: string, fallback = '#000000'): string {
+  const c = color.trim()
+  if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase()
+  if (/^#[0-9a-f]{3}$/i.test(c)) return hex(rgb(c))
+  const m = /^rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/i.exec(c)
+  return m ? hex([+m[1], +m[2], +m[3]]) : fallback
+}
+
+/** The theme's own CSS, aimed at it: a plain `:root` becomes `:root[data-theme='custom']`, so it beats the theme. */
+function scopedCss(css: string | undefined): string {
+  return (css ?? '').replace(/:root(?![\w[-])/g, ":root[data-theme='custom']")
+}
+
+/** Sets `name: value;` in the CSS's `:root` block (adding the block when there's none). */
+export function setCssVar(css: string, name: string, value: string): string {
+  const line = new RegExp(`(${name.replace(/[-]/g, '\\-')}\\s*:\\s*)[^;}\\n]*`)
+  const root = /:root\s*\{/.exec(css)
+  if (root) {
+    const end = css.indexOf('}', root.index)
+    const block = css.slice(root.index, end < 0 ? undefined : end)
+    if (line.test(block)) return css.slice(0, root.index) + block.replace(line, `$1${value}`) + (end < 0 ? '' : css.slice(end))
+    const at = root.index + root[0].length
+    return `${css.slice(0, at)}\n  ${name}: ${value};${css.slice(at)}`
+  }
+  return `:root {\n  ${name}: ${value};\n}\n${css ? `\n${css}` : ''}`
+}
+
+/** The value `name` has in the CSS's `:root` block, if it sets one. */
+export function cssVarIn(css: string, name: string): string | undefined {
+  const root = /:root\s*\{([^}]*)\}/.exec(css)
+  return root ? new RegExp(`${name.replace(/[-]/g, '\\-')}\\s*:\\s*([^;}\\n]+)`).exec(root[1])?.[1].trim() : undefined
 }
 
 // ---------- Pictures ----------
@@ -171,7 +224,7 @@ export function showCustom(th: CustomTheme | undefined, draftPicture?: string) {
   const body = Object.entries(vars(th))
     .map(([k, v]) => `  ${k}: ${v};`)
     .join('\n')
-  tag.textContent = `:root[data-theme='custom'] {\n${body}\n}\n`
+  tag.textContent = `:root[data-theme='custom'] {\n${body}\n}\n${scopedCss(th.css)}\n`
   root.dataset.theme = 'custom'
   root.dataset.themeStyle = th.style
   root.dataset.themeFit = th.imageFit
@@ -220,5 +273,80 @@ export function draftFromScreen(): CustomTheme {
     imageFit: 'cover',
     darken: 45,
     effect: 'none'
+  }
+}
+
+// ---------- Sharing: .rctheme files ----------
+
+/** The colour variables Fine-tune offers (the How to customize guide's), beyond the four main colours. */
+export const TUNABLE = ['--bg-sidebar', '--surface-2', '--border', '--text-dim', '--accent-fg', '--data', '--play', '--danger'] as const
+
+interface ThemeFile {
+  format: 'resincraft-theme'
+  version: 1
+  theme: Omit<CustomTheme, 'id' | 'imageFile'>
+  /** An uploaded picture, as a data URL. */
+  picture?: string
+}
+
+/** A theme as a file someone else can import: settings, fine-tuning, CSS and its picture. */
+export async function themeFile(th: CustomTheme): Promise<string> {
+  const { id, imageFile, ...theme } = th
+  const picture = imageFile ? ((await api.app.themeImage(id).catch(() => null)) ?? undefined) : undefined
+  const file: ThemeFile = { format: 'resincraft-theme', version: 1, theme, ...(picture ? { picture } : {}) }
+  return JSON.stringify(file, null, 2)
+}
+
+/** The look on screen now (a built-in theme and the player's Custom CSS) as a theme of its own, to export. */
+export function themeFromScreen(name: string, customCss?: string): CustomTheme {
+  const th = draftFromScreen()
+  const css = getComputedStyle(document.documentElement)
+  th.name = name
+  th.vars = Object.fromEntries(TUNABLE.map((k) => [k, toHex(css.getPropertyValue(k), '')]).filter(([, v]) => v))
+  if (customCss?.trim()) th.css = customCss
+  return th
+}
+
+const MAX_PICTURE_CHARS = 12 * 1024 * 1024
+
+/** Reads a .rctheme file into a new theme (fresh id), checking every field; throws on a file that isn't one. */
+export function readThemeFile(text: string): { theme: CustomTheme; picture?: string } {
+  const file = JSON.parse(text) as Partial<ThemeFile>
+  if (file?.format !== 'resincraft-theme' || typeof file.theme !== 'object' || !file.theme) throw new Error('not a theme')
+  const t = file.theme as Record<string, unknown>
+  const base = draftFromScreen()
+  const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
+  const color = (v: unknown, fallback: string) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : fallback)
+  const num = (v: unknown, min: number, max: number, fallback: number) => (typeof v === 'number' && isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback)
+  const one = <T extends string>(v: unknown, options: readonly T[], fallback: T) => (options.includes(v as T) ? (v as T) : fallback)
+  const vars = Object.fromEntries(
+    Object.entries(typeof t.vars === 'object' && t.vars ? (t.vars as Record<string, unknown>) : {})
+      .filter(([k, v]) => /^--[a-z0-9-]+$/.test(k) && typeof v === 'string' && safeValue(v))
+      .slice(0, 40)
+  ) as Record<string, string>
+  const imageUrl = str(t.imageUrl, 2000)
+  const picture = typeof file.picture === 'string' && /^data:image\/(png|jpeg|webp|gif|avif);base64,/.test(file.picture) && file.picture.length < MAX_PICTURE_CHARS ? file.picture : undefined
+  return {
+    theme: {
+      ...base,
+      name: str(t.name, 40).trim() || base.name,
+      description: str(t.description, 80),
+      style: one(t.style, ['flat', 'glass', 'soft'] as const, 'flat'),
+      bg: color(t.bg, base.bg),
+      panel: color(t.panel, base.panel),
+      text: color(t.text, base.text),
+      accent: color(t.accent, base.accent),
+      radius: num(t.radius, 0, 24, base.radius),
+      blur: num(t.blur, 0, 30, 0),
+      panelOpacity: num(t.panelOpacity, 20, 100, 100),
+      font: FONTS.some((f) => f.id === t.font) ? (t.font as string) : '',
+      imageUrl: /^https:/i.test(imageUrl) ? imageUrl : '',
+      imageFit: one(t.imageFit, ['cover', 'contain', 'tile', 'center'] as const, 'cover'),
+      darken: num(t.darken, 0, 90, 45),
+      effect: one(t.effect, ['none', 'snow', 'petals', 'embers', 'fireflies', 'rain'] as const, 'none'),
+      vars,
+      css: str(t.css, 100_000)
+    },
+    picture
   }
 }

@@ -248,6 +248,14 @@ export function mockApi(): ResinApi {
       saveThemeImage: async (id, url) => void (url ? mockThemeImages.set(id, url) : mockThemeImages.delete(id)),
       themeImage: async (id) => mockThemeImages.get(id) ?? null,
       gameTexture: async () => null,
+      // The browser preview has no save dialog: a download stands in for it.
+      exportTheme: async (name, contents) => {
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(new Blob([contents], { type: 'application/json' }))
+        a.download = `${name}.rctheme`
+        a.click()
+        return a.download
+      },
       showItem: async () => {},
       pathForFile: (f: File) => f.name
     },

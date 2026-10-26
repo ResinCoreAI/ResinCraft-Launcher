@@ -25,6 +25,7 @@ export default {
   'engine.accounts.xbox.country': "Xbox Live isn't available in this account's country.",
   'engine.accounts.xbox.failed': 'Xbox sign-in failed: {error}',
   'engine.accounts.xbox.noProfile': "This Microsoft account doesn't have an Xbox profile yet. Sign in once at xbox.com, then try again.",
+  'engine.app.exportThemeTitle': 'Save the theme',
   'engine.art.tooBig': 'That picture is too large.',
   'engine.art.unreadable': "That picture couldn't be read. Try a PNG or JPEG file.",
   'engine.atlauncher.legacyFormat': "{name} {version} uses ATLauncher's legacy install format (Minecraft {mc}), which ResinCraft doesn't support.",

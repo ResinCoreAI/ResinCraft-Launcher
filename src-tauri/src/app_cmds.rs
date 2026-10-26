@@ -42,6 +42,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "app:themeImage" => json(theme_image(&args.get::<String>(0)?).await),
+        // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.
+        "app:exportTheme" => json(export_theme(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         // A few textures for the holiday decorations, from the player's own Minecraft (never shipped with ResinCraft).
         "app:gameTexture" => json(game_texture(&args.get::<String>(0)?).await),
 
@@ -204,4 +206,14 @@ fn read_game_texture(name: &str) -> Option<String> {
         return Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)));
     }
     None
+}
+/// Saves a theme someone can import elsewhere (`<name>.rctheme`, JSON with the picture inside). None if cancelled.
+async fn export_theme(name: &str, contents: &str) -> Result<Option<String>> {
+    let base: String = name.chars().filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_')).collect();
+    let base = if base.trim().is_empty() { "theme".to_string() } else { base.trim().to_string() };
+    let title = crate::tr!("app.exportThemeTitle", "Save the theme").text;
+    let default = shell::downloads_dir().join(format!("{base}.rctheme"));
+    let Some(path) = shell::save_file(&title, &default, &[("ResinCraft theme", &["rctheme"])]).await? else { return Ok(None) };
+    tokio::fs::write(&path, contents).await?;
+    Ok(Some(path.to_string_lossy().into_owned()))
 }

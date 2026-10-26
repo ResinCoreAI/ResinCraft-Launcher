@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Monitor, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Download, Monitor, Pencil, Plus, Sparkles, Trash2, Upload } from 'lucide-react'
 import type { CustomTheme, Settings } from '@shared/types'
 import { api } from '../api'
-import { draftFromScreen, forgetPicture, pictureFor } from '../customTheme'
+import { useStore } from '../store'
+import { cssVarIn, draftFromScreen, forgetPicture, pictureFor, readThemeFile, setCssVar, themeFile, themeFromScreen } from '../customTheme'
+import { CssGuide } from './CssGuide'
 import { ThemeMaker } from './ThemeMaker'
-import { t, type Key } from '../i18n'
+import { t } from '../i18n'
 import { activeSeason, effectiveTheme, THEMES, themesNow } from '../themes'
 import { ConfirmModal, Switch } from './ui'
 
@@ -65,6 +67,36 @@ export function ThemePicker({ s, set }: { s: Settings; set: (patch: Partial<Sett
     if (th.imageFile) await api.app.saveThemeImage(th.id, null).catch(() => {})
     forgetPicture(th.id)
     set({ customThemes: mine.filter((c) => c.id !== th.id), ...(s.theme === `custom:${th.id}` ? { theme: 'dark' } : {}) })
+  }
+
+  // Sharing: the theme on screen goes out as a .rctheme file (a built-in one with the player's Custom CSS too);
+  // a file someone sent comes in as a new theme of your own.
+  const { toast } = useStore()
+  const importInput = useRef<HTMLInputElement>(null)
+  const exportShown = async () => {
+    const builtIn = THEMES.find((x) => x.id === shown)
+    const th = current ?? themeFromScreen(builtIn ? t(builtIn.label) : t('settings.themeMaker.untitled'), s.customCss)
+    try {
+      const path = await api.app.exportTheme(th.name, await themeFile(th))
+      if (path) toast(t('settings.themeMaker.exported', { path }), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+  const importFile = async (file: File | undefined, input: HTMLInputElement) => {
+    input.value = ''
+    if (!file) return
+    try {
+      const { theme, picture } = readThemeFile(await file.text())
+      if (picture) {
+        await api.app.saveThemeImage(theme.id, picture)
+        theme.imageFile = true
+      }
+      saveTheme(theme)
+      toast(t('settings.themeMaker.imported', { name: theme.name }), 'success')
+    } catch (e) {
+      toast(e instanceof SyntaxError || (e as Error).message === 'not a theme' ? t('settings.themeMaker.badFile') : (e as Error).message, 'error')
+    }
   }
 
   return (
@@ -139,18 +171,33 @@ export function ThemePicker({ s, set }: { s: Settings; set: (patch: Partial<Sett
             <span className="theme-name">{t('settings.themeMaker.new')}</span>
           </button>
         </div>
-        {current && !making && (
-          <div className="row" style={{ gap: 8 }}>
+        {!making && (
+          <div className="row wrap" style={{ gap: 8 }}>
             <span className="grow muted ellipsis">
-              <b>{current.name}</b>
-              {current.description && ` · ${current.description}`}
+              {current && (
+                <>
+                  <b>{current.name}</b>
+                  {current.description && ` · ${current.description}`}
+                </>
+              )}
             </span>
-            <button className="btn sm" onClick={() => setMaking({ theme: current, isNew: false })}>
-              <Pencil /> {t('common.edit')}
+            {current && (
+              <>
+                <button className="btn sm" onClick={() => setMaking({ theme: current, isNew: false })}>
+                  <Pencil /> {t('common.edit')}
+                </button>
+                <button className="btn sm ghost" onClick={() => setDeleting(current)}>
+                  <Trash2 /> {t('common.delete')}
+                </button>
+              </>
+            )}
+            <button className="btn sm" title={t('settings.themeMaker.exportHint')} onClick={() => void exportShown()}>
+              <Download /> {t('settings.themeMaker.export')}
             </button>
-            <button className="btn sm ghost" onClick={() => setDeleting(current)}>
-              <Trash2 /> {t('common.delete')}
+            <button className="btn sm" onClick={() => importInput.current?.click()}>
+              <Upload /> {t('settings.themeMaker.import')}
             </button>
+            <input ref={importInput} type="file" accept=".rctheme,application/json" hidden onChange={(e) => void importFile(e.target.files?.[0], e.target)} />
           </div>
         )}
         {making && <ThemeMaker key={making.theme.id} initial={making.theme} isNew={making.isNew} s={s} onSave={saveTheme} onClose={() => setMaking(undefined)} />}
@@ -181,6 +228,7 @@ export function ThemePicker({ s, set }: { s: Settings; set: (patch: Partial<Sett
 
 function CustomCss({ s, set }: { s: Settings; set: (patch: Partial<Settings>) => void }) {
   const [css, setCss] = useState(s.customCss ?? '')
+  const applyTimer = useRef<number | undefined>(undefined)
   useEffect(() => setCss(s.customCss ?? ''), [s.customCss])
   const save = (v: string) => v !== (s.customCss ?? '') && set({ customCss: v })
   return (
@@ -213,114 +261,17 @@ function CustomCss({ s, set }: { s: Settings; set: (patch: Partial<Settings>) =>
           {t('settings.customCss.apply')}
         </button>
       </div>
-      <CssGuide add={(snippet) => setCss((c) => (c.trim() ? `${c.trimEnd()}
-
-${snippet}` : snippet))} />
+      <CssGuide
+        add={(snippet) => setCss((c) => (c.trim() ? `${c.trimEnd()}\n\n${snippet}` : snippet))}
+        color={(name) => cssVarIn(css, name) ?? getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
+        setColor={(name, hex) => {
+          // A picked colour shows at once: its line goes in the box, and the CSS is applied a moment later.
+          const next = setCssVar(css, name, hex)
+          setCss(next)
+          window.clearTimeout(applyTimer.current)
+          applyTimer.current = window.setTimeout(() => save(next), 350)
+        }}
+      />
     </div>
-  )
-}
-
-/** The colour variables most themes change, with what each one paints. */
-const GUIDE_VARS: [string, Key][] = [
-  ['--bg', 'settings.cssGuide.var.bg'],
-  ['--bg-sidebar', 'settings.cssGuide.var.sidebar'],
-  ['--surface', 'settings.cssGuide.var.surface'],
-  ['--surface-2', 'settings.cssGuide.var.surface2'],
-  ['--border', 'settings.cssGuide.var.border'],
-  ['--text', 'settings.cssGuide.var.text'],
-  ['--text-dim', 'settings.cssGuide.var.textDim'],
-  ['--accent', 'settings.cssGuide.var.accent'],
-  ['--accent-fg', 'settings.cssGuide.var.accentFg'],
-  ['--data', 'settings.cssGuide.var.data'],
-  ['--play', 'settings.cssGuide.var.play'],
-  ['--danger', 'settings.cssGuide.var.danger'],
-  ['--radius', 'settings.cssGuide.var.radius'],
-  ['--font', 'settings.cssGuide.var.font']
-]
-
-/** Parts of the app a selector can reach. */
-const GUIDE_PARTS: [string, Key][] = [
-  ['body', 'settings.cssGuide.part.body'],
-  ['.sidebar', 'settings.cssGuide.part.sidebar'],
-  ['.topbar', 'settings.cssGuide.part.topbar'],
-  ['.content', 'settings.cssGuide.part.content'],
-  ['.card', 'settings.cssGuide.part.card'],
-  ['.icard', 'settings.cssGuide.part.icard'],
-  ['.btn.primary', 'settings.cssGuide.part.button'],
-  ['.chip', 'settings.cssGuide.part.chip'],
-  ['.modal', 'settings.cssGuide.part.modal']
-]
-
-/** Ready-made changes, added to the CSS box with one click. */
-const GUIDE_EXAMPLES: [Key, string][] = [
-  ['settings.cssGuide.ex.background', `/* A picture behind everything (any image link) */
-body {
-  background: url("https://example.com/my-picture.jpg") center / cover fixed;
-}
-.content, .sidebar {
-  background: rgba(10, 9, 18, 0.82);
-}`],
-  ['settings.cssGuide.ex.round', `/* Rounder corners */
-:root {
-  --radius: 14px;
-  --radius-sm: 10px;
-}`],
-  ['settings.cssGuide.ex.bigger', `/* Bigger text */
-body {
-  font-size: 15.5px;
-}`],
-  ['settings.cssGuide.ex.neon', `/* A neon glow on main buttons */
-.btn.primary {
-  box-shadow: 0 0 14px var(--accent);
-}`],
-  ['settings.cssGuide.ex.noDecor', `/* No holiday decorations */
-.hw-web-wrap, .hw-monster, .hw-pumpkin, .xm-sleigh, .xm-tree {
-  display: none;
-}`]
-]
-
-/** Settings → Custom CSS → How to customize: the variables, the parts of the app, and examples to start from. */
-function CssGuide({ add }: { add: (snippet: string) => void }) {
-  const css = getComputedStyle(document.documentElement)
-  return (
-    <details className="css-guide">
-      <summary>{t('settings.cssGuide.title')}</summary>
-      <p className="hint">{t('settings.cssGuide.intro')}</p>
-      <h4>{t('settings.cssGuide.vars')}</h4>
-      <div className="css-guide-grid">
-        {GUIDE_VARS.map(([name, label]) => {
-          const value = css.getPropertyValue(name).trim()
-          return (
-            <button key={name} className="css-guide-row" title={t('settings.cssGuide.insert')} onClick={() => add(`:root {
-  ${name}: ${value};
-}`)}>
-              {name.includes('radius') || name.includes('font') ? <span className="css-guide-dot none" /> : <span className="css-guide-dot" style={{ background: value }} />}
-              <code>{name}</code>
-              <span className="grow">{t(label)}</span>
-            </button>
-          )
-        })}
-      </div>
-      <h4>{t('settings.cssGuide.parts')}</h4>
-      <div className="css-guide-grid">
-        {GUIDE_PARTS.map(([sel, label]) => (
-          <button key={sel} className="css-guide-row" title={t('settings.cssGuide.insert')} onClick={() => add(`${sel} {
-  
-}`)}>
-            <code>{sel}</code>
-            <span className="grow">{t(label)}</span>
-          </button>
-        ))}
-      </div>
-      <h4>{t('settings.cssGuide.examples')}</h4>
-      <div className="row wrap" style={{ gap: 6 }}>
-        {GUIDE_EXAMPLES.map(([label, snippet]) => (
-          <button key={label} className="btn sm" onClick={() => add(snippet)}>
-            + {t(label)}
-          </button>
-        ))}
-      </div>
-      <p className="hint">{t('settings.cssGuide.tips')}</p>
-    </details>
   )
 }

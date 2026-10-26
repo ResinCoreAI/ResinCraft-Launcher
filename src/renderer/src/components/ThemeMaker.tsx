@@ -4,7 +4,8 @@ import type { CustomTheme, Settings } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t } from '../i18n'
-import { contrast, FONTS, forgetPicture, pictureFor, showCustom, showTheme } from '../customTheme'
+import { contrast, FONTS, forgetPicture, pictureFor, showCustom, showTheme, toHex } from '../customTheme'
+import { CssGuide } from './CssGuide'
 
 const MAX_PICTURE = 8 * 1024 * 1024
 
@@ -40,6 +41,13 @@ export function ThemeMaker({
   latest.current = s
 
   const edit = (patch: Partial<CustomTheme>) => setD((x) => ({ ...x, ...patch }))
+
+  // Fine-tune: the guide's colours map onto the four main ones where they match, the rest become overrides.
+  const MAIN: Record<string, 'bg' | 'panel' | 'text' | 'accent'> = { '--bg': 'bg', '--surface': 'panel', '--text': 'text', '--accent': 'accent' }
+  const colorOf = (name: string) =>
+    MAIN[name] ? d[MAIN[name]] : (d.vars?.[name] ?? toHex(getComputedStyle(document.documentElement).getPropertyValue(name), '#000000'))
+  const setColor = (name: string, hex: string) => (MAIN[name] ? edit({ [MAIN[name]]: hex }) : setD((x) => ({ ...x, vars: { ...x.vars, [name]: hex } })))
+  const addCss = (snippet: string) => setD((x) => ({ ...x, css: x.css?.trim() ? `${x.css.trimEnd()}\n\n${snippet}` : snippet }))
   const shown: CustomTheme = { ...d, imageFile: !dropPicture && (!!upload || !!d.imageFile) }
 
   // Live preview, and the old theme back when the form closes without saving.
@@ -233,6 +241,31 @@ export function ThemeMaker({
         )}
         {field(t('settings.themeMaker.darken'), range('darken', 0, 90, '%'))}
       </div>
+
+      <details className="theme-maker-tune" open={!!(d.css || Object.keys(d.vars ?? {}).length)}>
+        <summary>{t('settings.themeMaker.tune')}</summary>
+        <span className="hint">{t('settings.themeMaker.tuneHint')}</span>
+        <CssGuide open add={addCss} color={colorOf} setColor={setColor} />
+        <label className="field">
+          {t('settings.themeMaker.themeCss')}
+          <textarea
+            className="input mono"
+            value={d.css ?? ''}
+            spellCheck={false}
+            placeholder={'.sidebar {\n  border-right: 2px solid var(--accent);\n}'}
+            onChange={(e) => edit({ css: e.target.value })}
+            aria-label={t('settings.themeMaker.themeCss')}
+          />
+          <span className="hint">{t('settings.themeMaker.themeCssHint')}</span>
+        </label>
+        {(d.css || Object.keys(d.vars ?? {}).length > 0) && (
+          <div className="row">
+            <button className="btn sm ghost" onClick={() => edit({ vars: {}, css: '' })}>
+              {t('settings.themeMaker.resetTune')}
+            </button>
+          </div>
+        )}
+      </details>
 
       <div className="theme-maker-foot">
         <button className="btn primary" disabled={busy} onClick={() => void save()}>

@@ -3701,27 +3701,55 @@ textarea.custom-css {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  padding: 0 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
   font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
 }
 .css-guide-row:hover,
-.css-guide-row:focus-visible {
+.css-guide-row:focus-within {
   border-color: var(--border-strong);
   background: var(--surface-3);
 }
-.css-guide-row code {
+/* The row's text adds its snippet; its swatch (a colour picker) changes the colour itself. */
+.css-guide-insert {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.css-guide-dot.pick {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.css-guide-dot.pick:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.css-guide-dot.pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.css-guide-insert code {
   font-family: var(--mono);
   color: var(--data);
   white-space: nowrap;
 }
-.css-guide-row .grow {
+.css-guide-insert .grow {
   color: var(--text-dim);
 }
 .css-guide-dot {
@@ -4141,4 +4169,22 @@ textarea.custom-css {
 }
 .sv-web-tip p {
   margin: 2px 0 0;
+}
+/* Theme editor: Fine-tune (components/ThemeMaker.tsx). */
+.theme-maker-tune {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.theme-maker-tune > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.theme-maker-tune textarea {
+  min-height: 120px;
+  font-size: 12.5px;
+  resize: vertical;
+  user-select: text;
 }

@@ -382,6 +382,10 @@ export interface CustomTheme {
   /** Darkens the picture, 0–90 %, so text stays readable. */
   darken: number
   effect: 'none' | 'snow' | 'petals' | 'embers' | 'fireflies' | 'rain'
+  /** Fine-tuned colours (e.g. { '--border': '#3a2f4f' }), over the ones made from the four above. */
+  vars?: Record<string, string>
+  /** The theme's own CSS (Fine-tune → CSS for this theme), applied while it's on. */
+  css?: string
 }
 
 export interface Settings {
@@ -1513,6 +1517,8 @@ export interface ResinApi {
     themeImage(themeId: string): Promise<string | null>
     /** A texture from the player's own Minecraft (e.g. 'block/pumpkin_side') as a PNG data URL, or null. */
     gameTexture(name: string): Promise<string | null>
+    /** Asks where to save a theme file (`<name>.rctheme`) and writes `contents`; the path, or null if cancelled. */
+    exportTheme(name: string, contents: string): Promise<string | null>
   }
   settings: {
     get(): Promise<Settings>
