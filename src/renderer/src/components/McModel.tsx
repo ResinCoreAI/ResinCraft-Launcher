@@ -89,7 +89,8 @@ export function Box({ w, h, d, s, faces }: { w: number; h: number; d: number; s:
           backgroundImage: `url("${f.src}")`,
           backgroundSize: `${f.size[0] * kx}px ${f.size[1] * ky}px`,
           backgroundPosition: `${-u * kx}px ${-v * ky}px`,
-          filter: `brightness(${LIGHT[side]})`,
+          // Shading as an inset shadow over the texture: much cheaper to animate than a filter on every face.
+          boxShadow: LIGHT[side] < 1 ? `inset 0 0 0 999px rgba(0, 0, 0, ${(1 - LIGHT[side]).toFixed(2)})` : undefined,
           transform: f.flip ? 'scaleY(-1)' : undefined
         }
         return (

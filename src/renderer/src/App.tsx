@@ -14,20 +14,21 @@ import { PackUpdatesBanner } from './components/PackUpdates'
 import { RelayWatcher } from './components/ServerRelay'
 import { isTauri } from './api'
 import NewInstanceModal from './components/NewInstanceModal'
-import Accounts from './pages/Accounts'
-import Bedrock from './pages/Bedrock'
-import Discover from './pages/Discover'
 import Home from './pages/Home'
-import InstancePage from './pages/InstancePage'
 import Library, { useInstanceMenu } from './pages/Library'
-import QuickJoin from './pages/QuickJoin'
-import SettingsPage from './pages/SettingsPage'
 import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
 
-// Server hosting is self-contained and fairly large; load it on first visit.
+// Home and the Library are where the launcher opens; every other page (and what only it uses, like the theme
+// editor in Settings) loads on its first visit, so starting up parses less.
 const Servers = lazy(() => import('./pages/Servers'))
+const InstancePage = lazy(() => import('./pages/InstancePage'))
+const Discover = lazy(() => import('./pages/Discover'))
+const QuickJoin = lazy(() => import('./pages/QuickJoin'))
+const Accounts = lazy(() => import('./pages/Accounts'))
+const Bedrock = lazy(() => import('./pages/Bedrock'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
 const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'home', label: 'nav.home', icon: <HomeIcon /> },
@@ -168,21 +169,19 @@ export default function App() {
           </div>
         </header>
         <div className="content">
-          {route.page === 'home' && <Home />}
-          {route.page === 'library' && <Library />}
-          {route.page === 'quickjoin' && <QuickJoin />}
-          {route.page === 'instance' && <InstancePage key={route.id} id={route.id} tab={route.tab} />}
-          {route.page === 'discover' && (
-            <Discover key={`${route.instanceId ?? ''}${route.kind ?? ''}`} initialKind={route.kind} instanceId={route.instanceId} build={route.build} />
-          )}
-          {route.page === 'accounts' && <Accounts />}
-          {route.page === 'bedrock' && <Bedrock />}
-          {route.page === 'settings' && <SettingsPage />}
-          {route.page === 'servers' && (
-            <Suspense fallback={null}>
-              <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />
-            </Suspense>
-          )}
+          <Suspense fallback={null}>
+            {route.page === 'home' && <Home />}
+            {route.page === 'library' && <Library />}
+            {route.page === 'quickjoin' && <QuickJoin />}
+            {route.page === 'instance' && <InstancePage key={route.id} id={route.id} tab={route.tab} />}
+            {route.page === 'discover' && (
+              <Discover key={`${route.instanceId ?? ''}${route.kind ?? ''}`} initialKind={route.kind} instanceId={route.instanceId} build={route.build} />
+            )}
+            {route.page === 'accounts' && <Accounts />}
+            {route.page === 'bedrock' && <Bedrock />}
+            {route.page === 'settings' && <SettingsPage />}
+            {route.page === 'servers' && <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />}
+          </Suspense>
         </div>
       </main>
 
