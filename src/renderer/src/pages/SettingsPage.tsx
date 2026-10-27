@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, Sun, Terminal } from 'lucide-react'
+import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
-import { Logo, Segmented, Switch } from '../components/ui'
+import { ConfirmModal, Logo, Segmented, Switch } from '../components/ui'
 import { StorageSection } from '../components/Storage'
 import { ThemePicker } from '../components/ThemePicker'
 import { RemoteControlSection } from '../components/RemoteControl'
@@ -13,6 +13,45 @@ import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../compo
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { fixed } from '../util'
+
+/** Every setting back to its default, after asking: instances, servers, accounts and the player's own themes stay. */
+function ResetSettings() {
+  const { updateSettings, toast } = useStore()
+  const [asking, setAsking] = useState(false)
+  return (
+    <section className="settings-section" id="reset">
+      <div className="card">
+        <div className="setting">
+          <div className="text">
+            <b>{t('settings.reset')}</b>
+            <span>{t('settings.reset.hint')}</span>
+          </div>
+          <button className="btn danger" onClick={() => setAsking(true)}>
+            <RotateCcw /> {t('settings.reset.button')}
+          </button>
+        </div>
+      </div>
+      {asking && (
+        <ConfirmModal
+          title={t('settings.reset.title')}
+          body={t('settings.reset.body')}
+          confirm={t('settings.reset.button')}
+          onConfirm={async () => {
+            try {
+              await api.settings.reset()
+              // Picks up the defaults everywhere (theme, language, tray…), as any settings change does.
+              await updateSettings({})
+              toast(t('settings.reset.done'), 'success')
+            } catch (e) {
+              toast((e as Error).message, 'error')
+            }
+          }}
+          onClose={() => setAsking(false)}
+        />
+      )}
+    </section>
+  )
+}
 
 /** A new GitHub issue, with the version and system filled in (nothing is sent until the player submits it there). */
 function issueUrl(version?: string, platform?: string): string {
@@ -432,6 +471,8 @@ export default function SettingsPage() {
               <PackUpdatesSetting />
             </div>
           </section>
+
+          <ResetSettings />
 
           <section className="settings-section" id="about">
             <h3>{t('settings.nav.about')}</h3>

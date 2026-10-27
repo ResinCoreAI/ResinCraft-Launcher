@@ -138,6 +138,7 @@ export function mockApi(): ResinApi {
     env: [],
     commands: { preLaunch: '', wrapper: '', postExit: '' }
   }
+  const defaultSettings: Settings = { ...settings }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },
     { id: '26.3-pre2', type: 'snapshot', releaseTime: '2026-09-05T00:00:00Z' },
@@ -248,6 +249,10 @@ export function mockApi(): ResinApi {
       saveThemeImage: async (id, url) => void (url ? mockThemeImages.set(id, url) : mockThemeImages.delete(id)),
       themeImage: async (id) => mockThemeImages.get(id) ?? null,
       gameTexture: async () => null,
+      pendingOpen: async () => null,
+      readThemeFile: async () => {
+        throw new Error('The browser preview has no files to open.')
+      },
       // The browser preview has no save dialog: a download stands in for it.
       exportTheme: async (name, contents) => {
         const a = document.createElement('a')
@@ -260,7 +265,12 @@ export function mockApi(): ResinApi {
       pathForFile: (f: File) => f.name
     },
     // Saving takes a moment, as with the engine.
-    settings: { get: () => wait(settings, 0), set: (p) => wait((settings = { ...settings, ...p }), 150) },
+    settings: {
+      get: () => wait(settings, 0),
+      set: (p) => wait((settings = { ...settings, ...p }), 150),
+      // Like settings.rs reset(): back to the defaults, the player's own themes kept.
+      reset: () => wait((settings = { ...defaultSettings, customThemes: settings.customThemes }), 150)
+    },
     storage: mockStorage(),
     // The preview can't open file dialogs: it pretends a backup was saved, and that one was picked.
     backup: {
@@ -563,7 +573,7 @@ export function mockApi(): ResinApi {
     ...mockMigrate((inst) => {
       instances = [inst, ...instances]
     }),
-    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop() },
+    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), openFile: () => noop() },
     remote: { status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }) }
   }
 }

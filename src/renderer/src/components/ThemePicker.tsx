@@ -3,7 +3,7 @@ import { Download, Monitor, Pencil, Plus, Sparkles, Trash2, Upload } from 'lucid
 import type { CustomTheme, Settings } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
-import { cssVarIn, draftFromScreen, forgetPicture, pictureFor, readThemeFile, setCssVar, themeFile, themeFromScreen } from '../customTheme'
+import { cssVarIn, draftFromScreen, forgetPicture, importThemeText, notATheme, pictureFor, setCssVar, themeFile, themeFromScreen } from '../customTheme'
 import { CssGuide } from './CssGuide'
 import { ThemeMaker } from './ThemeMaker'
 import { t } from '../i18n'
@@ -87,15 +87,11 @@ export function ThemePicker({ s, set }: { s: Settings; set: (patch: Partial<Sett
     input.value = ''
     if (!file) return
     try {
-      const { theme, picture } = readThemeFile(await file.text())
-      if (picture) {
-        await api.app.saveThemeImage(theme.id, picture)
-        theme.imageFile = true
-      }
+      const theme = await importThemeText(await file.text())
       saveTheme(theme)
       toast(t('settings.themeMaker.imported', { name: theme.name }), 'success')
     } catch (e) {
-      toast(e instanceof SyntaxError || (e as Error).message === 'not a theme' ? t('settings.themeMaker.badFile') : (e as Error).message, 'error')
+      toast(notATheme(e) ? t('settings.themeMaker.badFile') : (e as Error).message, 'error')
     }
   }
 

@@ -18,6 +18,7 @@ pub mod discord;
 pub mod files;
 pub mod game;
 pub mod migrate;
+pub mod openfile;
 pub mod player;
 pub mod server;
 pub mod remote;
@@ -38,8 +39,12 @@ async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, Value> {
 
 pub fn run() {
     tauri::Builder::default()
-        // A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show(app)))
+        // A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead, with the file it was
+        // asked to open (a theme, backup or modpack double-clicked in Windows).
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            tray::show(app);
+            openfile::opened(args);
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -48,6 +53,7 @@ pub fn run() {
             let data_dir = core::paths::default_data_dir(app.path().config_dir().ok());
             std::fs::create_dir_all(&data_dir)?;
             core::ctx::init(data_dir, Some(app.handle().clone()));
+            openfile::at_start();
             tauri::async_runtime::spawn(discord::init());
             tauri::async_runtime::spawn(server::discordbot::init());
             tauri::async_runtime::spawn(remote::init());

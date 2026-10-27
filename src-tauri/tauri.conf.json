@@ -38,6 +38,10 @@
     "publisher": "Puirkle",
     "copyright": "Copyright © 2026 ResinCore by Puirkle",
     "category": "Game",
+    "fileAssociations": [
+      { "ext": ["rctheme"], "name": "ResinCraft theme", "description": "ResinCraft Launcher theme", "role": "Viewer", "mimeType": "application/json" },
+      { "ext": ["resincraft"], "name": "ResinCraft backup", "description": "ResinCraft Launcher backup", "role": "Editor" }
+    ],
     "shortDescription": "A modern Minecraft: Java Edition launcher",
     "longDescription": "ResinCraft Launcher by Puirkle: separate instances for every Minecraft version and modpack, mods from Modrinth, CurseForge, FTB, ATLauncher and Technic, and Java handled for you.",
     "icon": [

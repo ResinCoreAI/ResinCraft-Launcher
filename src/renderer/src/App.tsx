@@ -3,6 +3,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
 import DropImport from './components/DropImport'
+import OpenFiles from './components/OpenFiles'
 import WindowControls from './components/WindowControls'
 import { UpdateBanner, UpdateTitleButton } from './components/Updates'
 import { useRemoteActions } from './components/RemoteControl'
@@ -196,6 +197,7 @@ export default function App() {
       <RelayWatcher />
       <ContextMenuHost />
       <DropImport />
+      <OpenFiles />
       {isTauri ? (
         <WindowControls />
       ) : (

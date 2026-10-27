@@ -215,6 +215,18 @@ pub async fn set(patch: Value) -> Result<Settings> {
     Ok(s)
 }
 
+/// Settings → Reset settings: every setting back to its default. The player's own themes stay (they're things they
+/// made, not settings), and so do the hidden service-key overrides, which the UI never shows.
+pub async fn reset() -> Result<Settings> {
+    let old = get().await;
+    let s = Settings { custom_themes: old.custom_themes, ms_client_id: old.ms_client_id, curseforge_key: old.curseforge_key, ..Settings::default() };
+    write_json(&paths::settings_file(), &s).await?;
+    *CACHE.lock().unwrap() = Some(s.clone());
+    crate::tray::sync(s.tray);
+    crate::remote::sync(s.remote_control);
+    Ok(s)
+}
+
 #[cfg(test)]
 mod defaults_tests {
     use super::*;

@@ -26,10 +26,12 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       themeImage: fn('app:themeImage'),
       gameTexture: fn('app:gameTexture'),
       exportTheme: fn('app:exportTheme'),
+      pendingOpen: fn('app:pendingOpen'),
+      readThemeFile: fn('app:readThemeFile'),
       showItem: fn('app:showItem'),
       pathForFile
     },
-    settings: { get: fn('settings:get'), set: fn('settings:set') },
+    settings: { get: fn('settings:get'), set: fn('settings:set'), reset: fn('settings:reset') },
     storage: {
       info: fn('storage:info'),
       drives: fn('storage:drives'),
@@ -259,6 +261,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), openFile: on('openFile') }
   } as ResinApi
 }

@@ -3,7 +3,7 @@
 // panel style and ambient effect are attributes styles.css and ThemeAmbient.tsx read.
 import type { CustomTheme, Settings } from '@shared/types'
 import { api } from './api'
-import { effectiveTheme } from './themes'
+import { activeSeason, effectiveTheme } from './themes'
 
 /** Fonts a theme can use: the launcher's own (bundled), or ones every PC has. */
 export const FONTS: { id: string; label: string; stack: string }[] = [
@@ -349,4 +349,26 @@ export function readThemeFile(text: string): { theme: CustomTheme; picture?: str
     },
     picture
   }
+}
+/** A .rctheme file's text as a theme of the player's own, its picture saved; throws on a file that isn't one. */
+export async function importThemeText(text: string): Promise<CustomTheme> {
+  const { theme, picture } = readThemeFile(text)
+  if (picture) {
+    await api.app.saveThemeImage(theme.id, picture)
+    theme.imageFile = true
+  }
+  return theme
+}
+
+/** The settings change that adds (or replaces) a theme and puts it on, keeping it through a holiday's theme. */
+export function addThemePatch(s: Settings, th: CustomTheme): Partial<Settings> {
+  const mine = s.customThemes ?? []
+  const list = mine.some((c) => c.id === th.id) ? mine.map((c) => (c.id === th.id ? th : c)) : [...mine, th]
+  const season = activeSeason()
+  return { customThemes: list, theme: `custom:${th.id}`, ...(season ? { seasonOff: season.key } : {}) }
+}
+
+/** Whether an error from importing means the file just isn't a theme. */
+export function notATheme(e: unknown): boolean {
+  return e instanceof SyntaxError || (e as Error)?.message === 'not a theme'
 }

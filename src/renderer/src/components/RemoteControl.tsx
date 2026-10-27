@@ -99,11 +99,25 @@ function useRemoteStatus() {
   return status
 }
 
-/** Servers page header: opens the web console while remote control is on. */
+/** The web console signs in with a Microsoft account that owns Minecraft: without one there's nothing to open. */
+function useHasMicrosoft() {
+  const { accounts } = useStore()
+  return accounts.some((a) => a.type === 'msa')
+}
+
+/** Servers page header: opens the web console while remote control is on (or asks for a Microsoft sign-in first). */
 export function WebConsoleButton() {
-  const { settings } = useStore()
+  const { settings, go } = useStore()
   const status = useRemoteStatus()
-  if (!settings?.remoteControl || !status?.url) return null
+  const microsoft = useHasMicrosoft()
+  if (!settings?.remoteControl) return null
+  if (!microsoft || status?.state === 'noAccount')
+    return (
+      <button data-pc-only className="btn lg" title={t('settings.remote.state.noAccount')} onClick={() => go({ page: 'accounts' })}>
+        <Globe /> {t('servers.web.signIn')}
+      </button>
+    )
+  if (!status?.url) return null
   return (
     <button data-pc-only className="btn lg" title={t('settings.remote.open')} onClick={() => void api.app.openExternal(status.url!)}>
       <Globe /> {t('servers.web.open')} <ExternalLink size={13} />
@@ -117,6 +131,7 @@ const TIP_KEY = 'resincraft.tip.webConsole'
 export function WebConsoleTip() {
   const { settings, go } = useStore()
   const status = useRemoteStatus()
+  const microsoft = useHasMicrosoft()
   const [hidden, setHidden] = useState(() => {
     try {
       return localStorage.getItem(TIP_KEY) === 'hidden'
@@ -144,11 +159,17 @@ export function WebConsoleTip() {
       <Smartphone className="sv-web-tip-icon" />
       <div className="grow">
         <b>{t('servers.web.tipTitle')}</b>
-        <p className="hint">{t('servers.web.tipBody')}</p>
+        <p className="hint">{t(microsoft ? 'servers.web.tipBody' : 'servers.web.tipNoAccount')}</p>
       </div>
-      <button className="btn sm primary" onClick={turnOn}>
-        {t('servers.web.tipTurnOn')}
-      </button>
+      {microsoft ? (
+        <button className="btn sm primary" onClick={turnOn}>
+          {t('servers.web.tipTurnOn')}
+        </button>
+      ) : (
+        <button className="btn sm primary" onClick={() => go({ page: 'accounts' })}>
+          {t('servers.web.tipSignIn')}
+        </button>
+      )}
       <button className="btn sm ghost icon-only" title={t('servers.web.tipDismiss')} aria-label={t('servers.web.tipDismiss')} onClick={dismiss}>
         <X />
       </button>

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Download, FolderOpen, Loader2, Upload } from 'lucide-react'
 import type { BackupInfo } from '@shared/types'
 import { api } from '../api'
+import { onBackupOpen } from '../openRequests'
 import { useStore } from '../store'
 import { t } from '../i18n'
 import { size as bytes } from './Storage'
@@ -46,6 +47,16 @@ export function BackupSection() {
       failed(e)
     }
   }
+
+  // A .resincraft file double-clicked in Windows: straight to its restore window, which asks before anything.
+  useEffect(
+    () =>
+      onBackupOpen((path) => {
+        document.getElementById('backup')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        void api.backup.inspect(path).then(setOpening, failed)
+      }),
+    []
+  )
 
   return (
     <section className="settings-section" id="backup">

@@ -42,6 +42,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "app:themeImage" => json(theme_image(&args.get::<String>(0)?).await),
+        // A file Windows asked ResinCraft to open at start (once), and a theme file's text (openfile.rs).
+        "app:pendingOpen" => json(crate::openfile::take()),
+        "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
         // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.
         "app:exportTheme" => json(export_theme(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         // A few textures for the holiday decorations, from the player's own Minecraft (never shipped with ResinCraft).
@@ -50,6 +53,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "settings:get" => json(settings::redacted(settings::get().await)),
         "settings:set" => {
             let s = settings::set(args.raw(0)).await?;
+            crate::discord::refresh().await;
+            json(settings::redacted(s))
+        }
+
+        "settings:reset" => {
+            let s = settings::reset().await?;
             crate::discord::refresh().await;
             json(settings::redacted(s))
         }

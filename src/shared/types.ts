@@ -1521,10 +1521,16 @@ export interface ResinApi {
     gameTexture(name: string): Promise<string | null>
     /** Asks where to save a theme file (`<name>.rctheme`) and writes `contents`; the path, or null if cancelled. */
     exportTheme(name: string, contents: string): Promise<string | null>
+    /** The file ResinCraft was started with (double-clicked in Windows), once; null if none. */
+    pendingOpen(): Promise<string | null>
+    /** A .rctheme file's text. */
+    readThemeFile(path: string): Promise<string>
   }
   settings: {
     get(): Promise<Settings>
     set(patch: Partial<Settings>): Promise<Settings>
+    /** Every setting back to its default; the player's own themes stay. */
+    reset(): Promise<Settings>
   }
   /** Where instances and game files are kept, and moving them (Settings → Storage). */
   storage: {
@@ -1929,5 +1935,7 @@ export interface ResinApi {
     remote(cb: (s: RemoteStatus) => void): () => void
     /** The web console changed something (started a server, made one…). */
     remoteAction(cb: (e: { method: string; serverId?: string }) => void): () => void
+    /** Windows asked the running ResinCraft to open a file (a theme, backup or modpack double-clicked). */
+    openFile(cb: (e: { path: string }) => void): () => void
   }
 }
