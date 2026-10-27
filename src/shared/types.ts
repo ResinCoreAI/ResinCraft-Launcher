@@ -1157,6 +1157,122 @@ export interface DomainInfo {
 }
 
 /** Whether ResinCraft Relay accepts the domain as the player's, the way Vercel verifies domains. */
+/** What a server-list listing shows (relay protocol 8). */
+export interface ListingInfo {
+  /** 1–48 characters. */
+  title: string
+  description: string
+  /** Category ids plus up to 5 custom tags. */
+  tags: string[]
+  /** '' or na, sa, eu, asia, oceania, africa, me. */
+  region: string
+  /** '' or a language code ("en", "th", "pt-BR"). */
+  language: string
+  version: string
+  edition: 'java' | 'bedrock'
+  modded: boolean
+  /** Bedrock players can join a Java server too (Geyser); for a hosted server, the engine fills it in. */
+  crossplay?: boolean
+  /** Offline profiles can join (online-mode=false); for a hosted server, the engine fills it in. */
+  offline?: boolean
+  /** Where Bedrock players join when it isn't the address (Geyser's port). */
+  bedrock_address?: string
+  website?: string
+  discord?: string
+}
+
+export type ListingState = 'listed' | 'pending' | 'rejected' | 'hidden' | 'off' | 'unknown'
+
+export interface ListingStatus {
+  /** "rc-<name>" for ResinCraft servers, "s-<id>" for submitted ones. */
+  id: string
+  state: ListingState
+  /** The relay's words (why rejected or hidden). */
+  message?: string
+}
+
+/** A hosted server's listing, for its Settings tab. */
+export interface ServerListing {
+  /** It has a ResinCraft Relay address (was online through the relay once). */
+  available: boolean
+  enabled: boolean
+  info: ListingInfo
+  status?: ListingStatus
+  /** The relay has no server list yet. */
+  unsupported: boolean
+  error?: EngineText
+  categories: string[]
+}
+
+/** One server in Discover → Servers. */
+export interface ListedServer {
+  id: string
+  title: string
+  description: string
+  tags: string[]
+  region: string
+  language: string
+  version: string
+  edition: 'java' | 'bedrock'
+  modded: boolean
+  address: string
+  /** Hosted through ResinCraft Relay. */
+  resincraft: boolean
+  online: boolean
+  players: number
+  max_players: number
+  motd?: string | null
+  /** data: URL. */
+  icon?: string | null
+  likes: number
+  /** This launcher's player liked it. */
+  liked?: boolean
+  /** Takes whitelist requests from the launcher. */
+  join_requests: boolean
+  /** Bedrock players can join (Geyser). */
+  crossplay?: boolean
+  /** Offline profiles can join. */
+  offline?: boolean
+  bedrock_address?: string | null
+  website?: string | null
+  discord?: string | null
+  listed_at: number
+  last_seen?: number | null
+}
+
+export interface ServerListPage {
+  total: number
+  page: number
+  servers: ListedServer[]
+}
+
+export interface ServerListQuery {
+  q?: string
+  tags?: string[]
+  edition?: 'java' | 'bedrock'
+  version?: string
+  region?: string
+  lang?: string
+  modded?: boolean
+  online?: boolean
+  /** Bedrock players can join. */
+  crossplay?: boolean
+  /** Offline profiles can join. */
+  offline?: boolean
+  sort?: 'best' | 'players' | 'likes' | 'new'
+  page?: number
+}
+
+export interface MyListing {
+  status: ListingStatus
+  address: string
+  info: ListingInfo
+  likes: number
+  resincraft: boolean
+}
+
+export type AskJoinOutcome = 'received' | 'alreadyListed' | 'alreadyRequested' | 'closed' | 'invalid' | 'banned' | 'unknown'
+
 export interface DomainOwnership {
   /** The relay verifies domains (older relays just follow the CNAME). */
   supported: boolean
@@ -1861,6 +1977,18 @@ export interface ResinApi {
     /** Settings → Anti-cheat: Grim, for plugin servers. */
     antiCheat(id: string): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>
     setAntiCheat(id: string, on: boolean): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>
+    /** Settings → Server list: this server in the public list (off by default). */
+    listing(id: string): Promise<ServerListing>
+    setListing(id: string, req: { enabled: boolean; info: ListingInfo }): Promise<ServerListing>
+    /** Discover → Servers. */
+    browseList(query: ServerListQuery): Promise<ServerListPage>
+    submitListing(req: { address: string; info: ListingInfo }): Promise<ListingStatus>
+    myListings(): Promise<MyListing[]>
+    removeListing(id: string): Promise<ListingStatus>
+    likeListing(id: string, on: boolean): Promise<{ likes: number; liked: boolean }>
+    reportListing(id: string, reason: string): Promise<void>
+    /** A whitelist request to a ResinCraft server, signed with the active Microsoft account. */
+    askToJoin(id: string): Promise<AskJoinOutcome>
     // The add-on calls take an optional last `area` for hybrid servers (Arclight): 'plugins' (default) or 'mods'.
     addonSources(id: string, area?: AddonArea): Promise<AddonSource[]>
     addons(id: string, area?: AddonArea): Promise<ServerAddon[]>

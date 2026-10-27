@@ -18,6 +18,7 @@ import {
   Package,
   Repeat,
   Search,
+  Server,
   Sparkles,
   SquareCheck,
   Star,
@@ -44,6 +45,10 @@ import { compact, describe, timeAgo } from '../util'
 import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
 import { PackBuilderBanner } from '../components/OwnPack'
 import { ProjectPage } from '../components/ProjectPage'
+import { ServerList } from '../components/ServerList'
+
+/** Which half of Discover was open last (this session). */
+const VIEW_KEY = 'resin.discoverView'
 
 const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.ReactNode }[] = [
   { value: 'modpack', labelKey: 'discover.kind.modpack', searchKey: 'discover.search.modpack', icon: <Package size={15} /> },
@@ -203,6 +208,23 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   })
   // Discover opens on modpacks; opened for an instance (adding to it), on mods, since packs can't go into one.
   const [kind, setKind] = useState<ContentKind>(initialKind ?? (target && !modpackOnly(source) ? 'mod' : 'modpack'))
+  // Content (mods, packs…) or the server list; opened for an instance or a kind, always content.
+  const [view, setViewState] = useState<'content' | 'servers'>(() => {
+    if (target || initialKind) return 'content'
+    try {
+      return sessionStorage.getItem(VIEW_KEY) === 'servers' ? 'servers' : 'content'
+    } catch {
+      return 'content'
+    }
+  })
+  const setView = (v: 'content' | 'servers') => {
+    setViewState(v)
+    try {
+      sessionStorage.setItem(VIEW_KEY, v)
+    } catch {
+      /* private storage: just this visit */
+    }
+  }
   const sourceInfo =
     source === 'all'
       ? { value: 'all' as const, label: t('discover.allSites'), color: 'var(--accent)', kinds: ALL_KINDS }
@@ -574,10 +596,22 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         <div className="page-head">
           <div>
             <h1>{t('discover.title')}</h1>
-            <p>{t('discover.subtitle')}</p>
+            <p>{t(view === 'servers' ? 'servers.list.subtitle' : 'discover.subtitle')}</p>
           </div>
+          {!target && (
+            <Segmented<'content' | 'servers'>
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'content', label: <><Package /> {t('servers.list.tab.content')}</> },
+                { value: 'servers', label: <><Server /> {t('servers.list.tab.servers')}</> }
+              ]}
+            />
+          )}
         </div>
       )}
+
+      {!top && view === 'servers' && <ServerList />}
 
       {target?.ownPack && build ? (
         <PackBuilderBanner inst={{ ...target, ownPack: target.ownPack }} refresh={installed} />
@@ -616,7 +650,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         />
       )}
 
-      {!top && (
+      {!top && view === 'content' && (
         <>
           <div className="toolbar">
             <Segmented<Site>

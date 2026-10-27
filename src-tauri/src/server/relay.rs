@@ -56,7 +56,7 @@ fn not_configured() -> anyhow::Error {
     err_tr!("hostRelay.notConfigured", "This build of ResinCraft Launcher doesn't include ResinCraft Relay.")
 }
 
-fn needs_microsoft() -> anyhow::Error {
+pub(crate) fn needs_microsoft() -> anyhow::Error {
     err_tr!(
         "hostRelay.needsMicrosoft",
         "ResinCraft Relay needs a Microsoft account that owns Minecraft. Sign in with Microsoft in Accounts (offline profiles can't use it)."
@@ -165,6 +165,11 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ErrorCode::ServiceOff => err_tr!("hostRelay.off", "ResinCraft Relay is switched off by its admin: {message}", message = admin_message(e)),
         ErrorCode::SessionEnded => err_tr!("hostRelay.sessionEnded", "The ResinCraft Relay session ended."),
         ErrorCode::DomainInvalid => err_tr!("hostRelay.domainInvalid", "ResinCraft Relay can't take this domain: {error}", error = admin_message(e)),
+        ErrorCode::ListingInvalid => err_tr!("hostRelay.listingInvalid", "The server list can't take this: {error}", error = admin_message(e)),
+        ErrorCode::ListingLimit => err_tr!(
+            "hostRelay.listingLimit",
+            "You've already submitted as many servers as the list allows. Remove one first."
+        ),
         ErrorCode::BedrockUnavailable => err_tr!(
             "hostRelay.noBedrock",
             "ResinCraft Relay can't carry Bedrock servers right now (it has no free Bedrock ports, or hasn't been updated for them yet)."
@@ -305,6 +310,12 @@ pub(crate) async fn connect_for_remote(account: &MicrosoftAccount) -> Result<Con
         Failure::Relay(e) => e,
         Failure::Account(e) => AgentError::Refused(ErrorCode::AuthFailed, e.to_string()),
     })
+}
+
+/// Connects and signs in as `account` for the server list (listing.rs); errors are worded for players.
+pub(crate) async fn connect_for_list(account: &MicrosoftAccount) -> Result<Connection> {
+    let Some(s) = settings() else { return Err(describe(&AgentError::Config("no relay in this build".into()), "")) };
+    connect(&s, account).await.map_err(|f| f.into_error(""))
 }
 
 /// A name for a server that has none yet: from its name, with a short suffix when that's taken.
@@ -681,7 +692,7 @@ fn normalize(name: &str) -> String {
     name.trim().to_ascii_lowercase()
 }
 
-fn as_text(e: &anyhow::Error) -> Text {
+pub(crate) fn as_text(e: &anyhow::Error) -> Text {
     text_of(e).cloned().unwrap_or_else(|| Text::plain(e.to_string()))
 }
 

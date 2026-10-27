@@ -1,0 +1,746 @@
+// Discover → Servers: the public server list on ResinCraft Relay (relay protocol 8). Servers hosted through the relay
+// whose owner listed them, plus servers players submitted (the relay's admin approves those). Players filter, like,
+// report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Copy, ExternalLink, Flag, Heart, Loader2, MessageCircle, Plus, Search, Server, Smartphone, Trash2, UserPlus, UserRound, Users, Zap } from 'lucide-react'
+import type { AskJoinOutcome, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListQuery } from '@shared/types'
+import { api } from '../api'
+import { useStore } from '../store'
+import { currentLanguage, t, tx, type Key } from '../i18n'
+import { Empty, Modal, MoreButton, Switch, useCopy } from './ui'
+import '../serverlist.css'
+
+export const CATEGORIES = ['smp', 'survival', 'pvp', 'minigames', 'creative', 'modded', 'skyblock', 'anarchy', 'roleplay', 'economy', 'factions', 'prison', 'parkour', 'hardcore', 'vanilla', 'towny', 'lifesteal', 'bedwars']
+export const REGIONS = ['na', 'sa', 'eu', 'asia', 'oceania', 'africa', 'me']
+export const LANGUAGES = ['en', 'th', 'es', 'pt-BR', 'de', 'fr', 'it', 'pl', 'ru', 'tr', 'ja', 'ko', 'zh-CN', 'zh-TW', 'id', 'vi']
+const MAX_CUSTOM = 5
+
+export const tagLabel = (tag: string) => (CATEGORIES.includes(tag) ? t(`servers.list.cat.${tag}` as Key) : tag)
+export const regionLabel = (r: string) => t(`servers.list.region.${r}` as Key)
+export function languageLabel(code: string): string {
+  try {
+    return new Intl.DisplayNames([currentLanguage()], { type: 'language' }).of(code) ?? code
+  } catch {
+    return code
+  }
+}
+
+/** A custom tag as the relay takes it: 1–24 of a-z, 0-9, space and dash. */
+const cleanTag = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 24)
+
+export const stateChip: Record<ListingState, string> = {
+  listed: 'success',
+  pending: 'warn',
+  rejected: 'danger',
+  hidden: 'danger',
+  off: '',
+  unknown: ''
+}
+
+/** The fields a listing is made of, for a hosted server's Settings and the Submit form. */
+export function ListingFields({ info, onChange, showEdition }: { info: ListingInfo; onChange: (i: ListingInfo) => void; showEdition?: boolean }) {
+  const [custom, setCustom] = useState('')
+  const set = (patch: Partial<ListingInfo>) => onChange({ ...info, ...patch })
+  const customTags = info.tags.filter((x) => !CATEGORIES.includes(x))
+  const toggle = (tag: string) => set({ tags: info.tags.includes(tag) ? info.tags.filter((x) => x !== tag) : [...info.tags, tag] })
+  const addCustom = () => {
+    const tag = cleanTag(custom)
+    if (!tag || info.tags.includes(tag) || customTags.length >= MAX_CUSTOM) return setCustom('')
+    set({ tags: [...info.tags, tag] })
+    setCustom('')
+  }
+  return (
+    <div className="listing-fields">
+      <label className="field">
+        <span>{t('servers.list.field.title')}</span>
+        <input className="input" maxLength={48} value={info.title} onChange={(e) => set({ title: e.target.value })} />
+      </label>
+      <label className="field">
+        <span>
+          {t('servers.list.field.description')} <em className="hint">{info.description.length}/1000</em>
+        </span>
+        <textarea
+          className="input"
+          rows={4}
+          maxLength={1000}
+          value={info.description}
+          placeholder={t('servers.list.field.descriptionHint')}
+          onChange={(e) => set({ description: e.target.value })}
+        />
+      </label>
+      <div className="field">
+        <span>{t('servers.list.field.tags')}</span>
+        <div className="tag-picker" role="group" aria-label={t('servers.list.field.tags')}>
+          {CATEGORIES.map((c) => (
+            <button key={c} type="button" className={`tag-toggle ${info.tags.includes(c) ? 'on' : ''}`} aria-pressed={info.tags.includes(c)} onClick={() => toggle(c)}>
+              {tagLabel(c)}
+            </button>
+          ))}
+          {customTags.map((c) => (
+            <button key={c} type="button" className="tag-toggle on custom" title={t('servers.list.field.removeTag')} onClick={() => toggle(c)}>
+              #{c} ×
+            </button>
+          ))}
+        </div>
+        {customTags.length < MAX_CUSTOM && (
+          <div className="row">
+            <input
+              className="input"
+              value={custom}
+              maxLength={24}
+              placeholder={t('servers.list.field.customTag', { count: MAX_CUSTOM - customTags.length })}
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustom())}
+            />
+            <button type="button" className="btn sm" disabled={!cleanTag(custom)} onClick={addCustom}>
+              <Plus /> {t('servers.list.field.addTag')}
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="field-row">
+        <label className="field">
+          <span>{t('servers.list.field.region')}</span>
+          <select className="select" value={info.region} onChange={(e) => set({ region: e.target.value })}>
+            <option value="">{t('servers.list.any')}</option>
+            {REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {regionLabel(r)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>{t('servers.list.field.language')}</span>
+          <select className="select" value={info.language} onChange={(e) => set({ language: e.target.value })}>
+            <option value="">{t('servers.list.any')}</option>
+            {LANGUAGES.map((l) => (
+              <option key={l} value={l}>
+                {languageLabel(l)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {showEdition && (
+          <label className="field">
+            <span>{t('servers.list.field.edition')}</span>
+            <select className="select" value={info.edition} onChange={(e) => set({ edition: e.target.value as ListingInfo['edition'] })}>
+              <option value="java">Java</option>
+              <option value="bedrock">Bedrock</option>
+            </select>
+          </label>
+        )}
+        {showEdition && (
+          <label className="field">
+            <span>{t('servers.list.field.version')}</span>
+            <input className="input" value={info.version} placeholder="1.21.1" onChange={(e) => set({ version: e.target.value.trim() })} />
+          </label>
+        )}
+      </div>
+      {showEdition && (
+        <div className="setting">
+          <div className="text">
+            <b>{t('servers.list.field.modded')}</b>
+          </div>
+          <Switch on={info.modded} onChange={(v) => set({ modded: v })} label={t('servers.list.field.modded')} />
+        </div>
+      )}
+      {showEdition && info.edition === 'java' && (
+        <div className="setting">
+          <div className="text">
+            <b>{t('servers.list.field.crossplay')}</b>
+            <span>{t('servers.list.crossplayHint')}</span>
+          </div>
+          <Switch on={!!info.crossplay} onChange={(v) => set({ crossplay: v, bedrock_address: v ? info.bedrock_address : undefined })} label={t('servers.list.field.crossplay')} />
+        </div>
+      )}
+      {showEdition && info.edition === 'java' && info.crossplay && (
+        <label className="field">
+          <span>{t('servers.list.field.bedrockAddress')}</span>
+          <input
+            className="input"
+            value={info.bedrock_address ?? ''}
+            placeholder="play.example.com:19132"
+            spellCheck={false}
+            onChange={(e) => set({ bedrock_address: e.target.value.trim() || undefined })}
+          />
+        </label>
+      )}
+      {showEdition && (
+        <div className="setting">
+          <div className="text">
+            <b>{t('servers.list.field.offline')}</b>
+            <span>{t('servers.list.offlineHint')}</span>
+          </div>
+          <Switch on={!!info.offline} onChange={(v) => set({ offline: v })} label={t('servers.list.field.offline')} />
+        </div>
+      )}
+      {!showEdition && (
+        <p className="hint listing-facts">
+          {info.edition === 'bedrock' || info.crossplay ? <><Smartphone /> {t('servers.list.bedrockCanJoin')}</> : t('servers.list.javaOnly')}
+          {' · '}
+          {info.offline ? <><UserRound /> {t('servers.list.offlineOk')}</> : t('servers.list.accountNeeded')}
+          {' · '}
+          {t('servers.list.factsHint')}
+        </p>
+      )}
+      <div className="field-row">
+        <label className="field">
+          <span>{t('servers.list.field.website')}</span>
+          <input className="input" value={info.website ?? ''} placeholder="https://" spellCheck={false} onChange={(e) => set({ website: e.target.value.trim() || undefined })} />
+        </label>
+        <label className="field">
+          <span>{t('servers.list.field.discord')}</span>
+          <input
+            className="input"
+            value={info.discord ?? ''}
+            placeholder="https://discord.gg/…"
+            spellCheck={false}
+            onChange={(e) => set({ discord: e.target.value.trim() || undefined })}
+          />
+        </label>
+      </div>
+    </div>
+  )
+}
+
+const SORTS = ['best', 'players', 'likes', 'new'] as const
+
+export function ServerList() {
+  const { toast } = useStore()
+  const [q, setQ] = useState('')
+  const [debounced, setDebounced] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const [sort, setSort] = useState<(typeof SORTS)[number]>('best')
+  const [edition, setEdition] = useState<'' | 'java' | 'bedrock'>('')
+  const [region, setRegion] = useState('')
+  const [lang, setLang] = useState('')
+  const [modded, setModded] = useState<'' | 'yes' | 'no'>('')
+  const [online, setOnline] = useState(false)
+  const [offline, setOffline] = useState(false)
+  const [servers, setServers] = useState<ListedServer[]>()
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(0)
+  const [error, setError] = useState<string>()
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [showMine, setShowMine] = useState(false)
+  const [reporting, setReporting] = useState<ListedServer>()
+  const seq = useRef(0)
+
+  useEffect(() => {
+    const h = setTimeout(() => setDebounced(q), 300)
+    return () => clearTimeout(h)
+  }, [q])
+
+  const query = useMemo<ServerListQuery>(
+    () => ({
+      q: debounced || undefined,
+      tags: tags.length ? tags : undefined,
+      sort,
+      // 'bedrock' means Bedrock players can join: Bedrock servers, and Java ones with Geyser.
+      edition: edition === 'java' ? 'java' : undefined,
+      crossplay: edition === 'bedrock' || undefined,
+      offline: offline || undefined,
+      region: region || undefined,
+      lang: lang || undefined,
+      modded: modded === '' ? undefined : modded === 'yes',
+      online: online || undefined
+    }),
+    [debounced, tags, sort, edition, region, lang, modded, online, offline]
+  )
+
+  const load = async (p: number) => {
+    const my = ++seq.current
+    if (p === 0) setServers(undefined)
+    else setLoadingMore(true)
+    try {
+      const r = await api.server.browseList({ ...query, page: p })
+      if (my !== seq.current) return
+      setError(undefined)
+      setTotal(r.total)
+      setPage(p)
+      setServers((old) => (p === 0 ? r.servers : [...(old ?? []), ...r.servers]))
+    } catch (e) {
+      if (my === seq.current) {
+        setError((e as Error).message)
+        setServers([])
+      }
+    } finally {
+      if (my === seq.current) setLoadingMore(false)
+    }
+  }
+  useEffect(() => void load(0), [query]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleTag = (tag: string) => setTags((ts) => (ts.includes(tag) ? ts.filter((x) => x !== tag) : [...ts, tag]))
+  const replace = (s: ListedServer) => setServers((list) => list?.map((x) => (x.id === s.id ? s : x)))
+
+  const like = async (s: ListedServer) => {
+    const on = !s.liked
+    replace({ ...s, liked: on, likes: s.likes + (on ? 1 : -1) })
+    try {
+      const r = await api.server.likeListing(s.id, on)
+      replace({ ...s, liked: r.liked, likes: r.likes })
+    } catch (e) {
+      replace(s)
+      toast((e as Error).message, 'error')
+    }
+  }
+
+  return (
+    <div className="server-list">
+      <div className="toolbar">
+        <div className="search">
+          <Search />
+          <input className="input" placeholder={t('servers.list.search')} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+        </div>
+        <select className="select" value={sort} aria-label={t('servers.list.sort')} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          {SORTS.map((s) => (
+            <option key={s} value={s}>
+              {t(`servers.list.sort.${s}` as Key)}
+            </option>
+          ))}
+        </select>
+        <span className="grow" />
+        <button className="btn sm" onClick={() => setShowMine(true)}>
+          {t('servers.list.mine')}
+        </button>
+        <button className="btn sm primary" onClick={() => setSubmitting(true)}>
+          <Plus /> {t('servers.list.submit')}
+        </button>
+      </div>
+      <div className="toolbar wrap">
+        <select className="select" value={edition} aria-label={t('servers.list.field.edition')} onChange={(e) => setEdition(e.target.value as typeof edition)}>
+          <option value="">{t('servers.list.allEditions')}</option>
+          <option value="java">Java</option>
+          <option value="bedrock">{t('servers.list.bedrockCanJoin')}</option>
+        </select>
+        <select className="select" value={region} aria-label={t('servers.list.field.region')} onChange={(e) => setRegion(e.target.value)}>
+          <option value="">{t('servers.list.allRegions')}</option>
+          {REGIONS.map((r) => (
+            <option key={r} value={r}>
+              {regionLabel(r)}
+            </option>
+          ))}
+        </select>
+        <select className="select" value={lang} aria-label={t('servers.list.field.language')} onChange={(e) => setLang(e.target.value)}>
+          <option value="">{t('servers.list.allLanguages')}</option>
+          {LANGUAGES.map((l) => (
+            <option key={l} value={l}>
+              {languageLabel(l)}
+            </option>
+          ))}
+        </select>
+        <select className="select" value={modded} aria-label={t('servers.list.field.modded')} onChange={(e) => setModded(e.target.value as typeof modded)}>
+          <option value="">{t('servers.list.moddedAny')}</option>
+          <option value="no">{t('servers.list.moddedNo')}</option>
+          <option value="yes">{t('servers.list.moddedYes')}</option>
+        </select>
+        <label className="inline-switch">
+          <Switch on={online} onChange={setOnline} label={t('servers.list.onlineOnly')} />
+          {t('servers.list.onlineOnly')}
+        </label>
+        <label className="inline-switch">
+          <Switch on={offline} onChange={setOffline} label={t('servers.list.offlineOk')} />
+          {t('servers.list.offlineOk')}
+        </label>
+      </div>
+      <div className="tag-picker filters" role="group" aria-label={t('servers.list.field.tags')}>
+        {CATEGORIES.map((c) => (
+          <button key={c} className={`tag-toggle ${tags.includes(c) ? 'on' : ''}`} aria-pressed={tags.includes(c)} onClick={() => toggleTag(c)}>
+            {tagLabel(c)}
+          </button>
+        ))}
+        {tags
+          .filter((x) => !CATEGORIES.includes(x))
+          .map((c) => (
+            <button key={c} className="tag-toggle on custom" onClick={() => toggleTag(c)}>
+              #{c} ×
+            </button>
+          ))}
+      </div>
+
+      {servers === undefined ? (
+        <div className="server-grid">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="card server-card skeleton" aria-hidden />
+          ))}
+        </div>
+      ) : error ? (
+        <Empty icon={<Server />} title={t('servers.list.unavailable')}>
+          {error}
+        </Empty>
+      ) : servers.length === 0 ? (
+        <Empty icon={<Server />} title={t('servers.list.empty')}>
+          {t('servers.list.emptyHint')}
+        </Empty>
+      ) : (
+        <>
+          <div className="server-grid">
+            {servers.map((s) => (
+              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} />
+            ))}
+          </div>
+          {servers.length < total && (
+            <div className="load-more">
+              <button className="btn" disabled={loadingMore} onClick={() => void load(page + 1)}>
+                {loadingMore && <Loader2 className="spin" />} {t('servers.list.more')}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      <p className="hint list-note">{t('servers.list.note')}</p>
+
+      {submitting && <SubmitServer onClose={() => setSubmitting(false)} />}
+      {showMine && <MyServers onClose={() => setShowMine(false)} />}
+      {reporting && <ReportServer s={reporting} onClose={() => setReporting(undefined)} />}
+    </div>
+  )
+}
+
+function ServerCard({ s, onLike, onReport, onTag }: { s: ListedServer; onLike: () => void; onReport: () => void; onTag: (tag: string) => void }) {
+  const { join, toast, go, activeAccount } = useStore()
+  const copy = useCopy()
+  const [joining, setJoining] = useState(false)
+  const bedrockOk = s.edition === 'bedrock' || !!s.crossplay
+  // Java servers in online mode turn offline profiles away at the door: say so before trying.
+  const needsAccount = s.edition === 'java' && !s.offline && activeAccount?.type === 'offline'
+  /** Where Bedrock players connect: Geyser's own address, else the server's host on Bedrock's port. */
+  const bedrockAddress = s.edition === 'bedrock' ? s.address : s.bedrock_address || s.address.replace(/:\d+$/, '')
+  const [asking, setAsking] = useState(false)
+  const [asked, setAsked] = useState<AskJoinOutcome>()
+
+  const play = async (edition: 'java' | 'bedrock' = s.edition) => {
+    if (edition === 'java' && needsAccount) {
+      return toast(t('servers.list.needsAccount', { name: s.title }), 'error', { label: t('servers.list.openAccounts'), run: () => go({ page: 'accounts' }) })
+    }
+    setJoining(true)
+    const ok = await join({ address: edition === 'bedrock' ? bedrockAddress : s.address, name: s.title, edition })
+    setJoining(false)
+    if (ok && edition === 'bedrock') toast(t('quickjoin.openedBedrock', { name: s.title }), 'info')
+  }
+  const askToJoin = async () => {
+    setAsking(true)
+    try {
+      const outcome = await api.server.askToJoin(s.id)
+      setAsked(outcome)
+      toast(t(`servers.list.asked.${outcome}` as Key, { name: s.title }), outcome === 'received' || outcome === 'alreadyListed' ? 'success' : 'info')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setAsking(false)
+    }
+  }
+  const addToQuickJoin = async () => {
+    try {
+      const data = await api.quickjoin.get()
+      const key = (a: string) => a.trim().toLowerCase().replace(/:25565$/, '')
+      if (data.entries.some((e) => key(e.address) === key(s.address))) return toast(t('quickjoin.alreadyThere', { address: s.address }), 'info')
+      const entry = {
+        id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+        name: s.title,
+        address: s.address,
+        edition: s.edition,
+        pinned: false,
+        icon: s.icon?.replace(/^data:image\/png;base64,/, '') || undefined,
+        addedAt: Date.now()
+      }
+      await api.quickjoin.save({ ...data, entries: [...data.entries, entry] })
+      toast(t('quickjoin.added', { name: s.title }), 'success', { label: t('quickjoin.open'), run: () => go({ page: 'quickjoin' }) })
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
+  return (
+    <article className="card server-card">
+      <header>
+        {s.icon ? <img className="server-icon" src={s.icon} alt="" /> : <span className="server-icon fallback" aria-hidden><Server /></span>}
+        <div className="grow">
+          <h3 title={s.title}>{s.title}</h3>
+          <div className="server-meta">
+            <span className={`dot ${s.online ? 'on' : ''}`} aria-hidden />
+            {s.online ? (
+              <span>
+                <Users /> {t('servers.list.players', { count: s.players, max: s.max_players })}
+              </span>
+            ) : (
+              <span>{t('servers.list.offline')}</span>
+            )}
+            <span>{s.edition === 'bedrock' ? 'Bedrock' : 'Java'} {s.version}</span>
+            {s.resincraft && <span className="chip accent compact">ResinCraft</span>}
+          </div>
+        </div>
+        <button className={`btn ghost sm like ${s.liked ? 'on' : ''}`} aria-pressed={!!s.liked} title={t(s.liked ? 'servers.list.unlike' : 'servers.list.like')} onClick={onLike}>
+          <Heart /> {s.likes}
+        </button>
+      </header>
+      {s.description && <p className="server-desc">{s.description}</p>}
+      <div className="server-tags">
+        {s.tags.map((tag) => (
+          <button key={tag} className="chip" title={t('servers.list.filterBy', { tag: tagLabel(tag) })} onClick={() => onTag(tag)}>
+            {CATEGORIES.includes(tag) ? tagLabel(tag) : `#${tag}`}
+          </button>
+        ))}
+        {bedrockOk && (
+          <span className="chip success" title={s.edition === 'java' ? t('servers.list.crossplayHint') : undefined}>
+            <Smartphone /> {t('servers.list.bedrockCanJoin')}
+          </span>
+        )}
+        {s.offline && (
+          <span className="chip success" title={t('servers.list.offlineHint')}>
+            <UserRound /> {t('servers.list.offlineOk')}
+          </span>
+        )}
+        {s.region && <span className="chip">{regionLabel(s.region)}</span>}
+        {s.language && <span className="chip">{languageLabel(s.language)}</span>}
+      </div>
+      <footer>
+        <button className="btn ghost sm address" title={t('servers.connect.copy')} onClick={() => void copy(s.address)}>
+          <Copy /> <span>{s.address}</span>
+        </button>
+        <span className="grow" />
+        {s.resincraft && s.join_requests && (
+          <button className="btn sm" disabled={asking || !!asked} title={t('servers.list.askHint')} onClick={() => void askToJoin()}>
+            {asking ? <Loader2 className="spin" /> : <UserPlus />} {t(asked ? 'servers.list.askedShort' : 'servers.list.ask')}
+          </button>
+        )}
+        <button className="btn sm primary" disabled={joining} title={needsAccount ? t('servers.list.needsAccountShort') : undefined} onClick={() => void play()}>
+          {joining ? <Loader2 className="spin" /> : <Zap />} {t('servers.list.join')}
+        </button>
+        <MoreButton
+          items={() => [
+            s.edition === 'java' && !!s.crossplay && { label: t('servers.list.joinBedrock'), icon: <Smartphone />, onSelect: () => void play('bedrock') },
+            { label: t('quickjoin.addToQuickJoin'), icon: <Zap />, onSelect: () => void addToQuickJoin() },
+            { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(s.address) },
+            !!s.website && { label: t('servers.list.website'), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(s.website!) },
+            !!s.discord && { label: t('servers.list.discord'), icon: <MessageCircle />, onSelect: () => void api.app.openExternal(s.discord!) },
+            '-',
+            { label: t('servers.list.report'), icon: <Flag />, danger: true, onSelect: onReport }
+          ]}
+        />
+      </footer>
+    </article>
+  )
+}
+
+const emptyInfo = (): ListingInfo => ({ title: '', description: '', tags: [], region: '', language: '', version: '', edition: 'java', modded: false })
+
+function SubmitServer({ onClose }: { onClose: () => void }) {
+  const { toast } = useStore()
+  const [address, setAddress] = useState('')
+  const [info, setInfo] = useState<ListingInfo>(emptyInfo)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const ok = address.trim() && info.title.trim()
+  const submit = async () => {
+    setBusy(true)
+    setError(undefined)
+    try {
+      const st = await api.server.submitListing({ address: address.trim(), info })
+      toast(t(st.state === 'listed' ? 'servers.list.submitted.listed' : 'servers.list.submitted.pending', { name: info.title }), 'success')
+      onClose()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      wide
+      title={t('servers.list.submitTitle')}
+      subtitle={t('servers.list.submitHint')}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary" disabled={!ok || busy} onClick={() => void submit()}>
+            {busy && <Loader2 className="spin" />} {t('servers.list.submitSend')}
+          </button>
+        </>
+      }
+    >
+      <label className="field">
+        <span>{t('servers.list.field.address')}</span>
+        <input className="input" value={address} placeholder="play.example.com" spellCheck={false} autoFocus onChange={(e) => setAddress(e.target.value)} />
+      </label>
+      <ListingFields info={info} onChange={setInfo} showEdition />
+      {error && <p className="hint bad" role="alert">{error}</p>}
+      <p className="hint">{t('servers.list.submitNote')}</p>
+    </Modal>
+  )
+}
+
+function MyServers({ onClose }: { onClose: () => void }) {
+  const { toast } = useStore()
+  const [list, setList] = useState<MyListing[]>()
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    api.server.myListings().then(setList, (e) => setError((e as Error).message))
+  }, [])
+  const remove = async (m: MyListing) => {
+    try {
+      await api.server.removeListing(m.status.id)
+      setList((l) => l?.filter((x) => x.status.id !== m.status.id))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+  return (
+    <Modal title={t('servers.list.mine')} subtitle={t('servers.list.mineHint')} onClose={onClose}>
+      {error ? (
+        <p className="hint bad">{error}</p>
+      ) : !list ? (
+        <Loader2 className="spin" />
+      ) : list.length === 0 ? (
+        <p className="hint">{t('servers.list.mineEmpty')}</p>
+      ) : (
+        <div className="my-listings">
+          {list.map((m) => (
+            <div key={m.status.id} className="setting">
+              <div className="text">
+                <b>
+                  {m.info.title} <span className={`chip compact ${stateChip[m.status.state]}`}>{t(`servers.list.state.${m.status.state}` as Key)}</span>
+                </b>
+                <span>
+                  {m.address} · <Heart className="inline" /> {m.likes}
+                  {m.status.message ? ` · ${m.status.message}` : ''}
+                </span>
+              </div>
+              {!m.resincraft && (
+                <button className="btn ghost icon sm" title={t('servers.list.remove')} aria-label={t('servers.list.remove')} onClick={() => void remove(m)}>
+                  <Trash2 />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function ReportServer({ s, onClose }: { s: ListedServer; onClose: () => void }) {
+  const { toast } = useStore()
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const send = async () => {
+    setBusy(true)
+    try {
+      await api.server.reportListing(s.id, reason)
+      toast(t('servers.list.reported', { name: s.title }), 'success')
+      onClose()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      title={t('servers.list.reportTitle', { name: s.title })}
+      subtitle={t('servers.list.reportHint')}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn danger" disabled={!reason.trim() || busy} onClick={() => void send()}>
+            {busy && <Loader2 className="spin" />} {t('servers.list.report')}
+          </button>
+        </>
+      }
+    >
+      <textarea className="input" rows={4} maxLength={500} autoFocus value={reason} placeholder={t('servers.list.reportPlaceholder')} onChange={(e) => setReason(e.target.value)} />
+    </Modal>
+  )
+}
+
+/** A hosted server's Settings → Server list: off by default; on lists it in Discover → Servers for everyone. */
+export function ServerListSettings({ s }: { s: ServerInfo }) {
+  const { toast } = useStore()
+  const [l, setL] = useState<ServerListing>()
+  const [draft, setDraft] = useState<ListingInfo>()
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let live = true
+    void api.server.listing(s.id).then(
+      (v) => {
+        if (!live) return
+        setL(v)
+        setDraft(v.info)
+      },
+      () => {}
+    )
+    return () => void (live = false)
+  }, [s.id])
+  if (!l || !draft) return null
+  const dirty = JSON.stringify(draft) !== JSON.stringify(l.info)
+  const save = async (enabled: boolean) => {
+    setBusy(true)
+    try {
+      const v = await api.server.setListing(s.id, { enabled, info: draft })
+      setL(v)
+      setDraft(v.info)
+      if (enabled !== l.enabled) toast(t(enabled ? 'servers.list.settings.listedToast' : 'servers.list.settings.offToast', { name: s.name }), 'success')
+      else toast(t('servers.list.settings.saved'), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const state = l.status?.state
+  return (
+    <div className="settings-section">
+      <h3>{t('servers.list.settings.section')}</h3>
+      <div className="card">
+        <div className="setting">
+          <div className="text">
+            <b>
+              {t('servers.list.settings.show')}{' '}
+              {l.enabled && state && <span className={`chip compact ${stateChip[state]}`}>{t(`servers.list.state.${state}` as Key)}</span>}
+            </b>
+            <span>
+              {!l.available
+                ? t('servers.list.settings.needsRelay')
+                : l.unsupported
+                ? t('servers.list.settings.unsupported')
+                : t('servers.list.settings.showHint')}
+            </span>
+            {l.enabled && l.status?.message && <span className="hint">{l.status.message}</span>}
+            {l.error && <span className="hint bad">{tx(l.error)}</span>}
+          </div>
+          {busy ? <Loader2 className="spin" /> : <Switch on={l.enabled} disabled={!l.available || l.unsupported} onChange={(v) => void save(v)} label={t('servers.list.settings.show')} />}
+        </div>
+        {l.available && !l.unsupported && (
+          <div className="setting stack">
+            <ListingFields info={draft} onChange={setDraft} />
+            <div className="row end">
+              {!(s.joinRequests?.enabled && s.joinRequests.web) && <span className="hint grow">{t('servers.list.settings.joinHint')}</span>}
+              {dirty && (
+                <button className="btn sm" disabled={busy} onClick={() => setDraft(l.info)}>
+                  {t('common.cancel')}
+                </button>
+              )}
+              <button className="btn sm primary" disabled={busy || !dirty} onClick={() => void save(l.enabled)}>
+                {t(l.enabled ? 'servers.list.settings.update' : 'servers.list.settings.saveDraft')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

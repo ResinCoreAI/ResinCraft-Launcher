@@ -1,0 +1,422 @@
+//! The public server list on ResinCraft Relay (relay protocol 8): a server's own listing (opted in per server, off
+//! by default), servers hosted elsewhere that the player submits, and what players do in Discover → Servers
+//! (browse, like, report, ask to be whitelisted under their own Minecraft account).
+//!
+//! What a server's listing says is kept here too (`server-list.json`), so the Settings tab shows it even while the
+//! relay can't be reached, and so it can be listed again when the relay forgot it (a renamed or expired name).
+
+use std::collections::{BTreeSet, HashMap};
+use std::time::Duration;
+
+use anyhow::Result;
+use resincraft_relay::agent::Connection;
+use resincraft_relay::proto::{Edition, JoinOutcome, ListingInfo, ListingState, ListingStatus, MyListing, CATEGORIES};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::core::fsutil::{read_json, write_json};
+use crate::core::paths;
+use crate::core::text::Text;
+use crate::core::types::ServerMeta;
+use crate::player::accounts;
+
+use crate::err_tr;
+
+use super::{relay, store};
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Saved {
+    /// Server id → its listing.
+    #[serde(default)]
+    servers: HashMap<String, SavedListing>,
+    /// Listings this launcher's players liked (the public list doesn't say).
+    #[serde(default)]
+    liked: BTreeSet<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedListing {
+    enabled: bool,
+    info: ListingInfo,
+}
+
+fn file() -> std::path::PathBuf {
+    paths::root().join("server-list.json")
+}
+
+async fn load() -> Saved {
+    read_json(&file()).await.unwrap_or_default()
+}
+
+async fn save(s: &Saved) -> Result<()> {
+    write_json(&file(), s).await
+}
+
+/// A server's listing as its Settings tab shows it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerListing {
+    /// The server has a ResinCraft Relay name (it was online through the relay at least once).
+    pub available: bool,
+    pub enabled: bool,
+    pub info: ListingInfo,
+    /// Where the relay has it (None while off, or when the relay couldn't be asked).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<Status>,
+    /// The relay is too old for the list (protocol < 8).
+    pub unsupported: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Text>,
+    /// The fixed categories, for the tag picker.
+    pub categories: &'static [&'static str],
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Status {
+    pub id: String,
+    pub state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+fn status(st: ListingStatus) -> Status {
+    Status {
+        id: st.id,
+        state: match st.state {
+            ListingState::Listed => "listed",
+            ListingState::Pending => "pending",
+            ListingState::Rejected => "rejected",
+            ListingState::Hidden => "hidden",
+            ListingState::Off => "off",
+            ListingState::Unknown => "unknown",
+        },
+        message: st.message,
+    }
+}
+
+/// What a new listing starts with: the server's name, edition, version and whether it runs mods.
+fn defaults(meta: &ServerMeta) -> ListingInfo {
+    ListingInfo {
+        title: meta.name.chars().take(48).collect(),
+        version: meta.mc_version.clone(),
+        edition: if meta.kind.bedrock() { Edition::Bedrock } else { Edition::Java },
+        modded: meta.kind.modded(),
+        tags: if meta.kind.modded() { vec!["modded".into()] } else { vec!["survival".into()] },
+        ..Default::default()
+    }
+}
+
+/// What the server itself says about who can join (players see it in the list, so it's never typed by hand):
+/// Bedrock players through Geyser, and offline profiles when `online-mode=false`.
+async fn with_facts(id: &str, meta: &ServerMeta, mut info: ListingInfo) -> ListingInfo {
+    info.crossplay = !meta.kind.bedrock()
+        && super::plugins::bedrock_status(id).await.ok().and_then(|v| v.get("geyser").and_then(Value::as_bool)) == Some(true);
+    info.offline = match store::dir(id) {
+        Ok(dir) => super::properties::get_value(&dir, "online-mode").await.is_some_and(|v| v.trim() == "false"),
+        Err(_) => false,
+    };
+    // The relay knows Geyser's port on it; an address typed here would only be stale.
+    info.bedrock_address = None;
+    info
+}
+
+/// Signs in as the account the server's name belongs to (`owner`) or the active Microsoft account.
+async fn connect(owner: Option<&str>) -> Result<Connection> {
+    let Some(account) = accounts::microsoft_account(owner).await else { return Err(relay::needs_microsoft()) };
+    relay::connect_for_list(&account).await
+}
+
+fn not_yet() -> anyhow::Error {
+    err_tr!("serverList.notYet", "ResinCraft Relay doesn't have the server list yet.")
+}
+
+fn err_text(e: &anyhow::Error) -> Text {
+    relay::as_text(e)
+}
+
+/// The server's listing, asking the relay where it stands (and listing it again when the relay forgot it).
+pub async fn get(id: &str) -> Result<ServerListing> {
+    let meta = store::get(id).await?;
+    let saved = load().await.servers.get(id).cloned();
+    let enabled = saved.as_ref().is_some_and(|s| s.enabled);
+    let saved_info = saved.map(|s| s.info);
+    let info = with_facts(id, &meta, saved_info.clone().unwrap_or_else(|| defaults(&meta))).await;
+    // Geyser or online-mode changed since it was listed: the list should say so.
+    let changed = saved_info.as_ref().is_some_and(|s| (s.crossplay, s.offline) != (info.crossplay, info.offline));
+    let mut out = ServerListing {
+        available: meta.relay_name.is_some() && relay::settings().is_some(),
+        enabled,
+        info,
+        status: None,
+        unsupported: false,
+        error: None,
+        categories: CATEGORIES,
+    };
+    let (Some(name), true) = (meta.relay_name.clone(), out.available && enabled) else { return Ok(out) };
+    let asked = async {
+        let mut conn = connect(meta.relay_account.as_deref()).await?;
+        if !conn.has_listings() {
+            return Ok(None);
+        }
+        let st = conn.listing_get(&name).await.map_err(|e| relay::describe(&e, &name))?;
+        // Listed here but not there (the name was renamed or expired since), or who can join changed: list it again.
+        if st.state == ListingState::Off || changed {
+            let st = conn.listing_set(&name, Some(out.info.clone())).await.map_err(|e| relay::describe(&e, &name))?;
+            let mut all = load().await;
+            if let Some(s) = all.servers.get_mut(id) {
+                s.info = out.info.clone();
+            }
+            save(&all).await?;
+            return Ok(Some(st));
+        }
+        Ok::<_, anyhow::Error>(Some(st))
+    };
+    match asked.await {
+        Ok(Some(st)) => out.status = Some(status(st)),
+        Ok(None) => out.unsupported = true,
+        Err(e) => out.error = Some(err_text(&e)),
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetListing {
+    pub enabled: bool,
+    pub info: ListingInfo,
+}
+
+/// Saves the server's listing and tells the relay (listing it, updating it, or taking it off).
+pub async fn set(id: &str, req: SetListing) -> Result<ServerListing> {
+    let meta = store::get(id).await?;
+    let mut info = with_facts(id, &meta, req.info).await;
+    info.title = info.title.trim().chars().take(48).collect();
+    info.description = info.description.trim().chars().take(1000).collect();
+    if info.title.is_empty() {
+        info.title = meta.name.chars().take(48).collect();
+    }
+    let mut all = load().await;
+    let was_on = all.servers.get(id).is_some_and(|s| s.enabled);
+    all.servers.insert(id.to_string(), SavedListing { enabled: req.enabled, info: info.clone() });
+    save(&all).await?;
+    let Some(name) = meta.relay_name.clone() else { return get(id).await };
+    if req.enabled || was_on {
+        let mut conn = connect(meta.relay_account.as_deref()).await?;
+        if !conn.has_listings() {
+            return get(id).await;
+        }
+        let listing = req.enabled.then_some(info);
+        if let Err(e) = conn.listing_set(&name, listing).await {
+            // Keep the switch where it was when the relay refused (e.g. a bad link): the player fixes it and tries again.
+            let mut all = load().await;
+            if let Some(s) = all.servers.get_mut(id) {
+                s.enabled = was_on;
+            }
+            save(&all).await?;
+            return Err(relay::describe(&e, &name));
+        }
+    }
+    get(id).await
+}
+
+/// Takes a deleted server off the list. Best effort.
+pub async fn forget(id: &str, meta: &ServerMeta) {
+    let mut all = load().await;
+    if all.servers.remove(id).is_some_and(|s| s.enabled) {
+        if let (Some(name), Ok(mut conn)) = (meta.relay_name.clone(), connect(meta.relay_account.as_deref()).await) {
+            if conn.has_listings() {
+                let _ = conn.listing_set(&name, None).await;
+            }
+        }
+    }
+    let _ = save(&all).await;
+}
+
+// ---------- Discover → Servers ----------
+
+/// Browse filters, as the UI sends them (all optional).
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Browse {
+    #[serde(default)]
+    pub q: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub edition: Option<String>,
+    pub version: Option<String>,
+    pub region: Option<String>,
+    pub lang: Option<String>,
+    pub modded: Option<bool>,
+    #[serde(default)]
+    pub online: bool,
+    /// Only servers Bedrock players can join (Bedrock servers, and Java ones with Geyser).
+    #[serde(default)]
+    pub crossplay: bool,
+    /// Only servers offline profiles can join.
+    #[serde(default)]
+    pub offline: bool,
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub page: u32,
+}
+
+/// One page of the public list (`GET https://<base domain>/api/servers`), with `liked` filled in from this launcher.
+pub async fn browse(f: Browse) -> Result<Value> {
+    let Some(s) = relay::settings() else { return Err(err_tr!("serverList.noRelay", "This build has no ResinCraft Relay, so there's no server list.")) };
+    let mut query: Vec<(&str, String)> = vec![("page", f.page.to_string())];
+    let mut opt = |k: &'static str, v: Option<String>| {
+        if let Some(v) = v.map(|v| v.trim().to_string()).filter(|v| !v.is_empty()) {
+            query.push((k, v));
+        }
+    };
+    opt("q", Some(f.q));
+    opt("tags", Some(f.tags.join(",")));
+    opt("edition", f.edition);
+    opt("version", f.version);
+    opt("region", f.region);
+    opt("lang", f.lang);
+    opt("modded", f.modded.map(|m| m.to_string()));
+    opt("online", f.online.then(|| "true".to_string()));
+    opt("crossplay", f.crossplay.then(|| "true".to_string()));
+    opt("offline", f.offline.then(|| "true".to_string()));
+    opt("sort", f.sort);
+    let res = crate::core::ctx::http()
+        .get(format!("https://{}/api/servers", s.domain))
+        .query(&query)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await;
+    let res = match res {
+        Ok(r) => r,
+        Err(e) => return Err(err_tr!("serverList.unreachable", "Couldn't reach the server list ({error}).", error = e.to_string())),
+    };
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(not_yet());
+    }
+    if !res.status().is_success() {
+        return Err(err_tr!("serverList.httpError", "The server list didn't answer (HTTP {status}).", status = res.status().as_u16().to_string()));
+    }
+    let mut page: Value = res.json().await?;
+    let liked = load().await.liked;
+    if let Some(list) = page.get_mut("servers").and_then(Value::as_array_mut) {
+        for s in list {
+            let id = s.get("id").and_then(Value::as_str).unwrap_or_default().to_string();
+            s["liked"] = Value::Bool(liked.contains(&id));
+        }
+    }
+    Ok(page)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Submit {
+    pub address: String,
+    pub info: ListingInfo,
+}
+
+pub async fn submit(req: Submit) -> Result<Status> {
+    let address = req.address.trim().to_string();
+    if address.is_empty() {
+        return Err(err_tr!("serverList.noAddress", "Type the server's address."));
+    }
+    let mut conn = connect(None).await?;
+    if !conn.has_listings() {
+        return Err(not_yet());
+    }
+    let st = conn.listing_submit(&address, req.info).await.map_err(|e| relay::describe(&e, ""))?;
+    Ok(status(st))
+}
+
+/// The player's own listings: submitted servers and hosted ones.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Mine {
+    pub status: Status,
+    pub address: String,
+    pub info: ListingInfo,
+    pub likes: u32,
+    pub resincraft: bool,
+}
+
+pub async fn mine() -> Result<Vec<Mine>> {
+    let mut conn = connect(None).await?;
+    if !conn.has_listings() {
+        return Ok(Vec::new());
+    }
+    let list = conn.listing_mine().await.map_err(|e| relay::describe(&e, ""))?;
+    Ok(list
+        .into_iter()
+        .map(|m: MyListing| Mine { status: status(m.status), address: m.address, info: m.listing, likes: m.likes, resincraft: m.resincraft })
+        .collect())
+}
+
+pub async fn remove(id: &str) -> Result<Status> {
+    let mut conn = connect(None).await?;
+    let st = conn.listing_remove(id).await.map_err(|e| relay::describe(&e, ""))?;
+    Ok(status(st))
+}
+
+#[derive(Debug, Serialize)]
+pub struct Liked {
+    pub likes: u32,
+    pub liked: bool,
+}
+
+pub async fn like(id: &str, on: bool) -> Result<Liked> {
+    let mut conn = connect(None).await?;
+    let (likes, liked) = conn.listing_like(id, on).await.map_err(|e| relay::describe(&e, ""))?;
+    let mut all = load().await;
+    if liked {
+        all.liked.insert(id.to_string());
+    } else {
+        all.liked.remove(id);
+    }
+    save(&all).await?;
+    Ok(Liked { likes, liked })
+}
+
+pub async fn report(id: &str, reason: &str) -> Result<()> {
+    let reason: String = reason.trim().chars().take(500).collect();
+    if reason.is_empty() {
+        return Err(err_tr!("serverList.noReason", "Say what's wrong with this server."));
+    }
+    let mut conn = connect(None).await?;
+    conn.listing_report(id, &reason).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// Asks a ResinCraft server's host to whitelist the active account; the outcome as the UI words it.
+pub async fn ask_join(id: &str) -> Result<&'static str> {
+    let mut conn = connect(None).await?;
+    let outcome = conn.listing_join(id).await.map_err(|e| relay::describe(&e, ""))?;
+    Ok(match outcome {
+        JoinOutcome::Received => "received",
+        JoinOutcome::AlreadyListed => "alreadyListed",
+        JoinOutcome::AlreadyRequested => "alreadyRequested",
+        JoinOutcome::Closed => "closed",
+        JoinOutcome::Invalid => "invalid",
+        JoinOutcome::Banned => "banned",
+        JoinOutcome::Unknown => "unknown",
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saved_listing_reads_back() {
+        let mut s = Saved::default();
+        s.servers.insert("a".into(), SavedListing { enabled: true, info: ListingInfo { title: "SMP".into(), ..Default::default() } });
+        s.liked.insert("rc-smp".into());
+        let back: Saved = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert!(back.servers["a"].enabled);
+        assert_eq!(back.servers["a"].info.title, "SMP");
+        assert!(back.liked.contains("rc-smp"));
+        // An empty file is an empty list.
+        let empty: Saved = serde_json::from_str("{}").unwrap();
+        assert!(empty.servers.is_empty());
+    }
+}

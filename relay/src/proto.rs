@@ -37,6 +37,12 @@
 //! The relay routes a domain's players to the name only while that TXT is there; `domain_check` looks again now, and
 //! `domain_remove` detaches it. A domain verified by another account moves when this one's TXT shows up.
 //!
+//! Protocol 8 adds the public server list: `listing_set` lists one of the account's names (or takes it off),
+//! `listing_submit` adds a server hosted elsewhere, and `listing_mine` / `listing_get` / `listing_remove` manage them;
+//! the relay answers with `listing_status` / `my_listings`. Players `listing_like`, `listing_report` and `listing_join`
+//! (a whitelist request under their own verified name, which reaches the host as a `join_request`). Browsing is plain
+//! HTTPS (`GET /api/servers`), with no connection at all. The relay never sends protocol-8 messages to older launchers.
+//!
 //! A `banned` error carries the ban itself ([`Ban`]: until when, and why) in `ban`. It needs no protocol version
 //! of its own: every launcher knows the `banned` code, and older ones skip the field.
 
@@ -44,7 +50,7 @@ use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 7;
+pub const PROTOCOL_VERSION: u32 = 8;
 /// The first protocol with Bedrock (UDP) tunnels.
 pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The first protocol with data top-ups.
@@ -55,6 +61,8 @@ pub const JOIN_REQUESTS_PROTOCOL_VERSION: u32 = 5;
 pub const REMOTE_PROTOCOL_VERSION: u32 = 6;
 /// The first protocol with players' own, verified domains.
 pub const DOMAINS_PROTOCOL_VERSION: u32 = 7;
+/// The first protocol with the public server list (listings, likes, reports and whitelist requests from the launcher).
+pub const LISTINGS_PROTOCOL_VERSION: u32 = 8;
 /// Longest `call_result` / `push` line (results and log batches can be bigger than other messages).
 pub const MAX_REMOTE_LINE: usize = 1024 * 1024;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
@@ -122,7 +130,122 @@ pub enum AgentMsg {
     DomainCheck { domain: String },
     /// Detach `name`'s domain; answered with `domain_removed`. Protocol 7.
     DomainRemove { name: String },
+    /// List (or update) the account's name `name` in the server list; `listing: None` takes it off. Answered with
+    /// `listing_status`. Protocol 8.
+    ListingSet { name: String, listing: Option<ListingInfo> },
+    /// Where `name`'s listing stands; answered with `listing_status`. Protocol 8.
+    ListingGet { name: String },
+    /// Submit a server that isn't hosted through ResinCraft (`address`: host or host:port). Answered with
+    /// `listing_status`. Protocol 8.
+    ListingSubmit { address: String, listing: ListingInfo },
+    /// The account's submissions and ResinCraft listings; answered with `my_listings`. Protocol 8.
+    ListingMine,
+    /// Remove one of the account's own submissions; answered with `listing_status` (state off). Protocol 8.
+    ListingRemove { id: String },
+    /// Like (or unlike) a listing, one per account; answered with `liked`. Protocol 8.
+    ListingLike { id: String, on: bool },
+    /// Report a listing (reason ≤ 500 chars); answered with `reported`. Protocol 8.
+    ListingReport { id: String, reason: String },
+    /// Ask to be whitelisted on a ResinCraft listing: the relay passes it to the host's launcher as a `join_request`
+    /// with this account's verified username. Answered with `join_asked`. Protocol 8.
+    ListingJoin { id: String },
     Ping { seq: u64 },
+}
+
+/// What a server-list listing shows (written by its owner, checked by the relay). Protocol 8.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ListingInfo {
+    /// 1–48 characters.
+    pub title: String,
+    /// Plain text, at most 1000 characters.
+    #[serde(default)]
+    pub description: String,
+    /// Category ids from [`CATEGORIES`] plus up to 5 custom tags (1–24 characters of `a-z0-9 -`).
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// "" or one of na, sa, eu, asia, oceania, africa, me.
+    #[serde(default)]
+    pub region: String,
+    /// "" or a BCP-47 language ("en", "th", "pt-BR"…).
+    #[serde(default)]
+    pub language: String,
+    /// The Minecraft version shown (the relay may fill it from a ping).
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub edition: Edition,
+    #[serde(default)]
+    pub modded: bool,
+    /// Bedrock players can join a Java server too (Geyser). For a hosted server the launcher says so itself.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub crossplay: bool,
+    /// Players without a Minecraft account (offline profiles) can join: `online-mode=false`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub offline: bool,
+    /// Where Bedrock players join when that isn't `address` (Geyser's own port). The relay fills it in for hosted
+    /// servers that it carries Geyser for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bedrock_address: Option<String>,
+    /// https:// only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub website: Option<String>,
+    /// discord.gg/… or discord.com/invite/….
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discord: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Edition {
+    #[default]
+    Java,
+    Bedrock,
+}
+
+/// The server list's fixed categories; listings may add custom tags beyond these.
+pub const CATEGORIES: &[&str] = &[
+    "smp", "survival", "pvp", "minigames", "creative", "modded", "skyblock", "anarchy", "roleplay", "economy", "factions",
+    "prison", "parkour", "hardcore", "vanilla", "towny", "lifesteal", "bedwars",
+];
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ListingState {
+    /// In the list.
+    Listed,
+    /// Waiting for the relay's admin.
+    Pending,
+    /// The admin said no (the message says why).
+    Rejected,
+    /// The admin hid it, or enough reports did until the admin looks.
+    Hidden,
+    /// Not listed.
+    Off,
+    #[serde(other)]
+    Unknown,
+}
+
+/// Where a listing stands, for its owner. Protocol 8.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ListingStatus {
+    /// "rc-<name>" for ResinCraft servers, "s-<random>" for submissions.
+    pub id: String,
+    pub state: ListingState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// One of the account's own listings (the answer to `listing_mine`). Protocol 8.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MyListing {
+    pub status: ListingStatus,
+    pub address: String,
+    pub listing: ListingInfo,
+    #[serde(default)]
+    pub likes: u32,
+    /// Hosted through the relay (else submitted).
+    #[serde(default)]
+    pub resincraft: bool,
 }
 
 /// What became of a whitelist request (the web page shows a sentence for each).
@@ -219,6 +342,17 @@ pub enum RelayMsg {
     DomainStatus(DomainStatus),
     /// The answer to `domain_remove`. Protocol 7.
     DomainRemoved { name: String },
+    /// Where a listing stands (the answer to `listing_set`, `listing_get`, `listing_submit` and `listing_remove`).
+    /// Protocol 8.
+    ListingStatus(ListingStatus),
+    /// The answer to `listing_mine`. Protocol 8.
+    MyListings { listings: Vec<MyListing> },
+    /// The answer to `listing_like`. Protocol 8.
+    Liked { id: String, likes: u32, liked: bool },
+    /// The answer to `listing_report`. Protocol 8.
+    Reported { id: String },
+    /// The answer to `listing_join`. Protocol 8.
+    JoinAsked { id: String, outcome: JoinOutcome },
     /// A player asks on the web page to be whitelisted. Protocol 5, and only after `join_requests` turned on.
     JoinRequest { id: u64, username: String },
     Error {
@@ -313,6 +447,10 @@ pub enum ErrorCode {
     TopUpLimit,
     /// Not a domain the relay can take: malformed, the relay's own, or too many for the account. Protocol 7.
     DomainInvalid,
+    /// A listing field the relay won't take (the message says which), or a name that isn't this account's. Protocol 8.
+    ListingInvalid,
+    /// Too many submitted servers for this account. Protocol 8.
+    ListingLimit,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -706,4 +844,51 @@ mod tests {
         assert!(matches!(serde_json::from_str::<RelayMsg>(&newer).unwrap(), RelayMsg::DomainStatus(DomainStatus { state: DomainState::Unknown, .. })));
         let add = serde_json::to_string(&AgentMsg::DomainAdd { name: "smp".into(), domain: "play.example.com".into() }).unwrap();
         assert_eq!(add, r#"{"t":"domain_add","name":"smp","domain":"play.example.com"}"#);
+    }
+
+    #[test]
+    fn listing_messages_round_trip() {
+        let info = ListingInfo {
+            title: "Puirkle SMP".into(),
+            tags: vec!["smp".into(), "friends".into()],
+            region: "asia".into(),
+            language: "th".into(),
+            discord: Some("https://discord.gg/abc".into()),
+            crossplay: true,
+            offline: true,
+            ..Default::default()
+        };
+        for m in [
+            AgentMsg::ListingSet { name: "smp".into(), listing: Some(info.clone()) },
+            AgentMsg::ListingSet { name: "smp".into(), listing: None },
+            AgentMsg::ListingGet { name: "smp".into() },
+            AgentMsg::ListingSubmit { address: "play.example.com".into(), listing: info.clone() },
+            AgentMsg::ListingMine,
+            AgentMsg::ListingRemove { id: "s-1".into() },
+            AgentMsg::ListingLike { id: "rc-smp".into(), on: true },
+            AgentMsg::ListingReport { id: "rc-smp".into(), reason: "spam".into() },
+            AgentMsg::ListingJoin { id: "rc-smp".into() },
+        ] {
+            let line = serde_json::to_string(&m).unwrap();
+            assert_eq!(serde_json::from_str::<AgentMsg>(&line).unwrap(), m, "{line}");
+        }
+        assert_eq!(serde_json::to_string(&AgentMsg::ListingMine).unwrap(), r#"{"t":"listing_mine"}"#);
+        let status = ListingStatus { id: "rc-smp".into(), state: ListingState::Pending, message: None };
+        for m in [
+            RelayMsg::ListingStatus(status.clone()),
+            RelayMsg::MyListings {
+                listings: vec![MyListing { status, address: "smp.example".into(), listing: info, likes: 2, resincraft: true }],
+            },
+            RelayMsg::Liked { id: "rc-smp".into(), likes: 3, liked: true },
+            RelayMsg::Reported { id: "rc-smp".into() },
+            RelayMsg::JoinAsked { id: "rc-smp".into(), outcome: JoinOutcome::Received },
+        ] {
+            let line = serde_json::to_string(&m).unwrap();
+            assert_eq!(serde_json::from_str::<RelayMsg>(&line).unwrap(), m, "{line}");
+        }
+        // A minimal listing from the relay fills in the defaults; a state from a newer relay reads as unknown.
+        let s: RelayMsg = serde_json::from_str(r#"{"t":"listing_status","id":"s-1","state":"frozen"}"#).unwrap();
+        assert_eq!(s, RelayMsg::ListingStatus(ListingStatus { id: "s-1".into(), state: ListingState::Unknown, message: None }));
+        let i: ListingInfo = serde_json::from_str(r#"{"title":"x"}"#).unwrap();
+        assert_eq!(i.edition, Edition::Java);
     }}

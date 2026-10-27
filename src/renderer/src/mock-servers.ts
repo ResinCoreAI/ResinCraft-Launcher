@@ -27,6 +27,7 @@ import type {
 
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
 import { mockRequests } from './mock-requests'
+import { mockServerList } from './mock-serverlist'
 
 type Listener<T> = (e: T) => void
 
@@ -633,6 +634,7 @@ export function mockServers(): {
       grim[id] = on
       return { supported: true, installed: on, enabled: on }
     },
+    ...mockServerList(find),
     reinstall: () => wait(undefined, 1500),
     reinstallPack: () => wait({ versionName: 'current', added: 0, updated: 2, removed: 0, kept: [], pending: 0 } as never, 1500),
     addonSources: async (id, area) => sourcesOf(id, area),

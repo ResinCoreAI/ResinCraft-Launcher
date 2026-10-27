@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingStatus, MyListing};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -263,10 +263,17 @@ impl Drop for Connection {
 
 impl Connection {
     /// Connects and says hello. A relay that doesn't know this protocol yet is asked again with each older one
-    /// that matters (top-ups, then Bedrock tunnels): the newer features then stay off.
+    /// that matters (domains, remote control, whitelist requests, top-ups, then Bedrock tunnels): the newer features
+    /// then stay off.
     pub async fn connect(cfg: &AgentConfig) -> Result<Connection, AgentError> {
         let mut result = Self::over_version(Self::open(cfg).await?, &cfg.client, PROTOCOL_VERSION).await;
-        for older in [TOPUP_PROTOCOL_VERSION, BEDROCK_PROTOCOL_VERSION] {
+        for older in [
+            DOMAINS_PROTOCOL_VERSION,
+            REMOTE_PROTOCOL_VERSION,
+            JOIN_REQUESTS_PROTOCOL_VERSION,
+            TOPUP_PROTOCOL_VERSION,
+            BEDROCK_PROTOCOL_VERSION,
+        ] {
             match result {
                 Err(AgentError::Refused(ErrorCode::Version, _)) if older < PROTOCOL_VERSION => {
                     result = Self::over_version(Self::open(cfg).await?, &cfg.client, older).await;
@@ -332,7 +339,8 @@ impl Connection {
         };
         let (r, w) = tokio::io::split(stream);
         let mut conn = Connection {
-            lines: FramedRead::new(r, LinesCodec::new_with_max_length(MAX_LINE)),
+            // Remote-control results and a full `my_listings` can be longer than other lines.
+            lines: FramedRead::new(r, LinesCodec::new_with_max_length(proto::MAX_REMOTE_LINE)),
             writer: w,
             inbound: rx,
             driver,
@@ -470,6 +478,86 @@ impl Connection {
             other => Err(unexpected(&other)),
         }
     }
+
+    /// Whether this relay keeps the public server list (protocol 8).
+    pub fn has_listings(&self) -> bool {
+        self.relay_version >= LISTINGS_PROTOCOL_VERSION
+    }
+
+    fn need_listings(&self) -> Result<(), AgentError> {
+        if self.has_listings() {
+            Ok(())
+        } else {
+            Err(AgentError::Refused(ErrorCode::ListingInvalid, "this relay has no server list yet".into()))
+        }
+    }
+
+    async fn listing_request(&mut self, msg: AgentMsg) -> Result<ListingStatus, AgentError> {
+        self.need_listings()?;
+        self.send(&msg).await?;
+        match self.recv().await? {
+            RelayMsg::ListingStatus(status) => Ok(status),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Lists the account's name `name` in the server list (`None` takes it off).
+    pub async fn listing_set(&mut self, name: &str, listing: Option<ListingInfo>) -> Result<ListingStatus, AgentError> {
+        self.listing_request(AgentMsg::ListingSet { name: name.to_string(), listing }).await
+    }
+
+    pub async fn listing_get(&mut self, name: &str) -> Result<ListingStatus, AgentError> {
+        self.listing_request(AgentMsg::ListingGet { name: name.to_string() }).await
+    }
+
+    /// Submits a server that isn't hosted through the relay.
+    pub async fn listing_submit(&mut self, address: &str, listing: ListingInfo) -> Result<ListingStatus, AgentError> {
+        self.listing_request(AgentMsg::ListingSubmit { address: address.to_string(), listing }).await
+    }
+
+    pub async fn listing_remove(&mut self, id: &str) -> Result<ListingStatus, AgentError> {
+        self.listing_request(AgentMsg::ListingRemove { id: id.to_string() }).await
+    }
+
+    /// The account's own listings, submitted and hosted.
+    pub async fn listing_mine(&mut self) -> Result<Vec<MyListing>, AgentError> {
+        self.need_listings()?;
+        self.send(&AgentMsg::ListingMine).await?;
+        match self.recv().await? {
+            RelayMsg::MyListings { listings } => Ok(listings),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Likes (or unlikes) a listing; returns its likes and whether this account likes it now.
+    pub async fn listing_like(&mut self, id: &str, on: bool) -> Result<(u32, bool), AgentError> {
+        self.need_listings()?;
+        self.send(&AgentMsg::ListingLike { id: id.to_string(), on }).await?;
+        match self.recv().await? {
+            RelayMsg::Liked { likes, liked, .. } => Ok((likes, liked)),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    pub async fn listing_report(&mut self, id: &str, reason: &str) -> Result<(), AgentError> {
+        self.need_listings()?;
+        self.send(&AgentMsg::ListingReport { id: id.to_string(), reason: reason.to_string() }).await?;
+        match self.recv().await? {
+            RelayMsg::Reported { .. } => Ok(()),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Asks the listing's host to whitelist this account (under its verified Minecraft name).
+    pub async fn listing_join(&mut self, id: &str) -> Result<JoinOutcome, AgentError> {
+        self.need_listings()?;
+        self.send(&AgentMsg::ListingJoin { id: id.to_string() }).await?;
+        match self.recv().await? {
+            RelayMsg::JoinAsked { outcome, .. } => Ok(outcome),
+            other => Err(unexpected(&other)),
+        }
+    }
+
     /// Whether this relay takes whitelist requests from its web page.
     pub fn has_join_requests(&self) -> bool {
         self.relay_version >= JOIN_REQUESTS_PROTOCOL_VERSION

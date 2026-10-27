@@ -1,0 +1,264 @@
+/* Discover → Servers and Settings → Server list (components/ServerList.tsx). */
+
+.server-list .toolbar.wrap {
+  flex-wrap: wrap;
+}
+.inline-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Category chips: filters in the list, a pick-many in the forms. */
+.tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-picker.filters {
+  margin: 2px 0 14px;
+}
+.tag-toggle {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.tag-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.tag-toggle.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tag-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.server-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 12px;
+}
+.server-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  min-width: 0;
+}
+.server-card.skeleton {
+  height: 190px;
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
+  background-size: 200% 100%;
+  animation: server-shimmer 1.4s linear infinite;
+}
+@keyframes server-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .server-card.skeleton {
+    animation: none;
+  }
+}
+.server-card header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.server-card header .grow {
+  min-width: 0;
+}
+.server-card h3 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.server-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  image-rendering: pixelated;
+  background: var(--surface-2);
+}
+.server-icon.fallback {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+}
+.server-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.server-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.server-meta svg {
+  width: 13px;
+  height: 13px;
+}
+.server-meta .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.server-meta .dot.on {
+  background: var(--play);
+  box-shadow: 0 0 6px var(--play);
+}
+.server-card .like {
+  flex: none;
+  gap: 5px;
+}
+.server-card .like.on {
+  color: var(--danger);
+}
+.server-card .like.on svg {
+  fill: currentColor;
+}
+.server-desc {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.server-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.server-tags button.chip {
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.server-tags button.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.server-card footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  min-width: 0;
+}
+.server-card footer .address {
+  min-width: 0;
+  max-width: 55%;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.server-card footer .address span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.server-card footer .btn {
+  white-space: nowrap;
+}
+.server-list .load-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 0;
+}
+.server-list .list-note {
+  margin-top: 18px;
+  text-align: center;
+}
+
+/* The listing form (Settings → Server list, Submit a server). */
+.listing-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+.listing-fields .field,
+.modal .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.listing-fields .field > span,
+.modal .field > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.listing-fields .field em {
+  font-style: normal;
+  font-weight: 400;
+  float: right;
+}
+.listing-fields textarea {
+  resize: vertical;
+  min-height: 84px;
+  font: inherit;
+}
+.listing-fields .field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+}
+.listing-fields .row,
+.setting .row.end {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.setting .row.end {
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 12px;
+}
+.modal .listing-fields {
+  margin-top: 14px;
+}
+.listing-facts {
+  margin: 0;
+}
+.listing-facts svg {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+.my-listings .setting svg.inline {
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+}

@@ -10,6 +10,7 @@ pub mod create;
 pub mod discordbot;
 pub mod domain;
 pub mod installers;
+pub mod listing;
 pub mod network;
 pub mod packs;
 pub mod playit;
@@ -80,7 +81,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             if runtime::is_running(&id) {
                 bail!("Stop the server before deleting it");
             }
-            store::get(&id).await?;
+            let meta = store::get(&id).await?;
+            let gone = id.clone();
+            tokio::spawn(async move { listing::forget(&gone, &meta).await });
             runtime::forget_link(&id);
             shell::trash(&store::dir(&id)?).await?;
             let _ = cloudflare::set_token(&id, None).await;
@@ -181,6 +184,19 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(if antixray::supported(meta.kind) { Some(antixray::get(&meta, &dir).await) } else { None })
         }
         // Settings → Anti-cheat (Grim): [id] → {supported, installed, enabled}; [id, on] → the same, after the change.
+        // The public server list (relay protocol 8): this server's listing, then Discover → Servers.
+        "server:listing" => json(listing::get(&args.get::<String>(0)?).await?),
+        "server:setListing" => json(listing::set(&args.get::<String>(0)?, args.get(1)?).await?),
+        "server:browseList" => json(listing::browse(args.get(0)?).await?),
+        "server:submitListing" => json(listing::submit(args.get(0)?).await?),
+        "server:myListings" => json(listing::mine().await?),
+        "server:removeListing" => json(listing::remove(&args.get::<String>(0)?).await?),
+        "server:likeListing" => json(listing::like(&args.get::<String>(0)?, args.get(1)?).await?),
+        "server:reportListing" => {
+            listing::report(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            done()
+        }
+        "server:askToJoin" => json(listing::ask_join(&args.get::<String>(0)?).await?),
         "server:antiCheat" => json(plugins::anticheat_status(&args.get::<String>(0)?).await?),
         "server:setAntiCheat" => {
             let id: String = args.get(0)?;
