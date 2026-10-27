@@ -5,6 +5,7 @@ import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
 import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
 import FileManager from '../components/FileManager'
+import { WebConsoleButton, WebConsoleTip } from '../components/RemoteControl'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
 import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
@@ -318,6 +319,7 @@ function ServerList({
           <p>{t('servers.subtitle')}</p>
         </div>
         <div className="spacer" />
+        <WebConsoleButton />
         <button data-pc-only className="btn lg" onClick={onImport}>
           <FolderInput /> {t('migrate.serverButton')}
         </button>
@@ -325,6 +327,7 @@ function ServerList({
           <Plus /> {t('servers.create.button')}
         </button>
       </div>
+      <WebConsoleTip />
 
       {!servers ? (
         <div className="results">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Globe } from 'lucide-react'
+import { ExternalLink, Globe, Smartphone, X } from 'lucide-react'
 import type { RemoteStatus } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -86,6 +86,73 @@ export function RemoteControlSection() {
         )}
       </div>
     </section>
+  )
+}
+
+/** The engine's remote-control status, kept current. */
+function useRemoteStatus() {
+  const [status, setStatus] = useState<RemoteStatus>()
+  useEffect(() => {
+    void api.remote.status().then(setStatus, () => {})
+    return api.on.remote((s) => setStatus((old) => ({ ...s, url: s.url ?? old?.url })))
+  }, [])
+  return status
+}
+
+/** Servers page header: opens the web console while remote control is on. */
+export function WebConsoleButton() {
+  const { settings } = useStore()
+  const status = useRemoteStatus()
+  if (!settings?.remoteControl || !status?.url) return null
+  return (
+    <button data-pc-only className="btn lg" title={t('settings.remote.open')} onClick={() => void api.app.openExternal(status.url!)}>
+      <Globe /> {t('servers.web.open')} <ExternalLink size={13} />
+    </button>
+  )
+}
+
+const TIP_KEY = 'resincraft.tip.webConsole'
+
+/** Servers page: tells players about the web console while remote control is off (until they dismiss it). */
+export function WebConsoleTip() {
+  const { settings, go } = useStore()
+  const status = useRemoteStatus()
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(TIP_KEY) === 'hidden'
+    } catch {
+      return false
+    }
+  })
+  // Builds without ResinCraft Relay have no console to offer.
+  if (hidden || !settings || settings.remoteControl || !status || status.state === 'unavailable') return null
+  const dismiss = () => {
+    setHidden(true)
+    try {
+      localStorage.setItem(TIP_KEY, 'hidden')
+    } catch {
+      // Private storage: hidden for this visit.
+    }
+  }
+  const turnOn = () => {
+    go({ page: 'settings' })
+    // Once the Settings page is drawn, bring its Remote control section into view.
+    window.setTimeout(() => document.getElementById('remote')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+  }
+  return (
+    <div data-pc-only className="card sv-web-tip">
+      <Smartphone className="sv-web-tip-icon" />
+      <div className="grow">
+        <b>{t('servers.web.tipTitle')}</b>
+        <p className="hint">{t('servers.web.tipBody')}</p>
+      </div>
+      <button className="btn sm primary" onClick={turnOn}>
+        {t('servers.web.tipTurnOn')}
+      </button>
+      <button className="btn sm ghost icon-only" title={t('servers.web.tipDismiss')} aria-label={t('servers.web.tipDismiss')} onClick={dismiss}>
+        <X />
+      </button>
+    </div>
   )
 }
 
