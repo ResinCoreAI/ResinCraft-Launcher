@@ -210,17 +210,19 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:askToJoin" => json(listing::ask_join(&args.get::<String>(0)?).await?),
         // The Admin page, for the relay's admin accounts.
         "server:adminStatus" => json(admin::status().await),
-        // [password, user?]
-        "server:adminUnlock" => json(admin::unlock(args.get::<Option<String>>(1)?, &args.get::<String>(0)?).await?),
+        // [{password?, code?, remember}] → status (needCode when the 2FA code is still missing).
+        "server:adminUnlock" => json(admin::unlock(args.get(0)?).await?),
+        // [forget?]: forget also forgets this PC.
+        "server:adminLock" => {
+            admin::lock(args.get::<Option<bool>>(0)?.unwrap_or(false)).await;
+            done()
+        }
         "server:adminDashboard" => {
             admin::open_dashboard().await?;
             done()
         }
-        "server:adminLock" => {
-            admin::lock().await;
-            done()
-        }
-        "server:adminCall" => json(admin::call(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<Value>>(2)?).await?),
+        "server:adminDashboardLink" => json(admin::dashboard_link().await?),
+"server:adminCall" => json(admin::call(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<Value>>(2)?).await?),
         "server:antiCheat" => json(plugins::anticheat_status(&args.get::<String>(0)?).await?),
         "server:setAntiCheat" => {
             let id: String = args.get(0)?;

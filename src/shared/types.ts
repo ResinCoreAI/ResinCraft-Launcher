@@ -1205,6 +1205,10 @@ export interface AdminStatus {
   username?: string
   /** The relay dashboard user it's signed in as. */
   dashboardUser?: string
+  /** The last unlock needs the user's 2FA code. */
+  needCode?: boolean
+  /** This PC unlocks by itself. */
+  remembered?: boolean
 }
 
 /** One world backup zip (a server's or an instance's). */
@@ -2081,10 +2085,14 @@ export interface ResinApi {
     installListingPack(req: { id: string; url: string; sha256: string }): Promise<string>
     /** The Admin page: whether the active account is one of the relay's admins, and unlocked this session. */
     adminStatus(): Promise<AdminStatus>
-    adminUnlock(password: string, user?: string): Promise<AdminStatus>
+    /** Password and/or the 2FA code; `remember` keeps this PC unlocked. Status `needCode`: ask for the code. */
+    adminUnlock(req: { password?: string; code?: string; remember: boolean }): Promise<AdminStatus>
+    /** A one-time link that signs a page into the relay's dashboard (for the Admin page's frame). */
+    adminDashboardLink(): Promise<string>
     /** The relay's full dashboard in a window of its own, signed in (needs the Admin page unlocked). */
     adminDashboard(): Promise<void>
-    adminLock(): Promise<void>
+    /** `forget`: also forget this PC (the next unlock asks again). */
+    adminLock(forget?: boolean): Promise<void>
     /** One admin request (the relay dashboard's JSON API: GET /api/listings, POST /api/listings/…). */
     adminCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
     submitListing(req: { address: string; info: ListingInfo }): Promise<ListingStatus>

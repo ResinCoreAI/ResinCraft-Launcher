@@ -152,7 +152,21 @@ pub enum AgentMsg {
     /// Unlock the relay's admin tools on this connection with the dashboard's password; only for accounts the relay
     /// lists as admins (uthed said dmin). Answered with dmin_ready. Protocol 8.
     AdminUnlock {
+        /// Empty when signing in with `device_token`.
+        #[serde(default)]
         password: String,
+        /// Remember this PC: the answer carries a `device_token` for password-free unlocks.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        remember: bool,
+        /// A token from an earlier `admin_ready` (instead of the password).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        device_token: Option<String>,
+        /// The user's 2FA code (authenticator app), when they have 2FA on.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        totp: Option<String>,
+        /// This PC's name, shown in the dashboard's list of remembered launchers.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        device: Option<String>,
         /// The dashboard user to sign in as (relays with dashboard users); without it, the relay's legacy `admin` user.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         user: Option<String>,
@@ -420,6 +434,9 @@ pub enum RelayMsg {
         /// The dashboard user the account is linked to (relays with dashboard users).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         user: Option<String>,
+        /// After `remember`: unlocks this PC without the password from now on (revocable on the dashboard).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        device_token: Option<String>,
     },
     /// The answer to dmin_call id: alue when ok, else error. Protocol 8.
     AdminResult {
@@ -533,6 +550,8 @@ pub enum ErrorCode {
     ListingBanned,
     /// Not an admin account, a wrong password, or too many wrong ones (locked for a while). Protocol 8.
     AdminDenied,
+    /// The dashboard user has 2FA on: a code is needed, or the one sent was wrong. Protocol 8.
+    AdminTwoFactor,
     ShuttingDown,
     Internal,
     #[serde(other)]

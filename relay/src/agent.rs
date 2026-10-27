@@ -119,6 +119,17 @@ impl std::fmt::Debug for Credentials {
     }
 }
 
+/// How `admin_unlock` signs in.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AdminUnlock<'a> {
+    pub user: Option<&'a str>,
+    pub password: &'a str,
+    pub remember: bool,
+    pub device_token: Option<&'a str>,
+    pub device: Option<&'a str>,
+    pub totp: Option<&'a str>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Authed {
     pub uuid: String,
@@ -573,12 +584,21 @@ impl Connection {
     }
 
     /// Unlocks the relay's admin tools on this connection (only for an admin account, with the dashboard's password).
-    /// Returns the dashboard user it's signed in as, when the relay says.
-    pub async fn admin_unlock(&mut self, user: Option<&str>, password: &str) -> Result<Option<String>, AgentError> {
+    /// Unlocks the admin tools: with the password, or with a remembered PC's `device_token`. Returns the dashboard
+    /// user it's signed in as and, after `remember`, this PC's new token.
+    pub async fn admin_unlock(&mut self, how: AdminUnlock<'_>) -> Result<(Option<String>, Option<String>), AgentError> {
         self.need_listings()?;
-        self.send(&AgentMsg::AdminUnlock { password: password.to_string(), user: user.map(str::to_string) }).await?;
+        self.send(&AgentMsg::AdminUnlock {
+            password: how.password.to_string(),
+            remember: how.remember,
+            device_token: how.device_token.map(str::to_string),
+            device: how.device.map(str::to_string),
+            totp: how.totp.map(str::to_string),
+            user: how.user.map(str::to_string),
+        })
+        .await?;
         match self.recv().await? {
-            RelayMsg::AdminReady { user } => Ok(user),
+            RelayMsg::AdminReady { user, device_token } => Ok((user, device_token)),
             other => Err(unexpected(&other)),
         }
     }

@@ -287,6 +287,15 @@
   vertical-align: -2px;
 }
 /* The Admin page (pages/Admin.tsx). */
+.relay-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 230px);
+  min-height: 420px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
 .admin-unlock {
   display: flex;
   flex-direction: column;

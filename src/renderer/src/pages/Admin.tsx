@@ -1,6 +1,6 @@
 // The Admin page: ResinCraft Relay's server-list tools, for accounts the relay lists as admins (relay protocol 8).
 // Unlocked with the relay dashboard's password; the relay checks every request, this page is only its UI.
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Ban, Check, ExternalLink, EyeOff, Eye, Flag, Loader2, Lock, Pin, PinOff, Plus, RefreshCw, Search, Shield, Star, Trash2, X } from 'lucide-react'
 import type { AdminStatus, ListingInfo } from '@shared/types'
 import { api } from '../api'
@@ -59,7 +59,7 @@ interface AdminData {
   reports: { id: string; listing: string; title: string; address: string; reporterName?: string; reason: string; at: number }[]
 }
 
-type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
+type Tab = 'relay' | 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
@@ -71,7 +71,10 @@ export default function Admin() {
   const [unlocking, setUnlocking] = useState(false)
   const [error, setError] = useState<string>()
   const [data, setData] = useState<AdminData>()
-  const [tab, setTab] = useState<Tab>('pending')
+  const [tab, setTab] = useState<Tab>('relay')
+  const [code, setCode] = useState('')
+  const [needCode, setNeedCode] = useState(false)
+  const [remember, setRemember] = useState(true)
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -110,8 +113,15 @@ export default function Admin() {
     setUnlocking(true)
     setError(undefined)
     try {
-      setStatus(await api.server.adminUnlock(password))
-      setPassword('')
+      const st = await api.server.adminUnlock({ password, code: needCode ? code : undefined, remember })
+      if (st.needCode) {
+        setNeedCode(true)
+      } else {
+        setStatus(st)
+        setPassword('')
+        setCode('')
+        setNeedCode(false)
+      }
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -151,12 +161,33 @@ export default function Admin() {
             <input className="input" type="password" autoFocus autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
           <span className="hint">{t('servers.admin.passwordHint', { name: status.username ?? '' })}</span>
+          {needCode && (
+            <label className="field">
+              <span>{t('servers.admin.code')}</span>
+              <input
+                className="input"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={12}
+                value={code}
+                placeholder="123456"
+                onChange={(e) => setCode(e.target.value.replace(/[^0-9a-zA-Z-]/g, ''))}
+              />
+              <span className="hint">{t('servers.admin.codeHint')}</span>
+            </label>
+          )}
+          <label className="inline-switch">
+            <Switch on={remember} onChange={setRemember} label={t('servers.admin.remember')} />
+            {t('servers.admin.remember')}
+          </label>
+          <span className="hint">{t('servers.admin.rememberHint')}</span>
           {error && (
             <span className="hint bad" role="alert">
               {error}
             </span>
           )}
-          <button className="btn primary" disabled={!password || unlocking}>
+          <button className="btn primary" disabled={(!password && !needCode) || (needCode && !code) || unlocking}>
             {unlocking && <Loader2 className="spin" />} {t('servers.admin.unlock')}
           </button>
         </form>
@@ -165,6 +196,7 @@ export default function Admin() {
   }
 
   const tabs: { value: Tab; label: ReactNode }[] = [
+    { value: 'relay', label: t('servers.admin.tab.relay') },
     { value: 'pending', label: <>{t('servers.admin.tab.pending')} {data?.pending.length ? <span className="count">{data.pending.length}</span> : null}</> },
     { value: 'listings', label: t('servers.admin.tab.listings') },
     { value: 'reports', label: <>{t('servers.admin.tab.reports')} {data?.reports.length ? <span className="count">{data.reports.length}</span> : null}</> },
@@ -209,7 +241,7 @@ export default function Admin() {
           <button
             className="btn sm"
             onClick={() =>
-              void api.server.adminLock().then(() => {
+              void api.server.adminLock(false).then(() => {
                 setStatus({ ...status, unlocked: false })
                 setData(undefined)
               })
@@ -217,12 +249,28 @@ export default function Admin() {
           >
             <Lock /> {t('servers.admin.lock')}
           </button>
+          {status.remembered && (
+            <button
+              className="btn sm ghost"
+              title={t('servers.admin.forgetHint')}
+              onClick={() =>
+                void api.server.adminLock(true).then(() => {
+                  setStatus({ ...status, unlocked: false, remembered: false })
+                  setData(undefined)
+                })
+              }
+            >
+              {t('servers.admin.forget')}
+            </button>
+          )}
         </div>
       </div>
       <div className="toolbar">
         <Segmented<Tab> value={tab} onChange={setTab} options={tabs} />
       </div>
-      {!data ? (
+      {tab === 'relay' ? (
+        <RelayFrame />
+      ) : !data ? (
         <Loader2 className="spin" />
       ) : tab === 'pending' ? (
         <ItemList items={data.pending} empty={t('servers.admin.pendingEmpty')} act={act} pendingActions />
@@ -261,6 +309,37 @@ export default function Admin() {
       )}
     </div>
   )
+}
+
+/** The relay's own dashboard inside the page, signed in by a one-time link; when its session runs out it asks the
+ *  launcher (postMessage) for a fresh link instead of showing its sign-in page. */
+function RelayFrame() {
+  const frame = useRef<HTMLIFrameElement>(null)
+  const [src, setSrc] = useState<string>()
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    api.server.adminDashboardLink().then(
+      (url) => setSrc(`${url}${url.includes('?') ? '&' : '?'}embed=1`),
+      (e) => setError((e as Error).message)
+    )
+  }, [])
+  useEffect(() => {
+    const onMessage = async (e: MessageEvent) => {
+      const data = e.data as { type?: string; need?: string } | null
+      if (e.source !== frame.current?.contentWindow || data?.type !== 'resincraft-relay' || data.need !== 'ticket') return
+      try {
+        const url = await api.server.adminDashboardLink()
+        frame.current?.contentWindow?.postMessage({ type: 'resincraft-relay', ticket: url }, new URL(url).origin)
+      } catch (err) {
+        setError((err as Error).message)
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+  if (error) return <p className="hint bad">{error}</p>
+  if (!src) return <Loader2 className="spin" />
+  return <iframe ref={frame} className="relay-frame" src={src} title={t('servers.admin.tab.relay')} referrerPolicy="no-referrer" />
 }
 
 type Act = (route: string, body: unknown, done?: Key) => Promise<boolean>

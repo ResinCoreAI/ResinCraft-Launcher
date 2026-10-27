@@ -169,16 +169,25 @@ export function mockServerList(find: (id: string) => ServerInfo) {
     },
     // The Admin page: ?admin=1 previews an admin account (password "admin").
     adminStatus: () => wait({ admin: isAdmin(), unlocked: adminUnlocked, username: 'Puirkle', dashboardUser: adminUnlocked ? 'Puirkle_Gamer' : undefined }),
-    adminUnlock: async (password: string) => {
+    adminUnlock: async (req: { password?: string; code?: string; remember: boolean }) => {
       await wait(null, 500)
-      if (password !== 'admin') throw new Error('The relay didn’t accept that. Check the password, or wait a few minutes after several wrong tries.')
+      // ?admin=1&twofa=1 previews a user with 2FA on (code 123456).
+      if (new URLSearchParams(location.search).get('twofa') === '1') {
+        if (!req.code) return { admin: true, unlocked: false, username: 'Puirkle', needCode: true }
+        if (req.code !== '123456') throw new Error('That 2FA code didn’t work. Use the newest code from your authenticator app.')
+      } else if (req.password !== 'admin') {
+        throw new Error('The relay didn’t accept that. Check the password, or wait a few minutes after several wrong tries.')
+      }
       adminUnlocked = true
-      return { admin: true, unlocked: true, username: 'Puirkle', dashboardUser: 'Puirkle_Gamer' }
+      return { admin: true, unlocked: true, username: 'Puirkle', dashboardUser: 'Puirkle_Gamer', remembered: req.remember }
     },
     adminLock: async () => void (adminUnlocked = false),
     adminDashboard: async () => {
-      if (!adminUnlocked) throw new Error('Unlock the Admin page with the relay’s password first.')
-      window.open('about:blank', '_blank')
+      if (!adminUnlocked) throw new Error('Unlock the Admin page first.')
+    },
+    adminDashboardLink: async () => {
+      if (!adminUnlocked) throw new Error('Unlock the Admin page first.')
+      return 'about:blank'
     },
     adminCall: (method: 'GET' | 'POST', path: string, body?: unknown) => mockAdminCall(method, path, body),
     clientPack: (id: string) =>
