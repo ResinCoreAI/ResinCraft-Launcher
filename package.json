@@ -1,7 +1,7 @@
 {
   "name": "resincraft-launcher",
   "productName": "ResinCraft Launcher",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "A modern, friendly Minecraft launcher by Puirkle",
   "author": "Puirkle",
   "private": true,
