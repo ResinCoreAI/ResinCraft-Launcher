@@ -1858,6 +1858,9 @@ export interface ResinApi {
     backup(id: string): Promise<string>
     /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
     regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
+    /** Settings → Anti-cheat: Grim, for plugin servers. */
+    antiCheat(id: string): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>
+    setAntiCheat(id: string, on: boolean): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>
     // The add-on calls take an optional last `area` for hybrid servers (Arclight): 'plugins' (default) or 'mods'.
     addonSources(id: string, area?: AddonArea): Promise<AddonSource[]>
     addons(id: string, area?: AddonArea): Promise<ServerAddon[]>

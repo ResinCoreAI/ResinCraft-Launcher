@@ -1778,13 +1778,41 @@ function AntiXraySection({ s }: { s: ServerInfo }) {
             />
           </div>
         )}
-        <div className="setting">
-          <div className="text">
-            <b>{t('servers.antiXray.cheat')}</b>
-            <span>{t('servers.antiXray.cheatHint')}</span>
-          </div>
-        </div>
+        <AntiCheatSetting s={s} />
       </div>
+    </div>
+  )
+}
+
+/** Anti-cheat: a switch that installs Grim (configured by itself on the first start) or takes it away. */
+function AntiCheatSetting({ s }: { s: ServerInfo }) {
+  const { toast } = useStore()
+  const [ac, setAc] = useState<{ supported: boolean; installed: boolean; enabled: boolean }>()
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let live = true
+    void api.server.antiCheat(s.id).then((v) => live && setAc(v), () => {})
+    return () => void (live = false)
+  }, [s.id])
+  if (!ac?.supported) return null
+  const set = async (on: boolean) => {
+    setBusy(true)
+    try {
+      setAc(await api.server.setAntiCheat(s.id, on))
+      toast(t(on ? 'servers.antiCheat.on' : 'servers.antiCheat.off'), s.state === 'running' ? 'info' : 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="setting">
+      <div className="text">
+        <b>{t('servers.antiXray.cheat')}</b>
+        <span>{t(ac.enabled ? 'servers.antiCheat.onHint' : 'servers.antiCheat.hint')}</span>
+      </div>
+      {busy ? <Loader2 className="spin" /> : <Switch on={ac.enabled} onChange={(v) => void set(v)} label={t('servers.antiXray.cheat')} />}
     </div>
   )
 }

@@ -180,6 +180,13 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             let dir = store::dir(&meta.id)?;
             json(if antixray::supported(meta.kind) { Some(antixray::get(&meta, &dir).await) } else { None })
         }
+        // Settings → Anti-cheat (Grim): [id] → {supported, installed, enabled}; [id, on] → the same, after the change.
+        "server:antiCheat" => json(plugins::anticheat_status(&args.get::<String>(0)?).await?),
+        "server:setAntiCheat" => {
+            let id: String = args.get(0)?;
+            plugins::anticheat_set(&id, args.get(1)?).await?;
+            json(plugins::anticheat_status(&id).await?)
+        }
         "server:setAntiXray" => {
             let meta = store::get(&args.get::<String>(0)?).await?;
             let want: antixray::AntiXray = args.get(1)?;

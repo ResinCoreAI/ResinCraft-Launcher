@@ -1218,6 +1218,58 @@ async fn geyser_port(meta: &ServerMeta) -> Option<u16> {
     None
 }
 
+/// Grim Anticheat on Modrinth (GPL-3.0): what Settings → Anti-cheat installs on plugin servers.
+const GRIM: &str = "LJNGWSvH";
+
+/// The server's Grim jars (on or switched off).
+async fn grim_jars(meta: &View) -> Vec<String> {
+    let idx = load_index(meta).await;
+    let Ok(dir) = folder(meta) else { return Vec::new() };
+    jar_names(&dir)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|n| {
+            let base = n.strip_suffix(".disabled").unwrap_or(n);
+            let pid = idx.get(&key(n)).or_else(|| idx.get(&key(base))).map(|e| e.project_id.as_str()).unwrap_or_default();
+            pid == GRIM || base.to_lowercase().starts_with("grim")
+        })
+        .collect()
+}
+
+/// Settings → Anti-cheat: whether the server can have it and whether Grim is there and on.
+pub async fn anticheat_status(id: &str) -> Result<Value> {
+    let meta = view(id, Some("plugins")).await?;
+    let supported = meta.kind.plugins();
+    let jars = if supported { grim_jars(&meta).await } else { Vec::new() };
+    Ok(json!({ "supported": supported, "installed": !jars.is_empty(), "enabled": jars.iter().any(|n| !n.ends_with(".disabled")) }))
+}
+
+/// Anti-cheat on: installs Grim (the version for this server's Minecraft and software; it writes its recommended
+/// config on the first start, with alerts for ops and the console), or switches a Grim that was off back on. Off: Grim
+/// goes to the Recycle Bin. While the server runs, the change waits for it to stop, like other plugin changes.
+pub async fn anticheat_set(id: &str, on: bool) -> Result<()> {
+    let meta = view(id, Some("plugins")).await?;
+    if !meta.kind.plugins() {
+        bail!("An anti-cheat needs a plugin server (Paper, Purpur, Spigot…).");
+    }
+    let jars = grim_jars(&meta).await;
+    let running_one = jars.iter().any(|n| !n.ends_with(".disabled"));
+    if on {
+        if running_one {
+            return Ok(());
+        }
+        if let Some(off) = jars.iter().find(|n| n.ends_with(".disabled")) {
+            return toggle(id, off, Some("plugins")).await;
+        }
+        return install(id, GRIM, None, Some("plugins")).await;
+    }
+    for n in jars {
+        remove(id, &n, Some("plugins")).await?;
+    }
+    Ok(())
+}
+
 /// Lets Bedrock players join a Java server: installs Floodgate, then Geyser (and Fabric API on Fabric). With
 /// Floodgate there, Geyser signs Bedrock players in through Floodgate by itself, so they need no Java account.
 pub async fn bedrock_enable(id: &str) -> Result<()> {

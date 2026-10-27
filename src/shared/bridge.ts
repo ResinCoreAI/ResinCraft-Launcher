@@ -225,6 +225,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       playerRemove: fn('server:playerRemove'),
       backup: fn('server:backup'),
       regenerateWorld: fn('server:regenerateWorld'),
+      antiCheat: fn('server:antiCheat'),
+      setAntiCheat: fn('server:setAntiCheat'),
       addonSources: fn('server:addonSources'),
       addons: fn('server:addons'),
       addonSearch: fn('server:addonSearch'),

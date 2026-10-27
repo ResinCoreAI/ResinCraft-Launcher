@@ -79,6 +79,7 @@ export function mockServers(): {
   const checks: Record<string, DnsCheck | undefined> = {}
   const cfTokens: Record<string, boolean> = {}
   const owns: Record<string, DomainOwnership> = {}
+  const grim: Record<string, boolean> = {}
   /** Mirrors domain.rs: the records the server's domain needs for its current route. */
   const domainInfo = (id: string): DomainInfo => {
     const s = find(id)
@@ -626,6 +627,12 @@ export function mockServers(): {
     playerRemove: async (_id, kind, name) => void (lists[kind] = lists[kind].filter((e) => e.name !== name)),
     backup: () => wait('C:/…/servers/smp/backups/2026-10-18_14-02-11_world.zip', 1200),
     regenerateWorld: () => wait(3, 1400),
+    antiCheat: async (id) => ({ supported: find(id).type !== 'vanilla', installed: !!grim[id], enabled: !!grim[id] }),
+    setAntiCheat: async (id, on) => {
+      await wait(null, on ? 1600 : 500)
+      grim[id] = on
+      return { supported: true, installed: on, enabled: on }
+    },
     reinstall: () => wait(undefined, 1500),
     reinstallPack: () => wait({ versionName: 'current', added: 0, updated: 2, removed: 0, kept: [], pending: 0 } as never, 1500),
     addonSources: async (id, area) => sourcesOf(id, area),

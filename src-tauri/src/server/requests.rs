@@ -110,7 +110,10 @@ pub async fn info(id: &str) -> Result<RequestsInfo> {
         bot: discordbot::status(id),
         whitelist_on,
         // The player's verified domain, the name's own address, or /join/<name> on the relay (relay::join_page).
-        web_url: address.and(super::relay::join_page(&meta)),
+        web_url: match address {
+            Some(_) => super::relay::join_page(&meta).await,
+            None => None,
+        },
     })
 }
 

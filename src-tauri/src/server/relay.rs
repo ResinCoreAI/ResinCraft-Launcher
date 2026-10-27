@@ -228,17 +228,40 @@ impl Failure {
 /// The relay said (at the last connection) that each name's whitelist page is `https://<name>.<base domain>/`.
 static NAME_PAGES: AtomicBool = AtomicBool::new(false);
 
+/// Whether `https://<name>.<base domain>/` answered (and when it was tried): the relay may serve name pages before it
+/// says so (an older relay with a wildcard certificate), so the launcher looks for itself.
+static NAME_PAGE_PROBES: Mutex<Option<HashMap<String, (bool, std::time::Instant)>>> = Mutex::new(None);
+
+/// The name's own address serves its whitelist page with a working certificate (asked again after 6 hours, or 10
+/// minutes when it didn't).
+async fn name_page_works(address: &str) -> bool {
+    let cached = NAME_PAGE_PROBES.lock().unwrap().as_ref().and_then(|m| m.get(address).copied());
+    if let Some((ok, at)) = cached {
+        if at.elapsed() < Duration::from_secs(if ok { 6 * 3600 } else { 600 }) {
+            return ok;
+        }
+    }
+    let ok = crate::core::ctx::http()
+        .get(format!("https://{address}/"))
+        .timeout(Duration::from_secs(6))
+        .send()
+        .await
+        .is_ok_and(|r| r.status().is_success());
+    NAME_PAGE_PROBES.lock().unwrap().get_or_insert_with(HashMap::new).insert(address.to_string(), (ok, std::time::Instant::now()));
+    ok
+}
+
 /// The web page where players ask to be whitelisted, at its best address: the player's own domain once the relay
-/// verified it and has a certificate for it, else the name's own address when the relay serves pages there, else
-/// `https://<base domain>/join/<name>` (always covered by the relay's certificate).
-pub fn join_page(meta: &ServerMeta) -> Option<String> {
+/// verified it and has a certificate for it, else the name's own address once it works (the relay says so, or it
+/// answers over HTTPS), else `https://<base domain>/join/<name>` (always covered by the relay's certificate).
+pub async fn join_page(meta: &ServerMeta) -> Option<String> {
     let address = address_of(meta)?;
     if let (Some(domain), Some(o)) = (meta.domain.as_deref(), super::domain::ownership(&meta.id)) {
         if o.state == "verified" && o.https {
             return Some(format!("https://{domain}/"));
         }
     }
-    if NAME_PAGES.load(Ordering::Relaxed) {
+    if NAME_PAGES.load(Ordering::Relaxed) || name_page_works(&address).await {
         return Some(format!("https://{address}/"));
     }
     let (name, base) = address.split_once('.')?;

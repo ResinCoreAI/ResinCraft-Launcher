@@ -211,7 +211,7 @@ const SERVER: &[&str] = &[
     // Players and whitelist requests.
     "playerList", "playerAdd", "playerRemove", "requests", "requestAccept", "requestReject", "requestBlock", "requestUnblockAll",
     // Properties, anti-xray, Bedrock players, files to download yourself, client-only mods.
-    "properties", "setProperties", "antiXray", "setAntiXray", "bedrockJoin", "setBedrockJoin", "downloadsCheck", "downloadsForget", "clientMods",
+    "properties", "setProperties", "antiXray", "setAntiXray", "antiCheat", "setAntiCheat", "bedrockJoin", "setBedrockJoin", "downloadsCheck", "downloadsForget", "clientMods",
     // Plugins and mods from the built-in sources.
     "addonSources", "addons", "addonSearch", "addonVersions", "addonChangeVersion", "addonCheckUpdates", "addonCancelPending", "addonInstall", "addonToggle",
     "addonRemove",

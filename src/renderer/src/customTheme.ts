@@ -311,7 +311,8 @@ const MAX_PICTURE_CHARS = 12 * 1024 * 1024
 
 /** Reads a .rctheme file into a new theme (fresh id), checking every field; throws on a file that isn't one. */
 export function readThemeFile(text: string): { theme: CustomTheme; picture?: string } {
-  const file = JSON.parse(text) as Partial<ThemeFile>
+  // A file saved by Notepad (or PowerShell) can start with an invisible byte-order mark.
+  const file = JSON.parse(text.replace(/^﻿/, '')) as Partial<ThemeFile>
   if (file?.format !== 'resincraft-theme' || typeof file.theme !== 'object' || !file.theme) throw new Error('not a theme')
   const t = file.theme as Record<string, unknown>
   const base = draftFromScreen()
