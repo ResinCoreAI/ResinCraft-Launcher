@@ -1,8 +1,8 @@
 // Discover → Servers: the public server list on ResinCraft Relay (relay protocol 8). Servers hosted through the relay
 // whose owner listed them, plus servers players submitted (the relay's admin approves those). Players filter, like,
 // report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ArrowLeft, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
 import type { AskJoinOutcome, ClientPackInfo, Instance, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -297,6 +297,8 @@ export function ServerList() {
   const [submitting, setSubmitting] = useState(false)
   const [showMine, setShowMine] = useState(false)
   const [reporting, setReporting] = useState<ListedServer>()
+  /** The server whose own page is open (the list stays loaded underneath). */
+  const [open, setOpen] = useState<ListedServer>()
   const seq = useRef(0)
 
   useEffect(() => {
@@ -366,6 +368,30 @@ export function ServerList() {
       replace(s)
       toast((e as Error).message, 'error')
     }
+  }
+
+  if (open) {
+    // The open server, kept up to date with likes made here.
+    const cur = servers?.find((x) => x.id === open.id) ?? featured.find((x) => x.id === open.id) ?? open
+    return (
+      <>
+        <ServerPage
+          s={cur}
+          onBack={() => setOpen(undefined)}
+          onLike={() => void like(cur)}
+          onReport={() => setReporting(cur)}
+          onTag={(tag) => {
+            setOpen(undefined)
+            if (!tags.includes(tag)) toggleTag(tag)
+          }}
+          onModpack={(key) => {
+            setOpen(undefined)
+            setModpack(key)
+          }}
+        />
+        {reporting && <ReportServer s={reporting} onClose={() => setReporting(undefined)} />}
+      </>
+    )
   }
 
   return (
@@ -459,7 +485,7 @@ export function ServerList() {
           </h2>
           <div className="server-grid">
             {featured.map((s) => (
-              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} />
+              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} onOpen={() => setOpen(s)} />
             ))}
           </div>
         </section>
@@ -483,7 +509,7 @@ export function ServerList() {
         <>
           <div className="server-grid">
             {servers.map((s) => (
-              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} />
+              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} onOpen={() => setOpen(s)} />
             ))}
           </div>
           {servers.length < total && (
@@ -504,7 +530,8 @@ export function ServerList() {
   )
 }
 
-function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer; onLike: () => void; onReport: () => void; onTag: (tag: string) => void; onModpack: (key: string) => void }) {
+/** What a listed server's card and page can do: join (picking an instance), Install & join, ask to be whitelisted, Quick join. */
+function useServerActions(s: ListedServer, onReport: () => void) {
   const { join, toast, go, activeAccount, instances, setNewInstanceOpen } = useStore()
   const copy = useCopy()
   const [joining, setJoining] = useState(false)
@@ -602,12 +629,63 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer
     }
   }
 
+  /** The "…" menu (and the page's extra buttons). */
+  const menu = (): ContextEntry[] => [
+    !!s.pack && { label: t('servers.list.joinWithout'), icon: <Zap />, onSelect: () => void play() },
+    s.edition === 'java' && { label: t('servers.list.joinWith'), icon: <Gamepad2 />, onSelect: () => chooseInstance() },
+    s.edition === 'java' && !!s.crossplay && { label: t('servers.list.joinBedrock'), icon: <Smartphone />, onSelect: () => void play('bedrock') },
+    { label: t('quickjoin.addToQuickJoin'), icon: <Zap />, onSelect: () => void addToQuickJoin() },
+    { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(s.address) },
+    !!s.website && { label: t('servers.list.website'), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(s.website!) },
+    !!s.discord && { label: t('servers.list.discord'), icon: <MessageCircle />, onSelect: () => void api.app.openExternal(s.discord!) },
+    '-',
+    { label: t('servers.list.report'), icon: <Flag />, danger: true, onSelect: onReport }
+  ]
+  return { joining, asking, asked, bedrockOk, needsAccount, bedrockAddress, play, chooseInstance, installAndJoin, askToJoin, addToQuickJoin, copy, menu }
+}
+
+/** The main button: Install & join for servers with a client pack, else Join. */
+function JoinButtons({ s, a, size = 'sm', ask = true }: { s: ListedServer; a: ReturnType<typeof useServerActions>; size?: 'sm' | ''; ask?: boolean }) {
+  return (
+    <>
+      {ask && s.resincraft && s.join_requests && (
+        <button className={`btn ${size}`} disabled={a.asking || !!a.asked} title={t('servers.list.askHint')} onClick={() => void a.askToJoin()}>
+          {a.asking ? <Loader2 className="spin" /> : <UserPlus />} {t(a.asked ? 'servers.list.askedShort' : 'servers.list.ask')}
+        </button>
+      )}
+      {s.pack ? (
+        <button
+          className={`btn ${size} primary`}
+          disabled={a.joining}
+          title={t('servers.list.installJoinHint', { name: s.pack.name || s.title, size: bytes(s.pack.size) })}
+          onClick={() => void a.installAndJoin()}
+        >
+          {a.joining ? <Loader2 className="spin" /> : <Download />} {t('servers.list.installJoin')}
+        </button>
+      ) : (
+        <button className={`btn ${size} primary`} disabled={a.joining} title={a.needsAccount ? t('servers.list.needsAccountShort') : undefined} onClick={(e) => void a.play(s.edition, e.currentTarget)}>
+          {a.joining ? <Loader2 className="spin" /> : <Zap />} {t('servers.list.join')}
+        </button>
+      )}
+    </>
+  )
+}
+
+function ServerCard({ s, onLike, onReport, onTag, onModpack, onOpen }: { s: ListedServer; onLike: () => void; onReport: () => void; onTag: (tag: string) => void; onModpack: (key: string) => void; onOpen: () => void }) {
+  const a = useServerActions(s, onReport)
+  const { bedrockOk, copy } = a
   return (
     <article className="card server-card">
       <header>
-        {s.icon ? <img className="server-icon" src={s.icon} alt="" /> : <span className="server-icon fallback" aria-hidden><Server /></span>}
+        <button className="server-open" title={t('servers.list.openPage', { name: s.title })} onClick={onOpen}>
+          {s.icon ? <img className="server-icon" src={s.icon} alt="" /> : <span className="server-icon fallback" aria-hidden><Server /></span>}
+        </button>
         <div className="grow">
-          <h3 title={s.title}>{s.title}</h3>
+          <h3 title={s.title}>
+            <button className="link server-title" onClick={onOpen}>
+              {s.title}
+            </button>
+          </h3>
           <div className="server-meta">
             <span className={`dot ${s.online ? 'on' : ''}`} aria-hidden />
             {s.online ? (
@@ -640,7 +718,11 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer
           <Heart /> {s.likes}
         </button>
       </header>
-      {s.description && <p className="server-desc">{s.description}</p>}
+      {s.description && (
+        <p className="server-desc" onClick={onOpen}>
+          {s.description}
+        </p>
+      )}
       <div className="server-tags">
         {s.modpack && (
           <button className="chip accent modpack-chip" title={t('servers.list.filterByModpack', { name: s.modpack.name })} onClick={() => onModpack(packKey(s.modpack!))}>
@@ -671,44 +753,160 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer
           <Copy /> <span>{s.address}</span>
         </button>
         <span className="grow" />
-        {s.resincraft && s.join_requests && (
-          <button className="btn sm" disabled={asking || !!asked} title={t('servers.list.askHint')} onClick={() => void askToJoin()}>
-            {asking ? <Loader2 className="spin" /> : <UserPlus />} {t(asked ? 'servers.list.askedShort' : 'servers.list.ask')}
-          </button>
-        )}
-        {s.pack ? (
-          <button
-            className="btn sm primary"
-            disabled={joining}
-            title={t('servers.list.installJoinHint', { name: s.pack.name || s.title, size: bytes(s.pack.size) })}
-            onClick={() => void installAndJoin()}
-          >
-            {joining ? <Loader2 className="spin" /> : <Download />} {t('servers.list.installJoin')}
-          </button>
-        ) : (
-          <button className="btn sm primary" disabled={joining} title={needsAccount ? t('servers.list.needsAccountShort') : undefined} onClick={(e) => void play(s.edition, e.currentTarget)}>
-            {joining ? <Loader2 className="spin" /> : <Zap />} {t('servers.list.join')}
-          </button>
-        )}
-        <MoreButton
-          items={() => [
-            !!s.pack && { label: t('servers.list.joinWithout'), icon: <Zap />, onSelect: () => void play() },
-            s.edition === 'java' && { label: t('servers.list.joinWith'), icon: <Gamepad2 />, onSelect: () => chooseInstance() },
-            s.edition === 'java' && !!s.crossplay && { label: t('servers.list.joinBedrock'), icon: <Smartphone />, onSelect: () => void play('bedrock') },
-            { label: t('quickjoin.addToQuickJoin'), icon: <Zap />, onSelect: () => void addToQuickJoin() },
-            { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(s.address) },
-            !!s.website && { label: t('servers.list.website'), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(s.website!) },
-            !!s.discord && { label: t('servers.list.discord'), icon: <MessageCircle />, onSelect: () => void api.app.openExternal(s.discord!) },
-            '-',
-            { label: t('servers.list.report'), icon: <Flag />, danger: true, onSelect: onReport }
-          ]}
-        />
-      </footer>
+        <JoinButtons s={s} a={a} />
+        <MoreButton items={a.menu} />      </footer>
     </article>
   )
 }
 
-const emptyInfo = (): ListingInfo => ({ title: '', description: '', tags: [], region: '', language: '', version: '', edition: 'java', modded: false })
+/** One server's own page: everything the listing says, its client pack, and asking to be whitelisted. */
+function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: ListedServer; onBack: () => void; onLike: () => void; onReport: () => void; onTag: (tag: string) => void; onModpack: (key: string) => void }) {
+  const a = useServerActions(s, onReport)
+  const { activeAccount } = useStore()
+  const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString(currentLanguage(), { dateStyle: 'medium', timeStyle: 'short' }) : '—')
+  const fact = (label: string, value: ReactNode) => (
+    <div className="server-fact">
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  )
+  const top = useRef<HTMLDivElement>(null)
+  // The list may have been scrolled far down; the page starts at its top.
+  useEffect(() => {
+    top.current?.scrollIntoView({ block: 'start' })
+  }, [s.id])
+  return (
+    <div className="server-page" ref={top}>
+      <button className="btn ghost sm" onClick={onBack}>
+        <ArrowLeft /> {t('servers.list.back')}
+      </button>
+      <header className="card server-page-head">
+        {s.icon ? <img className="server-icon big" src={s.icon} alt="" /> : <span className="server-icon big fallback" aria-hidden><Server /></span>}
+        <div className="grow">
+          <h1>{s.title}</h1>
+          <div className="server-meta">
+            <span className={`dot ${s.online ? 'on' : ''}`} aria-hidden />
+            {s.online ? (
+              <span>
+                <Users /> {t('servers.list.players', { count: s.players, max: s.max_players })}
+              </span>
+            ) : (
+              <span>{t('servers.list.offline')}</span>
+            )}
+            <span>
+              {s.edition === 'bedrock' ? 'Bedrock' : 'Java'} {s.version}
+            </span>
+            {s.resincraft && <span className="chip accent compact">ResinCraft</span>}
+            {s.pinned && (
+              <span className="chip compact">
+                <Pin /> {t('servers.list.pinned')}
+              </span>
+            )}
+            {s.promo === 'recommended' && <span className="chip success compact">{t('servers.list.recommended')}</span>}
+            {s.promo === 'sponsored' && <span className="chip warn compact">{t('servers.list.sponsored')}</span>}
+          </div>
+          <div className="row server-page-actions">
+            {/* Asking has its own box below. */}
+            <JoinButtons s={s} a={a} size="" ask={false} />
+            {s.edition === 'java' && s.crossplay && (
+              <button className="btn" onClick={() => void a.play('bedrock')}>
+                <Smartphone /> {t('servers.list.joinBedrock')}
+              </button>
+            )}
+            <button className="btn" onClick={() => void a.addToQuickJoin()}>
+              <Zap /> {t('quickjoin.addToQuickJoin')}
+            </button>
+            <button className={`btn ghost like ${s.liked ? 'on' : ''}`} aria-pressed={!!s.liked} onClick={onLike}>
+              <Heart /> {s.likes}
+            </button>
+            <MoreButton items={a.menu} />
+          </div>
+        </div>
+      </header>
+
+      {s.resincraft && s.join_requests && (
+        <section className="card server-page-section whitelist-box">
+          <h2>
+            <UserPlus /> {t('servers.list.whitelistTitle')}
+          </h2>
+          <p>{t('servers.list.whitelistHint', { name: activeAccount?.username ?? '' })}</p>
+          {a.asked && <p className="hint">{t(`servers.list.asked.${a.asked}` as Key, { name: s.title })}</p>}
+          <button className="btn primary" disabled={a.asking || !!a.asked || activeAccount?.type !== 'msa'} onClick={() => void a.askToJoin()}>
+            {a.asking ? <Loader2 className="spin" /> : <UserPlus />} {t(a.asked ? 'servers.list.askedShort' : 'servers.list.ask')}
+          </button>
+          {activeAccount?.type !== 'msa' && <p className="hint bad">{t('servers.list.whitelistNeedsMs')}</p>}
+        </section>
+      )}
+
+      <div className="server-page-grid">
+        <section className="card server-page-section">
+          <h2>{t('servers.list.about')}</h2>
+          {s.description ? <p className="server-page-desc">{s.description}</p> : <p className="hint">{t('servers.list.noDescription')}</p>}
+          {s.motd && (
+            <>
+              <h3>{t('servers.list.motd')}</h3>
+              <p className="mono server-motd">{s.motd.replace(/§./g, '')}</p>
+            </>
+          )}
+          <div className="server-tags">
+            {s.tags.map((tag) => (
+              <button key={tag} className="chip" onClick={() => onTag(tag)}>
+                {CATEGORIES.includes(tag) ? tagLabel(tag) : `#${tag}`}
+              </button>
+            ))}
+            {a.bedrockOk && (
+              <span className="chip success">
+                <Smartphone /> {t('servers.list.bedrockCanJoin')}
+              </span>
+            )}
+            {s.offline && (
+              <span className="chip success">
+                <UserRound /> {t('servers.list.offlineOk')}
+              </span>
+            )}
+          </div>
+        </section>
+        <section className="card server-page-section">
+          <h2>{t('servers.list.details')}</h2>
+          {fact(t('servers.list.field.address'), <button className="link mono server-address" title={t('servers.connect.copy')} onClick={() => void a.copy(s.address)}>{s.address}</button>)}
+          {a.bedrockOk && s.edition === 'java' && fact(t('servers.list.bedrockAddress'), <span className="mono">{a.bedrockAddress}</span>)}
+          {fact(t('servers.list.field.edition'), `${s.edition === 'bedrock' ? 'Bedrock' : 'Java'} ${s.version}${s.modded ? ` · ${t('servers.list.cat.modded')}` : ''}`)}
+          {s.modpack &&
+            fact(
+              t('servers.list.modpack'),
+              <button className="link" onClick={() => onModpack(packKey(s.modpack!))}>
+                {s.modpack.name}
+                {s.modpack.version ? ` ${s.modpack.version}` : ''}
+              </button>
+            )}
+          {s.pack && fact(t('servers.list.clientPack'), `${s.pack.name || s.title}${s.pack.version ? ` ${s.pack.version}` : ''} · ${bytes(s.pack.size)}`)}
+          {s.region && fact(t('servers.list.field.region'), regionLabel(s.region))}
+          {s.language && fact(t('servers.list.field.language'), languageLabel(s.language))}
+          {fact(t('servers.list.listedSince'), when(s.listed_at))}
+          {s.last_seen && fact(t('servers.list.lastSeen'), when(s.last_seen))}
+          <div className="row server-page-links">
+            {s.website && (
+              <button className="btn sm" onClick={() => void api.app.openExternal(s.website!)}>
+                <ExternalLink /> {t('servers.list.website')}
+              </button>
+            )}
+            {s.discord && (
+              <button className="btn sm" onClick={() => void api.app.openExternal(s.discord!)}>
+                <MessageCircle /> {t('servers.list.discord')}
+              </button>
+            )}
+            <span className="grow" />
+            <button className="btn sm ghost" onClick={onReport}>
+              <Flag /> {t('servers.list.report')}
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+const emptyInfo = (): ListingInfo =>({ title: '', description: '', tags: [], region: '', language: '', version: '', edition: 'java', modded: false })
 
 function SubmitServer({ onClose }: { onClose: () => void }) {
   const { toast } = useStore()
