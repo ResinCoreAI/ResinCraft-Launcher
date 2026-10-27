@@ -50,6 +50,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
         // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.
         "app:exportTheme" => json(export_theme(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        // A QR code as SVG, made here (the 2FA setup key never leaves the PC).
+        "app:qrSvg" => json(qr_svg(&args.get::<String>(0)?)?),
+        // [file name, text] → a save dialog (recovery codes); the path, or null when cancelled.
+        "app:saveText" => json(save_text(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         // A few textures for the holiday decorations, from the player's own Minecraft (never shipped with ResinCraft).
         "app:gameTexture" => json(game_texture(&args.get::<String>(0)?).await),
 
@@ -229,6 +233,23 @@ async fn export_theme(name: &str, contents: &str) -> Result<Option<String>> {
     tokio::fs::write(&path, contents).await?;
     Ok(Some(path.to_string_lossy().into_owned()))
 }
+/// `text` as a black-on-white QR code (SVG, with a quiet zone), for an authenticator app to scan.
+fn qr_svg(text: &str) -> Result<String> {
+    let code = qrcode::QrCode::with_error_correction_level(text.as_bytes(), qrcode::EcLevel::M)?;
+    Ok(code.render::<qrcode::render::svg::Color>().min_dimensions(200, 200).quiet_zone(true).build())
+}
+
+/// Saves `text` as a .txt file the player picks (Downloads by default).
+async fn save_text(name: &str, text: &str) -> Result<Option<String>> {
+    let base: String = name.chars().filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.')).collect();
+    let base = if base.trim().is_empty() { "ResinCraft.txt".to_string() } else { base.trim().to_string() };
+    let title = crate::tr!("app.saveTextTitle", "Save the file").text;
+    let default = shell::downloads_dir().join(&base);
+    let Some(path) = shell::save_file(&title, &default, &[("Text", &["txt"])]).await? else { return Ok(None) };
+    tokio::fs::write(&path, text).await?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 /// Starts ResinCraft's own uninstaller (installed with the setup: `uninstall.exe` next to the program) and quits so it
 /// can remove the files; it asks whether to delete the player's data. MSI and Microsoft Store installs are removed
 /// through Windows' Installed apps page instead. Refused while a game or hosted server runs.

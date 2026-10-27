@@ -97,6 +97,7 @@ async function mockAdminCall(method: string, path: string, body?: unknown): Prom
   return { ok: true }
 }
 /** The relay dashboard's other routes for the preview (undefined: not one of them). */
+let twoFactorDone = false
 let service = { state: 'on', message: null as string | null, since: now() - 86400 }
 const relayEvents = [
   { id: 1, at: now() - 3600, kind: 'online', text: 'puirkle3 came online (Puirkle_Gamer)', ip: '203.0.113.9' },
@@ -106,6 +107,15 @@ const relayEvents = [
 function relayMock(method: string, path: string, b: Record<string, any>): unknown { // eslint-disable-line @typescript-eslint/no-explicit-any
   const p = path.split('?')[0]
   const limits = { tunnels_per_account: 3, names_per_account: 5, connections_per_tunnel: 50, connections_per_ip: 0, agents_per_ip: 0, monthly_gb_per_account: 100, handshake_timeout_secs: 10, idle_timeout_secs: 300, logins_per_ip_per_hour: 30, name_expiry_days: 180, session_days: 30, max_pending_handshakes: 200, session_minutes: 120, session_warn_minutes: [15, 5, 1], session_continue_minutes: 15, topup_gb: 30, topups_per_month: 3, topup_low_gb: 1, max_domains: 3 }
+  // ?require2fa=1: the relay wants 2FA before anything else (until it's set up here).
+  if (new URLSearchParams(location.search).get('require2fa') === '1' && !twoFactorDone && !p.startsWith('/api/users/2fa')) throw new Error('The relay refused: set up two-factor sign-in first')
+  if (method === 'POST' && p === '/api/users/2fa/setup')
+    return { secret: 'JBSWY3DPEHPK3PXPJBSWY3DP', uri: 'otpauth://totp/ResinCraft%20Relay:Puirkle_Gamer?secret=JBSWY3DPEHPK3PXPJBSWY3DP&issuer=ResinCraft%20Relay&algorithm=SHA1&digits=6&period=30' }
+  if (method === 'POST' && p === '/api/users/2fa/confirm') {
+    if (b.code !== '123456') throw new Error('The relay refused: that code isn’t right (set it up again if it keeps failing)')
+    twoFactorDone = true
+    return { ...(relayMock('GET', '/api/users', {}) as object), recoveryCodes: ['k7qm-2xpa', 'p3nd-8wqe', 'a9vz-4tkr', 'm2cx-7yhb', 'q8fe-1nsd', 'w4lg-6uop', 'z1rt-5mkc', 'h6bn-3ejv', 'c5ys-9adw', 'v2qp-0gtx'] }
+  }
   if (method === 'POST' && p === '/api/service') return (service = { ...service, state: b.state, message: b.message || null, since: now() })
   if (method === 'POST' && !p.startsWith('/api/listings')) return { ok: true }
   switch (p) {

@@ -2,9 +2,10 @@
 // Microsoft sign-in, passwords and remembered launchers; register more admins.
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store'
-import { KeyRound, Link2, Monitor, Plus, ShieldCheck, ShieldOff, Trash2, UserCog } from 'lucide-react'
+import { Copy, Download, KeyRound, Link2, Monitor, Plus, ShieldCheck, ShieldOff, Trash2, UserCog } from 'lucide-react'
 import { t } from '../../i18n'
-import { ConfirmModal, Modal, MoreButton } from '../ui'
+import { ConfirmModal, Modal, MoreButton, useCopy } from '../ui'
+import { api } from '../../api'
 import { ago, AskModal, Loading, post, shortId, useAct, useAdmin, when } from './common'
 
 interface Launcher {
@@ -262,9 +263,29 @@ export function TwoFactorSetup({ onClose, onDone }: { onClose: () => void; onDon
   const [code, setCode] = useState('')
   const [recovery, setRecovery] = useState<string[]>()
   const [busy, setBusy] = useState(false)
+  const [qr, setQr] = useState<string>()
+  const { toast } = useStore()
+  const copy = useCopy()
   useEffect(() => {
-    post<{ secret: string; uri: string }>('/api/users/2fa/setup').then(setSecret, (e) => setError((e as Error).message))
+    post<{ secret: string; uri: string }>('/api/users/2fa/setup').then(
+      (s) => {
+        setSecret(s)
+        // Drawn on this PC: the key never goes to a QR website.
+        api.app.qrSvg(s.uri).then(setQr, () => {})
+      },
+      (e) => setError((e as Error).message)
+    )
   }, [])
+  /** The recovery codes as a text file the player keeps. */
+  const download = async (codes: string[]) => {
+    const text = [t('servers.admin.relay.codesFileTitle'), '', ...codes, '', t('servers.admin.relay.codesFileHint')].join('\r\n')
+    try {
+      const path = await api.app.saveText('ResinCraft Relay recovery codes.txt', text)
+      if (path) toast(t('servers.admin.relay.codesSaved', { path }), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
   const confirm = async () => {
     setBusy(true)
     setError(undefined)
@@ -301,15 +322,31 @@ export function TwoFactorSetup({ onClose, onDone }: { onClose: () => void; onDon
       }
     >
       {recovery ? (
-        <div className="recovery-codes mono">
-          {recovery.map((c) => (
-            <span key={c}>{c}</span>
-          ))}
-        </div>
+        <>
+          <div className="recovery-codes mono">
+            {recovery.map((c) => (
+              <span key={c}>{c}</span>
+            ))}
+          </div>
+          <div className="row end recovery-actions">
+            <button className="btn sm" onClick={() => void copy(recovery.join('\n'), t('servers.admin.relay.codesCopied'))}>
+              <Copy /> {t('servers.admin.relay.copyCodes')}
+            </button>
+            <button className="btn sm primary" onClick={() => void download(recovery)}>
+              <Download /> {t('servers.admin.relay.downloadCodes')}
+            </button>
+          </div>
+        </>
       ) : !secret ? (
         <Loading error={error} />
       ) : (
         <div className="listing-fields">
+          {qr && (
+            <div className="twofa-qr">
+              <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr)}`} alt={t('servers.admin.relay.qrAlt')} width={200} height={200} />
+              <span className="hint">{t('servers.admin.relay.qrHint')}</span>
+            </div>
+          )}
           <label className="field">
             <span>{t('servers.admin.relay.setupKey')}</span>
             <code className="secret-key">{secret.secret.replace(/(.{4})/g, '$1 ').trim()}</code>

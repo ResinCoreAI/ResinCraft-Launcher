@@ -1721,6 +1721,10 @@ export interface ResinApi {
     gameTexture(name: string): Promise<string | null>
     /** Asks where to save a theme file (`<name>.rctheme`) and writes `contents`; the path, or null if cancelled. */
     exportTheme(name: string, contents: string): Promise<string | null>
+    /** A QR code as SVG text, drawn on this PC (2FA setup). */
+    qrSvg(text: string): Promise<string>
+    /** Saves text to a .txt the player picks (Downloads by default); the path, or null when cancelled. */
+    saveText(fileName: string, text: string): Promise<string | null>
     /** The file ResinCraft was started with (double-clicked in Windows), once; null if none. */
     pendingOpen(): Promise<string | null>
     /** Starts ResinCraft's uninstaller ('uninstaller', ResinCraft then quits) or opens Windows' Installed apps ('settings'). */

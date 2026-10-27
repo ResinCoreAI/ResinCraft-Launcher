@@ -1,7 +1,7 @@
 // The Admin page: ResinCraft Relay's server-list tools, for accounts the relay lists as admins (relay protocol 8).
 // Unlocked with the relay dashboard's password; the relay checks every request, this page is only its UI.
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Ban, Check, EyeOff, Eye, Flag, Gauge, Loader2, Lock, Pin, PinOff, Plus, Radio, RefreshCw, ScrollText, Search, Server, Settings2, Shield, Star, Tag, Trash2, Users, X } from 'lucide-react'
+import { Ban, Check, EyeOff, Eye, Flag, Gauge, Loader2, Lock, Pin, PinOff, Plus, Radio, RefreshCw, ScrollText, Search, Server, Settings2, Shield, ShieldCheck, Star, Tag, Trash2, Users, X } from 'lucide-react'
 import type { AdminStatus, ListingInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -12,7 +12,7 @@ import { ServiceCard, LiveTunnels } from '../components/admin/Live'
 import { NamesAdmin } from '../components/admin/Names'
 import { BansAdmin } from '../components/admin/Bans'
 import { UsageAdmin } from '../components/admin/Usage'
-import { UsersAdmin } from '../components/admin/Users'
+import { TwoFactorSetup, UsersAdmin } from '../components/admin/Users'
 import { RelaySettingsAdmin } from '../components/admin/RelaySettings'
 import { EventsAdmin } from '../components/admin/Events'
 import '../serverlist.css'
@@ -111,6 +111,17 @@ export default function Admin() {
   useEffect(() => {
     api.server.adminStatus().then(setStatus, () => setStatus({ admin: false, unlocked: false }))
   }, [])
+  // With the relay's require_2fa, a user without 2FA may do nothing but set it up: ask the relay once unlocked.
+  const [needs2fa, setNeeds2fa] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(false)
+  const [setupDone, setSetupDone] = useState(false)
+  useEffect(() => {
+    if (!status?.unlocked) return
+    api.server.adminCall('GET', '/api/service').then(
+      () => setNeeds2fa(false),
+      (e) => setNeeds2fa(/two-factor sign-in first/i.test((e as Error).message))
+    )
+  }, [status?.unlocked])
 
   const unlock = async () => {
     setUnlocking(true)
@@ -198,7 +209,38 @@ export default function Admin() {
     )
   }
 
-  const lock = (forget: boolean) => void api.server.adminLock(forget).then(() => setStatus({ ...status, unlocked: false, remembered: forget ? false : status.remembered }))
+  if (needs2fa) {
+    return (
+      <div className="page admin-page">
+        <div className="page-head">
+          <div>
+            <h1>{t('servers.admin.relayTitle')}</h1>
+            <p>{status.dashboardUser ? t('servers.admin.signedInAs', { user: status.dashboardUser }) : t('servers.admin.subtitle')}</p>
+          </div>
+        </div>
+        <div className="card admin-unlock">
+          <ShieldCheck />
+          <b>{t('servers.admin.relay.must2faTitle')}</b>
+          <span className="hint">{t('servers.admin.relay.must2faHint')}</span>
+          <button className="btn primary" onClick={() => setSetupOpen(true)}>
+            {t('servers.admin.relay.setup2fa')}
+          </button>
+        </div>
+        {setupOpen && (
+          <TwoFactorSetup
+            onClose={() => {
+              setSetupOpen(false)
+              // The recovery codes were shown in the dialog: now the relay screens.
+              if (setupDone) setNeeds2fa(false)
+            }}
+            onDone={() => setSetupDone(true)}
+          />
+        )}
+      </div>
+    )
+  }
+
+  const lock = (forget: boolean) =>void api.server.adminLock(forget).then(() => setStatus({ ...status, unlocked: false, remembered: forget ? false : status.remembered }))
   return (
     <div className="page admin-page">
       <div className="page-head">

@@ -255,6 +255,10 @@ export function mockApi(): ResinApi {
         throw new Error('The browser preview has no files to open.')
       },
       // The browser preview has no save dialog: a download stands in for it.
+      // A placeholder square in the browser preview (the app draws the real code).
+      qrSvg: async () =>
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29"><rect width="29" height="29" fill="#fff"/><rect x="4" y="4" width="7" height="7"/><rect x="18" y="4" width="7" height="7"/><rect x="4" y="18" width="7" height="7"/></svg>',
+      saveText: async (name) => `C:\\Users\\you\\Downloads\\${name}`,
       exportTheme: async (name, contents) => {
         const a = document.createElement('a')
         a.href = URL.createObjectURL(new Blob([contents], { type: 'application/json' }))
