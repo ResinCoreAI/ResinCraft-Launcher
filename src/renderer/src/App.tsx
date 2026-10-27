@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Smartphone, Users, Zap } from 'lucide-react'
+import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Shield, Smartphone, Users, Zap } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
@@ -20,6 +20,8 @@ import Library, { useInstanceMenu } from './pages/Library'
 import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
+import { useAdminStatus } from './adminStatus'
+
 
 // Home and the Library are where the launcher opens; every other page (and what only it uses, like the theme
 // editor in Settings) loads on its first visit, so starting up parses less.
@@ -30,6 +32,7 @@ const QuickJoin = lazy(() => import('./pages/QuickJoin'))
 const Accounts = lazy(() => import('./pages/Accounts'))
 const Bedrock = lazy(() => import('./pages/Bedrock'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const Admin = lazy(() => import('./pages/Admin'))
 
 const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'home', label: 'nav.home', icon: <HomeIcon /> },
@@ -39,7 +42,9 @@ const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'discover', label: 'nav.discover', icon: <Compass /> },
   { page: 'servers', label: 'servers.nav', icon: <Server /> },
   { page: 'accounts', label: 'nav.accounts', icon: <Users /> },
-  { page: 'settings', label: 'nav.settings', icon: <SettingsIcon /> }
+  { page: 'settings', label: 'nav.settings', icon: <SettingsIcon /> },
+  // Only for ResinCraft Relay's admin accounts (useAdminStatus).
+  { page: 'admin', label: 'servers.admin.nav', icon: <Shield /> }
 ]
 
 /** The sidebar's line under the account name. */
@@ -54,7 +59,8 @@ const TITLES: Record<Route['page'], Key> = {
   discover: 'nav.discover',
   servers: 'servers.nav',
   accounts: 'nav.accounts',
-  settings: 'nav.settings'
+  settings: 'nav.settings',
+  admin: 'servers.admin.nav'
 }
 
 /** An instance under "Jump back in"; right-click for the same menu as its Library card. */
@@ -91,6 +97,7 @@ function accountMenu(accounts: AccountView[], pick: (a: AccountView) => void, ma
 export default function App() {
   const { route, go, instances, games, accounts, activeAccount, switchAccount, toast, newInstanceOpen, setNewInstanceOpen } = useStore()
   useRemoteActions()
+  const isAdmin = useAdminStatus()
   const current = route.page === 'instance' ? 'library' : route.page
   const instance = route.page === 'instance' ? instances.find((i) => i.id === route.id) : undefined
   const recent = instances.filter((i) => i.lastPlayed || games[i.id]).slice(0, 6)
@@ -107,7 +114,7 @@ export default function App() {
         </div>
 
         <nav className="nav">
-          {NAV.filter((n) => n.page !== 'bedrock' || hasBedrockApp).map((n) => (
+          {NAV.filter((n) => (n.page !== 'bedrock' || hasBedrockApp) && (n.page !== 'admin' || isAdmin)).map((n) => (
             <button key={n.page} className={`nav-item ${current === n.page ? 'active' : ''}`} onClick={() => go({ page: n.page } as Route)}>
               {n.icon}
               <span className="ellipsis">{t(n.label)}</span>
@@ -181,6 +188,7 @@ export default function App() {
             {route.page === 'accounts' && <Accounts />}
             {route.page === 'bedrock' && <Bedrock />}
             {route.page === 'settings' && <SettingsPage />}
+            {route.page === 'admin' && <Admin />}
             {route.page === 'servers' && <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />}
           </Suspense>
         </div>

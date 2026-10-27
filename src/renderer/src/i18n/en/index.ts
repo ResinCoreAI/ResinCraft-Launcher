@@ -1,6 +1,7 @@
 // English, the source language. Each file holds one area of the UI; keys are "area.name".
 // engine.ts is generated from the Rust engine's tr!() calls (tools/engine-strings.ts).
 import accounts from './accounts'
+import admin from './admin'
 import art from './art'
 import app from './app'
 import bedrock from './bedrock'
@@ -40,6 +41,7 @@ const en = {
   ...menu,
   ...migrate,
   ...servers,
+  ...admin,
   ...quickjoin,
   ...commands,
   ...updates,

@@ -30,8 +30,56 @@ const LISTED: ListedServer[] = [
 const clientPacks: Record<string, ListingPack | undefined> = {}
 const isAdmin = () => new URLSearchParams(location.search).get('admin') === '1'
 let adminUnlocked = false
-/** Filled in once the relay's admin API shapes are final (the Admin page). */
-const mockAdminCall = async (_method: string, _path: string, _body?: unknown): Promise<unknown> => wait({ ok: true })
+/** The relay dashboard's JSON API as the Admin page calls it (GET /api/listings, POST /api/listings/<route>). */
+const bans: { uuid: string; name: string; reason: string; at: number; until: number | null }[] = []
+const reports = [{ id: 'r1', listing: 's-b2', title: 'Arena Rush', address: 'arenarush.example', reporterName: 'Steve', reason: 'Asks for passwords in chat', at: now() - 3600 }]
+const pendingList = [{ id: 's-p1', title: 'Ocean Kingdoms', description: 'Roleplay towns by the sea.', tags: ['roleplay', 'towny'], address: 'ocean.example' }]
+const asItem = (s: ListedServer, state: string) => ({
+  ...s,
+  kind: s.resincraft ? 'resincraft' : s.id.startsWith('a-') ? 'admin' : 'submitted',
+  owner: s.id.startsWith('a-') ? '' : 'uuid-' + s.id,
+  ownerName: s.id.startsWith('a-') ? undefined : 'Owner of ' + s.title,
+  ownerBanned: bans.some((b) => b.uuid === 'uuid-' + s.id),
+  promo: s.promo ? { kind: s.promo, until: null, order: 0, active: true } : null,
+  state,
+  reports: reports.filter((r) => r.listing === s.id).length,
+  maxPlayers: s.max_players
+})
+async function mockAdminCall(method: string, path: string, body?: unknown): Promise<unknown> {
+  if (!adminUnlocked) throw new Error('The relay refused: unlock the admin API first')
+  await wait(null, 300)
+  const b = (body ?? {}) as Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+  const find = (id: string) => LISTED.find((s) => s.id === id)
+  if (method === 'GET') {
+    return {
+      settings: adminSettings,
+      settingsOverridden: false,
+      counts: { listed: LISTED.length, pending: pendingList.length, hidden: 0 },
+      pending: pendingList.map((p) => ({ ...p, kind: 'submitted', edition: 'java', version: '1.21.1', modded: false, pinned: false, owner: 'uuid-p', ownerName: 'Alex', state: 'pending', likes: 0, reports: 0, online: true, players: 4, maxPlayers: 30 })),
+      featured: LISTED.filter((s) => s.promo).map((s) => asItem(s, 'listed')),
+      listings: LISTED.map((s) => asItem(s, 'listed')),
+      bans,
+      reports
+    }
+  }
+  const route = path.replace('/api/listings/', '')
+  const s = b.id ? find(b.id) : undefined
+  if (route === 'approve' || route === 'reject') pendingList.splice(pendingList.findIndex((p) => p.id === b.id), 1)
+  else if (route === 'pin' && s) s.pinned = true
+  else if (route === 'unpin' && s) s.pinned = false
+  else if (route === 'promo' && s) s.promo = b.promo?.kind ?? null
+  else if (route === 'remove' && s) LISTED.splice(LISTED.indexOf(s), 1)
+  else if (route === 'ban') bans.push({ uuid: b.uuid ?? 'uuid-' + (b.id ?? b.name), name: b.name ?? (s ? 'Owner of ' + s.title : b.uuid), reason: b.reason ?? '', at: now(), until: b.hours ? now() + b.hours * 3600 : null })
+  else if (route === 'unban') bans.splice(bans.findIndex((x) => x.uuid === b.uuid), 1)
+  else if (route === 'reports/dismiss' || route === 'reports/hide') reports.splice(reports.findIndex((r) => r.id === b.id), 1)
+  else if (route === 'settings') Object.assign(adminSettings, b.settings)
+  else if (route === 'add') {
+    const l = b.listing as ListingInfo
+    LISTED.push({ ...l, id: 'a-' + Math.random().toString(36).slice(2, 6), address: b.address, resincraft: false, online: false, players: 0, max_players: 0, likes: 0, join_requests: false, listed_at: now(), pinned: !!b.pinned, promo: b.promo?.kind ?? null } as ListedServer)
+  }
+  return { ok: true }
+}
+const adminSettings = { enabled: true, resincraft_approval: 'auto', submitted_approval: 'manual', max_submissions: 3, report_hide_threshold: 5, max_pack_mb: 50, pack_downloads_per_hour: 60 }
 
 const listings: Record<string, { enabled: boolean; info: ListingInfo; state: ListingStatus['state'] }> = {}
 const mine: MyListing[] = []

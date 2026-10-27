@@ -286,6 +286,42 @@
   height: 13px;
   vertical-align: -2px;
 }
+/* The Admin page (pages/Admin.tsx). */
+.admin-unlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 420px;
+  padding: 20px;
+}
+.admin-unlock > svg {
+  color: var(--accent);
+}
+.admin-items .admin-item .text b {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.admin-items .chip svg,
+.admin-items svg.inline {
+  width: 12px;
+  height: 12px;
+}
+.admin-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.segmented .count {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+}
 .my-listings .setting svg.inline {
   width: 12px;
   height: 12px;

@@ -13,6 +13,7 @@ export type Route =
   | { page: 'servers'; id?: string; fromInstance?: string }
   | { page: 'bedrock' }
   | { page: 'quickjoin' }
+  | { page: 'admin' }
   | { page: 'settings' }
 
 export type GameState = GameEvent['state']
