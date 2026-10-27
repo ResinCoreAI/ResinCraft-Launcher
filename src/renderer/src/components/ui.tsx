@@ -841,7 +841,8 @@ export function celebrate(from?: Element | { x: number; y: number } | null): voi
 }
 
 export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }) {
-  return <button className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} />
+  // type="button": inside a form, Enter would otherwise "click" the switch (the form's first submit button).
+  return <button type="button" className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} />
 }
 
 export function Segmented<T extends string>({
@@ -856,7 +857,7 @@ export function Segmented<T extends string>({
   return (
     <div className="segmented">
       {options.map((o) => (
-        <button key={o.value} className={o.value === value ? 'on' : ''} disabled={o.disabled} onClick={() => onChange(o.value)}>
+        <button key={o.value} type="button" className={o.value === value ? 'on' : ''} disabled={o.disabled} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}
