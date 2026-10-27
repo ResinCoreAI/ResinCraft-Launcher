@@ -573,11 +573,12 @@ impl Connection {
     }
 
     /// Unlocks the relay's admin tools on this connection (only for an admin account, with the dashboard's password).
-    pub async fn admin_unlock(&mut self, password: &str) -> Result<(), AgentError> {
+    /// Returns the dashboard user it's signed in as, when the relay says.
+    pub async fn admin_unlock(&mut self, user: Option<&str>, password: &str) -> Result<Option<String>, AgentError> {
         self.need_listings()?;
-        self.send(&AgentMsg::AdminUnlock { password: password.to_string() }).await?;
+        self.send(&AgentMsg::AdminUnlock { password: password.to_string(), user: user.map(str::to_string) }).await?;
         match self.recv().await? {
-            RelayMsg::AdminReady {} => Ok(()),
+            RelayMsg::AdminReady { user } => Ok(user),
             other => Err(unexpected(&other)),
         }
     }

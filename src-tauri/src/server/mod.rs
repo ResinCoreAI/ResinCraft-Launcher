@@ -210,7 +210,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:askToJoin" => json(listing::ask_join(&args.get::<String>(0)?).await?),
         // The Admin page, for the relay's admin accounts.
         "server:adminStatus" => json(admin::status().await),
-        "server:adminUnlock" => json(admin::unlock(&args.get::<String>(0)?).await?),
+        // [password, user?]
+        "server:adminUnlock" => json(admin::unlock(args.get::<Option<String>>(1)?, &args.get::<String>(0)?).await?),
+        "server:adminDashboard" => {
+            admin::open_dashboard().await?;
+            done()
+        }
         "server:adminLock" => {
             admin::lock().await;
             done()

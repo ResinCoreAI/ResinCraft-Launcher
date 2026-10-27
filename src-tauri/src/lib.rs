@@ -71,7 +71,8 @@ pub fn run() {
         .run(|app, event| {
             // Tray mode: the close button hides the window; ResinCraft goes on in the background.
             if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::CloseRequested { api, .. }, .. } = &event {
-                if core::settings::tray_on() && !tray::quitting() {
+                // Only the launcher itself goes to the tray; other windows (sign-in, relay dashboard) really close.
+                if label == "main" && core::settings::tray_on() && !tray::quitting() {
                     api.prevent_close();
                     if let Some(w) = app.get_webview_window(label) {
                         let _ = w.hide();

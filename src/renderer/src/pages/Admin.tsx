@@ -1,8 +1,8 @@
 // The Admin page: ResinCraft Relay's server-list tools, for accounts the relay lists as admins (relay protocol 8).
 // Unlocked with the relay dashboard's password; the relay checks every request, this page is only its UI.
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Ban, Check, EyeOff, Eye, Flag, Loader2, Lock, Pin, PinOff, Plus, RefreshCw, Search, Shield, Star, Trash2, X } from 'lucide-react'
-import type { ListingInfo } from '@shared/types'
+import { Ban, Check, ExternalLink, EyeOff, Eye, Flag, Loader2, Lock, Pin, PinOff, Plus, RefreshCw, Search, Shield, Star, Trash2, X } from 'lucide-react'
+import type { AdminStatus, ListingInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t, type Key } from '../i18n'
@@ -65,7 +65,8 @@ const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleStr
 
 export default function Admin() {
   const { toast } = useStore()
-  const [status, setStatus] = useState<{ admin: boolean; unlocked: boolean; username?: string }>()
+  const [status, setStatus] = useState<AdminStatus>()
+  const [opening, setOpening] = useState(false)
   const [password, setPassword] = useState('')
   const [unlocking, setUnlocking] = useState(false)
   const [error, setError] = useState<string>()
@@ -184,6 +185,24 @@ export default function Admin() {
           </p>
         </div>
         <div className="row">
+          {status.dashboardUser && <span className="hint">{t('servers.admin.signedInAs', { user: status.dashboardUser })}</span>}
+          <button
+            className="btn sm primary"
+            disabled={opening}
+            title={t('servers.admin.dashboardHint')}
+            onClick={async () => {
+              setOpening(true)
+              try {
+                await api.server.adminDashboard()
+              } catch (e) {
+                toast((e as Error).message, 'error')
+              } finally {
+                setOpening(false)
+              }
+            }}
+          >
+            {opening ? <Loader2 className="spin" /> : <ExternalLink />} {t('servers.admin.dashboard')}
+          </button>
           <button className="btn sm" disabled={loading} onClick={() => void load()}>
             {loading ? <Loader2 className="spin" /> : <RefreshCw />} {t('common.refresh')}
           </button>

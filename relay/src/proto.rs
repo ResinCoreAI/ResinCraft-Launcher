@@ -151,7 +151,12 @@ pub enum AgentMsg {
     ListingJoin { id: String },
     /// Unlock the relay's admin tools on this connection with the dashboard's password; only for accounts the relay
     /// lists as admins (uthed said dmin). Answered with dmin_ready. Protocol 8.
-    AdminUnlock { password: String },
+    AdminUnlock {
+        password: String,
+        /// The dashboard user to sign in as (relays with dashboard users); without it, the relay's legacy `admin` user.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        user: Option<String>,
+    },
     /// One admin request after dmin_ready: the same as the dashboard's JSON API (GET /api/listings, POST
     /// /api/listings/...). Answered with dmin_result. Protocol 8.
     AdminCall {
@@ -411,7 +416,11 @@ pub enum RelayMsg {
     /// The answer to `listing_join`. Protocol 8.
     JoinAsked { id: String, outcome: JoinOutcome },
     /// The answer to dmin_unlock. Protocol 8.
-    AdminReady {},
+    AdminReady {
+        /// The dashboard user the account is linked to (relays with dashboard users).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        user: Option<String>,
+    },
     /// The answer to dmin_call id: alue when ok, else error. Protocol 8.
     AdminResult {
         id: u64,

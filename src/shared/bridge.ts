@@ -245,6 +245,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       adminUnlock: fn('server:adminUnlock'),
       adminLock: fn('server:adminLock'),
       adminCall: fn('server:adminCall'),
+      adminDashboard: fn('server:adminDashboard'),
       submitListing: fn('server:submitListing'),
       myListings: fn('server:myListings'),
       removeListing: fn('server:removeListing'),

@@ -1197,6 +1197,16 @@ export interface ListingModpack {
   version?: string
 }
 
+/** The Admin page's account: one of the relay's admins, and unlocked this session. */
+export interface AdminStatus {
+  admin: boolean
+  unlocked: boolean
+  /** The Minecraft name. */
+  username?: string
+  /** The relay dashboard user it's signed in as. */
+  dashboardUser?: string
+}
+
 /** One world backup zip (a server's or an instance's). */
 export interface BackupFile {
   file: string
@@ -2070,8 +2080,10 @@ export interface ResinApi {
     /** Discover → Servers → Install & join: the instance made from (or already made from) a listing's pack. */
     installListingPack(req: { id: string; url: string; sha256: string }): Promise<string>
     /** The Admin page: whether the active account is one of the relay's admins, and unlocked this session. */
-    adminStatus(): Promise<{ admin: boolean; unlocked: boolean; username?: string }>
-    adminUnlock(password: string): Promise<{ admin: boolean; unlocked: boolean; username?: string }>
+    adminStatus(): Promise<AdminStatus>
+    adminUnlock(password: string, user?: string): Promise<AdminStatus>
+    /** The relay's full dashboard in a window of its own, signed in (needs the Admin page unlocked). */
+    adminDashboard(): Promise<void>
     adminLock(): Promise<void>
     /** One admin request (the relay dashboard's JSON API: GET /api/listings, POST /api/listings/…). */
     adminCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
