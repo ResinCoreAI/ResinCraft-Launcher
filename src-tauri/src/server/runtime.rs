@@ -1604,6 +1604,25 @@ async fn zip_worlds(dir: PathBuf, worlds: Vec<String>, target: PathBuf) -> Resul
 
 
 #[cfg(test)]
+mod restore_tests {
+    use super::restore_target;
+
+    #[test]
+    fn backups_go_back_under_the_level_name_now() {
+        assert_eq!(restore_target("world/region/r.0.0.mca", "world", "world", false).as_deref(), Some("world/region/r.0.0.mca"));
+        assert_eq!(restore_target("old/level.dat", "old", "smp", false).as_deref(), Some("smp/level.dat"));
+        assert_eq!(restore_target("old_nether/DIM-1/x", "old", "smp", false).as_deref(), Some("smp_nether/DIM-1/x"));
+        assert_eq!(restore_target("old_the_end/DIM1/x", "old", "smp", false).as_deref(), Some("smp_the_end/DIM1/x"));
+        // Nothing outside the world, and never the lock file.
+        assert_eq!(restore_target("server.properties", "world", "world", false), None);
+        assert_eq!(restore_target("plugins/x.jar", "world", "world", false), None);
+        assert_eq!(restore_target("world/session.lock", "world", "world", false), None);
+        assert_eq!(restore_target("worlds/Bedrock level/db/1.ldb", "Bedrock level", "level", true).as_deref(), Some("worlds/level/db/1.ldb"));
+        assert_eq!(restore_target("other/x", "Bedrock level", "level", true), None);
+    }
+}
+
+#[cfg(test)]
 mod player_tests {
     use super::*;
 
@@ -1666,6 +1685,108 @@ mod pack_flag_tests {
 /// Server → Settings → Regenerate world: the world (and Bukkit-style _nether/_the_end folders, or a Bedrock world)
 /// goes to the Recycle Bin, after a backup when `backup` is on, and a new one is made on the next start. `seed`:
 /// None keeps `level-seed`, Some("") picks a random one, Some(s) uses s. Only while the server is stopped.
+/// The server's backups (manual and auto), newest first.
+pub async fn list_backups(id: &str) -> Result<Vec<crate::core::backupfiles::BackupFile>> {
+    Ok(crate::core::backupfiles::list(&store::dir(id)?.join("backups")).await)
+}
+
+pub async fn delete_backup(id: &str, file: &str) -> Result<()> {
+    crate::core::backupfiles::delete(&store::dir(id)?.join("backups"), file).await
+}
+
+/// Where a zip entry goes when restoring: the backup's world folders are put back under the server's level name
+/// now (the zip may name another, if `level-name` changed since). None for anything that isn't the world.
+fn restore_target(entry: &str, zip_level: &str, level: &str, bedrock: bool) -> Option<String> {
+    let entry = entry.replace('\\', "/");
+    if bedrock {
+        let rest = entry.strip_prefix(&format!("worlds/{zip_level}/"))?;
+        return Some(format!("worlds/{level}/{rest}"));
+    }
+    let (top, rest) = entry.split_once('/')?;
+    let folder = if top == zip_level {
+        level.to_string()
+    } else if top == format!("{zip_level}_nether") {
+        format!("{level}_nether")
+    } else if top == format!("{zip_level}_the_end") {
+        format!("{level}_the_end")
+    } else {
+        return None;
+    };
+    (!rest.is_empty() && rest.rsplit('/').next() != Some("session.lock")).then(|| format!("{folder}/{rest}"))
+}
+
+/// Puts a backup back while the server is off: its current world goes to the Recycle Bin (so the restore can be
+/// undone), then the backup's world folders are unpacked in its place.
+pub async fn restore_backup(id: &str, file: &str) -> Result<()> {
+    let meta = store::get(id).await?;
+    if state(id) != "stopped" {
+        bail!("Stop {} first: its world can only be replaced while it's off.", meta.name);
+    }
+    let dir = store::dir(id)?;
+    let zip_path = crate::core::backupfiles::path_of(&dir.join("backups"), file)?;
+    let level = properties::get_value(&dir, "level-name").await.filter(|l| !l.trim().is_empty()).unwrap_or_else(|| "world".into());
+    let level = crate::content::index::safe_name(level.trim())?.to_string();
+    let bedrock = meta.kind.bedrock();
+    // Which world the zip holds: the folder with the shallowest level.dat.
+    let zp = zip_path.clone();
+    let names: Vec<String> = tokio::task::spawn_blocking(move || -> Result<Vec<String>> {
+        let zip = zip::ZipArchive::new(std::fs::File::open(&zp)?).map_err(|_| anyhow::anyhow!("That backup isn't a valid zip."))?;
+        Ok(zip.file_names().map(str::to_string).collect())
+    })
+    .await??;
+    let zip_level = names
+        .iter()
+        .map(|n| n.replace('\\', "/"))
+        .filter_map(|n| n.strip_suffix("/level.dat").map(str::to_string))
+        .filter_map(|p| if bedrock { p.strip_prefix("worlds/").filter(|l| !l.contains('/')).map(str::to_string) } else { (!p.contains('/')).then_some(p) })
+        .find(|l| !l.ends_with("_nether") && !l.ends_with("_the_end"));
+    let Some(zip_level) = zip_level else { bail!("That backup doesn't hold a {} world.", meta.name) };
+
+    let current: Vec<PathBuf> = if bedrock {
+        vec![dir.join("worlds").join(&level)]
+    } else {
+        [level.clone(), format!("{level}_nether"), format!("{level}_the_end")].into_iter().map(|f| dir.join(f)).collect()
+    };
+    for folder in current.iter().filter(|p| p.is_dir()) {
+        crate::core::shell::trash(folder).await?;
+    }
+    let (d, lv) = (dir.clone(), level.clone());
+    Task::run_to_end(format!("Restoring {}", meta.name), Some(id.to_string()), |t| async move {
+        let res = tokio::task::spawn_blocking(move || -> Result<()> {
+            let mut zip = zip::ZipArchive::new(std::fs::File::open(&zip_path)?)?;
+            let n = zip.len();
+            for i in 0..n {
+                let mut entry = zip.by_index(i)?;
+                if entry.is_dir() {
+                    continue;
+                }
+                let Some(rel) = restore_target(entry.name(), &zip_level, &lv, bedrock) else { continue };
+                let out = crate::core::fsutil::safe_join(&d, &rel)?;
+                if let Some(parent) = out.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::io::copy(&mut entry, &mut std::fs::File::create(&out)?)?;
+                if i % 64 == 0 {
+                    t.update(format!("Unpacking the world ({}/{n})", i + 1), Some((i + 1) as f64 / n as f64));
+                }
+            }
+            Ok(())
+        })
+        .await
+        .map_err(anyhow::Error::from)
+        .and_then(|r| r);
+        if let Err(e) = res {
+            // Only what this restore unpacked; the world before it is in the Recycle Bin.
+            for folder in &current {
+                let _ = tokio::fs::remove_dir_all(folder).await;
+            }
+            return Err(e.context("The restore didn't finish; the world from before it is in the Recycle Bin"));
+        }
+        Ok(())
+    })
+    .await
+}
+
 pub async fn regenerate_world(id: &str, backup_first: bool, seed: Option<String>) -> Result<usize> {
     let meta = store::get(id).await?;
     if state(id) != "stopped" {

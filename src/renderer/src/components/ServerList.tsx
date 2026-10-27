@@ -2,13 +2,13 @@
 // whose owner listed them, plus servers players submitted (the relay's admin approves those). Players filter, like,
 // report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Download, ExternalLink, Flag, Heart, Loader2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
-import type { AskJoinOutcome, ClientPackInfo, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
+import { Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
+import type { AskJoinOutcome, ClientPackInfo, Instance, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes } from '../util'
 import { currentLanguage, t, tx, type Key } from '../i18n'
-import { Empty, Modal, MoreButton, Switch, useCopy } from './ui'
+import { Empty, Modal, MoreButton, openMenuBelow, Switch, useCopy, type ContextEntry } from './ui'
 import '../serverlist.css'
 
 export const CATEGORIES = ['smp', 'survival', 'pvp', 'minigames', 'creative', 'modded', 'skyblock', 'anarchy', 'roleplay', 'economy', 'factions', 'prison', 'parkour', 'hardcore', 'vanilla', 'towny', 'lifesteal', 'bedwars']
@@ -17,7 +17,43 @@ export const LANGUAGES = ['en', 'th', 'es', 'pt-BR', 'de', 'fr', 'it', 'pl', 'ru
 const MAX_CUSTOM = 5
 
 /** A modpack's filter value: "<source>:<project id>", or a custom pack's name. */
-export const packKey = (m: { name: string; source: string; project_id: string }) => (m.source && m.project_id ? `${m.source}:${m.project_id}` : m.name)
+/** Instances for joining a listed server: the server's modpack, then its Minecraft version (and mods or not), first. */
+export function rankForListing(s: ListedServer, instances: Instance[]): { inst: Instance; fits: boolean }[] {
+  // ResinCraft keeps a pack's site as a prefix of its project id (Modrinth has none).
+  const prefix: Record<string, string> = { curseforge: 'cf:', ftb: 'ftb:', atlauncher: 'atl:', technic: 'technic:', modrinth: '' }
+  const pack = s.modpack?.project_id && s.modpack.source in prefix ? `${prefix[s.modpack.source]}${s.modpack.project_id}` : ''
+  const score = (i: Instance) => {
+    if (pack && i.modpack?.projectId === pack) return 3
+    if (!s.version || i.mcVersion !== s.version) return 0
+    const modded = i.loader !== 'vanilla'
+    return modded === (s.modded || !!s.modpack) ? 2 : 1
+  }
+  return instances
+    .map((inst) => ({ inst, score: score(inst) }))
+    .sort((a, b) => b.score - a.score || (b.inst.lastPlayed ?? 0) - (a.inst.lastPlayed ?? 0))
+    .map(({ inst, score }) => ({ inst, fits: score >= 2 || (score === 1 && !s.modded) }))
+}
+
+/** The instance a listed server was last joined with (this PC only). */
+const JOINED_KEY = 'resin.listJoined'
+function rememberedInstance(id: string): string | undefined {
+  try {
+    return (JSON.parse(localStorage.getItem(JOINED_KEY) ?? '{}') as Record<string, string>)[id]
+  } catch {
+    return undefined
+  }
+}
+function rememberInstance(id: string, instanceId: string) {
+  try {
+    const all = JSON.parse(localStorage.getItem(JOINED_KEY) ?? '{}') as Record<string, string>
+    all[id] = instanceId
+    localStorage.setItem(JOINED_KEY, JSON.stringify(all))
+  } catch {
+    /* private storage: just not remembered */
+  }
+}
+
+export const packKey =(m: { name: string; source: string; project_id: string }) => (m.source && m.project_id ? `${m.source}:${m.project_id}` : m.name)
 export const tagLabel = (tag: string) => (CATEGORIES.includes(tag) ? t(`servers.list.cat.${tag}` as Key) : tag)
 export const regionLabel = (r: string) => t(`servers.list.region.${r}` as Key)
 export function languageLabel(code: string): string {
@@ -469,7 +505,7 @@ export function ServerList() {
 }
 
 function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer; onLike: () => void; onReport: () => void; onTag: (tag: string) => void; onModpack: (key: string) => void }) {
-  const { join, toast, go, activeAccount } = useStore()
+  const { join, toast, go, activeAccount, instances, setNewInstanceOpen } = useStore()
   const copy = useCopy()
   const [joining, setJoining] = useState(false)
   const bedrockOk = s.edition === 'bedrock' || !!s.crossplay
@@ -480,14 +516,42 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer
   const [asking, setAsking] = useState(false)
   const [asked, setAsked] = useState<AskJoinOutcome>()
 
-  const play = async (edition: 'java' | 'bedrock' = s.edition) => {
+  /** Joins with `instanceId` (Java), remembering it for this server. */
+  const joinWith = async (edition: 'java' | 'bedrock', instanceId?: string) => {
+    if (instanceId) rememberInstance(s.id, instanceId)
+    setJoining(true)
+    const ok = await join({ address: edition === 'bedrock' ? bedrockAddress : s.address, name: s.title, edition, instanceId })
+    setJoining(false)
+    if (ok && edition === 'bedrock') toast(t('quickjoin.openedBedrock', { name: s.title }), 'info')
+  }
+  /** Java: the instance this server was last joined with, else the one that fits it best, else a chooser. */
+  const play = async (edition: 'java' | 'bedrock' = s.edition, button?: HTMLElement | null) => {
     if (edition === 'java' && needsAccount) {
       return toast(t('servers.list.needsAccount', { name: s.title }), 'error', { label: t('servers.list.openAccounts'), run: () => go({ page: 'accounts' }) })
     }
-    setJoining(true)
-    const ok = await join({ address: edition === 'bedrock' ? bedrockAddress : s.address, name: s.title, edition })
-    setJoining(false)
-    if (ok && edition === 'bedrock') toast(t('quickjoin.openedBedrock', { name: s.title }), 'info')
+    if (edition === 'bedrock') return joinWith('bedrock')
+    if (instances.length === 0) {
+      return toast(t('servers.list.noInstance', { version: s.version }), 'error', { label: t('servers.list.newInstance'), run: () => setNewInstanceOpen(true) })
+    }
+    const ranked = rankForListing(s, instances)
+    const pick = ranked.find((r) => r.inst.id === rememberedInstance(s.id))?.inst ?? ranked.find((r) => r.fits)?.inst
+    if (pick) return joinWith('java', pick.id)
+    chooseInstance(button)
+  }
+  /** The menu of instances to join with, the ones that fit the server first. */
+  const chooseInstance = (button?: HTMLElement | null) => {
+    const ranked = rankForListing(s, instances)
+    const at = button ?? document.activeElement
+    const entries: ContextEntry[] = [
+      ...ranked.slice(0, 12).map(({ inst, fits }) => ({
+        label: inst.name,
+        hint: fits ? t('servers.list.fitsServer', { version: inst.mcVersion }) : t('servers.list.otherVersion', { version: inst.mcVersion }),
+        onSelect: () => void joinWith('java', inst.id)
+      })),
+      '-',
+      { label: t('servers.list.newInstanceFor', { version: s.version || '?' }), icon: <Plus />, onSelect: () => setNewInstanceOpen(true) }
+    ]
+    if (at instanceof HTMLElement) openMenuBelow(at, entries, false, t('servers.list.joinWith'))
   }
   /** The server's own client pack: install it as an instance (once; again when it changes), then join with it. */
   const installAndJoin = async () => {
@@ -622,13 +686,14 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer
             {joining ? <Loader2 className="spin" /> : <Download />} {t('servers.list.installJoin')}
           </button>
         ) : (
-          <button className="btn sm primary" disabled={joining} title={needsAccount ? t('servers.list.needsAccountShort') : undefined} onClick={() => void play()}>
+          <button className="btn sm primary" disabled={joining} title={needsAccount ? t('servers.list.needsAccountShort') : undefined} onClick={(e) => void play(s.edition, e.currentTarget)}>
             {joining ? <Loader2 className="spin" /> : <Zap />} {t('servers.list.join')}
           </button>
         )}
         <MoreButton
           items={() => [
             !!s.pack && { label: t('servers.list.joinWithout'), icon: <Zap />, onSelect: () => void play() },
+            s.edition === 'java' && { label: t('servers.list.joinWith'), icon: <Gamepad2 />, onSelect: () => chooseInstance() },
             s.edition === 'java' && !!s.crossplay && { label: t('servers.list.joinBedrock'), icon: <Smartphone />, onSelect: () => void play('bedrock') },
             { label: t('quickjoin.addToQuickJoin'), icon: <Zap />, onSelect: () => void addToQuickJoin() },
             { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(s.address) },

@@ -234,6 +234,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:reinstallPack" => json(packs::reinstall_pack(&args.get::<String>(0)?).await?),
         "server:backup" => json(runtime::backup(&args.get::<String>(0)?).await?),
+        "server:backups" => json(runtime::list_backups(&args.get::<String>(0)?).await?),
+        "server:restoreBackup" => {
+            runtime::restore_backup(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            done()
+        }
+        "server:deleteBackup" => {
+            runtime::delete_backup(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            done()
+        }
         // [id, {backup: bool, seed: null | "" (random) | "…"}] → how many world folders went to the Recycle Bin.
         "server:regenerateWorld" => {
             let opts = args.raw(1);

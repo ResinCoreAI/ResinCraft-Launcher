@@ -28,6 +28,21 @@ const LISTED: ListedServer[] = [
 ]
 
 const clientPacks: Record<string, ListingPack | undefined> = {}
+
+/** A few backups of `world` for the preview's Restore lists: two auto backups and one made by hand. */
+export function mockBackups(world: string) {
+  const at = (hoursAgo: number) => Date.now() - hoursAgo * 3_600_000
+  const name = (ms: number, auto: boolean) => {
+    const d = new Date(ms)
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-00_${world}${auto ? '_auto' : ''}.zip`
+  }
+  return [
+    { file: name(at(0.5), true), world, at: at(0.5), size: 48_200_000, auto: true },
+    { file: name(at(1), true), world, at: at(1), size: 47_900_000, auto: true },
+    { file: name(at(26), false), world, at: at(26), size: 45_100_000, auto: false }
+  ]
+}
 const isAdmin = () => new URLSearchParams(location.search).get('admin') === '1'
 let adminUnlocked = false
 /** The relay dashboard's JSON API as the Admin page calls it (GET /api/listings, POST /api/listings/<route>). */

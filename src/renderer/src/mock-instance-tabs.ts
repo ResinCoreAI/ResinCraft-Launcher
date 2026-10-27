@@ -1,3 +1,4 @@
+import { mockBackups } from './mock-serverlist'
 // Fake Notes / Worlds / Servers / Screenshots data for the browser preview (see mock.ts).
 import type { Instance, ResinApi, ScreenshotInfo, ServerEntry, WorldInfo } from '@shared/types'
 
@@ -86,7 +87,13 @@ export function mockInstanceTabs(setIcon: (instanceId: string, iconUrl: string) 
       play: (id, _folder, accountId) => launch(id, accountId),
       // The preview's worlds all live in Cozy Survival.
       recent: async (limit = 8) => (await wait(worlds)).slice(0, limit).map((w) => ({ ...w, instanceId: 'survival' })),
-      import: async () => null
+      import: async () => null,
+      backups: () => wait(mockBackups(worlds[0]?.folder ?? 'New World')),
+      restore: async (_id, _file, asCopy) => {
+        await wait(null, 900)
+        return asCopy ? { ...worlds[0], folder: `${worlds[0].folder} (2)`, name: `${worlds[0].name} (2)` } : worlds[0]
+      },
+      deleteBackup: () => wait(undefined, 300)
     },
     servers: {
       list: () => wait(servers),

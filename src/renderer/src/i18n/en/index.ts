@@ -3,6 +3,7 @@
 import accounts from './accounts'
 import admin from './admin'
 import art from './art'
+import backups from './backups'
 import app from './app'
 import bedrock from './bedrock'
 import commands from './commands'
@@ -30,6 +31,7 @@ const en = {
   ...settings,
   ...reinstall,
   ...storage,
+  ...backups,
   ...home,
   ...library,
   ...bedrock,

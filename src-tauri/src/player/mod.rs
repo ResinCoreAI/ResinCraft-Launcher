@@ -83,6 +83,13 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "worlds:backup" => json(worlds::backup_world(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        // Restore: [id] → backups; [id, file, asCopy] → the world; [id, file] deletes one (to the Recycle Bin).
+        "worlds:backups" => json(worlds::list_backups(&args.get::<String>(0)?).await?),
+        "worlds:restore" => json(worlds::restore_backup(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<bool>>(2)?.unwrap_or(false)).await?),
+        "worlds:deleteBackup" => {
+            worlds::delete_backup(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            done()
+        }
         "worlds:remove" => {
             worlds::remove_world(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()

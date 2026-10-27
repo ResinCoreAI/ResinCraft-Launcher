@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Archive, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, Play, RefreshCw, Search, Skull, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Archive, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, Play, RefreshCw, RotateCcw, Search, Skull, Trash2, Upload } from 'lucide-react'
 import type { GameMode, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes, instancePath, timeAgo } from '../util'
 import { currentLanguage, rich, t, tx, type Key } from '../i18n'
 import { ConfirmModal, Empty, Modal, MoreButton, openContextMenu, useCopy, type ContextEntry } from './ui'
+import { RestoreModal } from './BackupRestore'
 import '../instance-tabs.css'
 
 const MODE_LABEL: Record<GameMode, Key> = {
@@ -31,6 +32,8 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
   const [removing, setRemoving] = useState<WorldInfo>()
   const [backingUp, setBackingUp] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
+  /** The Restore list: every backup, or one world's. */
+  const [restoring, setRestoring] = useState<{ world?: string }>()
   const running = games[inst.id] === 'running' || games[inst.id] === 'preparing'
   // Opening a world from outside the game is Minecraft's quick play, which came in 1.20 (snapshots: try and see).
   const quickPlay = hasQuickPlay(inst.mcVersion)
@@ -71,6 +74,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
     '-',
     { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.worlds.openFolder(inst.id, w.folder).catch((e) => toast(e.message, 'error')) },
     { label: t('worlds.backup'), icon: <Archive />, disabled: backingUp.includes(w.folder), onSelect: () => void backup(w) },
+    { label: t('backups.restoreMenu'), icon: <RotateCcw />, onSelect: () => setRestoring({ world: w.folder }) },
     { label: t('menu.rename'), icon: <Pencil />, disabled: !!w.error || running, onSelect: () => setRenaming(w) },
     '-',
     w.seed ? { label: t('worlds.copySeed'), icon: <Copy />, onSelect: () => void copy(w.seed!, t('worlds.seedCopied', { seed: w.seed })) } : null,
@@ -114,6 +118,9 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
         <button className="btn icon" title={t('worlds.openBackups')} onClick={() => void api.instances.openFolder(inst.id, 'backups')}>
           <Archive />
         </button>
+        <button className="btn" title={t('backups.restoreHint')} onClick={() => setRestoring({})}>
+          <RotateCcw /> {t('backups.restore')}
+        </button>
         <button className="btn icon" title={t('worlds.openSaves')} onClick={() => void api.instances.openFolder(inst.id, 'saves')}>
           <FolderOpen />
         </button>
@@ -126,6 +133,8 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
           {importing ? <Loader2 className="spin" /> : <Upload />} {t('worlds.import')}
         </button>
       </div>
+
+      {restoring && <RestoreModal target={{ kind: 'world', id: inst.id, world: restoring.world, running }} onClose={() => setRestoring(undefined)} onRestored={() => void load()} />}
 
       {running && (
         <div className="callout" style={{ marginBottom: 16 }}>

@@ -49,6 +49,8 @@ export default {
   'engine.backup.saveTitle': 'Save the backup',
   'engine.backup.tooNew': 'This backup was made by a newer ResinCraft ({version}). Update the launcher first.',
   'engine.backup.unreadable': "Couldn't read {file}: {error}",
+  'engine.backups.badName': "That isn't one of the backups here.",
+  'engine.backups.gone': "That backup isn't there any more.",
   'engine.bedrock.backingUp': 'Backing up {count} worlds…',
   'engine.bedrock.closeFirst': 'Close Minecraft first, then uninstall it.',
   'engine.bedrock.removing': 'Removing {name}…',

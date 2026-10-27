@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
-import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
+import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
@@ -13,6 +13,7 @@ import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import MigrateModal from '../components/MigrateModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
 import { ClientPackSettings, ServerListSettings } from '../components/ServerList'
+import { RestoreModal } from '../components/BackupRestore'
 import { ServerOriginChips, ServerPackSettings } from '../components/ServerPacks'
 import { PackUpdateBadge } from '../components/PackUpdates'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
@@ -1213,6 +1214,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
   const [boreOpen, setBoreOpen] = useState(false)
   const showBore = s.tunnel !== 'resin' || boreOpen || !!s.relayHost || !!s.relaySecret
   const [backingUp, setBackingUp] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const maxMem = Math.max(4096, Math.floor(((info?.totalMemMb ?? 8192) * 0.75) / 512) * 512)
   const running = live(s)
 
@@ -1515,8 +1517,18 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               </button>
             </div>
           </div>
+          <div className="setting">
+            <div className="text">
+              <b>{t('backups.restoreServer')}</b>
+              <span>{t('backups.restoreServerHint')}</span>
+            </div>
+            <button className="btn" onClick={() => setRestoring(true)}>
+              <RotateCcw /> {t('backups.restore')}
+            </button>
+          </div>
         </div>
       </div>
+      {restoring && <RestoreModal target={{ kind: 'server', id: s.id, name: s.name, running: s.state !== 'stopped' && s.state !== 'crashed' }} onClose={() => setRestoring(false)} />}
 
       <div className="settings-section">
         <h3>{t('servers.settings.dangerZone')}</h3>

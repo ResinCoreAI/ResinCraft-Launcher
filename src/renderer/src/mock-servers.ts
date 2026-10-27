@@ -27,7 +27,7 @@ import type {
 
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
 import { mockRequests } from './mock-requests'
-import { mockServerList } from './mock-serverlist'
+import { mockBackups, mockServerList } from './mock-serverlist'
 
 type Listener<T> = (e: T) => void
 
@@ -628,6 +628,9 @@ export function mockServers(): {
     playerRemove: async (_id, kind, name) => void (lists[kind] = lists[kind].filter((e) => e.name !== name)),
     backup: () => wait('C:/…/servers/smp/backups/2026-10-18_14-02-11_world.zip', 1200),
     regenerateWorld: () => wait(3, 1400),
+    backups: (id) => wait(mockBackups('world').map((b) => ({ ...b, file: b.file }))),
+    restoreBackup: () => wait(undefined, 1500),
+    deleteBackup: () => wait(undefined, 300),
     antiCheat: async (id) => ({ supported: find(id).type !== 'vanilla', installed: !!grim[id], enabled: !!grim[id] }),
     setAntiCheat: async (id, on) => {
       await wait(null, on ? 1600 : 500)

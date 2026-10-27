@@ -275,6 +275,32 @@ fn base_name(p: &str) -> &str {
 
 /// Imports a world from a zip that has level.dat at its root or inside one folder.
 pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
+    unpack_world(id, zip_path, None).await
+}
+
+/// The instance's world backups (manual and auto), newest first.
+pub async fn list_backups(id: &str) -> Result<Vec<crate::core::backupfiles::BackupFile>> {
+    Ok(crate::core::backupfiles::list(&game_subdir(id, "backups").await?).await)
+}
+
+/// Puts a backup back: over its world (the current one goes to the Recycle Bin first), or `as_copy` as a new world.
+pub async fn restore_backup(id: &str, file: &str, as_copy: bool) -> Result<WorldInfo> {
+    let dir = game_subdir(id, "backups").await?;
+    let zip = crate::core::backupfiles::path_of(&dir, file)?;
+    if as_copy {
+        return unpack_world(id, &zip, None).await;
+    }
+    let world = crate::core::backupfiles::list(&dir).await.into_iter().find(|b| b.file == file).map(|b| b.world);
+    unpack_world(id, &zip, Some(world.unwrap_or_else(|| file.trim_end_matches(".zip").to_string()))).await
+}
+
+pub async fn delete_backup(id: &str, file: &str) -> Result<()> {
+    crate::core::backupfiles::delete(&game_subdir(id, "backups").await?, file).await
+}
+
+/// Unpacks a world zip into saves/: into a new folder, or into `replace` (whose current world goes to the Recycle
+/// Bin first, so a restore can be undone).
+async fn unpack_world(id: &str, zip_path: &Path, replace: Option<String>) -> Result<WorldInfo> {
     assert_stopped(id, tr!("worlds.closeToImport", "Close the game before you import a world"))?;
     if !zip_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
         bail_tr!("worlds.chooseZip", "Choose a .zip file");
@@ -306,7 +332,17 @@ pub async fn import_world(id: &str, zip_path: &Path) -> Result<WorldInfo> {
     } else {
         clean_folder_name(base_name(&prefix))
     };
-    let folder = unique_name(&saves, &base, "").await;
+    let folder = match replace {
+        Some(name) => {
+            let folder = clean_folder_name(&name);
+            let current = child_path(&saves, &folder)?;
+            if tokio::fs::metadata(&current).await.is_ok() {
+                crate::core::shell::trash(&current).await?;
+            }
+            folder
+        }
+        None => unique_name(&saves, &base, "").await,
+    };
     let dest = child_path(&saves, &folder)?;
     let files: Vec<(usize, String)> = entries
         .into_iter()

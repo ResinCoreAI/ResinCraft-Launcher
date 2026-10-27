@@ -1197,7 +1197,19 @@ export interface ListingModpack {
   version?: string
 }
 
-/** A listing's client pack: the owner's mod set as a .mrpack on the relay, installed by players as an instance. */
+/** One world backup zip (a server's or an instance's). */
+export interface BackupFile {
+  file: string
+  /** The world in it. */
+  world: string
+  /** When it was made (ms). */
+  at: number
+  size: number
+  /** Made by auto backup. */
+  auto: boolean
+}
+
+/** A listing's client pack:the owner's mod set as a .mrpack on the relay, installed by players as an instance. */
 export interface ListingPack {
   url: string
   size: number
@@ -1933,6 +1945,11 @@ export interface ResinApi {
     play(instanceId: string, folder: string, accountId?: string): Promise<void>
     /** Imports a world from a .zip; opens a file picker when no path is given. Null if cancelled. */
     import(instanceId: string, zipPath?: string): Promise<WorldInfo | null>
+    /** The instance's world backups (manual and auto), newest first. */
+    backups(instanceId: string): Promise<BackupFile[]>
+    /** Puts a backup back over its world (the current one goes to the Recycle Bin), or `asCopy` as a new world. */
+    restore(instanceId: string, file: string, asCopy?: boolean): Promise<WorldInfo>
+    deleteBackup(instanceId: string, file: string): Promise<void>
   }
   servers: {
     list(instanceId: string): Promise<ServerEntry[]>
@@ -2030,6 +2047,11 @@ export interface ResinApi {
     playerRemove(id: string, kind: PlayerListKind, name: string): Promise<void>
     /** Zips the world into the server's backups folder; returns the zip path. */
     backup(id: string): Promise<string>
+    /** The server's backups (manual and auto), newest first. */
+    backups(id: string): Promise<BackupFile[]>
+    /** While it's off: the current world to the Recycle Bin, the backup's world in its place. */
+    restoreBackup(id: string, file: string): Promise<void>
+    deleteBackup(id: string, file: string): Promise<void>
     /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
     regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
     /** Settings → Anti-cheat: Grim, for plugin servers. */
