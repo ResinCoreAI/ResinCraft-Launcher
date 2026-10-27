@@ -223,10 +223,15 @@ pub(crate) fn zip_folder<W: std::io::Write + std::io::Seek>(zip: &mut zip::ZipWr
 
 /// Zips a world into minecraft/backups (the same folder vanilla's "Make Backup" uses).
 pub async fn backup_world(id: &str, folder: &str) -> Result<String> {
+    backup_world_as(id, folder, "").await
+}
+
+/// `backup_world` with `suffix` after the folder in the zip's name ("_auto" for auto backups).
+pub async fn backup_world_as(id: &str, folder: &str, suffix: &str) -> Result<String> {
     let dir = world_path(id, folder).await?;
     tokio::fs::metadata(&dir).await?;
     let backups = game_subdir(id, "backups").await?;
-    let target = backups.join(unique_name(&backups, &format!("{}_{folder}", stamp()), ".zip").await);
+    let target = backups.join(unique_name(&backups, &format!("{}_{folder}{suffix}", stamp()), ".zip").await);
     let folder = folder.to_string();
     Task::run_to_end(tr!("worlds.backingUp", "Backing up {folder}", folder = folder), Some(id.to_string()), |t| async move {
         t.update(tr!("worlds.compressing", "Compressing files…"), None);

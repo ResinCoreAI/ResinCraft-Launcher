@@ -1515,6 +1515,11 @@ pub async fn shutdown_all(grace: Duration) {
 /// Zips the world (and Bukkit-style _nether/_the_end folders) into `<server>/backups`. A running server
 /// is told to flush and pause saving while the zip is written.
 pub async fn backup(id: &str) -> Result<String> {
+    backup_as(id, "").await
+}
+
+/// `backup` with `suffix` after the world's name in the zip's name ("_auto" for auto backups, which autobackup.rs prunes).
+pub async fn backup_as(id: &str, suffix: &str) -> Result<String> {
     let meta = store::get(id).await?;
     let dir = store::dir(id)?;
     let level = properties::get_value(&dir, "level-name").await.filter(|l| !l.trim().is_empty()).unwrap_or_else(|| "world".into());
@@ -1530,7 +1535,7 @@ pub async fn backup(id: &str) -> Result<String> {
         let backups = dir.join("backups");
         tokio::fs::create_dir_all(&backups).await?;
         let stamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
-        let target = backups.join(unique_name(&backups, &format!("{stamp}_{level}"), ".zip").await);
+        let target = backups.join(unique_name(&backups, &format!("{stamp}_{level}{suffix}"), ".zip").await);
         let t2 = target.clone();
         Task::run_to_end(format!("Backing up {}", meta.name), Some(id.to_string()), |t| async move {
             t.update("Compressing the world…", None);
@@ -1558,7 +1563,7 @@ pub async fn backup(id: &str) -> Result<String> {
     let backups = dir.join("backups");
     tokio::fs::create_dir_all(&backups).await?;
     let stamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
-    let target = backups.join(unique_name(&backups, &format!("{stamp}_{level}"), ".zip").await);
+    let target = backups.join(unique_name(&backups, &format!("{stamp}_{level}{suffix}"), ".zip").await);
 
     let result = Task::run_to_end(format!("Backing up {}", meta.name), Some(id.to_string()), |t| {
         let (dir, target) = (dir.clone(), target.clone());

@@ -399,6 +399,12 @@ export interface Settings {
   customCss?: string
   /** Themes the player made (Settings → Appearance → Create theme). */
   customThemes?: CustomTheme[]
+  /** Auto backup of hosted servers' and instances' worlds while they run (on by default). */
+  autoBackup?: boolean
+  /** Every this many minutes (default 30). */
+  autoBackupMinutes?: number
+  /** Auto backups kept per world (default 3); the oldest goes when a new one is made. */
+  autoBackupKeep?: number
   /** Remote control from the web console while ResinCraft runs (Settings → Remote control; off by default). */
   remoteControl?: boolean
   /** Remote control may also use the file manager, Java settings and plugins from any link (off by default). */

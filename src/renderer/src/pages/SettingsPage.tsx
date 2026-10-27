@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { ConfirmModal, Logo, Segmented, Switch } from '../components/ui'
@@ -91,6 +91,86 @@ function ResetSettings() {
   )
 }
 
+/** Auto backup: worlds of running servers and games, every N minutes, keeping the newest few (on by default). */
+function AutoBackupSection({ s, set }: { s: Settings; set: (p: Partial<Settings>) => void }) {
+  const on = s.autoBackup ?? true
+  const [minutes, setMinutes] = useState(String(s.autoBackupMinutes ?? 30))
+  const [keep, setKeep] = useState(String(s.autoBackupKeep ?? 3))
+  const clamp = (v: string, lo: number, hi: number, fallback: number) => {
+    const n = Math.round(Number(v))
+    return Number.isFinite(n) && n > 0 ? Math.min(hi, Math.max(lo, n)) : fallback
+  }
+  const saveMinutes = () => {
+    const n = clamp(minutes, 5, 1440, 30)
+    setMinutes(String(n))
+    if (n !== s.autoBackupMinutes) set({ autoBackupMinutes: n })
+  }
+  const saveKeep = () => {
+    const n = clamp(keep, 1, 50, 3)
+    setKeep(String(n))
+    if (n !== s.autoBackupKeep) set({ autoBackupKeep: n })
+  }
+  return (
+    <section className="settings-section" id="autobackup">
+      <h3>{t('settings.autoBackup')}</h3>
+      <p>{t('settings.autoBackup.lead')}</p>
+      <div className="card">
+        <div className="setting">
+          <div className="text">
+            <b>{t('settings.autoBackup.on')}</b>
+            <span>{t('settings.autoBackup.onHint')}</span>
+          </div>
+          <Switch on={on} onChange={(v) => set({ autoBackup: v })} label={t('settings.autoBackup.on')} />
+        </div>
+        {on && (
+          <>
+            <div className="setting">
+              <div className="text">
+                <b>{t('settings.autoBackup.every')}</b>
+                <span>{t('settings.autoBackup.everyHint')}</span>
+              </div>
+              <div className="row" style={{ width: 220 }}>
+                <input
+                  className="input"
+                  type="number"
+                  min={5}
+                  max={1440}
+                  value={minutes}
+                  onChange={(e) => setMinutes(e.target.value)}
+                  onBlur={saveMinutes}
+                  onKeyDown={(e) => e.key === 'Enter' && saveMinutes()}
+                  aria-label={t('settings.autoBackup.every')}
+                />
+                <span className="faint">{t('settings.autoBackup.minutes')}</span>
+              </div>
+            </div>
+            <div className="setting">
+              <div className="text">
+                <b>{t('settings.autoBackup.keep')}</b>
+                <span>{t('settings.autoBackup.keepHint')}</span>
+              </div>
+              <div className="row" style={{ width: 220 }}>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={keep}
+                  onChange={(e) => setKeep(e.target.value)}
+                  onBlur={saveKeep}
+                  onKeyDown={(e) => e.key === 'Enter' && saveKeep()}
+                  aria-label={t('settings.autoBackup.keep')}
+                />
+                <span className="faint">{t('settings.autoBackup.perWorld')}</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
 /** A new GitHub issue, with the version and system filled in (nothing is sent until the player submits it there). */
 function issueUrl(version?: string, platform?: string): string {
   const body = [
@@ -119,6 +199,7 @@ const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'commands', label: 'commands.nav', icon: <Terminal size={16} /> },
   { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
   { id: 'storage', label: 'storage.nav', icon: <HardDrive size={16} /> },
+  { id: 'autobackup', label: 'settings.autoBackup', icon: <Archive size={16} /> },
   { id: 'backup', label: 'backup.nav', icon: <ArrowLeftRight size={16} /> },
   { id: 'remote', label: 'settings.remote', icon: <Globe size={16} /> },
   { id: 'updates', label: 'updates.nav', icon: <RefreshCw size={16} /> },
@@ -496,6 +577,8 @@ export default function SettingsPage() {
           </section>
 
           <StorageSection />
+
+          <AutoBackupSection s={s} set={set} />
 
           <BackupSection />
 

@@ -22,6 +22,11 @@ pub struct Settings {
     /// Themes the player made in Settings → Appearance → Create theme (the UI owns their shape; see themes.ts).
     /// A theme's uploaded background picture is a file in `<data>/themes` (`app:themeImage`).
     pub custom_themes: Vec<Value>,
+    /// Auto backup (Settings → Backups; on by default): while a hosted server or the game runs, its worlds are zipped
+    /// every `auto_backup_minutes`, keeping the newest `auto_backup_keep` (the oldest goes when a new one is made).
+    pub auto_backup: bool,
+    pub auto_backup_minutes: u32,
+    pub auto_backup_keep: u32,
     /// Remote control from the web console (console.<relay domain>) while ResinCraft runs, signed in with the same
     /// Minecraft account (Settings → Remote control; off by default).
     pub remote_control: bool,
@@ -95,6 +100,9 @@ impl Default for Settings {
             season_off: String::new(),
             custom_css: String::new(),
             custom_themes: Vec::new(),
+            auto_backup: true,
+            auto_backup_minutes: 30,
+            auto_backup_keep: 3,
             remote_control: false,
             remote_full_control: false,
             language: "system".into(),
