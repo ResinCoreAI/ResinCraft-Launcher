@@ -1657,3 +1657,36 @@ mod pack_flag_tests {
         assert_eq!(flags, ["-Xmx6G", "-Xms6G", "-XX:+UseZGC", "-XX:+UseG1GC", "-Dfml.readTimeout=180", "-Xss4M"]);
     }
 }
+
+/// Server → Settings → Regenerate world: the world (and Bukkit-style _nether/_the_end folders, or a Bedrock world)
+/// goes to the Recycle Bin, after a backup when `backup` is on, and a new one is made on the next start. `seed`:
+/// None keeps `level-seed`, Some("") picks a random one, Some(s) uses s. Only while the server is stopped.
+pub async fn regenerate_world(id: &str, backup_first: bool, seed: Option<String>) -> Result<usize> {
+    let meta = store::get(id).await?;
+    if state(id) != "stopped" {
+        bail!("Stop {} first: its world can only be replaced while it's off.", meta.name);
+    }
+    let dir = store::dir(id)?;
+    let level = properties::get_value(&dir, "level-name").await.filter(|l| !l.trim().is_empty()).unwrap_or_else(|| "world".into());
+    let level = crate::content::index::safe_name(level.trim())?.to_string();
+    let folders: Vec<std::path::PathBuf> = if meta.kind.bedrock() {
+        vec![dir.join("worlds").join(&level)]
+    } else {
+        [level.clone(), format!("{level}_nether"), format!("{level}_the_end")].into_iter().map(|f| dir.join(f)).collect()
+    };
+    let existing: Vec<_> = folders.into_iter().filter(|p| p.is_dir()).collect();
+    if backup_first && !existing.is_empty() {
+        backup(id).await?;
+    }
+    for folder in &existing {
+        crate::core::shell::trash(folder).await?;
+    }
+    if let Some(seed) = seed {
+        let seed = seed.trim().to_string();
+        if seed.len() > 64 || seed.contains(['\n', '\r']) {
+            bail!("That seed is too long.");
+        }
+        properties::set_values(&dir, &[("level-seed", seed)]).await?;
+    }
+    Ok(existing.len())
+}

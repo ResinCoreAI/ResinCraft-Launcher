@@ -192,6 +192,13 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:reinstallPack" => json(packs::reinstall_pack(&args.get::<String>(0)?).await?),
         "server:backup" => json(runtime::backup(&args.get::<String>(0)?).await?),
+        // [id, {backup: bool, seed: null | "" (random) | "…"}] → how many world folders went to the Recycle Bin.
+        "server:regenerateWorld" => {
+            let opts = args.raw(1);
+            let backup = opts.get("backup").and_then(Value::as_bool).unwrap_or(true);
+            let seed = opts.get("seed").and_then(Value::as_str).map(str::to_string);
+            json(runtime::regenerate_world(&args.get::<String>(0)?, backup, seed).await?)
+        }
         // The add-on calls end with an optional area ("plugins" / "mods") for hybrid servers.
         "server:addonSources" => json(plugins::sources(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addons" => json(plugins::list(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),

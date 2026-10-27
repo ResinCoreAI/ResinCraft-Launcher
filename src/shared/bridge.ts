@@ -27,6 +27,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       gameTexture: fn('app:gameTexture'),
       exportTheme: fn('app:exportTheme'),
       pendingOpen: fn('app:pendingOpen'),
+      uninstall: fn('app:uninstall'),
       readThemeFile: fn('app:readThemeFile'),
       showItem: fn('app:showItem'),
       pathForFile
@@ -223,6 +224,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       playerAdd: fn('server:playerAdd'),
       playerRemove: fn('server:playerRemove'),
       backup: fn('server:backup'),
+      regenerateWorld: fn('server:regenerateWorld'),
       addonSources: fn('server:addonSources'),
       addons: fn('server:addons'),
       addonSearch: fn('server:addonSearch'),

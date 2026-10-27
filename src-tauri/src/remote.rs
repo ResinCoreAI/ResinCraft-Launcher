@@ -225,7 +225,7 @@ const SERVER: &[&str] = &[
 
 /// Only with "Allow full control": these can run programs on this PC (Java and its arguments, any downloaded jar) or
 /// hand over secrets, so a stolen console sign-in alone can't use them.
-const SERVER_FULL: &[&str] = &["launchArgs", "addonFromLink", "setBotToken", "setDnsToken"];
+const SERVER_FULL: &[&str] = &["launchArgs", "addonFromLink", "setBotToken", "setDnsToken", "regenerateWorld"];
 
 /// The file manager, on a server's own folder only, with full control.
 const FILES_FULL: &[&str] = &["list", "readText", "writeText", "mkdir", "rename", "move", "copy", "trash"];

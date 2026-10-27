@@ -1206,6 +1206,11 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
   const [command, setCommand] = useState<string[]>()
   const [javas, setJavas] = useState<{ path: string; major: number; version: string; managed: boolean }[]>()
   const [deleting, setDeleting] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
+  // The bore relay's own settings: always shown for the other ways to connect, behind a button for ResinCraft Relay
+  // (where bore is only the fallback), unless they're already set.
+  const [boreOpen, setBoreOpen] = useState(false)
+  const showBore = s.tunnel !== 'resin' || boreOpen || !!s.relayHost || !!s.relaySecret
   const [backingUp, setBackingUp] = useState(false)
   const maxMem = Math.max(4096, Math.floor(((info?.totalMemMb ?? 8192) * 0.75) / 512) * 512)
   const running = live(s)
@@ -1422,7 +1427,19 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
           {(s.tunnel === 'auto' || s.tunnel === 'resin') && <RelaySettings s={s} info={relay} reload={reload} />}
           {/* Right under the ResinCraft address: a domain of your own can point at it. */}
           {!isBedrock(s) && <DomainSettings s={s} save={save} />}
-          {!isBedrock(s) && (
+          {/* With ResinCraft Relay the bore relay is only its fallback: its settings wait behind a button. */}
+          {!isBedrock(s) && !showBore && (
+            <div className="setting">
+              <div className="text">
+                <b>{t('servers.settings.boreFallback')}</b>
+                <span>{t('servers.settings.boreFallbackHint')}</span>
+              </div>
+              <button className="btn sm" onClick={() => setBoreOpen(true)}>
+                <Settings2 /> {t('servers.settings.boreFallbackButton')}
+              </button>
+            </div>
+          )}
+          {!isBedrock(s) && showBore && (
             <div className="setting">
               <div className="text">
                 <b>{t('servers.settings.relayHost')}</b>
@@ -1440,7 +1457,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
               </div>
             </div>
           )}
-          {!isBedrock(s) && (relayHost.trim() || s.relaySecret) && (
+          {!isBedrock(s) && showBore && (relayHost.trim() || s.relaySecret) && (
             <div className="setting">
               <div className="text">
                 <b>{t('servers.settings.relaySecret')}</b>
@@ -1502,6 +1519,15 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
         <div className="card">
           <div className="setting">
             <div className="text">
+              <b>{t('servers.regen.title')}</b>
+              <span>{running ? t('servers.regen.running') : t('servers.regen.hint')}</span>
+            </div>
+            <button className="btn danger" disabled={running} onClick={() => setRegenerating(true)}>
+              <RotateCw /> {t('servers.regen.button')}
+            </button>
+          </div>
+          <div className="setting">
+            <div className="text">
               <b>{t('servers.settings.delete')}</b>
               <span>{running ? t('servers.settings.deleteRunning') : t('servers.settings.deleteHint')}</span>
             </div>
@@ -1511,6 +1537,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
           </div>
         </div>
       </div>
+      {regenerating && <RegenerateWorld s={s} onClose={() => setRegenerating(false)} />}
       {deleting && (
         <ConfirmModal
           title={t('servers.settings.deleteTitle', { name: s.name })}
@@ -1528,6 +1555,73 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
 }
 
 // ---------- Dialogs ----------
+
+/**
+ * Settings → Regenerate world: the world goes to the Recycle Bin (after a backup, unless unticked) and a new one is made
+ * on the next start, with the same seed, a random one or the player's. Typing the server's name confirms.
+ */
+function RegenerateWorld({ s, onClose }: { s: ServerInfo; onClose: () => void }) {
+  const { toast } = useStore()
+  const [seedMode, setSeedMode] = useState<'keep' | 'random' | 'custom'>('keep')
+  const [seed, setSeed] = useState('')
+  const [backup, setBackup] = useState(true)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const go = async () => {
+    setBusy(true)
+    try {
+      await api.server.regenerateWorld(s.id, { backup, seed: seedMode === 'keep' ? null : seedMode === 'random' ? '' : seed.trim() })
+      toast(t('servers.regen.done', { name: s.name }), 'success')
+      onClose()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      title={t('servers.regen.dialogTitle', { name: s.name })}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn danger solid" disabled={busy || typed.trim() !== s.name || (seedMode === 'custom' && !seed.trim())} onClick={() => void go()}>
+            {busy ? <Loader2 className="spin" /> : <RotateCw />} {t('servers.regen.button')}
+          </button>
+        </>
+      }
+    >
+      <p className="muted">{t('servers.regen.body')}</p>
+      <div className="setting stack">
+        <b>{t('servers.regen.seed')}</b>
+        <Segmented
+          value={seedMode}
+          onChange={setSeedMode}
+          options={[
+            { value: 'keep', label: t('servers.regen.seedKeep') },
+            { value: 'random', label: t('servers.regen.seedRandom') },
+            { value: 'custom', label: t('servers.regen.seedCustom') }
+          ]}
+        />
+        {seedMode === 'custom' && <input className="input mono" value={seed} maxLength={64} placeholder="-4172144997902289642" onChange={(e) => setSeed(e.target.value)} />}
+      </div>
+      <div className="setting">
+        <div className="text">
+          <b>{t('servers.regen.backup')}</b>
+          <span>{t('servers.regen.backupHint')}</span>
+        </div>
+        <Switch on={backup} onChange={setBackup} label={t('servers.regen.backup')} />
+      </div>
+      <label className="field">
+        {t('servers.regen.typeName', { name: s.name })}
+        <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
+      </label>
+    </Modal>
+  )
+}
 
 function EulaModal({ server, onAgree, onClose }: { server: ServerInfo; onAgree: () => Promise<void>; onClose: () => void }) {
   const [agreed, setAgreed] = useState(false)

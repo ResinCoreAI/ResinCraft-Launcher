@@ -250,6 +250,7 @@ export function mockApi(): ResinApi {
       themeImage: async (id) => mockThemeImages.get(id) ?? null,
       gameTexture: async () => null,
       pendingOpen: async () => null,
+      uninstall: async () => 'settings' as const,
       readThemeFile: async () => {
         throw new Error('The browser preview has no files to open.')
       },

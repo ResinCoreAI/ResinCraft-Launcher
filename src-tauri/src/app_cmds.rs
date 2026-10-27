@@ -43,6 +43,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "app:themeImage" => json(theme_image(&args.get::<String>(0)?).await),
         // A file Windows asked ResinCraft to open at start (once), and a theme file's text (openfile.rs).
+        // Settings → Uninstall ResinCraft: "uninstaller" (it started; ResinCraft quits) or "settings" (Windows' Installed
+        // apps page, for MSI and Store installs).
+        "app:uninstall" => json(uninstall()?),
         "app:pendingOpen" => json(crate::openfile::take()),
         "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
         // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.
@@ -225,4 +228,31 @@ async fn export_theme(name: &str, contents: &str) -> Result<Option<String>> {
     let Some(path) = shell::save_file(&title, &default, &[("ResinCraft theme", &["rctheme"])]).await? else { return Ok(None) };
     tokio::fs::write(&path, contents).await?;
     Ok(Some(path.to_string_lossy().into_owned()))
+}
+/// Starts ResinCraft's own uninstaller (installed with the setup: `uninstall.exe` next to the program) and quits so it
+/// can remove the files; it asks whether to delete the player's data. MSI and Microsoft Store installs are removed
+/// through Windows' Installed apps page instead. Refused while a game or hosted server runs.
+fn uninstall() -> Result<&'static str> {
+    if !crate::game::running_ids().is_empty() || !crate::server::runtime::running_ids().is_empty() {
+        crate::bail_tr!("app.uninstallBusy", "Close your games and stop your servers first.");
+    }
+    #[cfg(windows)]
+    {
+        let uninstaller = std::env::current_exe()?.parent().map(|d| d.join("uninstall.exe")).filter(|p| p.is_file());
+        if let Some(uninstaller) = uninstaller {
+            std::process::Command::new(uninstaller).spawn()?;
+            if let Some(app) = ctx::app().cloned() {
+                // A moment for the answer to reach the UI; the uninstaller waits for ResinCraft to close.
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                    crate::tray::quit(&app);
+                });
+            }
+            return Ok("uninstaller");
+        }
+        std::process::Command::new("explorer.exe").arg("ms-settings:appsfeatures").spawn()?;
+        Ok("settings")
+    }
+    #[cfg(not(windows))]
+    crate::bail_tr!("app.uninstallElsewhere", "Remove ResinCraft the way your system removes apps.");
 }

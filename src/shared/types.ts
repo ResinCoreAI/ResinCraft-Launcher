@@ -1523,6 +1523,8 @@ export interface ResinApi {
     exportTheme(name: string, contents: string): Promise<string | null>
     /** The file ResinCraft was started with (double-clicked in Windows), once; null if none. */
     pendingOpen(): Promise<string | null>
+    /** Starts ResinCraft's uninstaller ('uninstaller', ResinCraft then quits) or opens Windows' Installed apps ('settings'). */
+    uninstall(): Promise<'uninstaller' | 'settings'>
     /** A .rctheme file's text. */
     readThemeFile(path: string): Promise<string>
   }
@@ -1854,6 +1856,8 @@ export interface ResinApi {
     playerRemove(id: string, kind: PlayerListKind, name: string): Promise<void>
     /** Zips the world into the server's backups folder; returns the zip path. */
     backup(id: string): Promise<string>
+    /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
+    regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
     // The add-on calls take an optional last `area` for hybrid servers (Arclight): 'plugins' (default) or 'mods'.
     addonSources(id: string, area?: AddonArea): Promise<AddonSource[]>
     addons(id: string, area?: AddonArea): Promise<ServerAddon[]>

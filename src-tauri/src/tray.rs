@@ -17,6 +17,12 @@ pub fn quitting() -> bool {
     QUITTING.load(Ordering::SeqCst)
 }
 
+/// Quits for real (tray mode would otherwise only hide the window), e.g. so the uninstaller can run.
+pub fn quit(app: &AppHandle) {
+    QUITTING.store(true, Ordering::SeqCst);
+    app.exit(0);
+}
+
 /// Brings the main window back (from the tray, minimised, or behind other windows).
 pub fn show(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
@@ -36,10 +42,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, e| match e.id.as_ref() {
             "open" => show(app),
-            "quit" => {
-                QUITTING.store(true, Ordering::SeqCst);
-                app.exit(0);
-            }
+            "quit" => self::quit(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, e| {

@@ -199,16 +199,21 @@ export function DomainSettings({ s, save }: { s: ServerInfo; save: (patch: Serve
           <b>{t('servers.domain.title')}</b>
           <span>{t('servers.domain.hint')}</span>
         </div>
-        <div className="control">
-          <input
-            className="input"
-            value={domain}
-            placeholder="play.example.com"
-            spellCheck={false}
-            onChange={(e) => setDomain(e.target.value)}
-            onBlur={() => domain.trim() !== (s.domain ?? '') && void save({ domain: domain.trim() })}
-          />
-        </div>
+        {/* Submit (or Enter) saves it; the TXT and CNAME (or SRV) records to add then show below. */}
+        <form
+          className="control row"
+          style={{ gap: 6 }}
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (domain.trim() !== (s.domain ?? '')) void save({ domain: domain.trim() })
+            else void check()
+          }}
+        >
+          <input className="input" value={domain} placeholder="play.example.com" spellCheck={false} onChange={(e) => setDomain(e.target.value)} />
+          <button type="submit" className="btn primary" disabled={!domain.trim() && !s.domain}>
+            {t('servers.domain.submit')}
+          </button>
+        </form>
       </div>
 
       {s.domain && info && (

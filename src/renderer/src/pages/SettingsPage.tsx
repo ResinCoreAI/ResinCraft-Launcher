@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal } from 'lucide-react'
+import { ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { ConfirmModal, Logo, Segmented, Switch } from '../components/ui'
@@ -13,6 +13,43 @@ import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../compo
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { fixed } from '../util'
+
+/** Starts ResinCraft's uninstaller after asking (it closes ResinCraft and asks about the data itself). */
+function UninstallSetting() {
+  const { toast } = useStore()
+  const [asking, setAsking] = useState(false)
+  return (
+    <>
+      <div className="card" style={{ marginTop: 10 }}>
+        <div className="setting">
+          <div className="text">
+            <b>{t('settings.uninstall')}</b>
+            <span>{t('settings.uninstall.hint')}</span>
+          </div>
+          <button className="btn danger" onClick={() => setAsking(true)}>
+            <Trash2 /> {t('settings.uninstall.button')}
+          </button>
+        </div>
+      </div>
+      {asking && (
+        <ConfirmModal
+          title={t('settings.uninstall.title')}
+          body={t('settings.uninstall.body')}
+          confirm={t('settings.uninstall.button')}
+          onConfirm={async () => {
+            try {
+              // MSI and Store installs: Windows' Installed apps page opened instead.
+              if ((await api.app.uninstall()) === 'settings') toast(t('settings.uninstall.settings'), 'info')
+            } catch (e) {
+              toast((e as Error).message, 'error')
+            }
+          }}
+          onClose={() => setAsking(false)}
+        />
+      )}
+    </>
+  )
+}
 
 /** Every setting back to its default, after asking: instances, servers, accounts and the player's own themes stay. */
 function ResetSettings() {
@@ -31,6 +68,7 @@ function ResetSettings() {
           </button>
         </div>
       </div>
+      <UninstallSetting />
       {asking && (
         <ConfirmModal
           title={t('settings.reset.title')}
