@@ -58,6 +58,7 @@ pub fn run() {
             tauri::async_runtime::spawn(server::discordbot::init());
             tauri::async_runtime::spawn(remote::init());
             tauri::async_runtime::spawn(core::autobackup::init());
+            tauri::async_runtime::spawn(server::clientfiles::init());
             // Reads the settings once, so the close button knows about tray mode.
             tauri::async_runtime::spawn(async {
                 tray::sync(core::settings::get().await.tray);

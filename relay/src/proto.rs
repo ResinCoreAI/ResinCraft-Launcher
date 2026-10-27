@@ -180,6 +180,12 @@ pub enum AgentMsg {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         body: Option<serde_json::Value>,
     },
+    /// Serve these files of `listing`'s pack plan (lowercase hex SHA-1s of its `owner` files) from this launcher:
+    /// players' `GET https://<base_domain>/files/<listing>/<sha1>` reach it as file streams (a [`DataHeader`] with
+    /// `file`). Only the listing's owner; replaces an earlier offer. Answered with `files_ready`. Protocol 8.
+    FilesOffer { listing: String, files: Vec<String> },
+    /// Stop serving `listing`'s files from this connection (no answer). Protocol 8.
+    FilesWithdraw { listing: String },
     Ping { seq: u64 },
 }
 
@@ -409,6 +415,8 @@ pub enum RelayMsg {
         refused: Option<ErrorCode>,
         usage: Usage,
     },
+    /// The answer to `files_offer`: players' downloads of those files come to this connection now. Protocol 8.
+    FilesReady {},
     Pong { seq: u64 },
     /// The answer to `remote {enabled: true}`: this launcher is listed for its account's console. Protocol 6.
     RemoteReady {},
@@ -689,6 +697,15 @@ pub struct DataHeader {
     /// A Bedrock player: the stream carries datagrams ([`write_datagram`] frames), not a byte stream.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub udp: bool,
+    /// An owner file download (protocol 8): the file's SHA-1. Send exactly `size` bytes of it, then close the stream.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// The listing the file belongs to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub listing: Option<String>,
+    /// The file's size in the plan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
 }
 
 /// Largest datagram a frame carries (a UDP payload never is bigger).
@@ -906,7 +923,7 @@ mod tests {
         assert_eq!(serde_json::to_string(&AgentMsg::Online { name: "a".into(), bedrock: false, geyser: false }).unwrap(), r#"{"t":"online","name":"a"}"#);
         assert_eq!(serde_json::from_str::<AgentMsg>(r#"{"t":"online","name":"a"}"#).unwrap(), AgentMsg::Online { name: "a".into(), bedrock: false, geyser: false });
         assert_eq!(serde_json::to_string(&AgentMsg::Online { name: "a".into(), bedrock: false, geyser: true }).unwrap(), r#"{"t":"online","name":"a","geyser":true}"#);
-        assert_eq!(serde_json::to_string(&DataHeader { peer: None, udp: true }).unwrap(), r#"{"udp":true}"#);
+        assert_eq!(serde_json::to_string(&DataHeader { peer: None, udp: true, ..Default::default() }).unwrap(), r#"{"udp":true}"#);
         assert_eq!(serde_json::from_str::<DataHeader>("{}").unwrap(), DataHeader::default());
         assert_eq!(serde_json::to_string(&AgentMsg::Continue).unwrap(), r#"{"t":"continue"}"#);
         // Protocol 4: top-ups, and the account's cap in usage reports (older usage lines still parse).

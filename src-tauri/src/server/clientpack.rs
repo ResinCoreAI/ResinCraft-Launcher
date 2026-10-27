@@ -103,7 +103,7 @@ pub async fn publish(id: &str, instance_id: &str, opts: PublishOpts) -> Result<L
         .map_err(|e| err_tr!("clientPack.unreachable", "Couldn't upload the pack to ResinCraft Relay ({error}).", error = e.to_string()))?;
     let status = res.status();
     if status.is_success() {
-        clientfiles::set(&format!("rc-{name}"), owned).await?;
+        clientfiles::set(&format!("rc-{name}"), &account.uuid, owned).await?;
         return Ok(res.json().await?);
     }
     let why = res.text().await.unwrap_or_default();
@@ -121,7 +121,7 @@ pub async fn remove(id: &str) -> Result<()> {
     let (token, base) = relay::session_token(&account).await?;
     let res = crate::core::ctx::http().delete(format!("https://{base}/api/packs/rc-{name}")).bearer_auth(token).timeout(Duration::from_secs(30)).send().await?;
     if res.status().is_success() || res.status().as_u16() == 404 {
-        clientfiles::set(&format!("rc-{name}"), HashMap::new()).await?;
+        clientfiles::set(&format!("rc-{name}"), &account.uuid, HashMap::new()).await?;
         Ok(())
     } else {
         Err(err_tr!("clientPack.refused", "ResinCraft Relay didn't take the pack: {error}", error = res.status().to_string()))

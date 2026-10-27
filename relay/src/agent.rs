@@ -274,7 +274,12 @@ pub struct Connection {
     /// Where Bedrock players' datagrams go when it isn't the served address (a Java server's Geyser port).
     udp_target: Option<SocketAddr>,
     seq: u64,
+    /// Where offered owner files are read from.
+    files: Option<FileSource>,
 }
+
+/// Finds an owner file the relay asks for: (listing id, SHA-1) → the file on this PC (None: not here).
+pub type FileSource = Arc<dyn Fn(&str, &str) -> Option<std::path::PathBuf> + Send + Sync>;
 
 impl Drop for Connection {
     fn drop(&mut self) {
@@ -371,6 +376,7 @@ impl Connection {
             admin: false,
             udp_target: None,
             seq: 0,
+            files: None,
         };
         conn.send(&AgentMsg::Hello { version, client: client.to_string() }).await?;
         match conn.recv().await? {
@@ -688,13 +694,39 @@ impl Connection {
         self.serve_with(local, on_event, &mut commands).await
     }
 
+    /// Where this connection reads the owner files it offers ([`Connection::offer_files`]); set it before serving.
+    pub fn set_file_source(&mut self, source: FileSource) {
+        self.files = Some(source);
+    }
+
+    /// Serves these owner files (SHA-1s) of `listing`'s pack plan from this connection: players' downloads come to
+    /// it while it's served ([`Connection::serve`] or [`Connection::serve_files`]). Replaces an earlier offer.
+    pub async fn offer_files(&mut self, listing: &str, files: Vec<String>) -> Result<(), AgentError> {
+        if !self.has_listings() {
+            return Err(AgentError::Refused(ErrorCode::ListingInvalid, "this relay doesn't serve owner files yet".into()));
+        }
+        self.send(&AgentMsg::FilesOffer { listing: listing.to_string(), files }).await?;
+        match self.recv().await? {
+            RelayMsg::FilesReady {} => Ok(()),
+            RelayMsg::Error { code, message, ban } => Err(refused(code, message, ban)),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Keeps a connection with no server online open for owner files only ([`Connection::offer_files`]): answers
+    /// the relay's file streams from the [`FileSource`] until the connection ends, and returns why it ended. A
+    /// connection like this has no session time, so the files stay up as long as the launcher runs.
+    pub async fn serve_files(self, on_event: impl FnMut(Event) + Send) -> AgentError {
+        let (_keep, mut commands) = mpsc::unbounded_channel();
+        self.run(None, on_event, &mut commands).await
+    }
+
     /// Like [`Connection::serve`], also sending what arrives on `commands` (Continue) to the relay.
-    pub async fn serve_with(
-        mut self,
-        local: SocketAddr,
-        mut on_event: impl FnMut(Event) + Send,
-        commands: &mut mpsc::UnboundedReceiver<Command>,
-    ) -> AgentError {
+    pub async fn serve_with(self, local: SocketAddr, on_event: impl FnMut(Event) + Send, commands: &mut mpsc::UnboundedReceiver<Command>) -> AgentError {
+        self.run(Some(local), on_event, commands).await
+    }
+
+    async fn run(mut self, local: Option<SocketAddr>, mut on_event: impl FnMut(Event) + Send, commands: &mut mpsc::UnboundedReceiver<Command>) -> AgentError {
         let mut commands_open = true;
         let mut ping = tokio::time::interval(Duration::from_secs(PING_SECS));
         ping.tick().await;
@@ -722,7 +754,7 @@ impl Connection {
                 }
                 stream = self.inbound.recv() => match stream {
                     Some(stream) => {
-                        tokio::spawn(forward(stream, local, self.udp_target.unwrap_or(local)));
+                        tokio::spawn(forward(stream, local, self.udp_target.or(local), self.files.clone()));
                     }
                     None => return net("the relay connection dropped"),
                 },
@@ -878,8 +910,8 @@ fn unexpected(msg: &RelayMsg) -> AgentError {
     AgentError::Protocol(format!("{msg:?}"))
 }
 
-/// One player: read the stream's header line, then join the rest to the local server.
-async fn forward(stream: StreamHandle, local: SocketAddr, udp_local: SocketAddr) {
+/// One player (or an owner file download): read the stream's header line, then join the rest to the local server.
+async fn forward(stream: StreamHandle, local: Option<SocketAddr>, udp_local: Option<SocketAddr>, files: Option<FileSource>) {
     let mut stream = BufReader::new(stream);
     let mut line = Vec::new();
     let header = tokio::time::timeout(Duration::from_secs(10), (&mut stream).take(4096).read_until(b'\n', &mut line)).await;
@@ -887,9 +919,16 @@ async fn forward(stream: StreamHandle, local: SocketAddr, udp_local: SocketAddr)
         return;
     }
     let header: DataHeader = serde_json::from_slice(&line).unwrap_or_default();
-    if header.udp {
-        return forward_udp(stream, udp_local).await;
+    if header.file.is_some() {
+        return send_file(stream, header, files).await;
     }
+    if header.udp {
+        if let Some(udp_local) = udp_local {
+            forward_udp(stream, udp_local).await;
+        }
+        return;
+    }
+    let Some(local) = local else { return };
     let Ok(mut server) = TcpStream::connect(local).await else {
         // Nothing listens locally (the server is restarting): the player gets disconnected.
         let _ = stream.get_mut().shutdown().await;
@@ -897,6 +936,23 @@ async fn forward(stream: StreamHandle, local: SocketAddr, udp_local: SocketAddr)
     };
     let _ = server.set_nodelay(true);
     let _ = tokio::io::copy_bidirectional(&mut stream, &mut server).await;
+}
+
+/// An owner file: its bytes (at most the plan's `size`), then the stream closes. A file that isn't here closes it
+/// right away (the relay tells the player it couldn't be sent).
+async fn send_file(mut stream: BufReader<StreamHandle>, header: DataHeader, files: Option<FileSource>) {
+    let path = match (files, header.listing.as_deref(), header.file.as_deref()) {
+        (Some(find), Some(listing), Some(sha1)) => find(listing, sha1),
+        _ => None,
+    };
+    if let Some(file) = match path {
+        Some(p) => tokio::fs::File::open(p).await.ok(),
+        None => None,
+    } {
+        let mut limited = file.take(header.size.unwrap_or(u64::MAX));
+        let _ = tokio::io::copy(&mut limited, stream.get_mut()).await;
+    }
+    let _ = stream.get_mut().shutdown().await;
 }
 
 /// One Bedrock player: datagrams from the stream go to the local server from a socket of their own (so the
