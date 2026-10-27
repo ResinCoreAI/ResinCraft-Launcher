@@ -47,6 +47,32 @@
   outline-offset: 2px;
 }
 
+/* The admin's recommended and sponsored servers, above the results. */
+.featured-servers {
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.featured-servers h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--accent);
+}
+.featured-servers h2 svg {
+  width: 15px;
+  height: 15px;
+}
+.server-meta .chip svg {
+  width: 11px;
+  height: 11px;
+}
+
 .server-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
@@ -163,6 +189,9 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-dim);
+}
+.server-tags .modpack-chip {
+  color: var(--accent);
 }
 .server-tags button.chip:hover {
   border-color: var(--accent);

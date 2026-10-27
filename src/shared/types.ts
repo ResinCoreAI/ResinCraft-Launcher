@@ -1177,11 +1177,51 @@ export interface ListingInfo {
   offline?: boolean
   /** Where Bedrock players join when it isn't the address (Geyser's port). */
   bedrock_address?: string
+  /** The modpack players need; for a server made from a pack, the engine fills it in. */
+  modpack?: ListingModpack
   website?: string
   discord?: string
 }
 
-export type ListingState = 'listed' | 'pending' | 'rejected' | 'hidden' | 'off' | 'unknown'
+export interface ListingModpack {
+  name: string
+  /** 'modrinth' | 'curseforge' | 'ftb' | 'atlauncher' | 'technic' | '' (custom). */
+  source: string
+  project_id: string
+  version?: string
+}
+
+/** A listing's client pack: the owner's mod set as a .mrpack on the relay, installed by players as an instance. */
+export interface ListingPack {
+  url: string
+  size: number
+  sha256: string
+  name: string
+  version: string
+  mc_version: string
+  loader: string
+  updated_at: number
+}
+
+/** A hosted server's client pack, for its Settings tab. */
+export interface ClientPackInfo {
+  modded: boolean
+  /** Instances with the server's Minecraft version and loader. */
+  instances: { id: string; name: string }[]
+  defaultInstance?: string
+  published?: ListingPack
+}
+
+/** A modpack among listed servers, for the Modpack filter. */
+export interface ServerListModpack {
+  name: string
+  source: string
+  project_id: string
+  servers: number
+  online: number
+}
+
+export type ListingState ='listed' | 'pending' | 'rejected' | 'hidden' | 'off' | 'unknown'
 
 export interface ListingStatus {
   /** "rc-<name>" for ResinCraft servers, "s-<id>" for submitted ones. */
@@ -1234,6 +1274,13 @@ export interface ListedServer {
   /** Offline profiles can join. */
   offline?: boolean
   bedrock_address?: string | null
+  modpack?: ListingModpack | null
+  /** The owner's client pack: Install & join makes an instance from it. */
+  pack?: ListingPack | null
+  /** The list's admin pinned it: first in every sort. */
+  pinned?: boolean
+  /** The list's admin recommends it, or it's a paid ad (always labelled Sponsored). */
+  promo?: 'recommended' | 'sponsored' | null
   website?: string | null
   discord?: string | null
   listed_at: number
@@ -1244,6 +1291,8 @@ export interface ServerListPage {
   total: number
   page: number
   servers: ListedServer[]
+  /** Page 0 only: the admin's recommended and sponsored servers, whatever the filters. */
+  featured?: ListedServer[]
 }
 
 export interface ServerListQuery {
@@ -1259,6 +1308,8 @@ export interface ServerListQuery {
   crossplay?: boolean
   /** Offline profiles can join. */
   offline?: boolean
+  /** "<source>:<project id>", or part of a modpack's name. */
+  modpack?: string
   sort?: 'best' | 'players' | 'likes' | 'new'
   page?: number
 }
@@ -1269,6 +1320,7 @@ export interface MyListing {
   info: ListingInfo
   likes: number
   resincraft: boolean
+  pack?: ListingPack
 }
 
 export type AskJoinOutcome = 'received' | 'alreadyListed' | 'alreadyRequested' | 'closed' | 'invalid' | 'banned' | 'unknown'
@@ -1982,6 +2034,19 @@ export interface ResinApi {
     setListing(id: string, req: { enabled: boolean; info: ListingInfo }): Promise<ServerListing>
     /** Discover → Servers. */
     browseList(query: ServerListQuery): Promise<ServerListPage>
+    listModpacks(): Promise<{ modpacks: ServerListModpack[] }>
+    /** Settings → Server list → Client pack. */
+    clientPack(id: string): Promise<ClientPackInfo>
+    publishClientPack(id: string, instanceId: string): Promise<ListingPack>
+    removeClientPack(id: string): Promise<void>
+    /** Discover → Servers → Install & join: the instance made from (or already made from) a listing's pack. */
+    installListingPack(req: { id: string; url: string; sha256: string }): Promise<string>
+    /** The Admin page: whether the active account is one of the relay's admins, and unlocked this session. */
+    adminStatus(): Promise<{ admin: boolean; unlocked: boolean; username?: string }>
+    adminUnlock(password: string): Promise<{ admin: boolean; unlocked: boolean; username?: string }>
+    adminLock(): Promise<void>
+    /** One admin request (the relay dashboard's JSON API: GET /api/listings, POST /api/listings/…). */
+    adminCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
     submitListing(req: { address: string; info: ListingInfo }): Promise<ListingStatus>
     myListings(): Promise<MyListing[]>
     removeListing(id: string): Promise<ListingStatus>

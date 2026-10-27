@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, MAX_LINE, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingStatus, MyListing};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingStatus, MyListing};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -41,6 +41,8 @@ pub enum AgentError {
     /// This account is banned from the relay: until when and why (relays from before bans said so send a plain
     /// `Refused(Banned, …)` instead).
     Banned(Ban),
+    /// This account is banned from the server list only (it can still host through the relay). Protocol 8.
+    ListingBanned(Ban),
     /// The relay couldn't be reached, didn't answer or the connection dropped.
     Network(String),
     /// The relay sent something unexpected.
@@ -54,7 +56,7 @@ impl AgentError {
     pub fn retryable(&self) -> bool {
         match self {
             AgentError::Refused(code, _) => code.retryable(),
-            AgentError::Banned(_) => false,
+            AgentError::Banned(_) | AgentError::ListingBanned(_) => false,
             AgentError::Network(_) | AgentError::Protocol(_) => true,
             AgentError::Config(_) => false,
         }
@@ -64,6 +66,7 @@ impl AgentError {
         match self {
             AgentError::Refused(code, _) => Some(*code),
             AgentError::Banned(_) => Some(ErrorCode::Banned),
+            AgentError::ListingBanned(_) => Some(ErrorCode::ListingBanned),
             _ => None,
         }
     }
@@ -74,6 +77,7 @@ impl std::fmt::Display for AgentError {
         match self {
             AgentError::Refused(_, msg) => write!(f, "the relay refused: {msg}"),
             AgentError::Banned(ban) => write!(f, "the relay refused: {}", ban.describe()),
+            AgentError::ListingBanned(ban) => write!(f, "the relay refused: banned from the server list ({})", ban.reason),
             AgentError::Network(msg) => write!(f, "{msg}"),
             AgentError::Protocol(msg) => write!(f, "unexpected answer from the relay: {msg}"),
             AgentError::Config(msg) => write!(f, "{msg}"),
@@ -87,6 +91,8 @@ impl std::error::Error for AgentError {}
 fn refused(code: ErrorCode, message: String, ban: Option<Ban>) -> AgentError {
     match ban {
         Some(ban) if code == ErrorCode::Banned => AgentError::Banned(ban),
+        Some(ban) if code == ErrorCode::ListingBanned => AgentError::ListingBanned(ban),
+        None if code == ErrorCode::ListingBanned => AgentError::ListingBanned(Ban::default()),
         _ => AgentError::Refused(code, message),
     }
 }
@@ -119,6 +125,8 @@ pub struct Authed {
     pub username: String,
     /// A new session token to keep (after a Minecraft-token login).
     pub session: Option<String>,
+    /// The relay lists this account as an admin (protocol 8).
+    pub admin: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -250,6 +258,8 @@ pub struct Connection {
     pub relay_version: u32,
     /// Whitelist pages live at `https://<name>.<base_domain>/` (the relay's certificate covers its names).
     pub name_pages: bool,
+    /// The signed-in account is one of the relay's admins (protocol 8).
+    pub admin: bool,
     /// Where Bedrock players' datagrams go when it isn't the served address (a Java server's Geyser port).
     udp_target: Option<SocketAddr>,
     seq: u64,
@@ -347,6 +357,7 @@ impl Connection {
             base_domain: String::new(),
             relay_version: 0,
             name_pages: false,
+            admin: false,
             udp_target: None,
             seq: 0,
         };
@@ -411,7 +422,10 @@ impl Connection {
         };
         self.send(&msg).await?;
         match self.recv().await? {
-            RelayMsg::Authed { uuid, username, session } => Ok(Authed { uuid, username, session }),
+            RelayMsg::Authed { uuid, username, session, admin } => {
+                self.admin = admin;
+                Ok(Authed { uuid, username, session, admin })
+            }
             other => Err(unexpected(&other)),
         }
     }
@@ -554,6 +568,28 @@ impl Connection {
         self.send(&AgentMsg::ListingJoin { id: id.to_string() }).await?;
         match self.recv().await? {
             RelayMsg::JoinAsked { outcome, .. } => Ok(outcome),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Unlocks the relay's admin tools on this connection (only for an admin account, with the dashboard's password).
+    pub async fn admin_unlock(&mut self, password: &str) -> Result<(), AgentError> {
+        self.need_listings()?;
+        self.send(&AgentMsg::AdminUnlock { password: password.to_string() }).await?;
+        match self.recv().await? {
+            RelayMsg::AdminReady {} => Ok(()),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// One admin request (the dashboard's JSON API) after `admin_unlock`; `Err(text)` when the relay said no.
+    pub async fn admin_call(&mut self, method: &str, path: &str, body: Option<serde_json::Value>) -> Result<Result<serde_json::Value, String>, AgentError> {
+        self.seq += 1;
+        let id = self.seq;
+        self.send(&AgentMsg::AdminCall { id, method: method.to_string(), path: path.to_string(), body }).await?;
+        match self.recv().await? {
+            RelayMsg::AdminResult { ok: true, value, .. } => Ok(Ok(value.unwrap_or(serde_json::Value::Null))),
+            RelayMsg::AdminResult { error, .. } => Ok(Err(error.unwrap_or_else(|| "the relay refused".into()))),
             other => Err(unexpected(&other)),
         }
     }
@@ -947,7 +983,7 @@ mod tests {
             assert!(matches!(next!(), AgentMsg::Hello { version, .. } if version == PROTOCOL_VERSION));
             w.write_all(say(RelayMsg::Welcome { version: 6, base_domain: "relay.test".into(), name_pages: false }).as_bytes()).await.unwrap();
             assert!(matches!(next!(), AgentMsg::Login { .. }));
-            w.write_all(say(RelayMsg::Authed { uuid: "u".into(), username: "Steve".into(), session: None }).as_bytes()).await.unwrap();
+            w.write_all(say(RelayMsg::Authed { uuid: "u".into(), username: "Steve".into(), session: None, admin: false }).as_bytes()).await.unwrap();
             assert_eq!(next!(), AgentMsg::Remote { enabled: true, device: "PC".into(), app_version: "9".into() });
             w.write_all(say(RelayMsg::RemoteReady {}).as_bytes()).await.unwrap();
             w.write_all(say(RelayMsg::Call { id: 5, method: "servers.list".into(), params: serde_json::json!([]) }).as_bytes()).await.unwrap();

@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use resincraft_relay::agent::Connection;
-use resincraft_relay::proto::{Edition, JoinOutcome, ListingInfo, ListingState, ListingStatus, MyListing, CATEGORIES};
+use resincraft_relay::proto::{Edition, JoinOutcome, ListingInfo, ListingModpack, ListingState, ListingStatus, MyListing, CATEGORIES};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -120,7 +120,24 @@ async fn with_facts(id: &str, meta: &ServerMeta, mut info: ListingInfo) -> Listi
     };
     // The relay knows Geyser's port on it; an address typed here would only be stale.
     info.bedrock_address = None;
+    // A server made from a modpack says which one (the owner can name a custom pack only when there's none).
+    if let Some(pack) = meta.modpack.as_ref() {
+        info.modpack = Some(listing_modpack(pack));
+    }
+    if info.modpack.is_some() {
+        info.modded = true;
+    }
     info
+}
+
+/// A ResinCraft modpack reference as the server list has it: the site comes from the project id's prefix.
+fn listing_modpack(pack: &crate::core::types::ModpackRef) -> ListingModpack {
+    let id = pack.project_id.clone().unwrap_or_default();
+    let (source, project_id) = [("cf:", "curseforge"), ("ftb:", "ftb"), ("atl:", "atlauncher"), ("technic:", "technic")]
+        .iter()
+        .find_map(|(prefix, site)| id.strip_prefix(prefix).map(|rest| (site.to_string(), rest.to_string())))
+        .unwrap_or_else(|| if id.is_empty() || id.contains(':') { (String::new(), String::new()) } else { ("modrinth".into(), id.clone()) });
+    ListingModpack { name: pack.name.chars().take(64).collect(), source, project_id, version: None }
 }
 
 /// Signs in as the account the server's name belongs to (`owner`) or the active Microsoft account.
@@ -145,7 +162,7 @@ pub async fn get(id: &str) -> Result<ServerListing> {
     let saved_info = saved.map(|s| s.info);
     let info = with_facts(id, &meta, saved_info.clone().unwrap_or_else(|| defaults(&meta))).await;
     // Geyser or online-mode changed since it was listed: the list should say so.
-    let changed = saved_info.as_ref().is_some_and(|s| (s.crossplay, s.offline) != (info.crossplay, info.offline));
+    let changed = saved_info.as_ref().is_some_and(|s| (s.crossplay, s.offline, &s.modpack) != (info.crossplay, info.offline, &info.modpack));
     let mut out = ServerListing {
         available: meta.relay_name.is_some() && relay::settings().is_some(),
         enabled,
@@ -258,6 +275,8 @@ pub struct Browse {
     /// Only servers offline profiles can join.
     #[serde(default)]
     pub offline: bool,
+    /// "<source>:<project id>", or part of a modpack's name.
+    pub modpack: Option<String>,
     pub sort: Option<String>,
     #[serde(default)]
     pub page: u32,
@@ -282,6 +301,7 @@ pub async fn browse(f: Browse) -> Result<Value> {
     opt("online", f.online.then(|| "true".to_string()));
     opt("crossplay", f.crossplay.then(|| "true".to_string()));
     opt("offline", f.offline.then(|| "true".to_string()));
+    opt("modpack", f.modpack);
     opt("sort", f.sort);
     let res = crate::core::ctx::http()
         .get(format!("https://{}/api/servers", s.domain))
@@ -301,13 +321,26 @@ pub async fn browse(f: Browse) -> Result<Value> {
     }
     let mut page: Value = res.json().await?;
     let liked = load().await.liked;
-    if let Some(list) = page.get_mut("servers").and_then(Value::as_array_mut) {
+    for key in ["servers", "featured"] {
+        let Some(list) = page.get_mut(key).and_then(Value::as_array_mut) else { continue };
         for s in list {
             let id = s.get("id").and_then(Value::as_str).unwrap_or_default().to_string();
             s["liked"] = Value::Bool(liked.contains(&id));
         }
     }
     Ok(page)
+}
+
+/// Every modpack among listed servers, for the Modpack filter (`GET /api/servers/modpacks`).
+pub async fn modpacks() -> Result<Value> {
+    let Some(s) = relay::settings() else { return Err(err_tr!("serverList.noRelay", "This build has no ResinCraft Relay, so there's no server list.")) };
+    let res = crate::core::ctx::http().get(format!("https://{}/api/servers/modpacks", s.domain)).timeout(Duration::from_secs(15)).send().await;
+    match res {
+        Ok(r) if r.status().is_success() => Ok(r.json().await?),
+        // An older list without the endpoint: no modpack filter, not an error.
+        Ok(_) => Ok(serde_json::json!({ "modpacks": [] })),
+        Err(e) => Err(err_tr!("serverList.unreachable", "Couldn't reach the server list ({error}).", error = e.to_string())),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -339,6 +372,8 @@ pub struct Mine {
     pub info: ListingInfo,
     pub likes: u32,
     pub resincraft: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pack: Option<resincraft_relay::proto::ListingPack>,
 }
 
 pub async fn mine() -> Result<Vec<Mine>> {
@@ -349,7 +384,7 @@ pub async fn mine() -> Result<Vec<Mine>> {
     let list = conn.listing_mine().await.map_err(|e| relay::describe(&e, ""))?;
     Ok(list
         .into_iter()
-        .map(|m: MyListing| Mine { status: status(m.status), address: m.address, info: m.listing, likes: m.likes, resincraft: m.resincraft })
+        .map(|m: MyListing| Mine { status: status(m.status), address: m.address, info: m.listing, likes: m.likes, resincraft: m.resincraft, pack: m.pack })
         .collect())
 }
 
@@ -418,5 +453,19 @@ mod tests {
         // An empty file is an empty list.
         let empty: Saved = serde_json::from_str("{}").unwrap();
         assert!(empty.servers.is_empty());
+    }
+
+    #[test]
+    fn modpack_sites_come_from_the_prefix() {
+        let pack = |id: Option<&str>| crate::core::types::ModpackRef { project_id: id.map(str::to_string), version_id: None, name: "ATM 9".into() };
+        let site = |id| {
+            let m = listing_modpack(&pack(id));
+            (m.source, m.project_id)
+        };
+        assert_eq!(site(Some("cf:715572")), ("curseforge".to_string(), "715572".to_string()));
+        assert_eq!(site(Some("1KVo5zza")), ("modrinth".to_string(), "1KVo5zza".to_string()));
+        assert_eq!(site(Some("ftb:23")), ("ftb".to_string(), "23".to_string()));
+        assert_eq!(site(Some("gh:owner/repo")), (String::new(), String::new()));
+        assert_eq!(site(None), (String::new(), String::new()));
     }
 }

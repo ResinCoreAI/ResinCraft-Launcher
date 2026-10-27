@@ -2,10 +2,11 @@
 // whose owner listed them, plus servers players submitted (the relay's admin approves those). Players filter, like,
 // report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, ExternalLink, Flag, Heart, Loader2, MessageCircle, Plus, Search, Server, Smartphone, Trash2, UserPlus, UserRound, Users, Zap } from 'lucide-react'
-import type { AskJoinOutcome, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListQuery } from '@shared/types'
+import { Copy, Download, ExternalLink, Flag, Heart, Loader2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
+import type { AskJoinOutcome, ClientPackInfo, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
+import { bytes } from '../util'
 import { currentLanguage, t, tx, type Key } from '../i18n'
 import { Empty, Modal, MoreButton, Switch, useCopy } from './ui'
 import '../serverlist.css'
@@ -15,6 +16,8 @@ export const REGIONS = ['na', 'sa', 'eu', 'asia', 'oceania', 'africa', 'me']
 export const LANGUAGES = ['en', 'th', 'es', 'pt-BR', 'de', 'fr', 'it', 'pl', 'ru', 'tr', 'ja', 'ko', 'zh-CN', 'zh-TW', 'id', 'vi']
 const MAX_CUSTOM = 5
 
+/** A modpack's filter value: "<source>:<project id>", or a custom pack's name. */
+export const packKey = (m: { name: string; source: string; project_id: string }) => (m.source && m.project_id ? `${m.source}:${m.project_id}` : m.name)
 export const tagLabel = (tag: string) => (CATEGORIES.includes(tag) ? t(`servers.list.cat.${tag}` as Key) : tag)
 export const regionLabel = (r: string) => t(`servers.list.region.${r}` as Key)
 export function languageLabel(code: string): string {
@@ -152,6 +155,21 @@ export function ListingFields({ info, onChange, showEdition }: { info: ListingIn
         </div>
       )}
       {showEdition && info.edition === 'java' && (
+        <label className="field">
+          <span>{t('servers.list.field.modpack')}</span>
+          <input
+            className="input"
+            maxLength={64}
+            value={info.modpack?.name ?? ''}
+            placeholder={t('servers.list.field.modpackHint')}
+            onChange={(e) => {
+              const name = e.target.value
+              set(name.trim() ? { modpack: { name, source: '', project_id: '' }, modded: true } : { modpack: undefined })
+            }}
+          />
+        </label>
+      )}
+      {showEdition && info.edition === 'java' && (
         <div className="setting">
           <div className="text">
             <b>{t('servers.list.field.crossplay')}</b>
@@ -187,6 +205,12 @@ export function ListingFields({ info, onChange, showEdition }: { info: ListingIn
           {' · '}
           {info.offline ? <><UserRound /> {t('servers.list.offlineOk')}</> : t('servers.list.accountNeeded')}
           {' · '}
+          {info.modpack && (
+            <>
+              <Package /> {info.modpack.name}
+              {' · '}
+            </>
+          )}
           {t('servers.list.factsHint')}
         </p>
       )}
@@ -224,7 +248,12 @@ export function ServerList() {
   const [modded, setModded] = useState<'' | 'yes' | 'no'>('')
   const [online, setOnline] = useState(false)
   const [offline, setOffline] = useState(false)
+  /** '' or "<source>:<project id>" (or a custom pack's name). */
+  const [modpack, setModpack] = useState('')
+  const [packs, setPacks] = useState<ServerListModpack[]>([])
   const [servers, setServers] = useState<ListedServer[]>()
+  /** The admin's recommended and sponsored servers, shown above the results. */
+  const [featured, setFeatured] = useState<ListedServer[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [error, setError] = useState<string>()
@@ -248,12 +277,13 @@ export function ServerList() {
       edition: edition === 'java' ? 'java' : undefined,
       crossplay: edition === 'bedrock' || undefined,
       offline: offline || undefined,
+      modpack: modpack || undefined,
       region: region || undefined,
       lang: lang || undefined,
       modded: modded === '' ? undefined : modded === 'yes',
       online: online || undefined
     }),
-    [debounced, tags, sort, edition, region, lang, modded, online, offline]
+    [debounced, tags, sort, edition, region, lang, modded, online, offline, modpack]
   )
 
   const load = async (p: number) => {
@@ -267,6 +297,7 @@ export function ServerList() {
       setTotal(r.total)
       setPage(p)
       setServers((old) => (p === 0 ? r.servers : [...(old ?? []), ...r.servers]))
+      if (p === 0) setFeatured(r.featured ?? [])
     } catch (e) {
       if (my === seq.current) {
         setError((e as Error).message)
@@ -277,9 +308,17 @@ export function ServerList() {
     }
   }
   useEffect(() => void load(0), [query]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    api.server.listModpacks().then((r) => setPacks(r.modpacks), () => {})
+  }, [])
 
   const toggleTag = (tag: string) => setTags((ts) => (ts.includes(tag) ? ts.filter((x) => x !== tag) : [...ts, tag]))
-  const replace = (s: ListedServer) => setServers((list) => list?.map((x) => (x.id === s.id ? s : x)))
+  const replace = (s: ListedServer) => {
+    // The same server can be in the featured row and the results: keep both in step.
+    const swap = (x: ListedServer) => (x.id === s.id ? { ...x, liked: s.liked, likes: s.likes } : x)
+    setServers((list) => list?.map(swap))
+    setFeatured((list) => list.map(swap))
+  }
 
   const like = async (s: ListedServer) => {
     const on = !s.liked
@@ -342,6 +381,17 @@ export function ServerList() {
           <option value="no">{t('servers.list.moddedNo')}</option>
           <option value="yes">{t('servers.list.moddedYes')}</option>
         </select>
+        {(packs.length > 0 || modpack) && (
+          <select className="select" value={modpack} aria-label={t('servers.list.modpack')} onChange={(e) => setModpack(e.target.value)}>
+            <option value="">{t('servers.list.allModpacks')}</option>
+            {modpack && !packs.some((m) => packKey(m) === modpack) && <option value={modpack}>{modpack.replace(/^[a-z]+:/, '')}</option>}
+            {packs.map((m) => (
+              <option key={packKey(m)} value={packKey(m)}>
+                {t('servers.list.modpackOption', { name: m.name, count: m.servers })}
+              </option>
+            ))}
+          </select>
+        )}
         <label className="inline-switch">
           <Switch on={online} onChange={setOnline} label={t('servers.list.onlineOnly')} />
           {t('servers.list.onlineOnly')}
@@ -366,6 +416,19 @@ export function ServerList() {
           ))}
       </div>
 
+      {!error && featured.length > 0 && (
+        <section className="featured-servers" aria-label={t('servers.list.featured')}>
+          <h2>
+            <Star /> {t('servers.list.featured')}
+          </h2>
+          <div className="server-grid">
+            {featured.map((s) => (
+              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {servers === undefined ? (
         <div className="server-grid">
           {Array.from({ length: 6 }, (_, i) => (
@@ -384,7 +447,7 @@ export function ServerList() {
         <>
           <div className="server-grid">
             {servers.map((s) => (
-              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} />
+              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} />
             ))}
           </div>
           {servers.length < total && (
@@ -405,7 +468,7 @@ export function ServerList() {
   )
 }
 
-function ServerCard({ s, onLike, onReport, onTag }: { s: ListedServer; onLike: () => void; onReport: () => void; onTag: (tag: string) => void }) {
+function ServerCard({ s, onLike, onReport, onTag, onModpack }: { s: ListedServer; onLike: () => void; onReport: () => void; onTag: (tag: string) => void; onModpack: (key: string) => void }) {
   const { join, toast, go, activeAccount } = useStore()
   const copy = useCopy()
   const [joining, setJoining] = useState(false)
@@ -425,6 +488,22 @@ function ServerCard({ s, onLike, onReport, onTag }: { s: ListedServer; onLike: (
     const ok = await join({ address: edition === 'bedrock' ? bedrockAddress : s.address, name: s.title, edition })
     setJoining(false)
     if (ok && edition === 'bedrock') toast(t('quickjoin.openedBedrock', { name: s.title }), 'info')
+  }
+  /** The server's own client pack: install it as an instance (once; again when it changes), then join with it. */
+  const installAndJoin = async () => {
+    if (!s.pack) return
+    if (needsAccount) {
+      return toast(t('servers.list.needsAccount', { name: s.title }), 'error', { label: t('servers.list.openAccounts'), run: () => go({ page: 'accounts' }) })
+    }
+    setJoining(true)
+    try {
+      const instanceId = await api.server.installListingPack({ id: s.id, url: s.pack.url, sha256: s.pack.sha256 })
+      await join({ address: s.address, name: s.title, edition: 'java', instanceId })
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setJoining(false)
+    }
   }
   const askToJoin = async () => {
     setAsking(true)
@@ -476,6 +555,21 @@ function ServerCard({ s, onLike, onReport, onTag }: { s: ListedServer; onLike: (
             )}
             <span>{s.edition === 'bedrock' ? 'Bedrock' : 'Java'} {s.version}</span>
             {s.resincraft && <span className="chip accent compact">ResinCraft</span>}
+            {s.pinned && (
+              <span className="chip compact" title={t('servers.list.pinnedHint')}>
+                <Pin /> {t('servers.list.pinned')}
+              </span>
+            )}
+            {s.promo === 'recommended' && (
+              <span className="chip success compact" title={t('servers.list.recommendedHint')}>
+                <Star /> {t('servers.list.recommended')}
+              </span>
+            )}
+            {s.promo === 'sponsored' && (
+              <span className="chip warn compact" title={t('servers.list.sponsoredHint')}>
+                {t('servers.list.sponsored')}
+              </span>
+            )}
           </div>
         </div>
         <button className={`btn ghost sm like ${s.liked ? 'on' : ''}`} aria-pressed={!!s.liked} title={t(s.liked ? 'servers.list.unlike' : 'servers.list.like')} onClick={onLike}>
@@ -484,6 +578,12 @@ function ServerCard({ s, onLike, onReport, onTag }: { s: ListedServer; onLike: (
       </header>
       {s.description && <p className="server-desc">{s.description}</p>}
       <div className="server-tags">
+        {s.modpack && (
+          <button className="chip accent modpack-chip" title={t('servers.list.filterByModpack', { name: s.modpack.name })} onClick={() => onModpack(packKey(s.modpack!))}>
+            <Package /> {s.modpack.name}
+            {s.modpack.version ? ` ${s.modpack.version}` : ''}
+          </button>
+        )}
         {s.tags.map((tag) => (
           <button key={tag} className="chip" title={t('servers.list.filterBy', { tag: tagLabel(tag) })} onClick={() => onTag(tag)}>
             {CATEGORIES.includes(tag) ? tagLabel(tag) : `#${tag}`}
@@ -512,11 +612,23 @@ function ServerCard({ s, onLike, onReport, onTag }: { s: ListedServer; onLike: (
             {asking ? <Loader2 className="spin" /> : <UserPlus />} {t(asked ? 'servers.list.askedShort' : 'servers.list.ask')}
           </button>
         )}
-        <button className="btn sm primary" disabled={joining} title={needsAccount ? t('servers.list.needsAccountShort') : undefined} onClick={() => void play()}>
-          {joining ? <Loader2 className="spin" /> : <Zap />} {t('servers.list.join')}
-        </button>
+        {s.pack ? (
+          <button
+            className="btn sm primary"
+            disabled={joining}
+            title={t('servers.list.installJoinHint', { name: s.pack.name || s.title, size: bytes(s.pack.size) })}
+            onClick={() => void installAndJoin()}
+          >
+            {joining ? <Loader2 className="spin" /> : <Download />} {t('servers.list.installJoin')}
+          </button>
+        ) : (
+          <button className="btn sm primary" disabled={joining} title={needsAccount ? t('servers.list.needsAccountShort') : undefined} onClick={() => void play()}>
+            {joining ? <Loader2 className="spin" /> : <Zap />} {t('servers.list.join')}
+          </button>
+        )}
         <MoreButton
           items={() => [
+            !!s.pack && { label: t('servers.list.joinWithout'), icon: <Zap />, onSelect: () => void play() },
             s.edition === 'java' && !!s.crossplay && { label: t('servers.list.joinBedrock'), icon: <Smartphone />, onSelect: () => void play('bedrock') },
             { label: t('quickjoin.addToQuickJoin'), icon: <Zap />, onSelect: () => void addToQuickJoin() },
             { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(s.address) },
@@ -740,6 +852,99 @@ export function ServerListSettings({ s }: { s: ServerInfo }) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** Settings → Client pack: publish the server's mods (from an instance) so players can Install & join from the list. */
+export function ClientPackSettings({ s }: { s: ServerInfo }) {
+  const { toast } = useStore()
+  const [info, setInfo] = useState<ClientPackInfo>()
+  const [source, setSource] = useState('')
+  const [busy, setBusy] = useState<'publish' | 'remove'>()
+  useEffect(() => {
+    let live = true
+    void api.server.clientPack(s.id).then(
+      (v) => {
+        if (!live) return
+        setInfo(v)
+        setSource(v.defaultInstance ?? v.instances[0]?.id ?? '')
+      },
+      () => {}
+    )
+    return () => void (live = false)
+  }, [s.id])
+  if (!info?.modded) return null
+  const publish = async () => {
+    setBusy('publish')
+    try {
+      const published = await api.server.publishClientPack(s.id, source)
+      setInfo({ ...info, published })
+      toast(t('servers.clientPack.published', { name: s.name, size: bytes(published.size) }), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(undefined)
+    }
+  }
+  const remove = async () => {
+    setBusy('remove')
+    try {
+      await api.server.removeClientPack(s.id)
+      setInfo({ ...info, published: undefined })
+      toast(t('servers.clientPack.removed'), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(undefined)
+    }
+  }
+  const p = info.published
+  return (
+    <div className="settings-section">
+      <h3>{t('servers.clientPack.section')}</h3>
+      <div className="card">
+        <div className="setting stack">
+          <div className="text">
+            <b>
+              {t('servers.clientPack.title')}{' '}
+              {p && <span className="chip success compact">{t('servers.clientPack.live')}</span>}
+            </b>
+            <span>{t('servers.clientPack.hint')}</span>
+            {p && (
+              <span className="hint">
+                {t('servers.clientPack.current', { name: p.name || s.name, version: p.version, size: bytes(p.size), when: new Date(p.updated_at * 1000).toLocaleString(currentLanguage()) })}
+              </span>
+            )}
+          </div>
+          {info.instances.length === 0 ? (
+            <span className="hint">{t('servers.clientPack.noInstance', { version: s.mcVersion })}</span>
+          ) : (
+            <div className="row end">
+              <label className="field grow">
+                <span>{t('servers.clientPack.from')}</span>
+                <select className="select" value={source} onChange={(e) => setSource(e.target.value)}>
+                  {info.instances.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
+                      {i.id === info.defaultInstance ? ` (${t('servers.clientPack.madeFrom')})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {p && (
+                <button className="btn sm" disabled={!!busy} onClick={() => void remove()}>
+                  {busy === 'remove' ? <Loader2 className="spin" /> : <Trash2 />} {t('servers.clientPack.remove')}
+                </button>
+              )}
+              <button className="btn sm primary" disabled={!!busy || !source} onClick={() => void publish()}>
+                {busy === 'publish' ? <Loader2 className="spin" /> : <Upload />} {t(p ? 'servers.clientPack.update' : 'servers.clientPack.publish')}
+              </button>
+            </div>
+          )}
+          <span className="hint">{t('servers.clientPack.note')}</span>
+        </div>
       </div>
     </div>
   )

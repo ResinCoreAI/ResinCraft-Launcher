@@ -134,6 +134,16 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
     if let AgentError::Banned(ban) = e {
         return banned_error(ban);
     }
+    if let AgentError::ListingBanned(ban) = e {
+        let base = match ban.until {
+            Some(t) => tr!("hostRelay.listBannedUntil", "You're banned from the ResinCraft server list until {date} ({left}).", date = DateTime(t), left = TimeLeft(t)),
+            None => tr!("hostRelay.listBanned", "You're banned from the ResinCraft server list."),
+        };
+        return match ban.reason.trim() {
+            "" => base.into(),
+            why => err_tr!("hostRelay.listBannedReason", "{ban} Reason: {reason}", ban = base, reason = why.to_string()),
+        };
+    }
     let Some(code) = e.code() else {
         return match e {
             AgentError::Config(msg) => err_tr!("hostRelay.badConfig", "This build's ResinCraft Relay address doesn't work ({error}).", error = msg),
@@ -310,6 +320,18 @@ pub(crate) async fn connect_for_remote(account: &MicrosoftAccount) -> Result<Con
         Failure::Relay(e) => e,
         Failure::Account(e) => AgentError::Refused(ErrorCode::AuthFailed, e.to_string()),
     })
+}
+
+/// The relay session token of `account` (signing in first when there's none yet), for the relay's HTTPS uploads
+/// (client packs), and the relay's base domain.
+pub(crate) async fn session_token(account: &MicrosoftAccount) -> Result<(String, String)> {
+    let Some(s) = settings() else { return Err(describe(&AgentError::Config("no relay in this build".into()), "")) };
+    if let Some(t) = saved_session(&s, &account.uuid).await {
+        return Ok((t, s.domain.clone()));
+    }
+    drop(connect(&s, account).await.map_err(|f| f.into_error(""))?);
+    let t = saved_session(&s, &account.uuid).await.ok_or_else(|| anyhow::anyhow!("ResinCraft Relay didn't give this account a session"))?;
+    Ok((t, s.domain.clone()))
 }
 
 /// Connects and signs in as `account` for the server list (listing.rs); errors are worded for players.

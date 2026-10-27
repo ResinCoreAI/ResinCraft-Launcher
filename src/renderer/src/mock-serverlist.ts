@@ -4,6 +4,7 @@ import type {
   AskJoinOutcome,
   ListedServer,
   ListingInfo,
+  ListingPack,
   ListingStatus,
   MyListing,
   ServerInfo,
@@ -20,11 +21,17 @@ const now = () => Math.floor(Date.now() / 1000)
 
 const LISTED: ListedServer[] = [
   { id: 'rc-puirkle3', title: 'Puirkle SMP', description: 'A friendly survival server for friends and friends of friends. No griefing, weekly build contests, and a shared nether hub.', tags: ['smp', 'survival', 'friends'], region: 'asia', language: 'th', version: '1.21.1', edition: 'java', modded: false, address: 'puirkle3.rscraft.resincore.tech', crossplay: true, bedrock_address: 'puirkle3.rscraft.resincore.tech:24011', resincraft: true, online: true, players: 3, max_players: 20, motd: 'Welcome back!', icon: null, likes: 12, join_requests: true, website: null, discord: 'https://discord.gg/example', listed_at: now() - 86400 * 3, last_seen: now() },
-  { id: 's-a1', title: 'Skyward Isles', description: 'Skyblock with custom islands, an economy and seasonal events.', tags: ['skyblock', 'economy'], region: 'eu', language: 'en', version: '1.20.4', edition: 'java', modded: false, address: 'play.skyward.example', crossplay: true, offline: true, resincraft: false, online: true, players: 148, max_players: 500, motd: 'Season 7 is live', icon: null, likes: 340, join_requests: false, website: 'https://skyward.example', discord: null, listed_at: now() - 86400 * 40, last_seen: now() },
-  { id: 'rc-create-lab', title: 'Create Lab', description: 'Modded server running Create and friends. Big factories, trains everywhere.', tags: ['modded', 'smp', 'create'], region: 'na', language: 'en', version: '1.20.1', edition: 'java', modded: true, address: 'create-lab.rscraft.resincore.tech', resincraft: true, online: false, players: 0, max_players: 10, motd: null, icon: null, likes: 27, join_requests: true, website: null, discord: null, listed_at: now() - 86400 * 9, last_seen: now() - 7200 },
+  { id: 's-a1', title: 'Skyward Isles', description: 'Skyblock with custom islands, an economy and seasonal events.', tags: ['skyblock', 'economy'], region: 'eu', language: 'en', version: '1.20.4', edition: 'java', modded: false, address: 'play.skyward.example', crossplay: true, offline: true, promo: 'sponsored', resincraft: false, online: true, players: 148, max_players: 500, motd: 'Season 7 is live', icon: null, likes: 340, join_requests: false, website: 'https://skyward.example', discord: null, listed_at: now() - 86400 * 40, last_seen: now() },
+  { id: 'rc-create-lab', title: 'Create Lab', description: 'Modded server running Create and friends. Big factories, trains everywhere.', tags: ['modded', 'smp', 'create'], region: 'na', language: 'en', version: '1.20.1', edition: 'java', modded: true, address: 'create-lab.rscraft.resincore.tech', modpack: { name: 'Create: Above and Beyond', source: 'curseforge', project_id: '542763', version: '1.3' }, pack: { url: 'https://rscraft.resincore.tech/packs/rc-create-lab.mrpack', size: 5_200_000, sha256: 'cd34', name: 'Create Lab pack', version: '1.3', mc_version: '1.20.1', loader: 'forge', updated_at: now() - 3600 }, pinned: true, promo: 'recommended', resincraft: true, online: false, players: 0, max_players: 10, motd: null, icon: null, likes: 27, join_requests: true, website: null, discord: null, listed_at: now() - 86400 * 9, last_seen: now() - 7200 },
   { id: 's-b2', title: 'Arena Rush', description: 'Fast PvP minigames: bedwars, duels and kit battles.', tags: ['pvp', 'minigames', 'bedwars'], region: 'sa', language: 'pt-BR', version: '1.8', edition: 'java', modded: false, address: 'arenarush.example', offline: true, resincraft: false, online: true, players: 61, max_players: 200, motd: 'Duels 2x XP', icon: null, likes: 88, join_requests: false, website: null, discord: 'https://discord.gg/arena', listed_at: now() - 86400, last_seen: now() },
   { id: 's-c3', title: 'Pocket Valley', description: 'Bedrock survival with land claims, for phones, consoles and PC.', tags: ['survival', 'towny'], region: 'oceania', language: 'en', version: '1.21.40', edition: 'bedrock', modded: false, address: 'valley.example:19132', resincraft: false, online: true, players: 9, max_players: 40, motd: 'Pocket Valley', icon: null, likes: 15, join_requests: false, website: null, discord: null, listed_at: now() - 86400 * 2, last_seen: now() }
 ]
+
+const clientPacks: Record<string, ListingPack | undefined> = {}
+const isAdmin = () => new URLSearchParams(location.search).get('admin') === '1'
+let adminUnlocked = false
+/** Filled in once the relay's admin API shapes are final (the Admin page). */
+const mockAdminCall = async (_method: string, _path: string, _body?: unknown): Promise<unknown> => wait({ ok: true })
 
 const listings: Record<string, { enabled: boolean; info: ListingInfo; state: ListingStatus['state'] }> = {}
 const mine: MyListing[] = []
@@ -76,7 +83,8 @@ export function mockServerList(find: (id: string) => ServerInfo) {
           (q.modded === undefined || s.modded === q.modded) &&
           (!q.online || s.online) &&
           (!q.crossplay || s.edition === 'bedrock' || !!s.crossplay) &&
-          (!q.offline || !!s.offline)
+          (!q.offline || !!s.offline) &&
+          (!q.modpack || (!!s.modpack && (q.modpack.includes(':') ? `${s.modpack.source}:${s.modpack.project_id}` === q.modpack : s.modpack.name.toLowerCase().includes(q.modpack.toLowerCase()))))
       )
       const by: Record<string, (a: ListedServer, b: ListedServer) => number> = {
         best: (a, b) => score(b) - score(a),
@@ -84,8 +92,10 @@ export function mockServerList(find: (id: string) => ServerInfo) {
         likes: (a, b) => b.likes - a.likes,
         new: (a, b) => b.listed_at - a.listed_at
       }
-      list = [...list].sort(by[q.sort ?? 'best'])
-      return wait({ total: list.length, page: q.page ?? 0, servers: list.slice((q.page ?? 0) * 24, (q.page ?? 0) * 24 + 24) }, 600)
+      // Pinned first in every sort, like the relay.
+      list = [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || by[q.sort ?? 'best'](a, b))
+      const featured = (q.page ?? 0) === 0 ? LISTED.filter((s) => s.promo) : undefined
+      return wait({ total: list.length, page: q.page ?? 0, servers: list.slice((q.page ?? 0) * 24, (q.page ?? 0) * 24 + 24), featured }, 600)
     },
     submitListing: async (req: { address: string; info: ListingInfo }): Promise<ListingStatus> => {
       await wait(null, 1200)
@@ -94,6 +104,34 @@ export function mockServerList(find: (id: string) => ServerInfo) {
       mine.push({ status, address: req.address, info: req.info, likes: 0, resincraft: false })
       return status
     },
+    // The Admin page: ?admin=1 previews an admin account (password "admin").
+    adminStatus: () => wait({ admin: isAdmin(), unlocked: adminUnlocked, username: 'Puirkle' }),
+    adminUnlock: async (password: string) => {
+      await wait(null, 500)
+      if (password !== 'admin') throw new Error('The relay didn’t accept that. Check the password, or wait a few minutes after several wrong tries.')
+      adminUnlocked = true
+      return { admin: true, unlocked: true, username: 'Puirkle' }
+    },
+    adminLock: async () => void (adminUnlocked = false),
+    adminCall: (method: 'GET' | 'POST', path: string, body?: unknown) => mockAdminCall(method, path, body),
+    clientPack: (id: string) =>
+      wait({
+        modded: find(id).type !== 'vanilla' && find(id).type !== 'paper' && find(id).type !== 'bedrock',
+        instances: [{ id: 'tech', name: 'Tech & Automation' }],
+        defaultInstance: 'tech',
+        published: clientPacks[id]
+      }),
+    publishClientPack: async (id: string) => {
+      await wait(null, 1800)
+      clientPacks[id] = { url: 'https://rscraft.resincore.tech/packs/rc-smp.mrpack', size: 3_400_000, sha256: 'ab12', name: find(id).name, version: '2026.10.27-1200', mc_version: find(id).mcVersion, loader: 'fabric', updated_at: Math.floor(Date.now() / 1000) }
+      return clientPacks[id]!
+    },
+    removeClientPack: async (id: string) => void delete clientPacks[id],
+    installListingPack: () => wait('tech', 2000),
+    listModpacks: () =>
+      wait({
+        modpacks: [{ name: 'Create: Above and Beyond', source: 'curseforge', project_id: '542763', servers: 1, online: 0 }]
+      }),
     myListings: () => wait([...mine]),
     removeListing: async (id: string): Promise<ListingStatus> => {
       const i = mine.findIndex((m) => m.status.id === id)

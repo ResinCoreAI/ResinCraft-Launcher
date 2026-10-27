@@ -12,7 +12,7 @@ import { ReinstallServerModal, type ServerReinstall } from '../components/Reinst
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import MigrateModal from '../components/MigrateModal'
 import { DomainAddress, DomainSettings } from '../components/ServerDomain'
-import { ServerListSettings } from '../components/ServerList'
+import { ClientPackSettings, ServerListSettings } from '../components/ServerList'
 import { ServerOriginChips, ServerPackSettings } from '../components/ServerPacks'
 import { PackUpdateBadge } from '../components/PackUpdates'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
@@ -1482,6 +1482,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
       </div>
 
       {(s.tunnel === 'auto' || s.tunnel === 'resin') && relay?.available && <ServerListSettings s={s} />}
+      {(s.tunnel === 'auto' || s.tunnel === 'resin') && relay?.available && <ClientPackSettings s={s} />}
 
       <div className="settings-section">
         <h3>{t('servers.settings.backups')}</h3>

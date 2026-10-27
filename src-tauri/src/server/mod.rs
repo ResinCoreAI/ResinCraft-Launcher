@@ -3,7 +3,9 @@
 //! the player lists, install plugins and mods, back up worlds, and open the port on the router so friends
 //! can join. Servers live in `<dataDir>/servers/<id>/`.
 
+pub mod admin;
 pub mod antixray;
+pub mod clientpack;
 pub mod cloudflare;
 pub mod clientmods;
 pub mod create;
@@ -188,6 +190,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:listing" => json(listing::get(&args.get::<String>(0)?).await?),
         "server:setListing" => json(listing::set(&args.get::<String>(0)?, args.get(1)?).await?),
         "server:browseList" => json(listing::browse(args.get(0)?).await?),
+        "server:listModpacks" => json(listing::modpacks().await?),
+        // Client packs: the owner publishes the server's mods; players install them as an instance.
+        "server:clientPack" => json(clientpack::info(&args.get::<String>(0)?).await?),
+        "server:publishClientPack" => json(clientpack::publish(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:removeClientPack" => {
+            clientpack::remove(&args.get::<String>(0)?).await?;
+            done()
+        }
+        "server:installListingPack" => json(clientpack::install(args.get(0)?).await?),
         "server:submitListing" => json(listing::submit(args.get(0)?).await?),
         "server:myListings" => json(listing::mine().await?),
         "server:removeListing" => json(listing::remove(&args.get::<String>(0)?).await?),
@@ -197,6 +208,14 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "server:askToJoin" => json(listing::ask_join(&args.get::<String>(0)?).await?),
+        // The Admin page, for the relay's admin accounts.
+        "server:adminStatus" => json(admin::status().await),
+        "server:adminUnlock" => json(admin::unlock(&args.get::<String>(0)?).await?),
+        "server:adminLock" => {
+            admin::lock().await;
+            done()
+        }
+        "server:adminCall" => json(admin::call(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<Value>>(2)?).await?),
         "server:antiCheat" => json(plugins::anticheat_status(&args.get::<String>(0)?).await?),
         "server:setAntiCheat" => {
             let id: String = args.get(0)?;

@@ -149,6 +149,18 @@ pub enum AgentMsg {
     /// Ask to be whitelisted on a ResinCraft listing: the relay passes it to the host's launcher as a `join_request`
     /// with this account's verified username. Answered with `join_asked`. Protocol 8.
     ListingJoin { id: String },
+    /// Unlock the relay's admin tools on this connection with the dashboard's password; only for accounts the relay
+    /// lists as admins (uthed said dmin). Answered with dmin_ready. Protocol 8.
+    AdminUnlock { password: String },
+    /// One admin request after dmin_ready: the same as the dashboard's JSON API (GET /api/listings, POST
+    /// /api/listings/...). Answered with dmin_result. Protocol 8.
+    AdminCall {
+        id: u64,
+        method: String,
+        path: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        body: Option<serde_json::Value>,
+    },
     Ping { seq: u64 },
 }
 
@@ -186,12 +198,31 @@ pub struct ListingInfo {
     /// servers that it carries Geyser for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bedrock_address: Option<String>,
+    /// The modpack players need (a listing with one counts as modded).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modpack: Option<ListingModpack>,
     /// https:// only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub website: Option<String>,
     /// discord.gg/… or discord.com/invite/….
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discord: Option<String>,
+}
+
+/// The modpack a listed server runs. Protocol 8.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ListingModpack {
+    /// 1–64 characters.
+    pub name: String,
+    /// "modrinth", "curseforge", "ftb", "atlauncher", "technic", or "" for a custom pack.
+    #[serde(default)]
+    pub source: String,
+    /// The pack's project id on that site ("" for a custom pack).
+    #[serde(default)]
+    pub project_id: String,
+    /// The pack version the server runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -246,6 +277,29 @@ pub struct MyListing {
     /// Hosted through the relay (else submitted).
     #[serde(default)]
     pub resincraft: bool,
+    /// The client pack players can install (the owner uploaded it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pack: Option<ListingPack>,
+}
+
+/// A listing's client pack: a Modrinth .mrpack the owner uploaded, which players install as an instance. Protocol 8.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ListingPack {
+    /// `https://<base domain>/packs/<listing id>.mrpack`.
+    pub url: String,
+    pub size: u64,
+    pub sha256: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub mc_version: String,
+    /// "forge", "neoforge", "fabric", "quilt", or "" (vanilla).
+    #[serde(default)]
+    pub loader: String,
+    #[serde(default)]
+    pub updated_at: u64,
 }
 
 /// What became of a whitelist request (the web page shows a sentence for each).
@@ -281,6 +335,9 @@ pub enum RelayMsg {
     Authed {
         uuid: String,
         username: String,
+        /// The relay lists this account as one of its admins (protocol 8): the launcher shows its Admin page.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        admin: bool,
         /// Only after `login`: keep it (it replaces the Minecraft token for later connections).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session: Option<String>,
@@ -353,6 +410,17 @@ pub enum RelayMsg {
     Reported { id: String },
     /// The answer to `listing_join`. Protocol 8.
     JoinAsked { id: String, outcome: JoinOutcome },
+    /// The answer to dmin_unlock. Protocol 8.
+    AdminReady {},
+    /// The answer to dmin_call id: alue when ok, else error. Protocol 8.
+    AdminResult {
+        id: u64,
+        ok: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        value: Option<serde_json::Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
     /// A player asks on the web page to be whitelisted. Protocol 5, and only after `join_requests` turned on.
     JoinRequest { id: u64, username: String },
     Error {
@@ -451,6 +519,11 @@ pub enum ErrorCode {
     ListingInvalid,
     /// Too many submitted servers for this account. Protocol 8.
     ListingLimit,
+    /// The relay's admin banned this account from the server list (not from the relay): `ban` says until when and
+    /// why. Protocol 8.
+    ListingBanned,
+    /// Not an admin account, a wrong password, or too many wrong ones (locked for a while). Protocol 8.
+    AdminDenied,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -877,7 +950,7 @@ mod tests {
         for m in [
             RelayMsg::ListingStatus(status.clone()),
             RelayMsg::MyListings {
-                listings: vec![MyListing { status, address: "smp.example".into(), listing: info, likes: 2, resincraft: true }],
+                listings: vec![MyListing { status, address: "smp.example".into(), listing: info, likes: 2, resincraft: true, pack: None }],
             },
             RelayMsg::Liked { id: "rc-smp".into(), likes: 3, liked: true },
             RelayMsg::Reported { id: "rc-smp".into() },
