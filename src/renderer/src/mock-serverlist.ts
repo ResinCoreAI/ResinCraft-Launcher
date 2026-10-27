@@ -273,9 +273,10 @@ export function mockServerList(find: (id: string) => ServerInfo) {
         defaultInstance: 'tech',
         published: clientPacks[id]
       }),
+    clientPackChoices: () => wait({ resourcepacks: ['Faithful 32x.zip', 'Create Dark Mode.zip'], shaderpacks: ['ComplementaryReimagined_r5.3.zip'] }),
     publishClientPack: async (id: string) => {
       await wait(null, 1800)
-      clientPacks[id] = { url: 'https://rscraft.resincore.tech/packs/rc-smp.mrpack', size: 3_400_000, sha256: 'ab12', name: find(id).name, version: '2026.10.27-1200', mc_version: find(id).mcVersion, loader: 'fabric', updated_at: Math.floor(Date.now() / 1000) }
+      clientPacks[id] = { url: 'https://rscraft.resincore.tech/packs/rc-smp.json', format: 2, size: 3_400, sha256: 'ab12', name: find(id).name, version: '2026.10.27-1200', mc_version: find(id).mcVersion, loader: 'fabric', updated_at: Math.floor(Date.now() / 1000) }
       return clientPacks[id]!
     },
     removeClientPack: async (id: string) => void delete clientPacks[id],

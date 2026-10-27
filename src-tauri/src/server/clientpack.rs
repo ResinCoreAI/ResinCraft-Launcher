@@ -1,9 +1,10 @@
-//! Client packs for the server list (relay protocol 8): a hosted modded server's mod set as a Modrinth .mrpack,
-//! exported from an instance (the one the server was made from, or another the owner picks) and uploaded to
-//! ResinCraft Relay; players install it from Discover → Servers as an instance of its own and join.
+//! Client packs for the server list (relay protocol 8): what players need to join a hosted modded server, made from
+//! an instance (the one the server was made from, or another the owner picks). Players install it from Discover →
+//! Servers as an instance of its own and join.
 //!
-//! Mods from Modrinth or CurseForge go in as download links; the owner's own jars go in as files. The relay checks
-//! the pack, keeps it while the listing is listed, and serves it at `https://<base domain>/packs/<id>.mrpack`.
+//! Published as a pack plan (clientplan.rs): the modpack it came from, then every other file as a link to Modrinth or
+//! CurseForge, or as the owner's own file, which stays on the owner's PC and reaches players through the relay
+//! (clientfiles.rs). Packs published by older builds are a Modrinth .mrpack; players can still install those.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -13,15 +14,16 @@ use resincraft_relay::proto::ListingPack;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::content::{export, sources};
+use crate::content::sources;
 use crate::core::fsutil::{read_json, write_json};
 use crate::core::instances;
 use crate::core::paths;
-use crate::core::types::ExportOptions;
 use crate::err_tr;
 use crate::player::accounts;
 
-use super::{listing, packs, relay, store};
+use super::{clientfiles, clientplan, listing, packs, relay, store};
+
+const PLAN_FORMAT: u32 = 2;
 
 /// What the Settings tab shows about a server's client pack.
 #[derive(Debug, Serialize)]
@@ -67,48 +69,47 @@ pub async fn info(id: &str) -> Result<PackInfo> {
     Ok(PackInfo { modded, instances: list, default_instance, published })
 }
 
-/// Exports `instance_id` as a .mrpack and uploads it as the server's client pack.
-pub async fn publish(id: &str, instance_id: &str) -> Result<ListingPack> {
+/// What the owner picked to send along besides the mods.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishOpts {
+    #[serde(default)]
+    pub resourcepacks: Vec<String>,
+    #[serde(default)]
+    pub shaderpacks: Vec<String>,
+}
+
+/// Makes the pack plan for `instance_id` and publishes it as the server's client pack. The owner's own files stay on
+/// this PC; players download them through the relay while this launcher is running.
+pub async fn publish(id: &str, instance_id: &str, opts: PublishOpts) -> Result<ListingPack> {
     let meta = store::get(id).await?;
     let Some(name) = meta.relay_name.clone() else {
         return Err(err_tr!("clientPack.needsRelay", "Start the server once with ResinCraft Relay to get its address, then publish its pack."));
     };
-    let inst = instances::get(instance_id).await?;
     let Some(account) = accounts::microsoft_account(meta.relay_account.as_deref()).await else { return Err(relay::needs_microsoft()) };
-    let include = export::export_preview(instance_id).await?.into_iter().filter(|e| e.suggested).map(|e| e.name).collect();
-    let dir = paths::root().join("tmp");
-    tokio::fs::create_dir_all(&dir).await?;
-    let file = dir.join(format!("client-pack-{name}.mrpack"));
-    let opts = ExportOptions {
-        format: "mrpack".into(),
-        name: meta.name.clone(),
-        version: chrono::Utc::now().format("%Y.%m.%d-%H%M").to_string(),
-        author: account.username.clone(),
-        summary: format!("Client pack for {}", meta.name),
-        include,
-        bump_on_export: None,
-    };
-    export::export_modpack(&inst.id, opts, &file).await?;
-    let body = tokio::fs::read(&file).await?;
-    let _ = tokio::fs::remove_file(&file).await;
+    let version = chrono::Utc::now().format("%Y.%m.%d-%H%M").to_string();
+    let (mut plan, owned) = clientplan::build(instance_id, &opts.resourcepacks, &opts.shaderpacks, &version).await?;
+    plan.name = meta.name.chars().take(64).collect();
+    let body = serde_json::to_vec(&plan)?;
     let (token, base) = relay::session_token(&account).await?;
     let res = crate::core::ctx::http()
         .put(format!("https://{base}/api/packs/rc-{name}"))
         .bearer_auth(token)
-        .header("Content-Type", "application/x-modrinth-modpack+zip")
-        .timeout(Duration::from_secs(300))
+        .header("Content-Type", "application/json")
+        .timeout(Duration::from_secs(60))
         .body(body)
         .send()
         .await
         .map_err(|e| err_tr!("clientPack.unreachable", "Couldn't upload the pack to ResinCraft Relay ({error}).", error = e.to_string()))?;
     let status = res.status();
     if status.is_success() {
+        clientfiles::set(&format!("rc-{name}"), owned).await?;
         return Ok(res.json().await?);
     }
     let why = res.text().await.unwrap_or_default();
     Err(match status.as_u16() {
         404 => err_tr!("clientPack.notYet", "ResinCraft Relay doesn't take client packs yet."),
-        413 => err_tr!("clientPack.tooBig", "The pack is bigger than ResinCraft Relay allows. Leave out big files (shaders, resource packs) and try again."),
+        413 => err_tr!("clientPack.tooBig", "The pack lists more files than ResinCraft Relay allows. Leave some out and try again."),
         _ => err_tr!("clientPack.refused", "ResinCraft Relay didn't take the pack: {error}", error = why.chars().take(300).collect::<String>()),
     })
 }
@@ -120,6 +121,7 @@ pub async fn remove(id: &str) -> Result<()> {
     let (token, base) = relay::session_token(&account).await?;
     let res = crate::core::ctx::http().delete(format!("https://{base}/api/packs/rc-{name}")).bearer_auth(token).timeout(Duration::from_secs(30)).send().await?;
     if res.status().is_success() || res.status().as_u16() == 404 {
+        clientfiles::set(&format!("rc-{name}"), HashMap::new()).await?;
         Ok(())
     } else {
         Err(err_tr!("clientPack.refused", "ResinCraft Relay didn't take the pack: {error}", error = res.status().to_string()))
@@ -146,10 +148,16 @@ pub struct InstallReq {
     pub id: String,
     pub url: String,
     pub sha256: String,
+    /// The pack's `format`: 2 for a plan, else a .mrpack.
+    #[serde(default)]
+    pub format: u32,
 }
 
 /// The instance for a listing's pack: the one installed before while it's the same pack, else a fresh install.
 pub async fn install(req: InstallReq) -> Result<String> {
+    if req.format == PLAN_FORMAT {
+        return clientplan::install(&req.id, &req.url).await;
+    }
     let mut known: Installed = read_json(&installed_file()).await.unwrap_or_default();
     if let Some((iid, sha)) = known.packs.get(&req.id) {
         if sha.eq_ignore_ascii_case(&req.sha256) && instances::get(iid).await.is_ok() {

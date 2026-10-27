@@ -3,7 +3,7 @@
 // report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
-import type { AskJoinOutcome, ClientPackInfo, Instance, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
+import type { AskJoinOutcome, ClientPackChoices, ClientPackInfo, Instance, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes } from '../util'
@@ -588,7 +588,7 @@ function useServerActions(s: ListedServer, onReport: () => void) {
     }
     setJoining(true)
     try {
-      const instanceId = await api.server.installListingPack({ id: s.id, url: s.pack.url, sha256: s.pack.sha256 })
+      const instanceId = await api.server.installListingPack({ id: s.id, url: s.pack.url, sha256: s.pack.sha256, format: s.pack.format ?? 0 })
       await join({ address: s.address, name: s.title, edition: 'java', instanceId })
     } catch (e) {
       toast((e as Error).message, 'error')
@@ -657,7 +657,7 @@ function JoinButtons({ s, a, size = 'sm', ask = true }: { s: ListedServer; a: Re
         <button
           className={`btn ${size} primary`}
           disabled={a.joining}
-          title={t('servers.list.installJoinHint', { name: s.pack.name || s.title, size: bytes(s.pack.size) })}
+          title={s.pack.format === 2 ? t('servers.list.installJoinPlanHint', { name: s.pack.name || s.title }) : t('servers.list.installJoinHint', { name: s.pack.name || s.title, size: bytes(s.pack.size) })}
           onClick={() => void a.installAndJoin()}
         >
           {a.joining ? <Loader2 className="spin" /> : <Download />} {t('servers.list.installJoin')}
@@ -879,7 +879,7 @@ function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: List
                 {s.modpack.version ? ` ${s.modpack.version}` : ''}
               </button>
             )}
-          {s.pack && fact(t('servers.list.clientPack'), `${s.pack.name || s.title}${s.pack.version ? ` ${s.pack.version}` : ''} · ${bytes(s.pack.size)}`)}
+          {s.pack && fact(t('servers.list.clientPack'), `${s.pack.name || s.title}${s.pack.version ? ` ${s.pack.version}` : ''}${s.pack.format === 2 ? '' : ` · ${bytes(s.pack.size)}`}`)}
           {s.region && fact(t('servers.list.field.region'), regionLabel(s.region))}
           {s.language && fact(t('servers.list.field.language'), languageLabel(s.language))}
           {fact(t('servers.list.listedSince'), when(s.listed_at))}
@@ -1125,6 +1125,8 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
   const { toast } = useStore()
   const [info, setInfo] = useState<ClientPackInfo>()
   const [source, setSource] = useState('')
+  const [choices, setChoices] = useState<ClientPackChoices>()
+  const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<'publish' | 'remove'>()
   useEffect(() => {
     let live = true
@@ -1138,13 +1140,32 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
     )
     return () => void (live = false)
   }, [s.id])
+  // What the picked instance can send along (resource packs, shaders); nothing is ticked until the owner ticks it.
+  useEffect(() => {
+    setChoices(undefined)
+    setPicked(new Set())
+    if (!source) return
+    let live = true
+    void api.server.clientPackChoices(source).then(
+      (v) => live && setChoices(v),
+      () => {}
+    )
+    return () => void (live = false)
+  }, [source])
   if (!info?.modded) return null
+  const toggle = (key: string) => {
+    const next = new Set(picked)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setPicked(next)
+  }
+  const pickedIn = (folder: string) => [...picked].filter((k) => k.startsWith(`${folder}/`)).map((k) => k.slice(folder.length + 1))
   const publish = async () => {
     setBusy('publish')
     try {
-      const published = await api.server.publishClientPack(s.id, source)
+      const published = await api.server.publishClientPack(s.id, source, { resourcepacks: pickedIn('resourcepacks'), shaderpacks: pickedIn('shaderpacks') })
       setInfo({ ...info, published })
-      toast(t('servers.clientPack.published', { name: s.name, size: bytes(published.size) }), 'success')
+      toast(t('servers.clientPack.published', { name: s.name }), 'success')
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
@@ -1177,7 +1198,7 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
             <span>{t('servers.clientPack.hint')}</span>
             {p && (
               <span className="hint">
-                {t('servers.clientPack.current', { name: p.name || s.name, version: p.version, size: bytes(p.size), when: new Date(p.updated_at * 1000).toLocaleString(currentLanguage()) })}
+                {t('servers.clientPack.current', { name: p.name || s.name, version: p.version, when: new Date(p.updated_at * 1000).toLocaleString(currentLanguage()) })}
               </span>
             )}
           </div>
@@ -1204,6 +1225,34 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
               <button className="btn sm primary" disabled={!!busy || !source} onClick={() => void publish()}>
                 {busy === 'publish' ? <Loader2 className="spin" /> : <Upload />} {t(p ? 'servers.clientPack.update' : 'servers.clientPack.publish')}
               </button>
+            </div>
+          )}
+          {choices?.modpack && <span className="hint">{t('servers.clientPack.fromModpack', { name: choices.modpack })}</span>}
+          {choices && (choices.resourcepacks.length > 0 || choices.shaderpacks.length > 0) && (
+            <div className="field">
+              <label>{t('servers.clientPack.extras')}</label>
+              <div className="include-list">
+                {(
+                  [
+                    ['resourcepacks', choices.resourcepacks],
+                    ['shaderpacks', choices.shaderpacks],
+                  ] as const
+                ).flatMap(([folder, names]) =>
+                  names.map((n) => {
+                    const key = `${folder}/${n}`
+                    return (
+                      <label key={key} className={`include-row ${picked.has(key) ? 'on' : ''}`}>
+                        <input type="checkbox" disabled={!!busy} checked={picked.has(key)} onChange={() => toggle(key)} />
+                        {folder === 'resourcepacks' ? <Package size={15} /> : <Star size={15} />}
+                        <span className="grow ellipsis" title={n}>
+                          {n}
+                        </span>
+                        <span className="hint">{t(folder === 'resourcepacks' ? 'servers.clientPack.resourcePack' : 'servers.clientPack.shader')}</span>
+                      </label>
+                    )
+                  })
+                )}
+              </div>
             </div>
           )}
           <span className="hint">{t('servers.clientPack.note')}</span>

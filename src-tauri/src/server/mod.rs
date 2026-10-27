@@ -6,6 +6,8 @@
 pub mod admin;
 pub mod antixray;
 pub mod clientpack;
+pub mod clientfiles;
+pub mod clientplan;
 pub mod cloudflare;
 pub mod clientmods;
 pub mod create;
@@ -193,7 +195,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:listModpacks" => json(listing::modpacks().await?),
         // Client packs: the owner publishes the server's mods; players install them as an instance.
         "server:clientPack" => json(clientpack::info(&args.get::<String>(0)?).await?),
-        "server:publishClientPack" => json(clientpack::publish(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:publishClientPack" => json(clientpack::publish(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<clientpack::PublishOpts>>(2)?.unwrap_or_default()).await?),
+        "server:clientPackChoices" => json(clientplan::choices(&args.get::<String>(0)?).await?),
         "server:removeClientPack" => {
             clientpack::remove(&args.get::<String>(0)?).await?;
             done()

@@ -1223,9 +1223,12 @@ export interface BackupFile {
   auto: boolean
 }
 
-/** A listing's client pack:the owner's mod set as a .mrpack on the relay, installed by players as an instance. */
+/** A listing's client pack, installed by players as an instance: a .mrpack (format 1) or a pack plan (format 2) whose
+ * files come from Modrinth, CurseForge or the owner's PC. */
 export interface ListingPack {
   url: string
+  /** 2: a pack plan (its size is only the plan's); else a .mrpack. */
+  format?: number
   size: number
   sha256: string
   name: string
@@ -1233,6 +1236,14 @@ export interface ListingPack {
   mc_version: string
   loader: string
   updated_at: number
+}
+
+/** What an instance can send along in a client pack besides its mods. */
+export interface ClientPackChoices {
+  resourcepacks: string[]
+  shaderpacks: string[]
+  /** The modpack it was made from (players install that from its site first). */
+  modpack?: string
 }
 
 /** A hosted server's client pack, for its Settings tab. */
@@ -2083,10 +2094,12 @@ export interface ResinApi {
     listModpacks(): Promise<{ modpacks: ServerListModpack[] }>
     /** Settings → Server list → Client pack. */
     clientPack(id: string): Promise<ClientPackInfo>
-    publishClientPack(id: string, instanceId: string): Promise<ListingPack>
+    clientPackChoices(instanceId: string): Promise<ClientPackChoices>
+    /** Publishes the instance's mods (and the picked resource packs and shaders) as a pack plan. */
+    publishClientPack(id: string, instanceId: string, opts?: { resourcepacks: string[]; shaderpacks: string[] }): Promise<ListingPack>
     removeClientPack(id: string): Promise<void>
     /** Discover → Servers → Install & join: the instance made from (or already made from) a listing's pack. */
-    installListingPack(req: { id: string; url: string; sha256: string }): Promise<string>
+    installListingPack(req: { id: string; url: string; sha256: string; format?: number }): Promise<string>
     /** The Admin page: whether the active account is one of the relay's admins, and unlocked this session. */
     adminStatus(): Promise<AdminStatus>
     /** Password and/or the 2FA code; `remember` keeps this PC unlocked. Status `needCode`: ask for the code. */

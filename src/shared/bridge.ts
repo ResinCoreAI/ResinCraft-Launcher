@@ -240,6 +240,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       browseList: fn('server:browseList'),
       listModpacks: fn('server:listModpacks'),
       clientPack: fn('server:clientPack'),
+      clientPackChoices: fn('server:clientPackChoices'),
       publishClientPack: fn('server:publishClientPack'),
       removeClientPack: fn('server:removeClientPack'),
       installListingPack: fn('server:installListingPack'),

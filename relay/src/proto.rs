@@ -301,11 +301,15 @@ pub struct MyListing {
     pub pack: Option<ListingPack>,
 }
 
-/// A listing's client pack: a Modrinth .mrpack the owner uploaded, which players install as an instance. Protocol 8.
+/// A listing's client pack, which players install as an instance: a Modrinth .mrpack the owner uploaded (`format` 1),
+/// or a pack plan (`format` 2, JSON: see server/clientplan.rs). Protocol 8.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ListingPack {
-    /// `https://<base domain>/packs/<listing id>.mrpack`.
+    /// `https://<base domain>/packs/<listing id>.mrpack`, or `….json` for a plan.
     pub url: String,
+    /// 1: a .mrpack; 2: a pack plan. Packs stored before plans read as 0 (a .mrpack).
+    #[serde(default)]
+    pub format: u32,
     pub size: u64,
     pub sha256: String,
     #[serde(default)]
