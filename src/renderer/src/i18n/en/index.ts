@@ -2,6 +2,7 @@
 // engine.ts is generated from the Rust engine's tr!() calls (tools/engine-strings.ts).
 import accounts from './accounts'
 import admin from './admin'
+import relayadmin from './relayadmin'
 import art from './art'
 import backups from './backups'
 import app from './app'
@@ -44,6 +45,7 @@ const en = {
   ...migrate,
   ...servers,
   ...admin,
+  ...relayadmin,
   ...quickjoin,
   ...commands,
   ...updates,

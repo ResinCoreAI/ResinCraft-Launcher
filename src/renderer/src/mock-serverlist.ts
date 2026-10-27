@@ -65,6 +65,8 @@ async function mockAdminCall(method: string, path: string, body?: unknown): Prom
   await wait(null, 300)
   const b = (body ?? {}) as Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
   const find = (id: string) => LISTED.find((s) => s.id === id)
+  const relay = relayMock(method, path, b)
+  if (relay !== undefined) return relay
   if (method === 'GET') {
     return {
       settings: adminSettings,
@@ -94,6 +96,77 @@ async function mockAdminCall(method: string, path: string, body?: unknown): Prom
   }
   return { ok: true }
 }
+/** The relay dashboard's other routes for the preview (undefined: not one of them). */
+let service = { state: 'on', message: null as string | null, since: now() - 86400 }
+const relayEvents = [
+  { id: 1, at: now() - 3600, kind: 'online', text: 'puirkle3 came online (Puirkle_Gamer)', ip: '203.0.113.9' },
+  { id: 2, at: now() - 1800, kind: 'join', text: 'a player joined puirkle3' },
+  { id: 3, at: now() - 600, kind: 'admin', text: 'admin Puirkle_Gamer (Puirkle_Gamer) via launcher: approved Ocean Kingdoms' }
+]
+function relayMock(method: string, path: string, b: Record<string, any>): unknown { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const p = path.split('?')[0]
+  const limits = { tunnels_per_account: 3, names_per_account: 5, connections_per_tunnel: 50, connections_per_ip: 0, agents_per_ip: 0, monthly_gb_per_account: 100, handshake_timeout_secs: 10, idle_timeout_secs: 300, logins_per_ip_per_hour: 30, name_expiry_days: 180, session_days: 30, max_pending_handshakes: 200, session_minutes: 120, session_warn_minutes: [15, 5, 1], session_continue_minutes: 15, topup_gb: 30, topups_per_month: 3, topup_low_gb: 1, max_domains: 3 }
+  if (method === 'POST' && p === '/api/service') return (service = { ...service, state: b.state, message: b.message || null, since: now() })
+  if (method === 'POST' && !p.startsWith('/api/listings')) return { ok: true }
+  switch (p) {
+    case '/api/service':
+      return service
+    case '/api/overview':
+      return { version: '0.9.0', baseDomain: 'rscraft.resincore.tech', uptimeSecs: 93_600, tunnels: 2, players: 7, names: 41, bans: 2, month: '2026-10', trafficMonth: 48_300_000_000, capPerAccount: 100_000_000_000, launchers: 5, forwardedTotal: 1200, offlineAnswered: 30, signInFailures: 1, service, sessionMinutes: 120 }
+    case '/api/tunnels':
+      return [
+        { name: 'puirkle3', address: 'puirkle3.rscraft.resincore.tech', owner: '8667ba71-b85a-4004-af54-457a9734eed7', ownerName: 'Puirkle_Gamer', since: now() - 3600, players: 3, bytesIn: 21_000_000, bytesOut: 310_000_000, secsLeft: null, unlimited: true, unlimitedTime: false, continues: 0, bedrockPort: 24011, bedrockOnly: false },
+        { name: 'create-lab', address: 'create-lab.rscraft.resincore.tech', owner: '069a79f4-44e9-4726-a5be-fca90e38aaf5', ownerName: 'Alex', since: now() - 5400, players: 4, bytesIn: 9_000_000, bytesOut: 120_000_000, secsLeft: 480, unlimited: false, unlimitedTime: false, continues: 1, bedrockPort: null, bedrockOnly: false }
+      ]
+    case '/api/names':
+      return {
+        total: 2,
+        names: [
+          { name: 'puirkle3', owner: '8667ba71-b85a-4004-af54-457a9734eed7', ownerName: 'Puirkle_Gamer', created: now() - 86400 * 30, lastUsed: now(), online: true, assigned: false, domain: { domain: 'play.puirkle.com', state: 'verified', routeOk: true, https: { serving: true } } },
+          { name: 'create-lab', owner: '069a79f4-44e9-4726-a5be-fca90e38aaf5', ownerName: 'Alex', created: now() - 86400 * 9, lastUsed: now(), online: true, assigned: false, domain: null }
+        ],
+        reserved: ['hypixel'],
+        builtinReserved: ['about', 'abuse', 'admin', 'relay']
+      }
+    case '/api/bans':
+      return { uuids: [{ uuid: '11111111-2222-3333-4444-555566667777', name: 'Griefer42', reason: 'spam', at: now() - 7200, expires: now() + 86400 }], ips: [], fromConfig: { uuids: [], ips: [] } }
+    case '/api/usage':
+      return {
+        accountUnlimited: ['tunnels_per_account', 'session_minutes', 'monthly_gb_per_account'],
+        accountKeys: ['tunnels_per_account', 'names_per_account', 'monthly_gb_per_account', 'session_minutes', 'max_domains'],
+        limits,
+        special: [{ uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle_Gamer', own: { tunnels_per_account: 5, session_minutes: 'unlimited' }, since: now() - 86400 }],
+        month: '2026-10',
+        cap: 100_000_000_000,
+        total: 48_300_000_000,
+        topupBytes: 30_000_000_000,
+        topupsPerMonth: 3,
+        lowBytes: 1_000_000_000,
+        accounts: [
+          { uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Alex', bytes: 82_000_000_000, cap: 100_000_000_000, extra: 0, topups: 0, unlimited: false, unlimitedTime: false, percent: 82, online: 1 },
+          { uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle_Gamer', bytes: 12_000_000_000, cap: 0, extra: 0, topups: 0, unlimited: true, unlimitedTime: false, percent: 0, online: 1 }
+        ]
+      }
+    case '/api/settings':
+      return { limits, fileLimits: { ...limits, session_minutes: 90 }, limitsOverridden: true, noServer: { message: true, version: 'Offline', title: 'This server is offline' }, restartOnly: ['max_pending_handshakes'] }
+    case '/api/events':
+      return relayEvents.filter((e) => e.id > Number(new URLSearchParams(path.split('?')[1] ?? '').get('since') ?? 0))
+    case '/api/users':
+      return {
+        users: [
+          { name: 'Puirkle_Gamer', minecraftUuid: '8667ba71-b85a-4004-af54-457a9734eed7', minecraftName: 'Puirkle_Gamer', createdAt: now() - 86400 * 2, createdBy: 'relay.toml', lastLogin: now() - 60, you: true, twoFactor: false, recoveryLeft: 0, microsoft: true, microsoftOff: false, launchers: [{ id: 'abc', device: 'PUIRKLE-PC', account: '8667ba71', createdAt: now() - 3600, lastUsed: now() - 60 }] },
+          { name: 'Alex', minecraftUuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', minecraftName: 'Alex', createdAt: now() - 86400, createdBy: 'Puirkle_Gamer', lastLogin: null, you: false, twoFactor: true, recoveryLeft: 9, microsoft: true, microsoftOff: false, launchers: [] }
+        ],
+        legacy: [],
+        you: 'Puirkle_Gamer',
+        passwordSet: true,
+        require2fa: false,
+        microsoft: true
+      }
+  }
+  return undefined
+}
+
 const adminSettings = { enabled: true, resincraft_approval: 'auto', submitted_approval: 'manual', max_submissions: 3, report_hide_threshold: 5, max_pack_mb: 50, pack_downloads_per_hour: 60 }
 
 const listings: Record<string, { enabled: boolean; info: ListingInfo; state: ListingStatus['state'] }> = {}
@@ -182,13 +255,6 @@ export function mockServerList(find: (id: string) => ServerInfo) {
       return { admin: true, unlocked: true, username: 'Puirkle', dashboardUser: 'Puirkle_Gamer', remembered: req.remember }
     },
     adminLock: async () => void (adminUnlocked = false),
-    adminDashboard: async () => {
-      if (!adminUnlocked) throw new Error('Unlock the Admin page first.')
-    },
-    adminDashboardLink: async () => {
-      if (!adminUnlocked) throw new Error('Unlock the Admin page first.')
-      return 'about:blank'
-    },
     adminCall: (method: 'GET' | 'POST', path: string, body?: unknown) => mockAdminCall(method, path, body),
     clientPack: (id: string) =>
       wait({

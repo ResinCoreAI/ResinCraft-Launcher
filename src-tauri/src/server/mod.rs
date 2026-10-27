@@ -217,11 +217,6 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             admin::lock(args.get::<Option<bool>>(0)?.unwrap_or(false)).await;
             done()
         }
-        "server:adminDashboard" => {
-            admin::open_dashboard().await?;
-            done()
-        }
-        "server:adminDashboardLink" => json(admin::dashboard_link().await?),
 "server:adminCall" => json(admin::call(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<Value>>(2)?).await?),
         "server:antiCheat" => json(plugins::anticheat_status(&args.get::<String>(0)?).await?),
         "server:setAntiCheat" => {

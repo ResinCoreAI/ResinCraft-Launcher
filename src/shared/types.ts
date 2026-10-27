@@ -2087,10 +2087,6 @@ export interface ResinApi {
     adminStatus(): Promise<AdminStatus>
     /** Password and/or the 2FA code; `remember` keeps this PC unlocked. Status `needCode`: ask for the code. */
     adminUnlock(req: { password?: string; code?: string; remember: boolean }): Promise<AdminStatus>
-    /** A one-time link that signs a page into the relay's dashboard (for the Admin page's frame). */
-    adminDashboardLink(): Promise<string>
-    /** The relay's full dashboard in a window of its own, signed in (needs the Admin page unlocked). */
-    adminDashboard(): Promise<void>
     /** `forget`: also forget this PC (the next unlock asks again). */
     adminLock(forget?: boolean): Promise<void>
     /** One admin request (the relay dashboard's JSON API: GET /api/listings, POST /api/listings/…). */

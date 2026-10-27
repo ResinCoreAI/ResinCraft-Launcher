@@ -1,13 +1,20 @@
 // The Admin page: ResinCraft Relay's server-list tools, for accounts the relay lists as admins (relay protocol 8).
 // Unlocked with the relay dashboard's password; the relay checks every request, this page is only its UI.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Ban, Check, ExternalLink, EyeOff, Eye, Flag, Loader2, Lock, Pin, PinOff, Plus, RefreshCw, Search, Shield, Star, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Ban, Check, EyeOff, Eye, Flag, Gauge, Loader2, Lock, Pin, PinOff, Plus, Radio, RefreshCw, ScrollText, Search, Server, Settings2, Shield, Star, Tag, Trash2, Users, X } from 'lucide-react'
 import type { AdminStatus, ListingInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t, type Key } from '../i18n'
 import { Empty, Modal, MoreButton, Segmented, Switch, type ContextEntry } from '../components/ui'
 import { ListingFields, stateChip } from '../components/ServerList'
+import { ServiceCard, LiveTunnels } from '../components/admin/Live'
+import { NamesAdmin } from '../components/admin/Names'
+import { BansAdmin } from '../components/admin/Bans'
+import { UsageAdmin } from '../components/admin/Usage'
+import { UsersAdmin } from '../components/admin/Users'
+import { RelaySettingsAdmin } from '../components/admin/RelaySettings'
+import { EventsAdmin } from '../components/admin/Events'
 import '../serverlist.css'
 
 type Promo = { kind: 'recommended' | 'sponsored'; until?: number | null; order?: number; since?: number; active?: boolean }
@@ -59,55 +66,51 @@ interface AdminData {
   reports: { id: string; listing: string; title: string; address: string; reporterName?: string; reason: string; at: number }[]
 }
 
-type Tab = 'relay' | 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
+type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
+/** The relay's screens, in the dashboard's order. */
+type Section = 'live' | 'names' | 'bans' | 'usage' | 'list' | 'users' | 'settings' | 'events'
+const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
+  { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
+  { id: 'names', label: 'servers.admin.nav.names', icon: <Tag size={16} /> },
+  { id: 'bans', label: 'servers.admin.nav.bans', icon: <Ban size={16} /> },
+  { id: 'usage', label: 'servers.admin.nav.usage', icon: <Gauge size={16} /> },
+  { id: 'list', label: 'servers.admin.nav.list', icon: <Server size={16} /> },
+  { id: 'users', label: 'servers.admin.nav.users', icon: <Users size={16} /> },
+  { id: 'settings', label: 'servers.admin.nav.settings', icon: <Settings2 size={16} /> },
+  { id: 'events', label: 'servers.admin.nav.events', icon: <ScrollText size={16} /> }
+]
+const SECTION_KEY = 'resin.adminSection'
+
 export default function Admin() {
-  const { toast } = useStore()
   const [status, setStatus] = useState<AdminStatus>()
-  const [opening, setOpening] = useState(false)
   const [password, setPassword] = useState('')
   const [unlocking, setUnlocking] = useState(false)
   const [error, setError] = useState<string>()
-  const [data, setData] = useState<AdminData>()
-  const [tab, setTab] = useState<Tab>('relay')
   const [code, setCode] = useState('')
   const [needCode, setNeedCode] = useState(false)
   const [remember, setRemember] = useState(true)
-  const [q, setQ] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [section, setSectionState] = useState<Section>(() => {
+    try {
+      return (sessionStorage.getItem(SECTION_KEY) as Section) || 'live'
+    } catch {
+      return 'live'
+    }
+  })
+  const setSection = (s: Section) => {
+    setSectionState(s)
+    try {
+      sessionStorage.setItem(SECTION_KEY, s)
+    } catch {
+      /* private storage: just this visit */
+    }
+  }
 
   useEffect(() => {
     api.server.adminStatus().then(setStatus, () => setStatus({ admin: false, unlocked: false }))
   }, [])
-
-  const load = useCallback(async (query = q) => {
-    setLoading(true)
-    try {
-      setData((await api.server.adminCall('GET', `/api/listings${query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''}`)) as AdminData)
-    } catch (e) {
-      toast((e as Error).message, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [q, toast])
-  useEffect(() => {
-    if (status?.unlocked) void load('')
-  }, [status?.unlocked]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  /** One action; reloads the lists after it. */
-  const act = async (route: string, body: unknown, done?: Key) => {
-    try {
-      await api.server.adminCall('POST', `/api/listings/${route}`, body)
-      if (done) toast(t(done), 'success')
-      await load()
-      return true
-    } catch (e) {
-      toast((e as Error).message, 'error')
-      return false
-    }
-  }
 
   const unlock = async () => {
     setUnlocking(true)
@@ -195,8 +198,96 @@ export default function Admin() {
     )
   }
 
+  const lock = (forget: boolean) => void api.server.adminLock(forget).then(() => setStatus({ ...status, unlocked: false, remembered: forget ? false : status.remembered }))
+  return (
+    <div className="page admin-page">
+      <div className="page-head">
+        <div>
+          <h1>{t('servers.admin.relayTitle')}</h1>
+          <p>{status.dashboardUser ? t('servers.admin.signedInAs', { user: status.dashboardUser }) : t('servers.admin.subtitle')}</p>
+        </div>
+        <div className="row">
+          <button className="btn sm" onClick={() => lock(false)}>
+            <Lock /> {t('servers.admin.lock')}
+          </button>
+          {status.remembered && (
+            <button className="btn sm ghost" title={t('servers.admin.forgetHint')} onClick={() => lock(true)}>
+              {t('servers.admin.forget')}
+            </button>
+          )}
+        </div>
+      </div>
+      <ServiceCard />
+      <div className="settings-grid admin-grid">
+        <nav className="settings-nav">
+          {SECTIONS.map((s) => (
+            <button key={s.id} className={`nav-item ${section === s.id ? 'active' : ''}`} onClick={() => setSection(s.id)}>
+              {s.icon} <span className="ellipsis">{t(s.label)}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="admin-section">
+          <h2 className="admin-section-title">{t(SECTIONS.find((s) => s.id === section)!.label)}</h2>
+          {section === 'live' ? (
+            <LiveTunnels />
+          ) : section === 'names' ? (
+            <NamesAdmin />
+          ) : section === 'bans' ? (
+            <BansAdmin />
+          ) : section === 'usage' ? (
+            <UsageAdmin />
+          ) : section === 'list' ? (
+            <ServerListAdmin />
+          ) : section === 'users' ? (
+            <UsersAdmin />
+          ) : section === 'settings' ? (
+            <RelaySettingsAdmin />
+          ) : (
+            <EventsAdmin />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The server list's moderation (the relay's Server list page). */
+function ServerListAdmin() {
+  const { toast } = useStore()
+  const [data, setData] = useState<AdminData>()
+  const [tab, setTab] = useState<Tab>('pending')
+  const [q, setQ] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const load = useCallback(
+    async (query = q) => {
+      setLoading(true)
+      try {
+        setData((await api.server.adminCall('GET', `/api/listings${query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''}`)) as AdminData)
+      } catch (e) {
+        toast((e as Error).message, 'error')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [q, toast]
+  )
+  useEffect(() => void load(''), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** One action; reloads the lists after it. */
+  const act = async (route: string, body: unknown, done?: Key) => {
+    try {
+      await api.server.adminCall('POST', `/api/listings/${route}`, body)
+      if (done) toast(t(done), 'success')
+      await load()
+      return true
+    } catch (e) {
+      toast((e as Error).message, 'error')
+      return false
+    }
+  }
+
   const tabs: { value: Tab; label: ReactNode }[] = [
-    { value: 'relay', label: t('servers.admin.tab.relay') },
     { value: 'pending', label: <>{t('servers.admin.tab.pending')} {data?.pending.length ? <span className="count">{data.pending.length}</span> : null}</> },
     { value: 'listings', label: t('servers.admin.tab.listings') },
     { value: 'reports', label: <>{t('servers.admin.tab.reports')} {data?.reports.length ? <span className="count">{data.reports.length}</span> : null}</> },
@@ -206,71 +297,16 @@ export default function Admin() {
   ]
 
   return (
-    <div className="page admin-page">
-      <div className="page-head">
-        <div>
-          <h1>{t('servers.admin.title')}</h1>
-          <p>
-            {data
-              ? t('servers.admin.counts', { listed: data.counts.listed ?? 0, pending: data.counts.pending ?? 0, hidden: data.counts.hidden ?? 0 })
-              : t('servers.admin.subtitle')}
-          </p>
-        </div>
-        <div className="row">
-          {status.dashboardUser && <span className="hint">{t('servers.admin.signedInAs', { user: status.dashboardUser })}</span>}
-          <button
-            className="btn sm primary"
-            disabled={opening}
-            title={t('servers.admin.dashboardHint')}
-            onClick={async () => {
-              setOpening(true)
-              try {
-                await api.server.adminDashboard()
-              } catch (e) {
-                toast((e as Error).message, 'error')
-              } finally {
-                setOpening(false)
-              }
-            }}
-          >
-            {opening ? <Loader2 className="spin" /> : <ExternalLink />} {t('servers.admin.dashboard')}
-          </button>
-          <button className="btn sm" disabled={loading} onClick={() => void load()}>
-            {loading ? <Loader2 className="spin" /> : <RefreshCw />} {t('common.refresh')}
-          </button>
-          <button
-            className="btn sm"
-            onClick={() =>
-              void api.server.adminLock(false).then(() => {
-                setStatus({ ...status, unlocked: false })
-                setData(undefined)
-              })
-            }
-          >
-            <Lock /> {t('servers.admin.lock')}
-          </button>
-          {status.remembered && (
-            <button
-              className="btn sm ghost"
-              title={t('servers.admin.forgetHint')}
-              onClick={() =>
-                void api.server.adminLock(true).then(() => {
-                  setStatus({ ...status, unlocked: false, remembered: false })
-                  setData(undefined)
-                })
-              }
-            >
-              {t('servers.admin.forget')}
-            </button>
-          )}
-        </div>
-      </div>
+    <>
       <div className="toolbar">
         <Segmented<Tab> value={tab} onChange={setTab} options={tabs} />
+        <span className="grow" />
+        {data && <span className="hint">{t('servers.admin.counts', { listed: data.counts.listed ?? 0, pending: data.counts.pending ?? 0, hidden: data.counts.hidden ?? 0 })}</span>}
+        <button className="btn sm" disabled={loading} onClick={() => void load()}>
+          {loading ? <Loader2 className="spin" /> : <RefreshCw />} {t('common.refresh')}
+        </button>
       </div>
-      {tab === 'relay' ? (
-        <RelayFrame />
-      ) : !data ? (
+      {!data ? (
         <Loader2 className="spin" />
       ) : tab === 'pending' ? (
         <ItemList items={data.pending} empty={t('servers.admin.pendingEmpty')} act={act} pendingActions />
@@ -307,41 +343,9 @@ export default function Admin() {
       ) : (
         <AddServer act={act} done={() => setTab('listings')} />
       )}
-    </div>
+    </>
   )
 }
-
-/** The relay's own dashboard inside the page, signed in by a one-time link; when its session runs out it asks the
- *  launcher (postMessage) for a fresh link instead of showing its sign-in page. */
-function RelayFrame() {
-  const frame = useRef<HTMLIFrameElement>(null)
-  const [src, setSrc] = useState<string>()
-  const [error, setError] = useState<string>()
-  useEffect(() => {
-    api.server.adminDashboardLink().then(
-      (url) => setSrc(`${url}${url.includes('?') ? '&' : '?'}embed=1`),
-      (e) => setError((e as Error).message)
-    )
-  }, [])
-  useEffect(() => {
-    const onMessage = async (e: MessageEvent) => {
-      const data = e.data as { type?: string; need?: string } | null
-      if (e.source !== frame.current?.contentWindow || data?.type !== 'resincraft-relay' || data.need !== 'ticket') return
-      try {
-        const url = await api.server.adminDashboardLink()
-        frame.current?.contentWindow?.postMessage({ type: 'resincraft-relay', ticket: url }, new URL(url).origin)
-      } catch (err) {
-        setError((err as Error).message)
-      }
-    }
-    window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
-  }, [])
-  if (error) return <p className="hint bad">{error}</p>
-  if (!src) return <Loader2 className="spin" />
-  return <iframe ref={frame} className="relay-frame" src={src} title={t('servers.admin.tab.relay')} referrerPolicy="no-referrer" />
-}
-
 type Act = (route: string, body: unknown, done?: Key) => Promise<boolean>
 
 function ItemList({ items, empty, act, pendingActions }: { items: AdminItem[]; empty: string; act: Act; pendingActions?: boolean }) {
