@@ -499,10 +499,16 @@ async fn check_joins() -> bool {
     all.asked.retain(|_, a| now - a.at < ASKED_KEPT_MS);
     let accounts: BTreeSet<String> = all.asked.values().filter(|a| a.state == "waiting").map(|a| a.account.clone()).collect();
     let mut changed = false;
+    let mut answered = false;
     for uuid in accounts {
         let Some(acc) = accounts::microsoft_account(Some(&uuid)).await.filter(|a| a.uuid.replace('-', "").eq_ignore_ascii_case(&uuid.replace('-', ""))) else { continue };
         let Ok(mut conn) = relay::connect_for_list(&acc).await else { continue };
-        let Ok(joins) = conn.listing_joins().await else { continue };
+        // A relay that can't say (older than this) or doesn't know the request any more: forgotten, so the player
+        // can ask again (the host's launcher says "already asked" while the old one still waits).
+        let joins = conn.listing_joins().await.unwrap_or_default();
+        let before = all.asked.len();
+        all.asked.retain(|id, a| a.account != uuid || a.state != "waiting" || joins.iter().any(|j| &j.id == id));
+        changed |= all.asked.len() != before;
         for j in joins {
             let Some(a) = all.asked.get_mut(&j.id) else { continue };
             if a.account != uuid || a.state != "waiting" || j.state == "waiting" || !(j.state == "accepted" || j.state == "rejected") {
@@ -511,6 +517,7 @@ async fn check_joins() -> bool {
             a.state = j.state.clone();
             a.at = now;
             changed = true;
+            answered = true;
             emit("joinAnswered", serde_json::json!({ "id": j.id, "title": a.title, "accepted": j.state == "accepted" }));
         }
     }
@@ -519,7 +526,7 @@ async fn check_joins() -> bool {
         emit("joinStates", join_states_of(&all));
         // Flash the taskbar when the launcher isn't in front, so the player sees the notice.
         use tauri::Manager;
-        if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window("main")) {
+        if let Some(w) = answered.then(crate::core::ctx::app).flatten().and_then(|a| a.get_webview_window("main")) {
             let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
         }
     }
