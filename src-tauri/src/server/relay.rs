@@ -433,16 +433,16 @@ pub async fn send_join_requests(id: &str) {
     send(id, Command::JoinRequests(on));
 }
 
-/// Blocks whoever sent web request `request` from sending more (Reject and block).
-pub fn send_join_block(id: &str, request: u64) {
-    send(id, Command::JoinBlock { id: request });
+/// Tells the relay what the host decided on `username`'s server list request (their launcher lets them know).
+pub fn send_join_decided(id: &str, username: &str, accepted: bool) {
+    send(id, Command::JoinDecided { username: username.to_string(), accepted });
 }
 
-/// A request from the relay's web page: kept like the bot's, and the answer goes back to the page.
-fn on_join_request(id: String, request: u64, username: String) {
+/// A request from the relay's web page or the server list: kept like the bot's, and the answer goes back.
+fn on_join_request(id: String, request: u64, username: String, listing: bool) {
     use super::requests::{submit, Outcome, Via};
     tokio::spawn(async move {
-        let outcome = match submit(&id, &username, Via::Web { relay_id: request }).await {
+        let outcome = match submit(&id, &username, Via::Web { relay_id: request, listing }).await {
             Outcome::Received => JoinOutcome::Received,
             Outcome::AlreadyListed => JoinOutcome::AlreadyListed,
             Outcome::AlreadyRequested => JoinOutcome::AlreadyRequested,
@@ -632,7 +632,7 @@ pub async fn open(
                                 status(Status::TopUp { added_bytes, by_admin, usage })
                             }
                         }
-                        Event::JoinRequest { id: request, username } => on_join_request(id.clone(), request, username),
+                        Event::JoinRequest { id: request, username, listing } => on_join_request(id.clone(), request, username, listing),
                     },
                     &mut commands,
                 );

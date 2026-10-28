@@ -1249,7 +1249,9 @@ export interface ClientPackChoices {
 /** A hosted server's client pack, for its Settings tab. */
 export interface ClientPackInfo {
   modded: boolean
-  /** Instances with the server's Minecraft version and loader. */
+  /** Any Java server can have one (a plugin or vanilla server's: client mods, resource packs, shaders). */
+  available?: boolean
+  /** Instances with the server's Minecraft version (and loader, for a modded server). */
   instances: { id: string; name: string }[]
   defaultInstance?: string
   published?: ListingPack
@@ -1498,10 +1500,30 @@ export interface JoinRequestsConfig {
 export interface JoinRequest {
   id: string
   username: string
-  source: 'web' | 'discord'
+  /** The web page, the server list (a signed-in player, told what the host decides) or the Discord bot. */
+  source: 'web' | 'list' | 'discord'
   /** Their Discord name, for requests from the bot. */
   from?: string
   at: number
+}
+
+/** Someone the host blocked from asking to join. */
+export interface BlockedRequester {
+  /** Unblock with this. */
+  key: string
+  kind: 'discord' | 'name'
+  name: string
+  at: number
+}
+
+/** Where a whitelist request sent from the server list stands. */
+export type JoinState = 'waiting' | 'accepted' | 'rejected'
+
+/** The host of a listed server decided on the player's whitelist request. */
+export interface JoinAnsweredEvent {
+  id: string
+  title: string
+  accepted: boolean
 }
 
 export interface DiscordBotStatus {
@@ -1518,6 +1540,8 @@ export interface RequestsInfo {
   hasBotToken: boolean
   /** Discord users the host blocked from asking (Reject and block). */
   blockedOnDiscord: number
+  /** Everyone the host blocked (Reject and block), newest first. */
+  blocked?: BlockedRequester[]
   bot: DiscordBotStatus
   /** Whether server.properties has the whitelist on (requests only matter then). */
   whitelistOn: boolean
@@ -2067,6 +2091,8 @@ export interface ResinApi {
     requestBlock(id: string, requestId: string): Promise<RequestsInfo>
     /** Lets every blocked Discord user ask again. */
     requestUnblockAll(id: string): Promise<RequestsInfo>
+    /** Lets one blocked player ask again. */
+    requestUnblock(id: string, key: string): Promise<RequestsInfo>
     /** Saves the server's Discord bot token (kept sealed, never shown again); null removes it. */
     setBotToken(id: string, token: string | null): Promise<RequestsInfo>
     properties(id: string): Promise<PropEntry[]>
@@ -2114,7 +2140,9 @@ export interface ResinApi {
     likeListing(id: string, on: boolean): Promise<{ likes: number; liked: boolean }>
     reportListing(id: string, reason: string): Promise<void>
     /** A whitelist request to a ResinCraft server, signed with the active Microsoft account. */
-    askToJoin(id: string): Promise<AskJoinOutcome>
+    askToJoin(id: string, title?: string): Promise<AskJoinOutcome>
+    /** Where this PC's whitelist requests from the list stand (listing id → state); also checks the relay soon. */
+    joinStates(): Promise<Record<string, JoinState>>
     // The add-on calls take an optional last `area` for hybrid servers (Arclight): 'plugins' (default) or 'mods'.
     addonSources(id: string, area?: AddonArea): Promise<AddonSource[]>
     addons(id: string, area?: AddonArea): Promise<ServerAddon[]>
@@ -2189,6 +2217,9 @@ export interface ResinApi {
     server(cb: (e: ServerEvent) => void): () => void
     serverLog(cb: (e: ServerLogEvent) => void): () => void
     serverRequests(cb: (e: ServerRequestsEvent) => void): () => void
+    /** A listed server's host accepted or rejected this player's whitelist request. */
+    joinAnswered(cb: (e: JoinAnsweredEvent) => void): () => void
+    joinStates(cb: (e: Record<string, JoinState>) => void): () => void
     gameCrash(cb: (e: GameCrashEvent) => void): () => void
     update(cb: (s: UpdateStatus) => void): () => void
     /** A list changed on disk (an install made an entry, or one went): fetch it again. */

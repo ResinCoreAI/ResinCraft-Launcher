@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingStatus, MyListing};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingJoinState, ListingStatus, MyListing};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -173,8 +173,9 @@ pub enum Event {
     /// A top-up: the answer to [`Command::TopUp`] (`refused` says why there's none), or the relay's admin added
     /// data (`by_admin`). `usage` is the account's data after it.
     TopUp { added_bytes: u64, by_admin: bool, refused: Option<ErrorCode>, usage: Usage },
-    /// A player asks on the web page to be whitelisted; answer with [`Command::JoinAnswer`].
-    JoinRequest { id: u64, username: String },
+    /// A player asks on the web page (or, with `listing`, in the server list) to be whitelisted; answer with
+    /// [`Command::JoinAnswer`], and later tell a `listing` one what the host decided ([`Command::JoinDecided`]).
+    JoinRequest { id: u64, username: String, listing: bool },
 }
 
 /// The answer to a top-up asked for outside [`Connection::serve`].
@@ -185,7 +186,7 @@ pub struct TopUp {
 }
 
 /// What the launcher can ask for while serving.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// Another full session (once the end is near).
     Continue,
@@ -196,8 +197,9 @@ pub enum Command {
     JoinRequests(bool),
     /// The answer to an [`Event::JoinRequest`] (ignored by relays older than protocol 5).
     JoinAnswer { id: u64, outcome: JoinOutcome },
-    /// Blocks whoever sent request `id` from sending more (ignored by relays older than protocol 5).
-    JoinBlock { id: u64 },
+    /// The host accepted or rejected a server list request (only send it for an [`Event::JoinRequest`] with
+    /// `listing`: relays that don't send those don't know it).
+    JoinDecided { username: String, accepted: bool },
 }
 
 enum Target {
@@ -589,6 +591,16 @@ impl Connection {
         }
     }
 
+    /// Where this account's server list whitelist requests stand (the relay keeps them 30 days).
+    pub async fn listing_joins(&mut self) -> Result<Vec<ListingJoinState>, AgentError> {
+        self.need_listings()?;
+        self.send(&AgentMsg::ListingJoins).await?;
+        match self.recv().await? {
+            RelayMsg::ListingJoins { joins } => Ok(joins),
+            other => Err(unexpected(&other)),
+        }
+    }
+
     /// Unlocks the relay's admin tools on this connection (only for an admin account, with the dashboard's password).
     /// Unlocks the admin tools: with the password, or with a remembered PC's `device_token`. Returns the dashboard
     /// user it's signed in as and, after `remember`, this PC's new token.
@@ -744,7 +756,7 @@ impl Connection {
                         Ok(RelayMsg::SessionExtended { secs_left, continues }) => on_event(Event::Extended { secs_left, continues }),
                         Ok(RelayMsg::Service { state, message }) => on_event(Event::Service { state, message }),
                         Ok(RelayMsg::TopUp { added_bytes, by_admin, refused, usage }) => on_event(Event::TopUp { added_bytes, by_admin, refused, usage }),
-                        Ok(RelayMsg::JoinRequest { id, username }) => on_event(Event::JoinRequest { id, username }),
+                        Ok(RelayMsg::JoinRequest { id, username, listing }) => on_event(Event::JoinRequest { id, username, listing }),
                         Ok(RelayMsg::Pong { .. }) => {}
                         Ok(RelayMsg::Error { code, message, ban }) => return refused(code, message, ban),
                         Ok(RelayMsg::Shutdown { .. }) => return AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into()),
@@ -782,12 +794,12 @@ impl Connection {
                             return e;
                         }
                     }
-                    Some(Command::JoinBlock { id }) if self.has_join_requests() => {
-                        if let Err(e) = self.send(&AgentMsg::JoinBlock { id }).await {
+                    Some(Command::JoinDecided { username, accepted }) if self.has_listings() => {
+                        if let Err(e) = self.send(&AgentMsg::JoinDecided { username, accepted }).await {
                             return e;
                         }
                     }
-                    Some(Command::JoinRequests(_) | Command::JoinAnswer { .. } | Command::JoinBlock { .. }) => {}
+                    Some(Command::JoinRequests(_) | Command::JoinAnswer { .. } | Command::JoinDecided { .. }) => {}
                     None => commands_open = false,
                 },
                 _ = ping.tick() => {
@@ -1103,8 +1115,13 @@ mod tests {
         let up = AgentMsg::JoinAnswer { id: 7, outcome: JoinOutcome::AlreadyListed };
         assert_eq!(serde_json::to_string(&up).unwrap(), r#"{"t":"join_answer","id":7,"outcome":"already_listed"}"#);
         let down: RelayMsg = serde_json::from_str(r#"{"t":"join_request","id":7,"username":"Steve"}"#).unwrap();
-        assert_eq!(down, RelayMsg::JoinRequest { id: 7, username: "Steve".into() });
-        assert_eq!(serde_json::to_string(&AgentMsg::JoinBlock { id: 7 }).unwrap(), r#"{"t":"join_block","id":7}"#);
+        assert_eq!(down, RelayMsg::JoinRequest { id: 7, username: "Steve".into(), listing: false });
+        let listed: RelayMsg = serde_json::from_str(r#"{"t":"join_request","id":8,"username":"Steve","listing":true}"#).unwrap();
+        assert_eq!(listed, RelayMsg::JoinRequest { id: 8, username: "Steve".into(), listing: true });
+        let decided = AgentMsg::JoinDecided { username: "Steve".into(), accepted: false };
+        assert_eq!(serde_json::to_string(&decided).unwrap(), r#"{"t":"join_decided","username":"Steve","accepted":false}"#);
+        let joins: RelayMsg = serde_json::from_str(r#"{"t":"listing_joins","joins":[{"id":"rc-smp","state":"accepted","at":5}]}"#).unwrap();
+        assert_eq!(joins, RelayMsg::ListingJoins { joins: vec![ListingJoinState { id: "rc-smp".into(), state: "accepted".into(), at: 5 }] });
         assert_eq!(serde_json::to_string(&JoinOutcome::Banned).unwrap(), r#""banned""#);
         let later: JoinOutcome = serde_json::from_str(r#""something_new""#).unwrap();
         assert_eq!(later, JoinOutcome::Unknown);

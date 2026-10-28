@@ -1,6 +1,6 @@
-import type { JoinRequest, RequestsInfo, ResinApi, ServerInfo, ServerRequestsEvent } from '@shared/types'
+import type { BlockedRequester, JoinRequest, RequestsInfo, ResinApi, ServerInfo, ServerRequestsEvent } from '@shared/types'
 
-type RequestsApi = Pick<ResinApi['server'], 'requests' | 'requestAccept' | 'requestReject' | 'requestBlock' | 'requestUnblockAll' | 'setBotToken'>
+type RequestsApi = Pick<ResinApi['server'], 'requests' | 'requestAccept' | 'requestReject' | 'requestBlock' | 'requestUnblockAll' | 'requestUnblock' | 'setBotToken'>
 
 /** Whitelist requests for the web preview: a couple waiting on the first server, and a bot that connects. */
 export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerRequestsEvent) => void): RequestsApi {
@@ -9,12 +9,13 @@ export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerR
   const pending = new Map<string, JoinRequest[]>()
   const tokens = new Set<string>()
   const online = new Set<string>()
-  const blocked = new Map<string, number>()
+  const blocked = new Map<string, BlockedRequester[]>()
   const seed = (id: string) => {
     if (!pending.has(id))
       pending.set(id, [
         { id: `${id}-1`, username: 'Alex_Builds', source: 'discord', from: 'alex', at: now - 4 * 60_000 },
-        { id: `${id}-2`, username: 'CreeperFan42', source: 'web', at: now - 35 * 60_000 }
+        { id: `${id}-2`, username: 'CreeperFan42', source: 'web', at: now - 35 * 60_000 },
+        { id: `${id}-3`, username: 'Puirkle', source: 'list', at: now - 2 * 60_000 }
       ])
     return pending.get(id)!
   }
@@ -25,7 +26,8 @@ export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerR
     return {
       requests: s.joinRequests?.enabled ? seed(id) : (pending.get(id) ?? []),
       hasBotToken,
-      blockedOnDiscord: blocked.get(id) ?? 0,
+      blockedOnDiscord: (blocked.get(id) ?? []).filter((b) => b.kind === 'discord').length,
+      blocked: blocked.get(id) ?? [],
       bot: !s.joinRequests?.enabled || !s.joinRequests.discord || !hasBotToken
         ? { state: 'off' }
         : online.has(id)
@@ -55,8 +57,21 @@ export function mockRequests(find: (id: string) => ServerInfo, emit: (e: ServerR
     requestAccept: answer,
     requestReject: answer,
     requestBlock: (id, requestId) => {
-      if (seed(id).find((r) => r.id === requestId)?.source === 'discord') blocked.set(id, (blocked.get(id) ?? 0) + 1)
+      const r = seed(id).find((r) => r.id === requestId)
+      if (r) {
+        const b: BlockedRequester =
+          r.source === 'discord'
+            ? { key: `discord-${r.id}`, kind: 'discord', name: r.from ? `${r.username} (${r.from})` : r.username, at: Date.now() }
+            : { key: r.username.toLowerCase(), kind: 'name', name: r.username, at: Date.now() }
+        blocked.set(id, [b, ...(blocked.get(id) ?? [])])
+      }
       return answer(id, requestId)
+    },
+    requestUnblock: (id, key) => {
+      blocked.set(id, (blocked.get(id) ?? []).filter((b) => b.key !== key))
+      const i = info(id)
+      emit({ serverId: id, info: i })
+      return wait(i)
     },
     requestUnblockAll: (id) => {
       blocked.delete(id)

@@ -4,6 +4,7 @@ import { mockInstanceTabs } from './mock-instance-tabs'
 import { mockEngine } from './mock-engine'
 import { mockProfile } from './mock-profile'
 import { mockServers } from './mock-servers'
+import { onJoinAnswered, onJoinStates } from './mock-serverlist'
 import { mockFiles } from './mock-files'
 import { mockUpdate } from './mock-update'
 import { mockMigrate } from './mock-migrate'
@@ -578,7 +579,7 @@ export function mockApi(): ResinApi {
     ...mockMigrate((inst) => {
       instances = [inst, ...instances]
     }),
-    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), openFile: () => noop() },
+    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), openFile: () => noop() },
     remote: { status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }) }
   }
 }

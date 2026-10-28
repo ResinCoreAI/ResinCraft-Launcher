@@ -141,6 +141,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:requestReject" => json(requests::reject(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:requestBlock" => json(requests::reject_and_block(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:requestUnblockAll" => json(requests::unblock_all(&args.get::<String>(0)?).await?),
+        "server:requestUnblock" => json(requests::unblock(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:setBotToken" => {
             let id: String = args.get(0)?;
             requests::set_bot_token(&id, args.get::<Option<String>>(1)?).await?;
@@ -210,7 +211,11 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             listing::report(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()
         }
-        "server:askToJoin" => json(listing::ask_join(&args.get::<String>(0)?).await?),
+        "server:askToJoin" => json(listing::ask_join(&args.get::<String>(0)?, args.get::<Option<String>>(1)?).await?),
+        "server:joinStates" => {
+            listing::check_joins_now();
+            json(listing::join_states().await)
+        }
         // The Admin page, for the relay's admin accounts.
         "server:adminStatus" => json(admin::status().await),
         // [{password?, code?, remember}] → status (needCode when the 2FA code is still missing).

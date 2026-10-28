@@ -2,15 +2,17 @@
 //! with ResinCraft Relay, a web page at the server's relay address; the host accepts or rejects them in the server's
 //! Players tab. Accepting puts the player on the whitelist (and the bot tells them on Discord).
 //!
-//! Pending requests are kept in `<dataDir>/servers/join-requests.json`; a server's bot token is kept sealed (like
-//! account tokens) in `<dataDir>/servers/discord-bots.json`, apart from server.json, and never sent to the UI.
+//! Pending requests are kept in `<dataDir>/servers/join-requests.json`, who the host blocked in `join-blocks.json`;
+//! a server's bot token is kept sealed (like account tokens) in `<dataDir>/servers/discord-bots.json`, apart from
+//! server.json, and never sent to the UI. A request from the server list (a signed-in player) tells the relay what
+//! the host decided, so the player's launcher can let them know.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use anyhow::{bail, Result};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
 use crate::core::events::emit;
@@ -25,8 +27,8 @@ const MAX_PENDING: usize = 100;
 
 /// Where a request came from.
 pub enum Via {
-    /// The relay's id for the request.
-    Web { relay_id: u64 },
+    /// The relay's id for the request; `listing`: from the server list rather than the web page.
+    Web { relay_id: u64, listing: bool },
     /// The Discord user's id (to message them the answer) and the name they go by.
     Discord { user_id: String, name: String },
 }
@@ -54,6 +56,8 @@ pub struct RequestsInfo {
     pub has_bot_token: bool,
     /// Discord users the host blocked from asking (Reject and block).
     pub blocked_on_discord: usize,
+    /// Everyone the host blocked (Reject and block), newest first.
+    pub blocked: Vec<Blocked>,
     pub bot: discordbot::BotStatus,
     /// Whether server.properties has the whitelist on (requests only matter then).
     pub whitelist_on: bool,
@@ -71,13 +75,43 @@ fn requests_file() -> std::path::PathBuf {
     store::root().join("join-requests.json")
 }
 
-fn blocked_file() -> std::path::PathBuf {
+/// Someone the host blocked from asking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Blocked {
+    /// A Discord user id, or a Minecraft name in lowercase (web page and server list requests).
+    pub key: String,
+    /// "discord" | "name"
+    pub kind: String,
+    /// What to show: the Minecraft name they asked with (and their Discord name).
+    pub name: String,
+    pub at: i64,
+}
+
+fn blocks_file() -> std::path::PathBuf {
+    store::root().join("join-blocks.json")
+}
+
+/// Before blocks had names: Discord user ids per server.
+fn old_blocked_file() -> std::path::PathBuf {
     store::root().join("join-blocked.json")
 }
 
-/// Discord user ids blocked per server.
-async fn blocked() -> HashMap<String, Vec<String>> {
-    read_json(&blocked_file()).await.unwrap_or_default()
+/// Who is blocked, per server.
+async fn blocked() -> HashMap<String, Vec<Blocked>> {
+    if let Some(b) = read_json(&blocks_file()).await {
+        return b;
+    }
+    let old: HashMap<String, Vec<String>> = read_json(&old_blocked_file()).await.unwrap_or_default();
+    old.into_iter()
+        .map(|(id, users)| (id, users.into_iter().map(|u| Blocked { name: format!("Discord user {u}"), key: u, kind: "discord".into(), at: 0 }).collect()))
+        .collect()
+}
+
+async fn save_blocked(all: &HashMap<String, Vec<Blocked>>) -> Result<()> {
+    write_json(&blocks_file(), all).await?;
+    let _ = tokio::fs::remove_file(old_blocked_file()).await;
+    Ok(())
 }
 
 fn tokens_file() -> std::path::PathBuf {
@@ -103,10 +137,13 @@ pub async fn info(id: &str) -> Result<RequestsInfo> {
     let dir = store::dir(id)?;
     let whitelist_on = properties::read(&dir).await.iter().any(|p| p.key == "white-list" && p.value.trim() == "true");
     let address = (!meta.kind.bedrock()).then(|| super::relay::address_of(&meta)).flatten();
+    let mut blocks = blocked().await.remove(id).unwrap_or_default();
+    blocks.sort_by_key(|b| std::cmp::Reverse(b.at));
     Ok(RequestsInfo {
         requests: list(id).await,
         has_bot_token: bot_token(id).await.is_some(),
-        blocked_on_discord: blocked().await.get(id).map_or(0, Vec::len),
+        blocked_on_discord: blocks.iter().filter(|b| b.kind == "discord").count(),
+        blocked: blocks,
         bot: discordbot::status(id),
         whitelist_on,
         // The player's verified domain, the name's own address, or /join/<name> on the relay (relay::join_page).
@@ -144,10 +181,12 @@ pub async fn submit(id: &str, username: &str, via: Via) -> Outcome {
     if !valid_username(username) {
         return Outcome::Invalid;
     }
-    if let Via::Discord { user_id, .. } = &via {
-        if blocked().await.get(id).is_some_and(|b| b.contains(user_id)) {
-            return Outcome::Blocked;
-        }
+    let key = match &via {
+        Via::Discord { user_id, .. } => user_id.clone(),
+        Via::Web { .. } => username.to_ascii_lowercase(),
+    };
+    if blocked().await.get(id).is_some_and(|b| b.iter().any(|b| b.key == key)) {
+        return Outcome::Blocked;
     }
     // Banned players never reach the host (a Bedrock name keeps Floodgate's leading dot, as the list does).
     let banned = properties::list_entries(id, "bans").await.unwrap_or_default();
@@ -169,7 +208,7 @@ pub async fn submit(id: &str, username: &str, via: Via) -> Outcome {
             return Outcome::Closed;
         }
         let (source, from, discord_user, relay_id) = match via {
-            Via::Web { relay_id } => ("web", None, None, Some(relay_id)),
+            Via::Web { relay_id, listing } => (if listing { "list" } else { "web" }, None, None, Some(relay_id)),
             Via::Discord { user_id, name } => ("discord", Some(name), Some(user_id), None),
         };
         pending.push(JoinRequest {
@@ -209,6 +248,9 @@ pub async fn accept(id: &str, request: &str) -> Result<RequestsInfo> {
     let Some(r) = r else { bail!("That request was already answered") };
     properties::add(id, "whitelist", &r.username).await?;
     take(id, request).await?;
+    if r.source == "list" {
+        super::relay::send_join_decided(id, &r.username, true);
+    }
     if let Some(user) = r.discord_user.as_deref() {
         let name = store::get(id).await.map(|m| m.name).unwrap_or_default();
         discordbot::tell(id, user, &format!("You're on the whitelist of **{name}** now as `{}`. Have fun!", r.username)).await;
@@ -219,6 +261,9 @@ pub async fn accept(id: &str, request: &str) -> Result<RequestsInfo> {
 
 pub async fn reject(id: &str, request: &str) -> Result<RequestsInfo> {
     let r = take(id, request).await?;
+    if r.source == "list" {
+        super::relay::send_join_decided(id, &r.username, false);
+    }
     if let Some(user) = r.discord_user.as_deref() {
         let name = store::get(id).await.map(|m| m.name).unwrap_or_default();
         discordbot::tell(id, user, &format!("Your request to join **{name}** as `{}` wasn't accepted.", r.username)).await;
@@ -227,23 +272,30 @@ pub async fn reject(id: &str, request: &str) -> Result<RequestsInfo> {
     info(id).await
 }
 
-/// Rejects a request and blocks whoever sent it: on the web page, through the relay (which knows their address
-/// for a day); on Discord, that Discord user (until Unblock).
+/// Rejects a request and blocks whoever sent it until Unblock: that Discord user, or that Minecraft name (web page
+/// and server list requests).
 pub async fn reject_and_block(id: &str, request: &str) -> Result<RequestsInfo> {
     let r = take(id, request).await?;
-    if let Some(relay_id) = r.relay_id {
-        super::relay::send_join_block(id, relay_id);
+    if r.source == "list" {
+        super::relay::send_join_decided(id, &r.username, false);
+    }
+    let (key, kind, name) = match (&r.discord_user, &r.from) {
+        (Some(user), from) => (user.clone(), "discord", match from {
+            Some(f) => format!("{} ({f})", r.username),
+            None => r.username.clone(),
+        }),
+        (None, _) => (r.username.to_ascii_lowercase(), "name", r.username.clone()),
+    };
+    {
+        let _guard = lock().lock().await;
+        let mut every = blocked().await;
+        let list = every.entry(id.to_string()).or_default();
+        if !list.iter().any(|b| b.key == key) {
+            list.push(Blocked { key, kind: kind.into(), name, at: now_ms() });
+        }
+        save_blocked(&every).await?;
     }
     if let Some(user) = r.discord_user.as_deref() {
-        {
-            let _guard = lock().lock().await;
-            let mut every = blocked().await;
-            let list = every.entry(id.to_string()).or_default();
-            if !list.iter().any(|u| u == user) {
-                list.push(user.to_string());
-            }
-            write_json(&blocked_file(), &every).await?;
-        }
         let name = store::get(id).await.map(|m| m.name).unwrap_or_default();
         discordbot::tell(id, user, &format!("Your request to join **{name}** as `{}` wasn't accepted.", r.username)).await;
     }
@@ -251,13 +303,30 @@ pub async fn reject_and_block(id: &str, request: &str) -> Result<RequestsInfo> {
     info(id).await
 }
 
-/// Lets every blocked Discord user ask again.
+/// Lets everyone blocked on server `id` ask again.
 pub async fn unblock_all(id: &str) -> Result<RequestsInfo> {
     {
         let _guard = lock().lock().await;
         let mut every = blocked().await;
         if every.remove(id).is_some() {
-            write_json(&blocked_file(), &every).await?;
+            save_blocked(&every).await?;
+        }
+    }
+    changed(id).await;
+    info(id).await
+}
+
+/// Lets one blocked player (`key` from [`Blocked`]) ask again.
+pub async fn unblock(id: &str, key: &str) -> Result<RequestsInfo> {
+    {
+        let _guard = lock().lock().await;
+        let mut every = blocked().await;
+        if let Some(list) = every.get_mut(id) {
+            list.retain(|b| b.key != key);
+            if list.is_empty() {
+                every.remove(id);
+            }
+            save_blocked(&every).await?;
         }
     }
     changed(id).await;
@@ -274,7 +343,7 @@ pub async fn forget(id: &str) {
         }
         let mut blocks = blocked().await;
         if blocks.remove(id).is_some() {
-            let _ = write_json(&blocked_file(), &blocks).await;
+            let _ = save_blocked(&blocks).await;
         }
     }
     let _ = set_bot_token(id, None).await;

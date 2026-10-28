@@ -1,5 +1,5 @@
-//! Client packs for the server list (relay protocol 8): what players need to join a hosted modded server, made from
-//! an instance (the one the server was made from, or another the owner picks). Players install it from Discover →
+//! Client packs for the server list (relay protocol 8): what players need to join a hosted server (its mods, or for a
+//! plugin or vanilla server the client mods, resource packs and shaders the owner suggests), made from an instance (the one the server was made from, or another the owner picks). Players install it from Discover →
 //! Servers as an instance of its own and join.
 //!
 //! Published as a pack plan (clientplan.rs): the modpack it came from, then every other file as a link to Modrinth or
@@ -29,9 +29,12 @@ const PLAN_FORMAT: u32 = 2;
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackInfo {
-    /// The server runs mods (a client pack makes sense).
+    /// The server runs mods.
     pub modded: bool,
-    /// Instances it could come from: same Minecraft version and loader as the server.
+    /// A client pack makes sense: any Java server (a plugin or vanilla server's pack is an instance with client
+    /// mods, resource packs and shaders for it).
+    pub available: bool,
+    /// Instances it could come from: same Minecraft version (and loader, for a modded server) as the server.
     pub instances: Vec<PackSource>,
     /// The instance the server was made from, when it still exists.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -51,10 +54,12 @@ pub struct PackSource {
 pub async fn info(id: &str) -> Result<PackInfo> {
     let meta = store::get(id).await?;
     let modded = meta.kind.modded();
+    let available = !meta.kind.bedrock();
     let mut list = Vec::new();
-    if modded {
+    if available {
         for i in instances::list().await.unwrap_or_default() {
-            let loader_ok = meta.loader.is_none_or(|l| l == i.loader) && (meta.kind.loader().is_none() || meta.kind.loader() == Some(i.loader));
+            // Plugin and vanilla servers take any client: the instance can use whatever loader its mods need.
+            let loader_ok = !modded || (meta.loader.is_none_or(|l| l == i.loader) && (meta.kind.loader().is_none() || meta.kind.loader() == Some(i.loader)));
             if i.mc_version == meta.mc_version && loader_ok {
                 list.push(PackSource { id: i.id, name: i.name });
             }
@@ -66,7 +71,7 @@ pub async fn info(id: &str) -> Result<PackInfo> {
         Some(lid) => listing::mine().await.ok().and_then(|all| all.into_iter().find(|m| m.status.id == lid)).and_then(|m| m.pack),
         None => None,
     };
-    Ok(PackInfo { modded, instances: list, default_instance, published })
+    Ok(PackInfo { modded, available, instances: list, default_instance, published })
 }
 
 /// What the owner picked to send along besides the mods.

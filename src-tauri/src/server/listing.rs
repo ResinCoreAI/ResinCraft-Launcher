@@ -5,7 +5,7 @@
 //! What a server's listing says is kept here too (`server-list.json`), so the Settings tab shows it even while the
 //! relay can't be reached, and so it can be listed again when the relay forgot it (a renamed or expired name).
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -14,7 +14,8 @@ use resincraft_relay::proto::{Edition, JoinOutcome, ListingInfo, ListingModpack,
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::core::fsutil::{read_json, write_json};
+use crate::core::events::emit;
+use crate::core::fsutil::{now_ms, read_json, write_json};
 use crate::core::paths;
 use crate::core::text::Text;
 use crate::core::types::ServerMeta;
@@ -33,6 +34,23 @@ struct Saved {
     /// Listings this launcher's players liked (the public list doesn't say).
     #[serde(default)]
     liked: BTreeSet<String>,
+    /// Whitelist requests this launcher's players sent from the list (listing id → the newest), until 30 days after.
+    #[serde(default)]
+    asked: BTreeMap<String, Asked>,
+}
+
+/// A whitelist request sent from the list, and what the host decided.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Asked {
+    /// The Microsoft account (UUID) it was sent as.
+    account: String,
+    /// The server's name in the list.
+    pub title: String,
+    /// "waiting", "accepted" or "rejected".
+    pub state: String,
+    /// When it was sent or decided (ms).
+    pub at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -423,9 +441,26 @@ pub async fn report(id: &str, reason: &str) -> Result<()> {
 }
 
 /// Asks a ResinCraft server's host to whitelist the active account; the outcome as the UI words it.
-pub async fn ask_join(id: &str) -> Result<&'static str> {
-    let mut conn = connect(None).await?;
+pub async fn ask_join(id: &str, title: Option<String>) -> Result<&'static str> {
+    let Some(account) = accounts::microsoft_account(None).await else { return Err(relay::needs_microsoft()) };
+    let mut conn = relay::connect_for_list(&account).await?;
     let outcome = conn.listing_join(id).await.map_err(|e| relay::describe(&e, ""))?;
+    // Waiting for the host: remembered, and checked until they decide (watch_joins).
+    let state = match outcome {
+        JoinOutcome::Received | JoinOutcome::AlreadyRequested => Some("waiting"),
+        JoinOutcome::AlreadyListed => Some("accepted"),
+        _ => None,
+    };
+    if let Some(state) = state {
+        let mut all = load().await;
+        let title = title.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| id.trim_start_matches("rc-").to_string());
+        all.asked.insert(id.to_string(), Asked { account: account.uuid.clone(), title, state: state.into(), at: now_ms() });
+        save(&all).await?;
+        emit("joinStates", join_states_of(&all));
+        if state == "waiting" {
+            WATCH.notify_one();
+        }
+    }
     Ok(match outcome {
         JoinOutcome::Received => "received",
         JoinOutcome::AlreadyListed => "alreadyListed",
@@ -435,6 +470,71 @@ pub async fn ask_join(id: &str) -> Result<&'static str> {
         JoinOutcome::Banned => "banned",
         JoinOutcome::Unknown => "unknown",
     })
+}
+
+/// Requests asked or decided longer ago than this are forgotten (the relay keeps them as long).
+const ASKED_KEPT_MS: i64 = 30 * 86_400_000;
+
+fn join_states_of(all: &Saved) -> BTreeMap<String, String> {
+    all.asked.iter().map(|(id, a)| (id.clone(), a.state.clone())).collect()
+}
+
+/// Where this launcher's whitelist requests from the list stand (listing id → "waiting", "accepted" or
+/// "rejected"), for Discover → Servers.
+pub async fn join_states() -> BTreeMap<String, String> {
+    join_states_of(&load().await)
+}
+
+/// Wakes the watcher early (a request was just sent, or Discover → Servers opened).
+static WATCH: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
+pub fn check_joins_now() {
+    WATCH.notify_one();
+}
+
+/// Asks the relay about requests still waiting, once; tells the UI about the ones the host decided.
+async fn check_joins() -> bool {
+    let mut all = load().await;
+    let now = now_ms();
+    all.asked.retain(|_, a| now - a.at < ASKED_KEPT_MS);
+    let accounts: BTreeSet<String> = all.asked.values().filter(|a| a.state == "waiting").map(|a| a.account.clone()).collect();
+    let mut changed = false;
+    for uuid in accounts {
+        let Some(acc) = accounts::microsoft_account(Some(&uuid)).await.filter(|a| a.uuid.replace('-', "").eq_ignore_ascii_case(&uuid.replace('-', ""))) else { continue };
+        let Ok(mut conn) = relay::connect_for_list(&acc).await else { continue };
+        let Ok(joins) = conn.listing_joins().await else { continue };
+        for j in joins {
+            let Some(a) = all.asked.get_mut(&j.id) else { continue };
+            if a.account != uuid || a.state != "waiting" || j.state == "waiting" || !(j.state == "accepted" || j.state == "rejected") {
+                continue;
+            }
+            a.state = j.state.clone();
+            a.at = now;
+            changed = true;
+            emit("joinAnswered", serde_json::json!({ "id": j.id, "title": a.title, "accepted": j.state == "accepted" }));
+        }
+    }
+    if changed {
+        let _ = save(&all).await;
+        emit("joinStates", join_states_of(&all));
+        // Flash the taskbar when the launcher isn't in front, so the player sees the notice.
+        use tauri::Manager;
+        if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window("main")) {
+            let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+        }
+    }
+    all.asked.values().any(|a| a.state == "waiting")
+}
+
+/// While the launcher runs: checks requests that wait for the host every minute (every 10 minutes when nothing waits,
+/// sooner when woken).
+pub async fn watch_joins() {
+    tokio::time::sleep(Duration::from_secs(20)).await;
+    loop {
+        let waiting = check_joins().await;
+        let pause = if waiting { 60 } else { 600 };
+        let _ = tokio::time::timeout(Duration::from_secs(pause), WATCH.notified()).await;
+    }
 }
 
 #[cfg(test)]

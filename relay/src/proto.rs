@@ -116,6 +116,9 @@ pub enum AgentMsg {
     /// The host rejected request `id` and blocks whoever sent it (the relay knows their address for 24 hours;
     /// the launcher never sees it). Protocol 5.
     JoinBlock { id: u64 },
+    /// The host accepted or rejected a server list request (a `join_request` with `listing`) from `username`, so the
+    /// player's launcher can tell them. Only for those: relays without them close the connection on it. Protocol 8.
+    JoinDecided { username: String, accepted: bool },
     /// Offer (or withdraw) this launcher for remote control from the web console: `device` is the PC's name.
     /// Only after `authed`, and only on a connection that never sent `online`. Protocol 6.
     Remote { enabled: bool, device: String, app_version: String },
@@ -149,8 +152,10 @@ pub enum AgentMsg {
     /// Ask to be whitelisted on a ResinCraft listing: the relay passes it to the host's launcher as a `join_request`
     /// with this account's verified username. Answered with `join_asked`. Protocol 8.
     ListingJoin { id: String },
+    /// Where this account's server list whitelist requests stand. Answered with `listing_joins`. Protocol 8.
+    ListingJoins,
     /// Unlock the relay's admin tools on this connection with the dashboard's password; only for accounts the relay
-    /// lists as admins (uthed said dmin). Answered with dmin_ready. Protocol 8.
+    /// lists as admins (`authed` said `admin`). Answered with `admin_ready`. Protocol 8.
     AdminUnlock {
         /// Empty when signing in with `device_token`.
         #[serde(default)]
@@ -171,8 +176,8 @@ pub enum AgentMsg {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         user: Option<String>,
     },
-    /// One admin request after dmin_ready: the same as the dashboard's JSON API (GET /api/listings, POST
-    /// /api/listings/...). Answered with dmin_result. Protocol 8.
+    /// One admin request after `admin_ready`: the same as the dashboard's JSON API (GET /api/listings, POST
+    /// /api/listings/...). Answered with `admin_result`. Protocol 8.
     AdminCall {
         id: u64,
         method: String,
@@ -305,6 +310,17 @@ pub struct MyListing {
     /// The client pack players can install (the owner uploaded it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pack: Option<ListingPack>,
+}
+
+/// One of a player's server list whitelist requests (`listing_joins`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ListingJoinState {
+    /// The listing ("rc-<name>").
+    pub id: String,
+    /// "waiting", "accepted" or "rejected".
+    pub state: String,
+    /// When it was asked, or decided (Unix seconds).
+    pub at: u64,
 }
 
 /// A listing's client pack, which players install as an instance: a Modrinth .mrpack the owner uploaded (`format` 1),
@@ -441,7 +457,9 @@ pub enum RelayMsg {
     Reported { id: String },
     /// The answer to `listing_join`. Protocol 8.
     JoinAsked { id: String, outcome: JoinOutcome },
-    /// The answer to dmin_unlock. Protocol 8.
+    /// The answer to `listing_joins`. Protocol 8.
+    ListingJoins { joins: Vec<ListingJoinState> },
+    /// The answer to `admin_unlock`. Protocol 8.
     AdminReady {
         /// The dashboard user the account is linked to (relays with dashboard users).
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -450,7 +468,7 @@ pub enum RelayMsg {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         device_token: Option<String>,
     },
-    /// The answer to dmin_call id: alue when ok, else error. Protocol 8.
+    /// The answer to `admin_call` `id`: `value` when ok, else `error`. Protocol 8.
     AdminResult {
         id: u64,
         ok: bool,
@@ -460,7 +478,13 @@ pub enum RelayMsg {
         error: Option<String>,
     },
     /// A player asks on the web page to be whitelisted. Protocol 5, and only after `join_requests` turned on.
-    JoinRequest { id: u64, username: String },
+    JoinRequest {
+        id: u64,
+        username: String,
+        /// From the server list (a signed-in player): send what the host decides with `join_decided`.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        listing: bool,
+    },
     Error {
         code: ErrorCode,
         message: String,

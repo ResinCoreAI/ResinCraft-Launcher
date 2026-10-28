@@ -2,8 +2,8 @@
 // whose owner listed them, plus servers players submitted (the relay's admin approves those). Players filter, like,
 // report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
-import type { AskJoinOutcome, ClientPackChoices, ClientPackInfo, Instance, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
+import { ArrowLeft, Check, Clock, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
+import type { AskJoinOutcome, ClientPackChoices, ClientPackInfo, Instance, JoinAnsweredEvent, JoinState, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes } from '../util'
@@ -530,6 +530,34 @@ export function ServerList() {
   )
 }
 
+// This PC's whitelist requests from the list (listing id → state), shared by every card.
+let joinStates: Record<string, JoinState> = {}
+const joinListeners = new Set<() => void>()
+let joinLoaded = false
+const setJoinStates = (next: Record<string, JoinState>) => {
+  joinStates = next
+  joinListeners.forEach((l) => l())
+}
+
+/** Where this PC's request to join `id` stands (undefined: never asked, or forgotten after 30 days). */
+function useJoinState(id: string): JoinState | undefined {
+  const [, bump] = useState(0)
+  useEffect(() => {
+    const l = () => bump((n) => n + 1)
+    joinListeners.add(l)
+    if (!joinLoaded) {
+      joinLoaded = true
+      void api.server.joinStates().then(setJoinStates, () => (joinLoaded = false))
+    }
+    const off = api.on.joinStates(setJoinStates)
+    return () => {
+      joinListeners.delete(l)
+      off()
+    }
+  }, [])
+  return joinStates[id]
+}
+
 /** What a listed server's card and page can do: join (picking an instance), Install & join, ask to be whitelisted, Quick join. */
 function useServerActions(s: ListedServer, onReport: () => void) {
   const { join, toast, go, activeAccount, instances, setNewInstanceOpen } = useStore()
@@ -542,6 +570,8 @@ function useServerActions(s: ListedServer, onReport: () => void) {
   const bedrockAddress = s.edition === 'bedrock' ? s.address : s.bedrock_address || s.address.replace(/:\d+$/, '')
   const [asking, setAsking] = useState(false)
   const [asked, setAsked] = useState<AskJoinOutcome>()
+  // What the host decided on an earlier request (kept by the engine, which checks the relay).
+  const joinState = useJoinState(s.id)
 
   /** Joins with `instanceId` (Java), remembering it for this server. */
   const joinWith = async (edition: 'java' | 'bedrock', instanceId?: string) => {
@@ -599,7 +629,7 @@ function useServerActions(s: ListedServer, onReport: () => void) {
   const askToJoin = async () => {
     setAsking(true)
     try {
-      const outcome = await api.server.askToJoin(s.id)
+      const outcome = await api.server.askToJoin(s.id, s.title)
       setAsked(outcome)
       toast(t(`servers.list.asked.${outcome}` as Key, { name: s.title }), outcome === 'received' || outcome === 'alreadyListed' ? 'success' : 'info')
     } catch (e) {
@@ -641,16 +671,25 @@ function useServerActions(s: ListedServer, onReport: () => void) {
     '-',
     { label: t('servers.list.report'), icon: <Flag />, danger: true, onSelect: onReport }
   ]
-  return { joining, asking, asked, bedrockOk, needsAccount, bedrockAddress, play, chooseInstance, installAndJoin, askToJoin, addToQuickJoin, copy, menu }
+  // Waiting for the host or already on the whitelist: no asking again (after a rejection, Ask again).
+  const askLocked = asking || joinState === 'waiting' || joinState === 'accepted' || (!joinState && (asked === 'banned' || asked === 'invalid' || asked === 'alreadyListed'))
+  const askLabel = joinState === 'waiting' ? t('servers.list.askWaiting') : joinState === 'accepted' ? t('servers.list.askAccepted') : joinState === 'rejected' ? t('servers.list.askAgain') : t('servers.list.ask')
+  const askIcon = asking ? <Loader2 className="spin" /> : joinState === 'waiting' ? <Clock /> : joinState === 'accepted' ? <Check /> : <UserPlus />
+  return { joining, asking, asked, joinState, askLocked, askLabel, askIcon, bedrockOk, needsAccount, bedrockAddress, play, chooseInstance, installAndJoin, askToJoin, addToQuickJoin, copy, menu }
 }
 
 /** The main button: Install & join for servers with a client pack, else Join. */
 function JoinButtons({ s, a, size = 'sm', ask = true }: { s: ListedServer; a: ReturnType<typeof useServerActions>; size?: 'sm' | ''; ask?: boolean }) {
   return (
     <>
-      {ask && s.resincraft && s.join_requests && (
-        <button className={`btn ${size}`} disabled={a.asking || !!a.asked} title={t('servers.list.askHint')} onClick={() => void a.askToJoin()}>
-          {a.asking ? <Loader2 className="spin" /> : <UserPlus />} {t(a.asked ? 'servers.list.askedShort' : 'servers.list.ask')}
+      {ask && s.resincraft && (s.join_requests || a.joinState === 'waiting') && (
+        <button
+          className={`btn ${size}`}
+          disabled={a.askLocked || !s.join_requests}
+          title={a.joinState === 'waiting' ? t('servers.list.askWaitingHint', { name: s.title }) : t('servers.list.askHint')}
+          onClick={() => void a.askToJoin()}
+        >
+          {a.askIcon} {a.askLabel}
         </button>
       )}
       {s.pack ? (
@@ -824,16 +863,25 @@ function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: List
         </div>
       </header>
 
-      {s.resincraft && s.join_requests && (
+      {s.resincraft && (s.join_requests || !!a.joinState) && (
         <section className="card server-page-section whitelist-box">
           <h2>
             <UserPlus /> {t('servers.list.whitelistTitle')}
           </h2>
           <p>{t('servers.list.whitelistHint', { name: activeAccount?.username ?? '' })}</p>
-          {a.asked && <p className="hint">{t(`servers.list.asked.${a.asked}` as Key, { name: s.title })}</p>}
-          <button className="btn primary" disabled={a.asking || !!a.asked || activeAccount?.type !== 'msa'} onClick={() => void a.askToJoin()}>
-            {a.asking ? <Loader2 className="spin" /> : <UserPlus />} {t(a.asked ? 'servers.list.askedShort' : 'servers.list.ask')}
-          </button>
+          {a.joinState ? (
+            <p className={`hint ${a.joinState === 'accepted' ? 'good' : ''}`}>
+              {t(a.joinState === 'waiting' ? 'servers.list.askWaitingHint' : a.joinState === 'accepted' ? 'servers.list.askAcceptedHint' : 'servers.list.askRejectedHint', { name: s.title })}
+            </p>
+          ) : (
+            a.asked && <p className="hint">{t(`servers.list.asked.${a.asked}` as Key, { name: s.title })}</p>
+          )}
+          {a.joinState !== 'accepted' && (
+            <button className="btn primary" disabled={a.askLocked || !s.join_requests || activeAccount?.type !== 'msa'} onClick={() => void a.askToJoin()}>
+              {a.askIcon} {a.askLabel}
+            </button>
+          )}
+          {!s.join_requests && a.joinState === 'rejected' && <p className="hint">{t('servers.list.askOffline')}</p>}
           {activeAccount?.type !== 'msa' && <p className="hint bad">{t('servers.list.whitelistNeedsMs')}</p>}
         </section>
       )}
@@ -1140,19 +1188,24 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
     )
     return () => void (live = false)
   }, [s.id])
-  // What the picked instance can send along (resource packs, shaders); nothing is ticked until the owner ticks it.
+  // What the picked instance can send along (resource packs, shaders): all of it ticked, the owner unticks what stays.
   useEffect(() => {
     setChoices(undefined)
     setPicked(new Set())
     if (!source) return
     let live = true
     void api.server.clientPackChoices(source).then(
-      (v) => live && setChoices(v),
+      (v) => {
+        if (!live) return
+        setChoices(v)
+        setPicked(new Set([...v.resourcepacks.map((n) => `resourcepacks/${n}`), ...v.shaderpacks.map((n) => `shaderpacks/${n}`)]))
+      },
       () => {}
     )
     return () => void (live = false)
   }, [source])
-  if (!info?.modded) return null
+  if (!(info?.available ?? info?.modded)) return null
+  const plain = !info.modded
   const toggle = (key: string) => {
     const next = new Set(picked)
     if (next.has(key)) next.delete(key)
@@ -1192,10 +1245,10 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
         <div className="setting stack">
           <div className="text">
             <b>
-              {t('servers.clientPack.title')}{' '}
+              {t(plain ? 'servers.clientPack.titlePlain' : 'servers.clientPack.title')}{' '}
               {p && <span className="chip success compact">{t('servers.clientPack.live')}</span>}
             </b>
-            <span>{t('servers.clientPack.hint')}</span>
+            <span>{t(plain ? 'servers.clientPack.hintPlain' : 'servers.clientPack.hint')}</span>
             {p && (
               <span className="hint">
                 {t('servers.clientPack.current', { name: p.name || s.name, version: p.version, when: new Date(p.updated_at * 1000).toLocaleString(currentLanguage()) })}
@@ -1203,11 +1256,11 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
             )}
           </div>
           {info.instances.length === 0 ? (
-            <span className="hint">{t('servers.clientPack.noInstance', { version: s.mcVersion })}</span>
+            <span className="hint">{t(plain ? 'servers.clientPack.noInstancePlain' : 'servers.clientPack.noInstance', { version: s.mcVersion })}</span>
           ) : (
             <div className="row end">
               <label className="field grow">
-                <span>{t('servers.clientPack.from')}</span>
+                <span>{t(plain ? 'servers.clientPack.fromPlain' : 'servers.clientPack.from')}</span>
                 <select className="select" value={source} onChange={(e) => setSource(e.target.value)}>
                   {info.instances.map((i) => (
                     <option key={i.id} value={i.id}>
@@ -1256,6 +1309,49 @@ export function ClientPackSettings({ s }: { s: ServerInfo }) {
             </div>
           )}
           <span className="hint">{t('servers.clientPack.note')}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Mounted in App: a listed server's host decided on this player's whitelist request (the engine checks the relay). */
+export function JoinAnswersNotice() {
+  const { go } = useStore()
+  const [shown, setShown] = useState<JoinAnsweredEvent[]>([])
+  useEffect(
+    () =>
+      api.on.joinAnswered((e) => {
+        setShown((list) => [...list.filter((x) => x.id !== e.id), e])
+      }),
+    []
+  )
+  if (!shown.length) return null
+  const open = () => {
+    try {
+      sessionStorage.setItem('resin.discoverView', 'servers')
+    } catch {
+      /* private storage: Discover opens on content */
+    }
+    setShown([])
+    go({ page: 'discover' })
+  }
+  return (
+    <div className="update-banner join-answers" role="status">
+      <UserPlus className="icon" />
+      <div className="grow">
+        {shown.slice(-3).map((e) => (
+          <p key={e.id} className={e.accepted ? 'good' : ''}>
+            {t(e.accepted ? 'servers.list.joinAccepted' : 'servers.list.joinRejected', { name: e.title })}
+          </p>
+        ))}
+        <div className="row actions">
+          <button className="btn sm primary" onClick={open}>
+            {t('servers.list.openServers')}
+          </button>
+          <button className="btn sm ghost" onClick={() => setShown([])}>
+            {t('common.close')}
+          </button>
         </div>
       </div>
     </div>

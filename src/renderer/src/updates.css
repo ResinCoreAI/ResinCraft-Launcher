@@ -110,3 +110,11 @@
   width: 14px;
   height: 14px;
 }
+
+/* A listed server's host answered a whitelist request (components/ServerList.tsx). */
+.update-banner.join-answers p.good {
+  color: var(--success, var(--text));
+}
+.update-banner ~ .update-banner.join-answers {
+  top: calc(var(--titlebar) + 150px);
+}

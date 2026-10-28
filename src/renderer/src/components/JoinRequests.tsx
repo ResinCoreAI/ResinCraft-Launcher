@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Ban, Check, Copy, ExternalLink, Globe, Loader2, MessageCircle, Trash2, X } from 'lucide-react'
+import { Ban, Check, Copy, ExternalLink, Globe, Loader2, MessageCircle, Trash2, Undo2, X } from 'lucide-react'
 import type { JoinRequestsConfig, RequestsInfo, ServerInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -117,14 +117,6 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
           {cfg.discord && info && (
             <div className="jr-bot">
               {bot?.message && <div className={`hint ${bot.state === 'error' ? 'warn' : ''}`}>{bot.message}</div>}
-              {info.blockedOnDiscord > 0 && (
-                <div className="hint">
-                  {info.blockedOnDiscord === 1 ? '1 Discord user is blocked from asking.' : `${info.blockedOnDiscord} Discord users are blocked from asking.`}{' '}
-                  <button className="link" disabled={busy === 'unblock'} onClick={() => void act('unblock', () => api.server.requestUnblockAll(s.id), 'They can ask again')}>
-                    Unblock all
-                  </button>
-                </div>
-              )}
               {info.hasBotToken ? (
                 <div className="row wrap" style={{ gap: 8 }}>
                   {bot?.inviteUrl && (
@@ -183,7 +175,7 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
                   <div className="grow">
                     <div className="title">{r.username}</div>
                     <div className="hint">
-                      {r.source === 'discord' ? `Discord${r.from ? ` · ${r.from}` : ''}` : 'Web page'} · {timeAgo(r.at)}
+                      {r.source === 'discord' ? `Discord${r.from ? ` · ${r.from}` : ''}` : r.source === 'list' ? 'Server list · signed in' : 'Web page'} · {timeAgo(r.at)}
                     </div>
                   </div>
                   <button
@@ -201,7 +193,7 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
                   <button
                     className="btn sm danger"
                     disabled={!!busy}
-                    title={r.source === 'discord' ? 'Reject, and stop this Discord user from asking again' : 'Reject, and stop whoever sent it from asking again for a day'}
+                    title={r.source === 'discord' ? 'Reject, and stop this Discord user from asking again' : `Reject, and stop ${r.username} from asking again`}
                     onClick={() => void act(r.id, () => api.server.requestBlock(s.id, r.id), `${r.username} rejected and blocked`)}
                   >
                     <Ban /> Reject and block
@@ -210,6 +202,36 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
               ))
             )}
           </div>
+
+          {!!info?.blocked?.length && (
+            <div className="jr-blocked">
+              <div className="row">
+                <b className="grow">Blocked ({info.blocked.length})</b>
+                {info.blocked.length > 1 && (
+                  <button className="btn sm ghost" disabled={!!busy} onClick={() => void act('unblock', () => api.server.requestUnblockAll(s.id), 'They can ask again')}>
+                    Unblock all
+                  </button>
+                )}
+              </div>
+              <div className="list">
+                {info.blocked.map((b) => (
+                  <div key={b.key} className="list-row">
+                    <Ban size={15} className="hint" />
+                    <div className="grow">
+                      <div className="title">{b.name}</div>
+                      <div className="hint">
+                        {b.kind === 'discord' ? 'Discord user' : 'Minecraft name'}
+                        {b.at > 0 && ` · ${timeAgo(b.at)}`}
+                      </div>
+                    </div>
+                    <button className="btn sm" disabled={!!busy} onClick={() => void act(`unblock-${b.key}`, () => api.server.requestUnblock(s.id, b.key), `${b.name} can ask again`)}>
+                      {busy === `unblock-${b.key}` ? <Loader2 className="spin" /> : <Undo2 />} Unblock
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

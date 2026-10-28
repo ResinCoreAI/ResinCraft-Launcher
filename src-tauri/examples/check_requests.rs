@@ -27,7 +27,7 @@ async fn main() {
     };
     let discord = || Via::Discord { user_id: "1".into(), name: "alex".into() };
 
-    let web = || Via::Web { relay_id: 1 };
+    let web = || Via::Web { relay_id: 1, listing: false };
     check("closed while off", requests::submit("smp", "Steve", web()).await == Outcome::Closed);
     meta.join_requests.enabled = true;
     meta.join_requests.web = true;
@@ -65,6 +65,18 @@ async fn main() {
     let info = requests::unblock_all("smp").await.unwrap();
     check("unblock all", info.blocked_on_discord == 0);
     check("unblocked user can ask again", requests::submit("smp", "Alex2", discord()).await == Outcome::Received);
+
+    // Web page and server list requests are blocked by name, and unblocked one at a time.
+    let list = || Via::Web { relay_id: 2, listing: true };
+    check("list request received", requests::submit("smp", "Griefer", list()).await == Outcome::Received);
+    let g = requests::list("smp").await.into_iter().find(|r| r.username == "Griefer").unwrap();
+    check("marked as from the list", g.source == "list");
+    let info = requests::reject_and_block("smp", &g.id).await.unwrap();
+    check("name blocked", info.blocked.iter().any(|b| b.kind == "name" && b.key == "griefer" && b.name == "Griefer"));
+    check("blocked name can't ask (any case)", requests::submit("smp", "GRIEFER", web()).await == Outcome::Blocked);
+    let info = requests::unblock("smp", "griefer").await.unwrap();
+    check("unblock one", !info.blocked.iter().any(|b| b.key == "griefer"));
+    check("unblocked name can ask again", requests::submit("smp", "Griefer", list()).await == Outcome::Received);
 
     let _ = std::fs::remove_dir_all(&data);
     println!("{}", if ok { "PASS" } else { "FAIL" });

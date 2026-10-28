@@ -209,7 +209,7 @@ const KINDS: &[&str] = &["vanilla", "paper", "purpur", "folia", "spigot", "leaf"
 const SERVER: &[&str] = &[
     "get", "start", "stop", "kill", "command", "log", "acceptEula", "remove", "backup", "setIcon", "update",
     // Players and whitelist requests.
-    "playerList", "playerAdd", "playerRemove", "requests", "requestAccept", "requestReject", "requestBlock", "requestUnblockAll",
+    "playerList", "playerAdd", "playerRemove", "requests", "requestAccept", "requestReject", "requestBlock", "requestUnblockAll", "requestUnblock",
     // Properties, anti-xray, Bedrock players, files to download yourself, client-only mods.
     "properties", "setProperties", "antiXray", "setAntiXray", "antiCheat", "setAntiCheat", "bedrockJoin", "setBedrockJoin", "downloadsCheck", "downloadsForget", "clientMods",
     // Plugins and mods from the built-in sources.

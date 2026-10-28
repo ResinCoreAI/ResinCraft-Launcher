@@ -222,6 +222,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       requestReject: fn('server:requestReject'),
       requestBlock: fn('server:requestBlock'),
       requestUnblockAll: fn('server:requestUnblockAll'),
+      requestUnblock: fn('server:requestUnblock'),
       setBotToken: fn('server:setBotToken'),
       properties: fn('server:properties'),
       setProperties: fn('server:setProperties'),
@@ -254,6 +255,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       likeListing: fn('server:likeListing'),
       reportListing: fn('server:reportListing'),
       askToJoin: fn('server:askToJoin'),
+      joinStates: fn('server:joinStates'),
       addonSources: fn('server:addonSources'),
       addons: fn('server:addons'),
       addonSearch: fn('server:addonSearch'),
@@ -292,6 +294,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), openFile: on('openFile') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), openFile: on('openFile') }
   } as ResinApi
 }

@@ -756,6 +756,16 @@ a svg.inline {
 .jr-list {
   margin-top: 4px;
 }
+.jr-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.jr-blocked .row {
+  align-items: center;
+  gap: 8px;
+}
 .jr-link {
   display: flex;
   align-items: center;

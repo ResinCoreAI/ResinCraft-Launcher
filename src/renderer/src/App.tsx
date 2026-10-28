@@ -12,6 +12,7 @@ import EasterEgg from './components/EasterEgg'
 import ThemeAmbient from './components/ThemeAmbient'
 import CrashFixer from './components/CrashFixer'
 import { PackUpdatesBanner } from './components/PackUpdates'
+import { JoinAnswersNotice } from './components/ServerList'
 import { RelayWatcher } from './components/ServerRelay'
 import { isTauri } from './api'
 import NewInstanceModal from './components/NewInstanceModal'
@@ -202,6 +203,7 @@ export default function App() {
       <ThemeDecor />
       <ThemeAmbient />
       <PackUpdatesBanner />
+      <JoinAnswersNotice />
       <RelayWatcher />
       <ContextMenuHost />
       <DropImport />

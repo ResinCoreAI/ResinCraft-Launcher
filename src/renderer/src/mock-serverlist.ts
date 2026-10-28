@@ -2,6 +2,8 @@
 // ask to join, plus each hosted server's own listing. ?list=old previews a relay without the list.
 import type {
   AskJoinOutcome,
+  JoinAnsweredEvent,
+  JoinState,
   ListedServer,
   ListingInfo,
   ListingPack,
@@ -269,6 +271,7 @@ export function mockServerList(find: (id: string) => ServerInfo) {
     clientPack: (id: string) =>
       wait({
         modded: find(id).type !== 'vanilla' && find(id).type !== 'paper' && find(id).type !== 'bedrock',
+        available: find(id).type !== 'bedrock',
         instances: [{ id: 'tech', name: 'Tech & Automation' }],
         defaultInstance: 'tech',
         published: clientPacks[id]
@@ -300,6 +303,26 @@ export function mockServerList(find: (id: string) => ServerInfo) {
       return wait({ likes: s?.likes ?? 0, liked: on }, 250)
     },
     reportListing: (_id: string, _reason: string) => wait(undefined, 500),
-    askToJoin: (id: string): Promise<AskJoinOutcome> => wait(LISTED.find((x) => x.id === id)?.online ? 'received' : 'closed', 800)
+    askToJoin: (id: string, title?: string): Promise<AskJoinOutcome> => {
+      const ok = !!LISTED.find((x) => x.id === id)?.online
+      if (ok) {
+        joinStates[id] = 'waiting'
+        statesListeners.forEach((l) => l({ ...joinStates }))
+        // The host answers a few seconds later.
+        setTimeout(() => {
+          joinStates[id] = 'accepted'
+          statesListeners.forEach((l) => l({ ...joinStates }))
+          answeredListeners.forEach((l) => l({ id, title: title ?? id, accepted: true }))
+        }, 6000)
+      }
+      return wait(ok ? 'received' : 'closed', 800)
+    },
+    joinStates: () => wait({ ...joinStates }, 100)
   }
 }
+
+const joinStates: Record<string, JoinState> = {}
+const statesListeners = new Set<(e: Record<string, JoinState>) => void>()
+const answeredListeners = new Set<(e: JoinAnsweredEvent) => void>()
+export const onJoinStates = (cb: (e: Record<string, JoinState>) => void) => (statesListeners.add(cb), () => void statesListeners.delete(cb))
+export const onJoinAnswered = (cb: (e: JoinAnsweredEvent) => void) => (answeredListeners.add(cb), () => void answeredListeners.delete(cb))
