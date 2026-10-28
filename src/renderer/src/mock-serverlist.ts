@@ -108,7 +108,7 @@ const relayEvents = [
 ]
 function relayMock(method: string, path: string, b: Record<string, any>): unknown { // eslint-disable-line @typescript-eslint/no-explicit-any
   const p = path.split('?')[0]
-  const limits = { tunnels_per_account: 3, names_per_account: 5, connections_per_tunnel: 50, connections_per_ip: 0, agents_per_ip: 0, monthly_gb_per_account: 100, handshake_timeout_secs: 10, idle_timeout_secs: 300, logins_per_ip_per_hour: 30, name_expiry_days: 180, session_days: 30, max_pending_handshakes: 200, session_minutes: 120, session_warn_minutes: [15, 5, 1], session_continue_minutes: 15, topup_gb: 30, topups_per_month: 3, topup_low_gb: 1, max_domains: 3 }
+  const limits = { tunnels_per_account: 3, names_per_account: 5, connections_per_tunnel: 50, connections_per_ip: 0, agents_per_ip: 0, monthly_gb_per_account: 100, handshake_timeout_secs: 10, idle_timeout_secs: 300, logins_per_ip_per_hour: 30, name_expiry_days: 180, session_days: 30, max_pending_handshakes: 200, session_minutes: 120, session_warn_minutes: [15, 5, 1], session_continue_minutes: 15, topup_gb: 30, topups_per_month: 3, topup_low_gb: 1, max_domains: 3, join_requests_per_ip: 5, join_requests_per_server: 30 }
   // ?require2fa=1: the relay wants 2FA before anything else (until it's set up here).
   if (new URLSearchParams(location.search).get('require2fa') === '1' && !twoFactorDone && !p.startsWith('/api/users/2fa')) throw new Error('The relay refused: set up two-factor sign-in first')
   if (method === 'POST' && p === '/api/users/2fa/setup')
@@ -159,6 +159,8 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
           { uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle_Gamer', bytes: 12_000_000_000, cap: 0, extra: 0, topups: 0, unlimited: true, unlimitedTime: false, percent: 0, online: 1 }
         ]
       }
+    case '/api/limits/clear':
+      return { ok: true }
     case '/api/settings':
       return { limits, fileLimits: { ...limits, session_minutes: 90 }, limitsOverridden: true, noServer: { message: true, version: 'Offline', title: 'This server is offline' }, restartOnly: ['max_pending_handshakes'] }
     case '/api/events':

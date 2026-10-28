@@ -21,7 +21,9 @@ export const LIMITS: { key: string; kind: LimitKind; min?: number }[] = [
   { key: 'topup_gb', kind: 'float', min: 0 },
   { key: 'topups_per_month', kind: 'int', min: 0 },
   { key: 'topup_low_gb', kind: 'float', min: 0 },
-  { key: 'max_domains', kind: 'int', min: 0 }
+  { key: 'max_domains', kind: 'int', min: 0 },
+  { key: 'join_requests_per_ip', kind: 'int', min: 0 },
+  { key: 'join_requests_per_server', kind: 'int', min: 0 }
 ]
 
 export const kindOf = (key: string): LimitKind => LIMITS.find((l) => l.key === key)?.kind ?? 'float'

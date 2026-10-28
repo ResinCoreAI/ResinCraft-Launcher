@@ -97,6 +97,9 @@ export function RelaySettingsAdmin() {
               })}
             </div>
             <div className="row end">
+              <button className="btn sm" title={t('servers.admin.relay.clearLimitsHint')} onClick={() => void act('/api/limits/clear', {}, 'servers.admin.relay.limitsCleared')}>
+                {t('servers.admin.relay.clearLimits')}
+              </button>
               {data.limitsOverridden && (
                 <button className="btn sm" onClick={() => void act('/api/settings/reset', {}, 'servers.admin.set.saved')}>
                   {t('servers.admin.set.reset')}

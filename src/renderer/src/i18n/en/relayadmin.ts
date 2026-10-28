@@ -225,6 +225,11 @@ export default {
   'servers.admin.relay.limit.topups_per_month': 'Host top-ups per account per month',
   'servers.admin.relay.limit.topup_low_gb': 'Host may top up below this much left (GB)',
   'servers.admin.relay.limit.max_domains': 'Own domains per account (0 = no limit)',
+  'servers.admin.relay.limit.join_requests_per_ip': 'Whitelist requests per IP per 10 minutes (0 = no limit)',
+  'servers.admin.relay.limit.join_requests_per_server': 'Whitelist requests per server per 10 minutes (0 = no limit)',
+  'servers.admin.relay.clearLimits': 'Clear request limits',
+  'servers.admin.relay.clearLimitsHint': 'Players who hit the sign-in or whitelist request limit can try again at once',
+  'servers.admin.relay.limitsCleared': 'Request limits cleared',
 
   // Events
   'servers.admin.relay.eventKind': 'Kind',
