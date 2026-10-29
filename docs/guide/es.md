@@ -1,6 +1,6 @@
 # ResinCraft Launcher: guía de uso
 
-Cómo hacer lo más habitual en ResinCraft. Los nombres en **negrita** son lo que verás en pantalla. Algunas partes de la página de servidores todavía no están traducidas y la app las muestra en inglés; por eso aquí también aparecen en inglés (con la traducción entre paréntesis).
+Cómo hacer lo más habitual en ResinCraft. Los nombres en **negrita** son lo que verás en pantalla. Algunas partes de la página de servidores todavía no están traducidas y la app las muestra en inglés; por eso aquí también aparecen en inglés (con la traducción entre paréntesis). Cada sección indica en qué versión llegó.
 
 > NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
@@ -22,9 +22,16 @@ Cómo hacer lo más habitual en ResinCraft. Los nombres en **negrita** son lo qu
 14. [Temas y CSS propio](#14-temas-y-css-propio)
 15. [Control remoto (consola web)](#15-control-remoto-consola-web)
 16. [Reinstalar y reparar](#16-reinstalar-y-reparar)
-17. [Solución de problemas](#17-solución-de-problemas)
+17. [Encontrar servidores y entrar](#17-encontrar-servidores-y-entrar)
+18. [Pon tu servidor en la lista y comparte sus mods](#18-pon-tu-servidor-en-la-lista-y-comparte-sus-mods)
+19. [Tus otros PC y los amigos que ayudan](#19-tus-otros-pc-y-los-amigos-que-ayudan)
+20. [Copias de seguridad de los mundos](#20-copias-de-seguridad-de-los-mundos)
+21. [Almacenamiento y pasar a otro PC](#21-almacenamiento-y-pasar-a-otro-pc)
+22. [Solución de problemas](#22-solución-de-problemas)
 
 ## 1. Instalar e iniciar sesión
+
+*Desde la versión 0.1.0.*
 
 1. Descarga ResinCraft para tu sistema desde la [página de versiones](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
    - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (siempre instala la versión más reciente), o `…_amd64_windows.exe` / `…_amd64_windows.msi`
@@ -35,6 +42,8 @@ Cómo hacer lo más habitual en ResinCraft. Los nombres en **negrita** son lo qu
    - ¿No tienes cuenta de Microsoft? Añade un **Perfil sin conexión** para jugar solo y en LAN.
 
 ## 2. Crea tu primera instancia
+
+*Desde la versión 0.1.0.*
 
 Una *instancia* es una instalación de Minecraft aparte, con sus propios mods, mundos y ajustes.
 
@@ -50,16 +59,20 @@ Consejo: **Unión rápida**, a la izquierda, muestra tus servidores y mundos rec
 
 ## 3. Añadir mods, paquetes de recursos y shaders
 
+*Desde la versión 0.1.0.*
+
 1. Abre tu instancia → pestaña **Contenido** → **Añadir mods**. O abre **Descubrir** en la barra de la izquierda.
 2. Busca, o explora Modrinth, CurseForge, FTB y los demás sitios. Solo se muestran las versiones que encajan con tu instancia.
 3. Pulsa **Instalar**. Los mods necesarios (dependencias) se añaden solos.
 4. De vuelta en **Contenido**:
    - usa el interruptor junto a un mod para activarlo o desactivarlo;
-   - pulsa **Buscar actualizaciones** para actualizar mods (uno o todos).
+   - pulsa **Buscar actualizaciones** para actualizar mods (uno o todos). **Actualizar todo** descarga hasta cuatro a la vez.
 
 Algunos autores de CurseForge no permiten que los launchers descarguen sus archivos. En ese caso, ResinCraft los muestra en **Descargar todo**: descárgalos con tu navegador y ResinCraft los encontrará solo en tu carpeta de descargas. ¿Tu navegador guarda en otro sitio? Añade esa carpeta en **Ajustes → Descargas → Carpetas vigiladas**.
 
 ## 4. Instalar un modpack
+
+*Desde la versión 0.1.0.*
 
 1. Abre **Descubrir** → **Modpacks** (o **Biblioteca** → **Nueva instancia** → **Descargar un modpack**).
 2. Abre un pack para ver su descripción, sus versiones y los **Mods** que contiene.
@@ -68,12 +81,16 @@ Algunos autores de CurseForge no permiten que los launchers descarguen sus archi
 
 ## 5. Cambiar la versión de Minecraft o el cargador de mods
 
+*Desde la versión 1.2.7.*
+
 1. En la página de la instancia, haz clic en la etiqueta de versión de arriba (por ejemplo **1.21.4 · Fabric 0.16.10**). Se abre **Ajustes → Versión**.
 2. Elige la versión de **Minecraft**, el **Cargador de mods** y la versión del cargador.
 3. Pulsa **Cambiar versión** y confirma. Al iniciar la próxima vez se descarga lo necesario.
 4. Puede que los mods hechos para la versión anterior no funcionen: ve a **Contenido** y pulsa **Buscar actualizaciones**.
 
 ## 6. Cuando Minecraft se cierra inesperadamente
+
+*Desde la versión 1.2.7.*
 
 Si el juego se cierra de golpe, se abre la ventana **Minecraft se cerró inesperadamente**. ResinCraft lee el informe de error y los registros y te dice qué ha fallado. Por ahora la app muestra estos avisos en inglés, por ejemplo:
 
@@ -86,6 +103,8 @@ Pulsa **Arreglar** en cada uno, o **Arreglar todo y jugar**. No cambia nada hast
 
 ## 7. Copiar cosas de otra instancia
 
+*Desde la versión 1.2.5.*
+
 1. Abre la instancia *a la que* quieres copiar → pulsa el botón **Copiar de otra instancia** de arriba.
 2. Elige la instancia *de la que* copiar.
 3. Marca lo que quieras:
@@ -96,6 +115,8 @@ Pulsa **Arreglar** en cada uno, o **Arreglar todo y jugar**. No cambia nada hast
 4. Pulsa **Copiar**. Los mundos cuyo nombre ya existe reciben un nombre nuevo. Los mods y packs que ya tienes se quedan como están.
 
 ## 8. Alojar un servidor
+
+*Desde la versión 0.1.0.*
 
 1. Abre **Servers** → **Create server** (crear servidor).
 2. Elige cómo:
@@ -110,7 +131,7 @@ En la página de un servidor:
 
 - **Console** (consola): lo que dice el servidor; escribe comandos abajo.
 - **Players** (jugadores): quién está conectado ahora mismo, además de la whitelist, los operadores y los baneos.
-- **Mods** o **Plugins:** añadir, actualizar o desactivar.
+- **Mods** o **Plugins:** añadir, actualizar o desactivar. **Actualizar todo** descarga hasta cuatro a la vez; si el servidor está en marcha, las actualizaciones se aplican en el siguiente reinicio.
 - **Properties** (propiedades): los ajustes del servidor (dificultad, whitelist activada o no, etc.).
 - **Settings** (ajustes):
   - memoria, Java y **Java flags** (los de ResinCraft o los del propio modpack);
@@ -119,6 +140,7 @@ En la página de un servidor:
 - **Reiniciar** y el menú **⋯** (copiar dirección, abrir carpeta, copia de seguridad ahora, eliminar).
 
 - **Settings → Anti-xray** (ajustes → anti-xray; Paper, Purpur, Folia, Leaf): oculta los minerales a los mods y paquetes de texturas de rayos X. **Hide ores** (ocultar minerales) apenas carga el servidor; **Fake ores** (minerales falsos) es más fuerte. Se aplica en el siguiente arranque.
+- **Settings → Anti-cheat** (ajustes → anticheat; servidores de plugins): un solo interruptor instala Grim.
 
 Los mods que solo funcionan en el cliente del juego (shaders, minimapas…) se quedan en el servidor mientras arranque bien. Si alguno lo tumba, ResinCraft desactiva ese mod y vuelve a arrancar el servidor; desde la pestaña **Mods** puedes volver a activarlo.
 
@@ -126,16 +148,22 @@ Cuando un modpack no tiene server pack oficial, ResinCraft monta el servidor a p
 
 ## 9. Deja que tus amigos entren a tu servidor
 
+*Desde la versión 0.2.0.*
+
 En la pestaña **Settings** del servidor → **How friends connect** (cómo se conectan tus amigos):
 
-- **Automatic** (automático, recomendado): prueba primero **ResinCraft Relay**, luego playit.gg y luego bore.
+- **Automatic** (automático, recomendado y la opción predeterminada para servidores nuevos): primero tu router, luego **ResinCraft Relay** y luego playit.gg.
 - **ResinCraft Relay:** tus amigos entran con `yourname.rscraft.resincore.tech`. Necesita una cuenta de Microsoft con la sesión iniciada.
 - **playit.gg:** una dirección gratuita que no cambia. La primera vez te pide vincular una cuenta de playit.gg (sirve una cuenta de invitado).
 - **Puerto redirigido por mí:** si configuraste el router tú mismo.
 
 La pestaña **Console** muestra la dirección que tienes que dar a tus amigos. Los amigos de Bedrock también pueden entrar a servidores Java: activa **Bedrock players can join** (los jugadores de Bedrock pueden entrar).
 
+**Tu propio dominio:** con ResinCraft Relay, activa **Conectar tu propio dominio a ResinCraft Relay** y escribe el dominio. Añade los registros DNS que muestra, incluido el registro TXT que demuestra que el dominio es tuyo, y pulsa **Verificar**. La insignia pasa de **Verificación pendiente** a **Verificado**. Con el DNS automático de Cloudflare activado, ResinCraft añade los registros por ti.
+
 ## 10. Solicitudes de whitelist (página web y bot de Discord)
+
+*Desde la versión 1.2.7.*
 
 Deja que los jugadores pidan entrar, y acéptalos o recházalos tú.
 
@@ -144,7 +172,7 @@ Deja que los jugadores pidan entrar, y acéptalos o recházalos tú.
 3. Elige cómo piden entrar los jugadores:
    - **Web page** (página web):
      - Funciona cuando el servidor se comparte con ResinCraft Relay.
-     - Pulsa **Copy link** (copiar enlace) y manda el enlace a los jugadores: `https://rscraft.resincore.tech/join/<name>`.
+     - Pulsa **Copy link** (copiar enlace) y manda el enlace a los jugadores. Es la propia dirección de tu servidor, o tu dominio verificado.
      - La página funciona mientras el servidor está en línea.
    - **Your Discord bot** (tu bot de Discord):
      1. Abre el [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → **Bot** → **Reset Token**, y copia el token.
@@ -154,15 +182,20 @@ Deja que los jugadores pidan entrar, y acéptalos o recházalos tú.
 4. Las solicitudes aparecen en la pestaña **Players**:
    - **Accept** (aceptar): añade al jugador a la whitelist (el bot se lo dice por mensaje directo).
    - **Reject** (rechazar): rechaza la solicitud.
-   - **Reject and block** (rechazar y bloquear): la rechaza y evita que esa persona vuelva a pedirlo. **Unblock all** (desbloquear a todos) deshace los bloqueos de Discord.
+   - **Reject and block** (rechazar y bloquear): la rechaza y evita que esa persona vuelva a pedirlo. Los jugadores bloqueados aparecen en la lista **Blocked** (bloqueados), con **Unblock** (desbloquear) para cada uno.
+   - **Desde la lista de servidores:** los jugadores con ResinCraft pueden pedirlo desde la página de tu servidor en Descubrir → Servidores (sección 17).
 
 Las solicitudes de jugadores baneados se rechazan solas. El bot de Discord funciona mientras ResinCraft está abierto; activa la bandeja del sistema (sección 13) para que siga funcionando con la ventana cerrada.
 
 ## 11. Bedrock Edition
 
+*Desde la versión 0.3.1.*
+
 En Windows, **Bedrock**, a la izquierda, instala, abre y desinstala Minecraft para Windows y Minecraft Preview. Antes de desinstalar, hace una copia de seguridad de tus mundos.
 
 ## 12. Venir desde otro launcher
+
+*Desde la versión 1.0.5.*
 
 **Biblioteca** → **Traer desde otro launcher** importa instancias de:
 
@@ -175,6 +208,8 @@ Sus mods, mundos y ajustes vienen con ellas. Los originales se quedan donde est�
 
 ## 13. Actualizaciones y la bandeja del sistema
 
+*Desde la versión 0.3.0 (la bandeja del sistema desde la 1.2.7).*
+
 - **Actualizaciones:**
   - Cuando hay una versión nueva de ResinCraft lista, aparece un botón **Actualizar** en la barra de título.
   - Si hay un juego o un servidor en marcha, eliges **Cerrarlos y actualizar** (los servidores guardan antes sus mundos) o **Actualizar cuando se detengan**.
@@ -185,6 +220,8 @@ Sus mods, mundos y ajustes vienen con ellas. Los originales se quedan donde est�
 
 ## 14. Temas y CSS propio
 
+*Desde la versión 1.3.0.*
+
 1. Abre **Ajustes → Apariencia → Tema** y elige una tarjeta: **Sistema**, Oscuro, Claro, Obsidiana, Pizarra profunda, Cerezo, Nether o El End.
 2. **CSS propio:** pulsa **Insertar colores actuales**, cambia el color que quieras y luego pulsa **Aplicar**. Funciona sobre cualquier tema; **Borrar** lo quita.
 3. Abre **Cómo personalizar** debajo del cuadro: muestra los colores y formas que puedes cambiar, las partes de la app a las que puedes dar estilo y ejemplos (una imagen de fondo, esquinas más redondas, texto más grande…). Haz clic en uno para añadirlo a tu CSS.
@@ -192,6 +229,8 @@ Sus mods, mundos y ajustes vienen con ellas. Los originales se quedan donde est�
 Psst: prueba el código Konami (↑ ↑ ↓ ↓ ← → ← → B A), o haz clic siete veces en el logo de ResinCraft.
 
 ## 15. Control remoto (consola web)
+
+*Desde la versión 1.3.0.*
 
 Maneja tus servidores desde cualquier navegador, o desde el móvil.
 
@@ -206,6 +245,8 @@ El gestor de archivos, los ajustes de Java y los plugins desde cualquier enlace 
 
 ## 16. Reinstalar y reparar
 
+*Desde la versión 1.3.0.*
+
 - **Una instancia no arranca porque faltan archivos o están dañados:**
   - Haz clic derecho en ella en la **Biblioteca** → **Reinstalar** → **Archivos del juego**, o abre su **Ajustes → Reparar**.
   - Minecraft, el cargador de mods, las bibliotecas y los recursos se vuelven a descargar. Los mundos, mods y ajustes se quedan.
@@ -213,7 +254,68 @@ El gestor de archivos, los ajustes de Java y los plugins desde cualquier enlace 
 - **Un servidor:** su menú **⋯** → **Reinstalar** → **Software del servidor** (o **Archivos del modpack** en un servidor de modpack). El mundo, los ajustes y las listas de jugadores se quedan.
 - **El propio ResinCraft:** **Ajustes → Actualizaciones → Reinstalar ResinCraft** vuelve a instalar la app sobre sí misma.
 
-## 17. Solución de problemas
+## 17. Encontrar servidores y entrar
+
+*Desde la versión 1.4.0.*
+
+1. Abre **Descubrir** → **Servidores**. Muestra los servidores alojados con ResinCraft y los que han añadido los jugadores.
+2. Busca, o filtra por categoría (SMP, PvP, Minijuegos, Skyblock…), región, idioma, modpack, y si pueden entrar jugadores de Bedrock o perfiles sin conexión.
+3. Haz clic en el icono o el nombre de un servidor para abrir su página: la descripción completa, todos los detalles, su pack de cliente y enlaces.
+4. Pulsa **Entrar**. ResinCraft elige la instancia que encaja con el servidor, o te pregunta cuál usar. Un servidor con sus propios mods tiene **Instalar y entrar**, que crea una instancia con exactamente esos mods y entra.
+5. ¿Servidor con whitelist? Pulsa **Pedir entrar**. El botón muestra **Waiting for the host** (esperando al anfitrión), luego **On the whitelist** (en la whitelist; pulsa **Entrar**) o **Ask again** (volver a pedir). ResinCraft te avisa, y hace parpadear la barra de tareas, cuando el anfitrión responde.
+
+Dales me gusta a los servidores que disfrutes, y denuncia los que se salten las normas.
+
+## 18. Pon tu servidor en la lista y comparte sus mods
+
+*Desde la versión 1.4.0.*
+
+1. En la pestaña **Settings** (ajustes) de un servidor alojado, activa **Lista de servidores** (viene desactivada).
+2. Añade una descripción, etiquetas, región e idioma. La compatibilidad con Bedrock y con perfiles sin conexión y el modpack se rellenan solos.
+3. **Pack de cliente:** publica lo que necesitan los jugadores, para que puedan usar **Instalar y entrar**:
+   - el modpack del servidor, instalado desde su propio sitio;
+   - cada mod adicional, desde Modrinth o CurseForge;
+   - tus propios archivos, enviados directamente desde tu PC mientras ResinCraft está en marcha;
+   - los paquetes de recursos y shaders que decidas enviar también.
+   Los servidores de plugins y vanilla también pueden tener uno: elige una instancia con la versión de Minecraft del servidor.
+
+¿Un servidor que tienes en otro sitio? Añádelo con **Enviar un servidor** en Descubrir → Servidores.
+
+## 19. Tus otros PC y los amigos que ayudan
+
+*Desde la versión 1.4.1.*
+
+**Tus otros PC:** activa el control remoto en cada PC (sección 15) e inicia sesión con la misma cuenta de Minecraft. Luego, en **Servers**, abre el menú de PC de arriba y elige un PC. Desde aquí puedes iniciar, detener y gestionar sus servidores, y también usar allí **Create server** (crear servidor) o **Importar un servidor**. Para importar desde una carpeta de ese PC, escribe la carpeta; para eso hace falta **Permitir control total** en ese PC.
+
+**Amigos que te ayudan a llevar tus servidores:**
+
+1. Abre **Ajustes → Control remoto → People who can use your servers** (personas que pueden usar tus servidores).
+2. Escribe su nombre de Minecraft y pulsa **Add** (añadir).
+3. Elige qué pueden hacer:
+   - **Viewer** (observador): ver la consola, los jugadores y los ajustes.
+   - **Operator** (operador): además, iniciar, detener y reiniciar, enviar comandos y gestionar jugadores y solicitudes de whitelist.
+   - **Manager** (gestor): además, cambiar ajustes, plugins y mods, y el modpack.
+4. Deja **All servers** (todos los servidores), o elige los servidores en **Which servers?** (¿qué servidores?).
+
+Abren tus servidores desde su ResinCraft (el menú de PC en **Servers**) o desde la consola web, mientras el control remoto está activado y ResinCraft está en marcha en tu PC. Los archivos, los ajustes de Java y crear o borrar servidores siguen siendo cosa tuya.
+
+## 20. Copias de seguridad de los mundos
+
+*Desde la versión 1.4.0.*
+
+- **Automáticas:** mientras un juego o un servidor está en marcha, se hace una copia de seguridad de sus mundos cada 30 minutos y se guardan las 3 más recientes de cada mundo. Cámbialo o desactívalo en **Ajustes → Copia de seguridad automática**.
+- **Restaurar:** en la pestaña **Mundos** de una instancia, o en **Settings → Backups** (ajustes → copias de seguridad) en un servidor alojado, pulsa **Restaurar** en una copia, tuya o automática. El mundo que se reemplaza va a la Papelera de reciclaje, así que una restauración se puede deshacer. Un mundo de un jugador también puede volver como copia.
+
+## 21. Almacenamiento y pasar a otro PC
+
+*Desde la versión 1.1.0 (Pasar a otro PC desde la 1.1.1).*
+
+- **Otra unidad:** **Ajustes → Almacenamiento → Cambiar…**, elige una unidad o carpeta y luego:
+  - **Mover instancias:** mueve allí tus instancias, servidores y los archivos compartidos de Minecraft.
+  - **Usar sin mover:** lo nuevo va allí; tus instancias actuales se quedan y vuelven cuando vuelves a cambiar.
+- **Un PC nuevo:** **Ajustes → Pasar a otro PC** guarda todo en un solo archivo `.resincraft`. Ábrelo con ResinCraft en el PC nuevo.
+
+## 22. Solución de problemas
 
 - **El juego no arranca:** mira la ventana **Minecraft se cerró inesperadamente** (sección 6) o la pestaña **Registros** de la instancia. ¿Faltan archivos o están dañados? Reinstálalos (sección 16).
 - **Un mod no aparece en Descubrir:** puede que no exista para tu versión de Minecraft o tu cargador. Prueba otra versión, o cambia la versión de la instancia (sección 5).

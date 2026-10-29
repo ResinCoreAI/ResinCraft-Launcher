@@ -1,6 +1,6 @@
 # ResinCraft Launcher: panduan pengguna
 
-Cara melakukan hal-hal yang paling umum di ResinCraft. Nama yang **ditebalkan** adalah yang akan Anda lihat di layar.
+Cara melakukan hal-hal yang paling umum di ResinCraft. Nama yang **ditebalkan** adalah yang akan Anda lihat di layar. Setiap bagian menyebutkan versi saat bagian itu hadir.
 
 > NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
@@ -22,9 +22,16 @@ Cara melakukan hal-hal yang paling umum di ResinCraft. Nama yang **ditebalkan** 
 14. [Tema dan CSS kustom](#14-tema-dan-css-kustom)
 15. [Kendali jarak jauh (konsol web)](#15-kendali-jarak-jauh-konsol-web)
 16. [Instal ulang dan perbaiki](#16-instal-ulang-dan-perbaiki)
-17. [Pemecahan masalah](#17-pemecahan-masalah)
+17. [Cari dan gabung ke server](#17-cari-dan-gabung-ke-server)
+18. [Daftarkan server Anda dan bagikan mod-nya](#18-daftarkan-server-anda-dan-bagikan-mod-nya)
+19. [PC Anda yang lain dan teman yang membantu](#19-pc-anda-yang-lain-dan-teman-yang-membantu)
+20. [Cadangan dunia](#20-cadangan-dunia)
+21. [Penyimpanan dan pindah ke PC lain](#21-penyimpanan-dan-pindah-ke-pc-lain)
+22. [Pemecahan masalah](#22-pemecahan-masalah)
 
 ## 1. Pasang dan masuk
+
+*Sejak versi 0.1.0.*
 
 1. Unduh ResinCraft untuk sistem Anda dari [halaman Releases](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest):
    - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (selalu memasang versi terbaru), atau `…_amd64_windows.exe` / `…_amd64_windows.msi`
@@ -35,6 +42,8 @@ Cara melakukan hal-hal yang paling umum di ResinCraft. Nama yang **ditebalkan** 
    - Tidak punya akun Microsoft? Tambahkan **Profil offline** untuk pemain tunggal dan LAN.
 
 ## 2. Buat instalasi pertama Anda
+
+*Sejak versi 0.1.0.*
 
 *Instalasi* (instance) adalah pemasangan Minecraft terpisah dengan mod, dunia, dan pengaturannya sendiri.
 
@@ -50,16 +59,20 @@ Tips: **Gabung cepat** di sebelah kiri menampilkan server dan dunia terakhir And
 
 ## 3. Tambahkan mod, paket sumber daya, dan shader
 
+*Sejak versi 0.1.0.*
+
 1. Buka instalasi Anda → tab **Konten** → **Tambah mod**. Atau buka **Jelajahi** dari bilah kiri.
 2. Cari, atau jelajahi Modrinth, CurseForge, FTB, dan situs lainnya. Hanya versi yang cocok dengan instalasi Anda yang ditampilkan.
 3. Tekan **Pasang**. Mod yang dibutuhkan (dependensi) ditambahkan untuk Anda.
 4. Kembali di **Konten**:
    - gunakan sakelar di samping mod untuk menyalakan atau mematikannya;
-   - tekan **Periksa pembaruan** untuk memperbarui mod (satu atau semua).
+   - tekan **Periksa pembaruan** untuk memperbarui mod (satu atau semua). **Perbarui semua** mengunduh hingga empat sekaligus.
 
 Beberapa pembuat mod di CurseForge tidak mengizinkan launcher mengunduh file mereka. ResinCraft lalu menampilkannya di bawah **Unduh semua**: unduh lewat browser Anda, dan ResinCraft akan menemukannya sendiri di folder Unduhan. Browser Anda menyimpan di tempat lain? Tambahkan folder itu di **Pengaturan → Unduhan → Folder yang dipantau**.
 
 ## 4. Pasang modpack
+
+*Sejak versi 0.1.0.*
 
 1. Buka **Jelajahi** → **Modpack** (atau **Pustaka** → **Instalasi baru** → **Unduh modpack**).
 2. Buka sebuah paket untuk melihat deskripsi, versi, dan **Mod** yang ada di dalamnya.
@@ -68,12 +81,16 @@ Beberapa pembuat mod di CurseForge tidak mengizinkan launcher mengunduh file mer
 
 ## 5. Ganti versi Minecraft atau pemuat mod
 
+*Sejak versi 1.2.7.*
+
 1. Di halaman instalasi, klik label versi di bagian atas (misalnya **1.21.4 · Fabric 0.16.10**). Ini membuka **Pengaturan → Versi**.
 2. Pilih versi **Minecraft**, **Pemuat mod**, dan versi loader-nya.
 3. Tekan **Ubah versi** lalu konfirmasi. Saat game dijalankan berikutnya, yang dibutuhkan akan diunduh.
 4. Mod yang dibuat untuk versi lama mungkin tidak berfungsi: buka **Konten** dan tekan **Periksa pembaruan**.
 
 ## 6. Saat Minecraft crash
+
+*Sejak versi 1.2.7.*
 
 Saat game crash, jendela **(nama instalasi) crash** terbuka. ResinCraft membaca laporan crash dan log, lalu memberi tahu apa yang salah, misalnya:
 
@@ -86,6 +103,8 @@ Tekan **Perbaiki** di masing-masing, atau **Perbaiki semua dan main**. Tidak ada
 
 ## 7. Salin dari instalasi lain
 
+*Sejak versi 1.2.5.*
+
 1. Buka instalasi *tujuan* salinan → tekan tombol **Salin dari instance lain** di bagian atas.
 2. Pilih instalasi *sumber* salinan.
 3. Centang yang Anda inginkan:
@@ -96,6 +115,8 @@ Tekan **Perbaiki** di masing-masing, atau **Perbaiki semua dan main**. Tidak ada
 4. Tekan **Salin**. Dunia yang namanya sudah dipakai akan mendapat nama baru. Mod dan paket yang sudah Anda punya dibiarkan apa adanya.
 
 ## 8. Jalankan server sendiri
+
+*Sejak versi 0.1.0.*
 
 1. Buka **Servers** → **Create server** (buat server).
 2. Pilih caranya:
@@ -110,7 +131,7 @@ Di halaman server:
 
 - **Console** (konsol): apa yang dikatakan server; ketik perintah di bagian bawah.
 - **Players** (pemain): siapa yang sedang online, ditambah whitelist, operator, dan ban.
-- **Mods** atau **Plugins:** tambah, perbarui, atau matikan.
+- **Mods** atau **Plugins:** tambah, perbarui, atau matikan. **Perbarui semua** mengunduh hingga empat sekaligus; selama server berjalan, pembaruan dipasang saat mulai ulang berikutnya.
 - **Properties** (properti): pengaturan server (tingkat kesulitan, whitelist nyala/mati, dan sebagainya).
 - **Settings** (pengaturan):
   - memori, Java, dan **Java flags** (milik ResinCraft atau milik modpack itu sendiri);
@@ -119,6 +140,7 @@ Di halaman server:
 - **Mulai ulang** dan menu **⋯** (salin alamat, buka folder, cadangkan sekarang, hapus).
 
 - **Settings → Anti-xray** (pengaturan → anti-xray; Paper, Purpur, Folia, Leaf): sembunyikan bijih dari mod dan texture pack x-ray. **Hide ores** (sembunyikan bijih) ringan untuk server; **Fake ores** (bijih palsu) lebih kuat. Berlaku saat server dimulai berikutnya.
+- **Settings → Anti-cheat** (pengaturan → anti-cheat; server plugin): satu sakelar memasang Grim.
 
 Mod yang hanya berjalan di klien game (shader, minimap…) tetap ada di server selama server bisa mulai dengan baik. Jika salah satunya membuat server crash, ResinCraft mematikan mod itu dan memulai server lagi; tab **Mods** bisa menyalakannya kembali.
 
@@ -126,16 +148,22 @@ Jika modpack tidak punya paket server resmi, ResinCraft membangun server dari da
 
 ## 9. Ajak teman masuk ke server Anda
 
+*Sejak versi 0.2.0.*
+
 Di **Settings** server → **How friends connect** (cara teman terhubung):
 
-- **Automatic** (disarankan): mencoba **ResinCraft Relay** dulu, lalu playit.gg, lalu bore.
+- **Automatic** (disarankan, dan bawaan untuk server baru): router Anda dulu, lalu **ResinCraft Relay**, lalu playit.gg.
 - **ResinCraft Relay:** teman bergabung lewat `yourname.rscraft.resincore.tech`. Perlu akun Microsoft yang sudah masuk.
 - **playit.gg:** alamat gratis yang tidak berubah. Saat pertama dijalankan, Anda diminta menautkan akun playit.gg (akun tamu juga boleh).
 - **Port diteruskan sendiri:** jika Anda mengatur router sendiri.
 
 Tab **Console** menampilkan alamat yang perlu Anda berikan ke teman. Teman yang main Bedrock juga bisa bergabung ke server Java: nyalakan **Bedrock players can join** (pemain Bedrock bisa bergabung).
 
+**Domain milik sendiri:** dengan ResinCraft Relay, nyalakan **Hubungkan domain sendiri ke ResinCraft Relay** dan ketik domainnya. Tambahkan record DNS yang ditampilkan, termasuk record TXT yang membuktikan domain itu milik Anda, lalu tekan **Verifikasi**. Lencananya berubah dari **Menunggu verifikasi** menjadi **Terverifikasi**. Jika DNS otomatis Cloudflare menyala, ResinCraft menambahkan record-nya untuk Anda.
+
 ## 10. Permintaan whitelist (halaman web dan bot Discord)
+
+*Sejak versi 1.2.7.*
 
 Biarkan pemain meminta untuk bergabung, lalu Anda sendiri yang menerima atau menolak.
 
@@ -144,7 +172,7 @@ Biarkan pemain meminta untuk bergabung, lalu Anda sendiri yang menerima atau men
 3. Pilih cara pemain meminta:
    - **Web page** (halaman web):
      - Berfungsi jika server dibagikan lewat ResinCraft Relay.
-     - Tekan **Copy link** (salin tautan) dan kirim tautannya ke pemain: `https://rscraft.resincore.tech/join/<name>`.
+     - Tekan **Copy link** (salin tautan) dan kirim tautannya ke pemain. Tautannya adalah alamat server Anda sendiri, atau domain Anda yang terverifikasi.
      - Halaman ini berfungsi selama server online.
    - **Your Discord bot** (bot Discord Anda):
      1. Buka [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → **Bot** → **Reset Token**, lalu salin token-nya.
@@ -154,15 +182,20 @@ Biarkan pemain meminta untuk bergabung, lalu Anda sendiri yang menerima atau men
 4. Permintaan muncul di tab **Players**:
    - **Accept** (terima): memasukkan pemain ke whitelist (bot memberi tahu mereka lewat pesan langsung).
    - **Reject** (tolak): menolak permintaan.
-   - **Reject and block** (tolak dan blokir): menolaknya dan mencegah orang itu meminta lagi. **Unblock all** (buka semua blokir) membatalkan blokir Discord.
+   - **Reject and block** (tolak dan blokir): menolaknya dan mencegah orang itu meminta lagi. Pemain yang diblokir muncul di daftar **Blocked** (diblokir), masing-masing dengan **Unblock** (buka blokir).
+   - **Dari daftar server:** pemain yang memakai ResinCraft bisa meminta dari halaman server Anda di Jelajahi → Server (bagian 17).
 
 Permintaan dari pemain yang di-ban otomatis ditolak. Bot Discord berjalan selama ResinCraft terbuka; nyalakan system tray (bagian 13) agar bot tetap berjalan saat jendela ditutup.
 
 ## 11. Bedrock Edition
 
+*Sejak versi 0.3.1.*
+
 Di Windows, **Bedrock** di sebelah kiri memasang, membuka, dan mencopot Minecraft for Windows dan Minecraft Preview. Sebelum mencopot, dunia Anda dicadangkan lebih dulu.
 
 ## 12. Pindah dari launcher lain
+
+*Sejak versi 1.0.5.*
 
 **Pustaka** → **Pindah dari launcher lain** membawa instalasi dari:
 
@@ -175,6 +208,8 @@ Mod, dunia, dan pengaturannya ikut terbawa. Yang asli tetap di tempatnya.
 
 ## 13. Pembaruan dan system tray
 
+*Sejak versi 0.3.0 (system tray sejak 1.2.7).*
+
 - **Pembaruan:**
   - Saat versi baru ResinCraft siap, tombol **Perbarui** muncul di bilah judul.
   - Jika ada game atau server yang berjalan, Anda memilih **Tutup dan perbarui** (server menyimpan dunianya dulu) atau **Perbarui saat berhenti**.
@@ -185,6 +220,8 @@ Mod, dunia, dan pengaturannya ikut terbawa. Yang asli tetap di tempatnya.
 
 ## 14. Tema dan CSS kustom
 
+*Sejak versi 1.3.0.*
+
 1. Buka **Pengaturan → Tampilan → Tema** dan pilih kartu: **Sistem**, Gelap, Terang, Obsidian, Deepslate, Ceri, Nether, atau The End.
 2. **CSS kustom:** tekan **Sisipkan warna saat ini**, ubah warna mana saja, lalu tekan **Terapkan**. Ini berlaku di atas tema apa pun; **Hapus** menghilangkannya.
 3. Buka **Cara kustomisasi** di bawah kotak: di sana ada daftar warna dan bentuk yang bisa diubah, bagian-bagian aplikasi yang bisa diberi gaya, dan contoh (gambar latar, sudut lebih bulat, teks lebih besar…). Klik salah satunya untuk menambahkannya ke CSS Anda.
@@ -192,6 +229,8 @@ Mod, dunia, dan pengaturannya ikut terbawa. Yang asli tetap di tempatnya.
 Psst: coba kode Konami (↑ ↑ ↓ ↓ ← → ← → B A), atau klik logo ResinCraft tujuh kali.
 
 ## 15. Kendali jarak jauh (konsol web)
+
+*Sejak versi 1.3.0.*
 
 Jalankan server Anda dari browser mana saja, atau dari ponsel.
 
@@ -206,6 +245,8 @@ Pengelola file, pengaturan Java, dan plugin dari tautan unduhan mana pun bisa me
 
 ## 16. Instal ulang dan perbaiki
 
+*Sejak versi 1.3.0.*
+
 - **Instalasi tidak mau mulai karena file hilang atau rusak:**
   - Klik kanan instalasi itu di **Pustaka** → **Instal ulang** → **File game**, atau buka **Pengaturan → Perbaiki**-nya.
   - Minecraft, pemuat mod, library, dan aset diunduh lagi. Dunia, mod, dan pengaturan tetap ada.
@@ -213,7 +254,68 @@ Pengelola file, pengaturan Java, dan plugin dari tautan unduhan mana pun bisa me
 - **Server:** menu **⋯**-nya → **Instal ulang** → **Software server** (atau **File modpack** untuk server modpack). Dunia, pengaturan, dan daftar pemain tetap ada.
 - **ResinCraft itu sendiri:** **Pengaturan → Pembaruan → Instal ulang ResinCraft** memasang ulang aplikasi di atas dirinya sendiri.
 
-## 17. Pemecahan masalah
+## 17. Cari dan gabung ke server
+
+*Sejak versi 1.4.0.*
+
+1. Buka **Jelajahi** → **Server**. Di sana ada server yang di-host dengan ResinCraft dan server yang ditambahkan pemain.
+2. Cari, atau saring menurut kategori (SMP, PvP, Minigame, Skyblock…), wilayah, bahasa, modpack, serta apakah pemain Bedrock atau profil offline bisa bergabung.
+3. Klik ikon atau nama server untuk membuka halamannya: deskripsi lengkap, semua detail, paket klien, dan tautannya.
+4. Tekan **Gabung**. ResinCraft memilih instalasi yang cocok dengan server, atau bertanya mana yang mau dipakai. Server dengan mod sendiri punya **Pasang & gabung**, yang membuat instalasi dengan mod yang persis sama lalu bergabung.
+5. Server ber-whitelist? Tekan **Minta gabung**. Tombolnya menampilkan **Waiting for the host** (menunggu host), lalu **On the whitelist** (sudah di whitelist; tekan **Gabung**) atau **Ask again** (minta lagi). ResinCraft memberi tahu Anda, dan membuat taskbar berkedip, saat host menjawab.
+
+Beri suka pada server yang Anda nikmati, dan laporkan yang melanggar aturan.
+
+## 18. Daftarkan server Anda dan bagikan mod-nya
+
+*Sejak versi 1.4.0.*
+
+1. Di **Settings** (pengaturan) server yang Anda host, nyalakan **Daftar server** (bawaannya mati).
+2. Tambahkan deskripsi, tag, wilayah, dan bahasa. Dukungan Bedrock dan profil offline serta modpack-nya terisi sendiri.
+3. **Paket klien:** terbitkan apa yang dibutuhkan pemain, agar mereka bisa memakai **Pasang & gabung**:
+   - modpack server, dipasang dari situsnya sendiri;
+   - setiap mod lain, dari Modrinth atau CurseForge;
+   - file Anda sendiri, dikirim langsung dari PC Anda selama ResinCraft berjalan;
+   - paket sumber daya dan shader yang Anda pilih untuk ikut dikirim.
+   Server plugin dan vanilla juga bisa punya: pilih instalasi dengan versi Minecraft server itu.
+
+Server yang Anda jalankan di tempat lain? Tambahkan dengan **Kirim server** di Jelajahi → Server.
+
+## 19. PC Anda yang lain dan teman yang membantu
+
+*Sejak versi 1.4.1.*
+
+**PC Anda yang lain:** nyalakan kendali jarak jauh di setiap PC (bagian 15) dan masuk dengan akun Minecraft yang sama. Lalu, di **Servers**, buka menu PC di bagian atas dan pilih PC. Dari sini Anda bisa memulai, menghentikan, dan mengelola server-nya, serta memakai **Create server** (buat server) atau **Impor server** di sana. Untuk mengimpor dari folder di PC itu, ketik foldernya; ini memerlukan **Izinkan kendali penuh** di PC itu.
+
+**Teman yang membantu menjalankan server Anda:**
+
+1. Buka **Pengaturan → Kendali jarak jauh → People who can use your servers** (orang yang bisa memakai server Anda).
+2. Ketik nama Minecraft mereka dan tekan **Add** (tambah).
+3. Pilih apa yang boleh mereka lakukan:
+   - **Viewer** (penonton): melihat konsol, pemain, dan pengaturan.
+   - **Operator:** juga memulai, menghentikan, dan memulai ulang, mengirim perintah, serta menangani pemain dan permintaan whitelist.
+   - **Manager** (pengelola): juga mengubah pengaturan, plugin dan mod, serta modpack.
+4. Biarkan **All servers** (semua server), atau pilih server di **Which servers?** (server mana?).
+
+Mereka membuka server Anda dari ResinCraft mereka (menu PC di **Servers**) atau konsol web, selama kendali jarak jauh menyala dan ResinCraft berjalan di PC Anda. File, pengaturan Java, serta membuat atau menghapus server tetap urusan Anda.
+
+## 20. Cadangan dunia
+
+*Sejak versi 1.4.0.*
+
+- **Otomatis:** selama game atau server berjalan, dunianya dicadangkan setiap 30 menit, dan 3 cadangan terbaru per dunia disimpan. Ubah atau matikan di **Pengaturan → Cadangan otomatis**.
+- **Pulihkan:** di tab **Dunia** sebuah instalasi, atau **Settings → Backups** (pengaturan → cadangan) untuk server yang Anda host, tekan **Pulihkan** pada sebuah cadangan, buatan Anda sendiri atau otomatis. Dunia yang digantikan dipindahkan ke Recycle Bin, jadi pemulihan bisa dibatalkan. Dunia pemain tunggal juga bisa dikembalikan sebagai salinan.
+
+## 21. Penyimpanan dan pindah ke PC lain
+
+*Sejak versi 1.1.0 (Pindah ke PC lain sejak 1.1.1).*
+
+- **Drive lain:** **Pengaturan → Penyimpanan → Ubah…**, pilih drive atau folder, lalu:
+  - **Pindahkan instalasi:** memindahkan instalasi, server, dan file bersama Minecraft ke sana.
+  - **Gunakan tanpa memindahkan:** yang baru disimpan di sana; instalasi Anda saat ini tetap di tempatnya dan kembali saat Anda beralih lagi.
+- **PC baru:** **Pengaturan → Pindah ke PC lain** menyimpan semuanya ke satu file `.resincraft`. Buka file itu dengan ResinCraft di PC baru.
+
+## 22. Pemecahan masalah
 
 - **Game tidak mau mulai:** lihat jendela **(nama instalasi) crash** (bagian 6), atau tab **Log** instalasi. File hilang atau rusak? Instal ulang (bagian 16).
 - **Mod tidak muncul di Jelajahi:** mungkin mod itu tidak tersedia untuk versi Minecraft atau loader Anda. Coba versi lain, atau ganti versi instalasi (bagian 5).

@@ -1,6 +1,6 @@
 # ResinCraft Launcher: kullanım kılavuzu
 
-ResinCraft'ta en sık yapılan işler nasıl yapılır. **Kalın** yazılan adlar ekranda göreceğin adlardır.
+ResinCraft'ta en sık yapılan işler nasıl yapılır. **Kalın** yazılan adlar ekranda göreceğin adlardır. Her bölüm hangi sürümle geldiğini belirtir.
 
 > NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
 
@@ -22,9 +22,16 @@ ResinCraft'ta en sık yapılan işler nasıl yapılır. **Kalın** yazılan adla
 14. [Temalar ve özel CSS](#14-temalar-ve-özel-css)
 15. [Uzaktan kontrol (web konsolu)](#15-uzaktan-kontrol-web-konsolu)
 16. [Yeniden kurma ve onarma](#16-yeniden-kurma-ve-onarma)
-17. [Sorun giderme](#17-sorun-giderme)
+17. [Sunucu bul ve katıl](#17-sunucu-bul-ve-katıl)
+18. [Sunucunu listele ve modlarını paylaş](#18-sunucunu-listele-ve-modlarını-paylaş)
+19. [Diğer bilgisayarların ve yardım eden arkadaşların](#19-diğer-bilgisayarların-ve-yardım-eden-arkadaşların)
+20. [Dünya yedekleri](#20-dünya-yedekleri)
+21. [Depolama ve başka bir bilgisayara taşıma](#21-depolama-ve-başka-bir-bilgisayara-taşıma)
+22. [Sorun giderme](#22-sorun-giderme)
 
 ## 1. Yükle ve giriş yap
+
+*0.1.0 sürümünden beri.*
 
 1. Sistemine uygun ResinCraft'ı [Releases sayfasından](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/latest) indir:
    - **Windows:** [`ResinCraft-Setup.exe`](https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/download/setup/ResinCraft-Setup.exe) (her zaman en yeni sürümü yükler) ya da `…_amd64_windows.exe` / `…_amd64_windows.msi`
@@ -35,6 +42,8 @@ ResinCraft'ta en sık yapılan işler nasıl yapılır. **Kalın** yazılan adla
    - Microsoft hesabın yok mu? Tek oyunculu ve LAN için bir **Çevrimdışı profil** ekle.
 
 ## 2. Yeni bir kurulum oluştur
+
+*0.1.0 sürümünden beri.*
 
 *Kurulum*, kendi modları, dünyaları ve ayarları olan ayrı bir Minecraft yüklemesidir.
 
@@ -50,16 +59,20 @@ ResinCraft'ta en sık yapılan işler nasıl yapılır. **Kalın** yazılan adla
 
 ## 3. Mod, kaynak paketi ve gölgelendirici ekle
 
+*0.1.0 sürümünden beri.*
+
 1. Kurulumunu aç → **İçerik** sekmesi → **Mod ekle**. Ya da sol çubuktan **Keşfet**'i aç.
 2. Ara ya da Modrinth, CurseForge, FTB ve diğer sitelere göz at. Yalnızca kurulumuna uyan sürümler gösterilir.
 3. **Yükle**'ye bas. Gerekli modlar (bağımlılıklar) senin için eklenir.
 4. **İçerik**'e döndüğünde:
    - bir modu açıp kapatmak için yanındaki anahtarı kullan;
-   - modları güncellemek için (tek tek veya hepsini) **Güncellemeleri denetle**'ye bas.
+   - modları güncellemek için (tek tek veya hepsini) **Güncellemeleri denetle**'ye bas. **Tümünü güncelle** aynı anda en fazla dördünü indirir.
 
 Bazı CurseForge yazarları, başlatıcıların dosyalarını indirmesine izin vermez. Bu durumda ResinCraft onları **Tümünü indir** altında listeler: tarayıcında indir, ResinCraft onları İndirilenler klasöründe kendisi bulur. Tarayıcın başka bir yere mi kaydediyor? O klasörü **Ayarlar → İndirmeler → İzlenen klasörler** bölümüne ekle.
 
 ## 4. Mod paketi yükle
+
+*0.1.0 sürümünden beri.*
 
 1. **Keşfet** → **Mod paketleri**'ni aç (ya da **Kitaplık** → **Yeni kurulum** → **Mod paketi indir**).
 2. Açıklamasını, sürümlerini ve içindeki **Modlar**'ı görmek için bir paketi aç.
@@ -68,12 +81,16 @@ Bazı CurseForge yazarları, başlatıcıların dosyalarını indirmesine izin v
 
 ## 5. Minecraft sürümünü veya mod yükleyiciyi değiştir
 
+*1.2.7 sürümünden beri.*
+
 1. Kurulum sayfasında, üstteki sürüm etiketine tıkla (örneğin **1.21.4 · Fabric 0.16.10**). **Ayarlar → Sürüm** açılır.
 2. **Minecraft** sürümünü, **Mod yükleyici**'yi ve yükleyici sürümünü seç.
 3. **Sürümü değiştir**'e bas ve onayla. Bir sonraki açılışta gerekenler indirilir.
 4. Eski sürüm için yapılmış modlar çalışmayabilir: **İçerik**'e git ve **Güncellemeleri denetle**'ye bas.
 
 ## 6. Minecraft çöktüğünde
+
+*1.2.7 sürümünden beri.*
 
 Oyun çöktüğünde **(kurulum adı) çöktü** penceresi açılır. ResinCraft çökme raporunu ve günlükleri okur ve neyin ters gittiğini söyler, örneğin:
 
@@ -86,6 +103,8 @@ Her birinde **Düzelt**'e ya da **Hepsini düzelt ve oyna**'ya bas. Sen bir buto
 
 ## 7. Başka bir kurulumdan kopyala
 
+*1.2.5 sürümünden beri.*
+
 1. *İçine* kopyalamak istediğin kurulumu aç → üstteki **Başka bir örnekten kopyala** butonuna bas.
 2. *Nereden* kopyalanacağını seç.
 3. İstediklerini işaretle:
@@ -96,6 +115,8 @@ Her birinde **Düzelt**'e ya da **Hepsini düzelt ve oyna**'ya bas. Sen bir buto
 4. **Kopyala**'ya bas. Adı zaten kullanılan dünyalara yeni bir ad verilir. Zaten sahip olduğun modlar ve paketler olduğu gibi kalır.
 
 ## 8. Sunucu barındır
+
+*0.1.0 sürümünden beri.*
 
 1. **Servers** → **Create server**'ı (sunucu oluştur) aç.
 2. Nasıl olacağını seç:
@@ -110,7 +131,7 @@ Bir sunucunun sayfasında:
 
 - **Console** (konsol): sunucunun söyledikleri; komutları en alta yaz.
 - **Players** (oyuncular): şu an kimlerin çevrimiçi olduğu, ayrıca beyaz liste, operatörler ve yasaklar.
-- **Mods** veya **Plugins:** ekle, güncelle ya da kapat.
+- **Mods** veya **Plugins:** ekle, güncelle ya da kapat. **Tümünü güncelle** aynı anda en fazla dördünü indirir; sunucu çalışırken güncellemeler bir sonraki yeniden başlatmada yerine konur.
 - **Properties** (özellikler): sunucu ayarları (zorluk, beyaz liste açık/kapalı ve benzerleri).
 - **Settings** (ayarlar):
   - bellek, Java ve **Java flags** (ResinCraft'ınkiler ya da mod paketinin kendi bayrakları);
@@ -119,6 +140,7 @@ Bir sunucunun sayfasında:
 - **Yeniden başlat** ve **⋯** menüsü (adresi kopyala, klasörü aç, şimdi yedekle, sil).
 
 - **Settings → Anti-xray** (ayarlar → x-ray önleme; Paper, Purpur, Folia, Leaf): cevherleri x-ray modlarından ve doku paketlerinden gizle. **Hide ores** (cevherleri gizle) sunucuyu az yorar; **Fake ores** (sahte cevherler) daha güçlüdür. Bir sonraki başlatmada etkinleşir.
+- **Settings → Anti-cheat** (ayarlar → hile önleme; eklenti sunucuları): tek bir anahtar Grim'i kurar.
 
 Sadece oyun istemcisinde çalışan modlar (gölgelendiriciler, mini haritalar…) sunucu sorunsuz başladığı sürece sunucuda açık kalır. Biri sunucuyu çökertirse ResinCraft o modu kapatır ve sunucuyu yeniden başlatır; **Mods** sekmesinden tekrar açabilirsin.
 
@@ -126,16 +148,22 @@ Bir mod paketinin resmi sunucu paketi yoksa ResinCraft sunucuyu paketin kendi mo
 
 ## 9. Arkadaşlarını sunucuna al
 
+*0.2.0 sürümünden beri.*
+
 Sunucunun **Settings** → **How friends connect** (arkadaşlar nasıl bağlanır) bölümünde:
 
-- **Automatic** (önerilen): önce **ResinCraft Relay**'i, sonra playit.gg'yi, sonra bore'u dener.
+- **Automatic** (otomatik; önerilen ve yeni sunucular için varsayılan): önce modemini, sonra **ResinCraft Relay**'i, sonra playit.gg'yi dener.
 - **ResinCraft Relay:** arkadaşların `yourname.rscraft.resincore.tech` adresine katılır. Giriş yapılmış bir Microsoft hesabı gerekir.
 - **playit.gg:** hiç değişmeyen ücretsiz bir adres. İlk açılışta bir playit.gg hesabı bağlamanı ister (misafir hesabı da olur).
 - **Portu kendim yönlendirdim:** modemini kendin ayarladıysan.
 
 **Console** sekmesi, arkadaşlarına vereceğin adresi gösterir. Bedrock'taki arkadaşların da Java sunucularına katılabilir: **Bedrock players can join**'i (Bedrock oyuncuları katılabilir) aç.
 
+**Kendi alan adın:** ResinCraft Relay ile **Kendi alan adını ResinCraft Relay'e bağla** anahtarını aç ve alan adını yaz. Gösterilen DNS kayıtlarını, alan adının senin olduğunu kanıtlayan TXT kaydı da dahil, ekle ve **Doğrula**'ya bas. Rozet **Doğrulama bekleniyor** durumundan **Doğrulandı** durumuna geçer. Cloudflare otomatik DNS açıksa kayıtları ResinCraft senin için ekler.
+
 ## 10. Beyaz liste istekleri (web sayfası ve Discord botu)
+
+*1.2.7 sürümünden beri.*
 
 Oyuncular katılmak için istek göndersin, sen de kabul et ya da reddet.
 
@@ -144,7 +172,7 @@ Oyuncular katılmak için istek göndersin, sen de kabul et ya da reddet.
 3. Oyuncuların nasıl istek göndereceğini seç:
    - **Web page** (web sayfası):
      - Sunucu ResinCraft Relay üzerinden paylaşılıyorsa çalışır.
-     - **Copy link**'e (bağlantıyı kopyala) bas ve oyunculara bağlantıyı gönder: `https://rscraft.resincore.tech/join/<name>`.
+     - **Copy link**'e (bağlantıyı kopyala) bas ve oyunculara bağlantıyı gönder. Bu, sunucunun kendi adresi ya da doğrulanmış alan adındır.
      - Sayfa, sunucu çevrimiçi olduğu sürece çalışır.
    - **Your Discord bot** (Discord botun):
      1. [Discord Developer Portal](https://discord.com/developers/applications)'ı aç → **New Application** → **Bot** → **Reset Token**, ve token'ı kopyala.
@@ -154,15 +182,20 @@ Oyuncular katılmak için istek göndersin, sen de kabul et ya da reddet.
 4. İstekler **Players** sekmesinde görünür:
    - **Accept** (kabul et): oyuncuyu beyaz listeye ekler (bot ona özel mesajla haber verir).
    - **Reject** (reddet): isteği reddeder.
-   - **Reject and block** (reddet ve engelle): isteği reddeder ve o kişinin tekrar istek göndermesini önler. **Unblock all** (tüm engelleri kaldır), Discord engellerini geri alır.
+   - **Reject and block** (reddet ve engelle): isteği reddeder ve o kişinin tekrar istek göndermesini önler. Engellenen oyuncular **Blocked** (engellenenler) listesinde, her biri için bir **Unblock** (engeli kaldır) butonuyla görünür.
+   - **Sunucu listesinden:** ResinCraft kullanan oyuncular, Keşfet → Sunucular içindeki sunucu sayfandan istek gönderebilir (bölüm 17).
 
 Yasaklı oyuncuların istekleri otomatik olarak reddedilir. Discord botu, ResinCraft açık olduğu sürece çalışır; pencere kapalıyken de çalışması için sistem tepsisini aç (bölüm 13).
 
 ## 11. Bedrock Edition
 
+*0.3.1 sürümünden beri.*
+
 Windows'ta soldaki **Bedrock**, Minecraft for Windows ve Minecraft Preview'u yükler, açar ve kaldırır. Kaldırmadan önce dünyalarını yedekler.
 
 ## 12. Başka bir başlatıcıdan taşı
+
+*1.0.5 sürümünden beri.*
 
 **Kitaplık** → **Başka bir başlatıcıdan taşı**, şuralardan kurulumları getirir:
 
@@ -175,6 +208,8 @@ Modları, dünyaları ve ayarları da onlarla birlikte gelir. Orijinaller oldukl
 
 ## 13. Güncellemeler ve sistem tepsisi
 
+*0.3.0 sürümünden beri (sistem tepsisi 1.2.7 sürümünden beri).*
+
 - **Güncellemeler:**
   - Yeni bir ResinCraft sürümü hazır olduğunda başlık çubuğunda bir **Güncelle** butonu belirir.
   - Bir oyun veya sunucu çalışıyorsa **Kapat ve güncelle** (sunucular önce dünyalarını kaydeder) ya da **Durduklarında güncelle** seçeneklerinden birini seçersin.
@@ -185,6 +220,8 @@ Modları, dünyaları ve ayarları da onlarla birlikte gelir. Orijinaller oldukl
 
 ## 14. Temalar ve özel CSS
 
+*1.3.0 sürümünden beri.*
+
 1. **Ayarlar → Görünüm → Tema**'yı aç ve bir kart seç: **Sistem**, Koyu, Açık, Obsidyen, Derin Arduvaz, Kiraz, Nether ya da End.
 2. **Özel CSS:** **Şu anki renkleri ekle**'ye bas, istediğin rengi değiştir, sonra **Uygula**'ya bas. Her temanın üstünde çalışır; **Temizle** onu kaldırır.
 3. Kutunun altındaki **Nasıl özelleştirilir**'i aç: değiştirebileceğin renkleri ve şekilleri, stil verebileceğin uygulama bölümlerini ve örnekleri (bir arka plan resmi, daha yuvarlak köşeler, daha büyük yazı…) listeler. Birine tıkla, CSS'ine eklensin.
@@ -192,6 +229,8 @@ Modları, dünyaları ve ayarları da onlarla birlikte gelir. Orijinaller oldukl
 Pst: Konami kodunu dene (↑ ↑ ↓ ↓ ← → ← → B A) ya da ResinCraft logosuna yedi kez tıkla.
 
 ## 15. Uzaktan kontrol (web konsolu)
+
+*1.3.0 sürümünden beri.*
 
 Sunucularını herhangi bir tarayıcıdan ya da telefonundan yönet.
 
@@ -206,6 +245,8 @@ Dosya yöneticisi, Java ayarları ve herhangi bir indirme bağlantısından ekle
 
 ## 16. Yeniden kurma ve onarma
 
+*1.3.0 sürümünden beri.*
+
 - **Bir kurulum eksik ya da bozuk dosyalar yüzünden başlamıyor:**
   - **Kitaplık**'ta ona sağ tıkla → **Yeniden kur** → **Oyun dosyaları**, ya da kurulumun **Ayarlar → Onar** bölümünü aç.
   - Minecraft, mod yükleyici, kütüphaneler ve varlıklar yeniden indirilir. Dünyalar, modlar ve ayarlar kalır.
@@ -213,7 +254,68 @@ Dosya yöneticisi, Java ayarları ve herhangi bir indirme bağlantısından ekle
 - **Bir sunucu:** **⋯** menüsü → **Yeniden kur** → **Sunucu yazılımı** (mod paketi sunucusu için **Mod paketi dosyaları**). Dünya, ayarlar ve oyuncu listeleri kalır.
 - **ResinCraft'ın kendisi:** **Ayarlar → Güncellemeler → ResinCraft'ı yeniden kur**, uygulamayı kendi üstüne yeniden kurar.
 
-## 17. Sorun giderme
+## 17. Sunucu bul ve katıl
+
+*1.4.0 sürümünden beri.*
+
+1. **Keşfet** → **Sunucular**'ı aç. Burada ResinCraft ile barındırılan sunucular ve oyuncuların eklediği sunucular listelenir.
+2. Ara ya da kategoriye (SMP, PvP, Minigames, Skyblock…), bölgeye, dile, mod paketine ve Bedrock oyuncularının veya çevrimdışı profillerin katılıp katılamayacağına göre süz.
+3. Sayfasını açmak için bir sunucunun simgesine veya adına tıkla: tam açıklama, her ayrıntı, istemci paketi ve bağlantılar.
+4. **Katıl** butonuna bas. ResinCraft sunucuya uyan kurulumu seçer ya da hangisini kullanacağını sorar. Kendi modları olan bir sunucuda **Kur ve katıl** vardır: tam olarak o modlarla bir kurulum oluşturur ve katılır.
+5. Sunucu beyaz listeli mi? **Katılma isteği gönder** butonuna bas. Buton önce **Waiting for the host** (sunucu sahibi bekleniyor), sonra **On the whitelist** (beyaz listedesin; **Katıl**'a bas) ya da **Ask again** (tekrar iste) gösterir. Sunucu sahibi cevap verdiğinde ResinCraft sana haber verir ve görev çubuğunu yanıp söndürür.
+
+Sevdiğin sunucuları beğen, kuralları çiğneyenleri bildir.
+
+## 18. Sunucunu listele ve modlarını paylaş
+
+*1.4.0 sürümünden beri.*
+
+1. Barındırdığın bir sunucunun **Settings** (ayarlar) bölümünde **Sunucu listesi**'ni aç (varsayılan olarak kapalıdır).
+2. Bir açıklama, etiketler, bölge ve dil ekle. Bedrock ve çevrimdışı profil desteği ile mod paketi kendiliğinden doldurulur.
+3. **İstemci paketi:** oyuncuların ihtiyaç duyduklarını yayımla, böylece **Kur ve katıl** diyebilsinler:
+   - sunucunun mod paketi, kendi sitesinden kurulur;
+   - diğer her mod, Modrinth veya CurseForge'dan;
+   - kendi dosyaların, ResinCraft çalışırken doğrudan bilgisayarından gönderilir;
+   - birlikte göndermeyi seçtiğin kaynak paketleri ve gölgelendiriciler.
+   Eklenti ve vanilla sunucularında da olabilir: sunucunun Minecraft sürümüne sahip bir kurulum seç.
+
+Başka bir yerde çalıştırdığın bir sunucu mu var? Keşfet → Sunucular içinde **Sunucu gönder** ile ekle.
+
+## 19. Diğer bilgisayarların ve yardım eden arkadaşların
+
+*1.4.1 sürümünden beri.*
+
+**Diğer bilgisayarların:** her bilgisayarda uzaktan kontrolü aç (bölüm 15) ve aynı Minecraft hesabıyla giriş yap. Sonra **Servers** (sunucular) içinde üstteki bilgisayar menüsünü açıp bir bilgisayar seç. O bilgisayarın sunucularını buradan başlatabilir, durdurabilir ve yönetebilirsin; orada **Create server** (sunucu oluştur) ya da **Sunucu içe aktar** da yapabilirsin. O bilgisayardaki bir klasörden içe aktarmak için klasörü yaz; bunun için o bilgisayarda **Tam kontrole izin ver** açık olmalıdır.
+
+**Sunucularını yönetmeye yardım eden arkadaşlar:**
+
+1. **Ayarlar → Uzaktan kontrol → People who can use your servers** (sunucularını kullanabilecek kişiler) bölümünü aç.
+2. Minecraft adını yaz ve **Add**'e (ekle) bas.
+3. Neler yapabileceklerini seç:
+   - **Viewer** (izleyici): konsolu, oyuncuları ve ayarları görür.
+   - **Operator** (operatör): ayrıca başlatır, durdurur ve yeniden başlatır, komut gönderir, oyuncuları ve beyaz liste isteklerini yönetir.
+   - **Manager** (yönetici): ayrıca ayarları, eklentileri ve modları, mod paketini değiştirir.
+4. **All servers**'ı (tüm sunucular) olduğu gibi bırak ya da **Which servers?** (hangi sunucular?) altında sunucuları seç.
+
+Uzaktan kontrol açıkken ve ResinCraft senin bilgisayarında çalışırken sunucularını kendi ResinCraft'larından (**Servers** içindeki bilgisayar menüsü) ya da web konsolundan açarlar. Dosyalar, Java ayarları ve sunucu oluşturma ya da silme sende kalır.
+
+## 20. Dünya yedekleri
+
+*1.4.0 sürümünden beri.*
+
+- **Otomatik:** bir oyun veya sunucu çalışırken dünyaları her 30 dakikada bir yedeklenir ve her dünya için en yeni 3 yedek tutulur. **Ayarlar → Otomatik yedek** bölümünden değiştir ya da kapat.
+- **Geri yükleme:** bir kurulumun **Dünyalar** sekmesinde ya da barındırılan bir sunucu için **Settings → Backups** (ayarlar → yedekler) bölümünde, kendi ya da otomatik bir yedekte **Geri yükle**'ye bas. Yerine geçilen dünya Geri Dönüşüm Kutusu'na gider, yani geri yükleme geri alınabilir. Tek oyunculu bir dünya kopya olarak da geri gelebilir.
+
+## 21. Depolama ve başka bir bilgisayara taşıma
+
+*1.1.0 sürümünden beri (Başka bir bilgisayara taşı 1.1.1 sürümünden beri).*
+
+- **Başka bir sürücü:** **Ayarlar → Depolama → Değiştir…**, bir sürücü ya da klasör seç, sonra:
+  - **Kurulumları taşı:** kurulumlarını, sunucularını ve Minecraft'ın paylaşılan dosyalarını oraya taşır.
+  - **Taşımadan kullan:** yeni şeyler oraya gider; mevcut kurulumların yerinde kalır ve geri geçtiğinde yine görünür.
+- **Yeni bir bilgisayar:** **Ayarlar → Başka bir bilgisayara taşı** her şeyi tek bir `.resincraft` dosyasına kaydeder. Onu yeni bilgisayarda ResinCraft ile aç.
+
+## 22. Sorun giderme
 
 - **Oyun açılmıyor:** **(kurulum adı) çöktü** penceresine (bölüm 6) ya da kurulumun **Günlükler** sekmesine bak. Dosyalar eksik ya da bozuk mu? Onları yeniden kur (bölüm 16).
 - **Bir mod Keşfet'te görünmüyor:** Minecraft sürümün veya yükleyicin için olmayabilir. Başka bir sürüm dene ya da kurulumun sürümünü değiştir (bölüm 5).
