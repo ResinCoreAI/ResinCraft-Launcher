@@ -4217,3 +4217,20 @@ textarea.custom-css {
   align-items: center;
   padding: 6px 12px 10px 50px;
 }
+/* One server to tick in "Which servers?": box and name side by side. */
+.remote-server-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.remote-server-pick input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+.remote-server-pick:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}

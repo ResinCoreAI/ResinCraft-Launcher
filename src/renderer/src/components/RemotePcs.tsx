@@ -171,13 +171,13 @@ export function RemotePeople() {
               {picking === g.uuid && (
                 <div className="remote-servers">
                   <span className="hint">{t('servers.people.pickServers')}</span>
-                  <label className="check">
+                  <label className="remote-server-pick">
                     <input type="checkbox" checked={!g.servers} onChange={(e) => change(g.uuid, { servers: e.target.checked ? null : servers.map((s) => s.id) })} />
                     {t('servers.people.allServers')}
                   </label>
                   {servers.length === 0 && <span className="hint">{t('servers.people.noServers')}</span>}
                   {servers.map((s) => (
-                    <label key={s.id} className="check">
+                    <label key={s.id} className="remote-server-pick">
                       <input
                         type="checkbox"
                         checked={!g.servers || g.servers.includes(s.id)}
