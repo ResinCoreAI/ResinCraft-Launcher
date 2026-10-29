@@ -495,11 +495,44 @@ fn check(method: &str, params: &Value, full: bool) -> Result<()> {
             _ => bail!("The web console can only search modpacks here."),
         };
     }
+    // Bringing in a server another launcher keeps on this PC (only ones this PC's own scan finds; see `known_servers`).
+    if matches!(method, "migrate.scan" | "migrate.size" | "migrate.import") {
+        return Ok(());
+    }
+    if method == "migrate.scanFolder" {
+        // A folder typed on the other side (never the picker, which would open on this PC): it reads any folder here.
+        if !full {
+            return Err(needs_full());
+        }
+        return match params.get(0).and_then(Value::as_str) {
+            Some(p) if !p.trim().is_empty() => Ok(()),
+            _ => bail!("Type the server's folder on this PC."),
+        };
+    }
     if method == "java.list" {
         // Shows where Java is installed on this PC.
         return if full { Ok(()) } else { Err(needs_full()) };
     }
     bail!("The web console can't do that ({method}).")
+}
+
+/// Servers other launchers keep on this PC, as this PC's own scan finds them.
+async fn found_servers() -> Result<Vec<crate::migrate::Source>> {
+    let mut list = crate::migrate::scan().await?;
+    for s in &mut list {
+        s.items.retain(|i| i.r.server);
+    }
+    list.retain(|s| !s.items.is_empty());
+    Ok(list)
+}
+
+/// Refuses any server to import that isn't in [`found_servers`]: a remote call can't name another folder on this PC.
+async fn known_servers(refs: &[crate::migrate::ItemRef]) -> Result<()> {
+    let keys: HashSet<String> = found_servers().await?.iter().flat_map(|s| s.items.iter().map(|i| i.r.key())).collect();
+    if refs.iter().any(|r| !r.server || !keys.contains(&r.key())) {
+        bail!("That server isn't in the list on this PC any more. Look again.");
+    }
+    Ok(())
 }
 
 /// Runs one console request (after `check`). `from`: another account's call (its UUID), checked against its grant.
@@ -565,6 +598,34 @@ async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> 
             dispatch("content:search", Args::new(vec![query])).await?
         }
         "create.packVersions" => dispatch("content:versions", Args::new(vec![arg(&params, 0)])).await?,
+        "migrate.scan" => serde_json::to_value(found_servers().await?)?,
+        "migrate.scanFolder" => {
+            let mut found = dispatch("migrate:scanFolder", Args::new(vec![json!(arg(&params, 0).as_str().unwrap_or_default().trim())])).await?;
+            // Servers only, like the scan.
+            if let Some(items) = found.get_mut("items").and_then(Value::as_array_mut) {
+                items.retain(|i| i["server"].as_bool() == Some(true));
+            }
+            found
+        }
+        "migrate.size" => {
+            let r: crate::migrate::ItemRef = serde_json::from_value(arg(&params, 0))?;
+            // With full control a typed folder may be one the scan doesn't list.
+            if !full {
+                known_servers(std::slice::from_ref(&r)).await?;
+            }
+            dispatch("migrate:size", Args::new(vec![arg(&params, 0)])).await?
+        }
+        "migrate.import" => {
+            let refs: Vec<crate::migrate::ItemRef> = serde_json::from_value(arg(&params, 0))?;
+            if refs.iter().any(|r| !r.server) {
+                bail!("Only servers can be brought in from another PC.");
+            }
+            if !full {
+                known_servers(&refs).await?;
+            }
+            // Never removes the originals from the web.
+            dispatch("migrate:import", Args::new(vec![arg(&params, 0), json!(false)])).await?
+        }
         m => {
             // The rest are the engine's own channels with the same arguments: server.<x> → server:<x>, files.<x> → files:<x>.
             let channel = m.replacen('.', ":", 1);
@@ -576,7 +637,7 @@ async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> 
         "server.addonSearch", "server.addonVersions", "server.addonCheckUpdates", "server.antiXray", "server.bedrockJoin", "server.origin", "server.syncPreview",
         "server.relayInfo", "server.relayCheck", "server.domain", "server.checkDns", "server.network", "server.versions", "server.builds", "server.softwareIcons",
         "server.packFlags", "server.clientMods", "server.launchArgs", "files.list", "files.readText", "versions.list", "content.search",
-        "content.versions", "java.list", "server.downloadsCheck"];
+        "content.versions", "java.list", "server.downloadsCheck", "migrate.scan", "migrate.scanFolder", "migrate.size"];
     if !method.starts_with("create.") && !reads.contains(&method) {
         emit("remoteAction", json!({ "method": method, "serverId": params.get(0).and_then(Value::as_str), "by": grant.as_ref().map(|g| g.name.clone()) }));
         crate::core::events::list_changed("servers");
@@ -633,6 +694,11 @@ mod tests {
         assert!(no("content.search", json!([{ "query": "x", "kind": "mod" }]), true).contains("only search modpacks"));
         assert!(no("java.list", json!([]), false).contains("full control"));
         assert!(no("instances.launch", json!(["i"]), true).contains("can't do that"));
+        // Servers from other launchers on this PC; never a folder named from the web.
+        assert!(check("migrate.import", &json!([[]]), false).is_ok());
+        assert!(no("migrate.scanFolder", json!(["C:/Servers/smp"]), false).contains("full control"));
+        assert!(check("migrate.scanFolder", &json!(["C:/Servers/smp"]), true).is_ok());
+        assert!(no("migrate.scanFolder", json!([null]), true).contains("Type the server's folder"), "never the picker on this PC");
     }
 
     #[test]
@@ -654,7 +720,7 @@ mod tests {
         let manager = g("manager", Some(vec!["smp"]));
         assert!(ok("server.addonInstall", json!(["smp", {}]), &manager) && ok("server.update", json!(["smp", {}]), &manager));
         assert!(ok("content.versions", json!(["p"]), &manager) && !ok("content.versions", json!(["p"]), &operator));
-        for owner_only in ["server.create", "server.remove", "server.relayName", "server.relayTopUp", "server.launchArgs", "server.setBotToken", "files.list", "java.list", "create.options"] {
+        for owner_only in ["server.create", "server.remove", "migrate.scan", "migrate.import", "server.relayName", "server.relayTopUp", "server.launchArgs", "server.setBotToken", "files.list", "java.list", "create.options"] {
             assert!(!ok(owner_only, json!(["smp"]), &manager), "{owner_only}");
         }
         assert!(!ok("server.start", json!([]), &operator), "a server has to be named");

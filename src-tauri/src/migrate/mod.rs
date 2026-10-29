@@ -105,7 +105,7 @@ pub struct ItemRef {
 }
 
 impl ItemRef {
-    fn key(&self) -> String {
+    pub(crate) fn key(&self) -> String {
         format!("{:?}|{}|{}|{}", self.launcher, self.server, self.path, self.profile.as_deref().unwrap_or(""))
     }
 }

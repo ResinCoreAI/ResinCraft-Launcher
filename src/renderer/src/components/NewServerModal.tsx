@@ -18,6 +18,8 @@ import { compact, describe } from '../util'
 import { t, type Key } from '../i18n'
 import { BlockArt, Modal, Segmented } from './ui'
 import { canHostBedrock } from '../platform'
+import { useRemotePc } from './RemotePcs'
+import { remoteInstances } from '../remotePc'
 
 type Mode = 'software' | 'modpack' | 'instance' | 'file'
 
@@ -121,7 +123,18 @@ export default function NewServerModal({
   onClose: () => void
   onCreated: (r: ServerCreated) => void
 }) {
-  const { instances, info, toast } = useStore()
+  const { instances: here, info, toast } = useStore()
+  // On another PC the server is made there: from its instances, and not from a file on this PC.
+  const pc = useRemotePc()
+  const [there, setThere] = useState<Instance[]>()
+  useEffect(() => {
+    if (!pc) return setThere(undefined)
+    remoteInstances().then(
+      (list) => setThere(list?.map((i) => ({ ...i, loader: i.loader as Instance['loader'] }) as Instance)),
+      () => setThere([])
+    )
+  }, [pc])
+  const instances = pc ? (there ?? []) : here
   const [mode, setMode] = useState<Mode>(fromInstance ? 'instance' : 'software')
   const [name, setName] = useState('')
   const [error, setError] = useState<string>()
@@ -149,6 +162,11 @@ export default function NewServerModal({
 
   // Instance
   const [instanceId, setInstanceId] = useState<string | undefined>(fromInstance ?? instances[0]?.id)
+  // The other PC's list comes a moment later.
+  useEffect(() => {
+    if (there && !there.some((i) => i.id === instanceId)) setInstanceId(there[0]?.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [there])
   const instance = instances.find((i) => i.id === instanceId)
 
   useEffect(() => {
@@ -285,7 +303,7 @@ export default function NewServerModal({
   return (
     <Modal
       title={t('servers.create.title')}
-      subtitle={t('servers.create.subtitle')}
+      subtitle={pc ? t('servers.create.subtitleOn', { pc: pc.name }) : t('servers.create.subtitle')}
       onClose={onClose}
       wide
       footer={
@@ -330,7 +348,7 @@ export default function NewServerModal({
             { value: 'software', label: t('servers.create.mode.software') },
             { value: 'modpack', label: t('servers.create.mode.modpack') },
             { value: 'instance', label: t('servers.create.mode.instance') },
-            { value: 'file', label: t('servers.create.mode.file') }
+            ...(pc ? [] : [{ value: 'file' as Mode, label: t('servers.create.mode.file') }])
           ]}
         />
       )}

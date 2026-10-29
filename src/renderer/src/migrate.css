@@ -236,3 +236,12 @@
   font-size: 11.5px;
   margin-top: 2px;
 }
+
+/* Another PC: its server folder, typed (components/MigrateModal.tsx). */
+.mg-remote-folder {
+  width: min(440px, 100%);
+  gap: 8px;
+}
+.mg-remote-folder .input {
+  min-width: 0;
+}

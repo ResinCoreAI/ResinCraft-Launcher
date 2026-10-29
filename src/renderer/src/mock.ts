@@ -19,6 +19,9 @@ import { mockVersions } from './mock-versions'
 
 export function mockApi(): ResinApi {
   const servers = mockServers()
+  const migrate = mockMigrate((inst) => {
+    instances = [inst, ...instances]
+  })
   // Settings → Remote control → People who can use your servers.
   let grants: RemoteGrant[] = [{ uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Steve', role: 'operator', servers: null }]
   const updates = mockUpdate()
@@ -579,9 +582,7 @@ export function mockApi(): ResinApi {
     server: servers.server,
     bedrock: mockBedrock(now),
     ...mockFiles(),
-    ...mockMigrate((inst) => {
-      instances = [inst, ...instances]
-    }),
+    ...migrate,
     on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop() },
     remote: {
       status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }),
@@ -601,10 +602,15 @@ export function mockApi(): ResinApi {
       ],
       open: async () => {},
       close: async () => {},
-      call: async (_device, method, params) => {
+      call: async (device, method, params) => {
         const [ns, key] = method.split('.')
-        if (ns !== 'server') throw new Error("The owner of this PC hasn't given you access to that.")
-        if (key === 'remove' || key === 'create') throw new Error("The owner of this PC hasn't given you access to that.")
+        const denied = () => new Error("The owner of this PC hasn't given you access to that.")
+        // GAMING-PC is your own: making and importing servers works there too.
+        const own = device === 7
+        if (own && method === 'create.options') return { instances: instances.map((i) => ({ id: i.id, name: i.name, mcVersion: i.mcVersion, loader: i.loader })) }
+        if (own && ns === 'migrate') return (migrate.migrate as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[key](...params)
+        if (ns !== 'server') throw denied()
+        if (key === 'remove' || (key === 'create' && !own)) throw denied()
         const f = (servers.server as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[key]
         const v = await f(...params)
         return key === 'list' ? (v as { name: string }[]).slice(0, 1).map((s) => ({ ...s, name: `${s.name} (remote)` })) : v

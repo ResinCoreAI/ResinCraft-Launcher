@@ -294,8 +294,9 @@ function ServerList({
   const { go, toast, info } = useStore()
   const copy = useCopy()
   const [deleting, setDeleting] = useState<ServerInfo>()
-  // Another PC's servers: its folders aren't here, and new servers are made on the PC itself.
+  // Another PC's servers: its folders aren't here. On your own PCs you can make and import servers there too.
   const pc = useRemotePc()
+  const canMake = !pc?.shared
 
   const menuFor = (s: ServerInfo): ContextEntry[] => {
     const up = s.state === 'starting' || s.state === 'running'
@@ -327,12 +328,12 @@ function ServerList({
         <div className="spacer" />
         <RemotePcPicker />
         {!pc && <WebConsoleButton />}
-        {!pc && (
+        {canMake && (
           <button data-pc-only className="btn lg" onClick={onImport}>
             <FolderInput /> {t('migrate.serverButton')}
           </button>
         )}
-        {!pc && (
+        {canMake && (
           <button className="btn primary lg" onClick={onCreate}>
             <Plus /> {t('servers.create.button')}
           </button>
@@ -350,7 +351,7 @@ function ServerList({
           icon={<Server />}
           title={t('servers.empty.title')}
           action={
-            pc ? undefined : (
+            !canMake ? undefined : (
               <div className="row" style={{ justifyContent: 'center' }}>
                 <button className="btn primary" onClick={onCreate}>
                   <Plus /> {t('servers.create.button')}

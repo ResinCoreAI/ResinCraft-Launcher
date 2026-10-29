@@ -5,6 +5,7 @@ import { api } from '../api'
 import { BlockArt, Empty, Modal } from './ui'
 import { SERVER_LABEL } from './NewServerModal'
 import { useStore } from '../store'
+import { useRemotePc } from './RemotePcs'
 import { bytes, fixed, LOADER_LABEL } from '../util'
 import { engineError, t, tx } from '../i18n'
 import '../migrate.css'
@@ -33,6 +34,9 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
   const [sources, setSources] = useState<MigrateSource[]>()
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [browsing, setBrowsing] = useState(false)
+  // Another PC: a folder picked here would be this PC's, so its folder is typed instead.
+  const pc = useRemotePc()
+  const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [outcomes, setOutcomes] = useState<MigrateOutcome[]>()
   /** "Remove the originals after moving" (off until ticked), and its confirm step. */
@@ -80,9 +84,10 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
   }, [])
 
   const chooseFolder = async () => {
+    if (pc && !typed.trim()) return
     setBrowsing(true)
     try {
-      const found = await api.migrate.scanFolder()
+      const found = await api.migrate.scanFolder(pc ? typed.trim() : undefined)
       if (!found) return
       const [shown] = only([found])
       if (!shown) {
@@ -279,9 +284,13 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
       wide
       footer={
         <>
-          <button className="btn" onClick={() => void chooseFolder()} disabled={browsing || busy}>
-            {browsing ? <Loader2 className="spin" /> : <FolderOpen />} {t('migrate.chooseFolder')}
-          </button>
+          {pc ? (
+            sources?.length !== 0 && <RemoteFolder pc={pc.name} value={typed} onChange={setTyped} onLook={() => void chooseFolder()} busy={browsing || busy} />
+          ) : (
+            <button className="btn" onClick={() => void chooseFolder()} disabled={browsing || busy}>
+              {browsing ? <Loader2 className="spin" /> : <FolderOpen />} {t('migrate.chooseFolder')}
+            </button>
+          )}
           <div className="spacer" />
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
@@ -301,9 +310,13 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
           icon={servers ? <Server /> : <ArrowLeftRight />}
           title={servers ? t('migrate.none.serversTitle') : t('migrate.none.title')}
           action={
-            <button className="btn primary" onClick={() => void chooseFolder()} disabled={browsing}>
-              {browsing ? <Loader2 className="spin" /> : <FolderOpen />} {t('migrate.chooseFolder')}
-            </button>
+            pc ? (
+              <RemoteFolder pc={pc.name} value={typed} onChange={setTyped} onLook={() => void chooseFolder()} busy={browsing} />
+            ) : (
+              <button className="btn primary" onClick={() => void chooseFolder()} disabled={browsing}>
+                {browsing ? <Loader2 className="spin" /> : <FolderOpen />} {t('migrate.chooseFolder')}
+              </button>
+            )
           }
         >
           {servers ? t('migrate.none.serversBody') : t('migrate.none.body')}
@@ -391,5 +404,30 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
         </div>
       )}
     </Modal>
+  )
+}
+
+/** A server folder on the other PC that's open, typed (its owner needs Allow full control on there). */
+function RemoteFolder({ pc, value, onChange, onLook, busy }: { pc: string; value: string; onChange: (v: string) => void; onLook: () => void; busy: boolean }) {
+  return (
+    <form
+      className="row grow mg-remote-folder"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onLook()
+      }}
+    >
+      <input
+        className="input mono grow"
+        value={value}
+        spellCheck={false}
+        placeholder={t('migrate.remoteFolder', { pc })}
+        title={t('migrate.remoteFolderHint')}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button className="btn" type="submit" disabled={busy || !value.trim()}>
+        {busy ? <Loader2 className="spin" /> : <FolderOpen />} {t('migrate.remoteLook')}
+      </button>
+    </form>
   )
 }

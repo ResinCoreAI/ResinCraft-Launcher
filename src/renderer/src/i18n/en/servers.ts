@@ -110,6 +110,7 @@ export default {
   'servers.create.button': 'Create server',
   'servers.create.title': 'Create a server',
   'servers.create.subtitle': 'Runs on this computer. You can change everything later.',
+  'servers.create.subtitleOn': 'Runs on {pc}. You can change everything later.',
   'servers.create.mode.software': 'Server software',
   'servers.create.mode.modpack': 'Modpack',
   'servers.create.mode.instance': 'From an instance',

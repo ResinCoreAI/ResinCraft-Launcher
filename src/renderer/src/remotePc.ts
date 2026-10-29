@@ -32,8 +32,12 @@ const REMOTE_SERVER = new Set([
   'addonSources', 'addons', 'addonSearch', 'addonVersions', 'addonChangeVersion', 'addonUpdateMany', 'addonCheckUpdates', 'addonCancelPending', 'addonInstall', 'addonToggle', 'addonRemove',
   'switchPack', 'origin', 'syncPreview', 'syncFromInstance', 'reinstall', 'reinstallPack', 'packFlags',
   'relayInfo', 'relayCheck', 'relayName', 'relayContinue', 'relayTopUp', 'relayRestart', 'domain', 'checkDns', 'network',
-  'launchArgs', 'addonFromLink', 'setBotToken', 'setDnsToken', 'regenerateWorld'
+  'launchArgs', 'addonFromLink', 'setBotToken', 'setDnsToken', 'regenerateWorld', 'create'
 ])
+
+/** `migrate.<name>` requests another PC answers: its servers from other launchers, or a folder typed for it
+ * (with full control there; never the folder picker, which would open on this PC). */
+const REMOTE_MIGRATE = new Set(['scan', 'scanFolder', 'size', 'import'])
 
 /** A server picture on the other PC is a file there: it can't be shown here. */
 function strip(s: unknown): unknown {
@@ -126,6 +130,7 @@ export function withRemotePc(base: ResinApi): ResinApi {
     ...base,
     server: routed(base.server, 'server', (k) => REMOTE_SERVER.has(k)),
     files: routed(base.files, 'files', () => true),
+    migrate: routed(base.migrate, 'migrate', (k) => REMOTE_MIGRATE.has(k)),
     on: { ...base.on, server: sub('server') as never, serverLog: sub('serverLog') as never, listChanged: sub('listChanged') as never, task: sub('task') as never }
   }
 }
@@ -135,6 +140,13 @@ let local: ResinApi | undefined
 /** This PC's engine, whatever the Servers page shows (Settings reads this PC's own servers). */
 export function thisPc(): ResinApi {
   return local!
+}
+
+/** The instances on the other PC that's open, to make a server from (undefined: this PC). */
+export async function remoteInstances(): Promise<{ id: string; name: string; mcVersion: string; loader: string }[] | undefined> {
+  if (!current) return undefined
+  const o = (await local!.remoteView.call(current.id, 'create.options', [])) as { instances?: { id: string; name: string; mcVersion: string; loader: string }[] }
+  return o.instances ?? []
 }
 
 /** Shows another PC's servers (or this PC's again with undefined). */
