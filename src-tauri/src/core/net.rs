@@ -280,6 +280,10 @@ async fn is_valid(item: &DownloadItem) -> bool {
     }
 }
 
+/// Files being downloaded right now, so two downloads to the same place (two updates that both bring in a new
+/// library) take turns instead of writing one `.part` file together.
+static IN_FLIGHT: Mutex<Option<HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>>> = Mutex::new(None);
+
 /// Downloads one file to `dest` (via `<dest>.part`), verifying size and hash. Retries 3 times.
 pub async fn download_file(item: &DownloadItem) -> Result<()> {
     if item.url.trim().is_empty() {
@@ -289,6 +293,22 @@ pub async fn download_file(item: &DownloadItem) -> Result<()> {
     if let Some(parent) = item.dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
+    let lock = IN_FLIGHT.lock().unwrap().get_or_insert_with(HashMap::new).entry(item.dest.clone()).or_default().clone();
+    let result = {
+        let _turn = lock.lock().await;
+        download_file_now(item).await
+    };
+    // The last one out takes the entry away.
+    let mut map = IN_FLIGHT.lock().unwrap();
+    if let Some(m) = map.as_mut() {
+        if m.get(&item.dest).is_some_and(|l| Arc::strong_count(l) <= 2) {
+            m.remove(&item.dest);
+        }
+    }
+    result
+}
+
+async fn download_file_now(item: &DownloadItem) -> Result<()> {
     let tmp = PathBuf::from(format!("{}.part", item.dest.display()));
     let mut last: Option<anyhow::Error> = None;
     for attempt in 0..3u64 {

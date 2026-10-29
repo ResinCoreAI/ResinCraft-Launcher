@@ -701,6 +701,21 @@ export function mockServers(): {
       )
       return running
     },
+    addonUpdateMany: async (id, list, area) => {
+      await wait(null, 1200)
+      const running = find(id).state !== 'stopped' && find(id).state !== 'crashed'
+      const by = new Map(list.map((x) => [x.filename, x.versionId]))
+      setList(area, (all) =>
+        all.map((a) => {
+          const versionId = by.get(a.filename)
+          if (!versionId) return a
+          const number = VERSIONS.find((x) => x.id === versionId)?.versionNumber ?? a.update?.versionNumber ?? versionId
+          return running ? { ...a, pending: 'update', pendingVersion: number, update: undefined } : { ...a, versionId, versionNumber: number, update: undefined, pending: undefined }
+        })
+      )
+      const names = list.map((x) => x.filename)
+      return running ? { now: [], queued: names, failed: [] } : { now: names, queued: [], failed: [] }
+    },
     addonCheckUpdates: async (_id, area) => {
       await wait(null, 700)
       setList(area, (list) =>

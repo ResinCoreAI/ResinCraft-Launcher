@@ -275,6 +275,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:addonChangeVersion" => json(
             plugins::change_version(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?, args.get::<Option<String>>(3)?.as_deref()).await?,
         ),
+        "server:addonUpdateMany" => json(plugins::update_many(&args.get::<String>(0)?, args.get(1)?, args.get::<Option<String>>(2)?.as_deref()).await?),
         "server:addonCheckUpdates" => json(plugins::check_updates(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addonCancelPending" => {
             plugins::cancel_pending(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<String>>(2)?.as_deref()).await?;

@@ -63,6 +63,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "content:checkUpdates" => json(sources::check_updates(&args.get::<String>(0)?).await?),
+        "content:updateMany" => json(sources::update_many(&args.get::<String>(0)?, &args.get::<Option<Vec<String>>>(1)?.unwrap_or_default()).await?),
         "content:update" => {
             sources::update_content(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()

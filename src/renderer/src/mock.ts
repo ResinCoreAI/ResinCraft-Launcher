@@ -507,6 +507,7 @@ export function mockApi(): ResinApi {
           600
         ),
       update: () => wait(undefined, 500),
+      updateMany: (_i, filenames) => wait({ updated: filenames ?? [mods[0].filename, mods[1].filename], failed: [] }, 900),
       changeVersion: () => wait(undefined, 700),
       packUpdates: async () => mockPackUpdates(instances, await servers.server.list()),
       reinstallPack: () => wait({ versionName: 'current', added: 0, updated: 3, removed: 0, kept: [], pending: 0 } as never, 1500),

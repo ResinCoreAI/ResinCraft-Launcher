@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Result};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -1820,21 +1821,7 @@ pub async fn change_version(id: &str, filename: &str, version_id: &str, area: Op
     };
     let (filename, version_id) = (filename.to_string(), version_id.to_string());
     Task::run(tr!("hostAddon.switching", "Switching versions on {server}", server = meta.name), Some(meta.id.clone()), move |task| async move {
-        let r = resolve(&meta, &pid, Some(&version_id)).await?;
-        task.update(tr!("hostAddon.downloading", "Downloading {name} {version}…", name = r.entry.title, version = r.entry.version_number), None);
-        let work = work_dir(&meta)?.join("staged");
-        tokio::fs::create_dir_all(&work).await?;
-        let staged = format!("{}-{}", &uuid::Uuid::new_v4().simple().to_string()[..8], r.filename);
-        let staged_path = safe_join(&work, &staged)?;
-        download_file(&DownloadItem::new(&r.url, &staged_path).hash(r.hash.clone()).size(r.size)).await?;
-        if !is_jar(&staged_path).await {
-            let _ = tokio::fs::remove_file(&staged_path).await;
-            bail_tr!("hostAddon.notJar", "The download for {name} isn't a plugin file", name = r.entry.title);
-        }
-        let mut entry = r.entry;
-        entry.sha1 = hash_file(&staged_path, HashAlgo::Sha1).await?;
-        let target = if filename.ends_with(".disabled") { format!("{}.disabled", r.filename) } else { r.filename };
-        let op = PendingOp::Replace { old: filename, staged, target, entry };
+        let op = stage_version(&meta, &task, &pid, filename, &version_id).await?;
         if runtime::is_running(&meta.id) {
             queue(&meta, op).await?;
             return Ok(true);
@@ -1843,6 +1830,108 @@ pub async fn change_version(id: &str, filename: &str, version_id: &str, area: Op
         apply_op(&meta, &folder, &op, &mut idx).await?;
         save_index(&meta, &idx).await?;
         Ok(false)
+    })
+    .await
+}
+
+/// Downloads `version_id` of project `pid` next to the server (in `.resincraft/staged`), checked, as the swap for
+/// `filename`; nothing in the server's folder changes yet.
+async fn stage_version(meta: &ServerMeta, task: &Task, pid: &str, filename: String, version_id: &str) -> Result<PendingOp> {
+    let r = resolve(meta, pid, Some(version_id)).await?;
+    task.update(tr!("hostAddon.downloading", "Downloading {name} {version}…", name = r.entry.title, version = r.entry.version_number), None);
+    let work = work_dir(meta)?.join("staged");
+    tokio::fs::create_dir_all(&work).await?;
+    let staged = format!("{}-{}", &uuid::Uuid::new_v4().simple().to_string()[..8], r.filename);
+    let staged_path = safe_join(&work, &staged)?;
+    download_file(&DownloadItem::new(&r.url, &staged_path).hash(r.hash.clone()).size(r.size)).await?;
+    if !is_jar(&staged_path).await {
+        let _ = tokio::fs::remove_file(&staged_path).await;
+        bail_tr!("hostAddon.notJar", "The download for {name} isn't a plugin file", name = r.entry.title);
+    }
+    let mut entry = r.entry;
+    entry.sha1 = hash_file(&staged_path, HashAlgo::Sha1).await?;
+    let target = if filename.ends_with(".disabled") { format!("{}.disabled", r.filename) } else { r.filename };
+    Ok(PendingOp::Replace { old: filename, staged, target, entry })
+}
+
+/// Updates at once on a server: this many downloads run side by side.
+const PARALLEL_UPDATES: usize = 4;
+
+/// What Update all did on a server: switched now, waiting for the next restart, or not possible (with why).
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateManyResult {
+    pub now: Vec<String>,
+    pub queued: Vec<String>,
+    pub failed: Vec<crate::content::sources::UpdateFailure>,
+}
+
+/// One version switch for [`update_many`].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionSwitch {
+    pub filename: String,
+    pub version_id: String,
+}
+
+/// Switches several jars at once: [`PARALLEL_UPDATES`] downloads side by side into `.resincraft/staged`, then every
+/// swap in one go (or all queued for the next restart while the server runs), with one save of the index.
+pub async fn update_many(id: &str, list: Vec<VersionSwitch>, area: Option<&str>) -> Result<UpdateManyResult> {
+    let meta = view(id, area).await?;
+    let folder = folder(&meta)?;
+    let idx = load_index(&meta).await;
+    let mut out = UpdateManyResult::default();
+    let mut todo = Vec::new();
+    for s in list {
+        if safe_name(&s.filename).is_err() {
+            continue;
+        }
+        match idx.get(&key(&s.filename)).map(|e| e.project_id.clone()).filter(|p| !p.is_empty()) {
+            Some(pid) => todo.push((pid, s)),
+            None => out.failed.push(crate::content::sources::UpdateFailure {
+                filename: s.filename.clone(),
+                title: None,
+                error: err_tr!("hostAddon.unknownSource", "ResinCraft doesn't know where {file} came from, so it can't change its version", file = s.filename).to_string(),
+            }),
+        }
+    }
+    if todo.is_empty() {
+        return Ok(out);
+    }
+    let total = todo.len();
+    Task::run(tr!("hostAddon.updatingMany", "Updating {count} on {server}", count = total, server = meta.name), Some(meta.id.clone()), move |task| async move {
+        let done = std::sync::atomic::AtomicUsize::new(0);
+        let staged: Vec<(VersionSwitch, Result<PendingOp>)> = futures::stream::iter(todo)
+            .map(|(pid, s)| {
+                let (meta, task, done) = (&meta, &task, &done);
+                async move {
+                    let r = stage_version(meta, task, &pid, s.filename.clone(), &s.version_id).await;
+                    let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    task.update(tr!("content.updatedOf", "Updated {done} of {total}", done = n, total = total), Some(n as f64 / total as f64));
+                    (s, r)
+                }
+            })
+            .buffer_unordered(PARALLEL_UPDATES)
+            .collect()
+            .await;
+        let running = runtime::is_running(&meta.id);
+        let mut idx = load_index(&meta).await;
+        for (s, r) in staged {
+            let applied = match r {
+                Ok(op) if running => queue(&meta, op).await.map(|()| true),
+                Ok(op) => apply_op(&meta, &folder, &op, &mut idx).await.map(|()| false),
+                Err(e) => Err(e),
+            };
+            match applied {
+                Ok(true) => out.queued.push(s.filename),
+                Ok(false) => out.now.push(s.filename),
+                Err(e) => out.failed.push(crate::content::sources::UpdateFailure { filename: s.filename, title: None, error: e.to_string() }),
+            }
+        }
+        if !out.now.is_empty() {
+            save_index(&meta, &idx).await?;
+        }
+        Ok(out)
     })
     .await
 }

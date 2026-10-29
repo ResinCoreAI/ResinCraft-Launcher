@@ -224,7 +224,7 @@ function ContentTab({ inst }: { inst: Instance }) {
   const [q, setQ] = useState('')
   const [checking, setChecking] = useState(false)
   const [listing, setListing] = useState(false)
-  const [updating, setUpdating] = useState<string>()
+  const [updating, setUpdating] = useState<Set<string>>()
   const [removing, setRemoving] = useState<ContentItem[]>()
   const [changingVersion, setChangingVersion] = useState<ContentItem>()
   // Rows picked with click / Ctrl+click / Shift+click; the right-click menu acts on all of them.
@@ -268,14 +268,14 @@ function ContentTab({ inst }: { inst: Instance }) {
   const update = async (list: ContentItem[]) => {
     const before = items ?? []
     const updated = new Set<string>()
-    for (const m of list) {
-      setUpdating(m.filename)
-      try {
-        await api.content.update(inst.id, m.filename)
-        updated.add(m.filename)
-      } catch (e) {
-        toast(t('instance.content.updateFailed', { name: m.title ?? m.filename, error: (e as Error).message }), 'error')
-      }
+    // All at once: the engine downloads them side by side and saves the instance's index once.
+    setUpdating(new Set(list.map((m) => m.filename)))
+    try {
+      const r = await api.content.updateMany(inst.id, list.map((m) => m.filename))
+      r.updated.forEach((f) => updated.add(f))
+      for (const f of r.failed) toast(t('instance.content.updateFailed', { name: f.title ?? list.find((m) => m.filename === f.filename)?.title ?? f.filename, error: f.error }), 'error')
+    } catch (e) {
+      toast((e as Error).message, 'error')
     }
     setUpdating(undefined)
     if (updated.size)
@@ -576,7 +576,7 @@ function ContentTab({ inst }: { inst: Instance }) {
                   onClick={() => void update([m])}
                   title={t('instance.content.updateTo', { version: m.update.versionNumber })}
                 >
-                  {updating === m.filename ? <Loader2 className="spin" /> : <ArrowUpCircle />} {m.update.versionNumber}
+                  {updating?.has(m.filename) ? <Loader2 className="spin" /> : <ArrowUpCircle />} {m.update.versionNumber}
                 </button>
               )}
               {m.projectId ? (

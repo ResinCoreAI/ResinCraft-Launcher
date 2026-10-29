@@ -668,6 +668,26 @@ export interface ProjectDependency {
   type: 'required' | 'optional' | 'embedded' | 'incompatible'
 }
 
+/** A file Update all couldn't update, and why. */
+export interface UpdateFailure {
+  filename: string
+  title?: string
+  error: string
+}
+
+/** What an instance's Update all did. */
+export interface UpdateManyResult {
+  updated: string[]
+  failed: UpdateFailure[]
+}
+
+/** What a server's Update all did: switched now, waiting for the next restart, or not possible. */
+export interface AddonUpdateManyResult {
+  now: string[]
+  queued: string[]
+  failed: UpdateFailure[]
+}
+
 export interface ContentItem {
   filename: string
   enabled: boolean
@@ -1958,6 +1978,8 @@ export interface ResinApi {
     remove(instanceId: string, kind: ContentKind, filename: string): Promise<void>
     checkUpdates(instanceId: string): Promise<ContentItem[]>
     update(instanceId: string, filename: string): Promise<void>
+    /** Updates several mods at once (every one with an update when `filenames` is left out): downloads side by side, one save. */
+    updateMany(instanceId: string, filenames?: string[]): Promise<UpdateManyResult>
     changeVersion(instanceId: string, kind: ContentKind, filename: string, versionId: string): Promise<void>
     /**
      * Switches a modpack instance to another version of its pack (newer or older): the pack's files change, the
@@ -2151,6 +2173,8 @@ export interface ResinApi {
     addonVersions(id: string, projectId: string, area?: AddonArea): Promise<ServerAddonVersion[]>
     /** Switches a jar to another version (keeping it enabled/disabled). True = queued until the server stops. */
     addonChangeVersion(id: string, filename: string, versionId: string, area?: AddonArea): Promise<boolean>
+    /** Switches several jars at once: downloads side by side, then every swap together (queued while the server runs). */
+    addonUpdateMany(id: string, list: { filename: string; versionId: string }[], area?: AddonArea): Promise<AddonUpdateManyResult>
     /** The installed list with `update` set where a newer compatible version exists. */
     addonCheckUpdates(id: string, area?: AddonArea): Promise<ServerAddon[]>
     /** Drops a change queued for when the server stops. */

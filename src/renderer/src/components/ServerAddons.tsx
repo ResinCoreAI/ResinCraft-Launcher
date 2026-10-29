@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import type { AddonArea, ServerAddon, ServerInfo } from '@shared/types'
 import { PLUGIN_SERVERS } from '@shared/types'
-import { api } from '../api'
+import { api, isConsole } from '../api'
 import { useStore } from '../store'
 import { bytes, projectUrl } from '../util'
 import { rich, t, type Key } from '../i18n'
@@ -114,6 +114,34 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
   const switchAll = async (list: { a: ServerAddon; versionId: string }[]) => {
     let now = 0
     let queued = 0
+    // Several at once: the engine downloads them side by side and swaps them together. The web console keeps
+    // one at a time (the launcher on the other PC may not take the batch call yet).
+    if (list.length > 1 && !isConsole) {
+      mark(
+        list.map(({ a }) => a.filename),
+        true
+      )
+      try {
+        const r = await api.server.addonUpdateMany(s.id, list.map(({ a, versionId }) => ({ filename: a.filename, versionId })), area)
+        now = r.now.length
+        queued = r.queued.length
+        for (const f of r.failed) {
+          const a = list.find((x) => x.a.filename === f.filename)?.a
+          toast(t('servers.addons.failed', { name: a ? nameOf(a) : f.filename, error: f.error }), 'error')
+        }
+      } catch (e) {
+        toast((e as Error).message, 'error')
+      } finally {
+        mark(
+          list.map(({ a }) => a.filename),
+          false
+        )
+      }
+      if (now) toast(t('servers.addons.updatedCount', { count: now }))
+      if (queued) toast(t('servers.addons.queuedCount', { count: queued }), 'info')
+      await load()
+      return
+    }
     for (const { a, versionId } of list) {
       mark([a.filename], true)
       try {
@@ -319,8 +347,8 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
                     {a.update && <span className="sv-badge">{t('servers.addons.updateBadge', { version: a.update.versionNumber })}</span>}
                   </div>
                   <div className="file ellipsis">
-                    {a.filename} · {bytes(a.size)}
-                    {a.versionNumber ? ` · ${a.versionNumber}` : ''}
+                    {a.filename} Â· {bytes(a.size)}
+                    {a.versionNumber ? ` Â· ${a.versionNumber}` : ''}
                   </div>
                   {a.pending && (
                     <div className="sv-pending">

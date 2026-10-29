@@ -3,12 +3,16 @@
 use std::path::Path;
 
 use anyhow::Result;
+use futures::stream::{self, StreamExt};
+use serde::Serialize;
 
-use super::index::{has_entry, open_zip};
+use super::dupes::Guard;
+use super::index::{has_entry, load_index, open_zip, save_index, ContentIndex};
 use super::{atlauncher, curseforge, ftb, github, modrinth, technic};
+use crate::core::events::Task;
 use crate::core::instances;
 use crate::core::types::{source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType, ProjectVersion, SearchQuery, SearchResult};
-use crate::{bail_tr, err_tr};
+use crate::{bail_tr, err_tr, tr};
 
 pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
     match q.source {
@@ -85,6 +89,114 @@ pub async fn update_content(instance_id: &str, filename: &str) -> Result<()> {
         change_version(instance_id, ContentKind::Mod, filename, &u.version_id).await?;
     }
     Ok(())
+}
+
+/// Updates at once: this many downloads run side by side.
+const PARALLEL_UPDATES: usize = 4;
+
+/// What Update all did: the files updated, and the ones that couldn't be (with why).
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateManyResult {
+    pub updated: Vec<String>,
+    pub failed: Vec<UpdateFailure>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateFailure {
+    pub filename: String,
+    pub title: Option<String>,
+    pub error: String,
+}
+
+/// Updates several mods of an instance (all that have one when `filenames` is empty): one check, then
+/// [`PARALLEL_UPDATES`] downloads at a time, each on its own copy of the content index; the changes are put
+/// together and saved once at the end, and files that were disabled stay disabled.
+pub async fn update_many(instance_id: &str, filenames: &[String]) -> Result<UpdateManyResult> {
+    let inst = instances::get(instance_id).await?;
+    let todo: Vec<ContentItem> = check_updates(instance_id)
+        .await?
+        .into_iter()
+        .filter(|m| m.update.is_some() && m.project_id.is_some() && (filenames.is_empty() || filenames.contains(&m.filename)))
+        .collect();
+    if todo.is_empty() {
+        return Ok(UpdateManyResult::default());
+    }
+    let total = todo.len();
+    Task::run(tr!("content.updatingMany", "Updating {count} mods", count = total), Some(inst.id.clone()), move |task| async move {
+        let base = load_index(&inst.id).await;
+        let done = std::sync::atomic::AtomicUsize::new(0);
+        let results: Vec<(ContentItem, Result<ContentIndex>)> = stream::iter(todo)
+            .map(|m| {
+                let (inst, task, base, done) = (&inst, &task, &base, &done);
+                async move {
+                    let mut idx = base.clone();
+                    let r = update_one(inst, task, &mut idx, &m).await.map(|()| idx);
+                    let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    task.update(tr!("content.updatedOf", "Updated {done} of {total}", done = n, total = total), Some(n as f64 / total as f64));
+                    (m, r)
+                }
+            })
+            .buffer_unordered(PARALLEL_UPDATES)
+            .collect()
+            .await;
+        // Each update changed only its own project's entries: apply what each one removed and added.
+        let mut idx = load_index(&inst.id).await;
+        let mut out = UpdateManyResult::default();
+        let mut disabled = Vec::new();
+        for (m, r) in results {
+            match r {
+                Ok(after) => {
+                    for k in base.keys().filter(|k| !after.contains_key(*k)) {
+                        idx.remove(k);
+                    }
+                    for (k, e) in after.iter().filter(|(k, e)| base.get(*k).map(|b| b.version_id != e.version_id || b.sha1 != e.sha1).unwrap_or(true)) {
+                        idx.insert(k.clone(), e.clone());
+                    }
+                    if !m.enabled {
+                        disabled.push(m.project_id.clone().unwrap_or_default());
+                    }
+                    out.updated.push(m.filename);
+                }
+                Err(e) => out.failed.push(UpdateFailure { filename: m.filename, title: m.title, error: e.to_string() }),
+            }
+        }
+        save_index(&inst.id, &idx).await?;
+        // The new files come in enabled: put back the ones that were off.
+        if !disabled.is_empty() {
+            for f in modrinth::list_content(&inst.id, ContentKind::Mod).await? {
+                if f.enabled && f.project_id.as_ref().is_some_and(|p| disabled.contains(p)) {
+                    let _ = modrinth::toggle_content(&inst.id, ContentKind::Mod, &f.filename).await;
+                }
+            }
+        }
+        Ok(out)
+    })
+    .await
+}
+
+/// One mod to its update, on `idx` (a copy of the instance's index).
+async fn update_one(inst: &Instance, task: &Task, idx: &mut ContentIndex, m: &ContentItem) -> Result<()> {
+    let (Some(pid), Some(u)) = (m.project_id.as_deref(), m.update.as_ref()) else { return Ok(()) };
+    let vid = Some(u.version_id.clone());
+    match source_of(pid) {
+        ContentSource::Curseforge => {
+            let mut guard = Guard::open(inst, ContentKind::Mod, idx).await;
+            let mut blocked = Vec::new();
+            let r = curseforge::install_into(inst, task, idx, &mut guard, pid, ContentKind::Mod, vid, &mut blocked).await;
+            if !blocked.is_empty() {
+                curseforge::add_pending(&inst.id, blocked).await?;
+            }
+            r
+        }
+        ContentSource::Github => github::install_into(inst, task, idx, pid, ContentKind::Mod, vid).await,
+        ContentSource::Modrinth => {
+            let mut guard = Guard::open(inst, ContentKind::Mod, idx).await;
+            modrinth::install_into(inst, task, idx, &mut guard, pid, ContentKind::Mod, vid).await
+        }
+        _ => Ok(()),
+    }
 }
 
 /// Swaps an installed file for another version of the same project (newer or older), keeping it disabled if it was.

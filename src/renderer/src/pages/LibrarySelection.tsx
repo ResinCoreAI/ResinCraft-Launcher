@@ -173,13 +173,10 @@ export function useBulkActions(picked: Instance[], clear: () => void) {
 
   const updateAll = async () => {
     const r = await each(t('library.sel.updating'), updatable, async (i) => {
-      const outdated = (await api.content.checkUpdates(i.id)).filter((m) => m.update)
-      for (const m of outdated) {
-        if (cancel.current) break
-        setProgress((p) => p && { ...p, name: `${i.name} · ${m.title ?? m.filename}` })
-        await api.content.update(i.id, m.filename)
-      }
-      return outdated.length
+      // Every mod with an update, downloaded side by side.
+      const res = await api.content.updateMany(i.id)
+      if (res.failed.length && !res.updated.length) throw new Error(res.failed[0].error)
+      return res.updated.length
     })
     if (!r.ok.length) return
     const count = r.ok.reduce((n, { value }) => n + value, 0)
