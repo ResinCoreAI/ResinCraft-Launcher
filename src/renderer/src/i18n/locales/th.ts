@@ -2205,6 +2205,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "นี่คือโฟลเดอร์เริ่มต้น ที่ ResinCraft เก็บทุกอย่างไว้ เว้นแต่คุณจะเลือกที่อื่น",
   'storage.dialog.move': "ย้ายอินสแตนซ์",
   'storage.dialog.use': "ใช้โฟลเดอร์นี้",
+  'storage.dialog.useNoMove': "ใช้โดยไม่ย้าย",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "ปัจจุบัน",
   'storage.drive.removable': "ถอดได้",

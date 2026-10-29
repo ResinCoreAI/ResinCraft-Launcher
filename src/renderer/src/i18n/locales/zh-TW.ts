@@ -2203,6 +2203,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "這是預設資料夾，除非你另行選擇，ResinCraft 會把所有內容放在這裡。",
   'storage.dialog.move': "移動實例",
   'storage.dialog.use': "使用此資料夾",
+  'storage.dialog.useNoMove': "不移動，直接使用",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "目前",
   'storage.drive.removable': "卸除式",

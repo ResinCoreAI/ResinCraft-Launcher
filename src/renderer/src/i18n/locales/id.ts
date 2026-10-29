@@ -2216,6 +2216,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "Ini folder bawaan, tempat ResinCraft menyimpan semuanya kecuali Anda memilih lain.",
   'storage.dialog.move': "Pindahkan instalasi",
   'storage.dialog.use': "Gunakan folder ini",
+  'storage.dialog.useNoMove': "Gunakan tanpa memindahkan",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "Saat ini",
   'storage.drive.removable': "Eksternal",

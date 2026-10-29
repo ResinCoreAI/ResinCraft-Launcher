@@ -31,6 +31,7 @@ export default {
   'storage.dialog.backToDefault': 'This is the default folder, where ResinCraft keeps everything unless you choose otherwise.',
   'storage.dialog.move': 'Move instances',
   'storage.dialog.use': 'Use this folder',
+  'storage.dialog.useNoMove': 'Use without moving',
   'storage.drive.named': '{label} ({drive})',
   'storage.drive.now': 'Now',
   'storage.drive.removable': 'Removable',

@@ -76,6 +76,12 @@
   min-height: 22px;
 }
 
+/* What each footer button does: Move instances, or Use without moving. */
+.storage-choice {
+  padding: 8px 12px;
+  border-left: 2px solid var(--line, rgba(255, 255, 255, 0.12));
+}
+
 .java-row.disabled {
   cursor: default;
   opacity: 0.6;

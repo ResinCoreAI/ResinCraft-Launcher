@@ -2275,6 +2275,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "Это папка по умолчанию, в которой ResinCraft хранит всё, пока ты не выберешь другую.",
   'storage.dialog.move': "Перенести сборки",
   'storage.dialog.use': "Использовать эту папку",
+  'storage.dialog.useNoMove': "Использовать без переноса",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "Сейчас",
   'storage.drive.removable': "Съёмный",

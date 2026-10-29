@@ -2213,6 +2213,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "Đây là thư mục mặc định, nơi ResinCraft lưu mọi thứ trừ khi bạn chọn nơi khác.",
   'storage.dialog.move': "Chuyển bản cài đặt",
   'storage.dialog.use': "Dùng thư mục này",
+  'storage.dialog.useNoMove': "Dùng mà không di chuyển",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "Hiện tại",
   'storage.drive.removable': "Ổ rời",

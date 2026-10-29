@@ -2208,6 +2208,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "기본 폴더예요. 다른 곳을 고르지 않으면 ResinCraft는 모든 것을 여기에 보관해요.",
   'storage.dialog.move': "인스턴스 이동",
   'storage.dialog.use': "이 폴더 사용",
+  'storage.dialog.useNoMove': "옮기지 않고 사용",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "현재",
   'storage.drive.removable': "이동식",

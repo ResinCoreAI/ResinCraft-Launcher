@@ -2226,6 +2226,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "Burası varsayılan klasör; başka bir yer seçmediğin sürece ResinCraft her şeyi burada tutar.",
   'storage.dialog.move': "Kurulumları taşı",
   'storage.dialog.use': "Bu klasörü kullan",
+  'storage.dialog.useNoMove': "Taşımadan kullan",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "Şu an",
   'storage.drive.removable': "Çıkarılabilir",

@@ -2213,6 +2213,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "ここは既定のフォルダーです。別の場所を選ばない限り、ResinCraft はすべてここに保存します。",
   'storage.dialog.move': "インスタンスを移動",
   'storage.dialog.use': "このフォルダーを使う",
+  'storage.dialog.useNoMove': "移動せずに使う",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "現在",
   'storage.drive.removable': "リムーバブル",

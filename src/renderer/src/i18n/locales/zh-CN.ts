@@ -2203,6 +2203,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "这是默认文件夹，除非你另行选择，ResinCraft 会把所有内容放在这里。",
   'storage.dialog.move': "移动实例",
   'storage.dialog.use': "使用此文件夹",
+  'storage.dialog.useNoMove': "不移动，直接使用",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "当前",
   'storage.drive.removable': "可移动",

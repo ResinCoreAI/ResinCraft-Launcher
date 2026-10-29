@@ -2230,6 +2230,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "Das ist der Standardordner, in dem ResinCraft alles speichert, sofern du nichts anderes wählst.",
   'storage.dialog.move': "Instanzen verschieben",
   'storage.dialog.use': "Diesen Ordner verwenden",
+  'storage.dialog.useNoMove': "Ohne Verschieben verwenden",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "Aktuell",
   'storage.drive.removable': "Wechseldatenträger",

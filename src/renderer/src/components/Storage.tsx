@@ -107,7 +107,6 @@ function ChangeDialog({ info, onClose, onChange }: { info: StorageInfo; onClose:
   const [folder, setFolder] = useState('')
   const [check, setCheck] = useState<StorageCheck>()
   const [checking, setChecking] = useState(false)
-  const [move, setMove] = useState(true)
   const seq = useRef(0)
 
   useEffect(() => {
@@ -147,7 +146,6 @@ function ChangeDialog({ info, onClose, onChange }: { info: StorageInfo; onClose:
 
   const fresh = check && sameFolder(check.folder, folder.trim()) ? check : undefined
   const canMove = !!fresh?.hasFiles && !fresh.moveProblem
-  const willMove = canMove && move
   const ok = !!fresh && !fresh.problem && !fresh.blocked && !checking
   const pickRow = (path: string) => setFolder(path)
 
@@ -162,9 +160,15 @@ function ChangeDialog({ info, onClose, onChange }: { info: StorageInfo; onClose:
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={!ok} onClick={() => fresh && onChange(fresh.folder, willMove)}>
-            {willMove ? t('storage.dialog.move') : t('storage.dialog.use')}
+          {/* Both on the buttons, so switching folders without moving anything is one click too. */}
+          <button className={`btn ${canMove ? '' : 'primary'}`} disabled={!ok} onClick={() => fresh && onChange(fresh.folder, false)}>
+            {fresh?.hasFiles ? t('storage.dialog.useNoMove') : t('storage.dialog.use')}
           </button>
+          {canMove && (
+            <button className="btn primary" disabled={!ok} onClick={() => fresh && onChange(fresh.folder, true)}>
+              {t('storage.dialog.move')}
+            </button>
+          )}
         </>
       }
     >
@@ -235,8 +239,7 @@ function ChangeDialog({ info, onClose, onChange }: { info: StorageInfo; onClose:
           <>
             {fresh.hasFiles ? (
               <>
-                <div className={`java-row ${willMove ? 'on' : ''} ${canMove ? '' : 'disabled'}`} onClick={() => canMove && setMove(true)}>
-                  <span className="radio" />
+                <div className="storage-choice">
                   <div className="grow">
                     <b>{t('storage.dialog.moveTitle')}</b>
                     <div className="hint">
@@ -248,8 +251,7 @@ function ChangeDialog({ info, onClose, onChange }: { info: StorageInfo; onClose:
                     </div>
                   </div>
                 </div>
-                <div className={`java-row ${!willMove ? 'on' : ''}`} onClick={() => setMove(false)}>
-                  <span className="radio" />
+                <div className="storage-choice">
                   <div className="grow">
                     <b>{t('storage.dialog.emptyTitle')}</b>
                     <div className="hint">{t('storage.dialog.emptyHint', { path: info.folder })}</div>

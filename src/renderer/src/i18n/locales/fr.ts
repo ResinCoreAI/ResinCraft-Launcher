@@ -2261,6 +2261,7 @@ const dict: Dict = {
   'storage.dialog.backToDefault': "Ceci est le dossier par défaut, où ResinCraft conserve tout sauf si vous choisissez autre chose.",
   'storage.dialog.move': "Déplacer les instances",
   'storage.dialog.use': "Utiliser ce dossier",
+  'storage.dialog.useNoMove': "Utiliser sans déplacer",
   'storage.drive.named': "{label} ({drive})",
   'storage.drive.now': "Actuel",
   'storage.drive.removable': "Amovible",
