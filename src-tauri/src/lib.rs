@@ -22,6 +22,7 @@ pub mod openfile;
 pub mod player;
 pub mod server;
 pub mod remote;
+pub mod remoteview;
 pub mod tray;
 pub mod updater;
 

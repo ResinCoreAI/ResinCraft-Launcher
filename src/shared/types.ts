@@ -1480,6 +1480,38 @@ export interface AntiXray {
   mode: 1 | 2
 }
 
+/** What another account may do on this PC's servers (Settings → Remote control → People). */
+export type RemoteRole = 'viewer' | 'operator' | 'manager'
+
+/** Another Minecraft account the host lets in. */
+export interface RemoteGrant {
+  uuid: string
+  name: string
+  role: RemoteRole
+  /** The servers it reaches; null or missing: all of them. */
+  servers?: string[] | null
+}
+
+/** A PC with remote control on that this account may open: one of its own, or one shared with it. */
+export interface RemotePc {
+  id: number
+  name: string
+  appVersion: string
+  since: number
+  /** The owner's Minecraft UUID and name. */
+  owner: string
+  ownerName: string
+  /** Another account's PC. */
+  shared?: boolean
+}
+
+/** A live update from the PC that's open (`remoteView`). */
+export interface RemoteViewPush {
+  device: number
+  topic: string
+  data: Record<string, unknown>
+}
+
 /** Settings → Remote control: the connection to the web console. */
 export interface RemoteStatus {
   state: 'off' | 'connecting' | 'online' | 'noAccount' | 'unavailable' | 'relayTooOld' | 'error'
@@ -1840,6 +1872,19 @@ export interface ResinApi {
   /** ResinCraft's own updates. */
   remote: {
     status(): Promise<RemoteStatus>
+    /** Who else may use this PC's servers. */
+    grants(): Promise<RemoteGrant[]>
+    setGrants(list: RemoteGrant[]): Promise<RemoteGrant[]>
+    /** A Minecraft account by its name (exact spelling and UUID). */
+    lookupName(name: string): Promise<{ uuid: string; name: string }>
+  }
+  /** Other PCs' servers, through ResinCraft Relay. */
+  remoteView: {
+    devices(): Promise<RemotePc[]>
+    open(device: number): Promise<void>
+    /** One request with the web console's method names (`server.start`). */
+    call(device: number, method: string, params: unknown[]): Promise<unknown>
+    close(): Promise<void>
   }
   update: {
     status(): Promise<UpdateStatus>
@@ -2250,7 +2295,11 @@ export interface ResinApi {
     listChanged(cb: (what: 'instances' | 'servers') => void): () => void
     remote(cb: (s: RemoteStatus) => void): () => void
     /** The web console changed something (started a server, made one…). */
-    remoteAction(cb: (e: { method: string; serverId?: string }) => void): () => void
+    remoteAction(cb: (e: { method: string; serverId?: string; by?: string | null }) => void): () => void
+    /** A live update from the other PC that's open. */
+    remoteViewPush(cb: (e: RemoteViewPush) => void): () => void
+    /** The other PC that's open went offline or stopped sharing. */
+    remoteViewGone(cb: (e: { device: number }) => void): () => void
     /** Windows asked the running ResinCraft to open a file (a theme, backup or modpack double-clicked). */
     openFile(cb: (e: { path: string }) => void): () => void
   }

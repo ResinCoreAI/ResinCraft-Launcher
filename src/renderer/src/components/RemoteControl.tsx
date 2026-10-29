@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useStore } from '../store'
 import { t, type Key } from '../i18n'
 import { Switch } from './ui'
+import { RemotePeople } from './RemotePcs'
 
 const STATE_TEXT: Record<RemoteStatus['state'], Key> = {
   off: 'settings.remote.state.off',
@@ -84,6 +85,7 @@ export function RemoteControlSection() {
             )}
           </div>
         )}
+        {on && <RemotePeople />}
       </div>
     </section>
   )
@@ -180,5 +182,5 @@ export function WebConsoleTip() {
 /** A small note in the launcher whenever the web console changes something. */
 export function useRemoteActions() {
   const { toast } = useStore()
-  useEffect(() => api.on.remoteAction(() => toast(t('settings.remote.action'), 'info')), [toast])
+  useEffect(() => api.on.remoteAction((e) => toast(e.by ? t('servers.people.actionBy', { name: e.by }) : t('settings.remote.action'), 'info')), [toast])
 }

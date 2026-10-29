@@ -6,6 +6,7 @@ import { api, isConsole } from '../api'
 import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
 import FileManager from '../components/FileManager'
 import { WebConsoleButton, WebConsoleTip } from '../components/RemoteControl'
+import { RemotePcBanner, RemotePcPicker, useRemotePc } from '../components/RemotePcs'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
 import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
@@ -124,6 +125,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
 
   return (
     <div className="page">
+      <RemotePcBanner />
       {id ? (
         servers && !server ? (
           <Empty
@@ -292,6 +294,8 @@ function ServerList({
   const { go, toast, info } = useStore()
   const copy = useCopy()
   const [deleting, setDeleting] = useState<ServerInfo>()
+  // Another PC's servers: its folders aren't here, and new servers are made on the PC itself.
+  const pc = useRemotePc()
 
   const menuFor = (s: ServerInfo): ContextEntry[] => {
     const up = s.state === 'starting' || s.state === 'running'
@@ -306,8 +310,8 @@ function ServerList({
       { label: t('menu.server.openConsole'), icon: <Terminal />, shortcut: 'Enter', onSelect: () => go({ page: 'servers', id: s.id }) },
       '-',
       { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(address) },
-      !isConsole && { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
-      info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
+      !isConsole && !pc && { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
+      info && !pc && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
       '-',
       { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: live(s), onSelect: () => setDeleting(s) }
     ]
@@ -321,15 +325,20 @@ function ServerList({
           <p>{t('servers.subtitle')}</p>
         </div>
         <div className="spacer" />
-        <WebConsoleButton />
-        <button data-pc-only className="btn lg" onClick={onImport}>
-          <FolderInput /> {t('migrate.serverButton')}
-        </button>
-        <button className="btn primary lg" onClick={onCreate}>
-          <Plus /> {t('servers.create.button')}
-        </button>
+        <RemotePcPicker />
+        {!pc && <WebConsoleButton />}
+        {!pc && (
+          <button data-pc-only className="btn lg" onClick={onImport}>
+            <FolderInput /> {t('migrate.serverButton')}
+          </button>
+        )}
+        {!pc && (
+          <button className="btn primary lg" onClick={onCreate}>
+            <Plus /> {t('servers.create.button')}
+          </button>
+        )}
       </div>
-      <WebConsoleTip />
+      {!pc && <WebConsoleTip />}
 
       {!servers ? (
         <div className="results">
@@ -341,14 +350,16 @@ function ServerList({
           icon={<Server />}
           title={t('servers.empty.title')}
           action={
-            <div className="row" style={{ justifyContent: 'center' }}>
-              <button className="btn primary" onClick={onCreate}>
-                <Plus /> {t('servers.create.button')}
-              </button>
-              <button data-pc-only className="btn" onClick={onImport}>
-                <FolderInput /> {t('migrate.serverButton')}
-              </button>
-            </div>
+            pc ? undefined : (
+              <div className="row" style={{ justifyContent: 'center' }}>
+                <button className="btn primary" onClick={onCreate}>
+                  <Plus /> {t('servers.create.button')}
+                </button>
+                <button data-pc-only className="btn" onClick={onImport}>
+                  <FolderInput /> {t('migrate.serverButton')}
+                </button>
+              </div>
+            )
           }
         >
           {t('servers.empty.body')}
@@ -417,6 +428,7 @@ function ServerDetail({
 }) {
   const { go, toast, info } = useStore()
   const copy = useCopy()
+  const pc = useRemotePc()
   const [tab, setTab] = useState<Tab>('console')
   const [deleting, setDeleting] = useState(false)
   const [reinstalling, setReinstalling] = useState<ServerReinstall>()
@@ -426,8 +438,8 @@ function ServerDetail({
     s.state === 'stopping' && { label: t('servers.forceStop'), icon: <Square />, danger: true, onSelect: () => onStop(s) },
     '-',
     { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(address) },
-    !isConsole && { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
-    info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
+    !isConsole && !pc && { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.server.openFolder(s.id) },
+    info && !pc && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(serverPath(info.dataDir, s.id)) },
     '-',
     {
       label: t('servers.settings.backupButton'),

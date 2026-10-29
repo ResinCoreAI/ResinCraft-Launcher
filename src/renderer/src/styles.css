@@ -4188,3 +4188,32 @@ textarea.custom-css {
   resize: vertical;
   user-select: text;
 }
+/* Servers page: which PC's servers, and the note while another PC's are shown (components/RemotePcs.tsx). */
+.sv-pc-pick {
+  max-width: 220px;
+}
+.sv-pc-pick .ellipsis {
+  min-width: 0;
+}
+/* Settings → Remote control → People who can use your servers. */
+.remote-people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.remote-person .list-row {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.remote-head {
+  flex: none;
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+.remote-servers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
+  padding: 6px 12px 10px 50px;
+}

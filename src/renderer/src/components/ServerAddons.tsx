@@ -21,6 +21,7 @@ import {
 import type { AddonArea, ServerAddon, ServerInfo } from '@shared/types'
 import { PLUGIN_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
+import { remotePc } from '../remotePc'
 import { useStore } from '../store'
 import { bytes, projectUrl } from '../util'
 import { rich, t, type Key } from '../i18n'
@@ -114,13 +115,15 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
   const switchAll = async (list: { a: ServerAddon; versionId: string }[]) => {
     let now = 0
     let queued = 0
-    // Several at once: the engine downloads them side by side and swaps them together. The web console keeps
-    // one at a time (the launcher on the other PC may not take the batch call yet).
-    if (list.length > 1 && !isConsole) {
+    // Several at once: the engine downloads them side by side and swaps them together. On another PC (the web
+    // console, or one opened in the Servers tab) an older launcher may not take the batch call: then one at a time.
+    const elsewhere = isConsole || !!remotePc()
+    if (list.length > 1) {
       mark(
         list.map(({ a }) => a.filename),
         true
       )
+      let batched = true
       try {
         const r = await api.server.addonUpdateMany(s.id, list.map(({ a, versionId }) => ({ filename: a.filename, versionId })), area)
         now = r.now.length
@@ -130,17 +133,20 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
           toast(t('servers.addons.failed', { name: a ? nameOf(a) : f.filename, error: f.error }), 'error')
         }
       } catch (e) {
-        toast((e as Error).message, 'error')
+        if (elsewhere) batched = false
+        else toast((e as Error).message, 'error')
       } finally {
         mark(
           list.map(({ a }) => a.filename),
           false
         )
       }
-      if (now) toast(t('servers.addons.updatedCount', { count: now }))
-      if (queued) toast(t('servers.addons.queuedCount', { count: queued }), 'info')
-      await load()
-      return
+      if (batched) {
+        if (now) toast(t('servers.addons.updatedCount', { count: now }))
+        if (queued) toast(t('servers.addons.queuedCount', { count: queued }), 'info')
+        await load()
+        return
+      }
     }
     for (const { a, versionId } of list) {
       mark([a.filename], true)

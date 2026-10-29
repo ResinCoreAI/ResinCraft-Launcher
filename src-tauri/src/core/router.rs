@@ -45,6 +45,7 @@ pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
         ("files", _) => crate::files::handle(channel, args).await,
         ("update", _) => crate::updater::handle(channel, args).await,
         ("remote", _) => crate::remote::handle(channel, args).await,
+        ("remoteView", _) => crate::remoteview::handle(channel, args).await,
         ("storage", _) => crate::core::storage::handle(channel, args).await,
         ("accounts" | "skins" | "notes" | "worlds" | "servers" | "quickjoin" | "screenshots", _) => crate::player::handle(channel, args).await,
         ("bedrock", _) => crate::player::bedrock::handle(channel, args).await,

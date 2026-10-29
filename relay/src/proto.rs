@@ -45,12 +45,19 @@
 //!
 //! A `banned` error carries the ban itself ([`Ban`]: until when, and why) in `ban`. It needs no protocol version
 //! of its own: every launcher knows the `banned` code, and older ones skip the field.
+//!
+//! Protocol 9 adds shared remote control. A launcher offered for remote control (`remote`) names the other accounts it
+//! lets in with `remote_share`; the relay then lists it for them too, passes their `call`s down with `from` (the
+//! caller's UUID; the launcher checks what that account may do) and namespaces their watches as `as:<uuid>:<topic>`.
+//! Any signed-in connection can open remote launchers itself: `view_devices` lists the account's own and shared ones,
+//! `view_call` / `view_watch` reach one, and the relay answers with `view_result`, `view_push` and `view_gone`. Older
+//! launchers never get these, and a launcher never sends them to an older relay.
 
 use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 8;
+pub const PROTOCOL_VERSION: u32 = 9;
 /// The first protocol with Bedrock (UDP) tunnels.
 pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The first protocol with data top-ups.
@@ -63,6 +70,8 @@ pub const REMOTE_PROTOCOL_VERSION: u32 = 6;
 pub const DOMAINS_PROTOCOL_VERSION: u32 = 7;
 /// The first protocol with the public server list (listings, likes, reports and whitelist requests from the launcher).
 pub const LISTINGS_PROTOCOL_VERSION: u32 = 8;
+/// The first protocol with shared remote control and remote launchers opened from a launcher.
+pub const SHARE_PROTOCOL_VERSION: u32 = 9;
 /// Longest `call_result` / `push` line (results and log batches can be bigger than other messages).
 pub const MAX_REMOTE_LINE: usize = 1024 * 1024;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
@@ -191,6 +200,17 @@ pub enum AgentMsg {
     FilesOffer { listing: String, files: Vec<String> },
     /// Stop serving `listing`'s files from this connection (no answer). Protocol 8.
     FilesWithdraw { listing: String },
+    /// The other accounts this remote-control launcher lets in (replaces the last list; empty: only its own
+    /// account). Protocol 9.
+    RemoteShare { accounts: Vec<ShareAccount> },
+    /// The remote-control launchers this account may open: its own and those shared with it. Answered with
+    /// `view_devices`. Protocol 9.
+    ViewDevices,
+    /// One request to remote launcher `device` (an id from `view_devices`), with the web console's methods. Answered
+    /// with `view_result` and the same `id` once the launcher answers. Protocol 9.
+    ViewCall { id: u64, device: u64, method: String, params: serde_json::Value },
+    /// Start or stop live updates for `topic` from remote launcher `device` (`view_push`). Protocol 9.
+    ViewWatch { device: u64, topic: String, on: bool },
     Ping { seq: u64 },
 }
 
@@ -323,6 +343,34 @@ pub struct ListingJoinState {
     pub at: u64,
 }
 
+/// An account a remote-control launcher lets in (`remote_share`). Protocol 9.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ShareAccount {
+    /// Minecraft UUID (with or without dashes).
+    pub uuid: String,
+    pub name: String,
+}
+
+/// A remote-control launcher this account may open (`view_devices`). Protocol 9.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ViewDevice {
+    /// The id `view_call` and `view_watch` take.
+    pub id: u64,
+    /// The PC's name.
+    pub name: String,
+    #[serde(default)]
+    pub app_version: String,
+    /// Online since (Unix seconds).
+    #[serde(default)]
+    pub since: u64,
+    /// The owner's Minecraft UUID and name.
+    pub owner: String,
+    pub owner_name: String,
+    /// Another account's launcher, shared with this one.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shared: bool,
+}
+
 /// A listing's client pack, which players install as an instance: a Modrinth .mrpack the owner uploaded (`format` 1),
 /// or a pack plan (`format` 2, JSON: see server/clientplan.rs). Protocol 8.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -435,13 +483,39 @@ pub enum RelayMsg {
     FilesReady {},
     Pong { seq: u64 },
     /// The answer to `remote {enabled: true}`: this launcher is listed for its account's console. Protocol 6.
-    RemoteReady {},
+    RemoteReady {
+        /// This launcher's device id (what `view_devices` lists it as), so it can leave itself out. Protocol 9.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<u64>,
+    },
     /// A request from the web console; `params` is a JSON array. Protocol 6.
-    Call { id: u64, method: String, params: serde_json::Value },
+    Call {
+        id: u64,
+        method: String,
+        params: serde_json::Value,
+        /// Another account's call (its UUID) on a launcher that shares with it; none for the owner's own. Protocol 9.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+    },
     /// Start or stop sending `push`es for a topic. Protocol 6.
     Watch { topic: String, on: bool },
     /// How many console tabs this account has open on this launcher. Protocol 6.
     Viewers { count: u32 },
+    /// The answer to `view_devices`. Protocol 9.
+    ViewDevices { devices: Vec<ViewDevice> },
+    /// The answer to `view_call` `id`: the remote launcher's value, or why not (worded for players). Protocol 9.
+    ViewResult {
+        id: u64,
+        ok: bool,
+        #[serde(default)]
+        value: Option<serde_json::Value>,
+        #[serde(default)]
+        error: Option<String>,
+    },
+    /// A live update from remote launcher `device` for a watched topic. Protocol 9.
+    ViewPush { device: u64, topic: String, data: serde_json::Value },
+    /// Remote launcher `device` went offline (or stopped sharing with this account). Protocol 9.
+    ViewGone { device: u64 },
     /// Where a domain stands (the answer to `domain_add` and `domain_check`). Protocol 7.
     DomainStatus(DomainStatus),
     /// The answer to `domain_remove`. Protocol 7.
@@ -867,10 +941,10 @@ mod tests {
         let push = AgentMsg::Push { topic: "servers".into(), data: serde_json::json!({"event": "list"}) };
         assert_eq!(serde_json::to_value(&push).unwrap()["t"], "push");
         let call: RelayMsg = serde_json::from_str(r#"{"t":"call","id":3,"method":"servers.list","params":[]}"#).unwrap();
-        assert_eq!(call, RelayMsg::Call { id: 3, method: "servers.list".into(), params: serde_json::json!([]) });
+        assert_eq!(call, RelayMsg::Call { id: 3, method: "servers.list".into(), params: serde_json::json!([]), from: None });
         let watch: RelayMsg = serde_json::from_str(r#"{"t":"watch","topic":"log:smp","on":true}"#).unwrap();
         assert_eq!(watch, RelayMsg::Watch { topic: "log:smp".into(), on: true });
-        assert_eq!(serde_json::from_str::<RelayMsg>(r#"{"t":"remote_ready"}"#).unwrap(), RelayMsg::RemoteReady {});
+        assert_eq!(serde_json::from_str::<RelayMsg>(r#"{"t":"remote_ready"}"#).unwrap(), RelayMsg::RemoteReady { id: None });
         assert_eq!(serde_json::from_str::<RelayMsg>(r#"{"t":"viewers","count":2}"#).unwrap(), RelayMsg::Viewers { count: 2 });
     }
 

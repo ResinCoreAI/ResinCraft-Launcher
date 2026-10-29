@@ -249,7 +249,7 @@ fn offline_uuid(name: &str) -> String {
 }
 
 /// Looks up a player's UUID (and the exact spelling of their name) for an online-mode server.
-async fn lookup(name: &str) -> Result<(String, String)> {
+pub(crate) async fn lookup(name: &str) -> Result<(String, String)> {
     #[derive(Deserialize)]
     struct Profile {
         id: String,

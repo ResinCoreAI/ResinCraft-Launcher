@@ -59,7 +59,16 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       openFolder: fn('bedrock:openFolder')
     },
     remote: {
-      status: fn('remote:status')
+      status: fn('remote:status'),
+      grants: fn('remote:grants'),
+      setGrants: fn('remote:setGrants'),
+      lookupName: fn('remote:lookupName')
+    },
+    remoteView: {
+      devices: fn('remoteView:devices'),
+      open: fn('remoteView:open'),
+      call: fn('remoteView:call'),
+      close: fn('remoteView:close')
     },
     update: {
       status: fn('update:status'),
@@ -296,6 +305,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), openFile: on('openFile') }
+    on: { task: on('task'), game: on('game'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile') }
   } as ResinApi
 }

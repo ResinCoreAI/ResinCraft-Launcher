@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingJoinState, ListingStatus, MyListing};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingJoinState, ListingStatus, MyListing, SHARE_PROTOCOL_VERSION, ShareAccount, ViewDevice};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -291,11 +291,12 @@ impl Drop for Connection {
 
 impl Connection {
     /// Connects and says hello. A relay that doesn't know this protocol yet is asked again with each older one
-    /// that matters (domains, remote control, whitelist requests, top-ups, then Bedrock tunnels): the newer features
-    /// then stay off.
+    /// that matters (the server list, domains, remote control, whitelist requests, top-ups, then Bedrock tunnels):
+    /// the newer features then stay off.
     pub async fn connect(cfg: &AgentConfig) -> Result<Connection, AgentError> {
         let mut result = Self::over_version(Self::open(cfg).await?, &cfg.client, PROTOCOL_VERSION).await;
         for older in [
+            LISTINGS_PROTOCOL_VERSION,
             DOMAINS_PROTOCOL_VERSION,
             REMOTE_PROTOCOL_VERSION,
             JOIN_REQUESTS_PROTOCOL_VERSION,
@@ -820,8 +821,11 @@ impl Connection {
 /// Something the web console asked for, on a remote-control connection.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RemoteEvent {
-    /// Answer with [`RemoteCommand::Result`] and the same `id`. `params` is a JSON array.
-    Call { id: u64, method: String, params: serde_json::Value },
+    /// The relay listed this launcher; protocol 9 relays say its device id (what [`ViewDevice::id`] calls it).
+    Ready(Option<u64>),
+    /// Answer with [`RemoteCommand::Result`] and the same `id`. `params` is a JSON array. `from`: another account's
+    /// call (its UUID, lowercase without dashes) that this launcher shares with; None for its own account.
+    Call { id: u64, method: String, params: serde_json::Value, from: Option<String> },
     /// Start or stop sending [`RemoteCommand::Push`]es for `topic`.
     Watch { topic: String, on: bool },
     /// How many console tabs are open on this launcher.
@@ -834,12 +838,92 @@ pub enum RemoteCommand {
     /// The answer to [`RemoteEvent::Call`] `id`: a value, or an error worded for players.
     Result { id: u64, result: Result<serde_json::Value, String> },
     Push { topic: String, data: serde_json::Value },
+    /// The other accounts this launcher lets in (protocol 9; ignored on older relays).
+    Share(Vec<ShareAccount>),
+}
+
+/// What a launcher hears while it has remote launchers open (protocol 9, [`Connection::view`]).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ViewEvent {
+    /// The answer to [`ViewCommand::Devices`].
+    Devices(Vec<ViewDevice>),
+    /// The answer to [`ViewCommand::Call`] `id`.
+    Result { id: u64, result: Result<serde_json::Value, String> },
+    /// A live update for a watched topic.
+    Push { device: u64, topic: String, data: serde_json::Value },
+    /// The remote launcher went offline or stopped sharing.
+    Gone { device: u64 },
+}
+
+/// What a launcher asks for while it has remote launchers open.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ViewCommand {
+    Devices,
+    Call { id: u64, device: u64, method: String, params: serde_json::Value },
+    Watch { device: u64, topic: String, on: bool },
 }
 
 impl Connection {
     /// Whether this relay has the web console (protocol 6).
     pub fn has_remote(&self) -> bool {
         self.relay_version >= REMOTE_PROTOCOL_VERSION
+    }
+
+    /// Whether this relay shares remote control with other accounts and lets launchers open remote launchers
+    /// (protocol 9).
+    pub fn has_shares(&self) -> bool {
+        self.relay_version >= SHARE_PROTOCOL_VERSION
+    }
+
+    /// Opens remote launchers (the account's own and those shared with it) until the connection ends (returning
+    /// why): requests come from `commands`, answers and live updates go to `on_event`. Needs a signed-in protocol 9
+    /// connection.
+    pub async fn view(mut self, mut on_event: impl FnMut(ViewEvent) + Send, commands: &mut mpsc::UnboundedReceiver<ViewCommand>) -> AgentError {
+        if !self.has_shares() {
+            return AgentError::Refused(ErrorCode::BadRequest, "this relay can't open other PCs yet".into());
+        }
+        let mut ping = tokio::time::interval(Duration::from_secs(PING_SECS));
+        ping.tick().await;
+        let silence = Duration::from_secs(PING_SECS * 3);
+        let mut deadline = tokio::time::Instant::now() + silence;
+        loop {
+            tokio::select! {
+                biased;
+                line = self.lines.next() => {
+                    deadline = tokio::time::Instant::now() + silence;
+                    match parse_line(line) {
+                        Ok(RelayMsg::ViewDevices { devices }) => on_event(ViewEvent::Devices(devices)),
+                        Ok(RelayMsg::ViewResult { id, ok: true, value, .. }) => on_event(ViewEvent::Result { id, result: Ok(value.unwrap_or(serde_json::Value::Null)) }),
+                        Ok(RelayMsg::ViewResult { id, error, .. }) => on_event(ViewEvent::Result { id, result: Err(error.unwrap_or_else(|| "Something went wrong on the other PC.".into())) }),
+                        Ok(RelayMsg::ViewPush { device, topic, data }) => on_event(ViewEvent::Push { device, topic, data }),
+                        Ok(RelayMsg::ViewGone { device }) => on_event(ViewEvent::Gone { device }),
+                        Ok(RelayMsg::Error { code, message, ban }) => return refused(code, message, ban),
+                        Ok(RelayMsg::Shutdown { .. }) => return AgentError::Refused(ErrorCode::ShuttingDown, "the relay is restarting".into()),
+                        Ok(_) => {}
+                        Err(e) => return e,
+                    }
+                }
+                cmd = commands.recv() => {
+                    let msg = match cmd {
+                        Some(ViewCommand::Devices) => AgentMsg::ViewDevices,
+                        Some(ViewCommand::Call { id, device, method, params }) => AgentMsg::ViewCall { id, device, method, params },
+                        Some(ViewCommand::Watch { device, topic, on }) => AgentMsg::ViewWatch { device, topic, on },
+                        None => return AgentError::Refused(ErrorCode::BadRequest, "closed".into()),
+                    };
+                    if let Err(e) = self.send(&msg).await {
+                        return e;
+                    }
+                }
+                _ = ping.tick() => {
+                    self.seq += 1;
+                    let seq = self.seq;
+                    if let Err(e) = self.send(&AgentMsg::Ping { seq }).await {
+                        return e;
+                    }
+                }
+                _ = tokio::time::sleep_until(deadline) => return net("the relay stopped answering"),
+            }
+        }
     }
 
     /// Offers this launcher to its account's web console and serves it until the connection ends (returning why):
@@ -859,10 +943,11 @@ impl Connection {
             return e;
         }
         match self.recv().await {
-            Ok(RelayMsg::RemoteReady {}) => {}
+            Ok(RelayMsg::RemoteReady { id }) => on_event(RemoteEvent::Ready(id)),
             Ok(other) => return unexpected(&other),
             Err(e) => return e,
         }
+        let shares = self.has_shares();
         let mut ping = tokio::time::interval(Duration::from_secs(PING_SECS));
         ping.tick().await;
         let silence = Duration::from_secs(PING_SECS * 3);
@@ -873,7 +958,7 @@ impl Connection {
                 line = self.lines.next() => {
                     deadline = tokio::time::Instant::now() + silence;
                     match parse_line(line) {
-                        Ok(RelayMsg::Call { id, method, params }) => on_event(RemoteEvent::Call { id, method, params }),
+                        Ok(RelayMsg::Call { id, method, params, from }) => on_event(RemoteEvent::Call { id, method, params, from }),
                         Ok(RelayMsg::Watch { topic, on }) => on_event(RemoteEvent::Watch { topic, on }),
                         Ok(RelayMsg::Viewers { count }) => on_event(RemoteEvent::Viewers(count)),
                         Ok(RelayMsg::Error { code, message, ban }) => return refused(code, message, ban),
@@ -887,6 +972,8 @@ impl Connection {
                         Some(RemoteCommand::Result { id, result: Ok(value) }) => AgentMsg::CallResult { id, ok: true, value: Some(value), error: None },
                         Some(RemoteCommand::Result { id, result: Err(error) }) => AgentMsg::CallResult { id, ok: false, value: None, error: Some(error) },
                         Some(RemoteCommand::Push { topic, data }) => AgentMsg::Push { topic, data },
+                        Some(RemoteCommand::Share(_)) if !shares => continue,
+                        Some(RemoteCommand::Share(accounts)) => AgentMsg::RemoteShare { accounts },
                         // The launcher turned remote control off: say so, then hang up.
                         None => {
                             let _ = self.send(&AgentMsg::Remote { enabled: false, device: device.to_string(), app_version: app_version.to_string() }).await;
@@ -1040,7 +1127,7 @@ mod tests {
 
     #[tokio::test]
     async fn steps_down_to_what_an_older_relay_speaks() {
-        for (relay, expect) in [(TOPUP_PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION), (BEDROCK_PROTOCOL_VERSION, BEDROCK_PROTOCOL_VERSION), (PROTOCOL_VERSION, PROTOCOL_VERSION)] {
+        for (relay, expect) in [(TOPUP_PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION), (BEDROCK_PROTOCOL_VERSION, BEDROCK_PROTOCOL_VERSION), (LISTINGS_PROTOCOL_VERSION, LISTINGS_PROTOCOL_VERSION), (PROTOCOL_VERSION, PROTOCOL_VERSION)] {
             let cfg = AgentConfig { url: old_relay(relay).await, extra_roots_pem: None, client: "test".into() };
             let conn = Connection::connect(&cfg).await.unwrap();
             assert_eq!(conn.relay_version, expect, "relay speaking {relay}");
@@ -1074,8 +1161,8 @@ mod tests {
             assert!(matches!(next!(), AgentMsg::Login { .. }));
             w.write_all(say(RelayMsg::Authed { uuid: "u".into(), username: "Steve".into(), session: None, admin: false }).as_bytes()).await.unwrap();
             assert_eq!(next!(), AgentMsg::Remote { enabled: true, device: "PC".into(), app_version: "9".into() });
-            w.write_all(say(RelayMsg::RemoteReady {}).as_bytes()).await.unwrap();
-            w.write_all(say(RelayMsg::Call { id: 5, method: "servers.list".into(), params: serde_json::json!([]) }).as_bytes()).await.unwrap();
+            w.write_all(say(RelayMsg::RemoteReady { id: None }).as_bytes()).await.unwrap();
+            w.write_all(say(RelayMsg::Call { id: 5, method: "servers.list".into(), params: serde_json::json!([]), from: None }).as_bytes()).await.unwrap();
             w.flush().await.unwrap();
             let answer = loop {
                 match next!() {

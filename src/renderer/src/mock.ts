@@ -1,5 +1,5 @@
 // A fake backend so the UI can be designed and previewed in a normal browser (npm run dev, then open the Vite URL).
-import type { AccountView, ContentItem, Instance, McVersion, ProjectHit, ResinApi, Settings } from '@shared/types'
+import type { AccountView, ContentItem, Instance, McVersion, ProjectHit, RemoteGrant, ResinApi, Settings } from '@shared/types'
 import { mockInstanceTabs } from './mock-instance-tabs'
 import { mockEngine } from './mock-engine'
 import { mockProfile } from './mock-profile'
@@ -19,6 +19,8 @@ import { mockVersions } from './mock-versions'
 
 export function mockApi(): ResinApi {
   const servers = mockServers()
+  // Settings → Remote control → People who can use your servers.
+  let grants: RemoteGrant[] = [{ uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Steve', role: 'operator', servers: null }]
   const updates = mockUpdate()
   const now = Date.now()
   let instances: Instance[] = [
@@ -580,7 +582,33 @@ export function mockApi(): ResinApi {
     ...mockMigrate((inst) => {
       instances = [inst, ...instances]
     }),
-    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), openFile: () => noop() },
-    remote: { status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }) }
+    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop() },
+    remote: {
+      status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }),
+      grants: async () => grants,
+      setGrants: async (list) => (grants = list),
+      lookupName: async (name) => {
+        await new Promise((r) => setTimeout(r, 300))
+        if (name.trim().length < 3) throw new Error(`No Minecraft account is called ${name}`)
+        return { uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: name.trim() }
+      }
+    },
+    // Another PC: answered by this mock's servers (only the first, renamed), like a friend's PC with one server.
+    remoteView: {
+      devices: async () => [
+        { id: 7, name: 'GAMING-PC', appVersion: '1.4.1', since: Math.floor(now / 1000) - 3600, owner: '8667ba71-b85a-4004-af54-457a9734eed7', ownerName: 'Puirkle' },
+        { id: 9, name: 'Steve-Desktop', appVersion: '1.4.1', since: Math.floor(now / 1000) - 600, owner: '069a79f4-44e9-4726-a5be-fca90e38aaf5', ownerName: 'Steve', shared: true }
+      ],
+      open: async () => {},
+      close: async () => {},
+      call: async (_device, method, params) => {
+        const [ns, key] = method.split('.')
+        if (ns !== 'server') throw new Error("The owner of this PC hasn't given you access to that.")
+        if (key === 'remove' || key === 'create') throw new Error("The owner of this PC hasn't given you access to that.")
+        const f = (servers.server as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[key]
+        const v = await f(...params)
+        return key === 'list' ? (v as { name: string }[]).slice(0, 1).map((s) => ({ ...s, name: `${s.name} (remote)` })) : v
+      }
+    }
   }
 }
