@@ -1,7 +1,8 @@
 //! Installing server software into a server folder: the official vanilla server.jar, Paper / Purpur / Folia /
 //! Leaf from their download APIs, Fabric's server launcher, Quilt's installer, the Forge / NeoForge installers
 //! (`--installServer`; Forge 1.7.10–1.12.2 is laid out from its installer instead), the Arclight hybrid (one
-//! jar; it fetches its libraries on first start) and Bedrock Dedicated Server. Each fills in
+//! jar; it fetches its libraries on first start), Mohist, Pufferfish, SpongeVanilla, the proxies (Velocity, BungeeCord,
+//! Waterfall), Glowstone, Cuberite and Bedrock Dedicated Server. Each fills in
 //! `ServerMeta::launch` (how to start it) and the loader/build version.
 
 use std::collections::{HashMap, VecDeque};
@@ -32,6 +33,19 @@ const SPIGOT_VERSIONS: &str = "https://hub.spigotmc.org/versions/";
 const BUILDTOOLS: &str = "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar";
 const QUILT_INSTALLER: &str = "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer";
 const LEAF: &str = "https://api.leafmc.one/v2/projects/leaf";
+const MOHIST: &str = "https://api.mohistmc.com/project/mohist";
+const SPONGE: &str = "https://dl-api.spongepowered.org/v2/groups/org.spongepowered/artifacts/spongevanilla";
+/// Pufferfish's Jenkins: one job per Minecraft series ("Pufferfish-1.21").
+const PUFFERFISH: &str = "https://ci.pufferfish.host";
+const BUNGEECORD: &str = "https://ci.md-5.net/job/BungeeCord/lastSuccessfulBuild/artifact/bootstrap/target/BungeeCord.jar";
+/// Its last release (2021), for Minecraft 1.12.2.
+const GLOWSTONE: &str = "https://github.com/GlowstoneMC/Glowstone/releases/download/2021.8.0/glowstone.jar";
+const CUBERITE: &str = "https://download.cuberite.org/linux-x86_64/Cuberite.tar.gz";
+/// What Glowstone and Cuberite speak; they have one version each.
+const OLD_MC: &str = "1.12.2";
+/// The newest Velocity needs it, and the older proxies run on it.
+const PROXY_JAVA: u32 = 21;
+const GLOWSTONE_JAVA: u32 = 11;
 /// Arclight's own file server: one folder per Minecraft version (some are aliases of the same branch).
 const ARCLIGHT: &str = "https://files.hypertention.cn/v1/files/arclight/minecraft";
 /// Every Bedrock Dedicated Server version, kept by the Bedrock OSS community (the downloads are Mojang's).
@@ -62,7 +76,11 @@ pub async fn choose_java(meta: &ServerMeta) -> Result<String> {
     if let Some(custom) = non_empty(meta.java_path.as_deref()).or_else(|| non_empty(Some(&settings.java_path))) {
         return Ok(custom);
     }
-    let required = required_java(&meta.mc_version).await?;
+    let required = match meta.kind {
+        k if k.proxy() => PROXY_JAVA,
+        ServerKind::Glowstone => GLOWSTONE_JAVA,
+        _ => required_java(&meta.mc_version).await?,
+    };
     if let Some(found) = find_java(required).await? {
         return Ok(found.path);
     }
@@ -79,7 +97,7 @@ pub async fn choose_java(meta: &ServerMeta) -> Result<String> {
 /// Mojang's list and the loader lists for those).
 pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
     let mut list: Vec<String> = match kind {
-        ServerKind::Paper | ServerKind::Folia => {
+        ServerKind::Paper | ServerKind::Folia | ServerKind::Velocity | ServerKind::Waterfall => {
             #[derive(Deserialize)]
             struct Project {
                 versions: HashMap<String, Vec<String>>,
@@ -94,7 +112,7 @@ pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
             }
             fetch_json::<Project>(PURPUR).await?.versions
         }
-        ServerKind::Spigot => {
+        ServerKind::Spigot | ServerKind::Craftbukkit => {
             // BuildTools' version list is a plain directory listing of <version>.json files.
             let html = fetch_text(SPIGOT_VERSIONS).await?;
             let re = regex::Regex::new(r#"href="(\d+\.\d+(?:\.\d+)?)\.json""#)?;
@@ -108,6 +126,11 @@ pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
             fetch_json::<Project>(LEAF).await?.versions
         }
         ServerKind::Arclight => arclight_versions().await?,
+        ServerKind::Mohist => mohist_versions().await?,
+        ServerKind::Pufferfish => pufferfish_versions().await?,
+        ServerKind::Sponge => sponge_versions().await?,
+        ServerKind::Bungeecord => vec!["latest".to_string()],
+        ServerKind::Glowstone | ServerKind::Cuberite => vec![OLD_MC.to_string()],
         ServerKind::Bedrock => bedrock_versions().await?,
         _ => return Ok(Vec::new()),
     };
@@ -150,6 +173,8 @@ pub async fn builds(kind: ServerKind, mc: &str) -> Result<Vec<ServerBuild>> {
 fn project_of(kind: ServerKind) -> &'static str {
     match kind {
         ServerKind::Folia => "folia",
+        ServerKind::Velocity => "velocity",
+        ServerKind::Waterfall => "waterfall",
         _ => "paper",
     }
 }
@@ -180,7 +205,32 @@ pub async fn install(meta: &mut ServerMeta, dir: &Path, task: &Arc<Task>) -> Res
             let exe = bedrock(&mc, dir, task).await?;
             (ServerLaunch { exe: Some(exe), ..Default::default() }, None)
         }
-        ServerKind::Paper | ServerKind::Folia => {
+        ServerKind::Mohist => {
+            let (on, build) = mohist(&mc, dir, task).await?;
+            loader = Some(on);
+            (jar("mohist.jar"), Some(build))
+        }
+        ServerKind::Pufferfish => {
+            let build = pufferfish(&mc, dir, task).await?;
+            (jar("pufferfish.jar"), Some(build))
+        }
+        ServerKind::Sponge => {
+            let build = sponge(&mc, dir, task).await?;
+            (jar("sponge.jar"), Some(build))
+        }
+        ServerKind::Bungeecord => {
+            download_all(vec![DownloadItem::new(BUNGEECORD, dir.join("bungeecord.jar"))], 1, task.counter("Downloading BungeeCord")).await?;
+            (jar("bungeecord.jar"), None)
+        }
+        ServerKind::Glowstone => {
+            download_all(vec![DownloadItem::new(GLOWSTONE, dir.join("glowstone.jar"))], 1, task.counter("Downloading Glowstone")).await?;
+            (jar("glowstone.jar"), None)
+        }
+        ServerKind::Cuberite => {
+            cuberite(dir, task).await?;
+            (ServerLaunch { exe: Some("Cuberite".to_string()), ..Default::default() }, None)
+        }
+        ServerKind::Paper | ServerKind::Folia | ServerKind::Velocity | ServerKind::Waterfall => {
             let build = paper_like(meta.kind, &mc, wanted.as_deref(), dir, task).await?;
             (jar(&format!("{}.jar", project_of(meta.kind))), Some(build))
         }
@@ -190,8 +240,13 @@ pub async fn install(meta: &mut ServerMeta, dir: &Path, task: &Arc<Task>) -> Res
         }
         ServerKind::Spigot => {
             let java = choose_java(meta).await?;
-            spigot(&mc, dir, &java, task).await?;
+            spigot(&mc, dir, &java, "spigot", task).await?;
             (jar("spigot.jar"), None)
+        }
+        ServerKind::Craftbukkit => {
+            let java = choose_java(meta).await?;
+            spigot(&mc, dir, &java, "craftbukkit", task).await?;
+            (jar("craftbukkit.jar"), None)
         }
         ServerKind::Fabric => {
             let loader = match wanted {
@@ -511,9 +566,119 @@ async fn bedrock(version: &str, dir: &Path, task: &Arc<Task>) -> Result<String> 
     Ok(exe.to_string())
 }
 
+/// The Minecraft versions Mohist has a build for (its list also names versions without any).
+async fn mohist_versions() -> Result<Vec<String>> {
+    #[derive(Deserialize)]
+    struct Version {
+        name: String,
+    }
+    let all: Vec<Version> = fetch_json(&format!("{MOHIST}/versions")).await?;
+    let checks = all.into_iter().map(|v| async move { fetch_text(&format!("{MOHIST}/{}/builds/latest", enc(&v.name))).await.ok().map(|_| v.name) });
+    Ok(futures::future::join_all(checks).await.into_iter().flatten().collect())
+}
+
+/// Mohist's newest build. Returns the loader it runs on and the build number.
+async fn mohist(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<(LoaderType, String)> {
+    #[derive(Deserialize)]
+    struct Loader {
+        #[serde(default)]
+        forge_version: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct Build {
+        id: u64,
+        file_sha256: String,
+        loader: Loader,
+    }
+    task.update(format!("Finding Mohist for Minecraft {mc}…"), None);
+    let b: Build = match fetch_json(&format!("{MOHIST}/{}/builds/latest", enc(mc))).await {
+        Err(e) if status_of(&e) == Some(404) => bail!("Mohist isn't available for Minecraft {mc}"),
+        r => r?,
+    };
+    let url = format!("{MOHIST}/{}/builds/{}/download", enc(mc), b.id);
+    let item = DownloadItem::new(url, dir.join("mohist.jar")).hash(Some(Hash::sha256(&b.file_sha256)));
+    download_all(vec![item], 1, task.counter("Downloading Mohist")).await?;
+    let on = if b.loader.forge_version.is_some_and(|v| !v.is_empty()) { LoaderType::Forge } else { LoaderType::Neoforge };
+    Ok((on, b.id.to_string()))
+}
+
+/// The Minecraft series Pufferfish has a job for.
+async fn pufferfish_versions() -> Result<Vec<String>> {
+    let text = fetch_text(&format!("{PUFFERFISH}/api/json?tree=jobs%5Bname%5D")).await?;
+    let re = regex::Regex::new(r#""name":"Pufferfish-(\d+\.\d+)""#)?;
+    Ok(re.captures_iter(&text).map(|c| c[1].to_string()).collect())
+}
+
+/// The series' newest build (its paperclip jar). Returns the build number.
+async fn pufferfish(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Artifact {
+        relative_path: String,
+    }
+    #[derive(Deserialize)]
+    struct Build {
+        number: u64,
+        artifacts: Vec<Artifact>,
+    }
+    task.update(format!("Finding Pufferfish for Minecraft {mc}…"), None);
+    let job = format!("{PUFFERFISH}/job/Pufferfish-{}/lastSuccessfulBuild", enc(mc));
+    let b: Build = match fetch_json(&format!("{job}/api/json?tree=number,artifacts%5BrelativePath%5D")).await {
+        Err(e) if status_of(&e) == Some(404) => bail!("Pufferfish isn't available for Minecraft {mc}"),
+        r => r?,
+    };
+    let art = b.artifacts.iter().find(|a| a.relative_path.contains("paperclip")).or(b.artifacts.iter().find(|a| a.relative_path.ends_with(".jar")));
+    let art = art.ok_or_else(|| anyhow!("Pufferfish build {} has no server jar", b.number))?;
+    let url = format!("{job}/artifact/{}", art.relative_path);
+    download_all(vec![DownloadItem::new(url, dir.join("pufferfish.jar"))], 1, task.counter("Downloading Pufferfish")).await?;
+    Ok(b.number.to_string())
+}
+
+/// The Minecraft releases SpongeVanilla has builds for.
+async fn sponge_versions() -> Result<Vec<String>> {
+    let v: Value = fetch_json(SPONGE).await?;
+    let list = v["tags"]["minecraft"].as_array().cloned().unwrap_or_default();
+    let re = regex::Regex::new(r"^\d+\.\d+(\.\d+)?$")?;
+    Ok(list.iter().filter_map(Value::as_str).filter(|m| re.is_match(m)).map(str::to_string).collect())
+}
+
+/// SpongeVanilla's recommended build, else its newest. Returns the build.
+async fn sponge(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    task.update(format!("Finding Sponge for Minecraft {mc}…"), None);
+    let v: Value = fetch_json(&format!("{SPONGE}/versions?tags=minecraft:{}&offset=0&limit=25", enc(mc))).await?;
+    let builds = v["artifacts"].as_object().cloned().unwrap_or_default();
+    let newest = |list: Vec<&String>| list.into_iter().max_by(|a, b| natural_cmp(a, b)).cloned();
+    let pick = newest(builds.iter().filter(|(_, b)| b["recommended"] == true).map(|(k, _)| k).collect()).or_else(|| newest(builds.keys().collect()));
+    let pick = pick.ok_or_else(|| anyhow!("Sponge isn't available for Minecraft {mc}"))?;
+    let detail: Value = fetch_json(&format!("{SPONGE}/versions/{}", enc(&pick))).await?;
+    let assets = detail["assets"].as_array().cloned().unwrap_or_default();
+    let asset = assets.iter().find(|a| a["classifier"] == "universal" && a["extension"] == "jar").ok_or_else(|| anyhow!("Sponge {pick} has no server jar"))?;
+    let url = asset["downloadUrl"].as_str().ok_or_else(|| anyhow!("Sponge {pick} has no server jar"))?;
+    let item = DownloadItem::new(url, dir.join("sponge.jar")).hash(asset["sha1"].as_str().map(Hash::sha1));
+    download_all(vec![item], 1, task.counter("Downloading Sponge")).await?;
+    Ok(pick)
+}
+
+/// Cuberite's nightly for 64-bit Linux, the only build it still publishes.
+async fn cuberite(dir: &Path, task: &Arc<Task>) -> Result<()> {
+    if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        bail!("Cuberite only has a build for 64-bit Linux");
+    }
+    let archive = dir.join("cuberite.tar.gz");
+    download_all(vec![DownloadItem::new(CUBERITE, &archive)], 1, task.counter("Downloading Cuberite")).await?;
+    task.update("Unpacking Cuberite…", None);
+    let status = tokio::process::Command::new("tar").arg("-xzf").arg(&archive).arg("-C").arg(dir).status().await.context("Couldn't run tar")?;
+    let _ = tokio::fs::remove_file(&archive).await;
+    if !status.success() || !dir.join("Cuberite").is_file() {
+        bail!("Cuberite's download couldn't be unpacked");
+    }
+    Ok(())
+}
+
 /// Spigot can't be redistributed as a ready-made jar, so it's compiled locally with Spigot's official
-/// BuildTools (which fetches Git and the sources itself). Takes a few minutes the first time.
-async fn spigot(mc: &str, dir: &Path, java: &str, task: &Arc<Task>) -> Result<()> {
+/// BuildTools (which fetches Git and the sources itself). Takes a few minutes the first time. `what`: "spigot" or
+/// "craftbukkit".
+async fn spigot(mc: &str, dir: &Path, java: &str, what: &str, task: &Arc<Task>) -> Result<()> {
     let work = paths::cache().join("buildtools");
     tokio::fs::create_dir_all(&work).await?;
     let tool = work.join("BuildTools.jar");
@@ -526,17 +691,17 @@ async fn spigot(mc: &str, dir: &Path, java: &str, task: &Arc<Task>) -> Result<()
         "--rev".into(),
         mc.into(),
         "--compile".into(),
-        "spigot".into(),
+        what.into(),
         "--output-dir".into(),
         plain(dir),
         "--nogui".into(),
     ];
     run_installer(java, &args, &work, task, "Spigot BuildTools").await?;
-    let built = dir.join(format!("spigot-{mc}.jar"));
+    let built = dir.join(format!("{what}-{mc}.jar"));
     if !built.is_file() {
-        bail!("BuildTools finished without producing spigot-{mc}.jar");
+        bail!("BuildTools finished without producing {what}-{mc}.jar");
     }
-    tokio::fs::rename(&built, dir.join("spigot.jar")).await?;
+    tokio::fs::rename(&built, dir.join(format!("{what}.jar"))).await?;
     Ok(())
 }
 

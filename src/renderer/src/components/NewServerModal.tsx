@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Blocks, Check, ChevronLeft, ChevronRight, Combine, FileArchive, FlaskConical, Layers, Leaf, Loader2, Package, Search, Server, Smartphone } from 'lucide-react'
+import { Blocks, Check, ChevronLeft, ChevronRight, Combine, Cpu, Fish, FileArchive, FlaskConical, Hammer, Layers, Leaf, Loader2, Network, Package, Search, Server, Smartphone, Sparkles } from 'lucide-react'
 import type {
   ContentSource,
   Instance,
@@ -30,6 +30,15 @@ export const SERVER_LABEL: Record<ServerKind, string> = {
   folia: 'Folia',
   spigot: 'Spigot',
   leaf: 'Leaf',
+  pufferfish: 'Pufferfish',
+  craftbukkit: 'CraftBukkit',
+  sponge: 'Sponge',
+  mohist: 'Mohist',
+  velocity: 'Velocity',
+  bungeecord: 'BungeeCord',
+  waterfall: 'Waterfall',
+  glowstone: 'Glowstone',
+  cuberite: 'Cuberite',
   fabric: 'Fabric',
   quilt: 'Quilt',
   forge: 'Forge',
@@ -56,6 +65,15 @@ const MODRINTH_ICON: Partial<Record<Pick, string>> = {
 const OWN_ICON: Partial<Record<Pick, ReactNode>> = {
   snapshot: <FlaskConical />,
   leaf: <Leaf />,
+  pufferfish: <Fish />,
+  craftbukkit: <Hammer />,
+  sponge: <Layers />,
+  mohist: <Combine />,
+  velocity: <Network />,
+  bungeecord: <Network />,
+  waterfall: <Network />,
+  glowstone: <Sparkles />,
+  cuberite: <Cpu />,
   arclight: <Combine />,
   bedrock: <Smartphone />
 }
@@ -97,14 +115,16 @@ const pickLabel = (k: Pick) => (k === 'snapshot' ? 'Snapshot' : SERVER_LABEL[k])
 
 const GROUPS: { title: Key; types: Pick[] }[] = [
   { title: 'servers.create.groupVanilla', types: ['vanilla', 'snapshot'] },
-  { title: 'servers.create.groupPlugins', types: ['paper', 'purpur', 'folia', 'spigot', 'leaf'] },
+  { title: 'servers.create.groupPlugins', types: ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge'] },
   { title: 'servers.create.groupMods', types: ['fabric', 'quilt', 'forge', 'neoforge'] },
-  { title: 'servers.create.groupHybrid', types: ['arclight'] },
+  { title: 'servers.create.groupHybrid', types: ['arclight', 'mohist'] },
+  { title: 'servers.create.groupProxy', types: ['velocity', 'bungeecord', 'waterfall'] },
+  { title: 'servers.create.groupOther', types: ['glowstone', 'cuberite'] },
   { title: 'servers.create.groupBedrock', types: ['bedrock'] }
 ]
 
 /** Server types whose version list comes from their own download site. */
-const OWN_VERSIONS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'arclight', 'bedrock']
+const OWN_VERSIONS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'arclight', 'mohist', 'velocity', 'bungeecord', 'waterfall', 'glowstone', 'cuberite', 'bedrock']
 /** Types that come in builds to choose from (Arclight: one per mod loader). */
 const WITH_BUILDS: ServerKind[] = ['arclight']
 const LOADER_OF: Partial<Record<ServerKind, LoaderType>> = { fabric: 'fabric', quilt: 'quilt', forge: 'forge', neoforge: 'neoforge' }

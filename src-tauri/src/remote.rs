@@ -397,7 +397,7 @@ fn public_server(mut v: Value, full: bool) -> Value {
     v
 }
 
-const KINDS: &[&str] = &["vanilla", "paper", "purpur", "folia", "spigot", "leaf", "fabric", "quilt", "forge", "neoforge", "arclight", "bedrock"];
+const KINDS: &[&str] = &["vanilla", "paper", "purpur", "folia", "spigot", "craftbukkit", "leaf", "pufferfish", "sponge", "fabric", "quilt", "forge", "neoforge", "arclight", "mohist", "velocity", "bungeecord", "waterfall", "glowstone", "cuberite", "bedrock"];
 
 /// Server-manager actions the console may run as `server.<name>` (the engine's `server:<name>`, same arguments).
 const SERVER: &[&str] = &[

@@ -12,7 +12,7 @@ import '../migrate.css'
 
 const keyOf = (r: MigrateRef) => [r.launcher, r.server ? 's' : 'i', r.path, r.profile ?? ''].join('|')
 const importable = (i: MigrateItem) => !i.problem
-const PLUGIN_SERVERS = new Set(['paper', 'purpur', 'folia', 'spigot', 'leaf'])
+const PLUGIN_SERVERS = new Set(['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'velocity', 'bungeecord', 'waterfall'])
 
 /** Sizes up to many GB (instances with big worlds). */
 const size = (n: number) => (n >= 1 << 30 ? t('common.size.gb', { n: fixed(n / (1 << 30), 1) }) : bytes(n))

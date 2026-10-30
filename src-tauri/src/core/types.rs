@@ -844,12 +844,29 @@ pub enum ServerKind {
     Spigot,
     /// A Paper fork tuned for performance.
     Leaf,
+    /// A Paper fork with Dynamic Activation of Brains.
+    Pufferfish,
+    /// Built locally with BuildTools, like Spigot.
+    Craftbukkit,
+    /// SpongeVanilla: the Sponge plugin API on the vanilla server.
+    Sponge,
     Fabric,
     Quilt,
     Forge,
     Neoforge,
     /// Mods and Bukkit plugins together, on Forge, NeoForge or Fabric (which one is in `ServerMeta::loader`).
     Arclight,
+    /// A hybrid like Arclight, on Forge or NeoForge (which one is in `ServerMeta::loader`).
+    Mohist,
+    /// Proxies route players between other servers; they have no world. `mc_version` is the proxy's own version.
+    Velocity,
+    Bungeecord,
+    /// PaperMC's old BungeeCord fork (no longer developed).
+    Waterfall,
+    /// A Minecraft server written from scratch in Java, for 1.12.2.
+    Glowstone,
+    /// A Minecraft server written from scratch in C++, for 1.12.2: its own program (no Java).
+    Cuberite,
     /// Bedrock Dedicated Server from minecraft.net: its own program, UDP port, worlds and packs (no Java).
     Bedrock,
 }
@@ -874,13 +891,37 @@ impl ServerKind {
             LoaderType::Neoforge => Self::Neoforge,
         }
     }
-    /// Bukkit-style plugin servers (plugins/ folder).
+    /// Runs Bukkit plugins.
+    pub fn bukkit(self) -> bool {
+        matches!(self, Self::Paper | Self::Purpur | Self::Folia | Self::Spigot | Self::Leaf | Self::Pufferfish | Self::Craftbukkit)
+    }
+    /// Has a plugins/ folder: Bukkit servers, Sponge and proxies (their plugins are their own kind).
     pub fn plugins(self) -> bool {
-        matches!(self, Self::Paper | Self::Purpur | Self::Folia | Self::Spigot | Self::Leaf)
+        self.bukkit() || self.proxy() || self == Self::Sponge
+    }
+    /// Routes players to other servers: no world, players or server.properties of its own.
+    pub fn proxy(self) -> bool {
+        matches!(self, Self::Velocity | Self::Bungeecord | Self::Waterfall)
+    }
+    /// Runs Mojang's server code, so its EULA applies.
+    pub fn needs_eula(self) -> bool {
+        !self.proxy() && !matches!(self, Self::Glowstone | Self::Cuberite)
+    }
+    /// Reads its port from server.properties.
+    pub fn uses_properties(self) -> bool {
+        !self.proxy() && self != Self::Cuberite
+    }
+    /// The console command that stops it cleanly.
+    pub fn stop_command(self) -> &'static str {
+        match self {
+            Self::Velocity => "shutdown",
+            Self::Bungeecord | Self::Waterfall => "end",
+            _ => "stop",
+        }
     }
     /// Hybrids (Arclight) run mods (mods/) and Bukkit plugins (plugins/) together.
     pub fn hybrid(self) -> bool {
-        matches!(self, Self::Arclight)
+        matches!(self, Self::Arclight | Self::Mohist)
     }
     /// Runs mods, as a mod loader or a hybrid.
     pub fn modded(self) -> bool {
@@ -897,6 +938,15 @@ impl ServerKind {
             Self::Folia => "Folia",
             Self::Spigot => "Spigot",
             Self::Leaf => "Leaf",
+            Self::Pufferfish => "Pufferfish",
+            Self::Craftbukkit => "CraftBukkit",
+            Self::Sponge => "Sponge",
+            Self::Mohist => "Mohist",
+            Self::Velocity => "Velocity",
+            Self::Bungeecord => "BungeeCord",
+            Self::Waterfall => "Waterfall",
+            Self::Glowstone => "Glowstone",
+            Self::Cuberite => "Cuberite",
             Self::Fabric => "Fabric",
             Self::Quilt => "Quilt",
             Self::Forge => "Forge",
