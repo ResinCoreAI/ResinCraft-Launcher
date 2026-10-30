@@ -20,6 +20,7 @@ use crate::game::java::hidden_command;
 use crate::game::launch::{split_args, LogParser};
 use crate::player::files::unique_name;
 
+use super::container::{self, Container};
 use super::{installers, network, playit, properties, relay, store, tunnel};
 
 /// How long a server gets to save and shut down after `stop` before it's killed.
@@ -380,6 +381,8 @@ pub async fn start(id: &str) -> Result<()> {
     if meta.kind.needs_eula() && !store::eula_accepted(id).await {
         bail!("Agree to the Minecraft EULA before starting {}.", meta.name);
     }
+    // Before the port check: a container left by a crash still holds its port.
+    let container = if crate::core::settings::get().await.containers { Some(Container::prepare(id).await?) } else { None };
     let bedrock = meta.kind.bedrock();
     let port_free = if bedrock { network::udp_port_free(meta.port) } else { network::port_free(meta.port) };
     if !port_free {
@@ -460,6 +463,25 @@ pub async fn start(id: &str) -> Result<()> {
     } else {
         dir.clone()
     };
+    let (shown_program, shown_args) = (program.clone(), args.clone());
+    let (program, args) = match &container {
+        None => (program, args),
+        Some(c) => {
+            let java = if meta.launch.exe.is_none() { container::java_home(&program) } else { None };
+            let udp: Vec<u16> = if bedrock { vec![meta.port + 1] } else { geyser_port(id).await.into_iter().collect() };
+            let contained = c.run_args(&container::Run {
+                dir: &dir,
+                workdir: &run_dir,
+                java_home: java.as_ref().map(|(_, home)| home.as_path()),
+                program: java.as_ref().map_or(&program, |(real, _)| real),
+                args: &args,
+                port: meta.port,
+                udp: &udp,
+                memory_mb: meta.memory_mb.max(512),
+            });
+            (c.engine().to_string(), contained)
+        }
+    };
     let mut cmd = hidden_command(&program);
     cmd.args(&args)
         .current_dir(&run_dir)
@@ -474,6 +496,23 @@ pub async fn start(id: &str) -> Result<()> {
             p.max_mb = max_mb;
         }
     });
+    // The RAM display follows the server, not the `docker run` that talks to it.
+    if let Some(c) = container.clone() {
+        let id = id.to_string();
+        tokio::spawn(async move {
+            for _ in 0..CONTAINER_PID_TRIES {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                if let Some(pid) = c.pid().await {
+                    with(|w| {
+                        if let Some(p) = w.procs.get_mut(&id).filter(|p| p.run == run) {
+                            p.pid = Some(pid);
+                        }
+                    });
+                    return;
+                }
+            }
+        });
+    }
     store::touch_started(id).await;
 
     // Batch console lines so a chatty server doesn't flood the UI.
@@ -520,9 +559,12 @@ pub async fn start(id: &str) -> Result<()> {
             level: "warn",
         });
     }
-    if !bedrock {
-        push(LogLine { text: format!("Java: {program}"), level: "info" });
-        push(LogLine { text: format!("Command: java {}", args.join(" ")), level: "debug" });
+    if let Some(c) = &container {
+        push(LogLine { text: format!("Running in a {} container", c.engine()), level: "info" });
+    }
+    if meta.launch.exe.is_none() {
+        push(LogLine { text: format!("Java: {shown_program}"), level: "info" });
+        push(LogLine { text: format!("Command: java {}", shown_args.join(" ")), level: "debug" });
     }
 
     let mut readers = Vec::new();
@@ -575,7 +617,7 @@ pub async fn start(id: &str) -> Result<()> {
     };
 
     if !bedrock {
-        tokio::spawn(watch_players(id.to_string(), run, meta.port));
+        tokio::spawn(watch_players(id.to_string(), run, meta.port, meta.kind == ServerKind::Cuberite, meta.public));
     }
     let id = id.to_string();
     let port = meta.port;
@@ -587,6 +629,9 @@ pub async fn start(id: &str) -> Result<()> {
                 s = child.wait() => break s,
                 Some(()) = kill_rx.recv(), if !killed => {
                     killed = true;
+                    if let Some(c) = &container {
+                        c.remove().await;
+                    }
                     let _ = child.start_kill();
                 }
             }
@@ -659,23 +704,38 @@ pub async fn start(id: &str) -> Result<()> {
 
 /// How often a running Java server is asked who's online.
 const PLAYER_POLL: Duration = Duration::from_secs(5);
+/// How often a server that only shows it's up by answering pings is tried.
+const READY_POLL: Duration = Duration::from_secs(1);
+/// Seconds a new container gets to appear (longer the first time, while its image downloads).
+const CONTAINER_PID_TRIES: u32 = 300;
 
 /// Asks the running server who's online every few seconds (the server-list ping, as the game's server list does), so
 /// the list stays right when join lines are missed or a modpack changes them. Ends with the run.
-async fn watch_players(id: String, run: u64, port: u16) {
+async fn watch_players(id: String, run: u64, port: u16, ready_by_ping: bool, public: bool) {
     let addr = format!("127.0.0.1:{port}");
     loop {
-        tokio::time::sleep(PLAYER_POLL).await;
+        let state = with(|w| w.procs.get(&id).map(|p| (p.run == run, p.state)));
+        tokio::time::sleep(if ready_by_ping && state == Some((true, "starting")) { READY_POLL } else { PLAYER_POLL }).await;
         match with(|w| w.procs.get(&id).map(|p| (p.run == run, p.state))) {
             Some((true, "running")) => {}
+            Some((true, "starting")) if ready_by_ping => {}
             Some((true, _)) => continue,
             _ => return,
         }
         let Ok(status) = crate::player::servers::ping_server(&addr, Duration::from_secs(3)).await else { continue };
-        let changed = with(|w| match w.procs.get_mut(&id) {
-            Some(p) if p.run == run => merge_players(&mut p.players, &mut p.online, status.players.online, &status.players.sample),
-            _ => false,
+        let (became_running, changed) = with(|w| match w.procs.get_mut(&id) {
+            Some(p) if p.run == run => {
+                let became_running = p.state == "starting";
+                if became_running {
+                    p.state = "running";
+                }
+                (became_running, merge_players(&mut p.players, &mut p.online, status.players.online, &status.players.sample) || became_running)
+            }
+            _ => (false, false),
         });
+        if became_running && public {
+            tokio::spawn(open_internet(id.clone()));
+        }
         if changed {
             emit_state(&id, None);
         }

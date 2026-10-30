@@ -409,6 +409,7 @@ export interface Settings {
   remoteControl?: boolean
   /** Remote control may also use the file manager, Java settings and plugins from any link (off by default). */
   remoteFullControl?: boolean
+  containers?: boolean
   /** 'system' follows the OS locale; otherwise a locale code such as 'de' or 'pt-BR'. */
   language: string
   memoryMb: number

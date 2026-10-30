@@ -33,6 +33,8 @@ pub struct Settings {
     /// Remote control may also use the file manager, Java settings and plugins from any link (they can run programs
     /// on this PC). Off by default.
     pub remote_full_control: bool,
+    /// Hosted servers run in Docker or Podman containers (the panel's `containers on`; off by default).
+    pub containers: bool,
     /// UI language: "system" (follow the OS) or a locale code such as "de" or "pt-BR".
     pub language: String,
     pub memory_mb: u32,
@@ -105,6 +107,7 @@ impl Default for Settings {
             auto_backup_keep: 3,
             remote_control: false,
             remote_full_control: false,
+            containers: false,
             language: "system".into(),
             // A quarter of system RAM, kept between 2 GB and 6 GB, suits most packs.
             memory_mb: ((total / 4 / 512) * 512).clamp(2048, 6144),

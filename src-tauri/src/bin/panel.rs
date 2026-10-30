@@ -7,6 +7,7 @@
 //!   resincraft-panel start|stop <id>          starts or stops a server
 //!   resincraft-panel call <channel> [json…]   any engine request, e.g. call server:list
 //!   resincraft-panel full-control on|off      lets the owner use files and Java settings from afar (off by default)
+//!   resincraft-panel containers on|off        hosts servers in Docker or Podman from their next start (off by default)
 //!   resincraft-panel login                    sign in with Microsoft (a code to enter on another device)
 //!   resincraft-panel accounts                 the accounts signed in here
 //!
@@ -22,7 +23,7 @@ use resincraft_lib::core::{ctx, events, router, settings, Args};
 use resincraft_lib::{player, remote, server};
 use serde_json::{json, Value};
 
-const USAGE: &str = "usage: resincraft-panel <run|servers|start|stop|call|full-control|login|accounts>";
+const USAGE: &str = "usage: resincraft-panel <run|servers|start|stop|call|full-control|containers|login|accounts>";
 /// How long the servers get to save and stop when the service stops.
 const STOP_GRACE: Duration = Duration::from_secs(60);
 
@@ -201,6 +202,10 @@ async fn panel() {
         "full-control" => match words.get(1).map(String::as_str) {
             Some(word @ ("on" | "off")) => call("settings:set", vec![json!({ "remoteFullControl": word == "on" })]).await.map(|_| ()),
             _ => Err(anyhow::anyhow!("usage: resincraft-panel full-control on|off")),
+        },
+        "containers" => match words.get(1).map(String::as_str) {
+            Some(word @ ("on" | "off")) => call("settings:set", vec![json!({ "containers": word == "on" })]).await.map(|_| ()),
+            _ => Err(anyhow::anyhow!("usage: resincraft-panel containers on|off")),
         },
         _ => {
             eprintln!("{USAGE}");

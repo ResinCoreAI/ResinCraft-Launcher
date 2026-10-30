@@ -9,6 +9,7 @@ pub mod clientpack;
 pub mod clientfiles;
 pub mod clientplan;
 pub mod cloudflare;
+pub mod container;
 pub mod clientmods;
 pub mod create;
 pub mod discordbot;

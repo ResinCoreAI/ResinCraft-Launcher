@@ -44,6 +44,17 @@ if ! id resincraft >/dev/null 2>&1; then
 fi
 mkdir -p "$DATA"
 chown -R resincraft "$DATA"
+# Containers are optional (resincraft-panel containers on). The docker group can run anything as root on this machine.
+if getent group docker >/dev/null 2>&1; then
+    usermod -aG docker resincraft 2>/dev/null || addgroup resincraft docker
+fi
+
+# Podman without Docker: its rootless mode needs newuidmap, which NoNewPrivileges stops, and sub-IDs for the user.
+NO_NEW_PRIVILEGES=true
+if command -v podman >/dev/null 2>&1 && ! command -v docker >/dev/null 2>&1; then
+    NO_NEW_PRIVILEGES=false
+    grep -q '^resincraft:' /etc/subuid 2>/dev/null || usermod --add-subuids 200000-265535 --add-subgids 200000-265535 resincraft
+fi
 
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
     cat >/etc/systemd/system/resincraft-panel.service <<EOF
@@ -60,7 +71,7 @@ Restart=on-failure
 RestartSec=5
 # The servers get their time to save.
 TimeoutStopSec=90
-NoNewPrivileges=true
+NoNewPrivileges=$NO_NEW_PRIVILEGES
 ProtectSystem=strict
 ReadWritePaths=$DATA
 PrivateTmp=true
