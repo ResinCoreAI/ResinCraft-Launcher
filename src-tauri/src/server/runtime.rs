@@ -1653,6 +1653,31 @@ mod restore_tests {
     use super::restore_target;
 
     #[test]
+    fn writes_the_port_of_software_without_server_properties() {
+        assert_eq!(port_in_bungee_config("", 25577), "listeners:
+- host: 0.0.0.0:25577
+");
+        assert_eq!(port_in_bungee_config("a: 1
+listeners:
+- query_port: 1
+  host: 0.0.0.0:25577
+  motd: x
+", 30000), "a: 1
+listeners:
+- query_port: 1
+  host: 0.0.0.0:30000
+  motd: x
+");
+        assert_eq!(port_in_cuberite_settings("[Server]
+Ports=25565
+MaxPlayers=10
+", 25570), "[Server]
+Ports=25570
+MaxPlayers=10
+");
+    }
+
+    #[test]
     fn backups_go_back_under_the_level_name_now() {
         assert_eq!(restore_target("world/region/r.0.0.mca", "world", "world", false).as_deref(), Some("world/region/r.0.0.mca"));
         assert_eq!(restore_target("old/level.dat", "old", "smp", false).as_deref(), Some("smp/level.dat"));
