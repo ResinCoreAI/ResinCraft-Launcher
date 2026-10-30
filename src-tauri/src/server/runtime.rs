@@ -1643,7 +1643,7 @@ async fn zip_worlds(dir: PathBuf, worlds: Vec<String>, target: PathBuf) -> Resul
 
 #[cfg(test)]
 mod restore_tests {
-    use super::restore_target;
+    use super::{port_in_bungee_config, port_in_cuberite_settings, restore_target};
 
     #[test]
     fn writes_the_port_of_software_without_server_properties() {
