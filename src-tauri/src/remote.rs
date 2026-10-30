@@ -49,7 +49,7 @@ pub struct RemoteStatus {
 }
 
 static STATUS: Mutex<Option<RemoteStatus>> = Mutex::new(None);
-static RUNNING: Mutex<Option<tauri::async_runtime::JoinHandle<()>>> = Mutex::new(None);
+static RUNNING: Mutex<Option<crate::core::task::JoinHandle<()>>> = Mutex::new(None);
 
 fn publish(f: impl FnOnce(&mut RemoteStatus)) {
     let s = {
@@ -80,8 +80,8 @@ fn console_url() -> Option<String> {
 /// Starts or stops the connection to match the setting (at start and whenever Settings change).
 pub fn sync(on: bool) {
     let mut running = RUNNING.lock().unwrap();
-    match (on, running.as_ref().is_some_and(|h| !h.inner().is_finished())) {
-        (true, false) => *running = Some(tauri::async_runtime::spawn(run())),
+    match (on, running.as_ref().is_some_and(|h| !crate::core::task::is_finished(h))) {
+        (true, false) => *running = Some(crate::core::task::spawn(run())),
         (false, true) => {
             if let Some(h) = running.take() {
                 h.abort();
@@ -301,7 +301,7 @@ async fn serve(conn: resincraft_relay::agent::Connection, account: &str) -> Agen
             RemoteEvent::Ready(id) => *OWN_DEVICE.lock().unwrap() = id,
             RemoteEvent::Call { id, method, params, from } => {
                 let tx = tx.clone();
-                tauri::async_runtime::spawn(async move {
+                crate::core::task::spawn(async move {
                     let result = call(&method, params, from.as_deref()).await.map_err(|e| e.to_string());
                     let _ = tx.send(RemoteCommand::Result { id, result });
                 });

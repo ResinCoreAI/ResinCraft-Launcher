@@ -4,7 +4,11 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Duration;
 
+#[cfg(feature = "desktop")]
 use tauri::AppHandle;
+/// There is no app in the panel.
+#[cfg(not(feature = "desktop"))]
+pub type AppHandle = ();
 
 pub const USER_AGENT: &str = concat!("ResinCraftLauncher/", env!("CARGO_PKG_VERSION"), " (by Puirkle)");
 

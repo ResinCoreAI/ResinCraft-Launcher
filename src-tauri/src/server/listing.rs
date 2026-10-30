@@ -565,9 +565,12 @@ async fn check_joins() -> bool {
         let _ = save(&all).await;
         emit("joinStates", join_states_of(&all));
         // Flash the taskbar when the launcher isn't in front, so the player sees the notice.
-        use tauri::Manager;
-        if let Some(w) = answered.then(crate::core::ctx::app).flatten().and_then(|a| a.get_webview_window("main")) {
-            let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+        #[cfg(feature = "desktop")]
+        {
+            use tauri::Manager;
+            if let Some(w) = answered.then(crate::core::ctx::app).flatten().and_then(|a| a.get_webview_window("main")) {
+                let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+            }
         }
     }
     all.asked.values().any(|a| a.state == "waiting")

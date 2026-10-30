@@ -56,7 +56,7 @@ async fn conn() -> Result<mpsc::UnboundedSender<ViewCommand>> {
         }
     }
     *CONN.lock().unwrap() = Some(tx.clone());
-    tauri::async_runtime::spawn(async move {
+    crate::core::task::spawn(async move {
         let ended = conn.view(on_event, &mut rx).await;
         // Whatever was waiting hears so; the next request connects again.
         for (_, waiter) in pending().take().unwrap_or_default() {

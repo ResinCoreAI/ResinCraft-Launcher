@@ -14,6 +14,7 @@ pub mod versionpatch;
 
 use anyhow::{bail, Result};
 use serde_json::Value;
+#[cfg(feature = "desktop")]
 use tauri::Manager;
 
 use crate::core::router::{done, json};
@@ -132,8 +133,33 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
     launch::launch_instance_to(id, &settings, auth, hooks, target.as_ref()).await
 }
 
+#[cfg(feature = "desktop")]
 fn main_window() -> Option<tauri::WebviewWindow> {
     ctx::app()?.get_webview_window("main")
+}
+
+#[cfg(not(feature = "desktop"))]
+fn main_window() -> Option<NoWindow> {
+    None
+}
+
+/// The panel has no window to move out of the game's way.
+#[cfg(not(feature = "desktop"))]
+struct NoWindow;
+#[cfg(not(feature = "desktop"))]
+impl NoWindow {
+    fn minimize(&self) -> Result<()> {
+        Ok(())
+    }
+    fn hide(&self) -> Result<()> {
+        Ok(())
+    }
+    fn show(&self) -> Result<()> {
+        Ok(())
+    }
+    fn unminimize(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Ids of instances whose game is currently running.

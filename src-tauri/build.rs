@@ -11,6 +11,7 @@ fn main() {
     }
 
     embed_keys();
+    #[cfg(feature = "desktop")]
     tauri_build::build()
 }
 

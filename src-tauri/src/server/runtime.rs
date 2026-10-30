@@ -886,9 +886,12 @@ async fn open_resin(id: &str) -> Result<()> {
 
 /// Flashes the launcher in the taskbar (when it isn't in front) so the host sees a relay warning.
 fn attention() {
-    use tauri::Manager;
-    if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window("main")) {
-        let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
+    #[cfg(feature = "desktop")]
+    {
+        use tauri::Manager;
+        if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window("main")) {
+            let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
+        }
     }
 }
 

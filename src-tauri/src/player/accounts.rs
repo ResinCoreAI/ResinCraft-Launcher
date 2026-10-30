@@ -561,6 +561,10 @@ async fn redirect_accepted(url: &str) -> bool {
     !(body.contains("redirect_uri&#39; is not valid") || body.contains("redirect_uri' is not valid"))
 }
 
+#[cfg(not(feature = "desktop"))]
+fn close_login_window() {}
+
+#[cfg(feature = "desktop")]
 fn close_login_window() {
     use tauri::Manager;
     if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window(LOGIN_WINDOW)) {
@@ -571,6 +575,12 @@ fn close_login_window() {
 /// Signs in on Microsoft's own page, in a private ResinCraft window (no saved browser sign-in, so Microsoft asks
 /// which account to use). The result arrives later as a `login` event, like the code sign-in. Ok(false): this
 /// app's registration doesn't allow the window yet, so the caller uses the code sign-in instead.
+#[cfg(not(feature = "desktop"))]
+pub async fn begin_microsoft_window_login() -> Result<bool> {
+    Ok(false)
+}
+
+#[cfg(feature = "desktop")]
 pub async fn begin_microsoft_window_login() -> Result<bool> {
     use tauri::{WebviewUrl, WebviewWindowBuilder, WindowEvent};
     let abort = Arc::new(AtomicBool::new(false));

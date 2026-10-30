@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "desktop"), allow(dead_code, unused_imports, unused_variables))]
 //! ResinCraft Launcher: Tauri shell + Rust engine.
 //!
 //! The React UI talks to the engine through one command, `ipc(channel, args)`, with the channel names
@@ -23,12 +24,46 @@ pub mod player;
 pub mod server;
 pub mod remote;
 pub mod remoteview;
+#[cfg(feature = "desktop")]
 pub mod tray;
+#[cfg(feature = "desktop")]
 pub mod updater;
 
+/// The panel has no tray.
+#[cfg(not(feature = "desktop"))]
+pub mod tray {
+    pub fn sync(_: bool) {}
+}
+
+/// The panel updates through its own install script, and says what's running from the same place.
+#[cfg(not(feature = "desktop"))]
+pub mod updater {
+    use anyhow::Result;
+    use serde_json::Value;
+
+    #[derive(Default)]
+    pub struct Blockers {
+        pub games: Vec<String>,
+        pub servers: Vec<String>,
+    }
+
+    pub async fn handle(channel: &str, _: crate::core::Args) -> Result<Value> {
+        anyhow::bail!("{channel} isn't available in the panel")
+    }
+
+    pub async fn blockers() -> Blockers {
+        let mut out = Blockers::default();
+        out.servers = crate::server::runtime::running_ids();
+        out
+    }
+}
+
+#[cfg(feature = "desktop")]
 use serde_json::Value;
+#[cfg(feature = "desktop")]
 use tauri::Manager;
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, Value> {
     core::router::dispatch(&channel, core::Args::new(args)).await.map_err(|e| {
@@ -38,6 +73,7 @@ async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, Value> {
     })
 }
 
+#[cfg(feature = "desktop")]
 pub fn run() {
     tauri::Builder::default()
         // A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead, with the file it was

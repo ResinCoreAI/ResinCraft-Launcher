@@ -257,7 +257,7 @@ fn uninstall() -> Result<&'static str> {
     if !crate::game::running_ids().is_empty() || !crate::server::runtime::running_ids().is_empty() {
         crate::bail_tr!("app.uninstallBusy", "Close your games and stop your servers first.");
     }
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "desktop"))]
     {
         let uninstaller = std::env::current_exe()?.parent().map(|d| d.join("uninstall.exe")).filter(|p| p.is_file());
         if let Some(uninstaller) = uninstaller {
@@ -274,6 +274,6 @@ fn uninstall() -> Result<&'static str> {
         std::process::Command::new("explorer.exe").arg("ms-settings:appsfeatures").spawn()?;
         Ok("settings")
     }
-    #[cfg(not(windows))]
+    #[cfg(not(all(windows, feature = "desktop")))]
     crate::bail_tr!("app.uninstallElsewhere", "Remove ResinCraft the way your system removes apps.");
 }

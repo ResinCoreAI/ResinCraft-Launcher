@@ -42,7 +42,7 @@ fn file() -> PathBuf {
 }
 
 /// The running file servers (one task per account).
-static SERVING: Mutex<Vec<tauri::async_runtime::JoinHandle<()>>> = Mutex::new(Vec::new());
+static SERVING: Mutex<Vec<crate::core::task::JoinHandle<()>>> = Mutex::new(Vec::new());
 
 /// Replaces what `listing` serves (an empty map stops serving it), then restarts the file servers.
 pub async fn set(listing: &str, account: &str, files: HashMap<String, PathBuf>) -> Result<()> {
@@ -76,7 +76,7 @@ async fn restart() {
     }
     let mut tasks = SERVING.lock().unwrap();
     for (account, listings) in by_account {
-        tasks.push(tauri::async_runtime::spawn(serve(account, listings)));
+        tasks.push(crate::core::task::spawn(serve(account, listings)));
     }
 }
 

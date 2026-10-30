@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde_json::Value;
+#[cfg(feature = "desktop")]
 use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
 
@@ -81,9 +82,12 @@ pub fn emit<S: Serialize + Clone>(channel: &str, payload: S) {
             let _ = tap.send((channel.to_string(), v));
         }
     }
+    #[cfg(feature = "desktop")]
     if let Some(app) = ctx::app() {
         let _ = app.emit(&format!("resin:{channel}"), payload);
-    } else if let Some(sink) = SINK.get() {
+        return;
+    }
+    if let Some(sink) = SINK.get() {
         sink(channel, serde_json::to_value(payload).unwrap_or(Value::Null));
     }
 }
