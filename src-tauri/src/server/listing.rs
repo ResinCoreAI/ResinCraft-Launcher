@@ -98,6 +98,8 @@ pub struct Status {
     pub state: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// The owner's appeal is waiting for the admin.
+    pub appealed: bool,
 }
 
 fn status(st: ListingStatus) -> Status {
@@ -109,9 +111,11 @@ fn status(st: ListingStatus) -> Status {
             ListingState::Rejected => "rejected",
             ListingState::Hidden => "hidden",
             ListingState::Off => "off",
+            ListingState::Removed => "removed",
             ListingState::Unknown => "unknown",
         },
         message: st.message,
+        appealed: st.appealed,
     }
 }
 
@@ -197,6 +201,15 @@ pub async fn get(id: &str) -> Result<ServerListing> {
             return Ok(None);
         }
         let st = conn.listing_get(&name).await.map_err(|e| relay::describe(&e, &name))?;
+        // The admin removed it: the switch goes off here too, until the owner lists it again.
+        if st.state == ListingState::Removed {
+            let mut all = load().await;
+            if let Some(s) = all.servers.get_mut(id) {
+                s.enabled = false;
+            }
+            save(&all).await?;
+            return Ok(Some(st));
+        }
         // Listed here but not there (the name was renamed or expired since), or who can join changed: list it again.
         if st.state == ListingState::Off || changed {
             let st = conn.listing_set(&name, Some(out.info.clone())).await.map_err(|e| relay::describe(&e, &name))?;
@@ -210,7 +223,10 @@ pub async fn get(id: &str) -> Result<ServerListing> {
         Ok::<_, anyhow::Error>(Some(st))
     };
     match asked.await {
-        Ok(Some(st)) => out.status = Some(status(st)),
+        Ok(Some(st)) => {
+            out.enabled = st.state != ListingState::Removed;
+            out.status = Some(status(st));
+        }
         Ok(None) => out.unsupported = true,
         Err(e) => out.error = Some(err_text(&e)),
     }
@@ -255,6 +271,15 @@ pub async fn set(id: &str, req: SetListing) -> Result<ServerListing> {
         }
     }
     get(id).await
+}
+
+/// Asks the admin to look at this server's hidden listing again.
+pub async fn appeal(id: &str, message: &str) -> Result<Status> {
+    let meta = store::get(id).await?;
+    let name = meta.relay_name.clone().ok_or_else(not_yet)?;
+    let mut conn = connect(meta.relay_account.as_deref()).await?;
+    let st = conn.listing_get(&name).await.map_err(|e| relay::describe(&e, &name))?;
+    conn.listing_appeal(&st.id, message).await.map(status).map_err(|e| relay::describe(&e, &name))
 }
 
 /// Takes a deleted server off the list. Best effort.
@@ -436,8 +461,23 @@ pub async fn report(id: &str, reason: &str) -> Result<()> {
     if reason.is_empty() {
         return Err(err_tr!("serverList.noReason", "Say what's wrong with this server."));
     }
+    if accounts::microsoft_account(None).await.is_none() {
+        return report_offline(id, &reason).await;
+    }
     let mut conn = connect(None).await?;
     conn.listing_report(id, &reason).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// Without a Microsoft account (only offline profiles): through the relay's public API.
+async fn report_offline(id: &str, reason: &str) -> Result<()> {
+    let Some(s) = relay::settings() else { return Err(err_tr!("serverList.noRelay", "This build has no ResinCraft Relay, so there's no server list.")) };
+    let url = format!("https://{}/api/servers/{}/report", s.domain, urlencoding::encode(id));
+    let r = crate::core::ctx::http().post(url).json(&serde_json::json!({ "reason": reason })).send().await?;
+    if r.status().is_success() {
+        return Ok(());
+    }
+    let why = r.json::<Value>().await.ok().and_then(|v| v["error"].as_str().map(String::from));
+    Err(anyhow::anyhow!(why.unwrap_or_else(|| "The report didn't go through. Try again later.".into())))
 }
 
 /// Asks a ResinCraft server's host to whitelist the active account; the outcome as the UI words it.

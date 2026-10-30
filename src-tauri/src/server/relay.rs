@@ -22,7 +22,7 @@ use tokio::task::JoinHandle;
 use crate::core::fsutil::{read_json, write_json};
 use crate::core::paths;
 use crate::core::text::{text_of, Text};
-use crate::core::types::{DnsRecord, DomainOwnership, DomainTxt, RelayInfo, RelayNameCheck, ServerMeta};
+use crate::core::types::{DnsRecord, DomainOwnership, DomainTxt, RelayInfo, RelayNameAccount, RelayNameCheck, RelayNameEntry, RelayNameRequest, RelayNameServer, RelayNames, ServerMeta};
 use crate::player::accounts::{self, MicrosoftAccount};
 use crate::{err_tr, tr};
 
@@ -159,6 +159,8 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ErrorCode::NameReserved => err_tr!("hostRelay.nameReserved", "\"{name}\" is reserved. Pick another name.", name = name),
         ErrorCode::NameTaken => err_tr!("hostRelay.nameTaken", "\"{name}\" belongs to another player. Pick another name.", name = name),
         ErrorCode::TooManyNames => err_tr!("hostRelay.tooManyNames", "Your account already has as many ResinCraft addresses as it may. Reuse the name of another server."),
+        ErrorCode::NameRequestsOff => err_tr!("hostRelay.nameRequestsOff", "ResinCraft Relay isn't taking requests for more names right now."),
+        ErrorCode::NameRequestPending => err_tr!("hostRelay.nameRequestPending", "Your request is already waiting for the relay's admin."),
         ErrorCode::TooManyTunnels => err_tr!("hostRelay.tooManyTunnels", "Your account already has as many servers online through ResinCraft Relay as it may. Stop one first."),
         ErrorCode::OverQuota => err_tr!("hostRelay.overQuota", "This month's ResinCraft Relay traffic for your account is used up. It resets on the 1st."),
         ErrorCode::TopUpNotYet => err_tr!("hostRelay.topUpNotYet", "There's still enough ResinCraft Relay data left this month. You can get more once it runs low."),
@@ -768,6 +770,123 @@ pub async fn set_name(id: &str, name: &str) -> Result<ServerMeta> {
     m.relay_account = Some(account.uuid);
     store::save(&m).await?;
     Ok(m)
+}
+
+fn same_account(a: &str, b: &str) -> bool {
+    a.replace('-', "").eq_ignore_ascii_case(&b.replace('-', ""))
+}
+
+/// This PC's servers that use the account's `name`.
+fn servers_with<'a>(metas: &'a [ServerMeta], account: &str, name: &str) -> impl Iterator<Item = &'a ServerMeta> {
+    let (account, name) = (account.to_string(), name.to_string());
+    metas.iter().filter(move |m| m.relay_name.as_deref() == Some(name.as_str()) && m.relay_account.as_deref().is_none_or(|a| same_account(a, &account)))
+}
+
+/// The names reserved with every signed-in Microsoft account, with the servers here that use them. A relay from before
+/// protocol 10 can't list them, and an unreachable one can't answer: then the names this PC's servers use are shown.
+pub async fn names() -> Result<RelayNames> {
+    let Some(s) = settings() else { return Ok(RelayNames { available: false, names: Vec::new(), accounts: Vec::new(), error: None }) };
+    let metas = store::list().await?;
+    let mut names = Vec::new();
+    let mut accounts_out = Vec::new();
+    let mut error = None;
+    for account in accounts::microsoft_accounts().await {
+        let listed = match connect(&s, &account).await {
+            Ok(mut conn) if conn.has_names() => conn.names_mine().await.map(Some).map_err(|e| describe(&e, "")),
+            Ok(_) => Ok(None),
+            Err(f) => Err(f.into_error("")),
+        };
+        let listed = listed.unwrap_or_else(|e| {
+            error.get_or_insert_with(|| as_text(&e));
+            None
+        });
+        let entry = |name: String, address: String, online, assigned| {
+            let servers = servers_with(&metas, &account.uuid, &name).map(|m| RelayNameServer { id: m.id.clone(), name: m.name.clone() }).collect();
+            RelayNameEntry { name, address, account: account.uuid.clone(), account_name: account.username.clone(), online, assigned, servers }
+        };
+        match listed {
+            Some(mine) => {
+                let used = mine.names.iter().filter(|n| !n.assigned).count() as u32;
+                accounts_out.push(RelayNameAccount {
+                    account: account.uuid.clone(),
+                    account_name: account.username.clone(),
+                    used,
+                    limit: mine.limit,
+                    requests_on: mine.requests_on,
+                    request: mine.request.map(|r| RelayNameRequest {
+                        wanted: r.wanted,
+                        state: match r.state {
+                            proto::NameRequestState::Pending => "pending",
+                            proto::NameRequestState::Approved => "approved",
+                            proto::NameRequestState::Rejected => "rejected",
+                        },
+                        note: r.note,
+                    }),
+                });
+                names.extend(mine.names.into_iter().map(|n| entry(n.name, n.address, n.online, n.assigned)));
+            }
+            None => {
+                let mut local: Vec<String> = metas.iter().filter(|m| m.relay_account.as_deref().is_some_and(|a| same_account(a, &account.uuid))).filter_map(|m| m.relay_name.clone()).collect();
+                local.sort();
+                local.dedup();
+                names.extend(local.into_iter().map(|n| {
+                    let address = proto::address(&n, &s.domain);
+                    entry(n, address, false, false)
+                }));
+            }
+        }
+    }
+    Ok(RelayNames { available: true, names, accounts: accounts_out, error })
+}
+
+/// The signed-in account a name belongs to, once none of this PC's servers is running under it.
+async fn name_owner(account: &str, name: &str, metas: &[ServerMeta]) -> Result<MicrosoftAccount> {
+    if let Some(m) = servers_with(metas, account, name).find(|m| super::runtime::is_running(&m.id)) {
+        return Err(err_tr!("hostRelay.stopFirst", "Stop {server} before you change its ResinCraft address.", server = m.name));
+    }
+    accounts::microsoft_accounts().await.into_iter().find(|a| same_account(&a.uuid, account)).ok_or_else(needs_microsoft)
+}
+
+/// Asks the relay's admin for more names for the account.
+pub async fn request_names(account: &str, wanted: u32, reason: &str) -> Result<()> {
+    let s = settings().ok_or_else(not_configured)?;
+    let owner = accounts::microsoft_accounts().await.into_iter().find(|a| same_account(&a.uuid, account)).ok_or_else(needs_microsoft)?;
+    let mut conn = connect(&s, &owner).await.map_err(|f| f.into_error(""))?;
+    conn.name_request(wanted, reason).await.map(|_| ()).map_err(|e| describe(&e, ""))
+}
+
+/// Frees a reserved name; this PC's servers that used it get a new one the next time they need one.
+pub async fn revoke_name(account: &str, name: &str) -> Result<()> {
+    let s = settings().ok_or_else(not_configured)?;
+    let metas = store::list().await?;
+    let owner = name_owner(account, name, &metas).await?;
+    let mut conn = connect(&s, &owner).await.map_err(|f| f.into_error(name))?;
+    conn.release(name).await.map_err(|e| describe(&e, name))?;
+    for m in servers_with(&metas, account, name) {
+        let mut m = m.clone();
+        m.relay_name = None;
+        store::save(&m).await?;
+    }
+    Ok(())
+}
+
+/// Changes a reserved name, for this PC's servers that use it too.
+pub async fn rename_name(account: &str, name: &str, new: &str) -> Result<()> {
+    let new = normalize(new);
+    let s = settings().ok_or_else(not_configured)?;
+    if let Err(code) = proto::check_name(&new, &[]) {
+        return Err(describe(&AgentError::Refused(code, String::new()), &new));
+    }
+    let metas = store::list().await?;
+    let owner = name_owner(account, name, &metas).await?;
+    let mut conn = connect(&s, &owner).await.map_err(|f| f.into_error(&new))?;
+    conn.reserve(&new, Some(name)).await.map_err(|e| describe(&e, &new))?;
+    for m in servers_with(&metas, account, name) {
+        let mut m = m.clone();
+        m.relay_name = Some(new.clone());
+        store::save(&m).await?;
+    }
+    Ok(())
 }
 
 /// The address friends type, e.g. for the card: `name.rscraft.resincore.tech`.

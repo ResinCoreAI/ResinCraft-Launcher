@@ -206,7 +206,7 @@ const OPERATOR: &[&str] = &[
     "requestUnblock", "requestUnblockAll", "relayContinue",
 ];
 /// Never for other accounts, whatever their role: making and deleting servers, and the host's relay names and data.
-const OWNER_ONLY: &[&str] = &["create", "remove", "relayName", "relayTopUp"];
+const OWNER_ONLY: &[&str] = &["listing", "setListing", "appealListing", "clientPack", "clientPackChoices", "publishClientPack", "removeClientPack", "create", "remove", "relayName", "relayTopUp"];
 /// `server.<name>`s that don't name a server.
 const NO_SERVER: &[&str] = &["list", "versions", "builds", "softwareIcons"];
 /// Server settings other accounts may change (Managers).
@@ -413,6 +413,8 @@ const SERVER: &[&str] = &[
     "switchPack", "origin", "syncPreview", "syncFromInstance", "reinstall", "reinstallPack", "packFlags",
     // Sharing: ResinCraft Relay, domain.
     "relayInfo", "relayCheck", "relayName", "relayContinue", "relayTopUp", "relayRestart", "domain", "checkDns", "network",
+    // The client pack, built from an instance on this PC.
+    "clientPack", "clientPackChoices", "publishClientPack", "removeClientPack", "listing", "setListing", "appealListing",
     // Making servers.
     "versions", "builds", "softwareIcons", "create",
 ];
@@ -636,7 +638,7 @@ async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> 
     let reads = ["server.list", "server.get", "server.log", "server.playerList", "server.requests", "server.properties", "server.addons", "server.addonSources",
         "server.addonSearch", "server.addonVersions", "server.addonCheckUpdates", "server.antiXray", "server.bedrockJoin", "server.origin", "server.syncPreview",
         "server.relayInfo", "server.relayCheck", "server.domain", "server.checkDns", "server.network", "server.versions", "server.builds", "server.softwareIcons",
-        "server.packFlags", "server.clientMods", "server.launchArgs", "files.list", "files.readText", "versions.list", "content.search",
+        "server.packFlags", "server.clientMods", "server.clientPack", "server.clientPackChoices", "server.listing", "server.launchArgs", "files.list", "files.readText", "versions.list", "content.search",
         "content.versions", "java.list", "server.downloadsCheck", "migrate.scan", "migrate.scanFolder", "migrate.size"];
     if !method.starts_with("create.") && !reads.contains(&method) {
         emit("remoteAction", json!({ "method": method, "serverId": params.get(0).and_then(Value::as_str), "by": grant.as_ref().map(|g| g.name.clone()) }));
@@ -720,7 +722,7 @@ mod tests {
         let manager = g("manager", Some(vec!["smp"]));
         assert!(ok("server.addonInstall", json!(["smp", {}]), &manager) && ok("server.update", json!(["smp", {}]), &manager));
         assert!(ok("content.versions", json!(["p"]), &manager) && !ok("content.versions", json!(["p"]), &operator));
-        for owner_only in ["server.create", "server.remove", "migrate.scan", "migrate.import", "server.relayName", "server.relayTopUp", "server.launchArgs", "server.setBotToken", "files.list", "java.list", "create.options"] {
+        for owner_only in ["server.publishClientPack", "server.create", "server.remove", "migrate.scan", "migrate.import", "server.relayName", "server.relayTopUp", "server.launchArgs", "server.setBotToken", "files.list", "java.list", "create.options"] {
             assert!(!ok(owner_only, json!(["smp"]), &manager), "{owner_only}");
         }
         assert!(!ok("server.start", json!([]), &operator), "a server has to be named");

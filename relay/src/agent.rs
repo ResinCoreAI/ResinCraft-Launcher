@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_yamux::{Config as YamuxConfig, Session, StreamHandle};
 
-use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingJoinState, ListingStatus, MyListing, SHARE_PROTOCOL_VERSION, ShareAccount, ViewDevice};
+use crate::proto::{self, AgentMsg, Ban, DataHeader, ErrorCode, Limits, RelayMsg, ServiceState, Usage, ALPN, BEDROCK_PROTOCOL_VERSION, PING_SECS, PROTOCOL_VERSION, TOPUP_PROTOCOL_VERSION, JoinOutcome, JOIN_REQUESTS_PROTOCOL_VERSION, REMOTE_PROTOCOL_VERSION, DOMAINS_PROTOCOL_VERSION, DomainStatus, LISTINGS_PROTOCOL_VERSION, ListingInfo, ListingJoinState, ListingStatus, MyListing, MyName, MyNameRequest, NAMES_PROTOCOL_VERSION, SHARE_PROTOCOL_VERSION, ShareAccount, ViewDevice};
 
 /// The agent port when a relay URL doesn't name one.
 pub const DEFAULT_AGENT_PORT: u16 = 7000;
@@ -289,6 +289,15 @@ impl Drop for Connection {
     }
 }
 
+/// The account's reserved names as the relay lists them.
+#[derive(Debug, Clone)]
+pub struct MyNames {
+    pub names: Vec<MyName>,
+    pub limit: u32,
+    pub requests_on: bool,
+    pub request: Option<MyNameRequest>,
+}
+
 impl Connection {
     /// Connects and says hello. A relay that doesn't know this protocol yet is asked again with each older one
     /// that matters (the server list, domains, remote control, whitelist requests, top-ups, then Bedrock tunnels):
@@ -296,6 +305,7 @@ impl Connection {
     pub async fn connect(cfg: &AgentConfig) -> Result<Connection, AgentError> {
         let mut result = Self::over_version(Self::open(cfg).await?, &cfg.client, PROTOCOL_VERSION).await;
         for older in [
+            SHARE_PROTOCOL_VERSION,
             LISTINGS_PROTOCOL_VERSION,
             DOMAINS_PROTOCOL_VERSION,
             REMOTE_PROTOCOL_VERSION,
@@ -467,6 +477,29 @@ impl Connection {
         }
     }
 
+    /// Whether this relay can list the account's names (protocol 10).
+    pub fn has_names(&self) -> bool {
+        self.relay_version >= NAMES_PROTOCOL_VERSION
+    }
+
+    /// The account's reserved names, how many it may have, and its request for more.
+    pub async fn names_mine(&mut self) -> Result<MyNames, AgentError> {
+        self.send(&AgentMsg::NamesMine).await?;
+        match self.recv().await? {
+            RelayMsg::MyNames { names, limit, requests_on, request } => Ok(MyNames { names, limit, requests_on, request }),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Asks the relay's admin for `wanted` names in all.
+    pub async fn name_request(&mut self, wanted: u32, reason: &str) -> Result<MyNameRequest, AgentError> {
+        self.send(&AgentMsg::NameRequest { wanted, reason: reason.to_string() }).await?;
+        match self.recv().await? {
+            RelayMsg::NameRequested { request } => Ok(request),
+            other => Err(unexpected(&other)),
+        }
+    }
+
     pub async fn release(&mut self, name: &str) -> Result<(), AgentError> {
         self.send(&AgentMsg::Release { name: name.to_string() }).await?;
         match self.recv().await? {
@@ -551,6 +584,11 @@ impl Connection {
 
     pub async fn listing_remove(&mut self, id: &str) -> Result<ListingStatus, AgentError> {
         self.listing_request(AgentMsg::ListingRemove { id: id.to_string() }).await
+    }
+
+    /// Asks the admin to look at a hidden listing again.
+    pub async fn listing_appeal(&mut self, id: &str, message: &str) -> Result<ListingStatus, AgentError> {
+        self.listing_request(AgentMsg::ListingAppeal { id: id.to_string(), message: message.to_string() }).await
     }
 
     /// The account's own listings, submitted and hosted.

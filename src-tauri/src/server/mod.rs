@@ -192,6 +192,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // The public server list (relay protocol 8): this server's listing, then Discover → Servers.
         "server:listing" => json(listing::get(&args.get::<String>(0)?).await?),
         "server:setListing" => json(listing::set(&args.get::<String>(0)?, args.get(1)?).await?),
+        "server:appealListing" => json(listing::appeal(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:browseList" => json(listing::browse(args.get(0)?).await?),
         "server:listModpacks" => json(listing::modpacks().await?),
         // Client packs: the owner publishes the server's mods; players install them as an instance.
@@ -317,6 +318,19 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
                 tokio::spawn(domain::on_open(id.clone()));
             }
             json(domain::info(&id).await?)
+        }
+        "server:relayNames" => json(relay::names().await?),
+        "server:relayRevoke" => {
+            relay::revoke_name(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
+            done()
+        }
+        "server:relayRename" => {
+            relay::rename_name(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?;
+            done()
+        }
+        "server:relayRequestNames" => {
+            relay::request_names(&args.get::<String>(0)?, args.get::<u32>(1)?, &args.get::<String>(2)?).await?;
+            done()
         }
         "server:relayInfo" => json(relay::info(&args.get::<String>(0)?).await?),
         "server:relayCheck" => json(relay::check(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),

@@ -77,6 +77,7 @@ export const stateChip: Record<ListingState, string> = {
   listed: 'success',
   pending: 'warn',
   rejected: 'danger',
+  removed: 'danger',
   hidden: 'danger',
   off: '',
   unknown: ''
@@ -1096,6 +1097,8 @@ export function ServerListSettings({ s }: { s: ServerInfo }) {
   const [l, setL] = useState<ServerListing>()
   const [draft, setDraft] = useState<ListingInfo>()
   const [busy, setBusy] = useState(false)
+  const [appealing, setAppealing] = useState(false)
+  const [appealText, setAppealText] = useState('')
   useEffect(() => {
     let live = true
     void api.server.listing(s.id).then(
@@ -1125,9 +1128,36 @@ export function ServerListSettings({ s }: { s: ServerInfo }) {
     }
   }
   const state = l.status?.state
+  const appeal = async () => {
+    setBusy(true)
+    try {
+      await api.server.appealListing(s.id, appealText.trim())
+      setL(await api.server.listing(s.id))
+      setAppealing(false)
+      toast(t('servers.list.appeal.sent'), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <div className="settings-section">
       <h3>{t('servers.list.settings.section')}</h3>
+      {appealing && (
+        <Modal
+          title={t('servers.list.appeal.title')}
+          subtitle={t('servers.list.appeal.hint')}
+          onClose={() => setAppealing(false)}
+          footer={
+            <button className="btn primary" disabled={busy || !appealText.trim()} onClick={() => void appeal()}>
+              {busy && <Loader2 className="spin" />} {t('servers.list.appeal.send')}
+            </button>
+          }
+        >
+          <textarea className="input" rows={4} maxLength={500} value={appealText} aria-label={t('servers.list.appeal.title')} onChange={(e) => setAppealText(e.target.value)} />
+        </Modal>
+      )}
       <div className="card">
         <div className="setting">
           <div className="text">
@@ -1142,7 +1172,15 @@ export function ServerListSettings({ s }: { s: ServerInfo }) {
                 ? t('servers.list.settings.unsupported')
                 : t('servers.list.settings.showHint')}
             </span>
-            {l.enabled && l.status?.message && <span className="hint">{l.status.message}</span>}
+            {(l.enabled || state === 'removed') && l.status?.message && <span className="hint">{l.status.message}</span>}
+            {l.enabled && state === 'hidden' &&
+              (l.status?.appealed ? (
+                <span className="hint">{t('servers.list.appeal.sent')}</span>
+              ) : (
+                <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setAppealing(true)}>
+                  <Flag /> {t('servers.list.appeal.button')}
+                </button>
+              ))}
             {l.error && <span className="hint bad">{tx(l.error)}</span>}
           </div>
           {busy ? <Loader2 className="spin" /> : <Switch on={l.enabled} disabled={!l.available || l.unsupported} onChange={(v) => void save(v)} label={t('servers.list.settings.show')} />}

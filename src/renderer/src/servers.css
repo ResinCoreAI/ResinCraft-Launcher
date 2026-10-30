@@ -802,3 +802,18 @@ a svg.inline {
 .sv-downloads .hint {
   margin: 2px 0 0;
 }
+
+/* Reserved relay names, under the server list. */
+.relay-names {
+  margin-top: 24px;
+}
+.relay-names .list-row {
+  flex-wrap: wrap;
+}
+.relay-names-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Ban, CircleCheck, CirclePause, CircleX, Gauge, Infinity as InfinityIcon, Loader2, PlusCircle, RefreshCw, RotateCcw, Timer, TimerOff, Users } from 'lucide-react'
 import type { RelayInfo, ResinNet, ServerEvent, ServerInfo } from '@shared/types'
 import { api } from '../api'
+import { AskForNames } from './RelayNames'
 import { useStore } from '../store'
 import { bytes, fixed } from '../util'
 import { t, tx } from '../i18n'
@@ -249,6 +250,7 @@ export function RelaySettings({ s, info, reload }: { s: ServerInfo; info?: Relay
               <RelayLive s={s} />
             </div>
           )}
+          <AskForNames account={s.relayAccount} />
           <RelayBanned s={s} />
           <RelayOutOfData s={s} />
         </>

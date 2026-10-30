@@ -52,6 +52,8 @@ export default {
   'servers.admin.promoDays': 'For how many days',
   'servers.admin.promoOrder': 'Order in the row (lower first)',
   'servers.admin.hide': 'Hide',
+  'servers.admin.appeals': 'Appeals',
+  'servers.admin.appeal.dismiss': 'Keep hidden',
   'servers.admin.unhide': 'Show again',
   'servers.admin.hidden': 'Hidden.',
   'servers.admin.removePack': 'Remove its client pack',

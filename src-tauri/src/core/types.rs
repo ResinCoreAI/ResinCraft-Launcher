@@ -1148,6 +1148,65 @@ pub struct RelayInfo {
 }
 
 /// Whether a ResinCraft Relay name can be used.
+/// A server on this PC that uses a relay name.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayNameServer {
+    pub id: String,
+    pub name: String,
+}
+
+/// One reserved relay name, for the Servers tab's list.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayNameEntry {
+    pub name: String,
+    pub address: String,
+    /// The account's UUID, and its name.
+    pub account: String,
+    pub account_name: String,
+    pub online: bool,
+    /// Given by the relay's admin.
+    pub assigned: bool,
+    pub servers: Vec<RelayNameServer>,
+}
+
+/// An account's request for more names.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayNameRequest {
+    pub wanted: u32,
+    /// "pending", "approved" or "rejected".
+    pub state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// How many names an account has and may have (limit 0: the relay doesn't say).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayNameAccount {
+    pub account: String,
+    pub account_name: String,
+    pub used: u32,
+    pub limit: u32,
+    /// The relay's admin takes requests for more names.
+    pub requests_on: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<RelayNameRequest>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayNames {
+    pub available: bool,
+    pub names: Vec<RelayNameEntry>,
+    pub accounts: Vec<RelayNameAccount>,
+    /// An account couldn't be asked, so only what this PC's servers use is shown for it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Text>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RelayNameCheck {

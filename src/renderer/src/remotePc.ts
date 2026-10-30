@@ -32,6 +32,7 @@ const REMOTE_SERVER = new Set([
   'addonSources', 'addons', 'addonSearch', 'addonVersions', 'addonChangeVersion', 'addonUpdateMany', 'addonCheckUpdates', 'addonCancelPending', 'addonInstall', 'addonToggle', 'addonRemove',
   'switchPack', 'origin', 'syncPreview', 'syncFromInstance', 'reinstall', 'reinstallPack', 'packFlags',
   'relayInfo', 'relayCheck', 'relayName', 'relayContinue', 'relayTopUp', 'relayRestart', 'domain', 'checkDns', 'network',
+  'clientPack', 'clientPackChoices', 'publishClientPack', 'removeClientPack', 'listing', 'setListing', 'appealListing',
   'launchArgs', 'addonFromLink', 'setBotToken', 'setDnsToken', 'regenerateWorld', 'create'
 ])
 
@@ -147,6 +148,13 @@ export async function remoteInstances(): Promise<{ id: string; name: string; mcV
   if (!current) return undefined
   const o = (await local!.remoteView.call(current.id, 'create.options', [])) as { instances?: { id: string; name: string; mcVersion: string; loader: string }[] }
   return o.instances ?? []
+}
+
+/** The RAM of the other PC that's open (undefined: this PC, or that PC doesn't say). */
+export async function remoteMemoryMb(): Promise<number | undefined> {
+  if (!current) return undefined
+  const o = (await local!.remoteView.call(current.id, 'create.options', []).catch(() => undefined)) as { totalMemoryMb?: number } | undefined
+  return o?.totalMemoryMb
 }
 
 /** Shows another PC's servers (or this PC's again with undefined). */

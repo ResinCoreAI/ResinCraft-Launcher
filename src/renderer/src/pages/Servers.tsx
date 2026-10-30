@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
-import { Archive, Ban, Blocks, ClipboardCopy, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
+import { Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { HYBRID_SERVERS, PLUGIN_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
@@ -7,6 +7,7 @@ import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../comp
 import FileManager from '../components/FileManager'
 import { WebConsoleButton, WebConsoleTip } from '../components/RemoteControl'
 import { RemotePcBanner, RemotePcPicker, useRemotePc } from '../components/RemotePcs'
+import { remoteMemoryMb } from '../remotePc'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
 import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
@@ -17,6 +18,7 @@ import { ClientPackSettings, ServerListSettings } from '../components/ServerList
 import { RestoreModal } from '../components/BackupRestore'
 import { ServerOriginChips, ServerPackSettings } from '../components/ServerPacks'
 import { PackUpdateBadge } from '../components/PackUpdates'
+import RelayNames from '../components/RelayNames'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
 import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, openMenuBelow, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
@@ -185,14 +187,35 @@ function ServerIcon({ s, size = 48 }: { s: ServerInfo; size?: number }) {
   )
 }
 
+/** The picture as a PNG small enough for one relay call: smaller sizes until it fits (a 64 px icon always does). */
+async function shrinkPicture(dataUrl: string): Promise<string> {
+  const MAX = 60_000
+  if (dataUrl.length <= MAX) return dataUrl
+  const img = new Image()
+  img.src = dataUrl
+  await img.decode()
+  let out = dataUrl
+  for (const size of [256, 128, 96, 64]) {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = size
+    const side = Math.min(img.naturalWidth, img.naturalHeight)
+    canvas.getContext('2d')?.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size)
+    out = canvas.toDataURL('image/png')
+    if (out.length <= MAX) break
+  }
+  return out
+}
+
 /** Settings → the server's picture: click to choose one (cropped square), or remove it. */
 function ServerIconPicker({ s, onChanged }: { s: ServerInfo; onChanged: () => Promise<void> }) {
   const { toast } = useStore()
   const [busy, setBusy] = useState(false)
+  const pc = useRemotePc()
   const apply = async (dataUrl: string | null) => {
     setBusy(true)
     try {
-      await api.server.setIcon(s.id, dataUrl)
+      // A picture for another PC goes through one relay call (64 KB at most).
+      await api.server.setIcon(s.id, dataUrl && (pc || isConsole) ? await shrinkPicture(dataUrl) : dataUrl)
       await onChanged()
       toast(t(dataUrl ? (live(s) ? 'servers.icon.setRestart' : 'servers.icon.set') : 'servers.icon.removed'), 'success')
     } catch (e) {
@@ -328,6 +351,11 @@ function ServerList({
         <div className="spacer" />
         <RemotePcPicker />
         {!pc && <WebConsoleButton />}
+        {isConsole && (
+          <a className="btn lg" href="/activity" title={t('servers.activityHint')}>
+            <Clock /> {t('servers.activity')}
+          </a>
+        )}
         {canMake && (
           <button data-pc-only className="btn lg" onClick={onImport}>
             <FolderInput /> {t('migrate.serverButton')}
@@ -401,6 +429,7 @@ function ServerList({
           ))}
         </div>
       )}
+      {!pc && !isConsole && <RelayNames reload={reload} />}
       {deleting && (
         <ConfirmModal
           title={t('servers.settings.deleteTitle', { name: deleting.name })}
@@ -1228,7 +1257,11 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
   const showBore = s.tunnel !== 'resin' || boreOpen || !!s.relayHost || !!s.relaySecret
   const [backingUp, setBackingUp] = useState(false)
   const [restoring, setRestoring] = useState(false)
-  const maxMem = Math.max(4096, Math.floor(((info?.totalMemMb ?? 8192) * 0.75) / 512) * 512)
+  // The server runs on the PC that's open, so its RAM is what counts.
+  const [pcMem, setPcMem] = useState<number>()
+  const pc = useRemotePc()
+  useEffect(() => void remoteMemoryMb().then(setPcMem), [pc?.id])
+  const maxMem = Math.max(4096, s.memoryMb, Math.floor(((pcMem ?? info?.totalMemMb ?? 8192) * 0.75) / 512) * 512)
   const running = live(s)
 
   useEffect(() => {

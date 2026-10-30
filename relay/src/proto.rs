@@ -52,12 +52,16 @@
 //! Any signed-in connection can open remote launchers itself: `view_devices` lists the account's own and shared ones,
 //! `view_call` / `view_watch` reach one, and the relay answers with `view_result`, `view_push` and `view_gone`. Older
 //! launchers never get these, and a launcher never sends them to an older relay.
+//!
+//! Protocol 10 adds `names_mine`, answered with `my_names`: the account's reserved names and how many it may have.
+//! `name_request` asks the admin for more of them (answered `name_requested`), when the admin takes such requests.
+//! `listing_appeal` asks the admin to look at a hidden listing again, and a listing the admin removed reads `removed`.
 
 use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 9;
+pub const PROTOCOL_VERSION: u32 = 10;
 /// The first protocol with Bedrock (UDP) tunnels.
 pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The first protocol with data top-ups.
@@ -72,6 +76,8 @@ pub const DOMAINS_PROTOCOL_VERSION: u32 = 7;
 pub const LISTINGS_PROTOCOL_VERSION: u32 = 8;
 /// The first protocol with shared remote control and remote launchers opened from a launcher.
 pub const SHARE_PROTOCOL_VERSION: u32 = 9;
+/// The first protocol where an account can list its reserved names.
+pub const NAMES_PROTOCOL_VERSION: u32 = 10;
 /// Longest `call_result` / `push` line (results and log batches can be bigger than other messages).
 pub const MAX_REMOTE_LINE: usize = 1024 * 1024;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
@@ -101,6 +107,10 @@ pub enum AgentMsg {
         release: Option<String>,
     },
     Release { name: String },
+    /// The account's reserved names. Protocol 10.
+    NamesMine,
+    /// Asks the relay's admin for more names than the account's limit, when the admin takes such requests. Protocol 10.
+    NameRequest { wanted: u32, reason: String },
     /// Bring a name online on this connection (reserving it first when it's free). `bedrock`: a Bedrock server,
     /// reached on a UDP port of its own (protocol 3).
     Online {
@@ -156,6 +166,8 @@ pub enum AgentMsg {
     ListingRemove { id: String },
     /// Like (or unlike) a listing, one per account; answered with `liked`. Protocol 8.
     ListingLike { id: String, on: bool },
+    /// The owner asks the admin to look at a hidden listing again. Protocol 10.
+    ListingAppeal { id: String, message: String },
     /// Report a listing (reason ≤ 500 chars); answered with `reported`. Protocol 8.
     ListingReport { id: String, reason: String },
     /// Ask to be whitelisted on a ResinCraft listing: the relay passes it to the host's launcher as a `join_request`
@@ -302,6 +314,8 @@ pub enum ListingState {
     Hidden,
     /// Not listed.
     Off,
+    /// The admin removed it: launchers leave it off until the owner lists it again. Protocol 10.
+    Removed,
     #[serde(other)]
     Unknown,
 }
@@ -314,6 +328,9 @@ pub struct ListingStatus {
     pub state: ListingState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// The owner's appeal against hiding it is waiting for the admin. Protocol 10.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub appealed: bool,
 }
 
 /// One of the account's own listings (the answer to `listing_mine`). Protocol 8.
@@ -444,6 +461,18 @@ pub enum RelayMsg {
     },
     Reserved { name: String, address: String },
     Released { name: String },
+    /// The account's reserved names and how many it may have. Protocol 10.
+    MyNames {
+        names: Vec<MyName>,
+        limit: u32,
+        /// The admin takes requests for more names.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        requests_on: bool,
+        /// The account's latest request.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        request: Option<MyNameRequest>,
+    },
+    NameRequested { request: MyNameRequest },
     Online {
         name: String,
         address: String,
@@ -626,6 +655,10 @@ pub enum ErrorCode {
     NameReserved,
     NameTaken,
     TooManyNames,
+    /// The relay's admin doesn't take requests for more names.
+    NameRequestsOff,
+    /// The account already has a request waiting for the admin.
+    NameRequestPending,
     TooManyTunnels,
     OverQuota,
     RateLimited,
@@ -828,6 +861,43 @@ pub async fn read_datagram<R: tokio::io::AsyncRead + Unpin>(r: &mut R, buf: &mut
     buf.resize(u16::from_be_bytes(len) as usize, 0);
     r.read_exact(buf).await?;
     Ok(true)
+}
+
+/// One of the account's reserved names (`my_names`, protocol 10).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MyName {
+    pub name: String,
+    pub address: String,
+    pub created: u64,
+    pub last_used: u64,
+    /// A tunnel is online under it right now.
+    pub online: bool,
+    /// Given to this account by the relay's admin.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub assigned: bool,
+}
+
+/// Where a request for more names stands.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NameRequestState {
+    #[default]
+    Pending,
+    Approved,
+    Rejected,
+}
+
+/// An account's request for more reserved names than its limit (protocol 10).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MyNameRequest {
+    /// How many names the account wants in all.
+    pub wanted: u32,
+    pub reason: String,
+    pub state: NameRequestState,
+    pub created: u64,
+    /// The admin's words with the answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 // ---------- Names ----------
@@ -1093,7 +1163,7 @@ mod tests {
             assert_eq!(serde_json::from_str::<AgentMsg>(&line).unwrap(), m, "{line}");
         }
         assert_eq!(serde_json::to_string(&AgentMsg::ListingMine).unwrap(), r#"{"t":"listing_mine"}"#);
-        let status = ListingStatus { id: "rc-smp".into(), state: ListingState::Pending, message: None };
+        let status = ListingStatus { id: "rc-smp".into(), state: ListingState::Pending, message: None, appealed: false };
         for m in [
             RelayMsg::ListingStatus(status.clone()),
             RelayMsg::MyListings {
@@ -1108,7 +1178,7 @@ mod tests {
         }
         // A minimal listing from the relay fills in the defaults; a state from a newer relay reads as unknown.
         let s: RelayMsg = serde_json::from_str(r#"{"t":"listing_status","id":"s-1","state":"frozen"}"#).unwrap();
-        assert_eq!(s, RelayMsg::ListingStatus(ListingStatus { id: "s-1".into(), state: ListingState::Unknown, message: None }));
+        assert_eq!(s, RelayMsg::ListingStatus(ListingStatus { id: "s-1".into(), state: ListingState::Unknown, message: None, appealed: false }));
         let i: ListingInfo = serde_json::from_str(r#"{"title":"x"}"#).unwrap();
         assert_eq!(i.edition, Edition::Java);
     }}

@@ -1,6 +1,6 @@
 // Fake server hosting for the browser preview (see mock.ts): a couple of servers, a simulated boot log,
 // console commands, players joining, and the router port opening.
-import type {
+import type { RelayNameAccount,
   AntiXray,
   ServerRequestsEvent,
   AddonSource,
@@ -328,6 +328,9 @@ export function mockServers(): {
   ]
 
   const find = (id: string) => servers.find((s) => s.id === id)!
+  // Relay names no server here uses, and the preview's request for more.
+  let spareNames = ['old-smp']
+  let nameRequest: RelayNameAccount['request']
   /** Session fields for a mock relay tunnel; ?relay=warn|soon|low|out|unlimited|paused|off previews those states. */
   const previewSession = (): Partial<ResinNet> => {
     const mode = new URLSearchParams(location.search).get('relay')
@@ -853,6 +856,39 @@ export function mockServers(): {
         }
       })
       fire(id)
+    },
+    relayNames: async () => {
+      const used = [...new Set(servers.filter((s) => s.relayName).map((s) => s.relayName!))]
+      const list = [...used, ...spareNames].sort()
+      const entry = (name: string) => ({
+        name,
+        address: `${name}.${RELAY_DOMAIN}`,
+        account: PUIRKLE,
+        accountName: 'Puirkle',
+        online: servers.some((s) => s.relayName === name && s.net?.via === 'resin'),
+        assigned: false,
+        servers: servers.filter((s) => s.relayName === name).map((s) => ({ id: s.id, name: s.name }))
+      })
+      return {
+        available: true,
+        names: list.map(entry),
+        accounts: [{ account: PUIRKLE, accountName: 'Puirkle', used: list.length, limit: list.length, requestsOn: true, request: nameRequest }]
+      }
+    },
+    relayRevoke: async (_account, name) => {
+      await wait(null, 400)
+      spareNames = spareNames.filter((n) => n !== name)
+      servers.filter((s) => s.relayName === name).forEach((s) => patch(s.id, { relayName: undefined }))
+    },
+    relayRename: async (_account, name, newName) => {
+      await wait(null, 400)
+      spareNames = spareNames.map((n) => (n === name ? newName : n))
+      servers.filter((s) => s.relayName === name).forEach((s) => patch(s.id, { relayName: newName }))
+    },
+    appealListing: async () => undefined,
+    relayRequestNames: async (_account, wanted) => {
+      await wait(null, 400)
+      nameRequest = { wanted, state: 'pending' }
     },
     relayName: async (id, name) => {
       await wait(null, 600)

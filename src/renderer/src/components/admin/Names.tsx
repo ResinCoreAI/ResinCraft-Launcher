@@ -25,6 +25,8 @@ interface Names {
   names: NameRow[]
   reserved: string[]
   builtinReserved: string[]
+  nameRequestsOn?: boolean
+  nameRequests?: { uuid: string; name: string; wanted: number; reason: string; created: number; limit: number }[]
 }
 
 const DOMAIN_TONE = { verified: 'success', pending: 'warn', misconfigured: 'danger' } as const
@@ -37,6 +39,7 @@ export function NamesAdmin() {
   const [renaming, setRenaming] = useState<NameRow>()
   const [releasing, setReleasing] = useState<NameRow>()
   const [giving, setGiving] = useState(false)
+  const [rejecting, setRejecting] = useState<string>()
   const [word, setWord] = useState('')
   return (
     <>
@@ -95,6 +98,47 @@ export function NamesAdmin() {
               </div>
             ))}
           </div>
+          {data.nameRequests && (
+            <div className="settings-section">
+              <h3>{t('servers.admin.relay.nameRequests')}</h3>
+              <div className="card admin-items">
+                <div className="setting admin-item">
+                  <div className="text">
+                    <b>{t('servers.admin.relay.nameRequestsOn')}</b>
+                    <span>{t('servers.admin.relay.nameRequestsHint')}</span>
+                  </div>
+                  <button className="btn sm" onClick={() => void act('/api/names/requests/switch', { on: !data.nameRequestsOn }, 'servers.admin.relay.done')}>
+                    {t(data.nameRequestsOn ? 'servers.admin.relay.turnOff' : 'servers.admin.relay.turnOn')}
+                  </button>
+                </div>
+                {data.nameRequests.length === 0 ? (
+                  <div className="setting admin-item">
+                    <span className="hint">{t('servers.admin.relay.nameRequestsNone')}</span>
+                  </div>
+                ) : (
+                  data.nameRequests.map((r) => (
+                    <div key={r.uuid} className="setting admin-item">
+                      <div className="text">
+                        <b>{r.name}</b>
+                        <span>
+                          {t('servers.admin.relay.nameRequestWants', { wanted: r.wanted, limit: r.limit })} · {ago(r.created)}
+                        </span>
+                        <span className="hint">{r.reason}</span>
+                      </div>
+                      <div className="row">
+                        <button className="btn sm primary" onClick={() => void act('/api/names/requests/answer', { uuid: r.uuid, approve: true }, 'servers.admin.relay.done')}>
+                          {t('servers.admin.relay.approve')}
+                        </button>
+                        <button className="btn sm" onClick={() => setRejecting(r.uuid)}>
+                          {t('servers.admin.relay.reject')}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
           <div className="settings-section">
             <h3>{t('servers.admin.relay.reservedWords')}</h3>
             <div className="card">
@@ -131,6 +175,15 @@ export function NamesAdmin() {
           confirm={t('servers.admin.relay.rename')}
           onSubmit={(v) => act('/api/names/rename', { name: renaming.name, to: v.to.trim().toLowerCase() }, 'servers.admin.relay.done')}
           onClose={() => setRenaming(undefined)}
+        />
+      )}
+      {rejecting && (
+        <AskModal
+          title={t('servers.admin.relay.reject')}
+          fields={[{ key: 'note', label: t('servers.admin.relay.rejectNote') }]}
+          confirm={t('servers.admin.relay.reject')}
+          onSubmit={(v) => act('/api/names/requests/answer', { uuid: rejecting, approve: false, note: v.note.trim() }, 'servers.admin.relay.done')}
+          onClose={() => setRejecting(undefined)}
         />
       )}
       {giving && (

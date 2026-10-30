@@ -1135,6 +1135,39 @@ export interface RelayInfo {
   suggested: string
 }
 
+/** One reserved relay name, for the Servers tab's list. */
+export interface RelayNameEntry {
+  name: string
+  address: string
+  /** The account's UUID, and its name. */
+  account: string
+  accountName: string
+  online: boolean
+  /** Given by the relay's admin. */
+  assigned: boolean
+  /** The servers on this PC that use it. */
+  servers: { id: string; name: string }[]
+}
+
+/** How many names an account has and may have (limit 0: the relay doesn't say), and its request for more. */
+export interface RelayNameAccount {
+  account: string
+  accountName: string
+  used: number
+  limit: number
+  /** The relay's admin takes requests for more names. */
+  requestsOn: boolean
+  request?: { wanted: number; state: 'pending' | 'approved' | 'rejected'; note?: string }
+}
+
+export interface RelayNames {
+  available: boolean
+  names: RelayNameEntry[]
+  accounts: RelayNameAccount[]
+  /** An account couldn't be asked, so only what this PC's servers use is shown for it. */
+  error?: EngineText
+}
+
 export interface RelayNameCheck {
   name: string
   available: boolean
@@ -1286,9 +1319,11 @@ export interface ServerListModpack {
   online: number
 }
 
-export type ListingState ='listed' | 'pending' | 'rejected' | 'hidden' | 'off' | 'unknown'
+export type ListingState ='listed' | 'pending' | 'rejected' | 'hidden' | 'off' | 'removed' | 'unknown'
 
 export interface ListingStatus {
+  /** The owner's appeal is waiting for the admin. */
+  appealed?: boolean
   /** "rc-<name>" for ResinCraft servers, "s-<id>" for submitted ones. */
   id: string
   state: ListingState
@@ -2245,6 +2280,16 @@ export interface ResinApi {
     relayCheck(id: string, name: string): Promise<RelayNameCheck>
     /** Reserves a name for the server (freeing its old one) and saves it. */
     relayName(id: string, name: string): Promise<ServerInfo>
+    /** Every name reserved with the signed-in Microsoft accounts. */
+    /** Asks the relay's admin to look at this server's hidden listing again. */
+    appealListing(id: string, message: string): Promise<unknown>
+    relayNames(): Promise<RelayNames>
+    /** Frees a reserved name. */
+    relayRevoke(account: string, name: string): Promise<void>
+    /** Changes a reserved name, for the servers here that use it too. */
+    relayRename(account: string, name: string, newName: string): Promise<void>
+    /** Asks the relay's admin for `wanted` names in all. */
+    relayRequestNames(account: string, wanted: number, reason: string): Promise<void>
     /** Another full relay session before the current one ends (same as typing `continue` in the console). */
     relayContinue(id: string): Promise<void>
     /** More relay data for this month (once little is left); resolves with the bytes added. */

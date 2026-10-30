@@ -36,7 +36,7 @@ interface AdminItem {
   owner: string
   ownerName?: string
   ownerBanned?: boolean
-  state: 'listed' | 'pending' | 'rejected' | 'hidden' | 'off' | 'unknown'
+  state: 'listed' | 'pending' | 'rejected' | 'hidden' | 'off' | 'removed' | 'unknown'
   message?: string | null
   likes: number
   reports: number
@@ -63,6 +63,7 @@ interface AdminData {
   featured: AdminItem[]
   listings: AdminItem[]
   bans: { uuid: string; name?: string; reason: string; at: number; until?: number | null }[]
+  appeals?: { id: string; title: string; message: string; at: number }[]
   reports: { id: string; listing: string; title: string; address: string; reporterName?: string; reason: string; at: number }[]
 }
 
@@ -377,7 +378,32 @@ function ServerListAdmin() {
           <ItemList items={data.listings} empty={t('servers.list.empty')} act={act} />
         </>
       ) : tab === 'reports' ? (
-        <Reports data={data} act={act} />
+        <>
+          {(data.appeals ?? []).length > 0 && (
+            <div className="settings-section">
+              <h3>{t('servers.admin.appeals')}</h3>
+              <div className="card">
+                {data.appeals!.map((a) => (
+                  <div key={a.id} className="setting">
+                    <div className="text">
+                      <b>{a.title || a.id}</b>
+                      <span>{a.message}</span>
+                    </div>
+                    <div className="row">
+                      <button className="btn sm primary" onClick={() => void act('unhide', { id: a.id })}>
+                        {t('servers.admin.unhide')}
+                      </button>
+                      <button className="btn sm" onClick={() => void act('appeal/dismiss', { id: a.id })}>
+                        {t('servers.admin.appeal.dismiss')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <Reports data={data} act={act} />
+        </>
       ) : tab === 'bans' ? (
         <Bans data={data} act={act} />
       ) : tab === 'settings' ? (

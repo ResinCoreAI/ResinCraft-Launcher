@@ -787,6 +787,12 @@ pub async fn microsoft_account(preferred: Option<&str>) -> Option<MicrosoftAccou
     Some(MicrosoftAccount { id: acc.id.clone(), uuid: acc.uuid.clone(), username: acc.username.clone() })
 }
 
+/// Every signed-in Microsoft account.
+pub async fn microsoft_accounts() -> Vec<MicrosoftAccount> {
+    let list = load().await.into_iter().filter(|a| a.kind == "msa" && !is_unreadable(a.refresh_token.as_deref()));
+    list.map(|a| MicrosoftAccount { id: a.id, uuid: a.uuid, username: a.username }).collect()
+}
+
 /// A fresh Minecraft services token for a Microsoft account (`force`: refresh even if it looks valid).
 pub async fn microsoft_token(id: &str, force: bool) -> Result<String> {
     minecraft_token(id, force).await
