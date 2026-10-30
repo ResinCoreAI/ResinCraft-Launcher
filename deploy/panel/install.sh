@@ -71,6 +71,8 @@ Restart=on-failure
 RestartSec=5
 # The servers get their time to save.
 TimeoutStopSec=90
+# The website's HTTPS port (resincraft-panel web).
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 NoNewPrivileges=$NO_NEW_PRIVILEGES
 ProtectSystem=strict
 ReadWritePaths=$DATA
@@ -90,6 +92,7 @@ command_args="run"
 command_user="resincraft"
 command_background=true
 pidfile="/run/resincraft-panel.pid"
+capabilities="^cap_net_bind_service"
 export RESINCRAFT_PANEL_DATA="$DATA"
 depend() { need net; }
 EOF
@@ -101,6 +104,7 @@ else
 fi
 
 echo
-echo "Installed. Two steps left:"
-echo "  1. Sign in:  sudo -u resincraft RESINCRAFT_PANEL_DATA=$DATA $BIN login"
-echo "  2. Start it: $START"
+echo "Installed. Next:"
+echo "  1. Start it: $START"
+echo "  2. To use ResinCraft Relay and the launcher's Servers page: sudo -u resincraft RESINCRAFT_PANEL_DATA=$DATA $BIN login"
+echo "  3. For a website on your own domain: sudo -u resincraft RESINCRAFT_PANEL_DATA=$DATA $BIN web <domain> <email>"

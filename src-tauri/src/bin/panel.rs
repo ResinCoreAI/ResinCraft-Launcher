@@ -8,6 +8,10 @@
 //!   resincraft-panel call <channel> [json…]   any engine request, e.g. call server:list
 //!   resincraft-panel full-control on|off      lets the owner use files and Java settings from afar (off by default)
 //!   resincraft-panel containers on|off        hosts servers in Docker or Podman from their next start (off by default)
+//!   resincraft-panel web <domain> <email>     a website on your domain, HTTPS from Let's Encrypt (port 443 must be open)
+//!   resincraft-panel web <domain> --cert <file> --key <file> [--port <port>]   the same with your own certificate
+//!   resincraft-panel web password             a new website password (the old one stops working)
+//!   resincraft-panel web off                  closes the website
 //!   resincraft-panel login                    sign in with Microsoft (a code to enter on another device)
 //!   resincraft-panel accounts                 the accounts signed in here
 //!
@@ -20,12 +24,14 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use resincraft_lib::core::{ctx, events, router, settings, Args};
-use resincraft_lib::{player, remote, server};
+use resincraft_lib::{panelweb, player, remote, server};
 use serde_json::{json, Value};
 
-const USAGE: &str = "usage: resincraft-panel <run|servers|start|stop|call|full-control|containers|login|accounts>";
+const USAGE: &str = "usage: resincraft-panel <run|servers|start|stop|call|full-control|containers|web|login|accounts>";
 /// How long the servers get to save and stop when the service stops.
 const STOP_GRACE: Duration = Duration::from_secs(60);
+/// Tells the running service that web.json changed.
+const WEB_APPLY: &str = "panel:webApply";
 
 fn data_dir() -> PathBuf {
     std::env::var_os("RESINCRAFT_PANEL_DATA").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/var/lib/resincraft-panel"))
@@ -54,7 +60,13 @@ async fn serve_socket() -> Result<()> {
                 let req: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
                 let channel = req["channel"].as_str().unwrap_or_default().to_string();
                 let args = req["args"].as_array().cloned().unwrap_or_default();
-                let answer = match router::dispatch(&channel, Args::new(args)).await {
+                let answered = if channel == WEB_APPLY {
+                    panelweb::apply().await;
+                    Ok(Value::Null)
+                } else {
+                    router::dispatch(&channel, Args::new(args)).await
+                };
+                let answer = match answered {
                     Ok(v) => json!({ "ok": v }),
                     Err(e) => json!({ "error": format!("{e:#}") }),
                 };
@@ -112,6 +124,48 @@ async fn login() -> Result<()> {
     }
 }
 
+/// Takes the new website settings live; with no service running they're read at its next start.
+async fn apply_web() {
+    #[cfg(unix)]
+    if tokio::net::UnixStream::connect(socket()).await.is_ok() {
+        if let Err(e) = call(WEB_APPLY, Vec::new()).await {
+            eprintln!("{e:#}");
+        }
+    }
+}
+
+/// `--name value` from the words after `web <domain>`.
+fn flag<'a>(words: &'a [String], name: &str) -> Option<&'a str> {
+    words.iter().position(|w| w == name).and_then(|i| words.get(i + 1)).map(String::as_str)
+}
+
+async fn web(words: &[String]) -> Result<()> {
+    match words {
+        [word] if word == "off" => {
+            panelweb::disable().await?;
+            println!("The website is closed.");
+        }
+        [word] if word == "password" => {
+            let password = panelweb::new_password().await?;
+            println!("New website password (shown only now): {password}");
+        }
+        [domain, rest @ ..] if !rest.is_empty() => {
+            let cert = flag(rest, "--cert").unwrap_or_default();
+            let key = flag(rest, "--key").unwrap_or_default();
+            let email = if rest[0].starts_with("--") { "" } else { rest[0].as_str() };
+            let port = flag(rest, "--port").map(str::parse).transpose().context("That port isn't a number")?;
+            if let Some(password) = panelweb::enable(domain, email, port, cert, key).await? {
+                println!("Website password (shown only now): {password}");
+            }
+            let config = panelweb::config().await;
+            println!("Point {} at this machine in DNS and open port {} in its firewall.", config.domain, config.port);
+        }
+        _ => bail!("usage: resincraft-panel web <domain> <email> | <domain> --cert <file> --key <file> [--port <port>] | password | off"),
+    }
+    apply_web().await;
+    Ok(())
+}
+
 async fn accounts() -> Result<()> {
     let list = call("accounts:list", Vec::new()).await?;
     for a in list.as_array().into_iter().flatten() {
@@ -145,6 +199,7 @@ async fn run() -> Result<()> {
             eprintln!("{e:#}");
         }
     });
+    panelweb::apply().await;
     if signed_in {
         println!("ResinCraft Panel is running. Open it from the launcher's Servers page or the web console.");
     } else {
@@ -192,6 +247,7 @@ async fn panel() {
     let done = match command.as_str() {
         "run" => run().await,
         "login" => login().await,
+        "web" => web(&words[1..]).await,
         "accounts" => accounts().await,
         "servers" => servers().await,
         "start" | "stop" => match id() {

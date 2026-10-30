@@ -20,6 +20,8 @@ pub mod files;
 pub mod game;
 pub mod migrate;
 pub mod openfile;
+#[cfg(feature = "panel")]
+pub mod panelweb;
 pub mod player;
 pub mod server;
 pub mod remote;

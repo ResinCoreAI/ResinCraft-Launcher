@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ResinCraft Panel</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <section id="login" class="login" hidden>
+    <form id="login-form">
+      <h1>ResinCraft Panel</h1>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required autofocus>
+      <p id="login-error" class="error" role="alert"></p>
+      <button class="primary" type="submit">Sign in</button>
+    </form>
+  </section>
+
+  <div id="app" class="app" hidden>
+    <header>
+      <strong>ResinCraft Panel</strong>
+      <button id="new-server">New server</button>
+      <button id="logout">Sign out</button>
+    </header>
+    <div class="columns">
+      <nav id="servers" aria-label="Servers"></nav>
+      <main id="detail" hidden>
+        <div class="title">
+          <div>
+            <h2 id="name"></h2>
+            <p id="about"></p>
+          </div>
+          <span id="state" class="state"></span>
+        </div>
+        <div class="actions">
+          <button id="start" class="primary">Start</button>
+          <button id="restart">Restart</button>
+          <button id="stop">Stop</button>
+          <button id="kill" class="danger">Kill</button>
+        </div>
+        <p id="message" class="error" role="alert"></p>
+        <p id="players"></p>
+        <pre id="log" tabindex="0" aria-label="Server console" aria-live="off"></pre>
+        <form id="command-form">
+          <input id="command" aria-label="Console command" placeholder="Type a command" autocomplete="off">
+          <button type="submit">Send</button>
+        </form>
+      </main>
+      <p id="empty" class="empty" hidden>No servers yet. Make one with New server.</p>
+    </div>
+  </div>
+
+  <dialog id="create">
+    <form id="create-form">
+      <h2>New server</h2>
+      <label for="c-name">Name</label>
+      <input id="c-name" required maxlength="64">
+      <label for="c-kind">Software</label>
+      <select id="c-kind"></select>
+      <label for="c-version">Version</label>
+      <select id="c-version" required></select>
+      <label for="c-memory">Memory (MB)</label>
+      <input id="c-memory" type="number" min="512" step="256" required>
+      <label for="c-port">Port (empty: the next free one)</label>
+      <input id="c-port" type="number" min="1024" max="65535">
+      <p id="create-error" class="error" role="alert"></p>
+      <div class="actions">
+        <button id="create-submit" class="primary" type="submit">Create</button>
+        <button id="create-cancel" type="button">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="eula">
+    <h2>Minecraft EULA</h2>
+    <p>This server needs you to agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener noreferrer">Minecraft End User License Agreement</a> first.</p>
+    <div class="actions">
+      <button id="eula-accept" class="primary">I agree</button>
+      <button id="eula-cancel">Cancel</button>
+    </div>
+  </dialog>
+</body>
+</html>

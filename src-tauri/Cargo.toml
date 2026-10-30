@@ -17,14 +17,17 @@ name = "resincraft"
 path = "src/main.rs"
 required-features = ["desktop"]
 
-# The Linux panel: the same engine with no window (cargo build --release --no-default-features --bin resincraft-panel).
+# The Linux panel: the same engine with no window (cargo build --release --no-default-features --features panel --bin resincraft-panel).
 [[bin]]
 name = "resincraft-panel"
 path = "src/bin/panel.rs"
+required-features = ["panel"]
 
 [features]
 default = ["desktop"]
 desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener", "dep:tauri-plugin-clipboard-manager", "dep:tauri-plugin-updater", "dep:tauri-plugin-single-instance"]
+# The panel's own website (panelweb.rs): HTTPS on the host's domain.
+panel = ["dep:axum", "dep:axum-server", "dep:rustls-acme", "dep:argon2", "dep:rustls-pemfile"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [], optional = true }
@@ -80,6 +83,12 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 webpki-roots = "1"
 # A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead of opening another.
 tauri-plugin-single-instance = { version = "2", optional = true }
+# The panel's website: Let's Encrypt certificates, passwords hashed with Argon2.
+axum = { version = "0.8", optional = true }
+axum-server = { version = "0.8", features = ["tls-rustls-no-provider"], optional = true }
+rustls-acme = { version = "0.15", default-features = false, features = ["ring", "tls12", "webpki-roots", "axum"], optional = true }
+argon2 = { version = "0.5", features = ["std"], optional = true }
+rustls-pemfile = { version = "2", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # proc_pid_rusage for the RAM display (core/memory.rs).

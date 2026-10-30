@@ -537,6 +537,12 @@ async fn known_servers(refs: &[crate::migrate::ItemRef]) -> Result<()> {
     Ok(())
 }
 
+/// One request as the owner, from the panel's own website: the same checks as the web console.
+#[cfg(feature = "panel")]
+pub async fn owner_call(method: &str, params: Value) -> Result<Value> {
+    call(method, params, None).await
+}
+
 /// Runs one console request (after `check`). `from`: another account's call (its UUID), checked against its grant.
 async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> {
     let grant = match from {
