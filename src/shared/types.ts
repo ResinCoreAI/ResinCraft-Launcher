@@ -2063,6 +2063,10 @@ export interface ResinApi {
     recent(limit?: number): Promise<RecentWorld[]>
     /** Starts the game straight into this world (Minecraft 1.20+). `accountId`: play as that account. */
     play(instanceId: string, folder: string, accountId?: string): Promise<void>
+    /** Moves the world to another instance (or copies it with `keep`); returns it as it is there. */
+    transfer(instanceId: string, folder: string, toInstanceId: string, keep?: boolean): Promise<WorldInfo>
+    /** Starts another instance straight into this world; the world goes back to its own instance when the game closes. */
+    playIn(instanceId: string, folder: string, toInstanceId: string, accountId?: string): Promise<void>
     /** Imports a world from a .zip; opens a file picker when no path is given. Null if cancelled. */
     import(instanceId: string, zipPath?: string): Promise<WorldInfo | null>
     /** The instance's world backups (manual and auto), newest first. */

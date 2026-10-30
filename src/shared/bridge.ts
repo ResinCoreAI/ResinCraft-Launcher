@@ -178,6 +178,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       remove: fn('worlds:remove'),
       openFolder: fn('worlds:openFolder'),
       play: fn('worlds:play'),
+      transfer: fn('worlds:transfer'),
+      playIn: fn('worlds:playIn'),
       recent: fn('worlds:recent'),
       import: fn('worlds:import')
     },

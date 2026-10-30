@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Archive, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, Play, RefreshCw, RotateCcw, Search, Skull, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Archive, ArrowRightLeft, Boxes, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, Play, RefreshCw, RotateCcw, Search, Skull, Trash2, Upload } from 'lucide-react'
 import type { GameMode, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -7,6 +7,7 @@ import { bytes, instancePath, timeAgo } from '../util'
 import { currentLanguage, rich, t, tx, type Key } from '../i18n'
 import { ConfirmModal, Empty, Modal, MoreButton, openContextMenu, useCopy, type ContextEntry } from './ui'
 import { RestoreModal } from './BackupRestore'
+import WorldElsewhereModal, { type ElsewhereMode } from './WorldElsewhereModal'
 import '../instance-tabs.css'
 
 const MODE_LABEL: Record<GameMode, Key> = {
@@ -34,6 +35,8 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
   const [importing, setImporting] = useState(false)
   /** The Restore list: every backup, or one world's. */
   const [restoring, setRestoring] = useState<{ world?: string }>()
+  /** Play, move or copy a world in another instance. */
+  const [elsewhere, setElsewhere] = useState<{ world: WorldInfo; mode: ElsewhereMode }>()
   const running = games[inst.id] === 'running' || games[inst.id] === 'preparing'
   // Opening a world from outside the game is Minecraft's quick play, which came in 1.20 (snapshots: try and see).
   const quickPlay = hasQuickPlay(inst.mcVersion)
@@ -71,6 +74,9 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
   // The same actions as the row's buttons, plus a few more; the "…" button shows this menu too.
   const menuFor = (w: WorldInfo): ContextEntry[] => [
     { label: t('worlds.play'), icon: <Play />, disabled: !quickPlay || running || !!w.error, onSelect: () => void playWorld(inst.id, w.folder) },
+    { label: t('worlds.elsewhere.menuPlay'), icon: <Boxes />, disabled: running || !!w.error, onSelect: () => setElsewhere({ world: w, mode: 'play' }) },
+    { label: t('worlds.elsewhere.menuMove'), icon: <ArrowRightLeft />, disabled: running || !!w.error, onSelect: () => setElsewhere({ world: w, mode: 'move' }) },
+    { label: t('worlds.elsewhere.menuCopy'), icon: <Copy />, disabled: running || !!w.error, onSelect: () => setElsewhere({ world: w, mode: 'copy' }) },
     '-',
     { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.worlds.openFolder(inst.id, w.folder).catch((e) => toast(e.message, 'error')) },
     { label: t('worlds.backup'), icon: <Archive />, disabled: backingUp.includes(w.folder), onSelect: () => void backup(w) },
@@ -223,6 +229,10 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
             await load()
           }}
         />
+      )}
+
+      {elsewhere && (
+        <WorldElsewhereModal inst={inst} world={elsewhere.world} initial={elsewhere.mode} onClose={() => setElsewhere(undefined)} onDone={() => void load()} />
       )}
 
       {removing && (

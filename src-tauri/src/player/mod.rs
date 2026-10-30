@@ -103,6 +103,17 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             crate::game::launch_as(&id, args.get::<Option<String>>(2)?.as_deref(), Some(crate::game::launch::Target::World(folder))).await?;
             done()
         }
+        // [fromId, folder, toId, keep] → the world in the other instance (moved, or copied when keep).
+        "worlds:transfer" => {
+            let (from, folder, to): (String, String, String) = (args.get(0)?, args.get(1)?, args.get(2)?);
+            json(worlds::transfer_world(&from, &folder, &to, args.get::<Option<bool>>(3)?.unwrap_or(false)).await?)
+        }
+        // [fromId, folder, toId, accountId?]: plays the world in the other instance; it comes back when the game closes.
+        "worlds:playIn" => {
+            let (from, folder, to): (String, String, String) = (args.get(0)?, args.get(1)?, args.get(2)?);
+            worlds::play_elsewhere(&from, &folder, &to, args.get::<Option<String>>(3)?.as_deref()).await?;
+            done()
+        }
         "worlds:openFolder" => {
             let path = worlds::world_path(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             shell::open_path(&path)?;

@@ -67,6 +67,8 @@ interface Store {
   play: (id: string, accountId?: string) => Promise<void>
   /** Starts an instance straight into one of its singleplayer worlds (Minecraft 1.20+). */
   playWorld: (id: string, folder: string, accountId?: string) => Promise<void>
+  /** Plays a world of instance `from` in instance `to`; it goes back to `from` when the game closes. */
+  playWorldIn: (from: string, folder: string, to: string, accountId?: string) => Promise<void>
   /** Quick join: starts the request's instance straight into its server (Bedrock: opens Minecraft). False on error. */
   join: (req: QuickJoinRequest) => Promise<boolean>
   /** `runId`: stop only that run; otherwise every run of the instance. */
@@ -247,6 +249,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async (id: string, folder: string, accountId?: string) => void (await start(id, () => api.worlds.play(id, folder, accountId))),
     [start]
   )
+  const playWorldIn = useCallback(
+    async (from: string, folder: string, to: string, accountId?: string) => void (await start(to, () => api.worlds.playIn(from, folder, to, accountId))),
+    [start]
+  )
   const join = useCallback((req: QuickJoinRequest) => start(req.instanceId, () => api.quickjoin.join(req)), [start])
 
   const stop = useCallback(async (id: string, runId?: string) => api.instances.kill(id, runId), [])
@@ -300,6 +306,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       runs,
       play,
       playWorld,
+      playWorldIn,
       join,
       stop,
       logs,
@@ -327,6 +334,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       runs,
       play,
       playWorld,
+      playWorldIn,
       join,
       stop,
       logs,

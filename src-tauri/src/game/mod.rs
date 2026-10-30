@@ -90,6 +90,11 @@ pub async fn launch(id: &str, server: Option<String>) -> Result<()> {
 
 /// Like `launch`, with a given account instead of the active one.
 pub async fn launch_as(id: &str, account: Option<&str>, target: Option<launch::Target>) -> Result<()> {
+    launch_then(id, account, target, None).await
+}
+
+/// Like `launch_as`; `after` runs once the game has exited (not when the launch fails).
+pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch::Target>, after: Option<Box<dyn FnOnce() + Send>>) -> Result<()> {
     crate::core::storage::ensure_not_moving()?;
     if crate::content::packswitch::is_switching(id) {
         crate::bail_tr!("packswitch.wait", "Wait for the modpack version switch to finish first");
@@ -113,6 +118,9 @@ pub async fn launch_as(id: &str, account: Option<&str>, target: Option<launch::T
             }
         })),
         on_exit: Some(Box::new(move |_code| {
+            if let Some(f) = after {
+                f();
+            }
             if exit_mode != "keep" && running_ids().is_empty() {
                 if let Some(win) = main_window() {
                     let _ = win.show();

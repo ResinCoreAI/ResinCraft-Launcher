@@ -232,3 +232,11 @@
   background: var(--play-hover);
   border-color: var(--play-hover);
 }
+
+/* Play / move / copy in another instance: each choice with its hint underneath. */
+.elsewhere-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}

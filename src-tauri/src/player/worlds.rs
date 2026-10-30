@@ -382,6 +382,155 @@ async fn unpack_world(id: &str, zip_path: &Path, replace: Option<String>) -> Res
     .await
 }
 
+// ---------- Other instances ----------
+
+/// In a world lent to another instance for one game: where it goes back to.
+const LENT: &str = "resincraft-lent.json";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Lent {
+    instance: String,
+    folder: String,
+}
+
+/// The other instance, checked to exist and to be a different one, with its game closed.
+async fn other_instance(from: &str, to: &str) -> Result<crate::core::types::Instance> {
+    if from == to {
+        bail_tr!("worlds.sameInstance", "Pick a different instance");
+    }
+    let other = crate::core::instances::get(to).await?;
+    assert_stopped(to, tr!("worlds.closeOther", "Close the game in {name} first", name = other.name))?;
+    Ok(other)
+}
+
+/// The world's folder, checked to hold a world (level.dat).
+async fn existing_world(id: &str, folder: &str) -> Result<PathBuf> {
+    let dir = world_path(id, folder).await?;
+    if !dir.join("level.dat").is_file() {
+        bail_tr!("worlds.notFound", "{folder} isn't a world in this instance any more.", folder = folder);
+    }
+    Ok(dir)
+}
+
+/// Moves or copies (`keep`) a world into another instance's saves/, under a free folder name.
+pub async fn transfer_world(from: &str, folder: &str, to: &str, keep: bool) -> Result<WorldInfo> {
+    let other = other_instance(from, to).await?;
+    let close = if keep { tr!("worlds.closeToCopy", "Close the game before you copy this world") } else { tr!("worlds.closeToMove", "Close the game before you move this world") };
+    assert_stopped(from, close)?;
+    let src = existing_world(from, folder).await?;
+    let saves = saves_dir(to).await?;
+    let name = unique_name(&saves, folder, "").await;
+    let dest = child_path(&saves, &name)?;
+    // Instances share one folder, so a move is usually just a rename.
+    if !keep && tokio::fs::rename(&src, &dest).await.is_ok() {
+        return Ok(read_world(&dest, &name).await);
+    }
+    let title = if keep {
+        tr!("worlds.copyingTo", "Copying {folder} to {name}", folder = folder, name = other.name)
+    } else {
+        tr!("worlds.movingTo", "Moving {folder} to {name}", folder = folder, name = other.name)
+    };
+    let (s, d) = (src.clone(), dest.clone());
+    Task::run_to_end(title, Some(to.to_string()), |t| async move {
+        t.update(tr!("worlds.copyingFiles", "Copying files…"), None);
+        let res = tokio::task::spawn_blocking(move || -> Result<()> {
+            use std::sync::atomic::{AtomicBool, AtomicU64};
+            let jobs = crate::core::fsutil::list_copy(&s, &d, &["session.lock"])?;
+            let failed = crate::core::fsutil::copy_many(&jobs, &AtomicBool::new(false), &AtomicU64::new(0));
+            match failed.into_iter().next() {
+                Some((_, e)) => Err(e.into()),
+                None => Ok(()),
+            }
+        })
+        .await
+        .map_err(anyhow::Error::from)
+        .and_then(|r| r);
+        if let Err(e) = res {
+            // Only ever removes the folder this copy just made.
+            let _ = tokio::fs::remove_dir_all(&dest).await;
+            return Err(e);
+        }
+        if !keep {
+            crate::core::shell::trash(&src).await?;
+        }
+        Ok(read_world(&dest, &name).await)
+    })
+    .await
+}
+
+/// Plays a world in another instance: the folder moves into that instance's saves/ for the game and back to its
+/// own instance once the game closes. A world from another Minecraft version is backed up first, since the game
+/// upgrades it.
+pub async fn play_elsewhere(from: &str, folder: &str, to: &str, account: Option<&str>) -> Result<()> {
+    let other = other_instance(from, to).await?;
+    assert_stopped(from, tr!("worlds.closeToLend", "Close the game in this instance before you play its world somewhere else"))?;
+    let src = existing_world(from, folder).await?;
+    let world = read_world(&src, folder).await;
+    if world.version.as_deref().is_some_and(|v| v != other.mc_version) {
+        backup_world_as(from, folder, "_before_other_version").await?;
+    }
+    let saves = saves_dir(to).await?;
+    let name = unique_name(&saves, folder, "").await;
+    let dest = child_path(&saves, &name)?;
+    tokio::fs::rename(&src, &dest).await?;
+    let lent = Lent { instance: from.to_string(), folder: folder.to_string() };
+    if let Err(e) = crate::core::fsutil::write_json(&dest.join(LENT), &lent).await {
+        let _ = tokio::fs::rename(&dest, &src).await;
+        return Err(e);
+    }
+    let back = dest.clone();
+    let after: Box<dyn FnOnce() + Send> = Box::new(move || {
+        tokio::spawn(async move {
+            if let Err(e) = give_back(&back).await {
+                eprintln!("[worlds] couldn't return the lent world {}: {e:#}", back.display());
+            }
+        });
+    });
+    if let Err(e) = crate::game::launch_then(to, account, Some(crate::game::launch::Target::World(name)), Some(after)).await {
+        let _ = give_back(&dest).await;
+        return Err(e);
+    }
+    Ok(())
+}
+
+/// Moves a lent world back to its own instance (under a free name if that one was taken meanwhile).
+async fn give_back(dir: &Path) -> Result<()> {
+    let marker = dir.join(LENT);
+    let Some(lent) = crate::core::fsutil::read_json::<Lent>(&marker).await else { return Ok(()) };
+    // Its instance is gone: the world stays where it is.
+    if crate::core::instances::get(&lent.instance).await.is_err() {
+        return Ok(tokio::fs::remove_file(&marker).await?);
+    }
+    let saves = saves_dir(&lent.instance).await?;
+    let home = child_path(&saves, &unique_name(&saves, &clean_folder_name(&lent.folder), "").await)?;
+    tokio::fs::remove_file(&marker).await?;
+    if let Err(e) = tokio::fs::rename(dir, &home).await {
+        // Keep the way back for the next start.
+        let _ = crate::core::fsutil::write_json(&marker, &lent).await;
+        return Err(e.into());
+    }
+    Ok(())
+}
+
+/// At start: returns worlds still lent out (ResinCraft closed while the game ran), unless that game is running.
+pub async fn return_lent_worlds() {
+    let running = crate::game::running_ids();
+    for inst in crate::core::instances::list().await.unwrap_or_default() {
+        if running.contains(&inst.id) {
+            continue;
+        }
+        let Ok(dir) = saves_dir(&inst.id).await else { continue };
+        let Ok(mut rd) = tokio::fs::read_dir(&dir).await else { continue };
+        while let Ok(Some(e)) = rd.next_entry().await {
+            if e.path().join(LENT).is_file() {
+                if let Err(err) = give_back(&e.path()).await {
+                    eprintln!("[worlds] couldn't return the lent world {}: {err:#}", e.path().display());
+                }
+            }
+        }
+    }
+}
+
 /// Moves the world folder to the Recycle Bin, never a permanent delete.
 pub async fn remove_world(id: &str, folder: &str) -> Result<()> {
     assert_stopped(id, tr!("worlds.closeToDelete", "Close the game before you delete this world"))?;

@@ -85,6 +85,14 @@ export function mockInstanceTabs(setIcon: (instanceId: string, iconUrl: string) 
       remove: async (_id, folder) => void (worlds = worlds.filter((w) => w.folder !== folder)),
       openFolder: async () => {},
       play: (id, _folder, accountId) => launch(id, accountId),
+      // The preview keeps one world list, so a move takes the world out of it and a copy leaves it.
+      transfer: async (_id, folder, _to, keep) => {
+        const w = worlds.find((x) => x.folder === folder)!
+        await wait(null, 700)
+        if (!keep) worlds = worlds.filter((x) => x.folder !== folder)
+        return w
+      },
+      playIn: (_id, _folder, to, accountId) => launch(to, accountId),
       // The preview's worlds all live in Cozy Survival.
       recent: async (limit = 8) => (await wait(worlds)).slice(0, limit).map((w) => ({ ...w, instanceId: 'survival' })),
       import: async () => null,
