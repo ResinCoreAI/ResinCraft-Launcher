@@ -215,7 +215,6 @@ pub fn optimized_flags(memory_mb: u32) -> Vec<String> {
         "-XX:MaxGCPauseMillis=200".into(),
         "-XX:+UnlockExperimentalVMOptions".into(),
         "-XX:+DisableExplicitGC".into(),
-        "-XX:+AlwaysPreTouch".into(),
         format!("-XX:G1NewSizePercent={new_size}"),
         format!("-XX:G1MaxNewSizePercent={max_new}"),
         format!("-XX:G1HeapRegionSize={region}"),

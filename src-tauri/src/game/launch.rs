@@ -463,7 +463,7 @@ fn with_target(mut game: Vec<String>, target: Option<&Target>, mc: &str) -> Resu
     Ok(game)
 }
 
-/// The servers' G1GC flags without the ones that only suit a server: AlwaysPreTouch (touches the whole heap
+/// The servers' G1GC flags without the ones that only suit a server: AlwaysPreTouch, if ever back (touches the whole heap
 /// before the window opens) and Aikar's marker properties.
 fn client_flags(memory_mb: u32) -> Vec<String> {
     crate::server::runtime::optimized_flags(memory_mb)
