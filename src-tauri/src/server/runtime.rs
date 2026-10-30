@@ -45,6 +45,8 @@ struct Proc {
     /// The server's process once started, and its Java memory limit (none for Bedrock), for the RAM display.
     pid: Option<u32>,
     max_mb: Option<u32>,
+    /// What stops it cleanly (`stop`, or a proxy's own word).
+    stop_command: &'static str,
 }
 
 #[derive(Default)]
@@ -283,10 +285,40 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
         }
         (None, None) => bail!("{} isn't fully installed. Create it again.", meta.name),
     }
-    if !args.iter().any(|a| a == "nogui" || a == "--nogui") {
+    if meta.kind == ServerKind::Velocity {
+        args.extend(["--port".to_string(), meta.port.to_string()]);
+    } else if !meta.kind.proxy() && meta.kind != ServerKind::Glowstone && !args.iter().any(|a| a == "nogui" || a == "--nogui") {
         args.push("nogui".into());
     }
     Ok(args)
+}
+
+/// The port in the config of software without server.properties (Velocity takes it as an argument).
+async fn write_own_port(meta: &ServerMeta, dir: &Path) -> Result<()> {
+    let (file, text) = match meta.kind {
+        ServerKind::Bungeecord | ServerKind::Waterfall => ("config.yml", port_in_bungee_config(&tokio::fs::read_to_string(dir.join("config.yml")).await.unwrap_or_default(), meta.port)),
+        ServerKind::Cuberite => ("settings.ini", port_in_cuberite_settings(&tokio::fs::read_to_string(dir.join("settings.ini")).await.unwrap_or_default(), meta.port)),
+        _ => return Ok(()),
+    };
+    Ok(tokio::fs::write(dir.join(file), text).await?)
+}
+
+/// BungeeCord's config.yml with the listener on `port`; a new one holds only that (it fills in the rest itself).
+fn port_in_bungee_config(text: &str, port: u16) -> String {
+    if text.trim().is_empty() {
+        return format!("listeners:\n- host: 0.0.0.0:{port}\n");
+    }
+    let re = regex::Regex::new(r"(?m)^(\s*-?\s*host:\s*)(\S+):\d+\s*$").expect("valid pattern");
+    re.replace(text, |c: &regex::Captures| format!("{}{}:{port}", &c[1], &c[2])).into_owned()
+}
+
+/// Cuberite's settings.ini with its port.
+fn port_in_cuberite_settings(text: &str, port: u16) -> String {
+    if text.trim().is_empty() {
+        return format!("[Server]\nPorts={port}\n");
+    }
+    let re = regex::Regex::new(r"(?m)^Ports=.*$").expect("valid pattern");
+    re.replace(text, format!("Ports={port}")).into_owned()
 }
 
 /// The Java flags a server pack sets for itself, in the order Java would read them: user_jvm_args.txt (Forge and
@@ -345,7 +377,7 @@ pub async fn start(id: &str) -> Result<()> {
     }
     let meta = store::get(id).await?;
     let dir = store::dir(id)?;
-    if !store::eula_accepted(id).await {
+    if meta.kind.needs_eula() && !store::eula_accepted(id).await {
         bail!("Agree to the Minecraft EULA before starting {}.", meta.name);
     }
     let bedrock = meta.kind.bedrock();
@@ -353,7 +385,8 @@ pub async fn start(id: &str) -> Result<()> {
     if !port_free {
         bail!("Port {} is already in use (maybe another server is running). Pick a different port in the server's settings.", meta.port);
     }
-    let args = if bedrock { Vec::new() } else { launch_args(&meta)? };
+    // Bedrock and Cuberite are programs of their own; everything else runs Java.
+    let args = if meta.launch.exe.is_some() { Vec::new() } else { launch_args(&meta)? };
     if bedrock && meta.launch.exe.is_none() {
         bail!("{} isn't fully installed. Create it again.", meta.name);
     }
@@ -387,6 +420,7 @@ pub async fn start(id: &str) -> Result<()> {
                 bedrock_port: None,
                 pid: None,
                 max_mb: None,
+                stop_command: meta.kind.stop_command(),
             },
         );
         w.logs.insert(id.to_string(), VecDeque::new());
@@ -399,16 +433,19 @@ pub async fn start(id: &str) -> Result<()> {
         emit_state(id, None);
         e
     };
-    // Bedrock runs its own program; everything else runs Java.
     let program = match &meta.launch.exe {
-        Some(exe) if bedrock => crate::game::mojang::plain(&crate::core::fsutil::safe_join(&dir, exe)?),
+        Some(exe) => crate::game::mojang::plain(&crate::core::fsutil::safe_join(&dir, exe)?),
         _ => installers::choose_java(&meta).await.map_err(fail)?,
     };
     let mut ports = vec![("server-port", meta.port.to_string())];
     if bedrock {
         ports.push(("server-portv6", (meta.port + 1).to_string()));
     }
-    properties::set_values(&dir, &ports).await.map_err(fail)?;
+    if meta.kind.uses_properties() {
+        properties::set_values(&dir, &ports).await.map_err(fail)?;
+    } else {
+        write_own_port(&meta, &dir).await.map_err(fail)?;
+    }
     // Plugin/mod changes queued while the server last ran (normally applied when it stopped).
     let mut applied = take_notes(id);
     applied.extend(super::plugins::apply_pending(id).await.unwrap_or_default());
@@ -418,7 +455,7 @@ pub async fn start(id: &str) -> Result<()> {
     // Only Paperclip, Spigot and Forge 1.7.10–1.12.2 need it (old log4j cuts jar URLs at the first '!' and then
     // scans the whole drive); other loaders resolve real paths and break across drives.
     let legacy_forge = meta.kind == ServerKind::Forge && crate::game::loaders::is_legacy_mc(&meta.mc_version);
-    let run_dir = if meta.kind.plugins() || legacy_forge {
+    let run_dir = if meta.kind.bukkit() || legacy_forge {
         launch_dir(id, &dir).await
     } else {
         dir.clone()
@@ -1433,10 +1470,11 @@ pub fn stop(id: &str) -> Result<()> {
         let p = w.procs.get_mut(id)?;
         p.stopping = true;
         p.state = "stopping";
-        Some(p.run)
+        Some((p.run, p.stop_command))
     });
+    let (run, command) = (run.map(|r| r.0), run.map_or("stop", |r| r.1));
     emit_state(id, None);
-    let _ = tx.send("stop".into());
+    let _ = tx.send(command.into());
     let id = id.to_string();
     tokio::spawn(async move {
         tokio::time::sleep(STOP_TIMEOUT).await;

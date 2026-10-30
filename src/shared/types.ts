@@ -1019,19 +1019,34 @@ export type ServerKind =
   | 'folia'
   | 'spigot'
   | 'leaf'
+  | 'pufferfish'
+  | 'craftbukkit'
+  /** SpongeVanilla: Sponge's own plugins on the vanilla server. */
+  | 'sponge'
   | 'fabric'
   | 'quilt'
   | 'forge'
   | 'neoforge'
   /** Mods and Bukkit plugins together, on Forge, NeoForge or Fabric (`loader`). */
   | 'arclight'
+  /** Mods and Bukkit plugins, on Forge or NeoForge (`loader`). */
+  | 'mohist'
+  /** Proxies route players to other servers; `mcVersion` is the proxy's own version. */
+  | 'velocity'
+  | 'bungeecord'
+  | 'waterfall'
+  /** Written from scratch, for Minecraft 1.12.2. Cuberite is its own program (64-bit Linux only). */
+  | 'glowstone'
+  | 'cuberite'
   /** Bedrock Dedicated Server: its own program and UDP port, no Java. */
   | 'bedrock'
 
 /** Bukkit-style plugin servers. */
-export const PLUGIN_SERVERS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf']
+export const PLUGIN_SERVERS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'velocity', 'bungeecord', 'waterfall']
+/** Proxies: no world, players or server.properties of their own. */
+export const PROXY_SERVERS: ServerKind[] = ['velocity', 'bungeecord', 'waterfall']
 /** Servers with plugins and mods (managed as two areas). */
-export const HYBRID_SERVERS: ServerKind[] = ['arclight']
+export const HYBRID_SERVERS: ServerKind[] = ['arclight', 'mohist']
 /** Which of a hybrid server's folders an add-on call is about. */
 export type AddonArea = 'plugins' | 'mods'
 

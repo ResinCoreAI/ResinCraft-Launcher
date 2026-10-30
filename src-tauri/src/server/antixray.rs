@@ -20,7 +20,7 @@ pub struct AntiXray {
 }
 
 pub fn supported(kind: ServerKind) -> bool {
-    matches!(kind, ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf)
+    matches!(kind, ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf | ServerKind::Pufferfish)
 }
 
 /// 1.19 and later: true. Snapshots and unknown versions count as new.

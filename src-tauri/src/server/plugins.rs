@@ -82,9 +82,10 @@ fn areas(kind: ServerKind) -> Vec<Option<&'static str>> {
 /// The sources that make sense for a server type, in the order the UI offers them.
 fn sources_for(kind: ServerKind) -> Vec<&'static str> {
     match kind {
-        ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf => vec!["modrinth", "hangar", "spigot", "bukkit", "github", "geysermc"],
-        ServerKind::Spigot => vec!["modrinth", "spigot", "bukkit", "github", "geysermc"],
-        ServerKind::Vanilla | ServerKind::Bedrock => Vec::new(),
+        ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf | ServerKind::Pufferfish => vec!["modrinth", "hangar", "spigot", "bukkit", "github", "geysermc"],
+        ServerKind::Spigot | ServerKind::Craftbukkit => vec!["modrinth", "spigot", "bukkit", "github", "geysermc"],
+        ServerKind::Velocity | ServerKind::Bungeecord | ServerKind::Waterfall | ServerKind::Sponge => vec!["modrinth", "github"],
+        ServerKind::Vanilla | ServerKind::Bedrock | ServerKind::Glowstone | ServerKind::Cuberite => Vec::new(),
         // Geyser has no Forge build.
         ServerKind::Forge => vec!["modrinth", "curseforge", "github"],
         _ => vec!["modrinth", "curseforge", "github", "geysermc"],
@@ -125,18 +126,23 @@ fn key(filename: &str) -> String {
 /// Modrinth loader tags a server type can run.
 fn mr_loaders(meta: &ServerMeta) -> Vec<&'static str> {
     match meta.kind {
-        ServerKind::Paper | ServerKind::Leaf => vec!["paper", "spigot", "bukkit"],
+        ServerKind::Paper | ServerKind::Leaf | ServerKind::Pufferfish => vec!["paper", "spigot", "bukkit"],
         ServerKind::Purpur => vec!["purpur", "paper", "spigot", "bukkit"],
         ServerKind::Folia => vec!["folia"],
         ServerKind::Spigot => vec!["spigot", "bukkit"],
+        ServerKind::Craftbukkit => vec!["bukkit"],
+        ServerKind::Sponge => vec!["sponge"],
+        ServerKind::Velocity => vec!["velocity"],
+        ServerKind::Bungeecord => vec!["bungeecord"],
+        ServerKind::Waterfall => vec!["waterfall", "bungeecord"],
         ServerKind::Fabric => vec!["fabric"],
         ServerKind::Quilt => vec!["quilt", "fabric"],
         ServerKind::Forge => vec!["forge"],
         ServerKind::Neoforge if meta.mc_version == "1.20.1" => vec!["neoforge", "forge"],
         ServerKind::Neoforge => vec!["neoforge"],
         // Hybrids are always viewed as Spigot (plugins) or their loader (mods); see `View`.
-        ServerKind::Arclight => vec!["spigot", "bukkit"],
-        ServerKind::Vanilla | ServerKind::Bedrock => Vec::new(),
+        ServerKind::Arclight | ServerKind::Mohist => vec!["spigot", "bukkit"],
+        ServerKind::Vanilla | ServerKind::Bedrock | ServerKind::Glowstone | ServerKind::Cuberite => Vec::new(),
     }
 }
 
@@ -1097,7 +1103,9 @@ async fn gh_search(meta: &ServerMeta, query: &str, offset: usize) -> Result<Serv
 /// GeyserMC's name for the platform a server (area) is: plugin servers run the Spigot builds.
 fn geyser_platform(meta: &ServerMeta) -> Result<&'static str> {
     match meta.kind {
-        k if k.plugins() => Ok("spigot"),
+        k if k.bukkit() => Ok("spigot"),
+        ServerKind::Velocity => Ok("velocity"),
+        ServerKind::Bungeecord | ServerKind::Waterfall => Ok("bungeecord"),
         ServerKind::Fabric | ServerKind::Quilt => Ok("fabric"),
         ServerKind::Neoforge => Ok("neoforge"),
         _ => bail_tr!(
@@ -1241,7 +1249,7 @@ async fn grim_jars(meta: &View) -> Vec<String> {
 /// Settings → Anti-cheat: whether the server can have it and whether Grim is there and on.
 pub async fn anticheat_status(id: &str) -> Result<Value> {
     let meta = view(id, Some("plugins")).await?;
-    let supported = meta.kind.plugins();
+    let supported = meta.kind.bukkit();
     let jars = if supported { grim_jars(&meta).await } else { Vec::new() };
     Ok(json!({ "supported": supported, "installed": !jars.is_empty(), "enabled": jars.iter().any(|n| !n.ends_with(".disabled")) }))
 }
@@ -1251,7 +1259,7 @@ pub async fn anticheat_status(id: &str) -> Result<Value> {
 /// goes to the Recycle Bin. While the server runs, the change waits for it to stop, like other plugin changes.
 pub async fn anticheat_set(id: &str, on: bool) -> Result<()> {
     let meta = view(id, Some("plugins")).await?;
-    if !meta.kind.plugins() {
+    if !meta.kind.bukkit() {
         bail!("An anti-cheat needs a plugin server (Paper, Purpur, Spigot…).");
     }
     let jars = grim_jars(&meta).await;

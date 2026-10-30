@@ -40,8 +40,16 @@ pub fn inspect_jar(path: &Path) -> JarInfo {
     let brand = |b: &str| listed_id.as_deref().is_some_and(|id| id.starts_with(&format!("{b}-")));
     if has("io/izzel/arclight/") {
         info.kind = Some(ServerKind::Arclight);
-    } else if has("io/papermc/paperclip/") || brand("paper") || brand("purpur") || brand("folia") || brand("leaf") {
-        info.kind = Some(if brand("purpur") {
+    } else if has("com/mohistmc/") {
+        info.kind = Some(ServerKind::Mohist);
+    } else if has("com/velocitypowered/proxy/") {
+        info.kind = Some(ServerKind::Velocity);
+    } else if has("net/md_5/bungee/") {
+        info.kind = Some(if has("io/github/waterfallmc/") { ServerKind::Waterfall } else { ServerKind::Bungeecord });
+    } else if has("io/papermc/paperclip/") || brand("paper") || brand("purpur") || brand("folia") || brand("leaf") || brand("pufferfish") {
+        info.kind = Some(if brand("pufferfish") {
+            ServerKind::Pufferfish
+        } else if brand("purpur") {
             ServerKind::Purpur
         } else if brand("folia") {
             ServerKind::Folia
