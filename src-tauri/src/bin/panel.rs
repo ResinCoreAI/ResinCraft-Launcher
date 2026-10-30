@@ -1,11 +1,16 @@
 //! ResinCraft Panel: the launcher's server engine with no window, for Linux machines without a desktop. It hosts the
-//! servers and connects to ResinCraft Relay like a PC with remote control on, so the launcher's Servers page and the web
-//! console run them from anywhere.
+//! servers with no account at all. Signing in with Microsoft adds ResinCraft's services: it then connects to ResinCraft
+//! Relay like a PC with remote control on, so the launcher's Servers page and the web console run them from anywhere.
 //!
-//!   resincraft-panel login     sign in with a Microsoft account (a code to enter on another device)
-//!   resincraft-panel accounts  the accounts signed in here
-//!   resincraft-panel servers   the servers here
-//!   resincraft-panel run       host: start the service (systemd runs this)
+//!   resincraft-panel run                      host: start the service (systemd runs this)
+//!   resincraft-panel servers                  the servers here
+//!   resincraft-panel start|stop <id>          starts or stops a server
+//!   resincraft-panel call <channel> [json…]   any engine request, e.g. call server:list
+//!   resincraft-panel full-control on|off      lets the owner use files and Java settings from afar (off by default)
+//!   resincraft-panel login                    sign in with Microsoft (a code to enter on another device)
+//!   resincraft-panel accounts                 the accounts signed in here
+//!
+//! Commands reach the running service through panel.sock in the data folder (only its user can open it).
 //!
 //! The data folder is $RESINCRAFT_PANEL_DATA, or /var/lib/resincraft-panel.
 
@@ -17,7 +22,7 @@ use resincraft_lib::core::{ctx, events, router, settings, Args};
 use resincraft_lib::{player, remote, server};
 use serde_json::{json, Value};
 
-const USAGE: &str = "usage: resincraft-panel <run|login|accounts|servers>";
+const USAGE: &str = "usage: resincraft-panel <run|servers|start|stop|call|full-control|login|accounts>";
 /// How long the servers get to save and stop when the service stops.
 const STOP_GRACE: Duration = Duration::from_secs(60);
 
@@ -25,8 +30,64 @@ fn data_dir() -> PathBuf {
     std::env::var_os("RESINCRAFT_PANEL_DATA").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/var/lib/resincraft-panel"))
 }
 
+fn socket() -> PathBuf {
+    data_dir().join("panel.sock")
+}
+
+/// Answers one request per line, `{"channel": …, "args": […]}`, with `{"ok": …}` or `{"error": …}`.
+#[cfg(unix)]
+async fn serve_socket() -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    let path = socket();
+    let _ = std::fs::remove_file(&path);
+    let listener = tokio::net::UnixListener::bind(&path).context("Couldn't open the control socket")?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    loop {
+        let (stream, _) = listener.accept().await?;
+        tokio::spawn(async move {
+            let (read, mut write) = stream.into_split();
+            let mut lines = BufReader::new(read).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                let req: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
+                let channel = req["channel"].as_str().unwrap_or_default().to_string();
+                let args = req["args"].as_array().cloned().unwrap_or_default();
+                let answer = match router::dispatch(&channel, Args::new(args)).await {
+                    Ok(v) => json!({ "ok": v }),
+                    Err(e) => json!({ "error": format!("{e:#}") }),
+                };
+                if write.write_all(format!("{answer}\n").as_bytes()).await.is_err() {
+                    break;
+                }
+            }
+        });
+    }
+}
+
+/// One request: to the running service when there is one, else here (only for what needs no running server).
 async fn call(channel: &str, args: Vec<Value>) -> Result<Value> {
+    #[cfg(unix)]
+    if let Ok(stream) = tokio::net::UnixStream::connect(socket()).await {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let (read, mut write) = stream.into_split();
+        write.write_all(format!("{}\n", json!({ "channel": channel, "args": args })).as_bytes()).await?;
+        let line = BufReader::new(read).lines().next_line().await?.context("The service closed the connection")?;
+        let answer: Value = serde_json::from_str(&line)?;
+        return match answer["error"].as_str() {
+            Some(e) => bail!("{e}"),
+            None => Ok(answer["ok"].clone()),
+        };
+    }
     router::dispatch(channel, Args::new(args)).await
+}
+
+/// `call <channel> [json…]`: each argument is JSON, or plain text when it isn't.
+async fn call_command(words: &[String]) -> Result<()> {
+    let [channel, rest @ ..] = words else { bail!("usage: resincraft-panel call <channel> [json…]") };
+    let args = rest.iter().map(|w| serde_json::from_str(w).unwrap_or_else(|_| Value::String(w.clone()))).collect();
+    println!("{}", serde_json::to_string_pretty(&call(channel, args).await?)?);
+    Ok(())
 }
 
 /// The device-code sign-in: the code shows here, and is entered in a browser anywhere.
@@ -68,21 +129,26 @@ async fn servers() -> Result<()> {
 
 /// Hosts until the service is told to stop, then lets the servers save.
 async fn run() -> Result<()> {
-    if server::relay::settings().is_none() {
-        bail!("This build has no ResinCraft Relay address, so nothing could reach it.");
-    }
-    if player::accounts::microsoft_account(None).await.is_none() {
-        bail!("Sign in first: resincraft-panel login");
-    }
-    // Being reachable is the point of the panel.
-    if !settings::get().await.remote_control {
+    // Signed in, the panel is reachable through ResinCraft's services; without an account it just hosts.
+    let signed_in = player::accounts::microsoft_account(None).await.is_some();
+    if signed_in && !settings::get().await.remote_control {
         settings::set(json!({ "remoteControl": true })).await?;
     }
     remote::init().await;
     tokio::spawn(resincraft_lib::core::autobackup::init());
     tokio::spawn(server::clientfiles::init());
     tokio::spawn(server::discordbot::init());
-    println!("ResinCraft Panel is running. Open it from the launcher's Servers page or the web console.");
+    #[cfg(unix)]
+    tokio::spawn(async {
+        if let Err(e) = serve_socket().await {
+            eprintln!("{e:#}");
+        }
+    });
+    if signed_in {
+        println!("ResinCraft Panel is running. Open it from the launcher's Servers page or the web console.");
+    } else {
+        println!("ResinCraft Panel is running without an account. Sign in (resincraft-panel login) to use ResinCraft Relay.");
+    }
     wait_for_stop().await;
     println!("Stopping the servers…");
     server::runtime::shutdown_all(STOP_GRACE).await;
@@ -113,7 +179,9 @@ fn main() {
 }
 
 async fn panel() {
-    let command = std::env::args().nth(1).unwrap_or_default();
+    let words: Vec<String> = std::env::args().skip(1).collect();
+    let command = words.first().cloned().unwrap_or_default();
+    let id = || words.get(1).cloned().map(Value::String).ok_or_else(|| anyhow::anyhow!("Which server? See: resincraft-panel servers"));
     let data = data_dir();
     if let Err(e) = std::fs::create_dir_all(&data) {
         eprintln!("Can't use {}: {e}", data.display());
@@ -125,6 +193,15 @@ async fn panel() {
         "login" => login().await,
         "accounts" => accounts().await,
         "servers" => servers().await,
+        "start" | "stop" => match id() {
+            Ok(id) => call(&format!("server:{command}"), vec![id]).await.map(|_| ()),
+            Err(e) => Err(e),
+        },
+        "call" => call_command(&words[1..]).await,
+        "full-control" => match words.get(1).map(String::as_str) {
+            Some(word @ ("on" | "off")) => call("settings:set", vec![json!({ "remoteFullControl": word == "on" })]).await.map(|_| ()),
+            _ => Err(anyhow::anyhow!("usage: resincraft-panel full-control on|off")),
+        },
         _ => {
             eprintln!("{USAGE}");
             std::process::exit(2);
