@@ -310,16 +310,31 @@ pub async fn download_file(item: &DownloadItem) -> Result<()> {
 
 async fn download_file_now(item: &DownloadItem) -> Result<()> {
     let tmp = PathBuf::from(format!("{}.part", item.dest.display()));
+    // Left by a run that died: nothing says it belongs to this file.
+    let _ = tokio::fs::remove_file(&tmp).await;
     let mut last: Option<anyhow::Error> = None;
-    for attempt in 0..3u64 {
+    let mut have = 0;
+    let mut attempt = 0;
+    while attempt < 3 {
         match try_download(item, &tmp).await {
             Ok(()) => return Ok(()),
             Err(e) => {
-                let _ = tokio::fs::remove_file(&tmp).await;
                 let not_found = status_of(&e) == Some(404);
                 last = Some(e);
                 if not_found {
+                    let _ = tokio::fs::remove_file(&tmp).await;
                     break;
+                }
+                // A cut-off connection that got further doesn't use up a try: some hosts (Cuberite's) drop
+                // every connection after a couple of minutes, so a slow file only ever finishes in pieces.
+                let now = tokio::fs::metadata(&tmp).await.map_or(0, |m| m.len());
+                if now > have {
+                    have = now;
+                    attempt = 0;
+                } else {
+                    let _ = tokio::fs::remove_file(&tmp).await;
+                    have = 0;
+                    attempt += 1;
                 }
                 tokio::time::sleep(Duration::from_millis(500 * (attempt + 1))).await;
             }
@@ -329,13 +344,36 @@ async fn download_file_now(item: &DownloadItem) -> Result<()> {
 }
 
 async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
-    let mut res = http().get(&item.url).send().await?;
+    let have = tokio::fs::metadata(tmp).await.map_or(0, |m| m.len());
+    let mut request = http().get(&item.url);
+    if have > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={have}-")).header(reqwest::header::ACCEPT_ENCODING, "identity");
+    }
+    let mut res = request.send().await?;
     if !res.status().is_success() {
         return Err(HttpError { status: res.status().as_u16(), url: item.url.clone(), body: String::new() }.into());
     }
-    let mut file = tokio::fs::File::create(tmp).await?;
-    while let Some(chunk) = res.chunk().await? {
-        file.write_all(&chunk).await?;
+    let resumed = res.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    // Bytes that were unzipped on the way can't be matched to a position in the file on the host.
+    let can_resume = resumed || res.content_length().is_some();
+    let mut file = if resumed {
+        tokio::fs::OpenOptions::new().append(true).open(tmp).await?
+    } else {
+        tokio::fs::File::create(tmp).await?
+    };
+    loop {
+        match res.chunk().await {
+            Ok(Some(chunk)) => file.write_all(&chunk).await?,
+            Ok(None) => break,
+            Err(e) => {
+                file.flush().await?;
+                drop(file);
+                if !can_resume {
+                    let _ = tokio::fs::remove_file(tmp).await;
+                }
+                return Err(e.into());
+            }
+        }
     }
     file.flush().await?;
     drop(file);
