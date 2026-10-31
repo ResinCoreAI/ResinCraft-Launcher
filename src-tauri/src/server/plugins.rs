@@ -63,7 +63,7 @@ async fn view(id: &str, area: Option<&str>) -> Result<View> {
         if area == Some("mods") {
             meta.kind = ServerKind::from_loader(meta.loader.unwrap_or(LoaderType::Forge));
         } else {
-            meta.kind = ServerKind::Spigot;
+            meta.kind = if meta.kind == ServerKind::Spongeforge { ServerKind::Sponge } else { ServerKind::Spigot };
             hybrid_plugins = true;
         }
     }
@@ -84,8 +84,9 @@ fn sources_for(kind: ServerKind) -> Vec<&'static str> {
     match kind {
         ServerKind::Paper | ServerKind::Purpur | ServerKind::Folia | ServerKind::Leaf | ServerKind::Pufferfish => vec!["modrinth", "hangar", "spigot", "bukkit", "github", "geysermc"],
         ServerKind::Spigot | ServerKind::Craftbukkit => vec!["modrinth", "spigot", "bukkit", "github", "geysermc"],
-        ServerKind::Velocity | ServerKind::Bungeecord | ServerKind::Waterfall | ServerKind::Sponge => vec!["modrinth", "github"],
-        ServerKind::Vanilla | ServerKind::Bedrock | ServerKind::Glowstone | ServerKind::Cuberite => Vec::new(),
+        ServerKind::Velocity | ServerKind::Bungeecord | ServerKind::Waterfall | ServerKind::Travertine | ServerKind::Sponge => vec!["modrinth", "github"],
+        ServerKind::Vanilla | ServerKind::Glowstone | ServerKind::Cuberite | ServerKind::Pumpkin | ServerKind::Horizon => Vec::new(),
+        k if k.bedrock() => Vec::new(),
         // Geyser has no Forge build.
         ServerKind::Forge => vec!["modrinth", "curseforge", "github"],
         _ => vec!["modrinth", "curseforge", "github", "geysermc"],
@@ -134,15 +135,15 @@ pub(crate) fn mr_loaders(meta: &ServerMeta) -> Vec<&'static str> {
         ServerKind::Sponge => vec!["sponge"],
         ServerKind::Velocity => vec!["velocity"],
         ServerKind::Bungeecord => vec!["bungeecord"],
-        ServerKind::Waterfall => vec!["waterfall", "bungeecord"],
+        ServerKind::Waterfall | ServerKind::Travertine => vec!["waterfall", "bungeecord"],
         ServerKind::Fabric => vec!["fabric"],
         ServerKind::Quilt => vec!["quilt", "fabric"],
         ServerKind::Forge => vec!["forge"],
         ServerKind::Neoforge if meta.mc_version == "1.20.1" => vec!["neoforge", "forge"],
         ServerKind::Neoforge => vec!["neoforge"],
         // Hybrids are always viewed as Spigot (plugins) or their loader (mods); see `View`.
-        ServerKind::Arclight | ServerKind::Mohist => vec!["spigot", "bukkit"],
-        ServerKind::Vanilla | ServerKind::Bedrock | ServerKind::Glowstone | ServerKind::Cuberite => Vec::new(),
+        k if k.hybrid() => vec!["spigot", "bukkit"],
+        _ => Vec::new(),
     }
 }
 
@@ -1135,7 +1136,7 @@ fn geyser_platform(meta: &ServerMeta) -> Result<&'static str> {
     match meta.kind {
         k if k.bukkit() => Ok("spigot"),
         ServerKind::Velocity => Ok("velocity"),
-        ServerKind::Bungeecord | ServerKind::Waterfall => Ok("bungeecord"),
+        ServerKind::Bungeecord | ServerKind::Waterfall | ServerKind::Travertine => Ok("bungeecord"),
         ServerKind::Fabric | ServerKind::Quilt => Ok("fabric"),
         ServerKind::Neoforge => Ok("neoforge"),
         _ => bail_tr!(

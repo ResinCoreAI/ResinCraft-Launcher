@@ -48,6 +48,10 @@ struct Opts {
     geyser: bool,
     /// Plugin servers and hybrids: also install from a Hangar link and from GitHub; hybrids: a mod in their mods.
     sources: bool,
+    /// Don't accept the EULA: run the server's own command until it stops at the EULA, and check it got that far.
+    to_eula: bool,
+    /// How long a server gets to come up (--start-secs).
+    start_secs: u64,
 }
 
 async fn run() -> Result<bool> {
@@ -68,7 +72,8 @@ async fn run() -> Result<bool> {
         Ok(Some(v))
     };
     let (tunnel, relay, relay_secret) = (value("--tunnel")?.unwrap_or_else(|| "auto".into()), value("--relay")?, value("--relay-secret")?);
-    let opts = Opts { tunnel, relay, relay_secret, keep: flag(&mut argv, "--keep"), upnp: flag(&mut argv, "--upnp"), verbose: flag(&mut argv, "--verbose"), managed_java: flag(&mut argv, "--managed-java"), update_test: flag(&mut argv, "--update-test"), geyser: flag(&mut argv, "--geyser"), sources: flag(&mut argv, "--sources"), mc: {
+    let start_secs = value("--start-secs")?.and_then(|s| s.parse().ok()).unwrap_or(900);
+    let opts = Opts { tunnel, relay, relay_secret, to_eula: flag(&mut argv, "--to-eula"), start_secs, keep: flag(&mut argv, "--keep"), upnp: flag(&mut argv, "--upnp"), verbose: flag(&mut argv, "--verbose"), managed_java: flag(&mut argv, "--managed-java"), update_test: flag(&mut argv, "--update-test"), geyser: flag(&mut argv, "--geyser"), sources: flag(&mut argv, "--sources"), mc: {
         let mut mc = "1.21.1".to_string();
         if let Some(i) = argv.iter().position(|a| a == "--mc") {
             mc = argv.get(i + 1).cloned().ok_or_else(|| anyhow!("--mc needs a version"))?;
@@ -172,6 +177,30 @@ async fn check(t: &str, opts: &Opts, port: u16) -> Result<()> {
     result
 }
 
+/// Runs a server with no eula.txt: real software loads its libraries, says it needs the EULA and exits. Nothing is agreed to.
+async fn run_to_eula(id: &str) -> Result<()> {
+    let meta = store::get(id).await?;
+    let dir = store::dir(id)?;
+    let (java, args) = match &meta.launch.exe {
+        Some(exe) => (dir.join(exe).to_string_lossy().into_owned(), meta.launch.exe_args.clone()),
+        None => (resincraft_lib::server::installers::choose_java(&meta).await?, runtime::launch_args(&meta)?),
+    };
+    println!("  {java} {}", args.join(" "));
+    let run = tokio::process::Command::new(&java).args(&args).current_dir(&dir).stdin(std::process::Stdio::null()).kill_on_drop(true).output();
+    let out = tokio::time::timeout(Duration::from_secs(420), run).await.map_err(|_| anyhow!("it didn't reach the EULA in 7 minutes"))??;
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    for line in text.lines().rev().take(12).collect::<Vec<_>>().into_iter().rev() {
+        println!("    | {}", line.chars().take(170).collect::<String>());
+    }
+    if store::eula_accepted(id).await {
+        bail!("eula.txt says accepted");
+    }
+    if !text.to_lowercase().contains("eula") {
+        bail!("it stopped without reaching the EULA");
+    }
+    Ok(())
+}
+
 async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     let meta = store::get(id).await?;
     let bedrock = meta.kind.bedrock();
@@ -181,7 +210,7 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
         ServerKind::Fabric | ServerKind::Quilt => Some("lithium"),
         _ => None,
     };
-    if let (Some(a), None) = (addon, &meta.modpack) {
+    if let (Some(a), None, false) = (addon, &meta.modpack, opts.to_eula) {
         plugins::install(id, a, None, None).await?;
         let list = plugins::list(id, None).await?;
         let names: Vec<String> = list.iter().map(|c| c.item.title.clone().unwrap_or_else(|| c.item.filename.clone())).collect();
@@ -245,15 +274,27 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
         println!("  managed Java {} at {}", java.version, java.path);
         store::update(id, json!({ "javaPath": java.path })).await?;
     }
-    if !bedrock {
+    if !bedrock && store::get(id).await?.launch.exe.is_none() {
         println!("  java {}", runtime::launch_args(&store::get(id).await?)?.join(" "));
     }
-    if runtime::start(id).await.is_ok() {
-        bail!("the server started without the EULA being accepted");
+    if opts.to_eula {
+        return run_to_eula(id).await;
     }
-    store::accept_eula(id).await?;
+    if meta.kind.needs_eula() {
+        if runtime::start(id).await.is_ok() {
+            bail!("the server started without the EULA being accepted");
+        }
+        store::accept_eula(id).await?;
+    }
     runtime::start(id).await?;
-    let state = runtime::wait_state(id, &["running", "stopped", "crashed"], Duration::from_secs(900)).await?;
+    let state = runtime::wait_state(id, &["running", "stopped", "crashed"], Duration::from_secs(opts.start_secs)).await;
+    let state = match state {
+        Ok(s) => s,
+        Err(e) => {
+            print_tail(id, 25);
+            return Err(e);
+        }
+    };
     if state != "running" {
         print_tail(id, 25);
         bail!("the server {state} before it was ready");
@@ -280,10 +321,12 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     }
 
     // Java: "There are 0 of a max of 20 players online"; Bedrock: "There are 0/10 players online".
-    let list_re = Regex::new(r"There are \d+(?: (?:of a max(?:imum)? of|out of maximum) |/)\d+ players online")?;
-    let waiter = runtime::wait_line(id, &list_re, Duration::from_secs(30));
-    runtime::command(id, "list")?;
-    println!("  list → {}", waiter.await?);
+    if !meta.kind.proxy() {
+        let list_re = Regex::new(r"(?i)there are \d+(?: (?:of a max(?:imum)? of|out of maximum) |/)\d+ players|online \(\d+/\d+\)|\(\d+/\d+\) online|players online")?;
+        let waiter = runtime::wait_line(id, &list_re, Duration::from_secs(30));
+        runtime::command(id, "list")?;
+        println!("  list → {}", waiter.await?);
+    }
     if let Some(a) = addon {
         let enabled = runtime::log(id).into_iter().any(|l| l.text.to_lowercase().contains(&format!("enabling {a}")) || l.text.to_lowercase().contains(a));
         println!("  {a} mentioned in the console: {enabled}");
@@ -326,7 +369,7 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     }
 
     // Bedrock worlds are backed up while the server is off (below).
-    if !bedrock {
+    if !bedrock && !meta.kind.proxy() {
         let zip = runtime::backup(id).await?;
         let size = std::fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
         println!("  backup {zip} ({} KB)", size / 1024);
@@ -343,7 +386,7 @@ async fn exercise(id: &str, opts: &Opts) -> Result<()> {
     }
     let tail = runtime::log(id).last().map(|l| l.text.clone()).unwrap_or_default();
     println!("  stopped cleanly ({tail})");
-    if bedrock {
+    if bedrock && !meta.kind.proxy() {
         let zip = runtime::backup(id).await?;
         let size = std::fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
         println!("  backup {zip} ({} KB)", size / 1024);

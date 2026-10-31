@@ -12,6 +12,7 @@ export type Route =
   | { page: 'accounts' }
   | { page: 'servers'; id?: string; fromInstance?: string }
   | { page: 'bedrock' }
+  | { page: 'horizon' }
   | { page: 'quickjoin' }
   | { page: 'admin' }
   | { page: 'settings' }

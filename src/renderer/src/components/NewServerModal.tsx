@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Blocks, Check, ChevronLeft, ChevronRight, Combine, Cpu, Fish, FileArchive, FlaskConical, Hammer, Layers, Leaf, Loader2, Network, Package, Search, Server, Smartphone, Sparkles } from 'lucide-react'
+import { Blocks, Check, ChevronLeft, ChevronRight, Combine, Cpu, Fish, FileArchive, FlaskConical, Hammer, Layers, Leaf, Loader2, Network, Package, Search, Server, Smartphone, Sparkles, Sunrise } from 'lucide-react'
 import type {
   ContentSource,
   Instance,
@@ -34,17 +34,31 @@ export const SERVER_LABEL: Record<ServerKind, string> = {
   craftbukkit: 'CraftBukkit',
   sponge: 'Sponge',
   mohist: 'Mohist',
+  magma: 'Magma',
+  catserver: 'CatServer',
+  crucible: 'Crucible',
+  spongeforge: 'SpongeForge',
+  cardboard: 'Cardboard',
   velocity: 'Velocity',
   bungeecord: 'BungeeCord',
   waterfall: 'Waterfall',
+  travertine: 'Travertine',
+  waterdogpe: 'WaterdogPE',
+  geyser: 'Geyser',
   glowstone: 'Glowstone',
   cuberite: 'Cuberite',
+  pumpkin: 'Pumpkin',
+  horizon: 'Horizon',
   fabric: 'Fabric',
   quilt: 'Quilt',
   forge: 'Forge',
   neoforge: 'NeoForge',
   arclight: 'Arclight',
-  bedrock: 'Bedrock'
+  bedrock: 'Bedrock',
+  pocketmine: 'PocketMine-MP',
+  nukkit: 'Nukkit',
+  powernukkitx: 'PowerNukkitX',
+  nukkitpm1: 'Nukkit PetteriM1'
 }
 
 /** A tile in the picker: a server type, or "snapshot" (a vanilla server on a snapshot). */
@@ -69,13 +83,27 @@ const OWN_ICON: Partial<Record<Pick, ReactNode>> = {
   craftbukkit: <Hammer />,
   sponge: <Layers />,
   mohist: <Combine />,
+  magma: <Combine />,
+  catserver: <Combine />,
+  crucible: <Combine />,
+  spongeforge: <Combine />,
+  cardboard: <Combine />,
   velocity: <Network />,
   bungeecord: <Network />,
   waterfall: <Network />,
+  travertine: <Network />,
+  waterdogpe: <Network />,
+  geyser: <Network />,
   glowstone: <Sparkles />,
   cuberite: <Cpu />,
+  pumpkin: <Cpu />,
+  horizon: <Sunrise />,
   arclight: <Combine />,
-  bedrock: <Smartphone />
+  bedrock: <Smartphone />,
+  pocketmine: <Smartphone />,
+  nukkit: <Smartphone />,
+  powernukkitx: <Smartphone />,
+  nukkitpm1: <Smartphone />
 }
 let iconCache: Promise<Record<string, string>> | undefined
 
@@ -117,14 +145,14 @@ const GROUPS: { title: Key; types: Pick[] }[] = [
   { title: 'servers.create.groupVanilla', types: ['vanilla', 'snapshot'] },
   { title: 'servers.create.groupPlugins', types: ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge'] },
   { title: 'servers.create.groupMods', types: ['fabric', 'quilt', 'forge', 'neoforge'] },
-  { title: 'servers.create.groupHybrid', types: ['arclight', 'mohist'] },
-  { title: 'servers.create.groupProxy', types: ['velocity', 'bungeecord', 'waterfall'] },
-  { title: 'servers.create.groupOther', types: ['glowstone', 'cuberite'] },
-  { title: 'servers.create.groupBedrock', types: ['bedrock'] }
+  { title: 'servers.create.groupHybrid', types: ['arclight', 'mohist', 'magma', 'catserver', 'crucible', 'spongeforge', 'cardboard'] },
+  { title: 'servers.create.groupProxy', types: ['velocity', 'bungeecord', 'waterfall', 'travertine', 'waterdogpe', 'geyser'] },
+  { title: 'servers.create.groupOther', types: ['glowstone', 'cuberite', 'pumpkin', 'horizon'] },
+  { title: 'servers.create.groupBedrock', types: ['bedrock', 'pocketmine', 'nukkit', 'powernukkitx', 'nukkitpm1'] }
 ]
 
 /** Server types whose version list comes from their own download site. */
-const OWN_VERSIONS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'arclight', 'mohist', 'velocity', 'bungeecord', 'waterfall', 'glowstone', 'cuberite', 'bedrock']
+const OWN_VERSIONS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'arclight', 'mohist', 'magma', 'catserver', 'crucible', 'spongeforge', 'cardboard', 'velocity', 'bungeecord', 'waterfall', 'travertine', 'waterdogpe', 'geyser', 'glowstone', 'cuberite', 'pumpkin', 'horizon', 'bedrock', 'pocketmine', 'nukkit', 'powernukkitx', 'nukkitpm1']
 /** Types that come in builds to choose from (Arclight: one per mod loader). */
 const WITH_BUILDS: ServerKind[] = ['arclight']
 const LOADER_OF: Partial<Record<ServerKind, LoaderType>> = { fabric: 'fabric', quilt: 'quilt', forge: 'forge', neoforge: 'neoforge' }
@@ -375,7 +403,7 @@ export default function NewServerModal({
 
       {mode === 'software' && step === 'pick' && (
         <div className="sv-pick-page">
-          {GROUPS.filter((g) => canHostBedrock || !g.types.includes('bedrock')).map((g) => (
+          {GROUPS.map((g) => ({ ...g, types: g.types.filter((k) => canHostBedrock || k !== 'bedrock') })).map((g) => (
             <div className="field" key={g.title}>
               <label>{t(g.title)}</label>
               <div className="sv-types">

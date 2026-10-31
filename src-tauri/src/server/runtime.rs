@@ -160,7 +160,8 @@ fn patterns() -> &'static Patterns {
     static P: OnceLock<Patterns> = OnceLock::new();
     P.get_or_init(|| Patterns {
         ansi: Regex::new(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[()][A-Za-z0-9]").unwrap(),
-        done: Regex::new(r#"Done \(\d+[.,]?\d*m?s\)! For help, type|INFO\] Server started\."#).unwrap(),
+        // The last ones: Velocity, BungeeCord, Glowstone and Cuberite.
+        done: Regex::new(r#"Done \(\d+[.,]?\d*m?s\)! For help, type|INFO\] Server started\.|INFO\]:? Listening on /|Ready for connections|Started server; took|INFO \] Binding to /|Startup complete"#).unwrap(),
         joined: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) joined the game\s*$").unwrap(),
         left: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) left the game\s*$").unwrap(),
         player_name: Regex::new(r"^[A-Za-z0-9_.]{1,17}$").unwrap(),
@@ -287,7 +288,9 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
     }
     if meta.kind == ServerKind::Velocity {
         args.extend(["--port".to_string(), meta.port.to_string()]);
-    } else if !meta.kind.proxy() && meta.kind != ServerKind::Glowstone && !args.iter().any(|a| a == "nogui" || a == "--nogui") {
+    } else if meta.kind == ServerKind::Geyser {
+        args.extend(["--nogui".to_string(), format!("--bedrock.port={}", meta.port)]);
+    } else if !meta.kind.proxy() && !meta.kind.bedrock() && meta.kind != ServerKind::Glowstone && !args.iter().any(|a| a == "nogui" || a == "--nogui") {
         args.push("nogui".into());
     }
     Ok(args)
@@ -296,7 +299,9 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
 /// The port in the config of software without server.properties (Velocity takes it as an argument).
 async fn write_own_port(meta: &ServerMeta, dir: &Path) -> Result<()> {
     let (file, text) = match meta.kind {
-        ServerKind::Bungeecord | ServerKind::Waterfall => ("config.yml", port_in_bungee_config(&tokio::fs::read_to_string(dir.join("config.yml")).await.unwrap_or_default(), meta.port)),
+        ServerKind::Bungeecord | ServerKind::Waterfall | ServerKind::Travertine => ("config.yml", port_in_bungee_config(&tokio::fs::read_to_string(dir.join("config.yml")).await.unwrap_or_default(), meta.port)),
+        ServerKind::Waterdogpe => ("config.yml", port_in_waterdog_config(&tokio::fs::read_to_string(dir.join("config.yml")).await.unwrap_or_default(), meta.port)),
+        ServerKind::Pumpkin => ("pumpkin.toml", port_in_pumpkin_config(&tokio::fs::read_to_string(dir.join("pumpkin.toml")).await.unwrap_or_default(), meta.port)),
         ServerKind::Cuberite => ("settings.ini", port_in_cuberite_settings(&tokio::fs::read_to_string(dir.join("settings.ini")).await.unwrap_or_default(), meta.port)),
         _ => return Ok(()),
     };
@@ -308,8 +313,40 @@ fn port_in_bungee_config(text: &str, port: u16) -> String {
     if text.trim().is_empty() {
         return format!("listeners:\n- host: 0.0.0.0:{port}\n");
     }
-    let re = regex::Regex::new(r"(?m)^(\s*-?\s*host:\s*)(\S+):\d+\s*$").expect("valid pattern");
+    let re = regex::Regex::new(r"(?m)^([ \t]*-?[ \t]*host:[ \t]*)(\S+):\d+[ \t]*$").expect("valid pattern");
     re.replace(text, |c: &regex::Captures| format!("{}{}:{port}", &c[1], &c[2])).into_owned()
+}
+
+/// WaterdogPE's config.yml with its listener on `port`; a new one holds only that.
+fn port_in_waterdog_config(text: &str, port: u16) -> String {
+    if text.trim().is_empty() {
+        return format!("listener:\n  host: 0.0.0.0:{port}\n");
+    }
+    port_in_bungee_config(text, port)
+}
+
+/// Pumpkin's pumpkin.toml with Java players on `port`; a new one holds only that.
+fn port_in_pumpkin_config(text: &str, port: u16) -> String {
+    let mut section = "";
+    let mut out: Vec<String> = Vec::new();
+    let mut found = false;
+    for line in text.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            section = t;
+        }
+        if section == "[networking.java]" && t.starts_with("address") {
+            let host = t.split('"').nth(1).and_then(|a| a.rsplit_once(':')).map_or("0.0.0.0", |(h, _)| h);
+            out.push(format!("address = \"{host}:{port}\""));
+            found = true;
+        } else {
+            out.push(line.to_string());
+        }
+    }
+    if !found {
+        out.push(format!("[networking.java]\naddress = \"0.0.0.0:{port}\""));
+    }
+    out.join("\n") + "\n"
 }
 
 /// Cuberite's settings.ini with its port.
@@ -385,9 +422,9 @@ pub async fn start(id: &str) -> Result<()> {
     if !port_free {
         bail!("Port {} is already in use (maybe another server is running). Pick a different port in the server's settings.", meta.port);
     }
-    // Bedrock and Cuberite are programs of their own; everything else runs Java.
-    let args = if meta.launch.exe.is_some() { Vec::new() } else { launch_args(&meta)? };
-    if bedrock && meta.launch.exe.is_none() {
+    // Bedrock, Cuberite, Pumpkin, Horizon and PocketMine's PHP are programs of their own; everything else runs Java.
+    let args = if meta.launch.exe.is_some() { meta.launch.exe_args.clone() } else { launch_args(&meta)? };
+    if meta.kind == ServerKind::Bedrock && meta.launch.exe.is_none() {
         bail!("{} isn't fully installed. Create it again.", meta.name);
     }
     for (_, file) in [("jar", &meta.launch.jar), ("args", &meta.launch.args_file), ("exe", &meta.launch.exe)] {
@@ -455,7 +492,7 @@ pub async fn start(id: &str) -> Result<()> {
     // Only Paperclip, Spigot and Forge 1.7.10–1.12.2 need it (old log4j cuts jar URLs at the first '!' and then
     // scans the whole drive); other loaders resolve real paths and break across drives.
     let legacy_forge = meta.kind == ServerKind::Forge && crate::game::loaders::is_legacy_mc(&meta.mc_version);
-    let run_dir = if meta.kind.bukkit() || legacy_forge {
+    let run_dir = if meta.kind.bukkit() || legacy_forge || matches!(meta.kind, ServerKind::Magma | ServerKind::Catserver | ServerKind::Crucible) {
         launch_dir(id, &dir).await
     } else {
         dir.clone()
@@ -467,7 +504,7 @@ pub async fn start(id: &str) -> Result<()> {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| fail(anyhow!("Couldn't start {program}: {e}")))?;
-    let (pid, max_mb) = (child.id(), (meta.kind != ServerKind::Bedrock).then_some(meta.memory_mb));
+    let (pid, max_mb) = (child.id(), meta.launch.exe.is_none().then_some(meta.memory_mb));
     with(|w| {
         if let Some(p) = w.procs.get_mut(id) {
             p.pid = pid;
@@ -1650,7 +1687,20 @@ async fn zip_worlds(dir: PathBuf, worlds: Vec<String>, target: PathBuf) -> Resul
 
 #[cfg(test)]
 mod restore_tests {
-    use super::{port_in_bungee_config, port_in_cuberite_settings, restore_target};
+    use super::{port_in_bungee_config, port_in_cuberite_settings, port_in_pumpkin_config, port_in_waterdog_config, restore_target};
+
+    #[test]
+    fn waterdog_port_goes_in_its_listener() {
+        assert_eq!(port_in_waterdog_config("", 19140), "listener:\n  host: 0.0.0.0:19140\n");
+        assert_eq!(port_in_waterdog_config("listener:\n  host: 0.0.0.0:19132\n", 19140), "listener:\n  host: 0.0.0.0:19140\n");
+    }
+
+    #[test]
+    fn pumpkin_port_goes_in_the_java_section() {
+        assert_eq!(port_in_pumpkin_config("", 25570), "[networking.java]\naddress = \"0.0.0.0:25570\"\n");
+        let text = "[networking.query]\naddress = \"0.0.0.0:25565\"\n[networking.java]\nenabled = true\naddress = \"0.0.0.0:25565\"\n";
+        assert_eq!(port_in_pumpkin_config(text, 25570), "[networking.query]\naddress = \"0.0.0.0:25565\"\n[networking.java]\nenabled = true\naddress = \"0.0.0.0:25570\"\n");
+    }
 
     #[test]
     fn writes_the_port_of_software_without_server_properties() {

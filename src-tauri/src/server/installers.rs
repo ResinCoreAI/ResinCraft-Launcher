@@ -2,8 +2,9 @@
 //! Leaf from their download APIs, Fabric's server launcher, Quilt's installer, the Forge / NeoForge installers
 //! (`--installServer`; Forge 1.7.10–1.12.2 is laid out from its installer instead), the Arclight hybrid (one
 //! jar; it fetches its libraries on first start), Mohist, Pufferfish, SpongeVanilla, the proxies (Velocity, BungeeCord,
-//! Waterfall), Glowstone, Cuberite and Bedrock Dedicated Server. Each fills in
-//! `ServerMeta::launch` (how to start it) and the loader/build version.
+//! Waterfall, Travertine, WaterdogPE), Geyser on its own, Glowstone, Cuberite, Pumpkin, Bedrock Dedicated Server, the
+//! other Bedrock servers (PocketMine-MP, Nukkit and its forks) and the other hybrids (Magma, CatServer,
+//! Crucible, SpongeForge, Cardboard). Each fills in `ServerMeta::launch` (how to start it) and the loader/build version.
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -15,6 +16,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
+use crate::content::github;
 use crate::content::index::natural_cmp;
 use crate::core::events::Task;
 use crate::core::net::{download_all, download_file, fetch_json, fetch_text, status_of, DownloadItem, Hash};
@@ -23,7 +25,7 @@ use crate::core::{paths, settings};
 use crate::game::java::{find_java, hidden_command, install_java};
 use crate::game::forge::legacy_lib_bases;
 use crate::game::loaders::{full_forge_version, installer_url, is_ancient_forge, is_legacy_forge, latest_loader, legacy_forge_error, normalize_loader_version};
-use crate::game::mojang::{get_vanilla_version, maven_path, plain};
+use crate::game::mojang::{asset_items, client_jar, get_vanilla_version, maven_path, plain, resolve_libraries};
 use crate::{err_tr, tr};
 
 const FILL: &str = "https://fill.papermc.io/v3/projects";
@@ -35,6 +37,23 @@ const QUILT_INSTALLER: &str = "https://maven.quiltmc.org/repository/release/org/
 const LEAF: &str = "https://api.leafmc.one/v2/projects/leaf";
 const MOHIST: &str = "https://api.mohistmc.com/project/mohist";
 const SPONGE: &str = "https://dl-api.spongepowered.org/v2/groups/org.spongepowered/artifacts/spongevanilla";
+const SPONGE_FORGE: &str = "https://dl-api.spongepowered.org/v2/groups/org.spongepowered/artifacts/spongeforge";
+const MODRINTH: &str = "https://api.modrinth.com/v2";
+/// One repository per Minecraft version, newest first.
+const MAGMA: [(&str, &str); 4] = [("1.20.1", "magmamaintained/Magma-1.20.1"), ("1.19.3", "magmamaintained/Magma-1.19.3"), ("1.18.2", "magmamaintained/Magma-1.18.2"), ("1.12.2", "magmamaintained/Magma-1.12.2")];
+const CATSERVER: &str = "Luohuayu/CatServer";
+const CRUCIBLE: &str = "CrucibleMC/Crucible";
+const CRUCIBLE_MC: &str = "1.7.10";
+const PUMPKIN: &str = "Pumpkin-MC/Pumpkin";
+const POCKETMINE: &str = "pmmp/PocketMine-MP";
+const POWERNUKKITX: &str = "PowerNukkitX/PowerNukkitX";
+const NUKKIT_PM1: &str = "PetteriM1/NukkitPetteriM1Edition";
+const WATERDOGPE: &str = "WaterdogPE/WaterdogPE";
+/// Cloudburst publishes Nukkit as a Maven snapshot.
+const NUKKIT: &str = "https://repo.opencollab.dev/maven-snapshots/cn/nukkit/nukkit/1.0-SNAPSHOT";
+const GEYSER: &str = "https://download.geysermc.org/v2/projects/geyser";
+const LATEST: &str = "latest";
+const HORIZON: &str = "horizon-rust/horizon";
 /// Pufferfish's Jenkins: one job per Minecraft series ("Pufferfish-1.21").
 const PUFFERFISH: &str = "https://ci.pufferfish.host";
 const BUNGEECORD: &str = "https://ci.md-5.net/job/BungeeCord/lastSuccessfulBuild/artifact/bootstrap/target/BungeeCord.jar";
@@ -77,14 +96,21 @@ pub async fn choose_java(meta: &ServerMeta) -> Result<String> {
         return Ok(custom);
     }
     let required = match meta.kind {
+        ServerKind::Nukkit | ServerKind::Nukkitpm1 | ServerKind::Powernukkitx => PROXY_JAVA,
+        ServerKind::Velocity if meta.mc_version.split('.').next().and_then(|v| v.parse::<u32>().ok()).is_some_and(|major| major >= 4) => VELOCITY_4_JAVA,
         k if k.proxy() => PROXY_JAVA,
         ServerKind::Glowstone => GLOWSTONE_JAVA,
         _ => required_java(&meta.mc_version).await?,
     };
+    java_of(required, meta).await
+}
+
+/// A detected Java of this major version, else Temurin downloaded into the launcher's Java folder.
+async fn java_of(required: u32, meta: &ServerMeta) -> Result<String> {
     if let Some(found) = find_java(required).await? {
         return Ok(found.path);
     }
-    if settings.auto_java {
+    if settings::get().await.auto_java {
         let installed = Task::run(format!("Downloading Java {required}"), Some(meta.id.clone()), |t| async move { install_java(required, &t).await }).await?;
         return Ok(installed.path);
     }
@@ -97,7 +123,7 @@ pub async fn choose_java(meta: &ServerMeta) -> Result<String> {
 /// Mojang's list and the loader lists for those).
 pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
     let mut list: Vec<String> = match kind {
-        ServerKind::Paper | ServerKind::Folia | ServerKind::Velocity | ServerKind::Waterfall => {
+        ServerKind::Paper | ServerKind::Folia | ServerKind::Velocity | ServerKind::Waterfall | ServerKind::Travertine => {
             #[derive(Deserialize)]
             struct Project {
                 versions: HashMap<String, Vec<String>>,
@@ -129,9 +155,20 @@ pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
         ServerKind::Mohist => mohist_versions().await?,
         ServerKind::Pufferfish => pufferfish_versions().await?,
         ServerKind::Sponge => sponge_versions().await?,
-        ServerKind::Bungeecord => vec!["latest".to_string()],
+        ServerKind::Magma => MAGMA.iter().map(|(mc, _)| mc.to_string()).collect(),
+        ServerKind::Catserver => catserver_versions().await?,
+        ServerKind::Crucible => vec![CRUCIBLE_MC.to_string()],
+        ServerKind::Spongeforge => spongeforge_versions().await?,
+        ServerKind::Cardboard => cardboard_versions().await?,
+        ServerKind::Bungeecord | ServerKind::Nukkit | ServerKind::Waterdogpe => vec![LATEST.to_string()],
+        ServerKind::Geyser => geyser_versions().await?,
         ServerKind::Glowstone | ServerKind::Cuberite => vec![OLD_MC.to_string()],
+        ServerKind::Pumpkin => pumpkin_versions().await?,
+        ServerKind::Horizon => horizon_versions().await?,
         ServerKind::Bedrock => bedrock_versions().await?,
+        ServerKind::Pocketmine => release_tags(POCKETMINE, "PocketMine-MP.phar").await?,
+        ServerKind::Powernukkitx => release_tags(POWERNUKKITX, "powernukkitx.jar").await?,
+        ServerKind::Nukkitpm1 => release_tags(NUKKIT_PM1, "Nukkit-PM1E.jar").await?,
         _ => return Ok(Vec::new()),
     };
     // Releases only; pre-releases and release candidates are experimental builds.
@@ -175,6 +212,7 @@ fn project_of(kind: ServerKind) -> &'static str {
         ServerKind::Folia => "folia",
         ServerKind::Velocity => "velocity",
         ServerKind::Waterfall => "waterfall",
+        ServerKind::Travertine => "travertine",
         _ => "paper",
     }
 }
@@ -218,6 +256,67 @@ pub async fn install(meta: &mut ServerMeta, dir: &Path, task: &Arc<Task>) -> Res
             let build = sponge(&mc, dir, task).await?;
             (jar("sponge.jar"), Some(build))
         }
+        ServerKind::Magma => {
+            let build = magma(&mc, dir, task).await?;
+            loader = Some(LoaderType::Forge);
+            (jar("magma.jar"), Some(build))
+        }
+        ServerKind::Catserver => {
+            let build = catserver(&mc, dir, task).await?;
+            loader = Some(LoaderType::Forge);
+            (jar("catserver.jar"), Some(build))
+        }
+        ServerKind::Crucible => {
+            let build = crucible(dir, task).await?;
+            loader = Some(LoaderType::Forge);
+            (jar("crucible.jar"), Some(build))
+        }
+        ServerKind::Spongeforge => {
+            let java = choose_java(meta).await?;
+            let (launch, build) = spongeforge(&mc, dir, &java, task).await?;
+            loader = Some(LoaderType::Forge);
+            (launch, Some(build))
+        }
+        ServerKind::Cardboard => {
+            let build = cardboard(&mc, dir, task).await?;
+            loader = Some(LoaderType::Fabric);
+            (jar("fabric-server-launch.jar"), Some(build))
+        }
+        ServerKind::Waterdogpe => {
+            let build = github_jar(WATERDOGPE, None, "Waterdog.jar", "waterdogpe.jar", dir, task).await?;
+            (jar("waterdogpe.jar"), Some(build))
+        }
+        ServerKind::Geyser => {
+            let build = geyser(&mc, dir, task).await?;
+            (jar("geyser.jar"), Some(build))
+        }
+        ServerKind::Pumpkin => {
+            let (exe, build) = pumpkin(&mc, dir, task).await?;
+            (ServerLaunch { exe: Some(exe), ..Default::default() }, Some(build))
+        }
+        ServerKind::Horizon => {
+            let (exe, exe_args) = horizon(meta, dir, task).await?;
+            (ServerLaunch { exe: Some(exe), exe_args, ..Default::default() }, None)
+        }
+        ServerKind::Pocketmine => {
+            let exe = pocketmine(&mc, dir, task).await?;
+            (ServerLaunch { exe: Some(exe), exe_args: vec!["PocketMine-MP.phar".to_string(), "--no-wizard".to_string()], ..Default::default() }, None)
+        }
+        ServerKind::Nukkit => {
+            let build = nukkit(dir, task).await?;
+            skip_language_question(dir).await?;
+            (jar("nukkit.jar"), Some(build))
+        }
+        ServerKind::Powernukkitx => {
+            github_jar(POWERNUKKITX, Some(&mc), "powernukkitx.jar", "powernukkitx.jar", dir, task).await?;
+            skip_language_question(dir).await?;
+            (jar("powernukkitx.jar"), None)
+        }
+        ServerKind::Nukkitpm1 => {
+            github_jar(NUKKIT_PM1, Some(&mc), "Nukkit-PM1E.jar", "nukkit.jar", dir, task).await?;
+            skip_language_question(dir).await?;
+            (jar("nukkit.jar"), None)
+        }
         ServerKind::Bungeecord => {
             download_all(vec![DownloadItem::new(BUNGEECORD, dir.join("bungeecord.jar"))], 1, task.counter("Downloading BungeeCord")).await?;
             (jar("bungeecord.jar"), None)
@@ -230,7 +329,7 @@ pub async fn install(meta: &mut ServerMeta, dir: &Path, task: &Arc<Task>) -> Res
             cuberite(dir, task).await?;
             (ServerLaunch { exe: Some("Cuberite".to_string()), ..Default::default() }, None)
         }
-        ServerKind::Paper | ServerKind::Folia | ServerKind::Velocity | ServerKind::Waterfall => {
+        ServerKind::Paper | ServerKind::Folia | ServerKind::Velocity | ServerKind::Waterfall | ServerKind::Travertine => {
             let build = paper_like(meta.kind, &mc, wanted.as_deref(), dir, task).await?;
             (jar(&format!("{}.jar", project_of(meta.kind))), Some(build))
         }
@@ -328,7 +427,8 @@ async fn paper_like(kind: ServerKind, mc: &str, build: Option<&str>, dir: &Path,
         None => builds.iter().find(|x| x.channel.eq_ignore_ascii_case("stable")).or(builds.first()),
     };
     let pick = pick.ok_or_else(|| anyhow!("{} has no build for Minecraft {mc}", kind.label()))?;
-    let dl = pick.downloads.get("server:default").ok_or_else(|| anyhow!("{} build {} has no server download", kind.label(), pick.id))?;
+    // Projects that stopped before Fill's "server:default" kept the old name.
+    let dl = pick.downloads.get("server:default").or(pick.downloads.get("application")).ok_or_else(|| anyhow!("{} build {} has no server download", kind.label(), pick.id))?;
     let item = DownloadItem::new(&dl.url, dir.join(format!("{project}.jar"))).hash(Some(Hash::sha256(&dl.checksums.sha256))).size(dl.size);
     download_all(vec![item], 1, task.counter(&format!("Downloading {}", kind.label()))).await?;
     Ok(pick.id.to_string())
@@ -659,6 +759,450 @@ async fn sponge(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
     Ok(pick)
 }
 
+// ---------- Software published as GitHub releases ----------
+
+/// The tags of the full releases that hold `file`: each is a version of that software.
+async fn release_tags(repo: &str, file: &str) -> Result<Vec<String>> {
+    let list = github::all_releases(repo).await?;
+    Ok(list.into_iter().filter(|r| !r.prerelease && r.assets.iter().any(|a| a.name == file)).map(|r| r.tag_name).collect())
+}
+
+/// The release `tag`, else the newest full release that holds `file`.
+async fn release_with(repo: &str, tag: Option<&str>, file: impl Fn(&str) -> bool) -> Result<github::Release> {
+    let list = github::all_releases(repo).await?;
+    let pick = list.into_iter().find(|r| tag.map_or(!r.prerelease, |t| r.tag_name == t) && r.assets.iter().any(|a| file(&a.name)));
+    pick.ok_or_else(|| anyhow!("{repo} has no download for that version"))
+}
+
+fn release_item(asset: &github::Asset, dest: PathBuf) -> DownloadItem {
+    DownloadItem::new(&asset.url, dest).hash(asset.sha256().map(Hash::sha256)).size(Some(asset.size))
+}
+
+/// The file `name` of a release, saved as `save`. Returns the release's tag.
+async fn github_jar(repo: &str, tag: Option<&str>, name: &str, save: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    task.update(format!("Finding {name}…"), None);
+    let release = release_with(repo, tag, |n| n == name).await?;
+    let asset = release.assets.iter().find(|a| a.name == name).ok_or_else(|| anyhow!("{repo} has no {name}"))?;
+    download_all(vec![release_item(asset, dir.join(save))], 1, task.counter(format!("Downloading {name}"))).await?;
+    Ok(release.tag_name)
+}
+
+// ---------- Other hybrids ----------
+
+/// The newest Magma server jar for `mc`. Returns the build (the commit it's tagged with).
+async fn magma(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    task.update(format!("Finding Magma for Minecraft {mc}…"), None);
+    let repo = MAGMA.iter().find(|(v, _)| *v == mc).map(|(_, r)| *r).ok_or_else(|| anyhow!("Magma isn't available for Minecraft {mc}"))?;
+    let is_server = |n: &str| n.to_lowercase().ends_with("-server.jar");
+    let release = release_with(repo, None, is_server).await?;
+    let asset = release.assets.iter().find(|a| is_server(&a.name)).ok_or_else(|| anyhow!("Magma {mc} has no server jar"))?;
+    download_all(vec![release_item(asset, dir.join("magma.jar"))], 1, task.counter("Downloading Magma")).await?;
+    Ok(release.tag_name)
+}
+
+/// The Minecraft version a CatServer jar is for: "CatServer-1.16.5-1d8d6313-server.jar"; the 1.12.2 builds are
+/// "CatServer-4168d848-universal.jar".
+fn catserver_mc(file: &str) -> Option<String> {
+    let rest = file.strip_prefix("CatServer-")?;
+    if file.ends_with("-universal.jar") {
+        return Some(OLD_MC.to_string());
+    }
+    let version = rest.strip_suffix("-server.jar")?.split('-').next()?;
+    version.starts_with("1.").then(|| version.to_string())
+}
+
+async fn catserver_versions() -> Result<Vec<String>> {
+    let list = github::all_releases(CATSERVER).await?;
+    Ok(list.iter().flat_map(|r| &r.assets).filter_map(|a| catserver_mc(&a.name)).collect())
+}
+
+/// The newest CatServer for `mc`. Returns the build (the release's tag).
+async fn catserver(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    task.update(format!("Finding CatServer for Minecraft {mc}…"), None);
+    let for_mc = |n: &str| catserver_mc(n).as_deref() == Some(mc);
+    let release = release_with(CATSERVER, None, for_mc).await.map_err(|_| anyhow!("CatServer isn't available for Minecraft {mc}"))?;
+    let asset = release.assets.iter().find(|a| for_mc(&a.name)).ok_or_else(|| anyhow!("CatServer isn't available for Minecraft {mc}"))?;
+    download_all(vec![release_item(asset, dir.join("catserver.jar"))], 1, task.counter("Downloading CatServer")).await?;
+    Ok(release.tag_name)
+}
+
+/// Crucible's newest full release: the server jar and the libraries it doesn't carry. Returns the build.
+async fn crucible(dir: &Path, task: &Arc<Task>) -> Result<String> {
+    task.update("Finding Crucible…", None);
+    let is_jar = |n: &str| n.starts_with("Crucible-") && n.ends_with(".jar");
+    let release = release_with(CRUCIBLE, None, is_jar).await?;
+    let asset = release.assets.iter().find(|a| is_jar(&a.name)).ok_or_else(|| anyhow!("Crucible has no server jar"))?;
+    let mut items = vec![release_item(asset, dir.join("crucible.jar"))];
+    let libs = release.assets.iter().find(|a| a.name == "libraries.zip");
+    let zip = dir.join("libraries.zip");
+    if let Some(l) = libs {
+        items.push(release_item(l, zip.clone()));
+    }
+    download_all(items, 2, task.counter("Downloading Crucible")).await?;
+    if libs.is_some() {
+        unpack_zip(&zip, &dir.join("libraries"), "Crucible's libraries").await?;
+        let _ = tokio::fs::remove_file(&zip).await;
+    }
+    Ok(release.tag_name)
+}
+
+/// Unpacks a download into the server folder, as it is laid out in the zip.
+pub async fn unpack_zip(zip: &Path, dir: &Path, what: &str) -> Result<()> {
+    let (zip, dir) = (zip.to_path_buf(), dir.to_path_buf());
+    let unpacked = tokio::task::spawn_blocking(move || -> Result<()> {
+        let mut archive = crate::content::index::open_zip(&zip)?;
+        crate::content::index::extract_where(&mut archive, &dir, |name| Some(name.to_string()))
+    })
+    .await?;
+    unpacked.with_context(|| format!("The download of {what} is damaged"))
+}
+
+pub async fn unpack_tar(archive: &Path, dir: &Path) -> Result<()> {
+    let status = tokio::process::Command::new("tar").arg("-xzf").arg(archive).arg("-C").arg(dir).status().await.context("Couldn't run tar")?;
+    if !status.success() {
+        bail!("{} couldn't be unpacked", archive.display());
+    }
+    Ok(())
+}
+
+/// SpongeForge's list goes further back, to Forge versions the launcher can't set up.
+const SPONGEFORGE_OLDEST: &str = "1.12.2";
+
+fn spongeforge_lists(mc: &str) -> bool {
+    mc.split('.').all(|p| p.parse::<u32>().is_ok()) && natural_cmp(mc, SPONGEFORGE_OLDEST).is_ge()
+}
+
+async fn spongeforge_versions() -> Result<Vec<String>> {
+    let v: Value = fetch_json(SPONGE_FORGE).await?;
+    let list = v["tags"]["minecraft"].as_array().cloned().unwrap_or_default();
+    Ok(list.iter().filter_map(Value::as_str).filter(|m| spongeforge_lists(m)).map(str::to_string).collect())
+}
+
+/// The Forge version a SpongeForge build asks for. The 1.12.2 builds give only Forge's build number.
+fn sponge_forge_version(mc: &str, forge: &str) -> String {
+    if mc == OLD_MC && !forge.contains('.') {
+        format!("14.23.5.{forge}")
+    } else {
+        forge.to_string()
+    }
+}
+
+/// The Forge server SpongeForge asks for, with SpongeForge in its mods. Returns how to start it and SpongeForge's build.
+async fn spongeforge(mc: &str, dir: &Path, java: &str, task: &Arc<Task>) -> Result<(ServerLaunch, String)> {
+    task.update(format!("Finding SpongeForge for Minecraft {mc}…"), None);
+    let v: Value = fetch_json(&format!("{SPONGE_FORGE}/versions?tags=minecraft:{}&offset=0&limit=25", enc(mc))).await?;
+    let builds = v["artifacts"].as_object().cloned().unwrap_or_default();
+    let newest = |list: Vec<&String>| list.into_iter().max_by(|a, b| natural_cmp(a, b)).cloned();
+    let pick = newest(builds.iter().filter(|(_, b)| b["recommended"] == true).map(|(k, _)| k).collect()).or_else(|| newest(builds.keys().collect()));
+    let pick = pick.ok_or_else(|| anyhow!("SpongeForge isn't available for Minecraft {mc}"))?;
+    let forge = builds[&pick]["tagValues"]["forge"].as_str().ok_or_else(|| anyhow!("SpongeForge {pick} doesn't say which Forge it needs"))?;
+    // SpongeForge 1.16.5 names a Forge that no longer starts on today's Java 8.
+    let forge = if mc == "1.16.5" { latest_loader(LoaderType::Forge, mc).await? } else { sponge_forge_version(mc, forge) };
+    let detail: Value = fetch_json(&format!("{SPONGE_FORGE}/versions/{}", enc(&pick))).await?;
+    let assets = detail["assets"].as_array().cloned().unwrap_or_default();
+    // 1.12.2's mod jar has no classifier.
+    let asset = assets.iter().find(|a| matches!(a["classifier"].as_str(), Some("universal" | "")) && a["extension"] == "jar").ok_or_else(|| anyhow!("SpongeForge {pick} has no mod jar"))?;
+    let url = asset["downloadUrl"].as_str().ok_or_else(|| anyhow!("SpongeForge {pick} has no mod jar"))?;
+    let launch = forge_like(LoaderType::Forge, mc, &forge, dir, java, task).await?;
+    let item = DownloadItem::new(url, dir.join("mods").join("spongeforge.jar")).hash(asset["sha1"].as_str().map(Hash::sha1));
+    download_all(vec![item], 1, task.counter("Downloading SpongeForge")).await?;
+    Ok((launch, pick))
+}
+
+#[derive(Deserialize)]
+struct MrFile {
+    url: String,
+    filename: String,
+    #[serde(default)]
+    primary: bool,
+    #[serde(default)]
+    hashes: HashMap<String, String>,
+}
+#[derive(Deserialize)]
+struct MrVersion {
+    version_number: String,
+    #[serde(default)]
+    files: Vec<MrFile>,
+}
+
+/// The newest Fabric build of a Modrinth project for `mc`, into mods/. Returns its version.
+async fn modrinth_mod(project: &str, mc: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    let url = format!("{MODRINTH}/project/{}/version?loaders={}&game_versions={}", enc(project), enc(r#"["fabric"]"#), enc(&format!(r#"["{mc}"]"#)));
+    let version = fetch_json::<Vec<MrVersion>>(&url).await?.into_iter().next().ok_or_else(|| anyhow!("{project} isn't available for Minecraft {mc}"))?;
+    let file = version.files.iter().find(|f| f.primary).or(version.files.first()).ok_or_else(|| anyhow!("{project} {} has no file", version.version_number))?;
+    let item = DownloadItem::new(&file.url, dir.join("mods").join(crate::content::index::safe_name(&file.filename)?)).hash(file.hashes.get("sha1").cloned().map(Hash::sha1));
+    download_all(vec![item], 1, task.counter(format!("Downloading {project}"))).await?;
+    Ok(version.version_number)
+}
+
+async fn modrinth_mc_versions(project: &str) -> Result<Vec<String>> {
+    let v: Value = fetch_json(&format!("{MODRINTH}/project/{project}")).await?;
+    let list = v["game_versions"].as_array().cloned().unwrap_or_default();
+    let re = regex::Regex::new(r"^\d+\.\d+(\.\d+)?$")?;
+    Ok(list.iter().filter_map(Value::as_str).filter(|m| re.is_match(m)).map(str::to_string).collect())
+}
+
+/// Minecraft versions with both Cardboard and iCommon, which it can't run without.
+async fn cardboard_versions() -> Result<Vec<String>> {
+    let common = modrinth_mc_versions("icommon").await?;
+    Ok(modrinth_mc_versions("cardboard").await?.into_iter().filter(|v| common.contains(v)).collect())
+}
+
+/// A Fabric server with Cardboard and the two mods it needs (its Modrinth page doesn't list them). Returns Cardboard's version.
+async fn cardboard(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    task.update(format!("Finding Cardboard for Minecraft {mc}…"), None);
+    let version = modrinth_mod("cardboard", mc, dir, task).await?;
+    modrinth_mod("fabric-api", mc, dir, task).await?;
+    modrinth_mod("icommon", mc, dir, task).await?;
+    let loader = latest_loader(LoaderType::Fabric, mc).await?;
+    fabric(mc, &loader, dir, task).await?;
+    Ok(version)
+}
+
+// ---------- Geyser, Pumpkin, Bedrock servers ----------
+
+async fn geyser_versions() -> Result<Vec<String>> {
+    #[derive(Deserialize)]
+    struct Project {
+        versions: Vec<String>,
+    }
+    Ok(fetch_json::<Project>(GEYSER).await?.versions)
+}
+
+/// The newest build of Geyser's standalone program. Returns the build number.
+async fn geyser(version: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    #[derive(Deserialize)]
+    struct Download {
+        sha256: String,
+    }
+    #[derive(Deserialize)]
+    struct Build {
+        build: u64,
+        downloads: HashMap<String, Download>,
+    }
+    task.update(format!("Finding Geyser {version}…"), None);
+    let builds = format!("{GEYSER}/versions/{}/builds/latest", enc(version));
+    let b: Build = fetch_json(&builds).await?;
+    let dl = b.downloads.get("standalone").ok_or_else(|| anyhow!("Geyser {version} has no standalone build"))?;
+    let item = DownloadItem::new(format!("{builds}/downloads/standalone"), dir.join("geyser.jar")).hash(Some(Hash::sha256(&dl.sha256)));
+    download_all(vec![item], 1, task.counter("Downloading Geyser")).await?;
+    Ok(b.build.to_string())
+}
+
+/// The Minecraft version a Pumpkin release speaks: "0.2.1+26.3-26.51" is Pumpkin 0.2.1 for Java 26.3 and Bedrock
+/// 26.51. Canary and nightly builds have none.
+fn pumpkin_mc(tag: &str) -> Option<String> {
+    let (_, target) = tag.split_once('+')?;
+    target.split('-').next().filter(|v| !v.is_empty()).map(str::to_string)
+}
+
+fn pumpkin_asset(os: &str, arch: &str) -> Option<&'static str> {
+    match (os, arch) {
+        ("windows", "x86_64") => Some("pumpkin-X64-Windows.exe"),
+        ("windows", "aarch64") => Some("pumpkin-ARM64-Windows.exe"),
+        ("linux", "x86_64") => Some("pumpkin-X64-Linux"),
+        ("linux", "aarch64") => Some("pumpkin-ARM64-Linux"),
+        ("macos", "aarch64") => Some("pumpkin-ARM64-macOS"),
+        _ => None,
+    }
+}
+
+async fn pumpkin_versions() -> Result<Vec<String>> {
+    let list = github::all_releases(PUMPKIN).await?;
+    Ok(list.iter().filter(|r| !r.prerelease).filter_map(|r| pumpkin_mc(&r.tag_name)).collect())
+}
+
+/// Pumpkin's newest release for `mc`, the program for this computer. Returns its name and Pumpkin's version.
+async fn pumpkin(mc: &str, dir: &Path, task: &Arc<Task>) -> Result<(String, String)> {
+    task.update(format!("Finding Pumpkin for Minecraft {mc}…"), None);
+    let name = pumpkin_asset(std::env::consts::OS, std::env::consts::ARCH).ok_or_else(|| anyhow!("Pumpkin has no build for this computer"))?;
+    let list = github::all_releases(PUMPKIN).await?;
+    let release = list.iter().find(|r| !r.prerelease && pumpkin_mc(&r.tag_name).as_deref() == Some(mc)).ok_or_else(|| anyhow!("Pumpkin isn't available for Minecraft {mc}"))?;
+    let asset = release.assets.iter().find(|a| a.name == name).ok_or_else(|| anyhow!("Pumpkin {} has no {name}", release.tag_name))?;
+    let exe = if cfg!(windows) { "pumpkin.exe" } else { "pumpkin" };
+    download_all(vec![release_item(asset, dir.join(exe))], 1, task.counter("Downloading Pumpkin")).await?;
+    make_executable(&dir.join(exe)).await?;
+    Ok((exe.to_string(), release.tag_name.split('+').next().unwrap_or_default().to_string()))
+}
+
+pub async fn make_executable(_file: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tokio::fs::set_permissions(_file, std::fs::Permissions::from_mode(0o755)).await?;
+    }
+    Ok(())
+}
+
+/// Horizon's archive for this kind of computer and the game program in it. Windows and macOS have only the full game
+/// (it runs without a window as a server); Linux has a build without its sound and controller libraries.
+fn horizon_archive(os: &str, arch: &str) -> Option<(&'static str, &'static str)> {
+    match (os, arch) {
+        ("windows", "x86_64") => Some(("horizon-windows-x64.zip", "horizon-client.exe")),
+        ("linux", "x86_64") => Some(("horizon-server-linux-x86_64.tar.gz", "horizon-engine")),
+        ("macos", "aarch64") => Some(("horizon-macos-arm64.zip", "horizon-client")),
+        _ => None,
+    }
+}
+
+fn horizon_here() -> Result<(&'static str, &'static str)> {
+    horizon_archive(std::env::consts::OS, std::env::consts::ARCH).ok_or_else(|| anyhow!("Horizon has no build for this computer"))
+}
+
+async fn horizon_versions() -> Result<Vec<String>> {
+    let (archive, _) = horizon_here()?;
+    let tags = release_tags(HORIZON, archive).await?;
+    Ok(tags.into_iter().filter(|t| t.starts_with('v')).collect())
+}
+
+/// The Minecraft version a Horizon release is pinned to, from its research-lock.json.
+fn horizon_mc(lock: &str) -> Option<String> {
+    serde_json::from_str::<Value>(lock).ok()?.pointer("/minecraft/version")?.as_str().map(str::to_string)
+}
+
+/// A Horizon release, prepared for hosting: horizon-prepare builds its resources from the client and server of the
+/// Minecraft version it's pinned to. Those come from Mojang into the launcher's own files, which are laid out like
+/// the official launcher's, where horizon-prepare reads them. Returns the program and what it's started with.
+async fn horizon(meta: &ServerMeta, dir: &Path, task: &Arc<Task>) -> Result<(String, Vec<String>)> {
+    let (archive, program) = horizon_here()?;
+    let tag = meta.mc_version.clone();
+    github_jar(HORIZON, Some(&tag), archive, archive, dir, task).await?;
+    let file = dir.join(archive);
+    task.update("Unpacking Horizon…", None);
+    if archive.ends_with(".zip") {
+        unpack_zip(&file, dir, "Horizon").await?;
+    } else {
+        unpack_tar(&file, dir).await?;
+    }
+    let _ = tokio::fs::remove_file(&file).await;
+    let mut locks = Vec::new();
+    find_files(dir, "research-lock.json", 2, &mut locks);
+    let lock = locks.into_iter().next().ok_or_else(|| anyhow!("Horizon {tag} has no research-lock.json"))?;
+    let mc = horizon_mc(&tokio::fs::read_to_string(&lock).await?).ok_or_else(|| anyhow!("Couldn't read which Minecraft version Horizon {tag} needs"))?;
+    let root = lock.parent().unwrap_or(dir).to_path_buf();
+
+    task.update(format!("Downloading Minecraft {mc}…"), None);
+    let vanilla = get_vanilla_version(&mc).await?;
+    let mut items = vec![client_jar(&vanilla)?];
+    items.extend(resolve_libraries(&vanilla).into_iter().map(|l| l.item));
+    download_all(items, 8, task.counter("Downloading Minecraft")).await?;
+    download_all(asset_items(&vanilla).await?.items, 16, task.counter("Downloading assets")).await?;
+    let server_jar = paths::cache().join("server-installers").join(format!("horizon-server-{mc}.jar"));
+    vanilla_jar(&mc, &server_jar, task).await?;
+
+    let java = java_of(vanilla.java_major(), meta).await?;
+    let java_home = Path::new(&java).parent().and_then(Path::parent).map(Path::to_path_buf);
+    let prepare = root.join(if cfg!(windows) { "horizon-prepare.exe" } else { "horizon-prepare" });
+    make_executable(&prepare).await?;
+    make_executable(&root.join(program)).await?;
+    let args = vec!["--prepare".to_string(), "--server-jar".into(), plain(&server_jar), "--minecraft-dir".into(), plain(&paths::root()), "--root".into(), plain(&root)];
+    let java_env = java_home.as_deref().map(|h| ("JAVA_HOME", h));
+    run_tool(&plain(&prepare), &args, &root, task, "Horizon", java_env).await?;
+    let _ = tokio::fs::remove_file(&server_jar).await;
+
+    let relative = |p: &Path| p.strip_prefix(dir).unwrap_or(p).to_string_lossy().replace('\\', "/");
+    let resources = root.join(".local").join("horizon-client").join(&mc);
+    if !resources.is_dir() {
+        bail!("Preparing Horizon finished without its resources");
+    }
+    Ok((relative(&root.join(program)), vec!["--resources".to_string(), relative(&resources), "--dedicated".to_string(), "--nogui".to_string()]))
+}
+
+/// The PHP build a server's release asks for, on this kind of computer. `series`: "PM5".
+fn php_asset(php: &str, series: &str, os: &str, arch: &str) -> Option<String> {
+    let platform = match (os, arch) {
+        ("windows", "x86_64") => "Windows-x64",
+        ("linux", "x86_64") => "Linux-x86_64",
+        ("macos", "aarch64") => "MacOS-arm64",
+        ("macos", "x86_64") => "MacOS-x86_64",
+        _ => return None,
+    };
+    let extension = if os == "windows" { "zip" } else { "tar.gz" };
+    Some(format!("PHP-{php}-{platform}-{series}.{extension}"))
+}
+
+fn php_for_computer(php: &str, series: &str) -> Result<String> {
+    php_asset(php, series, std::env::consts::OS, std::env::consts::ARCH).ok_or_else(|| anyhow!("PocketMine's PHP has no build for this computer"))
+}
+
+/// php.ini pointing at its extensions, through an absolute path that's only known once PHP is unpacked.
+fn php_ini_with_extensions(ini: &str, dir: &str) -> String {
+    let mut lines: Vec<String> = ini.lines().filter(|l| !l.trim_start().starts_with("extension_dir")).map(str::to_string).collect();
+    lines.push(format!("extension_dir=\"{dir}\""));
+    lines.join("\n") + "\n"
+}
+
+/// PocketMine's PHP has the extensions the server needs. It's unpacked into bin/ of the server folder, where
+/// PocketMine's own start scripts look too. Returns the program, relative to the server folder.
+async fn php_runtime(url: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    let archive = dir.join(url.rsplit('/').next().unwrap_or("php"));
+    download_all(vec![DownloadItem::new(url, &archive)], 1, task.counter("Downloading PHP")).await?;
+    task.update("Unpacking PHP…", None);
+    if cfg!(windows) {
+        unpack_zip(&archive, dir, "PHP").await?;
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Ok("bin/php/php.exe".to_string());
+    }
+    let unpacked = unpack_tar(&archive, dir).await;
+    let _ = tokio::fs::remove_file(&archive).await;
+    unpacked?;
+    let bin = dir.join("bin");
+    let root = bin.clone();
+    let extensions = tokio::task::spawn_blocking(move || {
+        let mut found = Vec::new();
+        find_files(&root, "phar.so", 8, &mut found);
+        found.into_iter().next().and_then(|p| p.parent().map(Path::to_path_buf))
+    })
+    .await?;
+    if let Some(ext) = extensions {
+        let ini = bin.join("php7/bin/php.ini");
+        let text = tokio::fs::read_to_string(&ini).await.unwrap_or_default();
+        tokio::fs::write(&ini, php_ini_with_extensions(&text, &plain(&ext))).await?;
+    }
+    Ok("bin/php7/bin/php".to_string())
+}
+
+/// PocketMine-MP `version` and the PHP its release asks for. Returns the program that starts it.
+async fn pocketmine(version: &str, dir: &Path, task: &Arc<Task>) -> Result<String> {
+    #[derive(Deserialize)]
+    struct BuildInfo {
+        php_version: String,
+    }
+    task.update(format!("Finding PocketMine-MP {version}…"), None);
+    let base = format!("https://github.com/{POCKETMINE}/releases/download/{}", enc(version));
+    let info: BuildInfo = fetch_json(&format!("{base}/build_info.json")).await?;
+    let series = version.split('.').next().unwrap_or("5");
+    let name = php_for_computer(&info.php_version, &format!("PM{series}"))?;
+    download_all(vec![DownloadItem::new(format!("{base}/PocketMine-MP.phar"), dir.join("PocketMine-MP.phar"))], 1, task.counter("Downloading PocketMine-MP")).await?;
+    php_runtime(&format!("https://github.com/pmmp/PHP-Binaries/releases/download/pm{series}-php-{}-latest/{name}", info.php_version), dir, task).await
+}
+
+/// The newest build in Maven's snapshot metadata ("1.0-20261027.214338-1252"): the jar without a classifier.
+fn nukkit_snapshot(xml: &str) -> Option<String> {
+    let block = regex::Regex::new(r"(?s)<snapshotVersion>(.*?)</snapshotVersion>").ok()?;
+    let value = regex::Regex::new(r"<value>([^<]+)</value>").ok()?;
+    let jar = block.captures_iter(xml).map(|c| c[1].to_string()).find(|v| v.contains("<extension>jar</extension>") && !v.contains("<classifier>"))?;
+    value.captures(&jar).map(|c| c[1].to_string())
+}
+
+/// With no nukkit.yml, Nukkit asks for a language in the console and waits. It fills in the rest of the file itself.
+async fn skip_language_question(dir: &Path) -> Result<()> {
+    Ok(tokio::fs::write(dir.join("nukkit.yml"), "settings:
+  language: eng
+").await?)
+}
+
+/// Cloudburst's newest Nukkit build. Returns the build number.
+async fn nukkit(dir: &Path, task: &Arc<Task>) -> Result<String> {
+    task.update("Finding Nukkit…", None);
+    let xml = fetch_text(&format!("{NUKKIT}/maven-metadata.xml")).await?;
+    let build = nukkit_snapshot(&xml).ok_or_else(|| anyhow!("Couldn't read Nukkit's newest build"))?;
+    let url = format!("{NUKKIT}/nukkit-{build}.jar");
+    let sha1 = fetch_text(&format!("{url}.sha1")).await.ok().map(|s| s.trim().to_string()).filter(|s| s.len() == 40);
+    download_all(vec![DownloadItem::new(url, dir.join("nukkit.jar")).hash(sha1.map(Hash::sha1))], 1, task.counter("Downloading Nukkit")).await?;
+    Ok(build.rsplit('-').next().unwrap_or(&build).to_string())
+}
+
 /// Cuberite's nightly for 64-bit Linux, the only build it still publishes.
 async fn cuberite(dir: &Path, task: &Arc<Task>) -> Result<()> {
     if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
@@ -938,15 +1482,22 @@ fn find_files(dir: &Path, name: &str, depth: u32, out: &mut Vec<PathBuf>) {
 
 /// Runs an installer jar, showing its progress lines in the task; on failure the last lines become the error.
 async fn run_installer(java: &str, args: &[String], cwd: &Path, task: &Arc<Task>, name: &str) -> Result<()> {
+    run_tool(java, args, cwd, task, name, None).await
+}
+
+async fn run_tool(program: &str, args: &[String], cwd: &Path, task: &Arc<Task>, name: &str, env: Option<(&str, &Path)>) -> Result<()> {
     task.update(format!("Running the {name} installer…"), None);
-    let mut cmd = hidden_command(java);
+    let mut cmd = hidden_command(program);
+    if let Some((key, value)) = env {
+        cmd.env(key, value);
+    }
     cmd.args(args)
         .current_dir(cwd)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
-    let mut child = cmd.spawn().with_context(|| format!("Couldn't start Java ({java})"))?;
+    let mut child = cmd.spawn().with_context(|| format!("Couldn't start {program}"))?;
     let tail = Arc::new(std::sync::Mutex::new(VecDeque::<String>::new()));
     let mut readers = Vec::new();
     for stream in [child.stdout.take().map(|s| Box::new(s) as Box<dyn tokio::io::AsyncRead + Send + Unpin>), child.stderr.take().map(|s| Box::new(s) as _)]
@@ -991,3 +1542,81 @@ pub fn describe(meta: &ServerMeta) -> String {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn catserver_files_name_their_version() {
+        assert_eq!(catserver_mc("CatServer-1.16.5-1d8d6313-server.jar").as_deref(), Some("1.16.5"));
+        assert_eq!(catserver_mc("CatServer-1.18.2-6c3f5965-server.jar").as_deref(), Some("1.18.2"));
+        assert_eq!(catserver_mc("CatServer-4168d848-universal.jar").as_deref(), Some("1.12.2"));
+        assert_eq!(catserver_mc("CatServer-4168d848-sources.jar"), None);
+    }
+
+    #[test]
+    fn pumpkin_tags_name_the_minecraft_version() {
+        assert_eq!(pumpkin_mc("0.2.1+26.3-26.51").as_deref(), Some("26.3"));
+        assert_eq!(pumpkin_mc("0.1.0-dev+26.2-26.45").as_deref(), Some("26.2"));
+        assert_eq!(pumpkin_mc("canary"), None);
+        assert_eq!(pumpkin_mc("nightly"), None);
+    }
+
+    #[test]
+    fn pumpkin_builds_per_computer() {
+        assert_eq!(pumpkin_asset("windows", "x86_64"), Some("pumpkin-X64-Windows.exe"));
+        assert_eq!(pumpkin_asset("linux", "aarch64"), Some("pumpkin-ARM64-Linux"));
+        assert_eq!(pumpkin_asset("macos", "x86_64"), None);
+    }
+
+    #[test]
+    fn horizon_builds_per_computer() {
+        assert_eq!(horizon_archive("windows", "x86_64"), Some(("horizon-windows-x64.zip", "horizon-client.exe")));
+        assert_eq!(horizon_archive("linux", "x86_64"), Some(("horizon-server-linux-x86_64.tar.gz", "horizon-engine")));
+        assert_eq!(horizon_archive("linux", "aarch64"), None);
+    }
+
+    #[test]
+    fn horizon_lock_names_its_minecraft() {
+        assert_eq!(horizon_mc(r#"{"minecraft":{"version":"26.3","manifest_sha1":"x"}}"#).as_deref(), Some("26.3"));
+        assert_eq!(horizon_mc("{}"), None);
+    }
+
+    #[test]
+    fn php_builds_per_computer() {
+        assert_eq!(php_asset("8.2", "PM5", "windows", "x86_64").as_deref(), Some("PHP-8.2-Windows-x64-PM5.zip"));
+        assert_eq!(php_asset("8.2", "PM5", "linux", "x86_64").as_deref(), Some("PHP-8.2-Linux-x86_64-PM5.tar.gz"));
+        assert_eq!(php_asset("8.2", "PM5", "macos", "aarch64").as_deref(), Some("PHP-8.2-MacOS-arm64-PM5.tar.gz"));
+        assert_eq!(php_asset("8.2", "PM5", "linux", "aarch64"), None);
+    }
+
+    #[test]
+    fn php_ini_gets_one_extension_folder() {
+        assert_eq!(php_ini_with_extensions("a=1\nextension_dir=\"/old\"\n", "/srv/ext"), "a=1\nextension_dir=\"/srv/ext\"\n");
+        assert_eq!(php_ini_with_extensions("", "/srv/ext"), "extension_dir=\"/srv/ext\"\n");
+    }
+
+    #[test]
+    fn nukkit_build_is_the_plain_jar() {
+        let xml = "<snapshotVersions>
+            <snapshotVersion><extension>pom</extension><value>1.0-2-5</value></snapshotVersion>
+            <snapshotVersion><classifier>dev</classifier><extension>jar</extension><value>1.0-2-4</value></snapshotVersion>
+            <snapshotVersion><extension>jar</extension><value>1.0-2-3</value></snapshotVersion>
+        </snapshotVersions>";
+        assert_eq!(nukkit_snapshot(xml).as_deref(), Some("1.0-2-3"));
+        assert_eq!(nukkit_snapshot("<metadata/>"), None);
+    }
+
+    #[test]
+    fn spongeforge_versions_start_at_1_12_2() {
+        assert!(spongeforge_lists("1.12.2") && spongeforge_lists("1.21.11") && spongeforge_lists("26.3"));
+        assert!(!spongeforge_lists("1.12.1") && !spongeforge_lists("1.8"));
+    }
+
+    #[test]
+    fn spongeforge_build_numbers_become_forge_versions() {
+        assert_eq!(sponge_forge_version("1.12.2", "2838"), "14.23.5.2838");
+        assert_eq!(sponge_forge_version("1.12.2", "14.23.5.2768"), "14.23.5.2768");
+        assert_eq!(sponge_forge_version("1.16.5", "36.2.5"), "36.2.5");
+    }
+}
