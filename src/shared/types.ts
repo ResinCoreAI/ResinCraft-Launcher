@@ -1107,6 +1107,42 @@ export type ServerTunnel = 'auto' | 'resin' | 'playit' | 'relay' | 'manual'
 export type ServerState = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed'
 
 /** Internet access for a running server: the port opened on the router automatically (UPnP). */
+/** One reading of a running server. */
+export interface ServerSample {
+  /** Unix milliseconds. */
+  at: number
+  /** % of the whole machine (all cores together). */
+  cpu?: number | null
+  bytes?: number | null
+  players: number
+  tps?: number | null
+}
+
+export interface ServerMetrics {
+  intervalSecs: number
+  samples: ServerSample[]
+  maxBytes?: number | null
+  /** False: this server has no reliable TPS. */
+  tpsAvailable: boolean
+}
+
+export interface SparkReport {
+  state: 'starting' | 'profiling' | 'uploading' | 'done' | 'failed'
+  startedAt: number
+  seconds: number
+  url?: string | null
+  error?: 'notLoaded' | 'busy' | 'upload' | 'failed' | 'timeout' | 'stopped' | null
+}
+
+export interface SparkStatus {
+  /** False: spark can't run here, so there's no lag report. */
+  available: boolean
+  needsInstall: boolean
+  /** Installed while the server runs: it loads at the next start. */
+  needsRestart: boolean
+  report?: SparkReport | null
+}
+
 export interface ServerNet {
   state: 'off' | 'opening' | 'open' | 'failed'
   /** Public "ip:port" to share once the router opened the port. */
@@ -2233,6 +2269,12 @@ export interface ResinApi {
     kill(id: string): Promise<void>
     command(id: string, command: string): Promise<void>
     log(id: string): Promise<LogLine[]>
+    /** About the last hour of CPU, RAM, players and TPS of a running server; empty once it stops. */
+    metrics(id: string): Promise<ServerMetrics>
+    /** Lag reports with spark (this PC only: never from the web console or another PC). */
+    spark(id: string): Promise<SparkStatus>
+    sparkInstall(id: string): Promise<SparkStatus>
+    sparkRun(id: string): Promise<SparkStatus>
     /** The Java arguments the next start uses (after "java"). */
     launchArgs(id: string): Promise<string[]>
     /** The Java flags the server pack sets for itself (user_jvm_args.txt, variables.txt, its start script). */

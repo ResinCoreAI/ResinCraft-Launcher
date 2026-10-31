@@ -198,7 +198,7 @@ pub async fn set_grants(list: Vec<Grant>) -> Result<Vec<Grant>> {
 /// What a Viewer may call (`server.<name>`): looking only.
 const VIEWER: &[&str] = &[
     "list", "get", "log", "playerList", "properties", "antiXray", "antiCheat", "bedrockJoin", "addons", "addonSources", "relayInfo", "network", "domain",
-    "origin", "clientMods", "requests", "packFlags",
+    "origin", "clientMods", "requests", "packFlags", "metrics",
 ];
 /// What an Operator may call on top: running the server, its players and whitelist requests.
 const OPERATOR: &[&str] = &[
@@ -401,7 +401,7 @@ const KINDS: &[&str] = &["vanilla", "paper", "purpur", "folia", "spigot", "craft
 
 /// Server-manager actions the console may run as `server.<name>` (the engine's `server:<name>`, same arguments).
 const SERVER: &[&str] = &[
-    "get", "start", "stop", "kill", "command", "log", "acceptEula", "remove", "backup", "setIcon", "update",
+    "get", "metrics", "start", "stop", "kill", "command", "log", "acceptEula", "remove", "backup", "setIcon", "update",
     // Players and whitelist requests.
     "playerList", "playerAdd", "playerRemove", "requests", "requestAccept", "requestReject", "requestBlock", "requestUnblockAll", "requestUnblock",
     // Properties, anti-xray, Bedrock players, files to download yourself, client-only mods.
@@ -641,7 +641,7 @@ async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> 
         }
     };
     // The launcher's own screens follow changes made from the console.
-    let reads = ["server.list", "server.get", "server.log", "server.playerList", "server.requests", "server.properties", "server.addons", "server.addonSources",
+    let reads = ["server.list", "server.get", "server.log", "server.metrics", "server.playerList", "server.requests", "server.properties", "server.addons", "server.addonSources",
         "server.addonSearch", "server.addonVersions", "server.addonCheckUpdates", "server.antiXray", "server.bedrockJoin", "server.origin", "server.syncPreview",
         "server.relayInfo", "server.relayCheck", "server.domain", "server.checkDns", "server.network", "server.versions", "server.builds", "server.softwareIcons",
         "server.packFlags", "server.clientMods", "server.clientPack", "server.clientPackChoices", "server.listing", "server.launchArgs", "files.list", "files.readText", "versions.list", "content.search",
@@ -686,6 +686,7 @@ mod tests {
         assert!(no("server.play", json!(["smp"]), true).contains("can't do that"));
         let file = json!([{ "name": "x", "source": { "kind": "file", "path": "C:/evil.zip" } }]);
         assert!(no("server.create", file, true).contains("not from a file"));
+        assert!(no("server.sparkRun", json!(["smp"]), true).contains("can't do that"), "lag reports stay on this PC");
         // Everyday server management, the first console's names included.
         for m in ["servers.list", "server.players", "server.addonInstall", "server.setProperties", "server.switchPack", "server.restart", "create.versions"] {
             assert!(check(m, &json!(["smp"]), false).is_ok(), "{m}");

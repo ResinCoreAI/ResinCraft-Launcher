@@ -26,7 +26,7 @@ export function onRemotePcGone(cb: (pc: RemotePc) => void): () => void {
 
 /** `server.<name>` requests another PC answers (the web console's list; the other PC checks again). */
 const REMOTE_SERVER = new Set([
-  'list', 'get', 'start', 'stop', 'kill', 'restart', 'command', 'log', 'acceptEula', 'remove', 'backup', 'setIcon', 'update',
+  'list', 'get', 'metrics', 'start', 'stop', 'kill', 'restart', 'command', 'log', 'acceptEula', 'remove', 'backup', 'setIcon', 'update',
   'playerList', 'playerAdd', 'playerRemove', 'requests', 'requestAccept', 'requestReject', 'requestBlock', 'requestUnblockAll', 'requestUnblock',
   'properties', 'setProperties', 'antiXray', 'setAntiXray', 'antiCheat', 'setAntiCheat', 'bedrockJoin', 'setBedrockJoin', 'downloadsCheck', 'downloadsForget', 'clientMods',
   'addonSources', 'addons', 'addonSearch', 'addonVersions', 'addonChangeVersion', 'addonUpdateMany', 'addonCheckUpdates', 'addonCancelPending', 'addonInstall', 'addonToggle', 'addonRemove',

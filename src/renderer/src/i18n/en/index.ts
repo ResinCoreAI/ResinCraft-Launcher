@@ -12,6 +12,7 @@ import common from './common'
 import discover from './discover'
 import engine from './engine'
 import files from './files'
+import graphs from './graphs'
 import home from './home'
 import instance from './instance'
 import library from './library'
@@ -44,6 +45,7 @@ const en = {
   ...menu,
   ...migrate,
   ...servers,
+  ...graphs,
   ...admin,
   ...relayadmin,
   ...quickjoin,

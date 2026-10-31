@@ -25,6 +25,7 @@ import type { RelayNameAccount,
   ServerNet
 } from '@shared/types'
 
+import { mockMetrics } from './mock-metrics'
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
 import { mockRequests } from './mock-requests'
 import { mockBackups, mockServerList } from './mock-serverlist'
@@ -593,6 +594,7 @@ export function mockServers(): {
       else say(id, `[${ts()}] [Server thread/INFO]: Unknown or incomplete command, see below for error`, 'warn')
     },
     log: async (id) => logs[id] ?? [],
+    ...mockMetrics(find),
     ...mockRequests(find, (e) => requestListeners.forEach((l) => l(e))),
     downloadsCheck: async (id) => ({ found: [], remaining: find(id).pendingDownloads ?? [] }),
     downloadsForget: async (id, fileName) => {

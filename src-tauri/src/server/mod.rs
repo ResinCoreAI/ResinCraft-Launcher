@@ -16,6 +16,7 @@ pub mod discordbot;
 pub mod domain;
 pub mod installers;
 pub mod listing;
+pub mod metrics;
 pub mod network;
 pub mod packs;
 pub mod playit;
@@ -24,6 +25,7 @@ pub mod properties;
 pub mod relay;
 pub mod requests;
 pub mod runtime;
+pub mod spark;
 pub mod store;
 pub mod tunnel;
 
@@ -136,6 +138,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "server:log" => json(runtime::log(&args.get::<String>(0)?)),
+        "server:metrics" => json(metrics::get(&args.get::<String>(0)?)),
+        "server:spark" => json(spark::status(&args.get::<String>(0)?).await?),
+        "server:sparkInstall" => json(spark::install(&args.get::<String>(0)?).await?),
+        "server:sparkRun" => json(spark::run(&args.get::<String>(0)?).await?),
         "server:launchArgs" => json(runtime::launch_args(&store::get(&args.get::<String>(0)?).await?)?),
         "server:requests" => json(requests::info(&args.get::<String>(0)?).await?),
         "server:requestAccept" => json(requests::accept(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),

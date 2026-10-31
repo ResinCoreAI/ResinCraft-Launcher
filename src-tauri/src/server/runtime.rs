@@ -80,6 +80,11 @@ pub fn server_processes() -> Vec<(String, u32, Option<u32>)> {
     with(|w| w.procs.iter().filter_map(|(id, p)| Some((id.clone(), p.pid?, p.max_mb))).collect())
 }
 
+/// Which run of the server this is (a restart is a new one).
+pub fn server_run(id: &str) -> Option<u64> {
+    with(|w| w.procs.get(id).map(|p| p.run))
+}
+
 pub fn state(id: &str) -> &'static str {
     with(|w| w.procs.get(id).map(|p| p.state).or_else(|| w.last.get(id).copied()).unwrap_or("stopped"))
 }
@@ -568,7 +573,7 @@ pub async fn start(id: &str) -> Result<()> {
         move |l: LogLine| {
             let text = patterns().ansi.replace_all(&l.text, "").trim_end().to_string();
             let text = text.trim_start_matches("> ").to_string();
-            if text.trim().is_empty() {
+            if text.trim().is_empty() || super::metrics::hide_line(&id, &text) {
                 return;
             }
             let line = LogLine { text: text.clone(), level: l.level };
@@ -653,6 +658,7 @@ pub async fn start(id: &str) -> Result<()> {
         })
     };
 
+    super::metrics::ensure_sampler();
     if !bedrock {
         tokio::spawn(watch_players(id.to_string(), run, meta.port, meta.kind == ServerKind::Cuberite, meta.public));
     }
@@ -1561,6 +1567,16 @@ pub fn command(id: &str, cmd: &str) -> Result<()> {
     with(|w| w.logs.entry(id.to_string()).or_default().push_back(echo.clone()));
     emit("serverLog", ServerLogEvent { server_id: id.to_string(), lines: vec![echo] });
     Ok(())
+}
+
+/// Sends a command the console doesn't show (the sampler's `tps`).
+pub fn quiet_command(id: &str, cmd: &str) -> Result<()> {
+    sender(id)?.send(cmd.to_string()).map_err(|_| anyhow!("The server isn't accepting commands"))
+}
+
+/// Console lines from now on, for following a command's replies.
+pub fn subscribe_lines(id: &str) -> Option<broadcast::Receiver<String>> {
+    with(|w| w.procs.get(id).map(|p| p.lines.subscribe()))
 }
 
 /// Asks the server to save and stop; it's killed if it hasn't exited after STOP_TIMEOUT.

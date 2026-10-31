@@ -51,7 +51,7 @@ pub struct MemoryUsage {
 const MB: u64 = 1024 * 1024;
 
 /// Every process under `root` (itself included), from a parent → children map.
-fn tree(root: u32, children: &HashMap<u32, Vec<u32>>, skip: &HashSet<u32>) -> Vec<u32> {
+pub(crate) fn tree(root: u32, children: &HashMap<u32, Vec<u32>>, skip: &HashSet<u32>) -> Vec<u32> {
     let mut out = Vec::new();
     let mut stack = vec![root];
     let mut seen = HashSet::new();

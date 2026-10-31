@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
-import { Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
+import { Activity, Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { BEDROCK_SERVERS, HYBRID_SERVERS, PLUGIN_SERVERS, PROXY_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
@@ -27,6 +27,7 @@ import { rich, t, tx, type Key } from '../i18n'
 import '../servers.css'
 import { hasBedrockApp } from '../platform'
 import { ServerMemoryChip } from '../components/Memory'
+import ServerGraphs from '../components/ServerGraphs'
 import JoinRequests from '../components/JoinRequests'
 import { usePicturePicker } from '../components/ImagePicker'
 
@@ -44,7 +45,7 @@ function onlineCount(s: ServerInfo): number {
   return Math.max(s.players.length, s.online ?? 0)
 }
 
-type Tab = 'console' | 'players' | 'addons' | 'mods' | 'properties' | 'files' | 'settings'
+type Tab = 'console' | 'graphs' | 'players' | 'addons' | 'mods' | 'properties' | 'files' | 'settings'
 
 // Servers deleted in the UI and still being moved to the Recycle Bin: hidden from the list until the engine is done.
 const removing = new Set<string>()
@@ -497,6 +498,7 @@ function ServerDetail({
   ]
   const tabs: { id: Tab; icon: ReactNode; label: string; hidden?: boolean }[] = [
     { id: 'console', icon: <Terminal />, label: t('servers.tab.console') },
+    { id: 'graphs', icon: <Activity />, label: t('servers.graphs.tab') },
     // Bedrock keeps its own allow list and permissions (by Xbox id): managed in the Console and Files for now.
     { id: 'players', icon: <Users />, label: t('servers.tab.players'), hidden: isBedrock(s) || isProxy(s) },
     {
@@ -576,6 +578,7 @@ function ServerDetail({
       </div>
 
       {tab === 'console' && <ConsoleTab s={s} />}
+      {tab === 'graphs' && <ServerGraphs s={s} />}
       {tab === 'players' && <PlayersTab s={s} reload={reload} />}
       {tab === 'addons' && <ServerAddons key="plugins" s={s} area={isHybrid(s) ? 'plugins' : undefined} />}
       {tab === 'mods' && <ServerAddons key="mods" s={s} area="mods" />}
