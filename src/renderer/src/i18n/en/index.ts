@@ -21,6 +21,7 @@ import logs from './logs'
 import menu from './menu'
 import migrate from './migrate'
 import quickjoin from './quickjoin'
+import proxyconfig from './proxyconfig'
 import reinstall from './reinstall'
 import schedule from './schedule'
 import commandlist from './commandlist'
@@ -52,6 +53,7 @@ const en = {
   ...migrate,
   ...servers,
   ...schedule,
+  ...proxyconfig,
   ...worldtools,
   ...transfer,
   ...commandlist,

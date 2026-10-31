@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
-import { Activity, Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FileArchive, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, ScrollText, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
+import { Activity, Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FileArchive, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Network, Play, Plus, Puzzle, RotateCcw, RotateCw, ScrollText, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { BEDROCK_SERVERS, HYBRID_SERVERS, PLUGIN_SERVERS, PROXY_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
@@ -11,6 +11,7 @@ import { remoteMemoryMb } from '../remotePc'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
 import ServerSchedule from '../components/ServerSchedule'
+import ServerProxy, { hasProxyConfig } from '../components/ServerProxy'
 import ServerWorldTools from '../components/ServerWorldTools'
 import { CloneServerModal, ExportServerModal, useImportServerZip } from '../components/ServerTransfer'
 import ConsoleInput from '../components/ConsoleCommands'
@@ -50,7 +51,7 @@ function onlineCount(s: ServerInfo): number {
   return Math.max(s.players.length, s.online ?? 0)
 }
 
-type Tab = 'console' | 'graphs' | 'logs' | 'players' | 'addons' | 'mods' | 'properties' | 'files' | 'settings'
+type Tab = 'console' | 'graphs' | 'logs' | 'players' | 'addons' | 'mods' | 'properties' | 'proxy' | 'files' | 'settings'
 
 // Servers deleted in the UI and still being moved to the Recycle Bin: hidden from the list until the engine is done.
 const removing = new Set<string>()
@@ -528,6 +529,7 @@ function ServerDetail({
     },
     { id: 'mods', icon: <Blocks />, label: t('servers.tab.mods'), hidden: !isHybrid(s) },
     { id: 'properties', icon: <SlidersHorizontal />, label: t('servers.tab.properties'), hidden: isProxy(s) || s.type === 'cuberite' || s.type === 'pumpkin' },
+    { id: 'proxy', icon: <Network />, label: t('servers.proxy.tab'), hidden: !hasProxyConfig(s.type) || !!pc || isConsole },
     { id: 'files', icon: <FolderTree />, label: t('files.tab') },
     { id: 'settings', icon: <Settings2 />, label: t('servers.tab.settings') }
   ]
@@ -605,6 +607,7 @@ function ServerDetail({
       {tab === 'addons' && <ServerAddons key="plugins" s={s} area={isHybrid(s) ? 'plugins' : undefined} />}
       {tab === 'mods' && <ServerAddons key="mods" s={s} area="mods" />}
       {tab === 'properties' && <PropertiesTab s={s} onStart={onStart} />}
+      {tab === 'proxy' && <ServerProxy s={s} />}
       {tab === 'files' && <FileManager root={{ kind: 'server', id: s.id }} rootLabel={t('files.root.server')} running={live(s)} />}
       {tab === 'settings' && <SettingsTab s={s} reload={reload} onDeleted={() => go({ page: 'servers' })} />}
     </>

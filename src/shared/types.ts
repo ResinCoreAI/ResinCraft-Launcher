@@ -1423,6 +1423,52 @@ export interface ScheduledTask extends ScheduledTaskEdit {
   running: boolean
 }
 
+/** A proxy's backend. `join`: players are sent here on joining, in list order. */
+export interface ProxyBackend {
+  name: string
+  address: string
+  join: boolean
+}
+
+export interface ProxyForcedHost {
+  host: string
+  servers: string[]
+}
+
+export type ProxyForwarding = 'none' | 'legacy' | 'modern' | 'bungeeguard'
+
+export interface ProxyEdit {
+  backends: ProxyBackend[]
+  forcedHosts: ProxyForcedHost[]
+  forwarding: ProxyForwarding
+}
+
+/** What one backend needs. null: ResinCraft can't see it. */
+export interface ProxyBackendSetup {
+  name: string
+  localId?: string | null
+  localName?: string | null
+  advice: 'paper' | 'spigot' | 'modded' | 'bedrock' | 'other' | 'remote'
+  canApply: boolean
+  tooOld: boolean
+  onlineModeOff?: boolean | null
+  forwardingOk?: boolean | null
+  exposed: boolean
+  pending: boolean
+}
+
+export interface ProxyConfigView extends ProxyEdit {
+  file: string
+  /** Velocity writes its config on the first start. */
+  missing: boolean
+  hasSecret: boolean
+  onlineMode: boolean
+  /** A saved change the running proxy hasn't read yet. */
+  pending: boolean
+  choices: { id: string; name: string; kind: ServerKind; address: string }[]
+  setup: ProxyBackendSetup[]
+}
+
 /** One world backup zip (a server's or an instance's). */
 export interface BackupFile {
   file: string
@@ -2418,6 +2464,12 @@ export interface ResinApi {
     scheduleDelete(id: string, taskId: string): Promise<ScheduledTask[]>
     /** Starts it now; the result arrives like a scheduled run's. */
     scheduleRun(id: string, taskId: string): Promise<ScheduledTask[]>
+    /** A proxy's backend servers (this PC only: the web console never reaches them, or the forwarding secret). */
+    proxyConfig(id: string): Promise<ProxyConfigView>
+    proxySave(id: string, edit: ProxyEdit): Promise<ProxyConfigView>
+    /** Sets up a local Paper-family backend for this proxy, and turns off that server's sharing. */
+    proxyApply(id: string, backendId: string): Promise<ProxyConfigView>
+    proxySecret(id: string): Promise<string>
     /** The log browser (this PC only: logs hold player IPs and tokens, so the web console never reaches them). */
     logFiles(id: string): Promise<LogFile[]>
     /** A page from line `from` (counted from 1), or the end of the file with 0. */

@@ -33,6 +33,7 @@ import { mockDepCheck, mockDepInstall } from './mock-depcheck'
 import { mockRequests } from './mock-requests'
 import { mockBackups, mockServerList } from './mock-serverlist'
 import { mockSchedule, mockScheduleDelete, mockScheduleRun, mockScheduleSave } from './mock-schedule'
+import { mockProxyApply, mockProxyConfig, mockProxySave } from './mock-proxyconfig'
 import { mockChunkCount, mockChunkReset, mockWorldCreate, mockWorldDelete, mockWorldPlayers, mockWorldPlayerSave, mockWorldSwitch, mockWorldTools } from './mock-worldtools'
 
 type Listener<T> = (e: T) => void
@@ -669,6 +670,10 @@ export function mockServers(): {
     scheduleSave: (id, edit) => wait(mockScheduleSave(id, edit)),
     scheduleDelete: (id, taskId) => wait(mockScheduleDelete(id, taskId)),
     scheduleRun: (id, taskId) => wait(mockScheduleRun(id, taskId)),
+    proxyConfig: (id) => wait(mockProxyConfig(id, find(id).type)),
+    proxySave: (id, edit) => wait(mockProxySave(id, edit, find(id).type)),
+    proxyApply: (id, backendId) => wait(mockProxyApply(id, backendId, find(id).type), 700),
+    proxySecret: () => wait('mock-forwarding-secret'),
     antiCheat: async (id) => ({ supported: find(id).type !== 'vanilla', installed: !!grim[id], enabled: !!grim[id] }),
     setAntiCheat: async (id, on) => {
       await wait(null, on ? 1600 : 500)

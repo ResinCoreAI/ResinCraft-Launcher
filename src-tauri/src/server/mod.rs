@@ -24,6 +24,7 @@ pub mod packs;
 pub mod playit;
 pub mod plugins;
 pub mod properties;
+pub mod proxyconfig;
 pub mod relay;
 pub mod requests;
 pub mod runtime;
@@ -270,6 +271,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:reinstallPack" => json(packs::reinstall_pack(&args.get::<String>(0)?).await?),
         "server:logFiles" | "server:logRead" | "server:logSearch" | "server:logSave" => logs::handle(channel, args).await,
         "server:schedule" | "server:scheduleSave" | "server:scheduleDelete" | "server:scheduleRun" => schedule::handle(channel, args).await,
+        "server:proxyConfig" | "server:proxySave" | "server:proxyApply" | "server:proxySecret" => proxyconfig::handle(channel, args).await,
         "server:backup" => json(runtime::backup(&args.get::<String>(0)?).await?),
         "server:backups" => json(runtime::list_backups(&args.get::<String>(0)?).await?),
         "server:restoreBackup" => {

@@ -1,0 +1,83 @@
+/* A proxy's Network tab (components/ServerProxy.tsx). */
+.sv-proxy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sv-proxy-empty {
+  color: var(--text-dim);
+}
+.sv-proxy-row {
+  display: grid;
+  grid-template-columns: auto minmax(100px, 1fr) minmax(140px, 1.4fr) 220px auto;
+  gap: 8px;
+  align-items: center;
+}
+.sv-proxy-row .input,
+.sv-proxy-host .input {
+  width: 100%;
+  min-width: 0;
+}
+.sv-proxy-move {
+  display: flex;
+  gap: 2px;
+}
+.sv-proxy-join {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sv-proxy-host {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(120px, auto) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.sv-proxy-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+.sv-proxy-save {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.sv-proxy-save .hint {
+  flex: 1;
+}
+.sv-proxy-setup-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sv-proxy-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.sv-proxy-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+}
+.sv-proxy-check svg {
+  width: 15px;
+  height: 15px;
+}
+.sv-proxy-check.ok {
+  color: var(--success, var(--text));
+}
+.sv-proxy-check.bad {
+  color: var(--danger);
+}
+@media (max-width: 720px) {
+  .sv-proxy-row,
+  .sv-proxy-host {
+    grid-template-columns: 1fr;
+  }
+}

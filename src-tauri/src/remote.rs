@@ -578,6 +578,11 @@ async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> 
             let all = lines.as_array().cloned().unwrap_or_default();
             json!({ "lines": all[all.len().saturating_sub(200)..] })
         }
+        "files.readText" => {
+            let file = dispatch("files:readText", Args::new(all)).await?;
+            crate::server::proxyconfig::guard_remote_read(arg(&params, 1).as_str().unwrap_or_default(), &file).await?;
+            file
+        }
         "server.update" => {
             let id = id_of(&params)?;
             let allowed = |k: &str| if grant.is_some() { SHARED_PATCH.contains(&k) } else { SAFE_PATCH.contains(&k) || (full && FULL_PATCH.contains(&k)) };
@@ -689,6 +694,9 @@ mod tests {
         }
         for m in ["server.logFiles", "server.logRead", "server.logSearch", "server.logSave"] {
             assert!(no(m, json!(["smp", "logs/latest.log"]), true).contains("can't do that"), "logs hold player IPs and tokens");
+        }
+        for m in ["server.proxyConfig", "server.proxySave", "server.proxyApply", "server.proxySecret"] {
+            assert!(no(m, json!(["smp"]), true).contains("can't do that"), "proxy settings and the forwarding secret stay on this PC");
         }
         let file = json!([{ "name": "x", "source": { "kind": "file", "path": "C:/evil.zip" } }]);
         assert!(no("server.create", file, true).contains("not from a file"));
