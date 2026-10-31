@@ -27,6 +27,7 @@ import type { RelayNameAccount,
 
 import { mockMetrics } from './mock-metrics'
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
+import { mockDepCheck, mockDepInstall } from './mock-depcheck'
 import { mockRequests } from './mock-requests'
 import { mockBackups, mockServerList } from './mock-serverlist'
 
@@ -647,6 +648,8 @@ export function mockServers(): {
     reinstallPack: () => wait({ versionName: 'current', added: 0, updated: 2, removed: 0, kept: [], pending: 0 } as never, 1500),
     addonSources: async (id, area) => sourcesOf(id, area),
     addons: (_id, area) => wait(listOf(area)),
+    addonDepCheck: (id, area) => wait(mockDepCheck(`${id}:${area ?? ''}`), 500),
+    addonDepInstall: (id, area) => wait(mockDepInstall(`${id}:${area ?? ''}`), 900),
     addonSearch: (_id, _q, source, offset = 0, area) => {
       if (source === 'geysermc') {
         const q = _q.trim().toLowerCase()

@@ -716,6 +716,30 @@ export interface ModPick {
 /** Why two listings look like the same mod: the same file, mod id inside the jar, source repository, name + author, or slug. */
 export type DuplicateReason = 'hash' | 'modid' | 'link' | 'name' | 'slug'
 
+/** A required mod or plugin a folder doesn't have. `id` is the mod id or plugin name as the jars ask for it. */
+export interface MissingDep {
+  id: string
+  requiredBy: string[]
+  /** The jar that has it but is turned off. */
+  disabled?: string
+}
+
+export interface DepReport {
+  /** Enabled jars that were read. */
+  checked: number
+  missing: MissingDep[]
+  /** Enabled jars with nothing to read for this loader. */
+  unread: string[]
+}
+
+export type DepNotFoundReason = 'notOnModrinth' | 'noVersion' | 'notSameMod' | 'disabled'
+
+export interface DepInstallResult {
+  installed: string[]
+  notFound: { id: string; reason: DepNotFoundReason }[]
+  failed: { id: string; error: string }[]
+}
+
 export interface DuplicateCheck {
   /** Picks that are the same mod from different sites (pick ids). */
   groups: { ids: string[]; reason: DuplicateReason }[]
@@ -2145,6 +2169,10 @@ export interface ResinApi {
     duplicates(instanceId: string, picks: ModPick[]): Promise<DuplicateCheck>
     /** Installs picks in one task, each from its own site, after moving `replace` to the Recycle Bin. */
     installMany(instanceId: string, picks: ModPick[], replace?: ContentFileRef[]): Promise<InstallManyResult>
+    /** What the instance's enabled mods require that its mods folder doesn't have. */
+    depCheck(instanceId: string): Promise<DepReport>
+    /** Installs each missing dependency from Modrinth on an exact match; the rest come back by name. */
+    depInstall(instanceId: string): Promise<DepInstallResult>
     list(instanceId: string, kind: ContentKind): Promise<ContentItem[]>
     toggle(instanceId: string, kind: ContentKind, filename: string): Promise<void>
     remove(instanceId: string, kind: ContentKind, filename: string): Promise<void>
@@ -2362,6 +2390,8 @@ export interface ResinApi {
     /** Drops a change queued for when the server stops. */
     addonCancelPending(id: string, filename: string, area?: AddonArea): Promise<void>
     addonInstall(id: string, projectId: string, versionId?: string, area?: AddonArea): Promise<void>
+    addonDepCheck(id: string, area?: AddonArea): Promise<DepReport>
+    addonDepInstall(id: string, area?: AddonArea): Promise<DepInstallResult>
     addonToggle(id: string, filename: string, area?: AddonArea): Promise<void>
     addonRemove(id: string, filename: string, area?: AddonArea): Promise<void>
     /** Installs what a link points to: a project page on a source (Modrinth, CurseForge, dev.bukkit.org, Hangar,

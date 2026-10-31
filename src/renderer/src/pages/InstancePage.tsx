@@ -48,6 +48,7 @@ import VersionPicker from '../components/VersionPicker'
 import { DeleteInstance } from './Library'
 import { Camera, Earth, FolderInput, FolderTree, NotebookPen, Server } from 'lucide-react'
 import CopyFromModal from '../components/CopyFromModal'
+import DepCheck from '../components/DepCheck'
 import NotesTab from '../components/NotesTab'
 import ScreenshotsTab from '../components/ScreenshotsTab'
 import ServersTab from '../components/ServersTab'
@@ -504,6 +505,7 @@ function ContentTab({ inst }: { inst: Instance }) {
                 {checking ? <Loader2 className="spin" /> : <RefreshCw />} {t('instance.content.checkUpdates')}
               </button>
             )}
+            <DepCheck check={() => api.content.depCheck(inst.id)} install={() => api.content.depInstall(inst.id)} onChanged={() => void load()} />
           </>
         )}
         <button className="btn icon" title={t('common.openFolder')} onClick={() => void api.instances.openFolder(inst.id, KIND_FOLDER[kind])}>

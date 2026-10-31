@@ -30,6 +30,7 @@ const REMOTE_SERVER = new Set([
   'playerList', 'playerAdd', 'playerRemove', 'requests', 'requestAccept', 'requestReject', 'requestBlock', 'requestUnblockAll', 'requestUnblock',
   'properties', 'setProperties', 'antiXray', 'setAntiXray', 'antiCheat', 'setAntiCheat', 'bedrockJoin', 'setBedrockJoin', 'downloadsCheck', 'downloadsForget', 'clientMods',
   'addonSources', 'addons', 'addonSearch', 'addonVersions', 'addonChangeVersion', 'addonUpdateMany', 'addonCheckUpdates', 'addonCancelPending', 'addonInstall', 'addonToggle', 'addonRemove',
+  'addonDepCheck', 'addonDepInstall',
   'switchPack', 'origin', 'syncPreview', 'syncFromInstance', 'reinstall', 'reinstallPack', 'packFlags',
   'relayInfo', 'relayCheck', 'relayName', 'relayContinue', 'relayTopUp', 'relayRestart', 'domain', 'checkDns', 'network',
   'clientPack', 'clientPackChoices', 'publishClientPack', 'removeClientPack', 'listing', 'setListing', 'appealListing',

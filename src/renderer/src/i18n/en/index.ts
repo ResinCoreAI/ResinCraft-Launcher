@@ -9,6 +9,7 @@ import app from './app'
 import bedrock from './bedrock'
 import commands from './commands'
 import common from './common'
+import depcheck from './depcheck'
 import discover from './discover'
 import engine from './engine'
 import files from './files'
@@ -45,6 +46,7 @@ const en = {
   ...menu,
   ...migrate,
   ...servers,
+  ...depcheck,
   ...graphs,
   ...admin,
   ...relayadmin,

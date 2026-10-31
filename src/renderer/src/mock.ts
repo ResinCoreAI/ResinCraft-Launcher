@@ -13,6 +13,7 @@ import { mockRuns } from './mock-runs'
 import { mockQuickJoin } from './mock-quickjoin'
 import { mockBedrock } from './mock-bedrock'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
+import { mockDepCheck, mockDepInstall } from './mock-depcheck'
 import { mockDetails, mockVersionInfo } from './mock-details'
 import { MOCK_PACK, mockPackUpdates, mockPackVersions, mockSwitchPack } from './mock-packswitch'
 import { mockVersions } from './mock-versions'
@@ -501,6 +502,8 @@ export function mockApi(): ResinApi {
       },
       duplicates: (i, picks) => wait(mockDuplicates(picks, contentOf(i)), 500),
       installMany: (i, picks, replace) => wait(mockInstallMany(contentOf(i), picks, replace), 900),
+      depCheck: (i) => wait(mockDepCheck(i), 500),
+      depInstall: (i) => wait(mockDepInstall(i), 900),
       list: (i, kind) => wait(packContent.has(i) ? packContent.get(i)!.filter((m) => m.kind === kind) : kind === 'mod' ? [...mods] : []),
       toggle: async () => {},
       remove: async () => {},

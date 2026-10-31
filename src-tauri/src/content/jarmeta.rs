@@ -50,7 +50,7 @@ fn is_template_id(id: &str) -> bool {
 }
 
 /// Not empty and not a build placeholder left unfilled ("${version}").
-fn usable(s: &str) -> bool {
+pub(super) fn usable(s: &str) -> bool {
     !s.is_empty() && !s.contains("${")
 }
 
@@ -69,7 +69,7 @@ fn str_at(v: &Value, path: &[&str]) -> Option<String> {
     cur.as_str().map(str::to_string)
 }
 
-fn json_of(text: &str) -> Option<Value> {
+pub(super) fn json_of(text: &str) -> Option<Value> {
     serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()
 }
 
@@ -95,7 +95,7 @@ pub fn parse_quilt(text: &str) -> (Option<String>, Option<String>, Option<String
 }
 
 /// A TOML string value at the start of `v` ("x", 'x' or """x"""), without what follows it (comments).
-fn toml_string(v: &str) -> Option<String> {
+pub(super) fn toml_string(v: &str) -> Option<String> {
     let v = v.trim_start();
     for q in ["\"\"\"", "'''", "\"", "'"] {
         if let Some(rest) = v.strip_prefix(q) {

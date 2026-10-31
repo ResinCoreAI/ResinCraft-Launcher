@@ -26,6 +26,7 @@ import { useStore } from '../store'
 import { bytes, projectUrl } from '../util'
 import { rich, t, type Key } from '../i18n'
 import AddonBrowser, { ADDON_SOURCE_LABEL } from './AddonBrowser'
+import DepCheck from './DepCheck'
 import { SERVER_LABEL } from './NewServerModal'
 import VersionPicker from './VersionPicker'
 import { ConfirmModal, Empty, openContextMenu, Switch, useCopy, type ContextEntry } from './ui'
@@ -290,6 +291,7 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
             {checking ? <Loader2 className="spin" /> : <RefreshCw />} {t('servers.addons.checkUpdates')}
           </button>
         )}
+        <DepCheck check={() => api.server.addonDepCheck(s.id, area)} install={() => api.server.addonDepInstall(s.id, area)} onChanged={() => void load()} />
         <button data-pc-only className="btn icon" title={t('common.openFolder')} onClick={() => void api.server.openFolder(s.id, plugins ? 'plugins' : 'mods')}>
           <FolderOpen />
         </button>

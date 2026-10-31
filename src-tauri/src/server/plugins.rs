@@ -108,6 +108,12 @@ fn folder(meta: &ServerMeta) -> Result<PathBuf> {
     }
 }
 
+/// What the dependency check needs to know of a server's plugins or mods: kind, folder, Modrinth loaders, game version.
+pub(crate) async fn dep_scope(id: &str, area: Option<&str>) -> Result<(ServerKind, PathBuf, Vec<&'static str>, String)> {
+    let v = view(id, area).await?;
+    Ok((v.kind, folder(&v)?, mr_loaders(&v), v.mc_version.clone()))
+}
+
 fn index_file(v: &View) -> Result<PathBuf> {
     Ok(store::dir(&v.id)?.join(if v.hybrid_plugins { "content-index-plugins.json" } else { "content-index.json" }))
 }

@@ -3,6 +3,7 @@
 
 pub mod atlauncher;
 pub mod curseforge;
+pub mod depcheck;
 pub mod details;
 pub mod dupes;
 pub mod export;
@@ -52,6 +53,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "content:duplicates" => json(dupes::check(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:installMany" => json(dupes::install_many(&args.get::<String>(0)?, args.get(1)?, args.get::<Option<_>>(2)?.unwrap_or_default()).await?),
+        "content:depCheck" => json(depcheck::check_instance(&args.get::<String>(0)?).await?),
+        "content:depInstall" => json(depcheck::install_instance(&args.get::<String>(0)?).await?),
         "content:list" => json(sources::list_content(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:toggle" => {
             modrinth::toggle_content(&args.get::<String>(0)?, args.get(1)?, &args.get::<String>(2)?).await?;

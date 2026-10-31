@@ -408,7 +408,7 @@ const SERVER: &[&str] = &[
     "properties", "setProperties", "antiXray", "setAntiXray", "antiCheat", "setAntiCheat", "bedrockJoin", "setBedrockJoin", "downloadsCheck", "downloadsForget", "clientMods",
     // Plugins and mods from the built-in sources.
     "addonSources", "addons", "addonSearch", "addonVersions", "addonChangeVersion", "addonUpdateMany", "addonCheckUpdates", "addonCancelPending", "addonInstall", "addonToggle",
-    "addonRemove",
+    "addonRemove", "addonDepCheck", "addonDepInstall",
     // Modpack: versions, sync from its instance, reinstall.
     "switchPack", "origin", "syncPreview", "syncFromInstance", "reinstall", "reinstallPack", "packFlags",
     // Sharing: ResinCraft Relay, domain.
