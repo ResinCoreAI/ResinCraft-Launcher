@@ -772,6 +772,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
                     }
                 });
             }
+            crate::friends::game_line(&run_id, &instance_id, &l.text);
             pending.lock().unwrap().push(l)
         }
     };
@@ -928,6 +929,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
             }
         };
         release(&id, slot);
+        crate::friends::game_exited(&run.run_id);
         // Let the readers drain what's left in the pipes.
         for r in readers {
             let _ = tokio::time::timeout(Duration::from_secs(5), r).await;

@@ -8,6 +8,7 @@
 //! - `player`: accounts, worlds, servers, screenshots, notes
 //! - `server`: hosting Minecraft servers on this computer
 //! - `files`: the file manager and text editor for instance and server folders
+//! - `friends`: inviting friends into an Open to LAN world with a code
 //! - `updater`: checking for and installing new ResinCraft versions
 //! - `discord`: Discord Rich Presence for running games
 
@@ -16,6 +17,7 @@ pub mod content;
 pub mod core;
 pub mod discord;
 pub mod files;
+pub mod friends;
 pub mod game;
 pub mod migrate;
 pub mod openfile;
@@ -87,6 +89,7 @@ pub fn run() {
             // Hosted servers would otherwise keep running (and holding their port) after the launcher closes.
             if let tauri::RunEvent::Exit = event {
                 discord::shutdown();
+                tauri::async_runtime::block_on(friends::shutdown());
                 tauri::async_runtime::block_on(server::runtime::shutdown_all(std::time::Duration::from_secs(20)));
             }
         });

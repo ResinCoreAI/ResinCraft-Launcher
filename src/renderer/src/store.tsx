@@ -71,6 +71,8 @@ interface Store {
   playWorldIn: (from: string, folder: string, to: string, accountId?: string) => Promise<void>
   /** Quick join: starts the request's instance straight into its server (Bedrock: opens Minecraft). False on error. */
   join: (req: QuickJoinRequest) => Promise<boolean>
+  /** Starts the instance into the friend's world the tunnel leads to. False on error. */
+  joinFriend: (instanceId: string) => Promise<boolean>
   /** `runId`: stop only that run; otherwise every run of the instance. */
   stop: (id: string, runId?: string) => Promise<void>
   /** Per run id (the first run's id is the instance id). */
@@ -167,7 +169,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setRuns(next)
     })
 
+    // Noticing a world opened to LAN (or an invite ending) wherever the player is in the launcher.
+    let lanWorlds = 0
     const offs = [
+      api.on.friends((s) => {
+        if (s.worlds.length > lanWorlds && !s.invite) {
+          toast(t('friends.lanSeen'), 'info', { label: t('friends.invite.start'), run: () => setRoute({ page: 'quickjoin' }) })
+        }
+        lanWorlds = s.worlds.length
+        if (s.ended && !s.invite) toast(t(`friends.ended.${s.ended}`), 'info')
+      }),
       api.on.task((t) => {
         setTasks((list) => [...list.filter((x) => x.id !== t.id), t])
         if (t.state !== 'running') setTimeout(() => setTasks((list) => list.filter((x) => x.id !== t.id)), t.state === 'error' ? 8000 : 1500)
@@ -254,6 +265,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [start]
   )
   const join = useCallback((req: QuickJoinRequest) => start(req.instanceId, () => api.quickjoin.join(req)), [start])
+  const joinFriend = useCallback((instanceId: string) => start(instanceId, () => api.friends.join({ instanceId })), [start])
 
   const stop = useCallback(async (id: string, runId?: string) => api.instances.kill(id, runId), [])
   const clearLogs = useCallback((runId: string) => setLogs((l) => ({ ...l, [runId]: [] })), [])
@@ -308,6 +320,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       playWorld,
       playWorldIn,
       join,
+      joinFriend,
       stop,
       logs,
       clearLogs,
@@ -336,6 +349,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       playWorld,
       playWorldIn,
       join,
+      joinFriend,
       stop,
       logs,
       clearLogs,

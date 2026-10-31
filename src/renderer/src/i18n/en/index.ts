@@ -17,6 +17,7 @@ import instance from './instance'
 import library from './library'
 import menu from './menu'
 import migrate from './migrate'
+import friends from './friends'
 import quickjoin from './quickjoin'
 import reinstall from './reinstall'
 import servers from './servers'
@@ -47,6 +48,7 @@ const en = {
   ...admin,
   ...relayadmin,
   ...quickjoin,
+  ...friends,
   ...commands,
   ...updates,
   ...engine

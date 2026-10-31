@@ -11,6 +11,7 @@ import { mockMigrate } from './mock-migrate'
 import { mockStorage } from './mock-storage'
 import { mockRuns } from './mock-runs'
 import { mockQuickJoin } from './mock-quickjoin'
+import { mockFriends } from './mock-friends'
 import { mockBedrock } from './mock-bedrock'
 import { mockCurseForgeHits, mockDuplicates, mockInstallMany } from './mock-content'
 import { mockDetails, mockVersionInfo } from './mock-details'
@@ -105,6 +106,7 @@ export function mockApi(): ResinApi {
     // A second player on the same PC.
     { id: 'a3', type: 'offline', username: 'Sprout', uuid: '7c1e2a40-3d1b-3f5e-9a3c-5b8d2e7f4a10', active: false }
   ]
+  const friends = mockFriends()
   const runs = mockRuns(
     () => instances,
     () => accounts
@@ -581,9 +583,10 @@ export function mockApi(): ResinApi {
     ...mockQuickJoin(runs.launch),
     server: servers.server,
     bedrock: mockBedrock(now),
+    friends: friends.friends,
     ...mockFiles(),
     ...migrate,
-    on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop() },
+    on: { task: mockEngine.onTask, game: runs.onGame, friends: friends.onFriends, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop() },
     remote: {
       status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }),
       grants: async () => grants,

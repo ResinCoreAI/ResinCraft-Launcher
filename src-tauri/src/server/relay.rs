@@ -712,6 +712,122 @@ pub async fn open(
 
 // ---------- The name picker ----------
 
+// ---------- Friends' invites ----------
+
+/// What a friends' invite is told about its relay way in.
+pub enum FriendRelay {
+    /// Connected (again).
+    Online,
+    /// The relay's session ends in `secs_left` seconds unless the host continues.
+    Ending { secs_left: u64 },
+    /// The relay way in is gone for this invite; direct connections go on.
+    Down(Text),
+}
+
+/// A tunnel for an invite (see friends/). Stays until [`close_for_friends`].
+pub struct FriendTunnel {
+    pub name: String,
+    /// Reserved just for this invite, and given back when it ends.
+    temporary: bool,
+    account: MicrosoftAccount,
+    commands: mpsc::UnboundedSender<Command>,
+    task: JoinHandle<()>,
+}
+
+impl FriendTunnel {
+    pub fn continue_session(&self) {
+        let _ = self.commands.send(Command::Continue);
+    }
+}
+
+/// A name for an invite: a new one that's given back afterwards, else one of the account's that nothing uses right now.
+async fn friend_name(conn: &mut Connection) -> Result<(String, bool), AgentError> {
+    let name = format!("friend-{}", &uuid::Uuid::new_v4().simple().to_string()[..10]);
+    match conn.reserve(&name, None).await {
+        Ok(name) => Ok((name, true)),
+        Err(e) if e.code() == Some(ErrorCode::TooManyNames) => {
+            let mine = conn.names_mine().await?;
+            let hosting = store::list().await.unwrap_or_default();
+            let running = |n: &str| hosting.iter().any(|m| m.relay_name.as_deref() == Some(n) && super::runtime::is_running(&m.id));
+            mine.names.into_iter().find(|n| !n.online && !running(&n.name)).map(|n| (n.name, false)).ok_or(e)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Puts this computer's `local_port` online under a name for an invite. Needs a signed-in Microsoft account; friends
+/// need none for the relay itself. Players' connections reach `local_port` with their Minecraft handshake first.
+pub async fn open_for_friends(local_port: u16, on_status: impl Fn(FriendRelay) + Send + Sync + 'static) -> Result<FriendTunnel> {
+    let s = settings().ok_or_else(not_configured)?;
+    let account = accounts::microsoft_account(None).await.ok_or_else(needs_microsoft)?;
+    let mut conn = connect(&s, &account).await.map_err(|f| f.into_error(""))?;
+    let (name, temporary) = friend_name(&mut conn).await.map_err(|e| describe(&e, ""))?;
+    conn.online(&name).await.map_err(|e| describe(&e, &name))?;
+    let (commands, mut rx) = mpsc::unbounded_channel();
+    let local = SocketAddr::from(([127, 0, 0, 1], local_port));
+    let (task_name, task_account) = (name.clone(), account.clone());
+    let task = tokio::spawn(async move {
+        let mut current = Some(conn);
+        let mut wait = 1;
+        loop {
+            if let Some(conn) = current.take() {
+                let status = &on_status;
+                let ended = conn
+                    .serve_with(
+                        local,
+                        move |e| {
+                            if let Event::Warning { secs_left } = e {
+                                status(FriendRelay::Ending { secs_left });
+                            }
+                        },
+                        &mut rx,
+                    )
+                    .await;
+                if !ended.retryable() {
+                    on_status(FriendRelay::Down(as_text(&describe(&ended, &task_name))));
+                    return;
+                }
+                wait = 1;
+            }
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+            let attempt = async {
+                let mut c = connect(&s, &task_account).await?;
+                c.online(&task_name).await.map_err(Failure::Relay)?;
+                Ok::<_, Failure>(c)
+            };
+            match attempt.await {
+                Ok(c) => {
+                    on_status(FriendRelay::Online);
+                    current = Some(c);
+                }
+                Err(f) if f.retryable() => wait = (wait * 2).min(60),
+                Err(f) => {
+                    on_status(FriendRelay::Down(as_text(&f.into_error(&task_name))));
+                    return;
+                }
+            }
+        }
+    });
+    Ok(FriendTunnel { name, temporary, account, commands, task })
+}
+
+/// Takes an invite's tunnel offline and gives its temporary name back.
+pub async fn close_for_friends(tunnel: FriendTunnel) {
+    tunnel.task.abort();
+    let _ = tunnel.task.await;
+    if !tunnel.temporary {
+        return;
+    }
+    let Some(s) = settings() else { return };
+    let release = async {
+        let mut conn = connect(&s, &tunnel.account).await.ok()?;
+        conn.release(&tunnel.name).await.ok()
+    };
+    if tokio::time::timeout(Duration::from_secs(8), release).await.ok().flatten().is_none() {
+        eprintln!("[relay] couldn't give back {}", tunnel.name);
+    }
+}
+
 fn normalize(name: &str) -> String {
     name.trim().to_ascii_lowercase()
 }

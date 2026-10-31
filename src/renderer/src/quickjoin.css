@@ -245,3 +245,58 @@
   border-color: var(--play);
   color: var(--play-fg);
 }
+
+/* Play with friends (components/Friends.tsx). */
+.friends-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.friends-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.friends-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+}
+.friends-panel .hint {
+  margin: 0;
+}
+.friends-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.friends-world {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friends-code {
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.friends-input {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--mono, monospace);
+}
