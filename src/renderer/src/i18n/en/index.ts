@@ -27,6 +27,7 @@ import servers from './servers'
 import settings from './settings'
 import storage from './storage'
 import tabs from './tabs'
+import transfer from './transfer'
 import updates from './updates'
 
 const en = {
@@ -49,6 +50,7 @@ const en = {
   ...migrate,
   ...servers,
   ...schedule,
+  ...transfer,
   ...commandlist,
   ...depcheck,
   ...graphs,

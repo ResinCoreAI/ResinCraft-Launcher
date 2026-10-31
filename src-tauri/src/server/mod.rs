@@ -29,6 +29,7 @@ pub mod runtime;
 pub mod schedule;
 pub mod spark;
 pub mod store;
+pub mod transfer;
 pub mod tunnel;
 
 use anyhow::{bail, Result};
@@ -52,6 +53,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:softwareIcons" => json(installers::software_icons().await),
         "server:builds" => json(installers::builds(args.get::<ServerKind>(0)?, &args.get::<String>(1)?).await?),
         "server:create" => json(create::create(args.get::<NewServer>(0)?).await?),
+        // A copy of a stopped server, and a server as a zip. Not on remote.rs's lists: only this PC's own window.
+        "server:clone" => json(transfer::clone(&args.get::<String>(0)?, args.get::<Option<transfer::CloneOpts>>(1)?.unwrap_or_default()).await?),
+        "server:exportZip" => json(transfer::export(&args.get::<String>(0)?, args.get::<Option<transfer::ExportOpts>>(1)?.unwrap_or_default()).await?),
+        "server:importZip" => json(transfer::import(args.get::<Option<String>>(0)?).await?),
         "server:switchPack" => json(packs::switch_pack(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:origin" => json(packs::origin(&args.get::<String>(0)?).await?),
         "server:syncPreview" => json(packs::sync_preview(&args.get::<String>(0)?).await?),
@@ -92,6 +97,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             }
             if schedule::busy(&id) {
                 bail!("A scheduled task is running on this server. Try again when it's done.");
+            }
+            if transfer::busy(&id) {
+                bail!("This server is being copied. Try again when that's done.");
             }
             let meta = store::get(&id).await?;
             let gone = id.clone();

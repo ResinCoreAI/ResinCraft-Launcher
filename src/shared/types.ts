@@ -1716,6 +1716,24 @@ export interface RemoteStatus {
   error?: string
 }
 
+/** Something that couldn't come along in a clone or an export, and why. */
+export interface TransferSkipped {
+  path: string
+  reason: string
+}
+
+/** A server made by cloning or from a zip. */
+export interface ServerTransferred {
+  server: ServerInfo
+  skipped: TransferSkipped[]
+}
+
+export interface ServerExported {
+  path: string
+  bytes: number
+  skipped: TransferSkipped[]
+}
+
 export interface ServerCreated {
   server: ServerInfo
   /** Client-only mods that were left out. */
@@ -2400,6 +2418,12 @@ export interface ResinApi {
     scheduleRun(id: string, taskId: string): Promise<ScheduledTask[]>
     /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
     regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
+    /** Copies a stopped server to a new one: new id, free port, none of the original's relay or listing details. */
+    clone(id: string, opts?: { name?: string; worlds?: boolean }): Promise<ServerTransferred>
+    /** A stopped server as a zip, asking where. Null when the dialog was closed. */
+    exportZip(id: string, opts?: { worlds?: boolean; logs?: boolean; backups?: boolean; caches?: boolean }): Promise<ServerExported | null>
+    /** A new server from such a zip, asking which. Null when the dialog was closed. Never agrees to the EULA. */
+    importZip(): Promise<ServerTransferred | null>
     /** Settings → Anti-cheat: Grim, for plugin servers. */
     antiCheat(id: string): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>
     setAntiCheat(id: string, on: boolean): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>

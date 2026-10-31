@@ -340,6 +340,19 @@ fn gate(id: &str) -> Arc<tokio::sync::Mutex<()>> {
     GATES.lock().unwrap().entry(id.to_string()).or_default().clone()
 }
 
+/// A cloned server's tasks: the same ones, with no history (runs, the backups they made), off until the player says.
+pub async fn copy_to(from: &str, to: &str) -> Result<()> {
+    let tasks = without_history(load(from).await.tasks, now_ms());
+    if tasks.is_empty() {
+        return Ok(());
+    }
+    save(to, &Schedule { tasks }).await
+}
+
+fn without_history(tasks: Vec<Task>, now: i64) -> Vec<Task> {
+    tasks.into_iter().map(|t| Task { enabled: false, anchor: now, last_run: None, made: Vec::new(), ..t }).collect()
+}
+
 /// A task of this server is running or queued (its restart may have the server stopped for a moment).
 pub fn busy(id: &str) -> bool {
     CLAIMS.lock().unwrap().iter().any(|(server, _)| server == id)

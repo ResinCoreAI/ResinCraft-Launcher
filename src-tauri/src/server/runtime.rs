@@ -414,6 +414,9 @@ pub async fn start(id: &str) -> Result<()> {
     if is_running(id) {
         bail!("This server is already running");
     }
+    if super::transfer::busy(id) {
+        bail!("This server is being copied. Try again when that's done.");
+    }
     if crate::content::packswitch::is_switching(&format!("server:{id}")) {
         crate::bail_tr!("packswitch.wait", "Wait for the modpack version switch to finish first");
     }

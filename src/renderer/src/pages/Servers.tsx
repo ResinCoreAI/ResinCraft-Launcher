@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
-import { Activity, Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
+import { Activity, Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FileArchive, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
 import { BEDROCK_SERVERS, HYBRID_SERVERS, PLUGIN_SERVERS, PROXY_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
@@ -11,6 +11,7 @@ import { remoteMemoryMb } from '../remotePc'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
 import ServerSchedule from '../components/ServerSchedule'
+import { CloneServerModal, ExportServerModal, useImportServerZip } from '../components/ServerTransfer'
 import ConsoleInput from '../components/ConsoleCommands'
 import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
@@ -324,6 +325,7 @@ function ServerList({
   // Another PC's servers: its folders aren't here. On your own PCs you can make and import servers there too.
   const pc = useRemotePc()
   const canMake = !pc?.shared
+  const importZip = useImportServerZip()
 
   const menuFor = (s: ServerInfo): ContextEntry[] => {
     const up = s.state === 'starting' || s.state === 'running'
@@ -363,6 +365,11 @@ function ServerList({
         {canMake && (
           <button data-pc-only className="btn lg" onClick={onImport}>
             <FolderInput /> {t('migrate.serverButton')}
+          </button>
+        )}
+        {canMake && !isConsole && !pc && (
+          <button data-pc-only className="btn lg" onClick={() => void importZip()}>
+            <FileArchive /> {t('servers.transfer.import')}
           </button>
         )}
         {canMake && (
@@ -466,6 +473,8 @@ function ServerDetail({
   const [tab, setTab] = useState<Tab>('console')
   const [deleting, setDeleting] = useState(false)
   const [reinstalling, setReinstalling] = useState<ServerReinstall>()
+  const [copying, setCopying] = useState<'clone' | 'export'>()
+  const importZip = useImportServerZip()
   const address = s.net?.state === 'open' && s.net.address ? s.net.address : `localhost:${s.port}`
   const more: ContextEntry[] = [
     { label: t('menu.server.restart'), icon: <RotateCw />, disabled: s.state !== 'running', onSelect: () => void restart(s, onStart, onStop) },
@@ -495,6 +504,10 @@ function ServerDetail({
         !!s.modpack && { label: t('reinstall.menu.pack'), onSelect: () => setReinstalling('pack') }
       ]
     },
+    !isConsole && !pc && '-',
+    !isConsole && !pc && { label: t('servers.transfer.clone'), icon: <Copy />, disabled: live(s), onSelect: () => setCopying('clone') },
+    !isConsole && !pc && { label: t('servers.transfer.export'), icon: <FileArchive />, disabled: live(s), onSelect: () => setCopying('export') },
+    !isConsole && !pc && { label: t('servers.transfer.import'), icon: <FolderInput />, onSelect: () => void importZip() },
     '-',
     { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: live(s), onSelect: () => setDeleting(true) }
   ]
@@ -555,6 +568,8 @@ function ServerDetail({
         )}
         <StartStop s={s} onStart={onStart} onStop={onStop} size="lg" />
       </div>
+      {copying === 'clone' && <CloneServerModal s={s} onClose={() => setCopying(undefined)} />}
+      {copying === 'export' && <ExportServerModal s={s} onClose={() => setCopying(undefined)} />}
       {reinstalling && <ReinstallServerModal s={s} what={reinstalling} onClose={() => setReinstalling(undefined)} after={reload} />}
       {deleting && (
         <ConfirmModal

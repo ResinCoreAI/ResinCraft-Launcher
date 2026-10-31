@@ -637,6 +637,20 @@ export function mockServers(): {
     playerRemove: async (_id, kind, name) => void (lists[kind] = lists[kind].filter((e) => e.name !== name)),
     backup: () => wait('C:/…/servers/smp/backups/2026-10-18_14-02-11_world.zip', 1200),
     regenerateWorld: () => wait(3, 1400),
+    clone: async (id, opts) => {
+      const from = find(id)
+      const s: ServerInfo = { ...from, id: `server-${servers.length + 1}`, name: opts?.name || `${from.name} copy`, port: 25565 + servers.length, state: 'stopped', eulaAccepted: false, createdAt: Date.now(), tunnel: 'auto', relayName: undefined, domain: undefined }
+      await wait(null, 1200)
+      servers = [s, ...servers]
+      return { server: s, skipped: [] }
+    },
+    exportZip: () => wait({ path: 'C:/Users/you/Downloads/smp.zip', bytes: 412_000_000, skipped: [] }, 1200),
+    importZip: async () => {
+      const s: ServerInfo = { ...base, id: `server-${servers.length + 1}`, name: 'Imported server', type: 'paper', mcVersion: '1.21.4', memoryMb: 2048, port: 25565 + servers.length, createdAt: Date.now(), eulaAccepted: false, tunnel: 'auto' }
+      await wait(null, 1200)
+      servers = [s, ...servers]
+      return { server: s, skipped: [] }
+    },
     backups: (id) => wait(mockBackups('world').map((b) => ({ ...b, file: b.file }))),
     restoreBackup: () => wait(undefined, 1500),
     deleteBackup: () => wait(undefined, 300),

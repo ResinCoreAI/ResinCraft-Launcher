@@ -160,11 +160,12 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
     }
 }
 
-/// 25565 (Bedrock: 19132), or the next port no other server uses. Bedrock also takes the port after it (IPv6).
-async fn free_port(bedrock: bool) -> u16 {
+/// 25565 (Bedrock: 19132), or the next port no other server or program uses. Bedrock also takes the port after it (IPv6).
+pub(super) async fn free_port(bedrock: bool) -> u16 {
     let used: HashSet<u16> = store::list().await.unwrap_or_default().into_iter().flat_map(|m| [m.port, m.port + u16::from(m.kind.bedrock())]).collect();
     let (first, step) = if bedrock { (BEDROCK_PORT, 2) } else { (DEFAULT_PORT, 1) };
-    (0..100).map(|i| first + i * step).find(|p| !used.contains(p) && !(bedrock && used.contains(&(p + 1)))).unwrap_or(first)
+    let open = |p: u16| if bedrock { super::network::udp_port_free(p) } else { super::network::port_free(p) };
+    (0..100).map(|i| first + i * step).find(|p| !used.contains(p) && !(bedrock && used.contains(&(p + 1))) && open(*p)).unwrap_or(first)
 }
 
 async fn resolve(req: &NewServer) -> Result<Plan> {
