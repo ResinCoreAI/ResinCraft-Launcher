@@ -1032,7 +1032,7 @@ function PickInstance({
   const { instances, setNewInstanceOpen } = useStore()
   const [selected, setSelected] = useState<Instance>()
   const needsLoader = hits.some((h) => h.kind === 'mod')
-  const usable = instances.filter((i) => !needsLoader || i.loader !== 'vanilla')
+  const usable = instances.filter((i) => i.loader !== 'horizon' && (!needsLoader || i.loader !== 'vanilla'))
   const single = hits.length === 1
   const done = (fn: (i: Instance) => void) => () => {
     fn(selected!)

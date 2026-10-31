@@ -654,7 +654,7 @@ async fn pick_meta(inst: &Instance, p: &ModPick) -> Option<JarMeta> {
 /// the rest; failures are listed in the result.
 pub async fn install_many(instance_id: &str, picks: Vec<ModPick>, replace: Vec<Replace>) -> Result<InstallManyResult> {
     let inst = instances::get(instance_id).await?;
-    if picks.iter().any(|p| p.kind == ContentKind::Mod) && inst.loader == LoaderType::Vanilla {
+    if picks.iter().any(|p| p.kind == ContentKind::Mod) && matches!(inst.loader, LoaderType::Vanilla | LoaderType::Horizon) {
         bail_tr!(
             "modrinth.vanillaInstance",
             "{name} is a vanilla instance. Mods need a mod loader such as Fabric or NeoForge; create a modded instance first.",

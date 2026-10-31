@@ -472,6 +472,7 @@ pub async fn start(id: &str) -> Result<()> {
         emit_state(id, None);
         e
     };
+    installers::refresh_horizon(&meta, &dir).await;
     let program = match &meta.launch.exe {
         Some(exe) => crate::game::mojang::plain(&crate::core::fsutil::safe_join(&dir, exe)?),
         _ => installers::choose_java(&meta).await.map_err(fail)?,

@@ -25,8 +25,11 @@ use crate::core::{paths, settings};
 use crate::game::java::{find_java, hidden_command, install_java};
 use crate::game::forge::legacy_lib_bases;
 use crate::game::loaders::{full_forge_version, installer_url, is_ancient_forge, is_legacy_forge, latest_loader, legacy_forge_error, normalize_loader_version};
-use crate::game::mojang::{asset_items, client_jar, get_vanilla_version, maven_path, plain, resolve_libraries};
+use crate::game::horizon;
+use crate::game::mojang::{get_vanilla_version, maven_path, plain};
 use crate::{err_tr, tr};
+
+use super::store;
 
 const FILL: &str = "https://fill.papermc.io/v3/projects";
 const PURPUR: &str = "https://api.purpurmc.org/v2/purpur";
@@ -53,7 +56,6 @@ const WATERDOGPE: &str = "WaterdogPE/WaterdogPE";
 const NUKKIT: &str = "https://repo.opencollab.dev/maven-snapshots/cn/nukkit/nukkit/1.0-SNAPSHOT";
 const GEYSER: &str = "https://download.geysermc.org/v2/projects/geyser";
 const LATEST: &str = "latest";
-const HORIZON: &str = "horizon-rust/horizon";
 /// Pufferfish's Jenkins: one job per Minecraft series ("Pufferfish-1.21").
 const PUFFERFISH: &str = "https://ci.pufferfish.host";
 const BUNGEECORD: &str = "https://ci.md-5.net/job/BungeeCord/lastSuccessfulBuild/artifact/bootstrap/target/BungeeCord.jar";
@@ -104,19 +106,19 @@ pub async fn choose_java(meta: &ServerMeta) -> Result<String> {
         ServerKind::Glowstone => GLOWSTONE_JAVA,
         _ => required_java(&meta.mc_version).await?,
     };
-    java_of(required, meta).await
+    java_for(required, Some(meta.id.clone()), &meta.mc_version).await
 }
 
 /// A detected Java of this major version, else Temurin downloaded into the launcher's Java folder.
-async fn java_of(required: u32, meta: &ServerMeta) -> Result<String> {
+pub async fn java_for(required: u32, owner: Option<String>, mc: &str) -> Result<String> {
     if let Some(found) = find_java(required).await? {
         return Ok(found.path);
     }
     if settings::get().await.auto_java {
-        let installed = Task::run(format!("Downloading Java {required}"), Some(meta.id.clone()), |t| async move { install_java(required, &t).await }).await?;
+        let installed = Task::run(format!("Downloading Java {required}"), owner, |t| async move { install_java(required, &t).await }).await?;
         return Ok(installed.path);
     }
-    bail!("Minecraft {} needs Java {required}. Install it, or turn on automatic Java downloads in Settings.", meta.mc_version)
+    bail!("Minecraft {mc} needs Java {required}. Install it, or turn on automatic Java downloads in Settings.")
 }
 
 // ---------- Version lists ----------
@@ -166,7 +168,11 @@ pub async fn software_versions(kind: ServerKind) -> Result<Vec<String>> {
         ServerKind::Geyser => geyser_versions().await?,
         ServerKind::Glowstone | ServerKind::Cuberite => vec![OLD_MC.to_string()],
         ServerKind::Pumpkin => pumpkin_versions().await?,
-        ServerKind::Horizon => horizon_versions().await?,
+        // Dated builds are gone after a week: a server follows the rolling release.
+        ServerKind::Horizon => {
+            horizon_here()?;
+            vec![horizon::NIGHTLY.to_string()]
+        }
         ServerKind::Bedrock => bedrock_versions().await?,
         ServerKind::Pocketmine => release_tags(POCKETMINE, "PocketMine-MP.phar").await?,
         ServerKind::Powernukkitx => release_tags(POWERNUKKITX, "powernukkitx.jar").await?,
@@ -297,8 +303,9 @@ pub async fn install(meta: &mut ServerMeta, dir: &Path, task: &Arc<Task>) -> Res
             (ServerLaunch { exe: Some(exe), ..Default::default() }, Some(build))
         }
         ServerKind::Horizon => {
-            let (exe, exe_args) = horizon(meta, dir, task).await?;
-            (ServerLaunch { exe: Some(exe), exe_args, ..Default::default() }, None)
+            let (release, build) = horizon::latest().await?;
+            let (exe, exe_args, build) = horizon_install(&release, &build, meta, dir, task).await?;
+            (ServerLaunch { exe: Some(exe), exe_args, ..Default::default() }, Some(build))
         }
         ServerKind::Pocketmine => {
             let exe = pocketmine(&mc, dir, task).await?;
@@ -388,7 +395,7 @@ fn jar(name: &str) -> ServerLaunch {
 }
 
 /// The official server.jar from the version JSON's `downloads.server`.
-async fn vanilla_jar(mc: &str, dest: &Path, task: &Arc<Task>) -> Result<()> {
+pub async fn vanilla_jar(mc: &str, dest: &Path, task: &Arc<Task>) -> Result<()> {
     task.update(format!("Downloading the Minecraft {mc} server…"), None);
     let v = get_vanilla_version(mc).await?;
     let f = v.downloads.as_ref().and_then(|d| d.get("server")).ok_or_else(|| anyhow!("Minecraft {mc} has no official server download"))?;
@@ -1036,78 +1043,50 @@ pub async fn make_executable(_file: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Horizon's archive for this kind of computer and the game program in it. Windows and macOS have only the full game
-/// (it runs without a window as a server); Linux has a build without its sound and controller libraries.
-fn horizon_archive(os: &str, arch: &str) -> Option<(&'static str, &'static str)> {
-    match (os, arch) {
-        ("windows", "x86_64") => Some(("horizon-windows-x64.zip", "horizon-client.exe")),
-        ("linux", "x86_64") => Some(("horizon-server-linux-x86_64.tar.gz", "horizon-engine")),
-        ("macos", "aarch64") => Some(("horizon-macos-arm64.zip", "horizon-client")),
-        _ => None,
-    }
-}
-
 fn horizon_here() -> Result<(&'static str, &'static str)> {
-    horizon_archive(std::env::consts::OS, std::env::consts::ARCH).ok_or_else(|| anyhow!("Horizon has no build for this computer"))
+    horizon::server_archive(std::env::consts::OS, std::env::consts::ARCH).ok_or_else(|| anyhow!("Horizon has no build for this computer"))
 }
 
-async fn horizon_versions() -> Result<Vec<String>> {
-    let (archive, _) = horizon_here()?;
-    let tags = release_tags(HORIZON, archive).await?;
-    Ok(tags.into_iter().filter(|t| t.starts_with('v')).collect())
-}
-
-/// The Minecraft version a Horizon release is pinned to, from its research-lock.json.
-fn horizon_mc(lock: &str) -> Option<String> {
-    serde_json::from_str::<Value>(lock).ok()?.pointer("/minecraft/version")?.as_str().map(str::to_string)
-}
-
-/// A Horizon release, prepared for hosting: horizon-prepare builds its resources from the client and server of the
-/// Minecraft version it's pinned to. Those come from Mojang into the launcher's own files, which are laid out like
-/// the official launcher's, where horizon-prepare reads them. Returns the program and what it's started with.
-async fn horizon(meta: &ServerMeta, dir: &Path, task: &Arc<Task>) -> Result<(String, Vec<String>)> {
+/// Horizon's newest build for a hosted server, in the server folder: it's unpacked and prepared on the side, so a
+/// failed update leaves the server as it was. Returns the program, what it's started with, and the build.
+async fn horizon_install(release: &github::Release, build: &str, meta: &ServerMeta, dir: &Path, task: &Arc<Task>) -> Result<(String, Vec<String>, String)> {
     let (archive, program) = horizon_here()?;
-    let tag = meta.mc_version.clone();
-    github_jar(HORIZON, Some(&tag), archive, archive, dir, task).await?;
-    let file = dir.join(archive);
-    task.update("Unpacking Horizon…", None);
-    if archive.ends_with(".zip") {
-        unpack_zip(&file, dir, "Horizon").await?;
-    } else {
-        unpack_tar(&file, dir).await?;
-    }
-    let _ = tokio::fs::remove_file(&file).await;
-    let mut locks = Vec::new();
-    find_files(dir, "research-lock.json", 2, &mut locks);
-    let lock = locks.into_iter().next().ok_or_else(|| anyhow!("Horizon {tag} has no research-lock.json"))?;
-    let mc = horizon_mc(&tokio::fs::read_to_string(&lock).await?).ok_or_else(|| anyhow!("Couldn't read which Minecraft version Horizon {tag} needs"))?;
-    let root = lock.parent().unwrap_or(dir).to_path_buf();
-
-    task.update(format!("Downloading Minecraft {mc}…"), None);
-    let vanilla = get_vanilla_version(&mc).await?;
-    let mut items = vec![client_jar(&vanilla)?];
-    items.extend(resolve_libraries(&vanilla).into_iter().map(|l| l.item));
-    download_all(items, 8, task.counter("Downloading Minecraft")).await?;
-    download_all(asset_items(&vanilla).await?.items, 16, task.counter("Downloading assets")).await?;
-    let server_jar = paths::cache().join("server-installers").join(format!("horizon-server-{mc}.jar"));
-    vanilla_jar(&mc, &server_jar, task).await?;
-
-    let java = java_of(vanilla.java_major(), meta).await?;
-    let java_home = Path::new(&java).parent().and_then(Path::parent).map(Path::to_path_buf);
-    let prepare = root.join(if cfg!(windows) { "horizon-prepare.exe" } else { "horizon-prepare" });
-    make_executable(&prepare).await?;
-    make_executable(&root.join(program)).await?;
-    let args = vec!["--prepare".to_string(), "--server-jar".into(), plain(&server_jar), "--minecraft-dir".into(), plain(&paths::root()), "--root".into(), plain(&root)];
-    let java_env = java_home.as_deref().map(|h| ("JAVA_HOME", h));
-    run_tool(&plain(&prepare), &args, &root, task, "Horizon", java_env).await?;
-    let _ = tokio::fs::remove_file(&server_jar).await;
-
+    let staging = dir.join(".horizon-new");
+    let _ = tokio::fs::remove_dir_all(&staging).await;
+    horizon::fetch(release, archive, &staging, task).await?;
+    let (root, mc) = horizon::prepare(&staging, Some(meta.id.clone()), task).await?;
+    let name = root.file_name().map(|n| n.to_os_string()).unwrap_or_default();
+    let target = dir.join(&name);
+    let _ = tokio::fs::remove_dir_all(&target).await;
+    tokio::fs::rename(&root, &target).await?;
+    let _ = tokio::fs::remove_dir_all(&staging).await;
+    make_executable(&target.join(program)).await?;
     let relative = |p: &Path| p.strip_prefix(dir).unwrap_or(p).to_string_lossy().replace('\\', "/");
-    let resources = root.join(".local").join("horizon-client").join(&mc);
-    if !resources.is_dir() {
-        bail!("Preparing Horizon finished without its resources");
+    let args = vec!["--resources".to_string(), relative(&horizon::resources(&target, &mc)), "--dedicated".to_string(), "--nogui".to_string()];
+    Ok((relative(&target.join(program)), args, build.to_string()))
+}
+
+/// Before a Horizon server starts: moves it to the newest build, as dated builds are gone after a week. Whatever goes
+/// wrong, it starts on the build it has.
+pub async fn refresh_horizon(meta: &ServerMeta, dir: &Path) {
+    if meta.kind != ServerKind::Horizon {
+        return;
     }
-    Ok((relative(&root.join(program)), vec!["--resources".to_string(), relative(&resources), "--dedicated".to_string(), "--nogui".to_string()]))
+    let Ok((release, build)) = horizon::latest().await else { return };
+    if meta.loader_version.as_deref() == Some(build.as_str()) {
+        return;
+    }
+    let updated = Task::run("Updating Horizon", Some(meta.id.clone()), |t| {
+        let (release, build) = (&release, &build);
+        async move { horizon_install(release, build, meta, dir, &t).await }
+    })
+    .await;
+    match updated {
+        Ok(_) => {
+            let _ = store::update(&meta.id, serde_json::json!({ "loaderVersion": build })).await;
+        }
+        Err(e) => eprintln!("[horizon] {} stays on its build: {e:#}", meta.name),
+    }
 }
 
 /// The PHP build a server's release asks for, on this kind of computer. `series`: "PM5".
@@ -1471,7 +1450,7 @@ async fn legacy_forge_lib(rel: &str, url: Option<&str>, dir: &Path) -> Result<()
     Err(last.unwrap_or_else(|| anyhow!("{file}")).context(err_tr!("forge.serverLibMissing", "Couldn't download {file}, which this Forge server needs", file = file)))
 }
 
-fn find_files(dir: &Path, name: &str, depth: u32, out: &mut Vec<PathBuf>) {
+pub fn find_files(dir: &Path, name: &str, depth: u32, out: &mut Vec<PathBuf>) {
     let Ok(rd) = std::fs::read_dir(dir) else { return };
     for e in rd.flatten() {
         let p = e.path();
@@ -1490,7 +1469,7 @@ async fn run_installer(java: &str, args: &[String], cwd: &Path, task: &Arc<Task>
     run_tool(java, args, cwd, task, name, None).await
 }
 
-async fn run_tool(program: &str, args: &[String], cwd: &Path, task: &Arc<Task>, name: &str, env: Option<(&str, &Path)>) -> Result<()> {
+pub async fn run_tool(program: &str, args: &[String], cwd: &Path, task: &Arc<Task>, name: &str, env: Option<(&str, &Path)>) -> Result<()> {
     task.update(format!("Running the {name} installer…"), None);
     let mut cmd = hidden_command(program);
     if let Some((key, value)) = env {
@@ -1572,19 +1551,6 @@ mod tests {
         assert_eq!(pumpkin_asset("windows", "x86_64"), Some("pumpkin-X64-Windows.exe"));
         assert_eq!(pumpkin_asset("linux", "aarch64"), Some("pumpkin-ARM64-Linux"));
         assert_eq!(pumpkin_asset("macos", "x86_64"), None);
-    }
-
-    #[test]
-    fn horizon_builds_per_computer() {
-        assert_eq!(horizon_archive("windows", "x86_64"), Some(("horizon-windows-x64.zip", "horizon-client.exe")));
-        assert_eq!(horizon_archive("linux", "x86_64"), Some(("horizon-server-linux-x86_64.tar.gz", "horizon-engine")));
-        assert_eq!(horizon_archive("linux", "aarch64"), None);
-    }
-
-    #[test]
-    fn horizon_lock_names_its_minecraft() {
-        assert_eq!(horizon_mc(r#"{"minecraft":{"version":"26.3","manifest_sha1":"x"}}"#).as_deref(), Some("26.3"));
-        assert_eq!(horizon_mc("{}"), None);
     }
 
     #[test]

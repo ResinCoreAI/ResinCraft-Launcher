@@ -220,7 +220,7 @@ fn loader_key(l: LoaderType) -> Option<&'static str> {
         LoaderType::Forge => Some("forge"),
         LoaderType::Neoforge => Some("neoforge"),
         // Neither pack format has LiteLoader.
-        LoaderType::Liteloader | LoaderType::Vanilla => None,
+        LoaderType::Liteloader | LoaderType::Vanilla | LoaderType::Horizon => None,
     }
 }
 

@@ -1,7 +1,7 @@
 // Types shared by the main process, preload bridge and renderer UI.
 import type { MigrateApi } from './migrate'
 
-export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'liteloader'
+export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'liteloader' | 'horizon'
 export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack'
 
 /**
@@ -1053,7 +1053,7 @@ export type ServerKind =
   | 'cuberite'
   /** Written from scratch in Rust: its own program. `mcVersion` is the Minecraft version it speaks. */
   | 'pumpkin'
-  /** Horizon's Rust rewrite of Minecraft as a dedicated server. `mcVersion` is Horizon's release. */
+  /** Horizon's Rust rewrite of Minecraft as a dedicated server. `mcVersion` is "nightly", the one channel it ships. */
   | 'horizon'
   /** Bedrock Dedicated Server: its own program and UDP port, no Java. */
   | 'bedrock'
@@ -1066,6 +1066,8 @@ export type ServerKind =
 /** Whether Horizon's launcher is here, and the newest one (unknown when GitHub can't be reached). */
 export interface HorizonStatus {
   supported: boolean
+  /** The Minecraft version Horizon plays now; a new Horizon instance gets it. */
+  minecraft?: string | null
   installed?: string | null
   latest?: string | null
 }

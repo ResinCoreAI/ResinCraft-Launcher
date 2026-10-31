@@ -237,7 +237,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         toast((e as Error).message, 'error')
         // Missing account is the most common first-run problem; take the user straight there.
         const { key, message } = e as EngineError
-        if (key ? key.startsWith('accounts.') && key !== 'accounts.bedrockOnly' : /sign in|account/i.test(message)) setRoute({ page: 'accounts' })
+        // A build ResinCraft can't start still opens in Horizon's own launcher.
+        if (key === 'horizon.launchApi') setRoute({ page: 'horizon' })
+        else if (key === 'horizon.needsOwner') setRoute({ page: 'accounts' })
+        else if (key ? key.startsWith('accounts.') && key !== 'accounts.bedrockOnly' : /sign in|account/i.test(message)) setRoute({ page: 'accounts' })
         return false
       } finally {
         bump(-1)

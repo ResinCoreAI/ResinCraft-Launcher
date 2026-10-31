@@ -10,7 +10,7 @@ import { useDropTarget } from './DropImport'
 export const OPTIFINE_DOWNLOADS = 'https://optifine.net/downloads'
 
 /** OptiFine doesn't run on NeoForge. */
-export const optifineFits = (loader: LoaderType) => loader !== 'neoforge'
+export const optifineFits = (loader: LoaderType) => loader !== 'neoforge' && loader !== 'horizon'
 
 /** How OptiFine is set up for each loader, shown under the steps. */
 export function optifineHow(loader: LoaderType): string {

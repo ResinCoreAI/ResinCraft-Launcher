@@ -237,6 +237,11 @@ pub async fn all_releases(repo: &str) -> Result<Vec<Release>> {
     Ok(list.into_iter().filter(|r| !r.draft).collect())
 }
 
+/// A repository's ("owner/name") release by its tag.
+pub async fn release_of(repo: &str, tag: &str) -> Result<Release> {
+    get(&format!("/repos/{repo}/releases/tags/{}", enc(tag))).await
+}
+
 /// A release by its tag.
 pub async fn release(id: &str, tag: &str) -> Result<Release> {
     get(&format!("/repos/{}/releases/tags/{}", repo_of(id)?, enc(tag))).await
@@ -457,7 +462,7 @@ pub(crate) async fn install_into(inst: &Instance, task: &Task, idx: &mut Content
 
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, tag: Option<String>) -> Result<()> {
     let inst = instances::get(instance_id).await?;
-    if kind == ContentKind::Mod && inst.loader == LoaderType::Vanilla {
+    if kind == ContentKind::Mod && matches!(inst.loader, LoaderType::Vanilla | LoaderType::Horizon) {
         bail_tr!(
             "modrinth.vanillaInstance",
             "{name} is a vanilla instance. Mods need a mod loader such as Fabric or NeoForge; create a modded instance first.",

@@ -14,6 +14,8 @@ pub enum LoaderType {
     Forge,
     Neoforge,
     Liteloader,
+    /// Horizon's own client (game/horizon.rs): no Java, and its Minecraft version comes with the build.
+    Horizon,
 }
 
 impl LoaderType {
@@ -25,6 +27,7 @@ impl LoaderType {
             Self::Forge => "forge",
             Self::Neoforge => "neoforge",
             Self::Liteloader => "liteloader",
+            Self::Horizon => "horizon",
         }
     }
     /// Human name, for messages.
@@ -36,6 +39,7 @@ impl LoaderType {
             Self::Forge => "Forge",
             Self::Neoforge => "NeoForge",
             Self::Liteloader => "LiteLoader",
+            Self::Horizon => "Horizon",
         }
     }
 }
@@ -908,7 +912,7 @@ impl ServerKind {
     }
     pub fn from_loader(l: LoaderType) -> ServerKind {
         match l {
-            LoaderType::Vanilla | LoaderType::Liteloader => Self::Vanilla,
+            LoaderType::Vanilla | LoaderType::Liteloader | LoaderType::Horizon => Self::Vanilla,
             LoaderType::Fabric => Self::Fabric,
             LoaderType::Quilt => Self::Quilt,
             LoaderType::Forge => Self::Forge,

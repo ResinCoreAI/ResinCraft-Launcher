@@ -111,7 +111,7 @@ fn loader_name(l: LoaderType) -> &'static str {
         LoaderType::Quilt => "quilt",
         LoaderType::Forge | LoaderType::Liteloader => "forge",
         LoaderType::Neoforge => "neoforge",
-        LoaderType::Vanilla => "vanilla",
+        LoaderType::Vanilla | LoaderType::Horizon => "vanilla",
     }
 }
 

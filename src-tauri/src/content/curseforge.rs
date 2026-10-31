@@ -70,7 +70,7 @@ fn loader_id(l: LoaderType) -> Option<u32> {
         LoaderType::Quilt => Some(5),
         LoaderType::Neoforge => Some(6),
         LoaderType::Liteloader => Some(3),
-        LoaderType::Vanilla => None,
+        LoaderType::Vanilla | LoaderType::Horizon => None,
     }
 }
 
@@ -540,7 +540,7 @@ async fn install_file(inst: &Instance, kind: ContentKind, m: &CfMod, f: &CfFile,
 
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, version_id: Option<String>) -> Result<()> {
     let inst = instances::get(instance_id).await?;
-    if kind == ContentKind::Mod && inst.loader == LoaderType::Vanilla {
+    if kind == ContentKind::Mod && matches!(inst.loader, LoaderType::Vanilla | LoaderType::Horizon) {
         bail_tr!("curseforge.vanillaInstance", "{name} is a vanilla instance. Mods need a mod loader; create a modded instance first.", name = inst.name);
     }
     let project_id = project_id.to_string();

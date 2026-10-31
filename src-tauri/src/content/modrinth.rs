@@ -457,7 +457,7 @@ async fn install_version(inst: &Instance, kind: ContentKind, version: &MrVersion
 
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, version_id: Option<String>) -> Result<()> {
     let inst = instances::get(instance_id).await?;
-    if kind == ContentKind::Mod && inst.loader == LoaderType::Vanilla {
+    if kind == ContentKind::Mod && matches!(inst.loader, LoaderType::Vanilla | LoaderType::Horizon) {
         bail_tr!(
             "modrinth.vanillaInstance",
             "{name} is a vanilla instance. Mods need a mod loader such as Fabric or NeoForge; create a modded instance first.",

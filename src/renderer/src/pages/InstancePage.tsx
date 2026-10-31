@@ -67,6 +67,11 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
   const { instances, go, games, activeAccount } = useStore()
   const inst = instances.find((i) => i.id === id)
   const [tab, setTab] = useState<Tab>(initialTab ?? 'content')
+  // Horizon has its own mods: Fabric and Forge content doesn't run on it.
+  const horizon = inst?.loader === 'horizon'
+  useEffect(() => {
+    if (horizon && tab === 'content') setTab('worlds')
+  }, [horizon, tab])
   const [exporting, setExporting] = useState(false)
   const [editingPack, setEditingPack] = useState(false)
   const [copyingFrom, setCopyingFrom] = useState(false)
@@ -162,9 +167,11 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
       )}
 
       <div className="tabs" role="tablist">
-        <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>
-          <Blocks /> {t('instance.tab.content')}
-        </button>
+        {!horizon && (
+          <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>
+            <Blocks /> {t('instance.tab.content')}
+          </button>
+        )}
         <button className={tab === 'worlds' ? 'on' : ''} onClick={() => setTab('worlds')}>
           <Earth /> {t('instance.tab.worlds')}
         </button>
@@ -188,7 +195,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         </button>
       </div>
 
-      {tab === 'content' && <ContentTab key={copies} inst={inst} />}
+      {tab === 'content' && !horizon && <ContentTab key={copies} inst={inst} />}
       {tab === 'logs' && <LogsTab inst={inst} />}
       {tab === 'worlds' && <WorldsTab key={copies} inst={inst} />}
       {tab === 'servers' && <ServersTab inst={inst} />}
@@ -1079,7 +1086,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
 
       <OptifineSection inst={inst} />
 
-      <VersionSection inst={inst} />
+      {inst.loader === 'horizon' ? <p className="hint">{t('servers.horizon.instanceHint')}</p> : <VersionSection inst={inst} />}
 
       <RepairSection inst={inst} />
 

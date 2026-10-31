@@ -3,6 +3,7 @@
 pub mod commands;
 pub mod crashfix;
 pub mod forge;
+pub mod horizon;
 pub mod jarmods;
 pub mod java;
 pub mod launch;
