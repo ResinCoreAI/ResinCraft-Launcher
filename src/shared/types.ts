@@ -1372,6 +1372,29 @@ export interface AdminStatus {
   remembered?: boolean
 }
 
+/** What a scheduled task does. `keep`: how many of this task's own backups stay. */
+export type ScheduledAction = { kind: 'backup'; keep?: number | null } | { kind: 'restart' } | { kind: 'command'; command: string }
+
+/** When it runs, local time. `at`: "HH:MM"; `days`: 0 = Monday … 6 = Sunday. */
+export type ScheduledTiming = { kind: 'daily'; at: string } | { kind: 'weekly'; days: number[]; at: string } | { kind: 'hours'; every: number }
+
+export interface ScheduledTaskEdit {
+  /** Empty for a new task. */
+  id?: string
+  enabled: boolean
+  action: ScheduledAction
+  timing: ScheduledTiming
+}
+
+export interface ScheduledTask extends ScheduledTaskEdit {
+  id: string
+  lastRun?: { at: number; outcome: 'ok' | 'skipped' | 'failed'; message?: string | null } | null
+  /** The next run (ms); none while it's off. */
+  next?: number | null
+  /** Running, or waiting for the server's other task. */
+  running: boolean
+}
+
 /** One world backup zip (a server's or an instance's). */
 export interface BackupFile {
   file: string
@@ -2339,6 +2362,12 @@ export interface ResinApi {
     /** While it's off: the current world to the Recycle Bin, the backup's world in its place. */
     restoreBackup(id: string, file: string): Promise<void>
     deleteBackup(id: string, file: string): Promise<void>
+    /** Scheduled tasks (this PC only: the web console never reaches them). Each answers with the server's tasks. */
+    schedule(id: string): Promise<ScheduledTask[]>
+    scheduleSave(id: string, task: ScheduledTaskEdit): Promise<ScheduledTask[]>
+    scheduleDelete(id: string, taskId: string): Promise<ScheduledTask[]>
+    /** Starts it now; the result arrives like a scheduled run's. */
+    scheduleRun(id: string, taskId: string): Promise<ScheduledTask[]>
     /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
     regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
     /** Settings → Anti-cheat: Grim, for plugin servers. */

@@ -192,6 +192,7 @@ async fn run() -> Result<()> {
     remote::init().await;
     tokio::spawn(resincraft_lib::core::autobackup::init());
     tokio::spawn(server::clientfiles::init());
+    tokio::spawn(server::schedule::init());
     tokio::spawn(server::discordbot::init());
     #[cfg(unix)]
     tokio::spawn(async {

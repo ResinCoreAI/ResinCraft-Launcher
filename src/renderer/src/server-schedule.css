@@ -1,0 +1,55 @@
+/* A server's scheduled tasks (components/ServerSchedule.tsx). */
+.sv-sched-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sv-sched-head h3 {
+  flex: 1;
+}
+.sv-sched-empty {
+  color: var(--text-dim);
+}
+.sv-sched-row .text b {
+  overflow-wrap: anywhere;
+}
+.sv-sched-row .text span {
+  display: block;
+}
+.sv-sched-row .text .bad {
+  color: var(--danger);
+}
+.sv-sched-row.off .text b {
+  color: var(--text-dim);
+}
+.sv-sched-row .row {
+  flex: none;
+}
+.sv-sched-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sv-sched-form label,
+.sv-sched-form .field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-weight: 600;
+}
+.sv-sched-form label .input:not(.narrow) {
+  width: 100%;
+}
+.sv-sched-form .hint {
+  font-weight: 400;
+}
+.sv-sched-form .narrow {
+  width: 140px;
+}
+.sv-sched-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}

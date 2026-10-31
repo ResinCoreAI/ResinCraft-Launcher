@@ -25,6 +25,7 @@ pub mod properties;
 pub mod relay;
 pub mod requests;
 pub mod runtime;
+pub mod schedule;
 pub mod spark;
 pub mod store;
 pub mod tunnel;
@@ -88,10 +89,14 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             if runtime::is_running(&id) {
                 bail!("Stop the server before deleting it");
             }
+            if schedule::busy(&id) {
+                bail!("A scheduled task is running on this server. Try again when it's done.");
+            }
             let meta = store::get(&id).await?;
             let gone = id.clone();
             tokio::spawn(async move { listing::forget(&gone, &meta).await });
             runtime::forget_link(&id);
+            schedule::forget(&id);
             shell::trash(&store::dir(&id)?).await?;
             let _ = cloudflare::set_token(&id, None).await;
             requests::forget(&id).await;
@@ -251,6 +256,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "server:reinstallPack" => json(packs::reinstall_pack(&args.get::<String>(0)?).await?),
+        "server:schedule" | "server:scheduleSave" | "server:scheduleDelete" | "server:scheduleRun" => schedule::handle(channel, args).await,
         "server:backup" => json(runtime::backup(&args.get::<String>(0)?).await?),
         "server:backups" => json(runtime::list_backups(&args.get::<String>(0)?).await?),
         "server:restoreBackup" => {

@@ -30,6 +30,7 @@ import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
 import { mockDepCheck, mockDepInstall } from './mock-depcheck'
 import { mockRequests } from './mock-requests'
 import { mockBackups, mockServerList } from './mock-serverlist'
+import { mockSchedule, mockScheduleDelete, mockScheduleRun, mockScheduleSave } from './mock-schedule'
 
 type Listener<T> = (e: T) => void
 
@@ -637,6 +638,10 @@ export function mockServers(): {
     backups: (id) => wait(mockBackups('world').map((b) => ({ ...b, file: b.file }))),
     restoreBackup: () => wait(undefined, 1500),
     deleteBackup: () => wait(undefined, 300),
+    schedule: (id) => wait(mockSchedule(id)),
+    scheduleSave: (id, edit) => wait(mockScheduleSave(id, edit)),
+    scheduleDelete: (id, taskId) => wait(mockScheduleDelete(id, taskId)),
+    scheduleRun: (id, taskId) => wait(mockScheduleRun(id, taskId)),
     antiCheat: async (id) => ({ supported: find(id).type !== 'vanilla', installed: !!grim[id], enabled: !!grim[id] }),
     setAntiCheat: async (id, on) => {
       await wait(null, on ? 1600 : 500)

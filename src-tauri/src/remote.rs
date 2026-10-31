@@ -684,6 +684,9 @@ mod tests {
         assert!(no("server:start", json!(["smp"]), true).contains("can't do that"), "engine channel names aren't methods");
         assert!(no("server.openFolder", json!(["smp"]), true).contains("can't do that"));
         assert!(no("server.play", json!(["smp"]), true).contains("can't do that"));
+        for m in ["server.schedule", "server.scheduleSave", "server.scheduleDelete", "server.scheduleRun"] {
+            assert!(no(m, json!(["smp"]), true).contains("can't do that"), "scheduled tasks stay on this PC");
+        }
         let file = json!([{ "name": "x", "source": { "kind": "file", "path": "C:/evil.zip" } }]);
         assert!(no("server.create", file, true).contains("not from a file"));
         assert!(no("server.sparkRun", json!(["smp"]), true).contains("can't do that"), "lag reports stay on this PC");

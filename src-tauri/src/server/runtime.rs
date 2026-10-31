@@ -1644,6 +1644,7 @@ pub async fn wait_state(id: &str, states: &[&str], timeout: Duration) -> Result<
 
 /// Stops every running server (used when the launcher quits): `stop` first, then kill whatever is left.
 pub async fn shutdown_all(grace: Duration) {
+    super::schedule::halt();
     let ids = running_ids();
     if ids.is_empty() {
         return;

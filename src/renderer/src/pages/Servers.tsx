@@ -10,6 +10,7 @@ import { RemotePcBanner, RemotePcPicker, useRemotePc } from '../components/Remot
 import { remoteMemoryMb } from '../remotePc'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
+import ServerSchedule from '../components/ServerSchedule'
 import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import MigrateModal from '../components/MigrateModal'
@@ -1579,6 +1580,8 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
         </div>
       </div>
       {restoring && <RestoreModal target={{ kind: 'server', id: s.id, name: s.name, running: s.state !== 'stopped' && s.state !== 'crashed' }} onClose={() => setRestoring(false)} />}
+
+      {!isConsole && !pc && <ServerSchedule s={s} proxy={isProxy(s)} />}
 
       <div className="settings-section">
         <h3>{t('servers.settings.dangerZone')}</h3>

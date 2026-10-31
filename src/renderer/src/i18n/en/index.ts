@@ -21,6 +21,7 @@ import menu from './menu'
 import migrate from './migrate'
 import quickjoin from './quickjoin'
 import reinstall from './reinstall'
+import schedule from './schedule'
 import servers from './servers'
 import settings from './settings'
 import storage from './storage'
@@ -46,6 +47,7 @@ const en = {
   ...menu,
   ...migrate,
   ...servers,
+  ...schedule,
   ...depcheck,
   ...graphs,
   ...admin,
