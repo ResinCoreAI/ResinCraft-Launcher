@@ -466,7 +466,7 @@ export default {
   'servers.settings.flagsNone': "This server's modpack doesn't set any Java flags, so ResinCraft's are used either way.",
   'servers.settings.flagsResin': 'ResinCraft',
   'servers.settings.flagsModpack': 'Modpack',
-  'servers.settings.optimizedHint': "Aikar's tuned garbage-collector flags: smoother ticks and fewer lag spikes. All the memory is reserved at start.",
+  'servers.settings.optimizedHint': "Aikar's tuned garbage-collector flags: smoother ticks and fewer lag spikes.",
   'servers.settings.command': 'Startup command',
   'servers.settings.commandHint': 'What runs on the next start (read only).',
   'servers.settings.commandRunning': 'What runs on the next start (read only). Changes apply after a restart.',

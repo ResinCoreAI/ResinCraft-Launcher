@@ -1716,7 +1716,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'Đang ghi tệp zip…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'Cờ khởi động tối ưu',
-  'servers.settings.optimizedHint': 'Bộ cờ thu gom rác do Aikar tinh chỉnh: tick mượt hơn, ít giật lag hơn. Toàn bộ bộ nhớ được cấp ngay khi khởi động.',
+  'servers.settings.optimizedHint': 'Bộ cờ thu gom rác do Aikar tinh chỉnh: tick mượt hơn, ít giật lag hơn.',
   'servers.settings.command': 'Lệnh khởi động',
   'servers.settings.commandHint': 'Lệnh sẽ chạy ở lần khởi động tới (chỉ đọc).',
   'servers.settings.commandRunning': 'Lệnh sẽ chạy ở lần khởi động tới (chỉ đọc). Thay đổi có hiệu lực sau khi khởi động lại.',

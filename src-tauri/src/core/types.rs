@@ -1056,7 +1056,7 @@ pub struct ServerMeta {
     /// Open the port on the router automatically (UPnP) while the server runs.
     #[serde(default = "yes")]
     pub public: bool,
-    /// Start Java with Aikar's tuned G1GC flags (and -Xms = -Xmx).
+    /// Start Java with Aikar's tuned G1GC flags.
     #[serde(default = "yes")]
     pub optimized_flags: bool,
     /// Whitelist requests through the host's Discord bot or the relay's web page (server/requests.rs).

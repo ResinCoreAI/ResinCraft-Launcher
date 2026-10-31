@@ -1706,7 +1706,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': '正在写入 zip…',
   // Server hosting: startup flags
   'servers.settings.optimized': '优化的启动参数',
-  'servers.settings.optimizedHint': 'Aikar 调校的垃圾回收参数：tick 更平稳，卡顿更少。启动时会预先分配全部内存。',
+  'servers.settings.optimizedHint': 'Aikar 调校的垃圾回收参数：tick 更平稳，卡顿更少。',
   'servers.settings.command': '启动命令',
   'servers.settings.commandHint': '下次启动时运行的命令（只读）。',
   'servers.settings.commandRunning': '下次启动时运行的命令（只读）。更改将在重启后生效。',

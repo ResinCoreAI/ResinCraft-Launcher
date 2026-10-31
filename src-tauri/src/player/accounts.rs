@@ -591,7 +591,10 @@ pub async fn begin_microsoft_window_login() -> Result<bool> {
     let (tx, rx) = tokio::sync::oneshot::channel::<Option<Result<String>>>();
     let tx = Arc::new(Mutex::new(Some(tx)));
     let nav_tx = tx.clone();
-    let window = WebviewWindowBuilder::new(app, LOGIN_WINDOW, WebviewUrl::External(url.parse()?))
+    let builder = WebviewWindowBuilder::new(app, LOGIN_WINDOW, WebviewUrl::External(url.parse()?));
+    #[cfg(windows)]
+    let builder = builder.additional_browser_args(crate::webview::BROWSER_ARGS);
+    let window = builder
         .title(crate::tr!("accounts.loginWindow", "Sign in with Microsoft").to_string())
         .inner_size(500.0, 680.0)
         .center()

@@ -1708,7 +1708,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'กำลังเขียนไฟล์ zip…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'แฟล็กเริ่มต้นที่ปรับแต่งแล้ว',
-  'servers.settings.optimizedHint': 'แฟล็ก Garbage Collector ที่ Aikar ปรับไว้: tick ลื่นขึ้นและแลคน้อยลง จองหน่วยความจำทั้งหมดตั้งแต่เริ่ม',
+  'servers.settings.optimizedHint': 'แฟล็ก Garbage Collector ที่ Aikar ปรับไว้: tick ลื่นขึ้นและแลคน้อยลง',
   'servers.settings.command': 'คำสั่งเริ่มต้น',
   'servers.settings.commandHint': 'สิ่งที่จะรันเมื่อเริ่มครั้งถัดไป (อ่านอย่างเดียว)',
   'servers.settings.commandRunning': 'สิ่งที่จะรันเมื่อเริ่มครั้งถัดไป (อ่านอย่างเดียว) การเปลี่ยนแปลงมีผลหลังรีสตาร์ท',

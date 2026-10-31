@@ -1764,7 +1764,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'Écriture du zip…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'Paramètres de démarrage optimisés',
-  'servers.settings.optimizedHint': 'Les réglages du ramasse-miettes d’Aikar : des ticks plus réguliers et moins de lag. Toute la mémoire est réservée au démarrage.',
+  'servers.settings.optimizedHint': 'Les réglages du ramasse-miettes d’Aikar : des ticks plus réguliers et moins de lag.',
   'servers.settings.command': 'Commande de démarrage',
   'servers.settings.commandHint': 'Ce qui sera lancé au prochain démarrage (lecture seule).',
   'servers.settings.commandRunning': 'Ce qui sera lancé au prochain démarrage (lecture seule). Les changements s’appliquent après un redémarrage.',

@@ -114,8 +114,9 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
                     "hide" => {
                         let _ = win.hide();
                     }
-                    _ => {}
+                    _ => return,
                 }
+                low_memory(true);
             }
         })),
         on_exit: Some(Box::new(move |_code| {
@@ -126,6 +127,7 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
                 if let Some(win) = main_window() {
                     let _ = win.show();
                     let _ = win.unminimize();
+                    low_memory(false);
                 }
             }
         })),
@@ -135,6 +137,11 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
 
 fn main_window() -> Option<tauri::WebviewWindow> {
     ctx::app()?.get_webview_window("main")
+}
+
+/// Out of sight while a game runs: the launcher gives its memory back to the game.
+fn low_memory(low: bool) {
+    crate::webview::set_low_memory(low);
 }
 
 /// Ids of instances whose game is currently running.

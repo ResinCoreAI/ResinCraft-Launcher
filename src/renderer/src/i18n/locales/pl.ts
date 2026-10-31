@@ -1783,7 +1783,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'Zapisywanie archiwum zip…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'Zoptymalizowane flagi uruchamiania',
-  'servers.settings.optimizedHint': 'Dostrojone flagi odśmiecacza pamięci od Aikara: płynniejsze ticki i mniej lagów. Cała pamięć jest rezerwowana przy starcie.',
+  'servers.settings.optimizedHint': 'Dostrojone flagi odśmiecacza pamięci od Aikara: płynniejsze ticki i mniej lagów.',
   'servers.settings.command': 'Polecenie uruchamiania',
   'servers.settings.commandHint': 'To zostanie uruchomione przy następnym starcie (tylko do odczytu).',
   'servers.settings.commandRunning': 'To zostanie uruchomione przy następnym starcie (tylko do odczytu). Zmiany zadziałają po ponownym uruchomieniu.',

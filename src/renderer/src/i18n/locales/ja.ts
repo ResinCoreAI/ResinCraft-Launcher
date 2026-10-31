@@ -1714,7 +1714,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'zipを書き込み中…',
   // Server hosting: startup flags
   'servers.settings.optimized': '最適化された起動フラグ',
-  'servers.settings.optimizedHint': 'Aikar が調整した GC フラグ：ティックが安定し、ラグが減ります。起動時にメモリをすべて確保します。',
+  'servers.settings.optimizedHint': 'Aikar が調整した GC フラグ：ティックが安定し、ラグが減ります。',
   'servers.settings.command': '起動コマンド',
   'servers.settings.commandHint': '次回の起動で実行される内容です（読み取り専用）。',
   'servers.settings.commandRunning': '次回の起動で実行される内容です（読み取り専用）。変更は再起動後に反映されます。',

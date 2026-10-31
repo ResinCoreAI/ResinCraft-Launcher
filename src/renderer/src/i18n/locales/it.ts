@@ -1752,7 +1752,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'Scrittura dello zip…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'Parametri di avvio ottimizzati',
-  'servers.settings.optimizedHint': 'I parametri del garbage collector ottimizzati da Aikar: tick più regolari e meno lag. Tutta la memoria viene riservata all’avvio.',
+  'servers.settings.optimizedHint': 'I parametri del garbage collector ottimizzati da Aikar: tick più regolari e meno lag.',
   'servers.settings.command': 'Comando di avvio',
   'servers.settings.commandHint': 'Ciò che viene eseguito al prossimo avvio (sola lettura).',
   'servers.settings.commandRunning': 'Ciò che viene eseguito al prossimo avvio (sola lettura). Le modifiche valgono dopo un riavvio.',

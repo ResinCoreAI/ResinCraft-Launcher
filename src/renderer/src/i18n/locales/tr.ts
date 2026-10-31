@@ -1729,7 +1729,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'Zip yazılıyor…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'Optimize başlatma bayrakları',
-  'servers.settings.optimizedHint': "Aikar'ın ayarladığı çöp toplayıcı bayrakları: daha düzgün tick'ler ve daha az takılma. Tüm bellek başlangıçta ayrılır.",
+  'servers.settings.optimizedHint': "Aikar'ın ayarladığı çöp toplayıcı bayrakları: daha düzgün tick'ler ve daha az takılma.",
   'servers.settings.command': 'Başlatma komutu',
   'servers.settings.commandHint': 'Bir sonraki başlatmada çalışacak komut (salt okunur).',
   'servers.settings.commandRunning': 'Bir sonraki başlatmada çalışacak komut (salt okunur). Değişiklikler yeniden başlatınca geçerli olur.',

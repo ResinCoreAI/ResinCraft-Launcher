@@ -1577,7 +1577,7 @@ export interface ServerInfo {
   launch: { jar?: string; argsFile?: string; exe?: string }
   /** Open the port on the router automatically while running. */
   public: boolean
-  /** Start with Aikar's tuned G1GC flags (-Xms = -Xmx). */
+  /** Start with Aikar's tuned G1GC flags. */
   optimizedFlags: boolean
   /** Start with the server pack's own Java flags instead of ResinCraft's (ResinCraft's when the pack sets none). */
   packFlags?: boolean

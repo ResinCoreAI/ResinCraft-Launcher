@@ -612,8 +612,8 @@ export function mockServers(): {
         ? pack
         : s.optimizedFlags
         ? [
-            `-Xms${mem}`,
             `-Xmx${mem}`,
+            '-Xms1024M',
             '-XX:+UseG1GC',
             '-XX:+ParallelRefProcEnabled',
             '-XX:MaxGCPauseMillis=200',

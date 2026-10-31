@@ -1776,7 +1776,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'Запись zip-архива…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'Оптимизированные флаги запуска',
-  'servers.settings.optimizedHint': 'Флаги сборщика мусора от Aikar: более ровные тики и меньше лагов. Вся память выделяется сразу при запуске.',
+  'servers.settings.optimizedHint': 'Флаги сборщика мусора от Aikar: более ровные тики и меньше лагов.',
   'servers.settings.command': 'Команда запуска',
   'servers.settings.commandHint': 'Что будет запущено при следующем старте (только чтение).',
   'servers.settings.commandRunning': 'Что будет запущено при следующем старте (только чтение). Изменения вступят в силу после перезапуска.',

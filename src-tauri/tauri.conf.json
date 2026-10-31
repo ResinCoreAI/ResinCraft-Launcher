@@ -22,6 +22,7 @@
         "backgroundColor": "#0a0912",
         "dragDropEnabled": true,
         "center": true,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --js-flags=--optimize-for-size",
         "maximized": true
       }
     ],

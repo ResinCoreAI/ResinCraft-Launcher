@@ -1709,7 +1709,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'zip 쓰는 중…',
   // Server hosting: startup flags
   'servers.settings.optimized': '최적화된 시작 플래그',
-  'servers.settings.optimizedHint': 'Aikar가 조정한 가비지 컬렉터 플래그: 틱이 더 안정적이고 렉이 줄어듭니다. 시작할 때 메모리를 모두 확보합니다.',
+  'servers.settings.optimizedHint': 'Aikar가 조정한 가비지 컬렉터 플래그: 틱이 더 안정적이고 렉이 줄어듭니다.',
   'servers.settings.command': '시작 명령',
   'servers.settings.commandHint': '다음 시작 때 실행되는 명령입니다(읽기 전용).',
   'servers.settings.commandRunning': '다음 시작 때 실행되는 명령입니다(읽기 전용). 변경 사항은 재시작 후 적용됩니다.',

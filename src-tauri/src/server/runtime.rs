@@ -252,6 +252,11 @@ async fn collect_downloads(meta: &ServerMeta, dir: &Path, notes: &mut Vec<String
     got.remaining
 }
 
+/// The heap starts small and grows when the server needs it: same tick times, far less RAM on a quiet server.
+fn heap_flags(memory_mb: u32) -> Vec<String> {
+    vec![format!("-Xmx{memory_mb}M"), format!("-Xms{}M", memory_mb.min(1024))]
+}
+
 /// The Java arguments a server starts with: memory, optimised flags (if on), the player's own JVM arguments
 /// (after ours, so they can override), then the server jar or @argument file and `nogui`.
 pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
@@ -265,11 +270,11 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
         }
         a
     } else if meta.optimized_flags {
-        let mut a = vec![format!("-Xms{memory}M"), format!("-Xmx{memory}M")];
+        let mut a = heap_flags(memory);
         a.extend(optimized_flags(memory));
         a
     } else {
-        vec![format!("-Xmx{memory}M"), format!("-Xms{}M", memory.min(1024))]
+        heap_flags(memory)
     };
     // A Thai system locale makes Java write Buddhist-era years (2569) in the server's logs and file dates; the
     // player's own JVM arguments, added after, can still set another locale.
@@ -1684,6 +1689,17 @@ async fn zip_worlds(dir: PathBuf, worlds: Vec<String>, target: PathBuf) -> Resul
     Ok(())
 }
 
+
+#[cfg(test)]
+mod heap_tests {
+    use super::heap_flags;
+
+    #[test]
+    fn the_heap_starts_at_a_gigabyte_at_most() {
+        assert_eq!(heap_flags(4096), ["-Xmx4096M", "-Xms1024M"]);
+        assert_eq!(heap_flags(768), ["-Xmx768M", "-Xms768M"]);
+    }
+}
 
 #[cfg(test)]
 mod restore_tests {

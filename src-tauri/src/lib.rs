@@ -26,6 +26,7 @@ pub mod server;
 pub mod remote;
 pub mod remoteview;
 pub mod tray;
+pub mod webview;
 pub mod updater;
 
 use serde_json::Value;
@@ -76,6 +77,12 @@ pub fn run() {
         .expect("error while running ResinCraft")
         .run(|app, event| {
             // Tray mode: the close button hides the window; ResinCraft goes on in the background.
+            // Looked at again (from the tray, or the taskbar while a game runs): back to normal memory.
+            if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } = &event {
+                if label == "main" {
+                    webview::set_low_memory(false);
+                }
+            }
             if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::CloseRequested { api, .. }, .. } = &event {
                 // Only the launcher itself goes to the tray; other windows (sign-in, relay dashboard) really close.
                 if label == "main" && core::settings::tray_on() && !tray::quitting() {
@@ -83,6 +90,7 @@ pub fn run() {
                     if let Some(w) = app.get_webview_window(label) {
                         let _ = w.hide();
                     }
+                    webview::set_low_memory(true);
                     return;
                 }
             }

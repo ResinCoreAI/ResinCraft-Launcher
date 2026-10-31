@@ -1719,7 +1719,7 @@ const dict: Dict = {
   'engine.worlds.writingZip': 'Menulis zip…',
   // Server hosting: startup flags
   'servers.settings.optimized': 'Flag startup yang dioptimalkan',
-  'servers.settings.optimizedHint': 'Flag garbage collector racikan Aikar: tick lebih stabil dan lebih sedikit lag. Semua memori dipesan saat mulai.',
+  'servers.settings.optimizedHint': 'Flag garbage collector racikan Aikar: tick lebih stabil dan lebih sedikit lag.',
   'servers.settings.command': 'Perintah startup',
   'servers.settings.commandHint': 'Yang dijalankan saat mulai berikutnya (hanya baca).',
   'servers.settings.commandRunning': 'Yang dijalankan saat mulai berikutnya (hanya baca). Perubahan berlaku setelah restart.',
