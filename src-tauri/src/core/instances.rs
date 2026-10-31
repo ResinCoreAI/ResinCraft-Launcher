@@ -58,6 +58,10 @@ fn random_hex(bytes: usize) -> String {
 
 /// Creates an instance folder and metadata. `extra` can fill in fields like icon or modpack info.
 pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Result<Instance> {
+    let mut data = data;
+    if data.loader == LoaderType::Horizon {
+        data.mc_version = crate::game::horizon::minecraft().await?;
+    }
     let name = if data.name.trim().is_empty() { format!("Minecraft {}", data.mc_version) } else { data.name.trim().to_string() };
     let id = format!("{}-{}", slugify(&name), random_hex(3));
     let loader_version = match (data.loader, data.loader_version) {
@@ -130,7 +134,7 @@ pub async fn set_version(id: &str, mc_version: &str, loader: LoaderType, loader_
         return Err(err_tr!("instances.closeToChangeVersion", "Close the game before changing its version."));
     }
     let mut inst = get(id).await?;
-    let mc = mc_version.trim().to_string();
+    let mc = if loader == LoaderType::Horizon { crate::game::horizon::minecraft().await? } else { mc_version.trim().to_string() };
     let loader_version = match (loader, loader_version.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())) {
         (LoaderType::Vanilla, _) => None,
         (l, Some(v)) => Some(crate::game::loaders::normalize_loader_version(l, &mc, &v)),

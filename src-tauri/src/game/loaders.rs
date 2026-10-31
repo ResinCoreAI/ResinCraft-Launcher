@@ -52,6 +52,11 @@ fn prerelease_re() -> regex::Regex {
 pub async fn loader_versions(loader: LoaderType, mc_version: &str) -> Result<Vec<LoaderVersion>> {
     match loader {
         LoaderType::Vanilla => Ok(Vec::new()),
+        // One build at a time, for the one Minecraft version it's pinned to.
+        LoaderType::Horizon => {
+            let pinned = super::horizon::minecraft().await?;
+            Ok(if pinned == mc_version { vec![LoaderVersion { version: super::horizon::NIGHTLY.to_string(), stable: true }] } else { Vec::new() })
+        }
         LoaderType::Forge => forge_versions(mc_version).await,
         LoaderType::Neoforge => neoforge_versions(mc_version).await,
         LoaderType::Liteloader => super::liteloader::versions(mc_version).await,

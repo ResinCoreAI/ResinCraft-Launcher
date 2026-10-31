@@ -590,7 +590,7 @@ export function mockApi(): ResinApi {
     bedrock: mockBedrock(now),
     friends: friends.friends,
     horizon: {
-      status: async () => ({ supported: true, installed: null, latest: '0.2.30' }),
+      status: async () => ({ supported: true, minecraft: '26.3', installed: null, latest: '0.2.30' }),
       install: async () => '0.2.30',
       open: async () => undefined
     },

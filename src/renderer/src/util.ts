@@ -7,7 +7,8 @@ export const LOADER_LABEL: Record<LoaderType, string> = {
   quilt: 'Quilt',
   forge: 'Forge',
   neoforge: 'NeoForge',
-  liteloader: 'LiteLoader'
+  liteloader: 'LiteLoader',
+  horizon: 'Horizon'
 }
 
 export const COLORS = ['#b26bff', '#22d3ee', '#39e58c', '#6d7bff', '#f472b6', '#2dd4bf', '#a3e635', '#fb7185']

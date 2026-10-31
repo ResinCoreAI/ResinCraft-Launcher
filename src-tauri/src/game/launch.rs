@@ -150,6 +150,12 @@ pub async fn reinstall(id: &str) -> Result<()> {
     let inst = instances::get(id).await?;
     let settings = crate::core::settings::get().await;
     crate::core::net::forget_all_verified().await;
+    if inst.loader == LoaderType::Horizon {
+        super::horizon::check_owner(&crate::player::accounts::launch_auth_for(None).await?)?;
+        super::horizon::forget_builds().await;
+        let title = tr!("reinstall.instance", "Reinstalling {name}", name = inst.name);
+        return Task::run(title, Some(id.to_string()), |t| async move { super::horizon::ensure_build(Some(inst.id.clone()), &t).await.map(|_| ()) }).await;
+    }
     // The loader's own install record (Forge/NeoForge `installed.json`, Fabric/Quilt `profile.json`) and the game's
     // version files: both are fetched again. A file another running game has open is left as it is.
     let versions = paths::versions();
@@ -728,6 +734,10 @@ pub async fn launch_instance(id: &str, settings: &Settings, auth: LaunchAuth, ho
 /// The instance can already be running with other accounts; each run gets its own log and state (see `Run`).
 pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth, hooks: LaunchHooks, target: Option<&Target>) -> Result<()> {
     let inst = instances::get(id).await?;
+    let horizon = inst.loader == LoaderType::Horizon;
+    if horizon {
+        super::horizon::check_owner(&auth)?;
+    }
     let slot = reserve(id, &auth)?;
     let run = RunInfo { instance_id: id.to_string(), run_id: run_id(id, slot), account_id: auth.account_id.clone(), username: auth.username.clone() };
     game_event(&run, "preparing", None, None);
@@ -738,13 +748,26 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         tr!("launch.preparingAs", "Preparing {name} for {player}", name = inst.name, player = auth.username)
     };
     let natives = natives_for(id, slot);
-    let prepared = Task::run(title, Some(id.to_string()), |t| {
-        let (inst, settings, natives) = (inst.clone(), settings.clone(), natives.clone());
-        async move { prepare(&inst, &settings, natives, &t).await }
-    })
-    .await
-    .and_then(|p| build_args(&inst, settings, &p, &auth, target).map(|args| (p, args)));
-    let (prepared, args) = match prepared {
+    let prepared = if horizon {
+        Task::run(title, Some(id.to_string()), |t| {
+            let (inst, width, height) = (inst.clone(), settings.game_width, settings.game_height);
+            async move { super::horizon::prepare_launch(&inst, width, height, target, &t).await }
+        })
+        .await
+        // Horizon runs no Java, so no Java version picks the memory flags shown to commands.
+        .map(|(java, args)| (java, args, 0))
+    } else {
+        Task::run(title, Some(id.to_string()), |t| {
+            let (inst, settings, natives) = (inst.clone(), settings.clone(), natives.clone());
+            async move { prepare(&inst, &settings, natives, &t).await }
+        })
+        .await
+        .and_then(|p| {
+            let major = p.version.java_major();
+            build_args(&inst, settings, &p, &auth, target).map(|args| (p.java, args, major))
+        })
+    };
+    let (java, args, java_major) = match prepared {
         Ok(p) => p,
         Err(e) => {
             release(id, slot);
@@ -803,12 +826,12 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     if slot > 1 {
         push(LogLine { text: format!("Playing as {} alongside another run of this instance (run {slot})", auth.username), level: "info" });
     }
-    push(LogLine { text: format!("Java: {}", prepared.java), level: "info" });
+    push(LogLine { text: format!("{}: {java}", if horizon { "Horizon" } else { "Java" }), level: "info" });
     push(LogLine { text: format!("Command: {}", shown.join(" ")), level: "debug" });
 
     let own = commands::effective(settings, &inst);
     let env = commands::merged_env(settings, &inst);
-    let vars = commands::command_vars(&inst, &prepared.java, &memory_and_user_flags(&inst, settings, prepared.version.java_major()), &env);
+    let vars = commands::command_vars(&inst, &java, &memory_and_user_flags(&inst, settings, java_major), &env);
     if !env.is_empty() {
         push(LogLine { text: format!("Environment: {}", commands::shown_env(&env)), level: "info" });
     }
@@ -861,7 +884,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     }
 
     let wrapper = own.wrapper.trim().to_string();
-    let (program, program_args) = if wrapper.is_empty() { (prepared.java.clone(), args.clone()) } else { commands::wrapped(&wrapper, &prepared.java, &args, &vars) };
+    let (program, program_args) = if wrapper.is_empty() { (java.clone(), args.clone()) } else { commands::wrapped(&wrapper, &java, &args, &vars) };
     if !wrapper.is_empty() {
         push(LogLine { text: format!("Wrapper: {wrapper}"), level: "info" });
     }
@@ -869,7 +892,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     cmd.args(&program_args)
         .envs(vars.iter().map(|(k, v)| (k, v)))
         .current_dir(&game_dir)
-        .stdin(std::process::Stdio::null())
+        .stdin(if horizon { std::process::Stdio::piped() } else { std::process::Stdio::null() })
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     // Stop has to reach Java behind the wrapper too: give them a process group of their own.
@@ -884,9 +907,16 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
             if !wrapper.is_empty() {
                 bail_tr!("commands.wrapperStartFailed", "Couldn't start the wrapper command ({program}): {error}", program = program, error = e.to_string());
             }
-            bail_tr!("launch.javaStartFailed", "Couldn't start Java ({java}): {error}", java = prepared.java, error = e.to_string());
+            bail_tr!("launch.javaStartFailed", "Couldn't start Java ({java}): {error}", java = java, error = e.to_string());
         }
     };
+    // Horizon's session goes in on its standard input, so the token is never on a command line.
+    if let Some(mut stdin) = child.stdin.take() {
+        use tokio::io::AsyncWriteExt;
+        let session = super::horizon::session_json(&auth);
+        let _ = stdin.write_all(session.as_bytes()).await;
+        let _ = stdin.shutdown().await;
+    }
     let (kill_tx, mut kill_rx) = mpsc::unbounded_channel::<()>();
     let (pid, max_mb) = (child.id(), inst.memory_mb.unwrap_or(settings.memory_mb));
     running(|m| {

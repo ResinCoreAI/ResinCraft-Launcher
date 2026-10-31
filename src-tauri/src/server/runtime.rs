@@ -161,7 +161,7 @@ fn patterns() -> &'static Patterns {
     P.get_or_init(|| Patterns {
         ansi: Regex::new(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[()][A-Za-z0-9]").unwrap(),
         // The last ones: Velocity, BungeeCord, Glowstone and Cuberite.
-        done: Regex::new(r#"Done \(\d+[.,]?\d*m?s\)! For help, type|INFO\] Server started\.|INFO\]:? Listening on /|Ready for connections|Started server; took|INFO \] Binding to /|Startup complete"#).unwrap(),
+        done: Regex::new(r#"Done \(\d+[.,]?\d*m?s\)!|INFO\] Server started\.|INFO\]:? Listening on /|Ready for connections|Started server; took|INFO \] Binding to /|Startup complete"#).unwrap(),
         joined: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) joined the game\s*$").unwrap(),
         left: Regex::new(r"(?:\]|INFO)\]?: ([A-Za-z0-9_.]{1,17}) left the game\s*$").unwrap(),
         player_name: Regex::new(r"^[A-Za-z0-9_.]{1,17}$").unwrap(),
@@ -470,6 +470,7 @@ pub async fn start(id: &str) -> Result<()> {
         emit_state(id, None);
         e
     };
+    installers::refresh_horizon(&meta, &dir).await;
     let program = match &meta.launch.exe {
         Some(exe) => crate::game::mojang::plain(&crate::core::fsutil::safe_join(&dir, exe)?),
         _ => installers::choose_java(&meta).await.map_err(fail)?,

@@ -25,6 +25,8 @@ const VERSION_FILE: &str = "version.txt";
 struct Status {
     /// Horizon publishes a launcher for this computer.
     supported: bool,
+    /// The Minecraft version Horizon plays now; a new Horizon instance gets it.
+    minecraft: Option<String>,
     installed: Option<String>,
     /// None when the release list can't be read.
     latest: Option<String>,
@@ -60,7 +62,7 @@ async fn latest() -> Result<github::Release> {
 async fn status() -> Status {
     let installed = tokio::fs::read_to_string(folder().join(VERSION_FILE)).await.ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
     let latest = latest().await.ok().and_then(|r| launcher_version(&r.tag_name).map(str::to_string));
-    Status { supported: this_computer().is_some(), installed, latest }
+    Status { supported: this_computer().is_some(), minecraft: crate::game::horizon::minecraft().await.ok(), installed, latest }
 }
 
 /// The newest Horizon launcher, replacing the one there. Returns its version.

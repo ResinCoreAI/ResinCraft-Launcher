@@ -49,6 +49,12 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const [lite, setLite] = useState(false)
   const [liteVersion, setLiteVersion] = useState<string | null>()
 
+  // Horizon plays one Minecraft version, the one its build is pinned to.
+  useEffect(() => {
+    if (loader !== 'horizon') return
+    api.horizon.status().then((s) => s.minecraft && setMc(s.minecraft), () => undefined)
+  }, [loader])
+
   useEffect(() => {
     api.versions
       .list()
@@ -320,11 +326,14 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
                     { value: 'quilt', label: 'Quilt' },
                     { value: 'forge', label: 'Forge' },
                     { value: 'neoforge', label: 'NeoForge' },
-                    { value: 'liteloader', label: 'LiteLoader' }
+                    { value: 'liteloader', label: 'LiteLoader' },
+                    { value: 'horizon', label: 'Horizon' }
                   ]}
                 />
                 <span className="hint">
-                  {loader === 'vanilla'
+                  {loader === 'horizon'
+                    ? t('servers.horizon.instanceHint')
+                    : loader === 'vanilla'
                     ? t('newInstance.vanillaHint')
                     : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', {
                         loader: LOADER_LABEL[loader]
@@ -349,7 +358,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
                     </div>
                   )}
                   {shown.map((v) => (
-                    <button key={v.id} className={v.id === mc ? 'on' : ''} onClick={() => setMc(v.id)}>
+                    <button key={v.id} className={v.id === mc ? 'on' : ''} disabled={loader === 'horizon'} onClick={() => setMc(v.id)}>
                       {v.id}
                       {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
                       <span className="date">

@@ -124,6 +124,7 @@ export default {
   'servers.horizon.notInstalled': "Horizon's launcher isn't installed yet.",
   'servers.horizon.installed': "Horizon's launcher {version} is installed.",
   'servers.horizon.needs': "It needs Minecraft: Java Edition 26.3, played once, and prepares itself from those files. Microsoft sign-in doesn't work in it yet, so it's single player and offline servers.",
+  'servers.horizon.instanceHint': "Horizon's own client, with its Minecraft version. It needs a Microsoft account that owns Java Edition.",
   'servers.horizon.install': 'Install Horizon',
   'servers.horizon.open': 'Open Horizon',
   'servers.horizon.update': 'Update to {version}',
