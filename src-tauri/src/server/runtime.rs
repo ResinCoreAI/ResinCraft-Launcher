@@ -573,7 +573,7 @@ pub async fn start(id: &str) -> Result<()> {
         move |l: LogLine| {
             let text = patterns().ansi.replace_all(&l.text, "").trim_end().to_string();
             let text = text.trim_start_matches("> ").to_string();
-            if text.trim().is_empty() || super::metrics::hide_line(&id, &text) {
+            if text.trim().is_empty() || super::metrics::hide_line(&id, &text) || super::commands::hide_line(&id, &text) {
                 return;
             }
             let line = LogLine { text: text.clone(), level: l.level };
@@ -586,7 +586,11 @@ pub async fn start(id: &str) -> Result<()> {
             });
             pending.lock().unwrap().push(line);
             let _ = lines_tx.send(text.clone());
-            if on_line(&id, &text) && public {
+            let ready = on_line(&id, &text);
+            if ready {
+                super::commands::on_ready(&id);
+            }
+            if ready && public {
                 tokio::spawn(open_internet(id.clone()));
             }
         }
@@ -1562,6 +1566,7 @@ pub fn command(id: &str, cmd: &str) -> Result<()> {
         emit("serverLog", ServerLogEvent { server_id: id.to_string(), lines: vec![note] });
         return Ok(());
     }
+    super::commands::note_typed(id);
     sender(id)?.send(cmd.to_string()).map_err(|_| anyhow!("The server isn't accepting commands"))?;
     let echo = LogLine { text: format!("> {cmd}"), level: "debug" };
     with(|w| w.logs.entry(id.to_string()).or_default().push_back(echo.clone()));

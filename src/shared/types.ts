@@ -1150,6 +1150,32 @@ export interface ServerMetrics {
   tpsAvailable: boolean
 }
 
+export interface ConsoleCommand {
+  /** Without the slash; `luckperms:lp` when that is how the server lists it. */
+  name: string
+  /** The plugin, mod or game; none when it can't be told. */
+  source?: string | null
+  sourceKind: 'minecraft' | 'server' | 'plugin' | 'mod' | 'proxy' | 'other'
+  usage?: string | null
+  description?: string | null
+  aliases: string[]
+  /** From the launcher's short list, not from this server or its files. */
+  builtIn: boolean
+}
+
+export interface ConsoleCommandList {
+  commands: ConsoleCommand[]
+  /** When the server last answered (Unix ms). */
+  liveAt?: number | null
+  /** The answer is from the run going on now. */
+  current: boolean
+  /** A question is out or about to be: look again soon. */
+  asking: boolean
+  canAsk: boolean
+  /** Why Refresh did not ask. */
+  refused?: 'stopped' | 'players' | 'wait' | 'unsupported' | null
+}
+
 export interface SparkReport {
   state: 'starting' | 'profiling' | 'uploading' | 'done' | 'failed'
   startedAt: number
@@ -2322,6 +2348,10 @@ export interface ResinApi {
     log(id: string): Promise<LogLine[]>
     /** About the last hour of CPU, RAM, players and TPS of a running server; empty once it stops. */
     metrics(id: string): Promise<ServerMetrics>
+    /** What can be typed into the console (this PC only: never from the web console or another PC). */
+    commands(id: string): Promise<ConsoleCommandList>
+    /** Asks the running server again, when nobody is online. */
+    commandsRefresh(id: string): Promise<ConsoleCommandList>
     /** Lag reports with spark (this PC only: never from the web console or another PC). */
     spark(id: string): Promise<SparkStatus>
     sparkInstall(id: string): Promise<SparkStatus>

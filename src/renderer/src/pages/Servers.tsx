@@ -11,6 +11,7 @@ import { remoteMemoryMb } from '../remotePc'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
 import ServerSchedule from '../components/ServerSchedule'
+import ConsoleInput from '../components/ConsoleCommands'
 import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
 import NewServerModal, { SERVER_LABEL } from '../components/NewServerModal'
 import MigrateModal from '../components/MigrateModal'
@@ -842,12 +843,12 @@ function ConsoleTab({ s }: { s: ServerInfo }) {
       </div>
       <form className="sv-cmd" onSubmit={send}>
         <span className="mono faint">/</span>
-        <input
-          className="input mono"
+        <ConsoleInput
+          s={s}
           placeholder={canType ? t('servers.console.commandHint') : t('servers.console.commandOffline')}
           disabled={!canType}
           value={cmd}
-          onChange={(e) => setCmd(e.target.value)}
+          onChange={setCmd}
           onKeyDown={(e) => {
             if (e.key === 'ArrowUp' && history.current.length) {
               e.preventDefault()

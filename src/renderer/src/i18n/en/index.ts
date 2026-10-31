@@ -22,6 +22,7 @@ import migrate from './migrate'
 import quickjoin from './quickjoin'
 import reinstall from './reinstall'
 import schedule from './schedule'
+import commandlist from './commandlist'
 import servers from './servers'
 import settings from './settings'
 import storage from './storage'
@@ -48,6 +49,7 @@ const en = {
   ...migrate,
   ...servers,
   ...schedule,
+  ...commandlist,
   ...depcheck,
   ...graphs,
   ...admin,

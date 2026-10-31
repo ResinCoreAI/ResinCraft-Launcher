@@ -26,6 +26,7 @@ import type { RelayNameAccount,
 } from '@shared/types'
 
 import { mockMetrics } from './mock-metrics'
+import { mockCommands } from './mock-commands'
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
 import { mockDepCheck, mockDepInstall } from './mock-depcheck'
 import { mockRequests } from './mock-requests'
@@ -597,6 +598,7 @@ export function mockServers(): {
     },
     log: async (id) => logs[id] ?? [],
     ...mockMetrics(find),
+    ...mockCommands(find),
     ...mockRequests(find, (e) => requestListeners.forEach((l) => l(e))),
     downloadsCheck: async (id) => ({ found: [], remaining: find(id).pendingDownloads ?? [] }),
     downloadsForget: async (id, fileName) => {

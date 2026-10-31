@@ -9,6 +9,7 @@ pub mod clientpack;
 pub mod clientfiles;
 pub mod clientplan;
 pub mod cloudflare;
+pub mod commands;
 pub mod container;
 pub mod clientmods;
 pub mod create;
@@ -144,6 +145,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:log" => json(runtime::log(&args.get::<String>(0)?)),
         "server:metrics" => json(metrics::get(&args.get::<String>(0)?)),
+        "server:commands" | "server:commandsRefresh" => commands::handle(channel, args).await,
         "server:spark" => json(spark::status(&args.get::<String>(0)?).await?),
         "server:sparkInstall" => json(spark::install(&args.get::<String>(0)?).await?),
         "server:sparkRun" => json(spark::run(&args.get::<String>(0)?).await?),

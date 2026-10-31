@@ -231,6 +231,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       command: fn('server:command'),
       log: fn('server:log'),
       metrics: fn('server:metrics'),
+      commands: fn('server:commands'),
+      commandsRefresh: fn('server:commandsRefresh'),
       spark: fn('server:spark'),
       sparkInstall: fn('server:sparkInstall'),
       sparkRun: fn('server:sparkRun'),
