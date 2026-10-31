@@ -17,6 +17,7 @@ import graphs from './graphs'
 import home from './home'
 import instance from './instance'
 import library from './library'
+import logs from './logs'
 import menu from './menu'
 import migrate from './migrate'
 import quickjoin from './quickjoin'
@@ -56,6 +57,7 @@ const en = {
   ...commandlist,
   ...depcheck,
   ...graphs,
+  ...logs,
   ...admin,
   ...relayadmin,
   ...quickjoin,

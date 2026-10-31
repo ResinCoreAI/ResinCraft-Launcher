@@ -1,5 +1,6 @@
 // Types shared by the main process, preload bridge and renderer UI.
 import type { MigrateApi } from './migrate'
+import type { LogFile, LogPage, LogQuery, LogSearch } from './serverlogs'
 import type { WorldToolsApi } from './worldtools'
 
 export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'liteloader' | 'horizon'
@@ -2417,6 +2418,13 @@ export interface ResinApi {
     scheduleDelete(id: string, taskId: string): Promise<ScheduledTask[]>
     /** Starts it now; the result arrives like a scheduled run's. */
     scheduleRun(id: string, taskId: string): Promise<ScheduledTask[]>
+    /** The log browser (this PC only: logs hold player IPs and tokens, so the web console never reaches them). */
+    logFiles(id: string): Promise<LogFile[]>
+    /** A page from line `from` (counted from 1), or the end of the file with 0. */
+    logRead(id: string, path: string, from: number): Promise<LogPage>
+    logSearch(id: string, query: LogQuery): Promise<LogSearch>
+    /** Asks where, and copies the file there. The path, or null if cancelled. */
+    logSave(id: string, path: string): Promise<string | null>
     /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
     regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
     /** Settings → World tools (shared/worldtools.ts). */

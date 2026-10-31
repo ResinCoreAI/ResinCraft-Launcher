@@ -17,6 +17,7 @@ pub mod discordbot;
 pub mod domain;
 pub mod installers;
 pub mod listing;
+pub mod logs;
 pub mod metrics;
 pub mod network;
 pub mod packs;
@@ -267,6 +268,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
         "server:reinstallPack" => json(packs::reinstall_pack(&args.get::<String>(0)?).await?),
+        "server:logFiles" | "server:logRead" | "server:logSearch" | "server:logSave" => logs::handle(channel, args).await,
         "server:schedule" | "server:scheduleSave" | "server:scheduleDelete" | "server:scheduleRun" => schedule::handle(channel, args).await,
         "server:backup" => json(runtime::backup(&args.get::<String>(0)?).await?),
         "server:backups" => json(runtime::list_backups(&args.get::<String>(0)?).await?),

@@ -687,6 +687,9 @@ mod tests {
         for m in ["server.schedule", "server.scheduleSave", "server.scheduleDelete", "server.scheduleRun"] {
             assert!(no(m, json!(["smp"]), true).contains("can't do that"), "scheduled tasks stay on this PC");
         }
+        for m in ["server.logFiles", "server.logRead", "server.logSearch", "server.logSave"] {
+            assert!(no(m, json!(["smp", "logs/latest.log"]), true).contains("can't do that"), "logs hold player IPs and tokens");
+        }
         let file = json!([{ "name": "x", "source": { "kind": "file", "path": "C:/evil.zip" } }]);
         assert!(no("server.create", file, true).contains("not from a file"));
         assert!(no("server.sparkRun", json!(["smp"]), true).contains("can't do that"), "lag reports stay on this PC");

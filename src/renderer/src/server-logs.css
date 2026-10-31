@@ -1,0 +1,125 @@
+/* A server's Logs tab (components/ServerLogs.tsx). */
+.sv-logs {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.sv-logs-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: calc(100vh - 400px);
+  min-height: 300px;
+  overflow: auto;
+  padding: 8px;
+}
+.sv-logs-side h4 {
+  margin: 8px 8px 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.sv-logs-side h4:first-child {
+  margin-top: 0;
+}
+.sv-logs-side button {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sv-logs-side button:hover,
+.sv-logs-side button.on {
+  background: var(--accent-soft);
+}
+.sv-logs-side button.on {
+  color: var(--accent);
+}
+.sv-logs-side b {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.sv-logs-side small {
+  color: var(--text-faint);
+}
+.sv-logs-side .hint {
+  margin: auto 8px 4px;
+  padding-top: 10px;
+}
+.sv-logs-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.sv-logs-main .console {
+  height: calc(100vh - 470px);
+}
+.sv-logs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+}
+.console .sv-logs-note {
+  margin-bottom: 8px;
+  color: #f5c542;
+  font-family: var(--font);
+}
+.sv-logs-row {
+  display: grid;
+  grid-template-columns: 6ch minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  user-select: text;
+}
+.console .sv-logs-row.target {
+  background: rgba(245, 197, 66, 0.14);
+}
+button.sv-logs-row {
+  cursor: pointer;
+}
+button.sv-logs-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.console .sv-logs-n {
+  color: #6e6887;
+  text-align: right;
+  user-select: none;
+}
+.console .sv-logs-file {
+  margin: 10px 0 2px;
+  color: #6e6887;
+  font-family: var(--font);
+}
+.console mark {
+  border-radius: 2px;
+  background: #f5c542;
+  color: #07060c;
+}
+@media (max-width: 760px) {
+  .sv-logs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sv-logs-side {
+    height: 200px;
+    min-height: 0;
+  }
+}
