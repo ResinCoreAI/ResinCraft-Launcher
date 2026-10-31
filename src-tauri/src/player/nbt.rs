@@ -384,7 +384,7 @@ fn write_payload(out: &mut Vec<u8>, tag: &Tag) -> Result<()> {
                     bail!("NBT list of {} contains a {}", type_name(*of), type_name(it.type_id()));
                 }
             }
-            out.push(if items.is_empty() { END } else { *of });
+            out.push(*of);
             write_len(out, items.len())?;
             for it in items {
                 write_payload(out, it)?;

@@ -31,6 +31,7 @@ pub mod spark;
 pub mod store;
 pub mod transfer;
 pub mod tunnel;
+pub mod worldtools;
 
 use anyhow::{bail, Result};
 use serde_json::{json, Value};
@@ -284,6 +285,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             let seed = opts.get("seed").and_then(Value::as_str).map(str::to_string);
             json(runtime::regenerate_world(&args.get::<String>(0)?, backup, seed).await?)
         }
+        // On this PC only: not on remote.rs's list.
+        "server:worldTools" | "server:worldSwitch" | "server:worldCreate" | "server:worldDelete" | "server:chunkPreview" | "server:chunkReset" | "server:worldPlayers" | "server:worldPlayerSave" => worldtools::handle(channel, args).await,
         // The add-on calls end with an optional area ("plugins" / "mods") for hybrid servers.
         "server:addonSources" => json(plugins::sources(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addons" => json(plugins::list(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),

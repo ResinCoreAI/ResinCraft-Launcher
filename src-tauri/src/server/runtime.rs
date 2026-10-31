@@ -445,6 +445,7 @@ pub async fn start(id: &str) -> Result<()> {
         }
     }
 
+    super::worldtools::check_free(id)?;
     // Register before the slow part (Java lookup) so a second click can't start it twice.
     let (stdin_tx, mut stdin_rx) = mpsc::unbounded_channel::<String>();
     let (kill_tx, mut kill_rx) = mpsc::unbounded_channel::<()>();
@@ -1683,10 +1684,16 @@ pub async fn backup(id: &str) -> Result<String> {
 
 /// `backup` with `suffix` after the world's name in the zip's name ("_auto" for auto backups, which autobackup.rs prunes).
 pub async fn backup_as(id: &str, suffix: &str) -> Result<String> {
-    let meta = store::get(id).await?;
     let dir = store::dir(id)?;
     let level = properties::get_value(&dir, "level-name").await.filter(|l| !l.trim().is_empty()).unwrap_or_else(|| "world".into());
-    let level = crate::content::index::safe_name(level.trim())?.to_string();
+    backup_level(id, level.trim(), suffix).await
+}
+
+/// `backup_as` of a world that needn't be the one `level-name` names (world tools work on any of a server's worlds).
+pub async fn backup_level(id: &str, level: &str, suffix: &str) -> Result<String> {
+    let meta = store::get(id).await?;
+    let dir = store::dir(id)?;
+    let level = crate::content::index::safe_name(level)?.to_string();
     if meta.kind.bedrock() {
         if is_running(id) {
             bail!("Stop {} first: a Bedrock world is backed up while the server is off.", meta.name);
@@ -1920,6 +1927,7 @@ fn restore_target(entry: &str, zip_level: &str, level: &str, bedrock: bool) -> O
 /// undone), then the backup's world folders are unpacked in its place.
 pub async fn restore_backup(id: &str, file: &str) -> Result<()> {
     let meta = store::get(id).await?;
+    super::worldtools::check_free(id)?;
     if state(id) != "stopped" {
         bail!("Stop {} first: its world can only be replaced while it's off.", meta.name);
     }
@@ -1990,6 +1998,7 @@ pub async fn restore_backup(id: &str, file: &str) -> Result<()> {
 
 pub async fn regenerate_world(id: &str, backup_first: bool, seed: Option<String>) -> Result<usize> {
     let meta = store::get(id).await?;
+    super::worldtools::check_free(id)?;
     if state(id) != "stopped" {
         bail!("Stop {} first: its world can only be replaced while it's off.", meta.name);
     }

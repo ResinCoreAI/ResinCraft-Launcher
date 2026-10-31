@@ -1,0 +1,92 @@
+/* A server's world tools (components/ServerWorldTools.tsx). */
+.sv-wt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sv-wt-head h3 {
+  flex: 1;
+}
+.sv-wt-world .text b {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.sv-wt-world .text span {
+  display: block;
+}
+.sv-wt-world .text b .chip {
+  display: inline-flex;
+}
+.sv-wt-world .row {
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.sv-wt-bad {
+  color: var(--danger);
+}
+.sv-wt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sv-wt-form label,
+.sv-wt-form .field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-weight: 600;
+}
+.sv-wt-form label > .input:not(.narrow) {
+  width: 100%;
+}
+.sv-wt-form .hint {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+.sv-wt-form p {
+  margin: 0;
+}
+.sv-wt-form .setting .text span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.sv-wt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sv-wt-row .input {
+  width: 130px;
+}
+.sv-wt-corners {
+  display: grid;
+  grid-template-columns: auto 130px 130px;
+  align-items: end;
+  gap: 8px 12px;
+}
+.sv-wt-corners > span {
+  padding-bottom: 8px;
+  font-weight: 600;
+}
+.sv-wt-corners .input {
+  width: 100%;
+}
+.sv-wt-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--danger);
+  font-weight: 600;
+}
+.sv-wt-warn svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}

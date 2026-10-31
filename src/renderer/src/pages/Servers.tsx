@@ -11,6 +11,7 @@ import { remoteMemoryMb } from '../remotePc'
 import ServerAddons from '../components/ServerAddons'
 import ServerDownloads from '../components/ServerDownloads'
 import ServerSchedule from '../components/ServerSchedule'
+import ServerWorldTools from '../components/ServerWorldTools'
 import { CloneServerModal, ExportServerModal, useImportServerZip } from '../components/ServerTransfer'
 import ConsoleInput from '../components/ConsoleCommands'
 import { ReinstallServerModal, type ServerReinstall } from '../components/Reinstall'
@@ -1598,6 +1599,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
       {restoring && <RestoreModal target={{ kind: 'server', id: s.id, name: s.name, running: s.state !== 'stopped' && s.state !== 'crashed' }} onClose={() => setRestoring(false)} />}
 
       {!isConsole && !pc && <ServerSchedule s={s} proxy={isProxy(s)} />}
+      {!isConsole && !pc && !isProxy(s) && !isBedrock(s) && <ServerWorldTools s={s} />}
 
       <div className="settings-section">
         <h3>{t('servers.settings.dangerZone')}</h3>

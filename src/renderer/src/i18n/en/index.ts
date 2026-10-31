@@ -29,6 +29,7 @@ import storage from './storage'
 import tabs from './tabs'
 import transfer from './transfer'
 import updates from './updates'
+import worldtools from './worldtools'
 
 const en = {
   ...common,
@@ -50,6 +51,7 @@ const en = {
   ...migrate,
   ...servers,
   ...schedule,
+  ...worldtools,
   ...transfer,
   ...commandlist,
   ...depcheck,

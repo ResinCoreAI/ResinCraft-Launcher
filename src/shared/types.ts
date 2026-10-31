@@ -1,5 +1,6 @@
 // Types shared by the main process, preload bridge and renderer UI.
 import type { MigrateApi } from './migrate'
+import type { WorldToolsApi } from './worldtools'
 
 export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'liteloader' | 'horizon'
 export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack'
@@ -2418,6 +2419,15 @@ export interface ResinApi {
     scheduleRun(id: string, taskId: string): Promise<ScheduledTask[]>
     /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
     regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
+    /** Settings → World tools (shared/worldtools.ts). */
+    worldTools: WorldToolsApi['worldTools']
+    worldSwitch: WorldToolsApi['worldSwitch']
+    worldCreate: WorldToolsApi['worldCreate']
+    worldDelete: WorldToolsApi['worldDelete']
+    chunkPreview: WorldToolsApi['chunkPreview']
+    chunkReset: WorldToolsApi['chunkReset']
+    worldPlayers: WorldToolsApi['worldPlayers']
+    worldPlayerSave: WorldToolsApi['worldPlayerSave']
     /** Copies a stopped server to a new one: new id, free port, none of the original's relay or listing details. */
     clone(id: string, opts?: { name?: string; worlds?: boolean }): Promise<ServerTransferred>
     /** A stopped server as a zip, asking where. Null when the dialog was closed. */

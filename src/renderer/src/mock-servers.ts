@@ -32,6 +32,7 @@ import { mockDepCheck, mockDepInstall } from './mock-depcheck'
 import { mockRequests } from './mock-requests'
 import { mockBackups, mockServerList } from './mock-serverlist'
 import { mockSchedule, mockScheduleDelete, mockScheduleRun, mockScheduleSave } from './mock-schedule'
+import { mockChunkCount, mockChunkReset, mockWorldCreate, mockWorldDelete, mockWorldPlayers, mockWorldPlayerSave, mockWorldSwitch, mockWorldTools } from './mock-worldtools'
 
 type Listener<T> = (e: T) => void
 
@@ -637,6 +638,14 @@ export function mockServers(): {
     playerRemove: async (_id, kind, name) => void (lists[kind] = lists[kind].filter((e) => e.name !== name)),
     backup: () => wait('C:/…/servers/smp/backups/2026-10-18_14-02-11_world.zip', 1200),
     regenerateWorld: () => wait(3, 1400),
+    worldTools: (id) => wait(mockWorldTools(id)),
+    worldSwitch: (id, r) => wait(mockWorldSwitch(id, r.name, r.backup), 700),
+    worldCreate: async (id, r) => wait(mockWorldCreate(id, r.name, r.backup), 700),
+    worldDelete: (id, r) => wait(mockWorldDelete(id, r.name, r.backup), 700),
+    chunkPreview: (_id, r) => wait(mockChunkCount(r)),
+    chunkReset: (_id, r) => wait(mockChunkReset(r), 900),
+    worldPlayers: () => wait(mockWorldPlayers()),
+    worldPlayerSave: (_id, r) => wait(mockWorldPlayerSave(r.world, r.file, r.edit, r.backup), 500),
     clone: async (id, opts) => {
       const from = find(id)
       const s: ServerInfo = { ...from, id: `server-${servers.length + 1}`, name: opts?.name || `${from.name} copy`, port: 25565 + servers.length, state: 'stopped', eulaAccepted: false, createdAt: Date.now(), tunnel: 'auto', relayName: undefined, domain: undefined }
