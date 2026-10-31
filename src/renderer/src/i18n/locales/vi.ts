@@ -2372,6 +2372,8 @@ const dict: Dict = {
   'servers.list.moddedYes': 'Có mod',
   'servers.list.onlineOnly': 'Đang trực tuyến',
   'servers.list.bedrockCanJoin': 'Bedrock vào được',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock vào được: {versions}',
+  'servers.list.javaRangeHint': 'Máy chủ chạy bản {version}. Người chơi ở các phiên bản khác vào qua plugin Via của máy chủ.',
   'servers.list.offlineOk': 'Cho phép hồ sơ ngoại tuyến',
   'servers.list.crossplayHint': 'Người chơi Bedrock (điện thoại, máy chơi game, Windows) cũng vào được máy chủ Java này, thông qua Geyser.',
   'servers.list.offlineHint': 'Người chơi dùng hồ sơ ngoại tuyến, không có tài khoản Minecraft, vẫn vào được (online-mode đang tắt).',

@@ -2434,6 +2434,8 @@ const dict: Dict = {
   'servers.list.moddedYes': 'С модами',
   'servers.list.onlineOnly': 'Сейчас онлайн',
   'servers.list.bedrockCanJoin': 'Можно зайти с Bedrock',
+  'servers.list.bedrockCanJoinVersions': 'Можно зайти с Bedrock: {versions}',
+  'servers.list.javaRangeHint': 'Сервер работает на {version}. Игроки на других версиях заходят через его плагины Via.',
   'servers.list.offlineOk': 'Офлайн-профили можно',
   'servers.list.crossplayHint': 'Игроки Bedrock (телефон, консоль, Windows) тоже могут зайти на этот Java-сервер через Geyser.',
   'servers.list.offlineHint': 'Могут зайти игроки с офлайн-профилем, без аккаунта Minecraft (online-mode выключен).',

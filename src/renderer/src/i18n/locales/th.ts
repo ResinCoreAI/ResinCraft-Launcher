@@ -2364,6 +2364,8 @@ const dict: Dict = {
   'servers.list.moddedYes': 'มีม็อด',
   'servers.list.onlineOnly': 'ออนไลน์อยู่ตอนนี้',
   'servers.list.bedrockCanJoin': 'Bedrock เข้าร่วมได้',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock เข้าร่วมได้: {versions}',
+  'servers.list.javaRangeHint': 'เซิร์ฟเวอร์รันเวอร์ชัน {version} ผู้เล่นเวอร์ชันอื่นเข้าร่วมผ่านปลั๊กอิน Via ของเซิร์ฟเวอร์',
   'servers.list.offlineOk': 'ใช้โปรไฟล์ออฟไลน์ได้',
   'servers.list.crossplayHint': 'ผู้เล่น Bedrock (มือถือ คอนโซล Windows) ก็เข้าร่วมเซิร์ฟเวอร์ Java นี้ได้ผ่าน Geyser',
   'servers.list.offlineHint': 'ผู้เล่นที่ใช้โปรไฟล์ออฟไลน์โดยไม่มีบัญชี Minecraft เข้าร่วมได้ (online-mode ปิดอยู่)',

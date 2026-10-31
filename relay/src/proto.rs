@@ -260,6 +260,17 @@ pub struct ListingInfo {
     /// servers that it carries Geyser for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bedrock_address: Option<String>,
+    /// With ViaVersion, ViaBackwards or ViaRewind on a hosted server: the oldest and newest Java versions players can
+    /// join with (both or neither; the launcher reads them from the server's plugins). Older launchers leave them out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_min: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_max: Option<String>,
+    /// The oldest and newest Bedrock versions Geyser accepts on a hosted server (both or neither).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bedrock_min: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bedrock_max: Option<String>,
     /// The modpack players need (a listing with one counts as modded).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modpack: Option<ListingModpack>,

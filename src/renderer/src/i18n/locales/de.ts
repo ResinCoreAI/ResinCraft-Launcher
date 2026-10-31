@@ -2389,6 +2389,8 @@ const dict: Dict = {
   'servers.list.moddedYes': 'Mit Mods',
   'servers.list.onlineOnly': 'Gerade online',
   'servers.list.bedrockCanJoin': 'Bedrock kann beitreten',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock kann beitreten: {versions}',
+  'servers.list.javaRangeHint': 'Der Server läuft auf {version}. Spieler anderer Versionen treten über seine Via-Plugins bei.',
   'servers.list.offlineOk': 'Offline-Profile erlaubt',
   'servers.list.crossplayHint': 'Bedrock-Spieler (Handy, Konsole, Windows) können über Geyser auch diesem Java-Server beitreten.',
   'servers.list.offlineHint': 'Spieler mit einem Offline-Profil ohne Minecraft-Konto können beitreten (online-mode ist aus).',

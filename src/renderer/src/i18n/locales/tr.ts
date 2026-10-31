@@ -2385,6 +2385,8 @@ const dict: Dict = {
   'servers.list.moddedYes': 'Modlu',
   'servers.list.onlineOnly': 'Şu an çevrimiçi',
   'servers.list.bedrockCanJoin': 'Bedrock katılabilir',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock katılabilir: {versions}',
+  'servers.list.javaRangeHint': 'Sunucu {version} sürümünde çalışıyor. Diğer sürümlerdeki oyuncular Via eklentileri üzerinden katılır.',
   'servers.list.offlineOk': 'Çevrimdışı profiller olur',
   'servers.list.crossplayHint': 'Bedrock oyuncuları (telefon, konsol, Windows) da Geyser üzerinden bu Java sunucusuna katılabilir.',
   'servers.list.offlineHint': 'Minecraft hesabı olmayan, çevrimdışı profilli oyuncular katılabilir (online-mode kapalı).',
