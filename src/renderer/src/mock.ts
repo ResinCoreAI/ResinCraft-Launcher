@@ -581,6 +581,11 @@ export function mockApi(): ResinApi {
     ...mockQuickJoin(runs.launch),
     server: servers.server,
     bedrock: mockBedrock(now),
+    horizon: {
+      status: async () => ({ supported: true, installed: null, latest: '0.2.30' }),
+      install: async () => '0.2.30',
+      open: async () => undefined
+    },
     ...mockFiles(),
     ...migrate,
     on: { task: mockEngine.onTask, game: runs.onGame, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop() },

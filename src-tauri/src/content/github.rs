@@ -231,6 +231,12 @@ pub async fn releases(id: &str) -> Result<Vec<Release>> {
     Ok(list.into_iter().filter(|r| !r.draft && !r.jars().is_empty()).collect())
 }
 
+/// The published releases of a repository ("owner/name"), whatever they hold, newest first (server software).
+pub async fn all_releases(repo: &str) -> Result<Vec<Release>> {
+    let list: Vec<Release> = get(&format!("/repos/{repo}/releases?per_page=100")).await?;
+    Ok(list.into_iter().filter(|r| !r.draft).collect())
+}
+
 /// A release by its tag.
 pub async fn release(id: &str, tag: &str) -> Result<Release> {
     get(&format!("/repos/{}/releases/tags/{}", repo_of(id)?, enc(tag))).await

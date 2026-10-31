@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Shield, Smartphone, Users, Zap } from 'lucide-react'
+import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Shield, Smartphone, Users, Zap, Sunrise } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
@@ -32,6 +32,7 @@ const Discover = lazy(() => import('./pages/Discover'))
 const QuickJoin = lazy(() => import('./pages/QuickJoin'))
 const Accounts = lazy(() => import('./pages/Accounts'))
 const Bedrock = lazy(() => import('./pages/Bedrock'))
+const Horizon = lazy(() => import('./pages/Horizon'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const Admin = lazy(() => import('./pages/Admin'))
 
@@ -40,6 +41,7 @@ const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'library', label: 'nav.library', icon: <Layers /> },
   { page: 'quickjoin', label: 'quickjoin.nav', icon: <Zap /> },
   { page: 'bedrock', label: 'nav.bedrock', icon: <Smartphone /> },
+  { page: 'horizon', label: 'servers.horizon.nav', icon: <Sunrise /> },
   { page: 'discover', label: 'nav.discover', icon: <Compass /> },
   { page: 'servers', label: 'servers.nav', icon: <Server /> },
   { page: 'accounts', label: 'nav.accounts', icon: <Users /> },
@@ -56,6 +58,7 @@ const TITLES: Record<Route['page'], Key> = {
   library: 'nav.library',
   quickjoin: 'quickjoin.nav',
   bedrock: 'nav.bedrock',
+  horizon: 'servers.horizon.nav',
   instance: 'nav.library',
   discover: 'nav.discover',
   servers: 'servers.nav',
@@ -188,6 +191,7 @@ export default function App() {
             )}
             {route.page === 'accounts' && <Accounts />}
             {route.page === 'bedrock' && <Bedrock />}
+            {route.page === 'horizon' && <Horizon />}
             {route.page === 'settings' && <SettingsPage />}
             {route.page === 'admin' && <Admin />}
             {route.page === 'servers' && <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />}

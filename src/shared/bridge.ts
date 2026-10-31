@@ -48,6 +48,11 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       inspect: fn('backup:inspect'),
       import: fn('backup:import')
     },
+    horizon: {
+      status: fn('horizon:status'),
+      install: fn('horizon:install'),
+      open: fn('horizon:open')
+    },
     bedrock: {
       status: fn('bedrock:status'),
       play: fn('bedrock:play'),

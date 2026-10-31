@@ -855,17 +855,44 @@ pub enum ServerKind {
     Arclight,
     /// A hybrid like Arclight, on Forge or NeoForge (which one is in `ServerMeta::loader`).
     Mohist,
+    /// Forge with Bukkit plugins, from the Magma Maintained builds (one repository per Minecraft version).
+    Magma,
+    /// Forge with Bukkit plugins, for 1.12.2, 1.16.5 and 1.18.2.
+    Catserver,
+    /// Forge with Bukkit plugins, for 1.7.10 (a continuation of Thermos).
+    Crucible,
+    /// A Forge server with the SpongeForge mod: Forge mods and Sponge plugins together.
+    Spongeforge,
+    /// A Fabric server with the Cardboard mod: Fabric mods and Bukkit plugins together.
+    Cardboard,
     /// Proxies route players between other servers; they have no world. `mc_version` is the proxy's own version.
     Velocity,
     Bungeecord,
     /// PaperMC's old BungeeCord fork (no longer developed).
     Waterfall,
+    /// PaperMC's old Waterfall fork with 1.7 clients (no longer developed).
+    Travertine,
+    /// A proxy for Bedrock servers.
+    Waterdogpe,
+    /// Geyser on its own: lets Bedrock players join a Java server, here or elsewhere.
+    Geyser,
     /// A Minecraft server written from scratch in Java, for 1.12.2.
     Glowstone,
     /// A Minecraft server written from scratch in C++, for 1.12.2: its own program (no Java).
     Cuberite,
+    /// A Minecraft server written from scratch in Rust: its own program (no Java).
+    Pumpkin,
+    /// Horizon's Rust rewrite of Minecraft, run as a dedicated server: its own program (no Java), prepared from
+    /// Mojang's files. `mc_version` is Horizon's release.
+    Horizon,
     /// Bedrock Dedicated Server from minecraft.net: its own program, UDP port, worlds and packs (no Java).
     Bedrock,
+    /// A Bedrock server written from scratch in PHP: PocketMine-MP.phar and PocketMine's own PHP build.
+    Pocketmine,
+    /// Bedrock servers written from scratch in Java: Cloudburst's Nukkit and two forks of it.
+    Nukkit,
+    Powernukkitx,
+    Nukkitpm1,
 }
 
 impl ServerKind {
@@ -892,40 +919,42 @@ impl ServerKind {
     pub fn bukkit(self) -> bool {
         matches!(self, Self::Paper | Self::Purpur | Self::Folia | Self::Spigot | Self::Leaf | Self::Pufferfish | Self::Craftbukkit)
     }
-    /// Has a plugins/ folder: Bukkit servers, Sponge and proxies (their plugins are their own kind).
+    /// Has a plugins/ folder: Bukkit servers, Sponge and Java proxies (their plugins are their own kind).
     pub fn plugins(self) -> bool {
-        self.bukkit() || self.proxy() || self == Self::Sponge
+        self.bukkit() || (self.proxy() && !self.bedrock()) || self == Self::Sponge
     }
     /// Routes players to other servers: no world, players or server.properties of its own.
     pub fn proxy(self) -> bool {
-        matches!(self, Self::Velocity | Self::Bungeecord | Self::Waterfall)
+        matches!(self, Self::Velocity | Self::Bungeecord | Self::Waterfall | Self::Travertine | Self::Waterdogpe | Self::Geyser)
     }
     /// Runs Mojang's server code, so its EULA applies.
     pub fn needs_eula(self) -> bool {
-        !self.proxy() && !matches!(self, Self::Glowstone | Self::Cuberite)
+        !self.proxy() && !matches!(self, Self::Glowstone | Self::Cuberite | Self::Pumpkin | Self::Pocketmine | Self::Nukkit | Self::Powernukkitx | Self::Nukkitpm1)
     }
     /// Reads its port from server.properties.
     pub fn uses_properties(self) -> bool {
-        !self.proxy() && self != Self::Cuberite
+        !self.proxy() && !matches!(self, Self::Cuberite | Self::Pumpkin)
     }
     /// The console command that stops it cleanly.
     pub fn stop_command(self) -> &'static str {
         match self {
             Self::Velocity => "shutdown",
-            Self::Bungeecord | Self::Waterfall => "end",
+            Self::Bungeecord | Self::Waterfall | Self::Travertine | Self::Waterdogpe => "end",
+            Self::Geyser => "geyser stop",
             _ => "stop",
         }
     }
-    /// Hybrids (Arclight) run mods (mods/) and Bukkit plugins (plugins/) together.
+    /// Hybrids (Arclight) run mods (mods/) and plugins (plugins/) together.
     pub fn hybrid(self) -> bool {
-        matches!(self, Self::Arclight | Self::Mohist)
+        matches!(self, Self::Arclight | Self::Mohist | Self::Magma | Self::Catserver | Self::Crucible | Self::Spongeforge | Self::Cardboard)
     }
     /// Runs mods, as a mod loader or a hybrid.
     pub fn modded(self) -> bool {
         self.loader().is_some() || self.hybrid()
     }
+    /// For Bedrock players: a UDP port (and the one after it for IPv6), and worlds in worlds/.
     pub fn bedrock(self) -> bool {
-        self == Self::Bedrock
+        matches!(self, Self::Bedrock | Self::Pocketmine | Self::Nukkit | Self::Powernukkitx | Self::Nukkitpm1 | Self::Waterdogpe | Self::Geyser)
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -939,17 +968,31 @@ impl ServerKind {
             Self::Craftbukkit => "CraftBukkit",
             Self::Sponge => "Sponge",
             Self::Mohist => "Mohist",
+            Self::Magma => "Magma",
+            Self::Catserver => "CatServer",
+            Self::Crucible => "Crucible",
+            Self::Spongeforge => "SpongeForge",
+            Self::Cardboard => "Cardboard",
             Self::Velocity => "Velocity",
             Self::Bungeecord => "BungeeCord",
             Self::Waterfall => "Waterfall",
+            Self::Travertine => "Travertine",
+            Self::Waterdogpe => "WaterdogPE",
+            Self::Geyser => "Geyser",
             Self::Glowstone => "Glowstone",
             Self::Cuberite => "Cuberite",
+            Self::Pumpkin => "Pumpkin",
+            Self::Horizon => "Horizon",
             Self::Fabric => "Fabric",
             Self::Quilt => "Quilt",
             Self::Forge => "Forge",
             Self::Neoforge => "NeoForge",
             Self::Arclight => "Arclight",
             Self::Bedrock => "Bedrock",
+            Self::Pocketmine => "PocketMine-MP",
+            Self::Nukkit => "Nukkit",
+            Self::Powernukkitx => "PowerNukkitX",
+            Self::Nukkitpm1 => "Nukkit PetteriM1",
         }
     }
 }
@@ -965,6 +1008,9 @@ pub struct ServerLaunch {
     pub args_file: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exe: Option<String>,
+    /// What `exe` is started with (PocketMine: PHP runs the .phar).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exe_args: Vec<String>,
 }
 
 fn yes() -> bool {

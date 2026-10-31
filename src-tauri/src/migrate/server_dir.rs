@@ -42,6 +42,20 @@ pub fn inspect_jar(path: &Path) -> JarInfo {
         info.kind = Some(ServerKind::Arclight);
     } else if has("com/mohistmc/") {
         info.kind = Some(ServerKind::Mohist);
+    } else if has("org/magmafoundation/") {
+        info.kind = Some(ServerKind::Magma);
+    } else if has("foxlaunch/") {
+        info.kind = Some(ServerKind::Catserver);
+    } else if has("io/github/crucible/") {
+        info.kind = Some(ServerKind::Crucible);
+    } else if has("org/geysermc/geyser/platform/standalone/") {
+        info.kind = Some(ServerKind::Geyser);
+    } else if has("dev/waterdog/waterdogpe/") {
+        info.kind = Some(ServerKind::Waterdogpe);
+    } else if has("org/powernukkitx/") {
+        info.kind = Some(ServerKind::Powernukkitx);
+    } else if has("cn/nukkit/") {
+        info.kind = Some(ServerKind::Nukkit);
     } else if has("com/velocitypowered/proxy/") {
         info.kind = Some(ServerKind::Velocity);
     } else if has("net/md_5/bungee/") {

@@ -378,7 +378,7 @@ async fn set_icon(id: &str, data_url: Option<String>) -> Result<ServerMeta> {
         let b64 = url.split_once("base64,").map(|(_, b)| b).ok_or_else(|| anyhow::anyhow!("That picture couldn't be read"))?;
         base64::engine::general_purpose::STANDARD.decode(b64.trim())?
     };
-    let java = meta.kind != ServerKind::Bedrock;
+    let java = !meta.kind.bedrock();
     let (small, icon) = tokio::task::spawn_blocking(move || icon_pngs(&bytes, java)).await??;
     if let Some(icon) = icon {
         tokio::fs::write(&file, icon).await?;

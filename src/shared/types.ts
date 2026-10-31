@@ -1032,22 +1032,52 @@ export type ServerKind =
   | 'arclight'
   /** Mods and Bukkit plugins, on Forge or NeoForge (`loader`). */
   | 'mohist'
+  /** Forge with Bukkit plugins (`loader` is forge). */
+  | 'magma'
+  | 'catserver'
+  | 'crucible'
+  /** Forge mods and Sponge plugins. */
+  | 'spongeforge'
+  /** Fabric mods and Bukkit plugins. */
+  | 'cardboard'
   /** Proxies route players to other servers; `mcVersion` is the proxy's own version. */
   | 'velocity'
   | 'bungeecord'
   | 'waterfall'
+  | 'travertine'
+  /** A proxy for Bedrock players; Geyser lets them join a Java server. Both use a UDP port. */
+  | 'waterdogpe'
+  | 'geyser'
   /** Written from scratch, for Minecraft 1.12.2. Cuberite is its own program (64-bit Linux only). */
   | 'glowstone'
   | 'cuberite'
+  /** Written from scratch in Rust: its own program. `mcVersion` is the Minecraft version it speaks. */
+  | 'pumpkin'
+  /** Horizon's Rust rewrite of Minecraft as a dedicated server. `mcVersion` is Horizon's release. */
+  | 'horizon'
   /** Bedrock Dedicated Server: its own program and UDP port, no Java. */
   | 'bedrock'
+  /** Bedrock servers written from scratch; `mcVersion` is the software's own version. */
+  | 'pocketmine'
+  | 'nukkit'
+  | 'powernukkitx'
+  | 'nukkitpm1'
+
+/** Whether Horizon's launcher is here, and the newest one (unknown when GitHub can't be reached). */
+export interface HorizonStatus {
+  supported: boolean
+  installed?: string | null
+  latest?: string | null
+}
 
 /** Bukkit-style plugin servers. */
-export const PLUGIN_SERVERS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'velocity', 'bungeecord', 'waterfall']
+export const PLUGIN_SERVERS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'velocity', 'bungeecord', 'waterfall', 'travertine']
 /** Proxies: no world, players or server.properties of their own. */
-export const PROXY_SERVERS: ServerKind[] = ['velocity', 'bungeecord', 'waterfall']
+export const PROXY_SERVERS: ServerKind[] = ['velocity', 'bungeecord', 'waterfall', 'travertine', 'waterdogpe', 'geyser']
 /** Servers with plugins and mods (managed as two areas). */
-export const HYBRID_SERVERS: ServerKind[] = ['arclight', 'mohist']
+export const HYBRID_SERVERS: ServerKind[] = ['arclight', 'mohist', 'magma', 'catserver', 'crucible', 'spongeforge', 'cardboard']
+/** Servers for Bedrock players: a UDP port, no add-ons from the launcher. */
+export const BEDROCK_SERVERS: ServerKind[] = ['bedrock', 'pocketmine', 'nukkit', 'powernukkitx', 'nukkitpm1', 'waterdogpe', 'geyser']
 /** Which of a hybrid server's folders an add-on call is about. */
 export type AddonArea = 'plugins' | 'mods'
 
@@ -1895,6 +1925,14 @@ export interface ResinApi {
     inspect(path: string): Promise<BackupInfo>
     /** Adds the backup to this launcher (nothing here is replaced). */
     import(path: string, useSettings: boolean): Promise<BackupImport>
+  }
+  /** Horizon's own launcher (playhorizon.dev), kept in the data folder. */
+  horizon: {
+    status(): Promise<HorizonStatus>
+    /** Installs or updates it (a task tied to `horizon`) and returns the version. */
+    install(): Promise<string>
+    /** Starts it. */
+    open(): Promise<void>
   }
   /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
   bedrock: {

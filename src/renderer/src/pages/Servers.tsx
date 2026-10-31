@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import { Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
 import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
-import { HYBRID_SERVERS, PLUGIN_SERVERS, PROXY_SERVERS } from '@shared/types'
+import { BEDROCK_SERVERS, HYBRID_SERVERS, PLUGIN_SERVERS, PROXY_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
 import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
 import FileManager from '../components/FileManager'
@@ -35,7 +35,7 @@ const MAX_LOG = 3000
 const isPluginServer = (s: ServerInfo) => PLUGIN_SERVERS.includes(s.type)
 /** Plugins and mods together (two tabs). */
 const isHybrid = (s: ServerInfo) => HYBRID_SERVERS.includes(s.type)
-const isBedrock = (s: ServerInfo) => s.type === 'bedrock'
+const isBedrock = (s: ServerInfo) => BEDROCK_SERVERS.includes(s.type)
 const isProxy = (s: ServerInfo) => PROXY_SERVERS.includes(s.type)
 const live = (s: ServerInfo) => s.state === 'starting' || s.state === 'running' || s.state === 'stopping'
 
@@ -503,10 +503,10 @@ function ServerDetail({
       id: 'addons',
       icon: <Puzzle />,
       label: t(isPluginServer(s) || isHybrid(s) ? 'servers.tab.plugins' : 'servers.tab.mods'),
-      hidden: s.type === 'vanilla' || isBedrock(s) || s.type === 'glowstone' || s.type === 'cuberite'
+      hidden: s.type === 'vanilla' || isBedrock(s) || s.type === 'glowstone' || s.type === 'cuberite' || s.type === 'pumpkin' || s.type === 'horizon'
     },
     { id: 'mods', icon: <Blocks />, label: t('servers.tab.mods'), hidden: !isHybrid(s) },
-    { id: 'properties', icon: <SlidersHorizontal />, label: t('servers.tab.properties'), hidden: isProxy(s) || s.type === 'cuberite' },
+    { id: 'properties', icon: <SlidersHorizontal />, label: t('servers.tab.properties'), hidden: isProxy(s) || s.type === 'cuberite' || s.type === 'pumpkin' },
     { id: 'files', icon: <FolderTree />, label: t('files.tab') },
     { id: 'settings', icon: <Settings2 />, label: t('servers.tab.settings') }
   ]
