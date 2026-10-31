@@ -14,6 +14,7 @@ import type { RelayNameAccount,
   PlayerListKind,
   PropEntry,
   ResinApi,
+  ServerMulticorePlan,
   ResinNet,
   ServerAddon,
   ServerAddonHit,
@@ -634,6 +635,11 @@ export function mockServers(): {
     backups: (id) => wait(mockBackups('world').map((b) => ({ ...b, file: b.file }))),
     restoreBackup: () => wait(undefined, 1500),
     deleteBackup: () => wait(undefined, 300),
+    multicorePlan: async (id) => mockMulticore(find(id).type),
+    multicoreApply: async (id) => ({ ...mockMulticore(find(id).type), undo: ['Lithium', 'C2ME'] }),
+    multicoreUndo: async (id) => mockMulticore(find(id).type),
+    moveToFolia: async () => ({ reason: 'folia', items: [], undo: [], moved: { kind: 'paper' } }),
+    undoFolia: async (id) => mockMulticore(find(id).type),
     antiCheat: async (id) => ({ supported: find(id).type !== 'vanilla', installed: !!grim[id], enabled: !!grim[id] }),
     setAntiCheat: async (id, on) => {
       await wait(null, on ? 1600 : 500)
@@ -948,4 +954,18 @@ export function mockServers(): {
       return () => void list.splice(list.indexOf(cb), 1)
     }
   return { server, onServer: subscribe(listeners), onServerLog: subscribe(logListeners), onServerRequests: subscribe(requestListeners) }
+}
+
+function mockMulticore(type: string): ServerMulticorePlan {
+  if (['paper', 'purpur', 'leaf', 'spigot'].includes(type)) {
+    return { reason: 'plugins', items: [], undo: [], folia: { available: true, ready: ['Grim'], blocked: ['EssentialsX', 'WorldEdit'] } }
+  }
+  if (!['fabric', 'quilt', 'forge', 'neoforge'].includes(type)) return { reason: 'vanilla', items: [], undo: [] }
+  return {
+    items: [
+      { slot: 'chunks', state: 'install', title: 'C2ME', version: '0.3.0', test: true },
+      { slot: 'logic', state: 'install', title: 'Lithium', version: '0.15.0', test: false }
+    ],
+    undo: []
+  }
 }

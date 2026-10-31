@@ -311,6 +311,7 @@ export default {
   'engine.modpack.notModpack': "That file isn't a Modrinth or CurseForge modpack",
   'engine.modpack.pickFile': 'Pick a Modrinth .mrpack or a CurseForge modpack .zip',
   'engine.modpack.unsupportedLoader': "This modpack needs {name}, which ResinCraft doesn't support yet.",
+  'engine.multicore.gameRunning': "Close the game first: mods can't change while it's running.",
   'engine.modrinth.installing': 'Installing content',
   'engine.modrinth.noFiles': '{name} {version} has no files to download',
   'engine.modrinth.noInstallableVersion': '{name} has no version ResinCraft can install',

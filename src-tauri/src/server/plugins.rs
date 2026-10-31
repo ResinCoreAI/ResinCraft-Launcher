@@ -123,7 +123,7 @@ fn key(filename: &str) -> String {
 }
 
 /// Modrinth loader tags a server type can run.
-fn mr_loaders(meta: &ServerMeta) -> Vec<&'static str> {
+pub(crate) fn mr_loaders(meta: &ServerMeta) -> Vec<&'static str> {
     match meta.kind {
         ServerKind::Paper | ServerKind::Leaf => vec!["paper", "spigot", "bukkit"],
         ServerKind::Purpur => vec!["purpur", "paper", "spigot", "bukkit"],
@@ -286,6 +286,36 @@ async fn plugin_yml(jar: &Path) -> Option<(String, String)> {
     .await
     .ok()
     .flatten()
+}
+
+/// Whether a plugin's yml says it runs on Folia. Folia refuses to load the ones that don't.
+fn folia_supported(yml: &str) -> bool {
+    yml.lines().any(|l| l.strip_prefix("folia-supported").and_then(|v| v.trim_start().strip_prefix(':')).is_some_and(|v| v.trim().trim_matches(['"', '\'']).eq_ignore_ascii_case("true")))
+}
+
+/// The enabled plugins by name: those ready for Folia, and those it won't load. Files without a plugin yml aren't plugins.
+pub async fn folia_support(id: &str) -> Result<(Vec<String>, Vec<String>)> {
+    let meta = view(id, None).await?;
+    let folder = folder(&meta)?;
+    let names = jar_names(&folder).await?;
+    tokio::task::spawn_blocking(move || {
+        let (mut ready, mut blocked) = (Vec::new(), Vec::new());
+        for n in names.iter().filter(|n| !n.ends_with(".disabled")) {
+            let Ok(mut zip) = crate::content::index::open_zip(&folder.join(n)) else { continue };
+            let Some(text) = ["paper-plugin.yml", "plugin.yml"].iter().find_map(|f| crate::content::index::read_zip_text(&mut zip, f).ok().flatten()) else { continue };
+            let name = text.lines().find_map(|l| l.strip_prefix("name")?.trim_start().strip_prefix(':').map(|v| v.trim().trim_matches(['"', '\'']).to_string()));
+            let name = name.filter(|v| !v.is_empty()).unwrap_or_else(|| n.clone());
+            if folia_supported(&text) {
+                ready.push(name);
+            } else {
+                blocked.push(name);
+            }
+        }
+        ready.sort_by(|a, b| display_cmp(a, b));
+        blocked.sort_by(|a, b| display_cmp(a, b));
+        Ok((ready, blocked))
+    })
+    .await?
 }
 
 pub async fn toggle(id: &str, filename: &str, area: Option<&str>) -> Result<()> {
@@ -2049,5 +2079,22 @@ mod tests {
         assert_eq!(flip_disabled("a.jar.disabled"), "a.jar");
         let replace = PendingOp::Replace { old: "a.jar".into(), staged: "x-a.jar".into(), target: "a2.jar".into(), entry: IndexEntry::default() };
         assert_eq!((replace.kind(), replace.filename()), ("update", "a.jar"));
+    }
+}
+
+#[cfg(test)]
+mod folia_tests {
+    use super::folia_supported;
+
+    #[test]
+    fn reads_the_folia_flag_of_a_plugin() {
+        assert!(folia_supported("name: Grim
+folia-supported: true
+"));
+        assert!(folia_supported("folia-supported : 'True'"));
+        assert!(!folia_supported("name: Old
+version: 1
+"));
+        assert!(!folia_supported("folia-supported: false"));
     }
 }

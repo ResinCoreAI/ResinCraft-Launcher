@@ -29,6 +29,7 @@ import { hasBedrockApp } from '../platform'
 import { ServerMemoryChip } from '../components/Memory'
 import JoinRequests from '../components/JoinRequests'
 import { usePicturePicker } from '../components/ImagePicker'
+import { ServerMulticore } from '../components/Multicore'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
 const MAX_LOG = 3000
@@ -1442,6 +1443,8 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
       <ServerPackSettings s={s} reload={reload} />
 
       <AntiXraySection s={s} />
+
+      <ServerMulticore s={s} reload={reload} />
 
       <div className="settings-section">
         <h3>{t('servers.settings.internet')}</h3>

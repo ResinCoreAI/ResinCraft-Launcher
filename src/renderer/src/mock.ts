@@ -491,6 +491,9 @@ export function mockApi(): ResinApi {
         )
       },
       install: () => wait(undefined, 800),
+      multicorePlan: async () => ({ items: [{ slot: 'render', state: 'install', title: 'Sodium', version: '0.6.0', test: false }], undo: [] }),
+      multicoreApply: async () => ({ items: [{ slot: 'render', state: 'have', title: 'Sodium', version: '0.6.0', test: false }], undo: ['Sodium'] }),
+      multicoreUndo: async () => ({ items: [{ slot: 'render', state: 'install', title: 'Sodium', version: '0.6.0', test: false }], undo: [] }),
       exportList: (_i, kind) =>
         wait(`C:\\Users\\you\\Downloads\\cozy-survival ${kind === 'mod' ? 'mods' : kind === 'shader' ? 'shaders' : 'resource-packs'}.json`, 500),
       importList: (_i, kind) =>

@@ -53,6 +53,7 @@ import ScreenshotsTab from '../components/ScreenshotsTab'
 import ServersTab from '../components/ServersTab'
 import WorldsTab from '../components/WorldsTab'
 import { OptifineSteps, optifineFits, optifineHow } from '../components/Optifine'
+import { InstanceMulticore } from '../components/Multicore'
 import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 import { instanceOwner, PackChip, PackVersionSetting } from '../components/PackVersion'
 import { VersionSection } from '../components/VersionSettings'
@@ -1078,6 +1079,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
       </div>
 
       <OptifineSection inst={inst} />
+
+      <InstanceMulticore inst={inst} />
 
       <VersionSection inst={inst} />
 

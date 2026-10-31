@@ -15,6 +15,7 @@ pub mod discordbot;
 pub mod domain;
 pub mod installers;
 pub mod listing;
+pub mod multicore;
 pub mod network;
 pub mod packs;
 pub mod playit;
@@ -239,6 +240,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             antixray::set(&meta, &store::dir(&meta.id)?, &want).await?;
             done()
         }
+        // The multi-core setup: [id] → the plan. Moving to Folia takes [id, confirmed].
+        "server:multicorePlan" => json(multicore::plan(&args.get::<String>(0)?).await?),
+        "server:multicoreApply" => json(multicore::apply(&args.get::<String>(0)?).await?),
+        "server:multicoreUndo" => json(multicore::undo(&args.get::<String>(0)?).await?),
+        "server:moveToFolia" => json(multicore::move_to_folia(&args.get::<String>(0)?, args.get::<Option<bool>>(1)?.unwrap_or(false)).await?),
+        "server:undoFolia" => json(multicore::undo_folia(&args.get::<String>(0)?).await?),
         "server:reinstall" => {
             packs::reinstall(&args.get::<String>(0)?).await?;
             done()

@@ -14,6 +14,7 @@ pub mod links;
 pub mod lists;
 pub mod manual;
 pub mod modrinth;
+pub mod multicore;
 pub mod packswitch;
 pub mod packupdates;
 pub mod sources;
@@ -44,6 +45,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             sources::install(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<ContentKind>(2)?, args.get(3)?).await?;
             done()
         }
+        // The one-click multi-core setup: [id] → what it would do, and doing or undoing it → the same, afterwards.
+        "content:multicorePlan" => json(multicore::instance_plan(&args.get::<String>(0)?).await?),
+        "content:multicoreApply" => json(multicore::instance_apply(&args.get::<String>(0)?).await?),
+        "content:multicoreUndo" => json(multicore::instance_undo(&args.get::<String>(0)?).await?),
         "content:exportList" => json(lists::export_list(&args.get::<String>(0)?, args.get::<ContentKind>(1)?).await?),
         "content:importList" => json(lists::import_list(&args.get::<String>(0)?, args.get::<ContentKind>(1)?, args.get(2)?).await?),
         "content:installFromLink" => {

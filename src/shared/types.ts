@@ -1823,6 +1823,35 @@ export interface StorageChange {
 }
 
 /** The API exposed to the renderer as `window.resin`. */
+/** One job of the multi-core setup and what would happen to it. */
+export interface MulticoreItem {
+  /** own (ResinCraft's own mod) | render | chunks | logic */
+  slot: string
+  /** off: installed but disabled. oldLoader / oldJava: `with` says the version it needs. */
+  state: 'install' | 'have' | 'off' | 'conflict' | 'oldLoader' | 'oldJava' | 'none'
+  title?: string
+  version?: string
+  /** Only alpha or beta builds exist for this Minecraft version. */
+  test: boolean
+  with?: string
+  projectId?: string
+  versionId?: string
+}
+
+export interface MulticorePlan {
+  reason?: 'vanilla' | 'noLoader' | 'noMods' | 'plugins' | 'hybrid' | 'bedrock' | 'folia'
+  items: MulticoreItem[]
+  /** Mods Undo would take away. */
+  undo: string[]
+}
+
+export interface ServerMulticorePlan extends MulticorePlan {
+  /** Plugin servers: the move to Folia, with which of the server's plugins would stop loading. */
+  folia?: { available: boolean; ready: string[]; blocked: string[] }
+  /** Moved to Folia by ResinCraft: what it ran before. */
+  moved?: { kind: ServerKind; backup?: string }
+}
+
 export interface ResinApi {
   app: {
     info(): Promise<AppInfo>
@@ -2046,6 +2075,10 @@ export interface ResinApi {
     /** Installs what a link points to (a Modrinth, CurseForge or GitHub page, or a .jar) into an instance. */
     installFromLink(instanceId: string, url: string, kind: ContentKind): Promise<void>
     /** Saves the instance's mods (or resource packs, or shaders) as a list file; null if the dialog was cancelled. */
+    /** The one-click multi-core setup: what it would do for this instance; doing and undoing it return the same, afterwards. */
+    multicorePlan(instanceId: string): Promise<MulticorePlan>
+    multicoreApply(instanceId: string): Promise<MulticorePlan>
+    multicoreUndo(instanceId: string): Promise<MulticorePlan>
     exportList(instanceId: string, kind: ContentKind): Promise<string | null>
     /** Installs a list file (asks for it without `path`); null if the dialog was cancelled. */
     importList(instanceId: string, kind: ContentKind, path?: string): Promise<ListImport | null>
@@ -2216,6 +2249,13 @@ export interface ResinApi {
     /** The world to the Recycle Bin (after a backup), a new one on the next start. seed: null keeps it, '' random. */
     regenerateWorld(id: string, opts: { backup: boolean; seed: string | null }): Promise<number>
     /** Settings → Anti-cheat: Grim, for plugin servers. */
+    /** The one-click multi-core setup on a server (the same plan as `content.multicorePlan`, plus Folia). */
+    multicorePlan(id: string): Promise<ServerMulticorePlan>
+    multicoreApply(id: string): Promise<ServerMulticorePlan>
+    multicoreUndo(id: string): Promise<ServerMulticorePlan>
+    /** Changes a plugin server's software to Folia, after a world backup. `confirmed` is the player's answer to the warning. */
+    moveToFolia(id: string, confirmed: boolean): Promise<ServerMulticorePlan>
+    undoFolia(id: string): Promise<ServerMulticorePlan>
     antiCheat(id: string): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>
     setAntiCheat(id: string, on: boolean): Promise<{ supported: boolean; installed: boolean; enabled: boolean }>
     /** Settings → Server list: this server in the public list (off by default). */
