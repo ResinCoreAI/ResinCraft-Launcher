@@ -11,8 +11,7 @@ HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 [ "$(id -u)" = 0 ] || { echo "Run this as root (sudo sh install.sh)."; exit 1; }
 [ -f "$HERE/resincraft-panel" ] || { echo "Put the resincraft-panel binary next to this script."; exit 1; }
 
-# Java comes with the panel on most systems; tar and curl are for server downloads. Alpine's libc can't run the Java the
-# panel downloads, so it gets its own.
+# The panel downloads its own Java; tar and gzip unpack it.
 if command -v apt-get >/dev/null 2>&1; then
     apt-get update -qq && apt-get install -y -qq tar gzip ca-certificates
 elif command -v dnf >/dev/null 2>&1; then
@@ -24,7 +23,7 @@ elif command -v zypper >/dev/null 2>&1; then
 elif command -v pacman >/dev/null 2>&1; then
     pacman -Sy --noconfirm --needed tar gzip ca-certificates
 elif command -v apk >/dev/null 2>&1; then
-    apk add --no-cache tar gzip ca-certificates openjdk21-jre-headless
+    apk add --no-cache tar gzip ca-certificates
 elif command -v xbps-install >/dev/null 2>&1; then
     xbps-install -Sy tar gzip ca-certificates
 elif command -v emerge >/dev/null 2>&1; then
@@ -103,8 +102,17 @@ else
     START="RESINCRAFT_PANEL_DATA=$DATA $BIN run   (no service manager found: start it your own way)"
 fi
 
+# Alpine and other small systems often have no sudo.
+if command -v sudo >/dev/null 2>&1; then
+    PANEL="sudo -u resincraft RESINCRAFT_PANEL_DATA=$DATA $BIN"
+    END=
+else
+    PANEL="su -s /bin/sh resincraft -c 'RESINCRAFT_PANEL_DATA=$DATA $BIN"
+    END="'"
+fi
+
 echo
 echo "Installed. Next:"
 echo "  1. Start it: $START"
-echo "  2. To use ResinCraft Relay and the launcher's Servers page: sudo -u resincraft RESINCRAFT_PANEL_DATA=$DATA $BIN login"
-echo "  3. For a website on your own domain: sudo -u resincraft RESINCRAFT_PANEL_DATA=$DATA $BIN web <domain> <email>"
+echo "  2. To use ResinCraft Relay and the launcher's Servers page: $PANEL login$END"
+echo "  3. For a website on your own domain: $PANEL web <domain> <email>$END"

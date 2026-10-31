@@ -241,6 +241,12 @@ async fn make_runnable(home: &Path) {
     let _ = home;
 }
 
+/// Alpine and other systems built on musl: the usual Linux Java needs glibc and won't even start. Asks the
+/// system rather than the build, because the panel's own binary is musl everywhere.
+pub fn on_musl() -> bool {
+    cfg!(target_os = "linux") && std::fs::read_dir("/lib").is_ok_and(|rd| rd.flatten().any(|e| e.file_name().to_string_lossy().starts_with("ld-musl-")))
+}
+
 /// Downloads an Eclipse Temurin JRE for this computer's CPU into the launcher's own Java folder.
 pub async fn install_java(required: u32, task: &Arc<Task>) -> Result<JavaInstall> {
     install_java_for(required, host_cpu(), task).await
@@ -254,6 +260,8 @@ pub async fn install_java_for(required: u32, cpu: &str, task: &Arc<Task>) -> Res
         "windows"
     } else if cfg!(target_os = "macos") {
         "mac"
+    } else if on_musl() {
+        "alpine-linux"
     } else {
         "linux"
     };

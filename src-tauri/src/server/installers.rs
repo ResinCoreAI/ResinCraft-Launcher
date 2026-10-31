@@ -1210,6 +1210,9 @@ async fn cuberite(dir: &Path, task: &Arc<Task>) -> Result<()> {
     if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         bail!("Cuberite only has a build for 64-bit Linux");
     }
+    if crate::game::java::on_musl() {
+        bail!("Cuberite's Linux build needs glibc, so it can't run on Alpine. Use a Java server here, or another Linux");
+    }
     let archive = dir.join("cuberite.tar.gz");
     download_all(vec![DownloadItem::new(CUBERITE, &archive)], 1, task.counter("Downloading Cuberite")).await?;
     task.update("Unpacking Cuberite…", None);
