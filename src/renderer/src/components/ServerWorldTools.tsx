@@ -101,7 +101,7 @@ function useReport() {
   )
 }
 
-function SwitchDialog({ s, world, current, onDone, onClose }: { s: ServerInfo; world: ServerWorld; current: string; onDone: () => void; onClose: () => void }) {
+function SwitchDialog({ s, world, current, unmade, onDone, onClose }: { s: ServerInfo; world: ServerWorld; current: string; unmade: boolean; onDone: () => void; onClose: () => void }) {
   const report = useReport()
   const [backup, setBackup] = useState(true)
   return (
@@ -113,7 +113,7 @@ function SwitchDialog({ s, world, current, onDone, onClose }: { s: ServerInfo; w
       onDone={onDone}
       onClose={onClose}
     >
-      <p className="muted">{t('servers.worldTools.switchBody', { name: world.name, current })}</p>
+      <p className="muted">{t(unmade ? 'servers.worldTools.switchBodyUnmade' : 'servers.worldTools.switchBody', { name: world.name, current })}</p>
       <BackupChoice on={backup} onChange={setBackup} offText="servers.worldTools.backupOffSwitch" />
     </ToolDialog>
   )
@@ -479,7 +479,7 @@ export default function ServerWorldTools({ s }: { s: ServerInfo }) {
           ))}
         </div>
       )}
-      {open?.kind === 'switch' && <SwitchDialog s={s} world={open.world} current={info.active} onDone={() => void load()} onClose={close} />}
+      {open?.kind === 'switch' && <SwitchDialog s={s} world={open.world} current={info.active} unmade={info.worlds.some((w) => w.active && !w.generated)} onDone={() => void load()} onClose={close} />}
       {open?.kind === 'new' && <NewWorldDialog s={s} current={info.active} onDone={() => void load()} onClose={close} />}
       {open?.kind === 'delete' && <DeleteDialog s={s} world={open.world} onDone={() => void load()} onClose={close} />}
       {open?.kind === 'chunks' && <ChunkDialog s={s} world={open.world} onClose={close} />}

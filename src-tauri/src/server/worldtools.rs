@@ -357,8 +357,14 @@ pub async fn switch_world(id: &str, req: SwitchWorld) -> Result<Option<String>> 
     if world.name == active {
         return Ok(None);
     }
-    let saved = if dir.join(&active).is_dir() { backup_first(id, &active, req.backup).await? } else { None };
-    properties::set_values(&dir, &[("level-name", req.name)]).await?;
+    let made = dir.join(&active).is_dir();
+    let saved = if made { backup_first(id, &active, req.backup).await? } else { None };
+    // A world that was never made leaves no folder to come back to, and its seed shouldn't reach the next new world.
+    let mut values = vec![("level-name", req.name)];
+    if !made {
+        values.push(("level-seed", String::new()));
+    }
+    properties::set_values(&dir, &values).await?;
     Ok(saved)
 }
 

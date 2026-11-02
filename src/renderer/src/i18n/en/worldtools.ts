@@ -18,6 +18,7 @@ export default {
   'servers.worldTools.done': 'Done.',
   'servers.worldTools.switchTitle': 'Use {name}?',
   'servers.worldTools.switchBody': 'The server opens {name} on its next start. {current} stays here, and you can switch back any time.',
+  'servers.worldTools.switchBodyUnmade': "The server opens {name} on its next start. {current} hasn't been made yet, so it's removed from this list.",
   'servers.worldTools.newTitle': 'New world',
   'servers.worldTools.newBody': 'The new world becomes the one in use. The server makes it on its next start; the other worlds stay here.',
   'servers.worldTools.name': 'Name',

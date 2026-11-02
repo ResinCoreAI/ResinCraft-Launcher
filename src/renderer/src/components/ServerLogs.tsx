@@ -98,6 +98,9 @@ export default function ServerLogs({ s }: { s: ServerInfo }) {
   const current = files?.find((f) => f.path === path)
   const re = useMemo(() => pattern(query), [query])
 
+  // A start or stop rotates latest.log, so what's on screen is out of date.
+  useEffect(() => setRefresh((n) => n + 1), [s.state])
+
   useEffect(() => {
     let live = true
     api.server.logFiles(s.id).then(
