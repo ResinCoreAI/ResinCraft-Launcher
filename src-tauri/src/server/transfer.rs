@@ -33,7 +33,7 @@ use crate::core::types::{ModpackRef, PendingDownload, ServerInfo, ServerKind, Se
 use crate::core::{shell, storage};
 use crate::migrate::copy::{copy_listed, Listing, Skipped};
 
-use super::{create, installers, properties, runtime, schedule, store};
+use super::{create, installers, plugins, properties, runtime, schedule, store};
 
 /// The description at the root of an exported zip.
 const MANIFEST: &str = "resincraft-server.json";
@@ -526,6 +526,7 @@ pub async fn clone(id: &str, opts: CloneOpts) -> Result<Transferred> {
         let total = listing.bytes.max(1) as f64;
         let skipped = copy_listed(&from2, &to, &listing, |b| task.update("Copying files…", Some(b as f64 / total))).await?;
         write_ports(&to, kind, meta.port).await?;
+        plugins::give_geyser_its_own_port(&to).await?;
         store::save(&meta).await?;
         schedule::copy_to(&id2, &meta.id).await?;
         guard.0 = None;
@@ -652,6 +653,7 @@ pub async fn import(path: Option<String>) -> Result<Option<Transferred>> {
         meta.icon_url = tokio::fs::read(dir.join("server-icon.png")).await.ok().map(|b| format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(b)));
         meta.launch = native_launch(&dir, meta.launch);
         write_ports(&dir, meta.kind, meta.port).await?;
+        plugins::give_geyser_its_own_port(&dir).await?;
         store::save(&meta).await?;
         // Nothing to start it with (made by hand, or left out): install the same software fresh, as `migrate` does.
         let l = &meta.launch;

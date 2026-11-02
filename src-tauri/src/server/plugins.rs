@@ -1215,23 +1215,64 @@ pub async fn bedrock_status(id: &str) -> Result<Value> {
     Ok(json!({ "supported": supported, "geyser": geyser, "floodgate": floodgate, "port": port }))
 }
 
-/// The Bedrock port in Geyser's config once it exists (`bedrock: port:`), else Geyser's default.
-async fn geyser_port(meta: &ServerMeta) -> Option<u16> {
-    let dir = store::dir(&meta.id).ok()?;
-    for cfg in ["plugins/Geyser-Spigot/config.yml", "config/Geyser-Fabric/config.yml", "config/Geyser-NeoForge/config.yml"] {
-        let Ok(text) = tokio::fs::read_to_string(dir.join(cfg)).await else { continue };
-        let mut in_bedrock = false;
-        for line in text.lines() {
-            if !line.starts_with(' ') && !line.trim().is_empty() && !line.starts_with('#') {
-                in_bedrock = line.trim_end() == "bedrock:";
-            } else if in_bedrock {
-                if let Some(p) = line.trim().strip_prefix("port:") {
-                    return p.trim().parse().ok();
-                }
+const GEYSER_CONFIGS: [&str; 3] = ["plugins/Geyser-Spigot/config.yml", "config/Geyser-Fabric/config.yml", "config/Geyser-NeoForge/config.yml"];
+
+/// The `port:` line of Geyser's `bedrock:` section, and its value.
+fn bedrock_port_line(text: &str) -> Option<(usize, u16)> {
+    let mut in_bedrock = false;
+    for (i, line) in text.lines().enumerate() {
+        if !line.starts_with(' ') && !line.trim().is_empty() && !line.starts_with('#') {
+            in_bedrock = line.trim_end() == "bedrock:";
+        } else if in_bedrock {
+            if let Some(p) = line.trim().strip_prefix("port:") {
+                return Some((i, p.trim().parse().ok()?));
             }
         }
     }
     None
+}
+
+/// The Bedrock port in Geyser's config once it exists (`bedrock: port:`), else Geyser's default.
+async fn geyser_port(meta: &ServerMeta) -> Option<u16> {
+    let dir = store::dir(&meta.id).ok()?;
+    for cfg in GEYSER_CONFIGS {
+        let Ok(text) = tokio::fs::read_to_string(dir.join(cfg)).await else { continue };
+        if let Some((_, port)) = bedrock_port_line(&text) {
+            return Some(port);
+        }
+    }
+    None
+}
+
+/// Geyser's config with another Bedrock port; comments and line endings stay as they were.
+fn with_bedrock_port(text: &str, port: u16) -> Option<String> {
+    let (at, old) = bedrock_port_line(text)?;
+    let lines = text.split_inclusive('\n').enumerate();
+    Some(lines.map(|(i, l)| if i == at { l.replacen(&old.to_string(), &port.to_string(), 1) } else { l.to_string() }).collect())
+}
+
+/// A copied server's Geyser moves off the original's Bedrock port, which would stop one of them while both run.
+pub(super) async fn give_geyser_its_own_port(dir: &Path) -> Result<()> {
+    for cfg in GEYSER_CONFIGS {
+        let path = dir.join(cfg);
+        let Ok(text) = tokio::fs::read_to_string(&path).await else { continue };
+        if bedrock_port_line(&text).is_none() {
+            continue;
+        }
+        let mut used = HashSet::new();
+        for meta in store::list().await? {
+            used.extend(geyser_port(&meta).await);
+            if meta.kind.bedrock() {
+                used.extend([meta.port, meta.port + 1]);
+            }
+        }
+        let Some(port) = (0..100).map(|i| 19132 + i * 2).find(|p| !used.contains(p) && super::network::udp_port_free(*p)) else { return Ok(()) };
+        if let Some(moved) = with_bedrock_port(&text, port) {
+            tokio::fs::write(&path, moved).await?;
+        }
+        return Ok(());
+    }
+    Ok(())
 }
 
 /// Grim Anticheat on Modrinth (GPL-3.0): what Settings → Anti-cheat installs on plugin servers.
@@ -2033,6 +2074,14 @@ pub async fn check_updates(id: &str, area: Option<&str>) -> Result<Vec<ServerAdd
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_bedrock_port_of_geyser_moves() {
+        let text = "# port: 1\r\nbedrock:\r\n  address: 0.0.0.0\r\n  port: 19132\r\nremote:\r\n  port: 25565\r\n";
+        assert_eq!(bedrock_port_line(text), Some((3, 19132)));
+        assert_eq!(with_bedrock_port(text, 19134).unwrap(), text.replace("19132", "19134"));
+        assert_eq!(with_bedrock_port("remote:\n  port: 25565\n", 19134), None);
+    }
 
     fn mr(id: &str, kind: &str) -> MrVersion {
         serde_json::from_value(json!({ "id": id, "project_id": "p", "version_number": id, "version_type": kind })).unwrap()
