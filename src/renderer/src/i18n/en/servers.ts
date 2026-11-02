@@ -646,6 +646,8 @@ export default {
   'servers.list.sponsored': 'Sponsored',
   'servers.list.sponsoredHint': 'A paid promotion, placed by the server list’s admin.',
   'servers.list.bedrockCanJoin': 'Bedrock can join',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock can join: {versions}',
+  'servers.list.javaRangeHint': 'The server runs {version}. Players on the other versions join through its Via plugins.',
   'servers.list.offlineOk': 'Offline profiles OK',
   'servers.list.crossplayHint': 'Bedrock players (phone, console, Windows) can join this Java server too, through Geyser.',
   'servers.list.offlineHint': 'Players with an offline profile, without a Minecraft account, can join (online-mode is off).',

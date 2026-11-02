@@ -132,7 +132,7 @@ fn defaults(meta: &ServerMeta) -> ListingInfo {
 }
 
 /// What the server itself says about who can join (players see it in the list, so it's never typed by hand):
-/// Bedrock players through Geyser, and offline profiles when `online-mode=false`.
+/// Bedrock players through Geyser, offline profiles when `online-mode=false`, and the versions its plugins let in.
 async fn with_facts(id: &str, meta: &ServerMeta, mut info: ListingInfo) -> ListingInfo {
     info.crossplay = !meta.kind.bedrock()
         && super::plugins::bedrock_status(id).await.ok().and_then(|v| v.get("geyser").and_then(Value::as_bool)) == Some(true);
@@ -140,6 +140,9 @@ async fn with_facts(id: &str, meta: &ServerMeta, mut info: ListingInfo) -> Listi
         Ok(dir) => super::properties::get_value(&dir, "online-mode").await.is_some_and(|v| v.trim() == "false"),
         Err(_) => false,
     };
+    let reach = super::plugins::reach(id).await;
+    (info.version_min, info.version_max) = reach.java.unzip();
+    (info.bedrock_min, info.bedrock_max) = reach.bedrock.filter(|_| info.crossplay).unzip();
     // The relay knows Geyser's port on it; an address typed here would only be stale.
     info.bedrock_address = None;
     // A server made from a modpack says which one (the owner can name a custom pack only when there's none).
@@ -183,8 +186,9 @@ pub async fn get(id: &str) -> Result<ServerListing> {
     let enabled = saved.as_ref().is_some_and(|s| s.enabled);
     let saved_info = saved.map(|s| s.info);
     let info = with_facts(id, &meta, saved_info.clone().unwrap_or_else(|| defaults(&meta))).await;
-    // Geyser or online-mode changed since it was listed: the list should say so.
-    let changed = saved_info.as_ref().is_some_and(|s| (s.crossplay, s.offline, &s.modpack) != (info.crossplay, info.offline, &info.modpack));
+    // Geyser, online-mode or the Via plugins changed since it was listed: the list should say so.
+    let facts = |i: &ListingInfo| (i.crossplay, i.offline, i.modpack.clone(), i.version_min.clone(), i.version_max.clone(), i.bedrock_min.clone(), i.bedrock_max.clone());
+    let changed = saved_info.as_ref().is_some_and(|s| facts(s) != facts(&info));
     let mut out = ServerListing {
         available: meta.relay_name.is_some() && relay::settings().is_some(),
         enabled,

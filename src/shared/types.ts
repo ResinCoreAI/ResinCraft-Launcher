@@ -1282,6 +1282,12 @@ export interface ListingInfo {
   offline?: boolean
   /** Where Bedrock players join when it isn't the address (Geyser's port). */
   bedrock_address?: string
+  /** The Java versions players can join with, when Via plugins widen them; for a hosted server, the engine fills it in. */
+  version_min?: string
+  version_max?: string
+  /** The Bedrock versions Geyser accepts; for a hosted server, the engine fills it in. */
+  bedrock_min?: string
+  bedrock_max?: string
   /** The modpack players need; for a server made from a pack, the engine fills it in. */
   modpack?: ListingModpack
   website?: string
@@ -1420,6 +1426,12 @@ export interface ListedServer {
   /** Offline profiles can join. */
   offline?: boolean
   bedrock_address?: string | null
+  /** The Java versions players can join with, when Via plugins widen them (older relays leave them out). */
+  version_min?: string | null
+  version_max?: string | null
+  /** The Bedrock versions Geyser accepts. */
+  bedrock_min?: string | null
+  bedrock_max?: string | null
   modpack?: ListingModpack | null
   /** The owner's client pack: Install & join makes an instance from it. */
   pack?: ListingPack | null

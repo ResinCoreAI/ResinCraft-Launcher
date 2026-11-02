@@ -17,6 +17,34 @@ export const LANGUAGES = ['en', 'th', 'es', 'pt-BR', 'de', 'fr', 'it', 'pl', 'ru
 const MAX_CUSTOM = 5
 
 /** A modpack's filter value: "<source>:<project id>", or a custom pack's name. */
+type Versions = Pick<ListedServer, 'version' | 'edition' | 'version_min' | 'version_max' | 'bedrock_min' | 'bedrock_max'>
+
+const versionSpan = (min?: string | null, max?: string | null) => (!min || !max ? '' : min === max ? min : `${min} – ${max}`)
+/** The Java versions a server takes: its range with Via plugins, else its own version. */
+const javaVersions = (s: Versions) => versionSpan(s.version_min, s.version_max) || s.version
+/** The Bedrock versions a server takes: a Bedrock server's own, or what Geyser accepts ('' when that isn't known). */
+const bedrockVersions = (s: Versions) => (s.edition === 'bedrock' ? s.version : versionSpan(s.bedrock_min, s.bedrock_max))
+/** The edition and versions, as the list shows them. */
+const versionsText = (s: Versions) => (s.edition === 'bedrock' ? `Bedrock ${s.version}` : `Java ${javaVersions(s)}`)
+
+/** a < b for Minecraft versions, number by number (1.9 < 1.21.1 < 26.1). */
+function compareVersions(a: string, b: string): number {
+  const [x, y] = [a.split('.').map(Number), b.split('.').map(Number)]
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0)
+    if (d) return d
+  }
+  return 0
+}
+const inRange = (s: Versions, version: string) =>
+  !!s.version_min && !!s.version_max && /^[\d.]+$/.test(version) && compareVersions(s.version_min, version) <= 0 && compareVersions(version, s.version_max) <= 0
+
+/** "Bedrock can join", with the versions when they're known. */
+function BedrockCanJoin({ s }: { s: Versions }) {
+  const versions = bedrockVersions(s)
+  return <>{versions ? t('servers.list.bedrockCanJoinVersions', { versions }) : t('servers.list.bedrockCanJoin')}</>
+}
+
 /** Instances for joining a listed server: the server's modpack, then its Minecraft version (and mods or not), first. */
 export function rankForListing(s: ListedServer, instances: Instance[]): { inst: Instance; fits: boolean }[] {
   // ResinCraft keeps a pack's site as a prefix of its project id (Modrinth has none).
@@ -24,14 +52,16 @@ export function rankForListing(s: ListedServer, instances: Instance[]): { inst: 
   const pack = s.modpack?.project_id && s.modpack.source in prefix ? `${prefix[s.modpack.source]}${s.modpack.project_id}` : ''
   const score = (i: Instance) => {
     if (pack && i.modpack?.projectId === pack) return 3
-    if (!s.version || i.mcVersion !== s.version) return 0
+    const exact = !!s.version && i.mcVersion === s.version
+    if (!exact && !inRange(s, i.mcVersion)) return 0
     const modded = i.loader !== 'vanilla'
-    return modded === (s.modded || !!s.modpack) ? 2 : 1
+    // The server's own version first, then the others its Via plugins let in.
+    return (modded === (s.modded || !!s.modpack) ? 2 : 1) + (exact ? 0.5 : 0)
   }
   return instances
     .map((inst) => ({ inst, score: score(inst) }))
     .sort((a, b) => b.score - a.score || (b.inst.lastPlayed ?? 0) - (a.inst.lastPlayed ?? 0))
-    .map(({ inst, score }) => ({ inst, fits: score >= 2 || (score === 1 && !s.modded) }))
+    .map(({ inst, score }) => ({ inst, fits: score >= 2 || (score >= 1 && !s.modded) }))
 }
 
 /** The instance a listed server was last joined with (this PC only). */
@@ -238,8 +268,9 @@ export function ListingFields({ info, onChange, showEdition }: { info: ListingIn
       )}
       {!showEdition && (
         <p className="hint listing-facts">
-          {info.edition === 'bedrock' || info.crossplay ? <><Smartphone /> {t('servers.list.bedrockCanJoin')}</> : t('servers.list.javaOnly')}
+          {info.edition === 'bedrock' || info.crossplay ? <><Smartphone /> <BedrockCanJoin s={info} /></> : t('servers.list.javaOnly')}
           {' · '}
+          {info.version_min && <>{versionsText(info)}{' · '}</>}
           {info.offline ? <><UserRound /> {t('servers.list.offlineOk')}</> : t('servers.list.accountNeeded')}
           {' · '}
           {info.modpack && (
@@ -735,7 +766,7 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack, onOpen }: { s: List
             ) : (
               <span>{t('servers.list.offline')}</span>
             )}
-            <span>{s.edition === 'bedrock' ? 'Bedrock' : 'Java'} {s.version}</span>
+            <span title={s.version_min ? t('servers.list.javaRangeHint', { version: s.version }) : undefined}>{versionsText(s)}</span>
             {s.resincraft && <span className="chip accent compact">ResinCraft</span>}
             {s.pinned && (
               <span className="chip compact" title={t('servers.list.pinnedHint')}>
@@ -777,7 +808,7 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack, onOpen }: { s: List
         ))}
         {bedrockOk && (
           <span className="chip success" title={s.edition === 'java' ? t('servers.list.crossplayHint') : undefined}>
-            <Smartphone /> {t('servers.list.bedrockCanJoin')}
+            <Smartphone /> <BedrockCanJoin s={s} />
           </span>
         )}
         {s.offline && (
@@ -833,9 +864,7 @@ function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: List
             ) : (
               <span>{t('servers.list.offline')}</span>
             )}
-            <span>
-              {s.edition === 'bedrock' ? 'Bedrock' : 'Java'} {s.version}
-            </span>
+            <span title={s.version_min ? t('servers.list.javaRangeHint', { version: s.version }) : undefined}>{versionsText(s)}</span>
             {s.resincraft && <span className="chip accent compact">ResinCraft</span>}
             {s.pinned && (
               <span className="chip compact">
@@ -905,7 +934,7 @@ function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: List
             ))}
             {a.bedrockOk && (
               <span className="chip success">
-                <Smartphone /> {t('servers.list.bedrockCanJoin')}
+                <Smartphone /> <BedrockCanJoin s={s} />
               </span>
             )}
             {s.offline && (
@@ -919,7 +948,7 @@ function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: List
           <h2>{t('servers.list.details')}</h2>
           {fact(t('servers.list.field.address'), <button className="link mono server-address" title={t('servers.connect.copy')} onClick={() => void a.copy(s.address)}>{s.address}</button>)}
           {a.bedrockOk && s.edition === 'java' && fact(t('servers.list.bedrockAddress'), <span className="mono">{a.bedrockAddress}</span>)}
-          {fact(t('servers.list.field.edition'), `${s.edition === 'bedrock' ? 'Bedrock' : 'Java'} ${s.version}${s.modded ? ` · ${t('servers.list.cat.modded')}` : ''}`)}
+          {fact(t('servers.list.field.edition'), `${versionsText(s)}${s.modded ? ` · ${t('servers.list.cat.modded')}` : ''}`)}
           {s.modpack &&
             fact(
               t('servers.list.modpack'),

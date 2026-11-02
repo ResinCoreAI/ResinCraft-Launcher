@@ -1230,6 +1230,15 @@ pub async fn bedrock_status(id: &str) -> Result<Value> {
     Ok(json!({ "supported": supported, "geyser": geyser, "floodgate": floodgate, "port": port }))
 }
 
+/// Which game versions can join, from the server's enabled jars (in the plugins of a hybrid).
+pub async fn reach(id: &str) -> super::reach::Reach {
+    let Ok(meta) = view(id, Some("plugins")).await else { return Default::default() };
+    let Ok(folder) = folder(&meta) else { return Default::default() };
+    let names = jar_names(&folder).await.unwrap_or_default();
+    let jars = names.iter().filter(|n| !n.ends_with(".disabled")).map(|n| folder.join(n)).collect();
+    super::reach::read_jars(jars, meta.mc_version.clone(), meta.kind.plugins()).await
+}
+
 /// The Bedrock port in Geyser's config once it exists (`bedrock: port:`), else Geyser's default.
 async fn geyser_port(meta: &ServerMeta) -> Option<u16> {
     let dir = store::dir(&meta.id).ok()?;

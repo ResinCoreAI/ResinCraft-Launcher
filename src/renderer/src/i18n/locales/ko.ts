@@ -2405,6 +2405,8 @@ const dict: Dict = {
   'servers.list.moddedYes': '모드 있음',
   'servers.list.onlineOnly': '지금 온라인',
   'servers.list.bedrockCanJoin': 'Bedrock 참가 가능',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock 참가 가능: {versions}',
+  'servers.list.javaRangeHint': '서버 버전은 {version}입니다. 다른 버전의 플레이어는 Via 플러그인을 통해 참가합니다.',
   'servers.list.offlineOk': '오프라인 프로필 가능',
   'servers.list.crossplayHint': 'Bedrock 플레이어(휴대폰, 콘솔, Windows)도 Geyser를 통해 이 Java 서버에 참가할 수 있습니다.',
   'servers.list.offlineHint': 'Minecraft 계정 없이 오프라인 프로필을 쓰는 플레이어도 참가할 수 있습니다(online-mode가 꺼져 있음).',

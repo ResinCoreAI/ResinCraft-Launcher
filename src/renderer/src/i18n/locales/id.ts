@@ -2413,6 +2413,8 @@ const dict: Dict = {
   'servers.list.moddedYes': 'Pakai mod',
   'servers.list.onlineOnly': 'Sedang online',
   'servers.list.bedrockCanJoin': 'Bedrock bisa gabung',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock bisa gabung: {versions}',
+  'servers.list.javaRangeHint': 'Server berjalan di {version}. Pemain versi lain bergabung lewat plugin Via-nya.',
   'servers.list.offlineOk': 'Profil offline boleh',
   'servers.list.crossplayHint': 'Pemain Bedrock (ponsel, konsol, Windows) juga bisa gabung ke server Java ini, lewat Geyser.',
   'servers.list.offlineHint': 'Pemain dengan profil offline, tanpa akun Minecraft, bisa gabung (online-mode mati).',

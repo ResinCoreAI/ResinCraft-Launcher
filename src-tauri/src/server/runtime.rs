@@ -468,8 +468,15 @@ pub async fn start(id: &str) -> Result<()> {
             });
             pending.lock().unwrap().push(line);
             let _ = lines_tx.send(text.clone());
-            if on_line(&id, &text) && public {
-                tokio::spawn(open_internet(id.clone()));
+            if on_line(&id, &text) {
+                if public {
+                    tokio::spawn(open_internet(id.clone()));
+                }
+                // Plugins only change while a server is down: its listing catches up here.
+                let listed = id.clone();
+                tokio::spawn(async move {
+                    let _ = super::listing::get(&listed).await;
+                });
             }
         }
     };

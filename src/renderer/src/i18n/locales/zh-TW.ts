@@ -2400,6 +2400,8 @@ const dict: Dict = {
   'servers.list.moddedYes': '有模組',
   'servers.list.onlineOnly': '目前在線',
   'servers.list.bedrockCanJoin': 'Bedrock 可加入',
+  'servers.list.bedrockCanJoinVersions': 'Bedrock 可加入：{versions}',
+  'servers.list.javaRangeHint': '伺服器執行 {version}。其他版本的玩家透過其 Via 外掛加入。',
   'servers.list.offlineOk': '允許離線設定檔',
   'servers.list.crossplayHint': 'Bedrock 玩家（手機、主機、Windows）也能透過 Geyser 加入這個 Java 伺服器。',
   'servers.list.offlineHint': '使用離線設定檔、沒有 Minecraft 帳戶的玩家也能加入（online-mode 已關閉）。',
