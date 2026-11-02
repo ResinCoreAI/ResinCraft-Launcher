@@ -466,6 +466,24 @@ fn client_flags(memory_mb: u32) -> Vec<String> {
         .collect()
 }
 
+/// Generational ZGC for a game on Java `java_major`, or None below Java 21, where ZGC isn't generational and
+/// G1GC does better. A chosen Java can be newer than the one the version asks for, and new Javas drop
+/// `ZGenerational`, so unknown flags are ignored. It aims 15% under the maximum heap and hands unused memory
+/// back after a minute, or the heap looks full long after the game stopped needing it.
+fn zgc_flags(memory_mb: u32, java_major: u32) -> Option<Vec<String>> {
+    if java_major < 21 {
+        return None;
+    }
+    let mut f = vec!["-XX:+UseZGC".to_string()];
+    if java_major < 23 {
+        f.push("-XX:+IgnoreUnrecognizedVMOptions".into());
+        f.push("-XX:+ZGenerational".into());
+    }
+    f.push(format!("-XX:SoftMaxHeapSize={}M", memory_mb / 20 * 17));
+    f.push("-XX:ZUncommitDelay=60".into());
+    Some(f)
+}
+
 /// Whether the arguments already pick a garbage collector (two would stop Java from starting).
 fn picks_gc(args: &[String]) -> bool {
     args.iter().any(|a| a.starts_with("-XX:+Use") && a.ends_with("GC"))
@@ -473,13 +491,14 @@ fn picks_gc(args: &[String]) -> bool {
 
 /// The memory flags, ResinCraft's flags (if on and the player's arguments don't pick a collector) and the
 /// player's JVM arguments after them, so theirs win (also `$INST_JAVA_ARGS` for commands).
-fn memory_and_user_flags(inst: &Instance, settings: &Settings) -> Vec<String> {
+fn memory_and_user_flags(inst: &Instance, settings: &Settings, java_major: u32) -> Vec<String> {
     let memory = inst.memory_mb.unwrap_or(settings.memory_mb);
     let user_jvm = non_empty(inst.jvm_args.as_deref()).unwrap_or_else(|| settings.jvm_args.clone());
     let user = split_args(&user_jvm);
     let mut args = vec![format!("-Xmx{memory}M"), format!("-Xms{}M", memory.min(1024))];
     if inst.optimized_flags.unwrap_or(settings.optimized_flags) && !picks_gc(&user) {
-        args.extend(client_flags(memory));
+        let zgc = inst.use_zgc.unwrap_or(settings.use_zgc).then(|| zgc_flags(memory, java_major)).flatten();
+        args.extend(zgc.unwrap_or_else(|| client_flags(memory)));
     }
     args.extend(user);
     args
@@ -539,7 +558,7 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
     let game = with_target(game, target, &inst.mc_version)?;
 
     let main_class = v.main_class.clone().filter(|m| !m.is_empty()).ok_or_else(|| err_tr!("launch.noMainClass", "Version {version} has no main class", version = v.id))?;
-    let mut args = memory_and_user_flags(inst, settings);
+    let mut args = memory_and_user_flags(inst, settings, v.java_major());
     args.extend(jvm.iter().map(sub));
     if let Some(l) = &p.log_argument {
         args.push(l.clone());
@@ -784,7 +803,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
 
     let own = commands::effective(settings, &inst);
     let env = commands::merged_env(settings, &inst);
-    let vars = commands::command_vars(&inst, &prepared.java, &memory_and_user_flags(&inst, settings), &env);
+    let vars = commands::command_vars(&inst, &prepared.java, &memory_and_user_flags(&inst, settings, prepared.version.java_major()), &env);
     if !env.is_empty() {
         push(LogLine { text: format!("Environment: {}", commands::shown_env(&env)), level: "info" });
     }
@@ -1011,6 +1030,17 @@ mod tests {
         assert!(!f.iter().any(|a| a == "-XX:+AlwaysPreTouch" || a.starts_with("-D")));
         assert!(picks_gc(&["-XX:+UseZGC".to_string()]));
         assert!(!picks_gc(&["-XX:MaxGCPauseMillis=50".to_string(), "-Dfoo=GC".to_string()]));
+    }
+
+    #[test]
+    fn zgc_needs_java_21_and_only_old_javas_get_zgenerational() {
+        assert_eq!(zgc_flags(4096, 17), None);
+        let j21 = zgc_flags(4096, 21).unwrap();
+        assert!(j21.contains(&"-XX:+ZGenerational".to_string()));
+        assert!(j21.contains(&"-XX:SoftMaxHeapSize=3468M".to_string()));
+        let j25 = zgc_flags(4096, 25).unwrap();
+        assert_eq!(j25[0], "-XX:+UseZGC");
+        assert!(!j25.iter().any(|a| a.contains("ZGenerational") || a.contains("G1")));
     }
 
     fn auth(id: &str, name: &str) -> LaunchAuth {

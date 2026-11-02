@@ -157,6 +157,9 @@ pub struct Instance {
     /// ResinCraft's G1GC flags for this instance; None follows Settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub optimized_flags: Option<bool>,
+    /// ZGC instead of G1GC in those flags; None follows Settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_zgc: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modpack: Option<ModpackRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

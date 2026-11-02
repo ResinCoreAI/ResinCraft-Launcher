@@ -106,6 +106,8 @@ export interface Instance {
   jvmArgs?: string
   /** ResinCraft's G1GC flags; unset follows Settings. */
   optimizedFlags?: boolean
+  /** ZGC instead of G1GC in those flags; unset follows Settings. */
+  useZgc?: boolean
   modpack?: { projectId?: string; versionId?: string; name: string }
   pendingDownloads?: PendingDownload[]
   /** Library group; none = Ungrouped. */
@@ -232,6 +234,8 @@ export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVer
   jvmArgs?: string | null
   /** `null` follows Settings again. */
   optimizedFlags?: boolean | null
+  /** `null` follows Settings again. */
+  useZgc?: boolean | null
   /** `null` moves the instance back to Ungrouped. */
   group?: string | null
   /** `null` clears the instance's own environment variables. */
@@ -415,6 +419,8 @@ export interface Settings {
   jvmArgs: string
   /** ResinCraft's G1GC flags for games (skipped when the JVM arguments pick a collector). */
   optimizedFlags: boolean
+  /** Those flags use ZGC instead of G1GC, on Java 21 or newer. */
+  useZgc: boolean
   javaPath: string
   autoJava: boolean
   onLaunch: CloseBehavior

@@ -124,6 +124,7 @@ export function mockApi(): ResinApi {
     memoryMb: 4096,
     jvmArgs: '',
     optimizedFlags: true,
+    useZgc: false,
     javaPath: '',
     autoJava: true,
     onLaunch: 'minimize',

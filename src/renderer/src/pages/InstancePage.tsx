@@ -1051,12 +1051,18 @@ function SettingsTab({ inst }: { inst: Instance }) {
               <b>{t('instance.settings.flags')}</b>
               <span>{t('instance.settings.flagsHint')}</span>
             </div>
-            <Segmented<'default' | 'resin' | 'off'>
-              value={inst.optimizedFlags == null ? 'default' : inst.optimizedFlags ? 'resin' : 'off'}
-              onChange={(v) => void save({ optimizedFlags: v === 'default' ? null : v === 'resin' })}
+            <Segmented<'default' | 'resin' | 'zgc' | 'off'>
+              value={inst.optimizedFlags == null ? 'default' : !inst.optimizedFlags ? 'off' : inst.useZgc ? 'zgc' : 'resin'}
+              onChange={(v) =>
+                void save({
+                  optimizedFlags: v === 'default' ? null : v !== 'off',
+                  useZgc: v === 'default' || v === 'off' ? null : v === 'zgc'
+                })
+              }
               options={[
                 { value: 'default', label: t('instance.settings.flagsDefault') },
                 { value: 'resin', label: t('instance.settings.flagsResin') },
+                { value: 'zgc', label: t('instance.settings.flagsZgc') },
                 { value: 'off', label: t('instance.settings.flagsOff') }
               ]}
             />

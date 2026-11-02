@@ -40,6 +40,8 @@ pub struct Settings {
     /// ResinCraft's G1GC flags for games (an instance can choose its own; skipped when the JVM arguments pick a
     /// collector themselves).
     pub optimized_flags: bool,
+    /// Those flags use ZGC instead of G1GC, on Java 21 or newer (an instance can choose its own).
+    pub use_zgc: bool,
     pub java_path: String,
     pub auto_java: bool,
     /// "keep" | "minimize" | "hide"
@@ -110,6 +112,7 @@ impl Default for Settings {
             memory_mb: ((total / 4 / 512) * 512).clamp(2048, 6144),
             jvm_args: String::new(),
             optimized_flags: true,
+            use_zgc: false,
             java_path: String::new(),
             auto_java: true,
             on_launch: "minimize".into(),

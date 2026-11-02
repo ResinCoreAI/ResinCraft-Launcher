@@ -192,6 +192,8 @@ export default {
   'settings.javaManaged': 'Installed by ResinCraft',
   'settings.noJava': "No Java found yet. That's fine: ResinCraft will download one when you first play.",
   'settings.jvmArgs': 'Default JVM arguments',
+  'settings.zgc': 'Use ZGC',
+  'settings.zgc.hint': 'Fewer stutters from garbage collection, for more RAM and a little more CPU. Best with 4 GB or more. Versions on Java below 21 keep G1GC.',
   'settings.flags': 'ResinCraft Java flags',
   'settings.flags.hint': 'Tuned garbage collection (G1GC) for smoother frames. Skipped when your JVM arguments choose a collector.',
   'settings.jvmArgs.hint': 'Advanced: extra flags passed to Java for every instance.',

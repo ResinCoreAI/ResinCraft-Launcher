@@ -468,6 +468,13 @@ export default function SettingsPage() {
                 </div>
                 <Switch on={s.optimizedFlags} onChange={(v) => set({ optimizedFlags: v })} label={t('settings.flags')} />
               </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.zgc')}</b>
+                  <span>{t('settings.zgc.hint')}</span>
+                </div>
+                <Switch on={s.useZgc} onChange={(v) => set({ useZgc: v })} label={t('settings.zgc')} />
+              </div>
               <div className="setting stack">
                 <div className="text">
                   <b>{t('settings.jvmArgs')}</b>

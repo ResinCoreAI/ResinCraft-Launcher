@@ -82,6 +82,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         java_path: None,
         jvm_args: None,
         optimized_flags: None,
+        use_zgc: None,
         modpack: None,
         pending_downloads: None,
         group: data.group.map(|g| g.trim().to_string()).filter(|g| !g.is_empty()),
