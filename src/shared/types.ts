@@ -921,6 +921,46 @@ export interface ServerStatus {
   favicon?: string
 }
 
+/** A world open to LAN in a running game. */
+export interface FriendsWorld {
+  runId: string
+  instanceId: string
+  port: number
+}
+
+export interface FriendsInvite {
+  runId: string
+  instanceId: string
+  code: string
+  expiresAt: number
+  connected: number
+  /** The router forwards the port, through this. */
+  router?: 'pcp' | 'natpmp' | 'upnp' | null
+  publicAddress?: string | null
+  port: number
+  relay: boolean
+  /** Why there's no relay fallback. */
+  relayNote?: EngineText | null
+  /** Seconds until the relay's session ends unless continued. */
+  relayEnding?: number | null
+  expired: boolean
+}
+
+export interface FriendsJoined {
+  /** The loopback address the game joins. */
+  address: string
+  route: 'direct' | 'lan' | 'relay'
+  status?: ServerStatus | null
+}
+
+export interface FriendsState {
+  worlds: FriendsWorld[]
+  invite?: FriendsInvite | null
+  joined?: FriendsJoined | null
+  /** Why the last invite ended by itself. */
+  ended?: 'worldClosed' | 'expired' | null
+}
+
 /** Quick join: a group of the player's own entries. */
 export interface QuickJoinGroup {
   id: string
@@ -2165,6 +2205,19 @@ export interface ResinApi {
     /** Starts the instance straight into the server (Bedrock: opens Minecraft with it) and remembers the join. */
     join(req: QuickJoinRequest): Promise<void>
   }
+  friends: {
+    state(): Promise<FriendsState>
+    /** Starts sharing a world that's open to LAN; takes a few seconds (router, public address, relay). */
+    invite(runId: string): Promise<FriendsState>
+    /** Ends the code, disconnects friends and removes the router mapping. */
+    stopInvite(): Promise<void>
+    relayContinue(): Promise<void>
+    /** Checks a code and opens the tunnel. */
+    open(code: string): Promise<FriendsJoined>
+    /** Starts the game into the open tunnel. */
+    join(req: { instanceId: string; accountId?: string }): Promise<void>
+    leave(): Promise<void>
+  }
   screenshots: {
     list(instanceId: string): Promise<ScreenshotInfo[]>
     /** A small JPEG data URL for the grid. */
@@ -2376,6 +2429,7 @@ export interface ResinApi {
   on: {
     task(cb: (t: TaskInfo) => void): () => void
     game(cb: (e: GameEvent) => void): () => void
+    friends(cb: (s: FriendsState) => void): () => void
     log(cb: (e: LogEvent) => void): () => void
     login(cb: (e: LoginEvent) => void): () => void
     server(cb: (e: ServerEvent) => void): () => void

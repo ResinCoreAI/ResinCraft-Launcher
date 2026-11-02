@@ -19,7 +19,7 @@ pub fn lan_ip() -> Option<Ipv4Addr> {
 
 /// Addresses the internet can't reach: the router itself sits behind another NAT (carrier-grade NAT or a
 /// second router).
-fn is_shared(ip: Ipv4Addr) -> bool {
+pub fn is_shared(ip: Ipv4Addr) -> bool {
     let [a, b, ..] = ip.octets();
     ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified() || (a == 100 && (64..128).contains(&b))
 }

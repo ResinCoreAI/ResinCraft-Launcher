@@ -44,6 +44,7 @@ import { timeAgo } from '../util'
 import { api } from '../api'
 import { t } from '../i18n'
 import { RecentWorldsSection } from '../components/RecentWorlds'
+import { FriendsSection } from '../components/Friends'
 
 /** What's being dragged (a server row or a group header) and where the pointer is. */
 type Drag = { kind: 'entry' | 'group'; id: string; label: string; x: number; y: number }
@@ -332,6 +333,8 @@ export default function QuickJoin() {
               </button>
             </div>
           )}
+
+          <FriendsSection />
 
           <RecentWorldsSection query={query} />
 
