@@ -2,6 +2,8 @@
 //! processes, like two computers:
 //!   cargo run --example check_friends -- host <instance> <name> <code file>     an offline profile hosts; open to LAN by hand
 //!   cargo run --example check_friends -- join <instance> <code file> [--offline <name>]
+//!   cargo run --example check_friends -- login        a Microsoft account for `join` (RESINCRAFT_MS_CLIENT_ID in the environment)
+//!   cargo run --example check_friends -- logout       removes it again
 //! `host` ends when <code file>.stop appears: it stops the invite, then says whether the port still answers.
 
 use std::path::{Path, PathBuf};
@@ -99,6 +101,35 @@ async fn join(instance: &str, code_file: &Path, offline_name: Option<&str>) {
     tokio::time::sleep(Duration::from_secs(3)).await;
 }
 
+async fn microsoft() -> Vec<Value> {
+    let list = call("accounts:list", vec![]).await.unwrap();
+    list.as_array().unwrap().iter().filter(|a| a["type"] != "offline").cloned().collect()
+}
+
+async fn login() {
+    let code = call("accounts:beginMicrosoft", vec![]).await.expect("sign-in");
+    println!("sign in at {} with the code {}", code["verificationUri"].as_str().unwrap_or_default(), code["userCode"].as_str().unwrap_or_default());
+    let account = loop {
+        if let Some(a) = microsoft().await.into_iter().next() {
+            break a;
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    };
+    call("accounts:setActive", vec![account["id"].clone()]).await.unwrap();
+    println!("signed in: {} ({})", account["username"], account["type"]);
+}
+
+async fn logout() {
+    for a in microsoft().await {
+        call("accounts:remove", vec![a["id"].clone()]).await.unwrap();
+    }
+    let list = call("accounts:list", vec![]).await.unwrap();
+    if let Some(a) = list.as_array().unwrap().first() {
+        call("accounts:setActive", vec![a["id"].clone()]).await.unwrap();
+    }
+    println!("accounts left: {}", list.as_array().unwrap().len());
+}
+
 fn main() {
     // Launching is a deep future for a debug build's main thread.
     let run = || tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(run());
@@ -114,6 +145,8 @@ async fn run() {
         ["host", instance, name, file] => host(instance, name, Path::new(file)).await,
         ["join", instance, file] => join(instance, Path::new(file), None).await,
         ["join", instance, file, "--offline", name] => join(instance, Path::new(file), Some(name)).await,
+        ["login"] => login().await,
+        ["logout"] => logout().await,
         _ => eprintln!("see the top of this file"),
     }
 }
