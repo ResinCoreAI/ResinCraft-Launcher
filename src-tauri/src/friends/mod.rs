@@ -124,14 +124,14 @@ fn edit_invite(f: impl FnOnce(&mut InviteView)) {
     changed();
 }
 
-/// Serving on a port. Vanilla, Fabric and Forge log it the same way; old versions say "Started on". Chat lines are
-/// skipped so another player can't fake one.
+/// Serving on a port. Vanilla, Fabric and Forge log it the same way; old versions say "Started on", 26.2 says
+/// "Published LAN server on port". Chat lines are skipped so another player can't fake one.
 fn lan_port_of(line: &str) -> Option<u16> {
     static RE: OnceLock<Regex> = OnceLock::new();
     if line.contains("[CHAT]") {
         return None;
     }
-    let re = RE.get_or_init(|| Regex::new(r"(?:^|: )Started (?:serving )?on (\d{1,5})\s*$").unwrap());
+    let re = RE.get_or_init(|| Regex::new(r"(?:^|: )(?:Started (?:serving )?on|Published LAN server on port) (\d{1,5})\s*$").unwrap());
     re.captures(line)?[1].parse().ok().filter(|p| *p > 0)
 }
 
@@ -470,6 +470,7 @@ mod tests {
             "[12:01:33] [Server thread/INFO] [net.minecraft.server.MinecraftServer/]: Started serving on 51234",
             "[12:01:33] [Server thread/INFO] [minecraft/IntegratedServer]: Started on 51234",
             "Started serving on 51234",
+            "[08:55:31] [Render thread/INFO]: Published LAN server on port 51234",
         ] {
             assert_eq!(lan_port_of(line), Some(51234), "{line}");
         }
@@ -480,6 +481,8 @@ mod tests {
         for line in [
             "[12:01:33] [Render thread/INFO]: [System] [CHAT] <Bob> : Started serving on 1234",
             "[12:01:33] [Render thread/INFO]: [CHAT] Started serving on 1234",
+            "[08:55:31] [Render thread/INFO]: [System] [CHAT] <Bob> : Published LAN server on port 1234",
+            "[08:55:31] [Render thread/INFO]: [System] [CHAT] This world is now open to LAN. The port number is [62919]",
             "[12:01:33] [main/INFO]: Started serving on 99999",
             "Starting integrated minecraft server version 1.21.1",
             "Started on port 25565",
