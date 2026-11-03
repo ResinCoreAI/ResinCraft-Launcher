@@ -2251,6 +2251,10 @@ const dict: Dict = {
   'friends.route.direct': "Terhubung langsung dan terenkripsi.",
   'friends.route.lan': "Terhubung lewat jaringan lokalmu dan terenkripsi.",
   'friends.route.relay': "Terhubung lewat ResinCraft Relay dan terenkripsi.",
+  'friends.offline.switch': "Izinkan pemain offline bergabung",
+  'friends.offline.warn': "Tidak ada nama yang diperiksa: siapa pun yang punya kode bisa bergabung dengan nama apa pun, bahkan namamu, dan bermain sebagai pemain itu. Bagikan kode hanya ke teman yang kamu percaya.",
+  'friends.offline.on': "Pemain offline bisa bergabung ke dunia ini.",
+  'friends.offline.restart': "Pemain offline belum bisa bergabung. Mulai ulang game untuk mengizinkan mereka (Minecraft 26.1 atau lebih baru).",
   // Quick join (engine messages)
   'engine.quickjoin.chooseInstance': "Pilih instalasi untuk bermain",
   'engine.quickjoin.groupNameTooLong': "Nama grup maksimal {max} karakter",

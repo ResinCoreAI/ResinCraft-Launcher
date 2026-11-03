@@ -11,11 +11,15 @@ use sha2::{Digest, Sha256};
 use crate::bail_tr;
 
 const VERSION: u8 = 1;
+/// Codes that let offline players in: launchers that can't use one ask for an update instead of failing later.
+const VERSION_OFFLINE: u8 = 2;
 pub const SECRET_LEN: usize = 12;
 const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const TAG_V4: u8 = 1;
 const TAG_V6: u8 = 2;
 const TAG_RELAY: u8 = 3;
+/// No address: the world lets offline players in (friends/offline.rs).
+const TAG_OFFLINE: u8 = 4;
 const MAX_ROUTES: usize = 8;
 
 /// One way to reach the host.
@@ -32,11 +36,13 @@ pub struct Invite {
     pub secret: [u8; SECRET_LEN],
     pub expires: u32,
     pub routes: Vec<Route>,
+    /// The world lets offline players in.
+    pub offline: bool,
 }
 
 impl Invite {
     pub fn encode(&self) -> String {
-        let mut b = vec![VERSION];
+        let mut b = vec![if self.offline { VERSION_OFFLINE } else { VERSION }];
         b.extend_from_slice(&self.secret);
         b.extend_from_slice(&self.expires.to_be_bytes());
         for route in self.routes.iter().take(MAX_ROUTES) {
@@ -58,6 +64,9 @@ impl Invite {
                 }
             }
         }
+        if self.offline {
+            b.push(TAG_OFFLINE);
+        }
         let sum = Sha256::digest(&b);
         b.extend_from_slice(&sum[..2]);
         let text = to_base32(&b);
@@ -75,7 +84,7 @@ impl Invite {
         if Sha256::digest(body)[..2] != *sum {
             return Err(bad());
         }
-        if body[0] != VERSION {
+        if body[0] != VERSION && body[0] != VERSION_OFFLINE {
             bail_tr!("friends.codeVersion", "This code came from a newer ResinCraft Launcher. Update the launcher and try again.");
         }
         let secret: [u8; SECRET_LEN] = body[1..1 + SECRET_LEN].try_into().map_err(|_| bad())?;
@@ -83,6 +92,7 @@ impl Invite {
         let expires = u32::from_be_bytes(body[at..at + 4].try_into().map_err(|_| bad())?);
         at += 4;
         let mut routes = Vec::new();
+        let mut offline = false;
         while at < body.len() {
             let tag = body[at];
             at += 1;
@@ -106,10 +116,11 @@ impl Invite {
                     routes.push(Route::Relay(name.to_string()));
                     at += 1 + len;
                 }
+                TAG_OFFLINE if body[0] == VERSION_OFFLINE => offline = true,
                 _ => return Err(bad()),
             }
         }
-        Ok(Invite { secret, expires, routes })
+        Ok(Invite { secret, expires, routes, offline })
     }
 }
 
@@ -164,7 +175,16 @@ mod tests {
                 Route::Direct("[2001:db8::5]:25581".parse().unwrap()),
                 Route::Relay("friend-a1b2c3".into()),
             ],
+            offline: false,
         }
+    }
+
+    #[test]
+    fn offline_codes_round_trip_and_plain_ones_stay_version_1() {
+        let offline = Invite { offline: true, ..sample() };
+        assert_eq!(Invite::decode(&offline.encode()).unwrap(), offline);
+        assert_eq!(from_base32(&sample().encode()).unwrap()[0], VERSION);
+        assert_eq!(from_base32(&offline.encode()).unwrap()[0], VERSION_OFFLINE);
     }
 
     #[test]
@@ -190,7 +210,7 @@ mod tests {
 
     #[test]
     fn newer_codes_ask_for_an_update() {
-        let mut b = vec![VERSION + 1];
+        let mut b = vec![VERSION_OFFLINE + 1];
         b.extend_from_slice(&[0; SECRET_LEN + 4]);
         let sum = Sha256::digest(&b);
         b.extend_from_slice(&sum[..2]);

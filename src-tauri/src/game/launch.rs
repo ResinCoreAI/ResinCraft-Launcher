@@ -559,6 +559,10 @@ fn build_args(inst: &Instance, settings: &Settings, p: &Prepared, auth: &LaunchA
 
     let main_class = v.main_class.clone().filter(|m| !m.is_empty()).ok_or_else(|| err_tr!("launch.noMainClass", "Version {version} has no main class", version = v.id))?;
     let mut args = memory_and_user_flags(inst, settings, v.java_major());
+    // Joining a server never hosts a world, so only other launches let offline friends in.
+    if settings.friends_offline && !matches!(target, Some(Target::Server(_))) {
+        args.push(crate::friends::offline::agent_argument()?);
+    }
     args.extend(jvm.iter().map(sub));
     if let Some(l) = &p.log_argument {
         args.push(l.clone());

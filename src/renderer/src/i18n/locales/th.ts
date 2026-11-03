@@ -2240,6 +2240,10 @@ const dict: Dict = {
   'friends.route.direct': 'เชื่อมต่อโดยตรงแล้ว เข้ารหัสแล้ว',
   'friends.route.lan': 'เชื่อมต่อผ่านเครือข่ายในบ้านแล้ว เข้ารหัสแล้ว',
   'friends.route.relay': 'เชื่อมต่อผ่าน ResinCraft Relay แล้ว เข้ารหัสแล้ว',
+  'friends.offline.switch': "ให้ผู้เล่นออฟไลน์เข้าร่วมได้",
+  'friends.offline.warn': "จะไม่มีการตรวจสอบชื่อ ใครก็ตามที่มีโค้ดสามารถเข้าร่วมด้วยชื่ออะไรก็ได้ แม้แต่ชื่อของคุณ และเล่นเป็นผู้เล่นคนนั้นได้ แชร์โค้ดให้เฉพาะเพื่อนที่ไว้ใจเท่านั้น",
+  'friends.offline.on': "ผู้เล่นออฟไลน์เข้าร่วมโลกนี้ได้",
+  'friends.offline.restart': "ผู้เล่นออฟไลน์ยังเข้าร่วมไม่ได้ เริ่มเกมใหม่เพื่อให้พวกเขาเข้าได้ (Minecraft 26.1 ขึ้นไป)",
   // Quick join (engine messages)
   'engine.quickjoin.chooseInstance': 'เลือกอินสแตนซ์ที่จะใช้เล่น',
   'engine.quickjoin.groupNameTooLong': 'ชื่อกลุ่มยาวได้ไม่เกิน {max} ตัวอักษร',

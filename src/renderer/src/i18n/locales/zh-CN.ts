@@ -2238,6 +2238,10 @@ const dict: Dict = {
   'friends.route.direct': '已直接连接，已加密。',
   'friends.route.lan': '已通过本地网络连接，已加密。',
   'friends.route.relay': '已通过 ResinCraft Relay 连接，已加密。',
+  'friends.offline.switch': "允许离线玩家加入",
+  'friends.offline.warn': "这样不会检查任何名称：任何拿到代码的人都能用任意名称加入，包括你的名称，并以该玩家的身份游戏。只把代码分享给你信任的朋友。",
+  'friends.offline.on': "离线玩家可以加入这个世界。",
+  'friends.offline.restart': "离线玩家暂时还不能加入。重启游戏即可让他们加入（需要 Minecraft 26.1 或更高版本）。",
   // Quick join (engine messages)
   'engine.quickjoin.chooseInstance': '选择用于游玩的实例',
   'engine.quickjoin.groupNameTooLong': '分组名称最多 {max} 个字符',

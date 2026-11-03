@@ -9,9 +9,11 @@
 pub mod code;
 pub mod guest;
 pub mod host;
+pub mod offline;
 pub mod portmap;
 pub mod secure;
 
+use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -44,6 +46,8 @@ pub struct LanWorld {
     pub run_id: String,
     pub instance_id: String,
     pub port: u16,
+    /// Offline players can join it (friends/offline.rs).
+    pub offline: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,6 +70,8 @@ pub struct InviteView {
     pub relay_ending: Option<u64>,
     /// The code ran out: friends still playing stay, nobody new gets in.
     pub expired: bool,
+    /// Offline players can use the code.
+    pub offline: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -76,6 +82,8 @@ pub struct JoinedView {
     /// "direct", "lan" or "relay".
     pub route: &'static str,
     pub status: Option<ServerStatus>,
+    /// The world lets offline players in.
+    pub offline: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -101,6 +109,8 @@ struct State {
     joined: Option<guest::Joined>,
     /// The router mapping, for removing it once the renewals have stopped.
     mapping: Arc<Mutex<Option<Mapping>>>,
+    /// Runs whose world lets offline players in, as their agent said.
+    offline_runs: HashSet<String>,
 }
 
 static STATE: OnceLock<Mutex<State>> = OnceLock::new();
@@ -139,13 +149,25 @@ fn lan_closed(line: &str) -> bool {
     !line.contains("[CHAT]") && (line.trim_end().ends_with(": Stopping server") || line.trim_end() == "Stopping server" || line.contains(": Stopping singleplayer server"))
 }
 
+/// The agent's line, which Minecraft may log as "[STDOUT]: …". Chat can't fake it either.
+fn agent_says(line: &str, what: &str) -> bool {
+    !line.contains("[CHAT]") && line.trim_end().ends_with(what)
+}
+
 /// Every line of a game's log comes through here.
 pub fn game_line(run_id: &str, instance_id: &str, line: &str) {
-    if let Some(port) = lan_port_of(line) {
+    if agent_says(line, offline::ON_LINE) {
+        let mut s = state().lock().unwrap();
+        s.offline_runs.insert(run_id.to_string());
+        for w in s.view.worlds.iter_mut().filter(|w| w.run_id == run_id) {
+            w.offline = true;
+        }
+    } else if let Some(port) = lan_port_of(line) {
         {
             let mut s = state().lock().unwrap();
+            let offline = s.offline_runs.contains(run_id);
             s.view.worlds.retain(|w| w.run_id != run_id);
-            s.view.worlds.push(LanWorld { run_id: run_id.to_string(), instance_id: instance_id.to_string(), port });
+            s.view.worlds.push(LanWorld { run_id: run_id.to_string(), instance_id: instance_id.to_string(), port, offline });
         }
         changed();
     } else if lan_closed(line) {
@@ -154,6 +176,7 @@ pub fn game_line(run_id: &str, instance_id: &str, line: &str) {
 }
 
 pub fn game_exited(run_id: &str) {
+    state().lock().unwrap().offline_runs.remove(run_id);
     world_gone(run_id);
 }
 
@@ -250,7 +273,7 @@ async fn start_invite(run_id: &str) -> Result<FriendsState> {
     if let Some(t) = &tunnel {
         routes.push(Route::Relay(t.name.clone()));
     }
-    let code = Invite { secret, expires: expires as u32, routes }.encode();
+    let code = Invite { secret, expires: expires as u32, routes, offline: world.offline }.encode();
     let public_address = mapped.as_ref().map(|m| m.external.to_string()).or_else(|| public.map(|ip| format!("{ip}:{port}")));
     let invite = InviteView {
         run_id: world.run_id.clone(),
@@ -265,6 +288,7 @@ async fn start_invite(run_id: &str) -> Result<FriendsState> {
         relay_note,
         relay_ending: None,
         expired: false,
+        offline: world.offline,
     };
 
     for l in listeners {
@@ -385,12 +409,13 @@ fn leave() {
 /// Checks a code and opens the tunnel; the world's name, version and players come back through it.
 async fn open_code(text: &str) -> Result<JoinedView> {
     let invite = Invite::decode(text)?;
+    let offline = invite.offline;
     leave();
     let domain = relay::settings().map(|s| s.domain);
     let joined = guest::open(invite, domain).await?;
     let address = format!("127.0.0.1:{}", joined.local_port);
     let status = crate::player::servers::ping_server(&address, Duration::from_secs(8)).await.ok();
-    let shown = JoinedView { address, route: guest::describe(&joined.route), status };
+    let shown = JoinedView { address, route: guest::describe(&joined.route), status, offline };
     {
         let mut s = state().lock().unwrap();
         s.joined = Some(joined);
@@ -409,13 +434,13 @@ struct JoinRequest {
 }
 
 /// Starts the game into the open tunnel. A LAN world checks accounts with Mojang like an online server, so an offline
-/// profile could only fail after the game has loaded: it's told now.
+/// profile could only fail after the game has loaded: it's told now, unless the host let offline players in.
 async fn join(req: JoinRequest) -> Result<()> {
-    let Some(address) = state().lock().unwrap().view.joined.as_ref().map(|j| j.address.clone()) else {
+    let Some((address, offline)) = state().lock().unwrap().view.joined.as_ref().map(|j| (j.address.clone(), j.offline)) else {
         bail_tr!("friends.notConnected", "Paste your friend's code first.");
     };
     let auth = crate::player::accounts::launch_auth_for(req.account_id.as_deref()).await?;
-    if auth.user_type == "legacy" {
+    if auth.user_type == "legacy" && !offline {
         bail_tr!(
             "friends.needsAccount",
             "Joining a friend's world needs a Microsoft account that owns Minecraft, because the world checks your account. Offline profiles can't join."
@@ -489,6 +514,13 @@ mod tests {
         ] {
             assert_eq!(lan_port_of(line), None, "{line}");
         }
+    }
+
+    #[test]
+    fn hears_the_agent_but_not_chat() {
+        assert!(agent_says("[09:40:01] [ResinCraft LAN offline/INFO]: [STDOUT]: [ResinCraft] LAN offline on", offline::ON_LINE));
+        assert!(agent_says("[ResinCraft] LAN offline on", offline::ON_LINE));
+        assert!(!agent_says("[09:40:01] [Render thread/INFO]: [System] [CHAT] <Bob> [ResinCraft] LAN offline on", offline::ON_LINE));
     }
 
     #[test]

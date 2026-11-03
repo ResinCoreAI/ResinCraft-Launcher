@@ -421,6 +421,8 @@ export interface Settings {
   optimizedFlags: boolean
   /** Those flags use ZGC instead of G1GC, on Java 21 or newer. */
   useZgc: boolean
+  /** Games start able to let offline players into their Open to LAN worlds (Quick join → Invite friends). */
+  friendsOffline: boolean
   javaPath: string
   autoJava: boolean
   onLaunch: CloseBehavior
@@ -926,6 +928,8 @@ export interface FriendsWorld {
   runId: string
   instanceId: string
   port: number
+  /** Offline players can join it (the game started with Settings.friendsOffline on a version that allows it). */
+  offline: boolean
 }
 
 export interface FriendsInvite {
@@ -944,6 +948,8 @@ export interface FriendsInvite {
   /** Seconds until the relay's session ends unless continued. */
   relayEnding?: number | null
   expired: boolean
+  /** Offline players can use the code. */
+  offline: boolean
 }
 
 export interface FriendsJoined {
@@ -951,6 +957,8 @@ export interface FriendsJoined {
   address: string
   route: 'direct' | 'lan' | 'relay'
   status?: ServerStatus | null
+  /** The world lets offline players in. */
+  offline: boolean
 }
 
 export interface FriendsState {

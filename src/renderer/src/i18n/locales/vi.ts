@@ -2248,6 +2248,10 @@ const dict: Dict = {
   'friends.route.direct': 'Đã kết nối trực tiếp, có mã hóa.',
   'friends.route.lan': 'Đã kết nối qua mạng nội bộ, có mã hóa.',
   'friends.route.relay': 'Đã kết nối qua ResinCraft Relay, có mã hóa.',
+  'friends.offline.switch': "Cho người chơi offline tham gia",
+  'friends.offline.warn': "Khi đó tên sẽ không được kiểm tra: bất kỳ ai có mã đều có thể vào với bất kỳ tên nào, kể cả tên của bạn, và chơi như người chơi đó. Chỉ chia sẻ mã với bạn bè bạn tin tưởng.",
+  'friends.offline.on': "Người chơi offline có thể vào thế giới này.",
+  'friends.offline.restart': "Người chơi offline chưa thể vào. Khởi động lại trò chơi để cho họ vào (Minecraft 26.1 trở lên).",
   // Quick join (engine messages)
   'engine.quickjoin.chooseInstance': 'Chọn bản cài để chơi',
   'engine.quickjoin.groupNameTooLong': 'Tên nhóm tối đa {max} ký tự',

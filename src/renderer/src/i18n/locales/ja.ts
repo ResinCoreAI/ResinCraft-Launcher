@@ -2247,6 +2247,10 @@ const dict: Dict = {
   'friends.route.direct': '直接接続しました（暗号化済み）。',
   'friends.route.lan': 'ローカルネットワーク経由で接続しました（暗号化済み）。',
   'friends.route.relay': 'ResinCraft Relay 経由で接続しました（暗号化済み）。',
+  'friends.offline.switch': "オフラインのプレイヤーも参加できるようにする",
+  'friends.offline.warn': "名前は確認されません。コードを知っている人は誰でも、あなたの名前を含むどんな名前でも参加して、そのプレイヤーとして遊べます。信頼できる友達にだけコードを渡してください。",
+  'friends.offline.on': "オフラインのプレイヤーもこのワールドに参加できます。",
+  'friends.offline.restart': "オフラインのプレイヤーはまだ参加できません。参加できるようにするにはゲームを再起動してください（Minecraft 26.1 以降）。",
 
   // Quick join (engine messages)
   'engine.quickjoin.chooseInstance': '一緒にプレイするインスタンスを選択',

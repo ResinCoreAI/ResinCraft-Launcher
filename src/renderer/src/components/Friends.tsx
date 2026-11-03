@@ -1,9 +1,9 @@
 // Playing together without a server: Invite friends (for a world opened to LAN) and Join a friend, on the Quick join page.
 import { useEffect, useMemo, useState } from 'react'
-import { Copy, Loader2, Play, Square, UserPlus, Users } from 'lucide-react'
+import { AlertTriangle, Copy, Loader2, Play, Square, UserPlus, Users } from 'lucide-react'
 import type { FriendsInvite, FriendsState } from '@shared/types'
 import { Motd } from './ServersTab'
-import { useCopy } from './ui'
+import { Switch, useCopy } from './ui'
 import { useStore } from '../store'
 import { api } from '../api'
 import { t, tx } from '../i18n'
@@ -17,6 +17,24 @@ export function useFriends(): FriendsState {
     return api.on.friends(setState)
   }, [])
   return state
+}
+
+/** Letting offline players in: the switch, what it risks, and whether this world does it yet. */
+function OfflineSwitch({ world }: { world?: { offline: boolean } }) {
+  const { settings, updateSettings } = useStore()
+  if (!settings) return null
+  const on = settings.friendsOffline
+  return (
+    <>
+      <Switch on={on} onChange={(v) => void updateSettings({ friendsOffline: v })} label={t('friends.offline.switch')} />
+      {on && (
+        <p className="hint warn">
+          <AlertTriangle size={13} /> {t('friends.offline.warn')}
+        </p>
+      )}
+      {world && (world.offline ? <p className="hint">{t('friends.offline.on')}</p> : on && <p className="hint">{t('friends.offline.restart')}</p>)}
+    </>
+  )
 }
 
 /** How friends outside this network get in, in the player's words. */
@@ -67,6 +85,7 @@ function InvitePanel({ state }: { state: FriendsState }) {
         <p className="hint">{invite.expired ? t('friends.invite.expired') : t('friends.invite.expires', { time: expires })}</p>
         <p className="hint">{reachText(invite)}</p>
         {invite.relayNote && !invite.router && <p className="hint">{tx(invite.relayNote)}</p>}
+        {invite.offline && <p className="hint">{t('friends.offline.on')}</p>}
         {invite.relayEnding != null && (
           <div className="friends-row">
             <span className="hint">{t('friends.relayEnding', { minutes: Math.ceil(invite.relayEnding / 60) })}</span>
@@ -100,6 +119,7 @@ function InvitePanel({ state }: { state: FriendsState }) {
           ))}
         </>
       )}
+      <OfflineSwitch world={state.worlds[0]} />
     </div>
   )
 }
@@ -116,7 +136,8 @@ function JoinPanel({ state }: { state: FriendsState }) {
   const matching = useMemo(() => instances.filter((i) => version?.includes(i.mcVersion)), [instances, version])
   const instanceId = picked ?? matching[0]?.id ?? instances[0]?.id
   const active = accounts.find((a) => a.active) ?? accounts[0]
-  const offline = active?.type === 'offline'
+  // An offline profile can join only a world that lets offline players in.
+  const offline = active?.type === 'offline' && !joined?.offline
 
   const connect = async () => {
     setBusy(true)

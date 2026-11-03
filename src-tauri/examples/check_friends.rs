@@ -1,6 +1,7 @@
 //! Real two-client check of "Play with friends", through the launcher's own requests. Run the two sides as separate
 //! processes, like two computers:
-//!   cargo run --example check_friends -- host <instance> <name> <code file>     an offline profile hosts; open to LAN by hand
+//!   cargo run --example check_friends -- host <instance> <name> <code file> [world]   an offline profile hosts (in <world>
+//!                                                                                 if given); open to LAN by hand
 //!   cargo run --example check_friends -- join <instance> <code file> [--offline <name>]
 //!   cargo run --example check_friends -- login        a Microsoft account for `join` (RESINCRAFT_MS_CLIENT_ID in the environment)
 //!   cargo run --example check_friends -- logout       removes it again
@@ -36,8 +37,8 @@ async fn start(instance: &str, auth: LaunchAuth, target: Option<Target>) {
     launch::launch_instance_to(instance, &settings, auth, hooks, target.as_ref()).await.expect("launch");
 }
 
-async fn host(instance: &str, name: &str, code_file: &Path) {
-    start(instance, offline(name), None).await;
+async fn host(instance: &str, name: &str, code_file: &Path, world: Option<&str>) {
+    start(instance, offline(name), world.map(|w| Target::World(w.to_string()))).await;
     println!("game starting: open a world to LAN");
     let run_id = loop {
         let s = call("friends:state", vec![]).await.unwrap();
@@ -142,7 +143,8 @@ async fn run() {
     let a: Vec<String> = std::env::args().skip(1).collect();
     let a: Vec<&str> = a.iter().map(String::as_str).collect();
     match a[..] {
-        ["host", instance, name, file] => host(instance, name, Path::new(file)).await,
+        ["host", instance, name, file] => host(instance, name, Path::new(file), None).await,
+        ["host", instance, name, file, world] => host(instance, name, Path::new(file), Some(world)).await,
         ["join", instance, file] => join(instance, Path::new(file), None).await,
         ["join", instance, file, "--offline", name] => join(instance, Path::new(file), Some(name)).await,
         ["login"] => login().await,

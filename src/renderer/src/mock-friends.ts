@@ -2,7 +2,7 @@
 import type { FriendsState, ResinApi } from '@shared/types'
 
 export function mockFriends(): Pick<ResinApi, 'friends'> & { onFriends: ResinApi['on']['friends'] } {
-  let state: FriendsState = { worlds: [{ runId: 'mock-run', instanceId: 'fabric-survival', port: 51234 }] }
+  let state: FriendsState = { worlds: [{ runId: 'mock-run', instanceId: 'fabric-survival', port: 51234, offline: false }] }
   const listeners = new Set<(s: FriendsState) => void>()
   const set = (next: FriendsState) => {
     state = next
@@ -32,7 +32,8 @@ export function mockFriends(): Pick<ResinApi, 'friends'> & { onFriends: ResinApi
             publicAddress: '203.0.113.9:25580',
             port: 25580,
             relay: false,
-            expired: false
+            expired: false,
+            offline: world.offline
           }
         })
       },
@@ -43,7 +44,8 @@ export function mockFriends(): Pick<ResinApi, 'friends'> & { onFriends: ResinApi
         const joined = {
           address: '127.0.0.1:50311',
           route: 'direct' as const,
-          status: { motd: 'Steve - New World', players: { online: 1, max: 8, sample: [] }, version: '1.21.1', latency: 24 }
+          status: { motd: 'Steve - New World', players: { online: 1, max: 8, sample: [] }, version: '1.21.1', latency: 24 },
+          offline: false
         }
         set({ ...state, joined })
         return joined

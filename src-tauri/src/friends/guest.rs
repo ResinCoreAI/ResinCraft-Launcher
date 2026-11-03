@@ -222,7 +222,7 @@ mod tests {
     }
 
     fn invite(port: u16, secret: [u8; 12]) -> Invite {
-        Invite { secret, expires: u32::MAX, routes: vec![Route::Direct(SocketAddr::from((Ipv4Addr::LOCALHOST, port)))] }
+        Invite { secret, expires: u32::MAX, routes: vec![Route::Direct(SocketAddr::from((Ipv4Addr::LOCALHOST, port)))], offline: false }
     }
 
     async fn talk(port: u16) -> std::io::Result<[u8; 5]> {

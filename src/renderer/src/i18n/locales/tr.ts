@@ -2261,6 +2261,10 @@ const dict: Dict = {
   'friends.route.direct': 'Doğrudan bağlandı, şifreli.',
   'friends.route.lan': 'Yerel ağın üzerinden bağlandı, şifreli.',
   'friends.route.relay': 'ResinCraft Relay üzerinden bağlandı, şifreli.',
+  'friends.offline.switch': "Çevrimdışı oyuncuların katılmasına izin ver",
+  'friends.offline.warn': "O zaman hiçbir ad kontrol edilmez: kodu olan herkes, seninki dahil herhangi bir adla katılıp o oyuncu olarak oynayabilir. Kodu yalnızca güvendiğin arkadaşlarınla paylaş.",
+  'friends.offline.on': "Çevrimdışı oyuncular bu dünyaya katılabilir.",
+  'friends.offline.restart': "Çevrimdışı oyuncular henüz katılamıyor. Onları içeri almak için oyunu yeniden başlat (Minecraft 26.1 veya daha yenisi).",
   // Quick join (engine messages)
   'engine.quickjoin.chooseInstance': 'Oynamak için bir kurulum seç',
   'engine.quickjoin.groupNameTooLong': 'Grup adları en fazla {max} karakter olabilir',

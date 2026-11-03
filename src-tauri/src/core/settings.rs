@@ -42,6 +42,9 @@ pub struct Settings {
     pub optimized_flags: bool,
     /// Those flags use ZGC instead of G1GC, on Java 21 or newer (an instance can choose its own).
     pub use_zgc: bool,
+    /// Games start with friends/offline.rs's agent, so their Open to LAN worlds let offline players in (Quick join →
+    /// Invite friends; off by default, nobody's name is checked then).
+    pub friends_offline: bool,
     pub java_path: String,
     pub auto_java: bool,
     /// "keep" | "minimize" | "hide"
@@ -113,6 +116,7 @@ impl Default for Settings {
             jvm_args: String::new(),
             optimized_flags: true,
             use_zgc: false,
+            friends_offline: false,
             java_path: String::new(),
             auto_java: true,
             on_launch: "minimize".into(),

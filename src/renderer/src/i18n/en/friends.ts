@@ -35,5 +35,9 @@ export default {
   'friends.join.addressHint': 'If the game is already open, use this address in Direct Connection.',
   'friends.route.direct': 'Connected directly, encrypted.',
   'friends.route.lan': 'Connected over your local network, encrypted.',
-  'friends.route.relay': 'Connected through ResinCraft Relay, encrypted.'
+  'friends.route.relay': 'Connected through ResinCraft Relay, encrypted.',
+  'friends.offline.switch': "Let offline players join",
+  'friends.offline.warn': "Nobody's name is checked then: anyone with the code can join under any name, even yours, and play as that player. Only share the code with friends you trust.",
+  'friends.offline.on': "Offline players can join this world.",
+  'friends.offline.restart': "Offline players can't join yet. Restart the game to let them in (Minecraft 26.1 or newer)."
 } as const

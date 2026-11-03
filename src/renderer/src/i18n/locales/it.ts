@@ -2284,6 +2284,10 @@ const dict: Dict = {
   'friends.route.direct': "Connesso direttamente e crittografato.",
   'friends.route.lan': "Connesso tramite la tua rete locale e crittografato.",
   'friends.route.relay': "Connesso tramite ResinCraft Relay e crittografato.",
+  'friends.offline.switch': "Fai entrare i giocatori offline",
+  'friends.offline.warn': "Così nessun nome viene controllato: chiunque abbia il codice può entrare con qualsiasi nome, anche il tuo, e giocare come quel giocatore. Condividi il codice solo con amici fidati.",
+  'friends.offline.on': "I giocatori offline possono entrare in questo mondo.",
+  'friends.offline.restart': "I giocatori offline non possono ancora entrare. Riavvia il gioco per farli entrare (Minecraft 26.1 o successivo).",
   // Quick join (engine messages)
   'engine.quickjoin.chooseInstance': "Scegli un’istanza con cui giocare",
   'engine.quickjoin.groupNameTooLong': "I nomi dei gruppi possono avere al massimo {max} caratteri",
