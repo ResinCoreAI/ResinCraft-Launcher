@@ -9,7 +9,7 @@ It runs on amd64 and arm64 (a Raspberry Pi 5, for example), on systemd and OpenR
 ## Install or update
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/main/deploy/panel/get.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/linux-panel/deploy/panel/get.sh | sudo sh
 ```
 
 The same command updates an installed panel: it stops the service, replaces the program and starts it again. Your

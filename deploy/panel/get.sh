@@ -1,6 +1,6 @@
 #!/bin/sh
 # Downloads the newest ResinCraft Panel for this machine and installs or updates it (install.sh). Run as root:
-#   curl -fsSL https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/main/deploy/panel/get.sh | sudo sh
+#   curl -fsSL https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/linux-panel/deploy/panel/get.sh | sudo sh
 # A version can be chosen with PANEL_VERSION=1.0.0. Releases are tagged panel-v<version> (panel-release.yml).
 set -eu
 

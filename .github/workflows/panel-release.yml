@@ -87,7 +87,7 @@ jobs:
       NOTES: |
         ResinCraft Panel hosts Minecraft servers on a Linux machine, with or without a desktop. Install or update it with one command:
 
-            curl -fsSL https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/main/deploy/panel/get.sh | sudo sh
+            curl -fsSL https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/linux-panel/deploy/panel/get.sh | sudo sh
 
         Or by hand: download the `.tar.gz` for your machine (`amd64` for most servers, `arm64` for ARM ones such as a Raspberry Pi 5; `-musl` for Alpine), unpack it and run `sudo sh install.sh`. Then `resincraft-panel servers` lists your servers and `resincraft-panel login` connects the panel to your ResinCraft Launcher.
 
