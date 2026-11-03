@@ -232,6 +232,21 @@ pub fn optimized_flags(memory_mb: u32) -> Vec<String> {
     .to_vec()
 }
 
+/// A proxy's flags, as Birdflop's generator gives them (https://www.birdflop.com/resources/flags): a proxy keeps little
+/// in memory, so small regions and none of Aikar's young-generation tuning. AlwaysPreTouch stays out, as for servers.
+pub fn proxy_flags() -> Vec<String> {
+    ["-XX:+UseG1GC", "-XX:G1HeapRegionSize=4M", "-XX:+UnlockExperimentalVMOptions", "-XX:+ParallelRefProcEnabled", "-XX:MaxInlineLevel=15"]
+        .map(String::from)
+        .to_vec()
+}
+
+/// Purpur, Pufferfish and Leaf draw maps with Java's vector API when its module is there; it needs Java 17, which
+/// Minecraft 1.18 and newer run on (on older Java the flag would stop the server from starting).
+fn uses_vectors(meta: &ServerMeta) -> bool {
+    matches!(meta.kind, ServerKind::Purpur | ServerKind::Pufferfish | ServerKind::Leaf)
+        && crate::game::loaders::compare_versions(&meta.mc_version, "1.18") != std::cmp::Ordering::Less
+}
+
 /// Puts the files the server still needs by hand in place when they turn up (kept copies, the same pack's instances,
 /// Downloads), notes what it added and returns what's still missing. The server's list keeps only those.
 async fn collect_downloads(meta: &ServerMeta, dir: &Path, notes: &mut Vec<String>) -> Vec<crate::core::types::PendingDownload> {
@@ -271,7 +286,10 @@ pub fn launch_args(meta: &ServerMeta) -> Result<Vec<String>> {
         a
     } else if meta.optimized_flags {
         let mut a = heap_flags(memory);
-        a.extend(optimized_flags(memory));
+        a.extend(if meta.kind.proxy() { proxy_flags() } else { optimized_flags(memory) });
+        if uses_vectors(meta) {
+            a.push("--add-modules=jdk.incubator.vector".into());
+        }
         a
     } else {
         heap_flags(memory)
@@ -1800,6 +1818,26 @@ mod player_tests {
 #[cfg(test)]
 mod pack_flag_tests {
     use super::*;
+
+    #[test]
+    fn proxies_and_purpur_get_birdflops_flags() {
+        let meta = |kind: &str, mc: &str| -> ServerMeta {
+            serde_json::from_value(serde_json::json!({
+                "id": "s", "name": "S", "type": kind, "mcVersion": mc, "memoryMb": 2048, "port": 25565, "createdAt": 1,
+                "optimizedFlags": true, "launch": { "jar": "server.jar" },
+            }))
+            .unwrap()
+        };
+        let velocity = launch_args(&meta("velocity", "3.4.0")).unwrap();
+        assert!(velocity.iter().any(|f| f == "-XX:G1HeapRegionSize=4M") && velocity.iter().any(|f| f == "-XX:MaxInlineLevel=15"));
+        assert!(!velocity.iter().any(|f| f.starts_with("-XX:G1NewSizePercent")), "{velocity:?}");
+        let vector = "--add-modules=jdk.incubator.vector";
+        assert!(launch_args(&meta("purpur", "1.21.4")).unwrap().iter().any(|f| f == vector));
+        assert!(launch_args(&meta("purpur", "26.1")).unwrap().iter().any(|f| f == vector));
+        assert!(!launch_args(&meta("purpur", "1.16.5")).unwrap().iter().any(|f| f == vector), "Java 8/11 has no vector module");
+        let paper = launch_args(&meta("paper", "1.21.4")).unwrap();
+        assert!(!paper.iter().any(|f| f == vector) && paper.iter().any(|f| f == "-XX:G1HeapRegionSize=8M"));
+    }
 
     #[test]
     fn reads_the_flags_a_server_pack_sets() {
