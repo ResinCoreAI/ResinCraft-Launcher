@@ -854,6 +854,7 @@ export default {
   'servers.multicore.reason.hybrid': "Arclight mixes mods and plugins, and these mods change the same code it does. They aren't safe here, so nothing is offered.",
   'servers.multicore.reason.bedrock': "Bedrock servers are a separate program that can't run Java mods or plugins, so there's nothing to set up.",
   'servers.multicore.reason.folia': 'This server runs Folia, which already ticks separate regions of the world on separate cores.',
+  'servers.multicore.reason.noJavaMods': "This server software can't run Fabric, Quilt, NeoForge or Forge mods, so there's nothing to set up.",
   'servers.multicore.folia.title': 'Move to Folia (optional)',
   'servers.multicore.folia.warning':
     "Folia ticks separate regions of the world on separate cores, so it only helps when players are spread out, and its team recommends at least 16 cores. Many plugins don't work on it. This changes the server's software, so only do it if you've checked your plugins.",

@@ -66,6 +66,8 @@ const CUBERITE: &str = "https://download.cuberite.org/linux-x86_64/Cuberite.tar.
 const OLD_MC: &str = "1.12.2";
 /// The newest Velocity needs it, and the older proxies run on it.
 const PROXY_JAVA: u32 = 21;
+/// Velocity 4 is compiled for Java 25.
+const VELOCITY_4_JAVA: u32 = 25;
 const GLOWSTONE_JAVA: u32 = 11;
 /// Arclight's own file server: one folder per Minecraft version (some are aliases of the same branch).
 const ARCLIGHT: &str = "https://files.hypertention.cn/v1/files/arclight/minecraft";

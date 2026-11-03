@@ -30,7 +30,8 @@ const REASON: Record<NonNullable<MulticorePlan['reason']>, Key> = {
   plugins: 'servers.multicore.reason.plugins',
   hybrid: 'servers.multicore.reason.hybrid',
   bedrock: 'servers.multicore.reason.bedrock',
-  folia: 'servers.multicore.reason.folia'
+  folia: 'servers.multicore.reason.folia',
+  noJavaMods: 'servers.multicore.reason.noJavaMods'
 }
 
 const SERVER_NAMES: Record<string, string> = { paper: 'Paper', purpur: 'Purpur', leaf: 'Leaf', spigot: 'Spigot' }

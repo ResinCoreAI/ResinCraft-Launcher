@@ -77,11 +77,13 @@ fn reason_for(kind: ServerKind) -> Option<&'static str> {
     match kind {
         ServerKind::Fabric | ServerKind::Quilt | ServerKind::Forge | ServerKind::Neoforge => None,
         ServerKind::Vanilla => Some("vanilla"),
-        ServerKind::Bedrock => Some("bedrock"),
-        // C2ME and Lithium patch the code Arclight has already rewritten for Bukkit.
-        ServerKind::Arclight => Some("hybrid"),
         ServerKind::Folia => Some("folia"),
-        ServerKind::Paper | ServerKind::Purpur | ServerKind::Leaf | ServerKind::Spigot => Some("plugins"),
+        k if k.bedrock() => Some("bedrock"),
+        // C2ME and Lithium patch the code a hybrid has already rewritten for Bukkit.
+        k if k.hybrid() => Some("hybrid"),
+        k if k.bukkit() => Some("plugins"),
+        // Proxies, Sponge and servers written from scratch run no Java mods.
+        _ => Some("noJavaMods"),
     }
 }
 
@@ -249,6 +251,12 @@ mod tests {
         assert_eq!(reason_for(ServerKind::Vanilla), Some("vanilla"));
         assert_eq!(reason_for(ServerKind::Arclight), Some("hybrid"));
         assert_eq!(reason_for(ServerKind::Bedrock), Some("bedrock"));
+        assert_eq!(reason_for(ServerKind::Nukkit), Some("bedrock"));
+        assert_eq!(reason_for(ServerKind::Mohist), Some("hybrid"));
+        assert_eq!(reason_for(ServerKind::Pufferfish), Some("plugins"));
+        for k in [ServerKind::Velocity, ServerKind::Sponge, ServerKind::Glowstone, ServerKind::Horizon] {
+            assert_eq!(reason_for(k), Some("noJavaMods"));
+        }
     }
 
     #[test]

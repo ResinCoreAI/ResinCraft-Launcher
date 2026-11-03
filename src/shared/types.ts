@@ -1952,7 +1952,7 @@ export interface MulticoreItem {
 }
 
 export interface MulticorePlan {
-  reason?: 'vanilla' | 'noLoader' | 'noMods' | 'plugins' | 'hybrid' | 'bedrock' | 'folia'
+  reason?: 'vanilla' | 'noLoader' | 'noMods' | 'plugins' | 'hybrid' | 'bedrock' | 'folia' | 'noJavaMods'
   items: MulticoreItem[]
   /** Mods Undo would take away. */
   undo: string[]
