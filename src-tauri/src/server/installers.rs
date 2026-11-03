@@ -1057,8 +1057,17 @@ async fn horizon_install(release: &github::Release, build: &str, meta: &ServerMe
     let (root, mc) = horizon::prepare(&staging, Some(meta.id.clone()), task).await?;
     let name = root.file_name().map(|n| n.to_os_string()).unwrap_or_default();
     let target = dir.join(&name);
-    let _ = tokio::fs::remove_dir_all(&target).await;
-    tokio::fs::rename(&root, &target).await?;
+    // The old build steps aside and comes back if the new one can't take its place.
+    let old = dir.join(".horizon-old");
+    let _ = tokio::fs::remove_dir_all(&old).await;
+    let had_old = tokio::fs::rename(&target, &old).await.is_ok();
+    if let Err(e) = tokio::fs::rename(&root, &target).await {
+        if had_old {
+            let _ = tokio::fs::rename(&old, &target).await;
+        }
+        return Err(e.into());
+    }
+    let _ = tokio::fs::remove_dir_all(&old).await;
     let _ = tokio::fs::remove_dir_all(&staging).await;
     make_executable(&target.join(program)).await?;
     let relative = |p: &Path| p.strip_prefix(dir).unwrap_or(p).to_string_lossy().replace('\\', "/");

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, UNIX_EPOCH};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use futures::stream::{self, StreamExt};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -354,6 +354,11 @@ async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
         return Err(HttpError { status: res.status().as_u16(), url: item.url.clone(), body: String::new() }.into());
     }
     let resumed = res.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    if resumed && range_start(res.headers()) != Some(have) {
+        // Not the rest of our file: start it again on the next try.
+        let _ = tokio::fs::remove_file(tmp).await;
+        bail!("The host sent the wrong part of {}", item.url);
+    }
     // Bytes that were unzipped on the way can't be matched to a position in the file on the host.
     let can_resume = resumed || res.content_length().is_some();
     let mut file = if resumed {
@@ -380,6 +385,8 @@ async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
     if let Some(h) = &item.hash {
         let got = hash_file(tmp, h.algo).await?;
         if !got.eq_ignore_ascii_case(&h.value) {
+            // A whole file that's wrong isn't progress: gone, so the next try counts as one.
+            let _ = tokio::fs::remove_file(tmp).await;
             return Err(anyhow!("Checksum mismatch for {}", item.url));
         }
     }
@@ -388,6 +395,12 @@ async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
         remember_verified(&item.dest, h).await;
     }
     Ok(())
+}
+
+/// Where a 206 answer's bytes start: `Content-Range: bytes 1000-1999/2000` → 1000.
+fn range_start(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    let value = headers.get(reqwest::header::CONTENT_RANGE)?.to_str().ok()?;
+    value.trim().strip_prefix("bytes ")?.split('-').next()?.trim().parse().ok()
 }
 
 /// Downloads every missing or corrupt file, `concurrency` at a time, reporting (done, total).
@@ -432,6 +445,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_where_a_partial_answer_starts() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        assert_eq!(range_start(&headers), None);
+        headers.insert(reqwest::header::CONTENT_RANGE, "bytes 1000-1999/2000".parse().unwrap());
+        assert_eq!(range_start(&headers), Some(1000));
+        headers.insert(reqwest::header::CONTENT_RANGE, "bytes */2000".parse().unwrap());
+        assert_eq!(range_start(&headers), None);
+    }
 
     #[tokio::test]
     async fn changed_files_are_hashed_again() {
