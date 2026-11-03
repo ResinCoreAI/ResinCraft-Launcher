@@ -1,0 +1,108 @@
+# Builds ResinCraft Panel (src-tauri/src/bin/panel.rs, the server engine with no window) for Linux and publishes it as
+# a GitHub Release when a panel tag is pushed:
+#   git tag panel-v1.0.0 && git push origin panel-v1.0.0
+# Panel tags never start with "v", so they don't run release.yml, and the launcher's own releases stay apart.
+# Running it by hand (workflow_dispatch) builds the same files and keeps them as the run's artifacts, with no release.
+#
+# Every file is resincraft-panel_<version>_<arch>_linux[-musl].tar.gz (arch: amd64 or arm64), holding the
+# resincraft-panel binary, install.sh and LICENSE, with a .sha256 next to it. The -musl builds are for Alpine and
+# other musl systems; deploy/panel/get.sh picks the right one by itself.
+name: Panel release
+
+on:
+  push:
+    tags: ['panel-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, libc: gnu, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          - { arch: arm64, libc: gnu, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          - { arch: amd64, libc: musl, os: ubuntu-22.04, target: x86_64-unknown-linux-musl }
+          - { arch: arm64, libc: musl, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-musl }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install musl
+        if: matrix.libc == 'musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: panel-${{ matrix.target }}
+      - name: Build
+        working-directory: src-tauri
+        env:
+          RESINCRAFT_MS_CLIENT_ID: ${{ secrets.RESINCRAFT_MS_CLIENT_ID }}
+          RESINCRAFT_CURSEFORGE_KEY: ${{ secrets.RESINCRAFT_CURSEFORGE_KEY }}
+          RESINCRAFT_RELAY_URL: ${{ secrets.RESINCRAFT_RELAY_URL }}
+          RESINCRAFT_RELAY_DOMAIN: ${{ secrets.RESINCRAFT_RELAY_DOMAIN }}
+        run: cargo build --release --locked --no-default-features --features panel --bin resincraft-panel --target ${{ matrix.target }}
+      - name: Pack
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          LIBC: ${{ matrix.libc }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          version=${GITHUB_REF_NAME#panel-v}
+          [ "${GITHUB_REF_TYPE}" = tag ] || version=dev
+          suffix=$([ "$LIBC" = musl ] && echo _linux-musl || echo _linux)
+          name="resincraft-panel_${version}_${ARCH}${suffix}"
+          mkdir -p "pack/$name" out
+          cp "src-tauri/target/$TARGET/release/resincraft-panel" deploy/panel/install.sh LICENSE "pack/$name/"
+          chmod 755 "pack/$name/resincraft-panel"
+          "pack/$name/resincraft-panel" 2>&1 | head -1 || true
+          tar -C pack -czf "out/$name.tar.gz" "$name"
+          (cd out && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel-${{ matrix.arch }}-${{ matrix.libc }}
+          path: out/*
+          if-no-files-found: error
+
+  # One job uploads, so the four builds never race to create the release. It is published at once and never marked
+  # latest: the website's download button and the launcher's updates follow the latest release, which stays the
+  # launcher's (a draft published by hand could be marked latest by GitHub).
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      NOTES: |
+        ResinCraft Panel hosts Minecraft servers on a Linux machine, with or without a desktop. Install or update it with one command:
+
+            curl -fsSL https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/main/deploy/panel/get.sh | sudo sh
+
+        Or by hand: download the `.tar.gz` for your machine (`amd64` for most servers, `arm64` for ARM ones such as a Raspberry Pi 5; `-musl` for Alpine), unpack it and run `sudo sh install.sh`. Then `resincraft-panel servers` lists your servers and `resincraft-panel login` connects the panel to your ResinCraft Launcher.
+
+        NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Publish the release
+        run: |
+          set -euo pipefail
+          cd files
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" * --clobber
+          else
+            gh release create "$TAG" * --latest=false --title "ResinCraft Panel ${TAG#panel-v}" --notes "$NOTES"
+          fi

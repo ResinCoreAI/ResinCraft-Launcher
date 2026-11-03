@@ -25,6 +25,8 @@ concurrency:
 
 jobs:
   publish:
+    # Panel releases (panel-release.yml) are a separate program with no update file.
+    if: ${{ !startsWith(github.event.release.tag_name || inputs.tag, 'panel-') }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
