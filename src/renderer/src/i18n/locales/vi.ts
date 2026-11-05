@@ -3494,6 +3494,8 @@ const dict: Dict = {
   "engine.friends.unreachable": "Không kết nối được với bạn bè. Thế giới của họ có thể đã đóng, hoặc router của họ và của bạn không cho phép kết nối trực tiếp và lời mời của họ không có ResinCraft Relay.",
   "engine.hostAddon.updatingMany": "Đang cập nhật {count} mục trên {server}",
   "engine.multicore.gameRunning": "Hãy đóng game trước: không thể thay đổi mod khi game đang chạy.",
+  "engine.horizon.launchApi": "Không thể khởi động bản Horizon này từ ResinCraft ({why}). Hãy thử lại sau bản nightly tiếp theo của Horizon hoặc cập nhật ResinCraft.",
+  "engine.horizon.needsOwner": "Horizon chỉ chạy với tài khoản Microsoft sở hữu Minecraft: Java Edition. {name} là tài khoản offline: hãy chuyển sang tài khoản Microsoft để chơi.",
 }
 
 export default dict

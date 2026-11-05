@@ -3484,6 +3484,8 @@ const dict: Dict = {
   "engine.friends.unreachable": "無法連線到你的朋友。對方的世界可能已關閉，或是對方和你的路由器不允許直接連線，而對方的邀請沒有使用 ResinCraft Relay。",
   "engine.hostAddon.updatingMany": "正在更新 {server} 上的 {count} 個項目",
   "engine.multicore.gameRunning": "請先關閉遊戲：遊戲執行時無法變更模組。",
+  "engine.horizon.launchApi": "無法從 ResinCraft 啟動這個 Horizon 版本（{why}）。請在 Horizon 下一個 nightly 版本推出後再試一次，或更新 ResinCraft。",
+  "engine.horizon.needsOwner": "Horizon 只能用擁有 Minecraft: Java Edition 的 Microsoft 帳號啟動。{name} 是離線帳號：請切換到你的 Microsoft 帳號來遊玩。",
 }
 
 export default dict

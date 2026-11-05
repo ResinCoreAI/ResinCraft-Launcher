@@ -254,7 +254,7 @@ pub fn read_launch_api(reply: &str) -> Result<Vec<String>, String> {
 }
 
 fn launch_api_error(why: &str) -> anyhow::Error {
-    err_tr!("horizon.launchApi", "This Horizon build can't be started from ResinCraft ({why}). Open Horizon's own launcher from the Horizon page instead.", why = why)
+    err_tr!("horizon.launchApi", "This Horizon build can't be started from ResinCraft ({why}). Try again after Horizon's next nightly build, or update ResinCraft.", why = why)
 }
 
 /// Asks the build what it takes, as the Launch API says to before every start.

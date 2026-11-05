@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Shield, Smartphone, Users, Zap, Sunrise } from 'lucide-react'
+import { ChevronRight, ChevronsUpDown, Compass, Home as HomeIcon, Layers, Server, Settings as SettingsIcon, Shield, Smartphone, Users, Zap } from 'lucide-react'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
@@ -41,7 +41,7 @@ const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
   { page: 'library', label: 'nav.library', icon: <Layers /> },
   { page: 'quickjoin', label: 'quickjoin.nav', icon: <Zap /> },
   { page: 'bedrock', label: 'nav.bedrock', icon: <Smartphone /> },
-  { page: 'horizon', label: 'servers.horizon.nav', icon: <Sunrise /> },
+  // Horizon's own launcher (pages/Horizon.tsx) is hidden: Horizon instances and servers don't need it.
   { page: 'discover', label: 'nav.discover', icon: <Compass /> },
   { page: 'servers', label: 'servers.nav', icon: <Server /> },
   { page: 'accounts', label: 'nav.accounts', icon: <Users /> },
