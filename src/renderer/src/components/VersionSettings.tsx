@@ -68,6 +68,21 @@ function GameVersion({ inst }: { inst: Instance }) {
   const [loaderList, setLoaderList] = useState<LoaderVersion[]>()
   const [asking, setAsking] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Loaders with no build for the chosen Minecraft version are greyed out.
+  const [hasBuild, setHasBuild] = useState<Partial<Record<LoaderType, boolean>>>({})
+  useEffect(() => {
+    setHasBuild({})
+    let live = true
+    for (const l of LOADERS.filter((l) => l !== 'vanilla')) {
+      api.versions.loaders(l, mc).then(
+        (list) => live && setHasBuild((b) => ({ ...b, [l]: list.length > 0 })),
+        () => undefined
+      )
+    }
+    return () => {
+      live = false
+    }
+  }, [mc])
   const running = games[inst.id] === 'running' || games[inst.id] === 'preparing'
 
   useEffect(() => {
@@ -137,7 +152,7 @@ function GameVersion({ inst }: { inst: Instance }) {
           <Segmented<LoaderType>
             value={loader}
             onChange={(v) => !running && setLoader(v)}
-            options={LOADERS.map((l) => ({ value: l, label: LOADER_LABEL[l] }))}
+            options={LOADERS.map((l) => ({ value: l, label: LOADER_LABEL[l], disabled: l !== loader && hasBuild[l] === false }))}
           />
         </label>
         {loader !== 'vanilla' && (

@@ -192,6 +192,7 @@ export default {
   'engine.ftb.noVersion': '{name} has no version to install',
   'engine.github.installing': 'Installing from GitHub',
   'engine.github.modsOnly': 'GitHub only offers mods here',
+  'engine.horizon.buildGone': "Horizon build {build} isn't on GitHub any more (Horizon deletes builds after a week). Pick another build in the instance's settings.",
   'engine.horizon.launchApi': "This Horizon build can't be started from ResinCraft ({why}). Try again after Horizon's next nightly build, or update ResinCraft.",
   'engine.horizon.needsOwner': 'Horizon only starts for a Microsoft account that owns Minecraft: Java Edition. {name} is an offline account: switch to your Microsoft account to play.',
   'engine.hostAddon.badLink': "That isn't a web address",

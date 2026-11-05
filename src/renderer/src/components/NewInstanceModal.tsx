@@ -13,6 +13,9 @@ import { PackFields, type PackDraft } from './OwnPack'
 import { liteloaderFits } from './VersionSettings'
 import { ModpackFinder } from './ModpackFinder'
 
+/** The loaders whose builds depend on the Minecraft version (Vanilla always has one; Horizon brings its own). */
+const CHECKED_LOADERS: LoaderType[] = ['fabric', 'quilt', 'forge', 'neoforge', 'liteloader']
+
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const { settings, activeAccount, refreshInstances, go, toast, instances } = useStore()
   // 'pack': the player makes their own modpack, then fills it on Discover (see PackBuilderBanner).
@@ -48,6 +51,24 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   // LiteLoader next to Forge (Minecraft 1.5.2 – 1.12.2): its newest build, added after creating.
   const [lite, setLite] = useState(false)
   const [liteVersion, setLiteVersion] = useState<string | null>()
+
+  // Which loaders have a build for the chosen Minecraft version; the others are greyed out. Horizon picks its own
+  // version, so while it's chosen every loader stays open (the player can always go back).
+  const [hasBuild, setHasBuild] = useState<Partial<Record<LoaderType, boolean>>>({})
+  useEffect(() => {
+    setHasBuild({})
+    if (!mc || loader === 'horizon') return
+    let live = true
+    for (const l of CHECKED_LOADERS) {
+      api.versions.loaders(l, mc).then(
+        (list) => live && setHasBuild((b) => ({ ...b, [l]: list.length > 0 })),
+        () => undefined
+      )
+    }
+    return () => {
+      live = false
+    }
+  }, [mc, loader === 'horizon'])
 
   // Horizon plays one Minecraft version, the one its build is pinned to.
   useEffect(() => {
@@ -320,15 +341,17 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
                 <Segmented<LoaderType>
                   value={loader}
                   onChange={setLoader}
-                  options={[
-                    { value: 'vanilla', label: 'Vanilla' },
-                    { value: 'fabric', label: 'Fabric' },
-                    { value: 'quilt', label: 'Quilt' },
-                    { value: 'forge', label: 'Forge' },
-                    { value: 'neoforge', label: 'NeoForge' },
-                    { value: 'liteloader', label: 'LiteLoader' },
-                    { value: 'horizon', label: 'Horizon' }
-                  ]}
+                  options={(
+                    [
+                      { value: 'vanilla', label: 'Vanilla' },
+                      { value: 'fabric', label: 'Fabric' },
+                      { value: 'quilt', label: 'Quilt' },
+                      { value: 'forge', label: 'Forge' },
+                      { value: 'neoforge', label: 'NeoForge' },
+                      { value: 'liteloader', label: 'LiteLoader' },
+                      { value: 'horizon', label: 'Horizon' }
+                    ] as { value: LoaderType; label: string }[]
+                  ).map((o) => ({ ...o, disabled: o.value !== loader && hasBuild[o.value] === false }))}
                 />
                 <span className="hint">
                   {loader === 'horizon'

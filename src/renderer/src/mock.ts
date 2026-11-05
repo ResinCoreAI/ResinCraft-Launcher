@@ -592,7 +592,11 @@ export function mockApi(): ResinApi {
     horizon: {
       status: async () => ({ supported: true, minecraft: '26.3', installed: null, latest: '0.2.30' }),
       install: async () => '0.2.30',
-      open: async () => undefined
+      open: async () => undefined,
+      builds: async () => [
+        { id: 'nightly-2026-11-04-3fb4c31', date: '2026-11-04', commit: '3fb4c31', installed: true, available: true },
+        { id: 'nightly-2026-11-03-9d979ca', date: '2026-11-03', commit: '9d979ca', installed: false, available: true }
+      ]
     },
     ...mockFiles(),
     ...migrate,

@@ -57,6 +57,7 @@ import { InstanceMulticore } from '../components/Multicore'
 import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 import { instanceOwner, PackChip, PackVersionSetting } from '../components/PackVersion'
 import { VersionSection } from '../components/VersionSettings'
+import { HorizonBuildSection } from '../components/HorizonBuild'
 import { GameMemoryChip } from '../components/Memory'
 
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
@@ -1095,7 +1096,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
 
       <InstanceMulticore inst={inst} />
 
-      {inst.loader === 'horizon' ? <p className="hint">{t('servers.horizon.instanceHint')}</p> : <VersionSection inst={inst} />}
+      {inst.loader === 'horizon' ? <HorizonBuildSection inst={inst} /> : <VersionSection inst={inst} />}
 
       <RepairSection inst={inst} />
 

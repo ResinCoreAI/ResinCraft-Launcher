@@ -51,7 +51,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
     horizon: {
       status: fn('horizon:status'),
       install: fn('horizon:install'),
-      open: fn('horizon:open')
+      open: fn('horizon:open'),
+      builds: fn('horizon:builds')
     },
     bedrock: {
       status: fn('bedrock:status'),

@@ -119,6 +119,7 @@ pub async fn handle(channel: &str, _args: Args) -> Result<Value> {
     match channel {
         "horizon:status" => json(status().await),
         "horizon:install" => json(install().await?),
+        "horizon:builds" => json(crate::game::horizon::builds().await?),
         "horizon:open" => {
             open()?;
             done()

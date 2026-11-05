@@ -1117,6 +1117,17 @@ export type ServerKind =
   | 'nukkitpm1'
 
 /** Whether Horizon's launcher is here, and the newest one (unknown when GitHub can't be reached). */
+/** A Horizon nightly build an instance can be set to. */
+export interface HorizonBuild {
+  /** nightly-2026-11-04-3fb4c31 */
+  id: string
+  date: string
+  commit: string
+  installed: boolean
+  /** Still on GitHub (Horizon deletes dated builds after a week). */
+  available: boolean
+}
+
 export interface HorizonStatus {
   supported: boolean
   /** The Minecraft version Horizon plays now; a new Horizon instance gets it. */
@@ -2029,6 +2040,8 @@ export interface ResinApi {
     install(): Promise<string>
     /** Starts it. */
     open(): Promise<void>
+    /** The dated nightly builds an instance can be set to (its loaderVersion), newest first. */
+    builds(): Promise<HorizonBuild[]>
   }
   /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
   bedrock: {

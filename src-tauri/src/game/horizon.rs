@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::content::github;
@@ -105,11 +105,66 @@ pub async fn latest() -> Result<(github::Release, String)> {
     Ok((release, id))
 }
 
+/// The newest build installed (the one `current.txt` names).
 async fn installed() -> Option<Build> {
     let id = tokio::fs::read_to_string(builds_dir().join(CURRENT_FILE)).await.ok()?.trim().to_string();
-    let root = find_root(&builds_dir().join(&id)).await?;
+    installed_build(&id).await
+}
+
+/// A build that's downloaded and prepared.
+async fn installed_build(id: &str) -> Option<Build> {
+    let root = find_root(&builds_dir().join(id)).await?;
     let mc = mc_in_lock(&tokio::fs::read_to_string(root.join(LOCK_FILE)).await.ok()?)?;
-    Some(Build { id, root, mc })
+    resources(&root, &mc).is_dir().then(|| Build { id: id.to_string(), root, mc })
+}
+
+/// The dated release a build comes from: nightly-2026-11-04-3fb4c31 is in nightly-2026-11-04.
+pub fn tag_of(id: &str) -> Option<String> {
+    let rest = id.strip_prefix("nightly-")?;
+    let (date, commit) = rest.rsplit_once('-')?;
+    (date.len() == 10 && !commit.is_empty() && commit.chars().all(|c| c.is_ascii_hexdigit())).then(|| format!("nightly-{date}"))
+}
+
+/// A build a player can pick for an instance.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildInfo {
+    pub id: String,
+    /// The day it was built (2026-11-04).
+    pub date: String,
+    pub commit: String,
+    pub installed: bool,
+    /// Still on GitHub: Horizon deletes dated builds after a week, and an installed one keeps working.
+    pub available: bool,
+}
+
+fn info(id: &str, installed: bool, available: bool) -> Option<BuildInfo> {
+    let rest = id.strip_prefix("nightly-")?;
+    let (date, commit) = rest.rsplit_once('-')?;
+    Some(BuildInfo { id: id.to_string(), date: date.to_string(), commit: commit.to_string(), installed, available })
+}
+
+/// The dated nightly builds on GitHub and the ones installed here, newest first.
+pub async fn builds() -> Result<Vec<BuildInfo>> {
+    let mut have = Vec::new();
+    if let Ok(mut dir) = tokio::fs::read_dir(builds_dir()).await {
+        while let Ok(Some(e)) = dir.next_entry().await {
+            let id = e.file_name().to_string_lossy().to_string();
+            if tag_of(&id).is_some() && installed_build(&id).await.is_some() {
+                have.push(id);
+            }
+        }
+    }
+    let online: Vec<String> = match github::all_releases(REPO).await {
+        Ok(list) => list.into_iter().filter(|r| r.tag_name.starts_with("nightly-")).filter_map(|r| build_id(&r.title())).collect(),
+        Err(e) if have.is_empty() => return Err(e),
+        Err(_) => Vec::new(),
+    };
+    let mut all: Vec<BuildInfo> = online.iter().filter_map(|id| info(id, have.contains(id), true)).collect();
+    all.extend(have.iter().filter(|id| !online.contains(id)).filter_map(|id| info(id, true, false)));
+    all.sort_by(|a, b| b.date.cmp(&a.date).then_with(|| b.id.cmp(&a.id)));
+    all.dedup_by(|a, b| a.id == b.id);
+    Ok(all)
 }
 
 /// The Minecraft version Horizon plays now: the installed build's, else the one the rolling release pins.
@@ -178,7 +233,8 @@ pub async fn prepare(dir: &Path, owner: Option<String>, task: &Arc<Task>) -> Res
     Ok((root, mc))
 }
 
-async fn install(release: &github::Release, id: &str, owner: Option<String>, task: &Arc<Task>) -> Result<Build> {
+/// Downloads and prepares a build. `newest` marks it as the one instances that follow nightly use.
+async fn install(release: &github::Release, id: &str, newest: bool, owner: Option<String>, task: &Arc<Task>) -> Result<Build> {
     let name = client_archive(std::env::consts::OS, std::env::consts::ARCH).ok_or_else(|| anyhow!("Horizon has no build for this computer"))?;
     let dir = builds_dir().join(id);
     let _ = tokio::fs::remove_dir_all(&dir).await;
@@ -195,7 +251,9 @@ async fn install(release: &github::Release, id: &str, owner: Option<String>, tas
         }
     };
     make_executable(&root.join("horizon-client")).await?;
-    tokio::fs::write(builds_dir().join(CURRENT_FILE), id).await?;
+    if newest {
+        tokio::fs::write(builds_dir().join(CURRENT_FILE), id).await?;
+    }
     Ok(Build { id: id.to_string(), root, mc })
 }
 
@@ -209,11 +267,14 @@ pub async fn ensure_build(owner: Option<String>, task: &Arc<Task>) -> Result<Bui
     if let Some(b) = have.as_ref().filter(|b| b.id == id) {
         return Ok(b.clone());
     }
-    match install(&release, &id, owner, task).await {
+    match install(&release, &id, true, owner, task).await {
         Ok(new) => {
-            // A game that's still running holds its files: that copy goes next time.
-            if let Some(old) = &have {
-                let _ = tokio::fs::remove_dir_all(builds_dir().join(&old.id)).await;
+            // A game that's still running holds its files: that copy goes next time. A build an instance is set to
+            // stays.
+            if let Some(old) = have.filter(|o| o.id != new.id) {
+                if !pinned_builds().await.contains(&old.id) {
+                    let _ = tokio::fs::remove_dir_all(builds_dir().join(&old.id)).await;
+                }
             }
             Ok(new)
         }
@@ -225,6 +286,26 @@ pub async fn ensure_build(owner: Option<String>, task: &Arc<Task>) -> Result<Bui
             None => Err(e),
         },
     }
+}
+
+/// The builds instances are set to (their loader version), not the newest.
+async fn pinned_builds() -> Vec<String> {
+    let list = crate::core::instances::list().await.unwrap_or_default();
+    list.into_iter().filter(|i| i.loader == crate::core::types::LoaderType::Horizon).filter_map(|i| i.loader_version).filter(|v| !v.is_empty()).collect()
+}
+
+/// One build an instance is set to, installed if it has to be.
+pub async fn ensure_pinned(id: &str, owner: Option<String>, task: &Arc<Task>) -> Result<Build> {
+    if let Some(b) = installed_build(id).await {
+        return Ok(b);
+    }
+    let gone = || err_tr!("horizon.buildGone", "Horizon build {build} isn't on GitHub any more (Horizon deletes builds after a week). Pick another build in the instance's settings.", build = id);
+    let tag = tag_of(id).ok_or_else(gone)?;
+    let release = github::release_of(REPO, &tag).await.map_err(|_| gone())?;
+    if build_id(&release.title()).as_deref() != Some(id) {
+        return Err(gone());
+    }
+    install(&release, id, false, owner, task).await
 }
 
 /// Forgets the installed builds, so the next start installs the newest again.
@@ -307,7 +388,10 @@ pub fn check_owner(auth: &LaunchAuth) -> Result<()> {
 
 /// The newest build for an instance, and how to start it. The instance follows the Minecraft version of the build.
 pub async fn prepare_launch(inst: &Instance, width: u32, height: u32, target: Option<&Target>, task: &Arc<Task>) -> Result<(String, Vec<String>)> {
-    let build = ensure_build(Some(inst.id.clone()), task).await?;
+    let build = match inst.loader_version.as_deref().filter(|v| !v.is_empty()) {
+        Some(id) => ensure_pinned(id, Some(inst.id.clone()), task).await?,
+        None => ensure_build(Some(inst.id.clone()), task).await?,
+    };
     if build.mc != inst.mc_version {
         crate::core::instances::update(&inst.id, json!({ "mcVersion": build.mc })).await?;
     }
@@ -331,6 +415,15 @@ mod tests {
         assert_eq!(build_id("Nightly 2026-10-31 · 9d979ca").as_deref(), Some("nightly-2026-10-31-9d979ca"));
         assert_eq!(build_id("nightly"), None);
         assert_eq!(build_id("Nightly ../evil · 9d979ca"), None);
+    }
+
+    #[test]
+    fn a_build_is_in_its_dated_release() {
+        assert_eq!(tag_of("nightly-2026-11-04-3fb4c31").as_deref(), Some("nightly-2026-11-04"));
+        assert_eq!(tag_of("nightly-3fb4c31"), None);
+        assert_eq!(tag_of("nightly-2026-11-04-zz"), None);
+        let b = info("nightly-2026-11-04-3fb4c31", true, false).unwrap();
+        assert_eq!((b.date.as_str(), b.commit.as_str()), ("2026-11-04", "3fb4c31"));
     }
 
     #[test]
