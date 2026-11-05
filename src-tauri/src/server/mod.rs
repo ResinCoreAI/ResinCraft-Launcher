@@ -19,6 +19,7 @@ pub mod multicore;
 pub mod network;
 pub mod packs;
 pub mod playit;
+pub mod plan;
 pub mod plugins;
 pub mod reach;
 pub mod properties;
@@ -328,6 +329,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(domain::info(&id).await?)
         }
         "server:relayNames" => json(relay::names().await?),
+        "server:relayPlans" => json(plan::plans().await?),
+        "server:relayPlanBuy" => json(plan::buy(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<bool>(2)?).await?),
+        "server:relayPlanChange" => json(plan::change(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?, args.get::<bool>(3)?).await?),
+        "server:relayPlanCancel" => json(plan::cancel(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<bool>(2)?).await?),
+        "server:relayPlanPay" => json(plan::pay(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:relayPlanRefresh" => json(plan::refresh(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:relayRevoke" => {
             relay::revoke_name(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()

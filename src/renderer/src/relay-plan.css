@@ -1,0 +1,101 @@
+/* The Servers tab's ResinCraft Relay plan (components/RelayPlan.tsx). */
+
+.relay-plan h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.relay-plan h4 svg {
+  width: 15px;
+  height: 15px;
+}
+
+.rp-accounts {
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.rp-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.rp-period {
+  margin-top: 14px;
+  gap: 10px;
+  align-items: center;
+}
+
+.rp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.rp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 0.15s var(--ease);
+}
+
+.rp-card:hover {
+  border-color: var(--border-strong);
+}
+
+.rp-card.owned {
+  opacity: 0.7;
+}
+
+.rp-card-name {
+  font-weight: 600;
+}
+
+.rp-card .btn {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.rp-price {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--data);
+}
+
+.rp-price .hint {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.rp-element {
+  min-height: 120px;
+}
+
+.rp-mock-card {
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  font-family: var(--mono, monospace);
+  color: var(--text-dim);
+}
+
+.rp-secure {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rp-secure svg {
+  width: 13px;
+  height: 13px;
+}

@@ -1335,6 +1335,81 @@ export interface RelayNameAccount {
   request?: { wanted: number; state: 'pending' | 'approved' | 'rejected'; note?: string }
 }
 
+/** What a relay product gives (relay protocol 11, snake_case as the relay sends it). */
+export interface PlanGrants {
+  servers: number
+  names: number
+  traffic_gb: number
+  unlimited_traffic: boolean
+  no_session_limit: boolean
+  whitelist_page: boolean
+}
+
+/** A product for sale; prices in the currency's smallest unit (satang: 6900 = 69 THB). */
+export interface PlanProduct {
+  id: string
+  name: string
+  description: string
+  kind: 'addon' | 'pack' | string
+  grants: PlanGrants
+  monthly: number
+  yearly: number
+  /** Everything it gives, the account has already. */
+  owned: boolean
+}
+
+export interface PlanSub {
+  id: string
+  product: string
+  name: string
+  yearly: boolean
+  /** Stripe's status ("active", "past_due", "incomplete", "canceled"…) or "granted". */
+  status: string
+  active: boolean
+  /** Unix seconds; 0: never. */
+  period_end: number
+  cancel_at_period_end: boolean
+  amount: number
+  /** Bought (can be cancelled or changed); false: given by the relay's admin. */
+  paid: boolean
+}
+
+export interface PlanInfo {
+  /** The relay sells anything; off: everything is free and nothing is shown for sale. */
+  enabled: boolean
+  currency: string
+  publishable_key: string
+  test_mode: boolean
+  free: { servers: number; names: number; monthly_bytes: number; bonus_bytes: number; session_secs: number }
+  products: PlanProduct[]
+  mine: PlanSub[]
+  totals: { servers: number; names: number; monthly_bytes: number; unlimited_traffic: boolean; no_session_limit: boolean; whitelist_page: boolean; session_secs: number }
+}
+
+/** What the payment form needs: a PaymentIntent (or SetupIntent) to confirm with Stripe.js, or nothing to pay. */
+export interface PayStep {
+  sub: string
+  client_secret?: string | null
+  intent: 'payment' | 'setup' | 'none' | string
+  publishable_key: string
+  amount: number
+  currency: string
+}
+
+export interface AccountPlan {
+  account: string
+  accountName: string
+  plan?: PlanInfo
+  /** The relay is too old for plans. */
+  unsupported: boolean
+  error?: EngineText
+}
+
+export interface RelayPlans {
+  available: boolean
+  accounts: AccountPlan[]
+}
+
 export interface RelayNames {
   available: boolean
   names: RelayNameEntry[]
@@ -2547,6 +2622,18 @@ export interface ResinApi {
     /** Asks the relay's admin to look at this server's hidden listing again. */
     appealListing(id: string, message: string): Promise<unknown>
     relayNames(): Promise<RelayNames>
+    /** Every signed-in Microsoft account's ResinCraft Relay plan, and what the relay sells. */
+    relayPlans(): Promise<RelayPlans>
+    /** Starts buying a product for an account: what the payment form needs. */
+    relayPlanBuy(account: string, product: string, yearly: boolean): Promise<PayStep>
+    /** Moves a subscription to another product or period (prorated). */
+    relayPlanChange(account: string, sub: string, product: string, yearly: boolean): Promise<PayStep>
+    /** Cancels a subscription at the end of its period, or (resume) keeps it. */
+    relayPlanCancel(account: string, sub: string, resume: boolean): Promise<PlanInfo>
+    /** A subscription's open invoice, for the payment form. */
+    relayPlanPay(account: string, sub: string): Promise<PayStep>
+    /** Reads a subscription again after paying. */
+    relayPlanRefresh(account: string, sub: string): Promise<PlanInfo>
     /** Frees a reserved name. */
     relayRevoke(account: string, name: string): Promise<void>
     /** Changes a reserved name, for the servers here that use it too. */

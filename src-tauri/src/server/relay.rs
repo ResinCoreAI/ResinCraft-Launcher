@@ -182,6 +182,9 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
             "hostRelay.listingLimit",
             "You've already submitted as many servers as the list allows. Remove one first."
         ),
+        ErrorCode::PaymentsOff => err_tr!("hostRelay.paymentsOff", "ResinCraft Relay isn't selling anything right now: everything is free."),
+        ErrorCode::NotForSale => err_tr!("hostRelay.notForSale", "That isn't for sale, or this account has it already."),
+        ErrorCode::PaymentFailed => err_tr!("hostRelay.paymentFailed", "The payment didn't go through: {error}", error = admin_message(e)),
         ErrorCode::BedrockUnavailable => err_tr!(
             "hostRelay.noBedrock",
             "ResinCraft Relay can't carry Bedrock servers right now (it has no free Bedrock ports, or hasn't been updated for them yet)."
@@ -888,7 +891,7 @@ pub async fn set_name(id: &str, name: &str) -> Result<ServerMeta> {
     Ok(m)
 }
 
-fn same_account(a: &str, b: &str) -> bool {
+pub(crate) fn same_account(a: &str, b: &str) -> bool {
     a.replace('-', "").eq_ignore_ascii_case(&b.replace('-', ""))
 }
 
