@@ -3528,7 +3528,7 @@ const dict: Dict = {
   "engine.horizon.unknownKind": "ResinCraft chưa thể cài {name} ({kind})",
   "engine.horizon.unknownProject": "Kho của Horizon không có dự án {id}",
   "engine.horizon.unreachable": "Không thể kết nối tới kho của Horizon: {error}",
-  "engine.horizon.buildGone": "Bản Horizon {build} không còn trên GitHub (Horizon xóa các bản sau một tuần). Hãy chọn bản khác trong cài đặt của bản cài đặt.",
+  "engine.horizon.buildGone": "Bản Horizon {build} không còn trên GitHub (Horizon xóa các bản sau một tuần). Hãy chọn bản khác trong phần cài đặt.",
   "servers.horizon.buildTitle": "Bản Horizon",
   "servers.horizon.buildLabel": "Bản",
   "servers.horizon.buildNewest": "Bản nightly mới nhất (cập nhật trước mỗi lần chạy)",
