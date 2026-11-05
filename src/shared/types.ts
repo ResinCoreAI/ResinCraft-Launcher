@@ -2149,8 +2149,6 @@ export interface ResinApi {
     saveText(fileName: string, text: string): Promise<string | null>
     /** The file ResinCraft was started with (double-clicked in Windows), once; null if none. */
     pendingOpen(): Promise<string | null>
-    /** The hidden window on the old http origin hands its localStorage over (once, after the move to https). */
-    storageExport(entries: Record<string, string>): Promise<void>
     /** The old origin's localStorage entries, once; null when there is nothing to carry over. */
     storageImport(): Promise<Record<string, string> | null>
     /** Starts ResinCraft's uninstaller ('uninstaller', ResinCraft then quits) or opens Windows' Installed apps ('settings'). */

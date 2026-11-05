@@ -71,7 +71,6 @@ pub fn run() {
                 tray::sync(core::settings::get().await.tray);
             });
             tray::build(app.handle())?;
-            webstorage::start(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![ipc])

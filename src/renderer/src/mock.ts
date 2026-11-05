@@ -260,7 +260,6 @@ export function mockApi(): ResinApi {
       themeImage: async (id) => mockThemeImages.get(id) ?? null,
       gameTexture: async () => null,
       pendingOpen: async () => null,
-      storageExport: async () => {},
       storageImport: async () => null,
       uninstall: async () => 'settings' as const,
       readThemeFile: async () => {

@@ -1,66 +1,96 @@
 //! The launcher's window is served over HTTPS (`https://tauri.localhost`, which Stripe's card form needs for real
 //! payments). Before, it was `http://tauri.localhost`, and the browser keeps each origin's storage apart: what the UI
-//! kept in `localStorage` (Library groups and order, Discover's site, the server list's hidden and joined servers…)
-//! would be gone. So the first start after the change opens the old origin once, in a hidden window, which hands its
-//! storage over (`exported`); the launcher's window waits for it (`import`) and keeps every entry it doesn't have yet.
+//! kept in `localStorage` (Library groups and order, Discover's site, hidden pack updates…) would be gone. So the first
+//! start after the change reads the old origin's entries from WebView2's own files (a copy of its `Local Storage`
+//! LevelDB), and the launcher's window keeps every one it doesn't have yet (`import`). It is done once.
 
-use std::path::PathBuf;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use serde_json::Value;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-const WINDOW: &str = "storage-export";
 const DONE: &str = "webstorage-https.done";
-
-static EXPORTED: Mutex<Option<Value>> = Mutex::new(None);
+/// How WebView2 (Chromium) keys an origin's entries: `_<origin>\0`, then the key, stored as a value is.
+const OLD_ORIGIN: &[u8] = b"_http://tauri.localhost\x00";
 
 fn marker() -> PathBuf {
     crate::core::paths::root().join(DONE)
 }
 
-fn mark_done() {
-    let _ = std::fs::write(marker(), "");
-}
-
-/// At start: opens the old origin in a hidden window, once.
-pub fn start(app: &AppHandle) {
-    if marker().exists() {
-        return;
-    }
-    let built = WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into())).use_https_scheme(false).visible(false).focused(false).skip_taskbar(true).build();
-    if let Err(e) = built {
-        eprintln!("[storage] couldn't open the old storage: {e}");
-        mark_done();
+/// A value as Chromium stores it: a format byte, then the text (0: UTF-16LE, 1: Latin-1).
+pub fn decode(raw: &[u8]) -> Option<String> {
+    let (&kind, rest) = raw.split_first()?;
+    match kind {
+        0 if rest.len() % 2 == 0 => String::from_utf16(&rest.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>()).ok(),
+        1 => Some(rest.iter().map(|&b| b as char).collect()),
+        _ => None,
     }
 }
 
-/// The old origin's `localStorage`, from the hidden window.
-pub fn exported(entries: Value) {
-    *EXPORTED.lock().unwrap() = Some(entries);
-    if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window(WINDOW)) {
-        let _ = w.close();
+/// The old origin's entries in a `Local Storage/leveldb` folder, read from a copy (WebView2 holds the folder open).
+pub fn read_old(leveldb: &Path) -> anyhow::Result<BTreeMap<String, String>> {
+    let copy = std::env::temp_dir().join(format!("resincraft-webstorage-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&copy);
+    std::fs::create_dir_all(&copy)?;
+    for e in std::fs::read_dir(leveldb)?.flatten() {
+        let name = e.file_name();
+        if name != "LOCK" && e.file_type().is_ok_and(|t| t.is_file()) {
+            std::fs::copy(e.path(), copy.join(&name))?;
+        }
     }
+    let read = (|| -> anyhow::Result<BTreeMap<String, String>> {
+        let mut db = rusty_leveldb::DB::open(&copy, rusty_leveldb::Options { create_if_missing: false, ..Default::default() }).map_err(|e| anyhow::anyhow!("{e}"))?;
+        let mut it = db.new_iter().map_err(|e| anyhow::anyhow!("{e}"))?;
+        let mut out = BTreeMap::new();
+        use rusty_leveldb::LdbIterator;
+        while let Some((k, v)) = it.next() {
+            let Some(key) = k.strip_prefix(OLD_ORIGIN) else { continue };
+            if let (Some(key), Some(value)) = (decode(key), decode(&v)) {
+                out.insert(key, value);
+            }
+        }
+        Ok(out)
+    })();
+    let _ = std::fs::remove_dir_all(&copy);
+    read
 }
 
-/// For the launcher's window: the old storage's entries once (null when there is nothing to carry over). Waits a few
-/// seconds for the hidden window; after that (or once it answered) it isn't asked again.
+fn leveldb_dir() -> Option<PathBuf> {
+    use tauri::Manager;
+    let app = crate::core::ctx::app()?;
+    Some(app.path().app_local_data_dir().ok()?.join("EBWebView").join("Default").join("Local Storage").join("leveldb"))
+}
+
+/// For the launcher's window: the old origin's entries, once (null when there is nothing to carry over).
 pub async fn import() -> Value {
     if marker().exists() {
         return Value::Null;
     }
-    for _ in 0..60 {
-        if let Some(v) = EXPORTED.lock().unwrap().take() {
-            mark_done();
-            return v;
+    let Some(dir) = leveldb_dir().filter(|d| d.is_dir()) else {
+        let _ = std::fs::write(marker(), "");
+        return Value::Null;
+    };
+    let read = tokio::task::spawn_blocking(move || read_old(&dir)).await;
+    let _ = std::fs::write(marker(), "");
+    match read {
+        Ok(Ok(entries)) => serde_json::to_value(entries).unwrap_or(Value::Null),
+        Ok(Err(e)) => {
+            eprintln!("[storage] couldn't read the old storage: {e:#}");
+            Value::Null
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        Err(_) => Value::Null,
     }
-    eprintln!("[storage] the old storage didn't answer");
-    mark_done();
-    if let Some(w) = crate::core::ctx::app().and_then(|a| a.get_webview_window(WINDOW)) {
-        let _ = w.close();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn values_decode_as_chromium_stores_them() {
+        assert_eq!(decode(b"\x01system").as_deref(), Some("system"));
+        assert_eq!(decode(&[0, b'h', 0, b'i', 0, 0x01, 0x0e]).as_deref(), Some("hi\u{e01}"));
+        assert_eq!(decode(b"\x02x"), None);
+        assert_eq!(decode(b""), None);
     }
-    Value::Null
 }

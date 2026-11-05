@@ -29,7 +29,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       qrSvg: fn('app:qrSvg'),
       saveText: fn('app:saveText'),
       pendingOpen: fn('app:pendingOpen'),
-      storageExport: fn('app:storageExport'),
       storageImport: fn('app:storageImport'),
       uninstall: fn('app:uninstall'),
       readThemeFile: fn('app:readThemeFile'),
