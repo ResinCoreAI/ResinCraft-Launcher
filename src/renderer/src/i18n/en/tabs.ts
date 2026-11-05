@@ -67,6 +67,8 @@ export default {
   'worlds.closeGameFirst': 'Close the game first',
   'worlds.import': 'Import world',
   'worlds.import.hint': 'Import a world from a .zip file',
+  'worlds.download': 'Download worlds',
+  'worlds.download.hint': 'Find maps and worlds on CurseForge and add one to this instance',
   'worlds.imported': 'Imported {name}',
   'worlds.running': 'The game is running. Close it before renaming, deleting or importing worlds; backups made now may miss the last few seconds of play.',
   'worlds.empty.title': 'No worlds yet',

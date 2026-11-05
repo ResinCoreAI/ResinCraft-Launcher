@@ -218,7 +218,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
 
 // ---------- Content ----------
 
-type Kind = Exclude<ContentKind, 'modpack'>
+type Kind = Exclude<ContentKind, 'modpack' | 'world'>
 const KINDS: Kind[] = ['mod', 'resourcepack', 'shader']
 const KIND_FOLDER: Record<Kind, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
 /** Identifies a file across enabling and disabling (which adds or drops ".disabled"). */

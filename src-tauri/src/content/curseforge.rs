@@ -27,7 +27,7 @@ use crate::core::settings;
 use crate::core::text::Text;
 use crate::core::types::{
     ContentItem, ContentKind, ContentSource, GalleryImage, Instance, LoaderType, ModpackRef, NewInstance, PendingDownload, ProjectDependency, ProjectDetails,
-    ProjectHit, ProjectLink, ProjectVersion, SearchQuery, SearchResult, UpdateRef, VersionInfo,
+    ProjectHit, ProjectLink, ProjectVersion, SearchQuery, SearchResult, UpdateRef, VersionInfo, WorldInfo,
 };
 use crate::{bail_tr, err_tr, tr};
 
@@ -35,6 +35,8 @@ const API: &str = "https://api.curseforge.com/v1";
 const MINECRAFT: u32 = 432;
 const REQUIRED_DEPENDENCY: u32 = 3;
 const SHA1: u32 = 1;
+/// CurseForge's class for maps and worlds.
+const WORLDS: u32 = 17;
 
 fn class_of(kind: ContentKind) -> u32 {
     match kind {
@@ -42,6 +44,7 @@ fn class_of(kind: ContentKind) -> u32 {
         ContentKind::Modpack => 4471,
         ContentKind::Resourcepack => 12,
         ContentKind::Shader => 6552,
+        ContentKind::World => WORLDS,
     }
 }
 
@@ -51,6 +54,7 @@ fn kind_of_class(class: u32) -> Option<ContentKind> {
         4471 => Some(ContentKind::Modpack),
         12 => Some(ContentKind::Resourcepack),
         6552 => Some(ContentKind::Shader),
+        WORLDS => Some(ContentKind::World),
         _ => None,
     }
 }
@@ -340,6 +344,8 @@ fn to_hit(m: &CfMod) -> ProjectHit {
 
 async fn files(mod_id: u64, inst: Option<&Instance>, kind: Option<ContentKind>) -> Result<Vec<CfFile>> {
     let mut params = vec!["pageSize=50".to_string()];
+    // A map's files are listed whatever their Minecraft version: the player is warned about a mismatch instead.
+    let inst = inst.filter(|_| kind != Some(ContentKind::World));
     if let Some(inst) = inst {
         params.push(format!("gameVersion={}", urlencoding::encode(&inst.mc_version)));
         if kind == Some(ContentKind::Mod) {
@@ -539,6 +545,9 @@ async fn install_file(inst: &Instance, kind: ContentKind, m: &CfMod, f: &CfFile,
 }
 
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, version_id: Option<String>) -> Result<()> {
+    if kind == ContentKind::World {
+        return install_world(instance_id, project_id, version_id).await.map(|_| ());
+    }
     let inst = instances::get(instance_id).await?;
     if kind == ContentKind::Mod && matches!(inst.loader, LoaderType::Vanilla | LoaderType::Horizon) {
         bail_tr!("curseforge.vanillaInstance", "{name} is a vanilla instance. Mods need a mod loader; create a modded instance first.", name = inst.name);
@@ -626,6 +635,57 @@ pub(crate) async fn install_into(
         stack.extend(deps.into_iter().rev());
     }
     Ok(())
+}
+
+// ---------- Worlds ----------
+
+/// The file to install when none was picked: the newest one made for `mc`, else the newest one.
+fn pick_world_file(newest_first: Vec<CfFile>, mc: &str) -> Option<CfFile> {
+    let i = newest_first.iter().position(|f| f.game_versions.iter().any(|v| v == mc)).unwrap_or(0);
+    newest_first.into_iter().nth(i)
+}
+
+/// Downloads a map (`version_id`, or [`pick_world_file`]), checks its SHA-1 and unpacks it into the instance's
+/// saves/ under the map's name (a free variant of it when taken). The download is deleted afterwards.
+pub async fn install_world(instance_id: &str, project_id: &str, version_id: Option<String>) -> Result<WorldInfo> {
+    let inst = instances::get(instance_id).await?;
+    let mod_id = cf_id(project_id);
+    Task::run(tr!("curseforge.installingWorld", "Downloading a world from CurseForge"), Some(inst.id.clone()), move |task| async move {
+        let m: CfMod = cf(&format!("/mods/{mod_id}"), None).await?;
+        if m.class_id != Some(WORLDS) {
+            bail_tr!("curseforge.notAWorld", "{name} isn't a world", name = m.name);
+        }
+        task.update(tr!("curseforge.downloadingWorld", "Downloading {name}…", name = m.name), None);
+        let f = match version_id.and_then(|v| v.parse::<u64>().ok()) {
+            Some(fid) => Some(cf::<CfFile>(&format!("/mods/{mod_id}/files/{fid}"), None).await?),
+            None => pick_world_file(files(mod_id, None, Some(ContentKind::World)).await?, &inst.mc_version),
+        };
+        let Some(f) = f.filter(|f| f.mod_id == mod_id) else {
+            bail_tr!("curseforge.noWorldFile", "{name} has no file to download", name = m.name);
+        };
+        let Some(url) = f.url() else {
+            bail_tr!(
+                "curseforge.blockedWorld",
+                "{name}'s author only allows downloads from the CurseForge website. Download {file} there, then import it in the instance's Worlds tab.",
+                name = m.name,
+                file = f.file_name
+            );
+        };
+        let tmp = paths::cache().join("world-downloads").join(format!("{mod_id}-{}.zip", f.id));
+        let item = DownloadItem::new(url, &tmp).hash(f.sha1().map(Hash::sha1)).size(f.file_length.filter(|n| *n > 0));
+        let result = async {
+            download_file(&item).await?;
+            let t = task.clone();
+            crate::player::worlds::install_downloaded(&inst.id, &tmp, &m.name, move |done, total| {
+                t.update(tr!("worlds.extracting", "Extracting ({done}/{total})", done = done, total = total), Some(done as f64 / total as f64))
+            })
+            .await
+        }
+        .await;
+        let _ = tokio::fs::remove_file(&tmp).await;
+        result
+    })
+    .await
 }
 
 pub(crate) async fn add_pending(instance_id: &str, list: Vec<PendingDownload>) -> Result<()> {
@@ -1130,4 +1190,25 @@ pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::
             PackMod { title: h.title, id: Some(h.id), source: Some(ContentSource::Curseforge), icon_url: h.icon_url, file: None }
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file(id: u64, versions: &[&str]) -> CfFile {
+        serde_json::from_value(json!({ "id": id, "modId": 1, "fileName": format!("{id}.zip"), "gameVersions": versions })).unwrap()
+    }
+
+    #[test]
+    fn picks_the_newest_world_file_for_the_version() {
+        let list = || vec![file(3, &["1.21.4"]), file(2, &["1.20.1", "1.20"]), file(1, &["1.20.1"])];
+        assert_eq!(pick_world_file(list(), "1.20.1").map(|f| f.id), Some(2));
+        assert_eq!(pick_world_file(list(), "1.21.4").map(|f| f.id), Some(3));
+        // Nothing for this version: the newest file, and the UI warns.
+        assert_eq!(pick_world_file(list(), "1.8.9").map(|f| f.id), Some(3));
+        assert!(pick_world_file(Vec::new(), "1.20.1").is_none());
+        assert_eq!(kind_of_class(17), Some(ContentKind::World));
+        assert_eq!(class_of(ContentKind::World), 17);
+    }
 }

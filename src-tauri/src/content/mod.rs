@@ -57,6 +57,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "content:duplicates" => json(dupes::check(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:installMany" => json(dupes::install_many(&args.get::<String>(0)?, args.get(1)?, args.get::<Option<_>>(2)?.unwrap_or_default()).await?),
+        // A map from Discover's Worlds: [instanceId, projectId, versionId?] → the new world.
+        "content:installWorld" => json(curseforge::install_world(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get(2)?).await?),
         "content:list" => json(sources::list_content(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:toggle" => {
             modrinth::toggle_content(&args.get::<String>(0)?, args.get(1)?, &args.get::<String>(2)?).await?;

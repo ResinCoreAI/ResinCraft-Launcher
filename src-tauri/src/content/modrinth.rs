@@ -563,7 +563,7 @@ fn matches_kind(kind: ContentKind, name: &str) -> bool {
     match kind {
         ContentKind::Mod => n.ends_with(".jar"),
         ContentKind::Resourcepack | ContentKind::Shader => n.ends_with(".zip"),
-        ContentKind::Modpack => false,
+        ContentKind::Modpack | ContentKind::World => false,
     }
 }
 

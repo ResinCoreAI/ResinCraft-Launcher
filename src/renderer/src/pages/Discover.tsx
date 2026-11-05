@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Earth,
   ExternalLink,
   Heart,
   Info,
@@ -24,7 +25,7 @@ import {
   Star,
   X
 } from 'lucide-react'
-import type { ContentFileRef, ContentItem, ContentKind, ContentSource, Instance, LoaderType, McVersion, ModPick, ProjectHit, SortMode } from '@shared/types'
+import type { ContentFileRef, ContentItem, ContentKind, ContentSource, Instance, LoaderType, McVersion, ModPick, ProjectHit, ProjectVersion, SortMode } from '@shared/types'
 import { api } from '../api'
 import { AutoLoadMore } from '../components/AutoLoadMore'
 import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, useCopy, type ContextEntry } from '../components/ui'
@@ -54,7 +55,8 @@ const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.Re
   { value: 'modpack', labelKey: 'discover.kind.modpack', searchKey: 'discover.search.modpack', icon: <Package size={15} /> },
   { value: 'mod', labelKey: 'discover.kind.mod', searchKey: 'discover.search.mod', icon: <Blocks size={15} /> },
   { value: 'resourcepack', labelKey: 'discover.kind.resourcepack', searchKey: 'discover.search.resourcepack', icon: <Image size={15} /> },
-  { value: 'shader', labelKey: 'discover.kind.shader', searchKey: 'discover.search.shader', icon: <Sparkles size={15} /> }
+  { value: 'shader', labelKey: 'discover.kind.shader', searchKey: 'discover.search.shader', icon: <Sparkles size={15} /> },
+  { value: 'world', labelKey: 'discover.kind.world', searchKey: 'discover.search.world', icon: <Earth size={15} /> }
 ]
 
 const SORTS: { value: SortMode; labelKey: Key }[] = [
@@ -133,7 +135,8 @@ function categoryLabel(c: string): string {
 
 export const SOURCES: { value: ContentSource; label: string; color: string; kinds: ContentKind[] }[] = [
   { value: 'modrinth', label: 'Modrinth', color: '#39e58c', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] },
-  { value: 'curseforge', label: 'CurseForge', color: '#f16436', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] },
+  // Worlds: only CurseForge has an API for maps (Modrinth has no worlds).
+  { value: 'curseforge', label: 'CurseForge', color: '#f16436', kinds: ['mod', 'modpack', 'resourcepack', 'shader', 'world'] },
   { value: 'ftb', label: 'FTB', color: '#b26bff', kinds: ['modpack'] },
   { value: 'atlauncher', label: 'ATLauncher', color: '#38bdf8', kinds: ['modpack'] },
   { value: 'technic', label: 'Technic', color: '#facc15', kinds: ['modpack'] },
@@ -142,7 +145,10 @@ export const SOURCES: { value: ContentSource; label: string; color: string; kind
 
 /** "All": every site that has the chosen kind at once. */
 type Site = ContentSource | 'all'
-const ALL_KINDS: ContentKind[] = ['mod', 'modpack', 'resourcepack', 'shader']
+const ALL_KINDS: ContentKind[] = ['mod', 'modpack', 'resourcepack', 'shader', 'world']
+
+/** Whether a map's file was made for this Minecraft version; a file that names no version can't be checked. */
+export const worldFits = (v: ProjectVersion, mc: string) => v.gameVersions.length === 0 || v.gameVersions.includes(mc)
 const siteLabel = (s: ContentSource) => SOURCES.find((x) => x.value === s)?.label ?? s
 
 /** Sources that only publish modpacks, which can't go into an existing instance. */
@@ -204,7 +210,10 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const [source, setSourceState] = useState<Site>(() => {
     const s = savedSource()
     // FTB only has modpacks, which can't go into an existing instance.
-    return (target || (initialKind && initialKind !== 'modpack')) && modpackOnly(s) ? 'all' : s
+    if ((target || (initialKind && initialKind !== 'modpack')) && modpackOnly(s)) return 'all'
+    // Opened on a kind this site doesn't have (Worlds on Modrinth): every site that has it.
+    if (initialKind && s !== 'all' && !SOURCES.find((x) => x.value === s)?.kinds.includes(initialKind)) return 'all'
+    return s
   })
   // Discover opens on modpacks; opened for an instance (adding to it), on mods, since packs can't go into one.
   const [kind, setKind] = useState<ContentKind>(initialKind ?? (target && !modpackOnly(source) ? 'mod' : 'modpack'))
@@ -270,10 +279,13 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const [pages, setPages] = useState<ProjectHit[]>([])
   /** The version to install once an instance is picked (installing a version from a details page). */
   const [pickedVersion, setPickedVersion] = useState<{ id: string; number: string }>()
+  /** A map made for another Minecraft version: asks before installing it. */
+  const [worldWarn, setWorldWarn] = useState<{ hit: ProjectHit; inst: Instance; versions: string[]; answer: (go: boolean) => void }>()
   const pageRef = useRef<HTMLDivElement>(null)
   const resultsScroll = useRef(0)
   const selectBar = useRef<HTMLDivElement>(null)
-  const canSelect = kind !== 'modpack'
+  // Maps install one at a time (each becomes a world of its own).
+  const canSelect = kind !== 'modpack' && kind !== 'world'
 
   useEffect(() => {
     void api.versions.list().then((v) => setVersions(v.filter((x) => x.type === 'release')))
@@ -303,7 +315,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
 
   // When browsing for a specific instance, know what it already has.
   const loadInstalled = useCallback(async () => {
-    if (!target || kind === 'modpack') return setInstalled(new Map())
+    if (!target || kind === 'modpack' || kind === 'world') return setInstalled(new Map())
     const list = await api.content.list(target.id, kind).catch(() => [])
     setInstalled(new Map(list.filter((i) => i.projectId).map((i) => [i.projectId!, i])))
   }, [target?.id, kind])
@@ -423,6 +435,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
       setPickedVersion(versionId ? { id: versionId, number: versionNumber ?? versionId } : undefined)
       return false
     }
+    if (hit.kind === 'world') return installWorld(hit, into!, versionId, from)
     if (hit.kind !== 'modpack') return installPicks([hit], into!, versionId, from)
     const mark = (state?: InstallState) => setInstalling((s) => ({ ...s, [hit.id]: state }))
     mark('busy')
@@ -517,6 +530,40 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
     } catch (e) {
       toast((e as Error).message, 'error')
       mark(undefined, plan.picks)
+      return false
+    }
+  }
+
+  /**
+   * Downloads a map into `inst`'s saves/ as a new world: `versionId`, or the newest file made for the instance's
+   * Minecraft version (else the newest file). Asks first when the file was made for another version.
+   */
+  const installWorld = async (hit: ProjectHit, inst: Instance, versionId?: string, from?: Element): Promise<boolean> => {
+    const mark = (state?: InstallState) => setInstalling((s) => ({ ...s, [hit.id]: state }))
+    mark('busy')
+    try {
+      const files = await api.content.versions(hit.id, inst.id)
+      const file = versionId ? files.find((f) => f.id === versionId) : (files.find((f) => f.gameVersions.includes(inst.mcVersion)) ?? files[0])
+      if (!file) throw new Error(t('discover.world.noFiles', { title: hit.title }))
+      if (!worldFits(file, inst.mcVersion)) {
+        const ok = await new Promise<boolean>((answer) => setWorldWarn({ hit, inst, versions: file.gameVersions, answer }))
+        setWorldWarn(undefined)
+        if (!ok) {
+          mark(undefined)
+          return false
+        }
+      }
+      const world = await api.content.installWorld(inst.id, hit.id, file.id)
+      mark('done')
+      toast(t('discover.toast.worldInstalled', { name: world.name, instance: inst.name }), 'success', {
+        label: t('discover.world.open'),
+        run: () => go({ page: 'instance', id: inst.id, tab: 'worlds' })
+      })
+      celebrate(from)
+      return true
+    } catch (e) {
+      toast(t('discover.toast.installFailed', { title: hit.title, error: (e as Error).message }), 'error')
+      mark(undefined)
       return false
     }
   }
@@ -746,10 +793,12 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                   <h3>{t('discover.link.title')}</h3>
                   <p className="ellipsis">{query.trim()}</p>
                   <div className="stats-line">
-                    <span className="faint">{kind === 'modpack' ? t('discover.link.noModpacks') : t('discover.link.hint')}</span>
+                    <span className="faint">
+                      {kind === 'modpack' ? t('discover.link.noModpacks') : kind === 'world' ? t('discover.link.noWorlds') : t('discover.link.hint')}
+                    </span>
                   </div>
                 </div>
-                {kind !== 'modpack' && (
+                {kind !== 'modpack' && kind !== 'world' && (
                   <div className="actions">
                     {!target && (
                       <select
@@ -986,6 +1035,32 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         />
       )}
 
+      {worldWarn && (
+        <Modal
+          title={t('discover.world.otherVersion.title')}
+          onClose={() => worldWarn.answer(false)}
+          footer={
+            <>
+              <button className="btn ghost" onClick={() => worldWarn.answer(false)}>
+                {t('common.cancel')}
+              </button>
+              <button className="btn primary" onClick={() => worldWarn.answer(true)}>
+                <Download /> {t('discover.world.otherVersion.install')}
+              </button>
+            </>
+          }
+        >
+          <p>
+            {t('discover.world.otherVersion.body', {
+              title: worldWarn.hit.title,
+              versions: worldWarn.versions.join(', '),
+              instance: worldWarn.inst.name,
+              version: worldWarn.inst.mcVersion
+            })}
+          </p>
+        </Modal>
+      )}
+
       {asking && <DuplicatesDialog rows={asking.rows} instance={asking.inst} total={asking.total} sites={SOURCES} onAnswer={asking.answer} />}
 
       {choosing && (
@@ -994,6 +1069,16 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
           title={choosing.hit.title}
           instance={choosing.inst}
           currentVersionId={choosing.current?.versionId}
+          load={
+            choosing.hit.kind === 'world' && choosing.inst
+              ? () => {
+                  const mc = choosing.inst!.mcVersion
+                  return api.content
+                    .versions(choosing.hit.id, choosing.inst!.id)
+                    .then((list) => list.map((v) => ({ ...v, compatible: v.gameVersions.length ? v.gameVersions.includes(mc) : undefined })))
+                }
+              : undefined
+          }
           onClose={() => setChoosing(undefined)}
           onPick={async (versionId) => {
             const { hit, inst, current } = choosing

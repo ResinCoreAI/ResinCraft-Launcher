@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Archive, ArrowRightLeft, Boxes, ClipboardCopy, Clock, Copy, Earth, FolderOpen, HardDrive, Loader2, Pencil, Play, RefreshCw, RotateCcw, Search, Skull, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Archive, ArrowRightLeft, Boxes, ClipboardCopy, Clock, Copy, Download, Earth, FolderOpen, HardDrive, Loader2, Pencil, Play, RefreshCw, RotateCcw, Search, Skull, Trash2, Upload } from 'lucide-react'
 import type { GameMode, Instance, WorldInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -25,7 +25,7 @@ export function hasQuickPlay(mc: string): boolean {
 }
 
 export default function WorldsTab({ inst }: { inst: Instance }) {
-  const { toast, games, info, playWorld } = useStore()
+  const { toast, games, info, playWorld, go } = useStore()
   const copy = useCopy()
   const [worlds, setWorlds] = useState<WorldInfo[]>()
   const [q, setQ] = useState('')
@@ -130,6 +130,9 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
         <button className="btn icon" title={t('worlds.openSaves')} onClick={() => void api.instances.openFolder(inst.id, 'saves')}>
           <FolderOpen />
         </button>
+        <button className="btn" title={t('worlds.download.hint')} onClick={() => go({ page: 'discover', kind: 'world', instanceId: inst.id })}>
+          <Download /> {t('worlds.download')}
+        </button>
         <button
           className="btn primary"
           disabled={importing || running}
@@ -159,9 +162,14 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
           icon={<Earth />}
           title={t('worlds.empty.title')}
           action={
-            <button className="btn" disabled={running} onClick={importZip}>
-              <Upload /> {t('worlds.empty.action')}
-            </button>
+            <>
+              <button className="btn" disabled={running} onClick={importZip}>
+                <Upload /> {t('worlds.empty.action')}
+              </button>
+              <button className="btn" onClick={() => go({ page: 'discover', kind: 'world', instanceId: inst.id })}>
+                <Download /> {t('worlds.download')}
+              </button>
+            </>
           }
         >
           {t('worlds.empty.body')}

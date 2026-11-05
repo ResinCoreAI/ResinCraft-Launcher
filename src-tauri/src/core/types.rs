@@ -51,6 +51,8 @@ pub enum ContentKind {
     Resourcepack,
     Shader,
     Modpack,
+    /// A map or world (CurseForge's Worlds), unpacked into saves/.
+    World,
 }
 
 impl ContentKind {
@@ -60,6 +62,7 @@ impl ContentKind {
             Self::Resourcepack => "resourcepack",
             Self::Shader => "shader",
             Self::Modpack => "modpack",
+            Self::World => "world",
         }
     }
     /// Folder inside the game directory where this kind of content lives.
@@ -67,6 +70,7 @@ impl ContentKind {
         match self {
             Self::Resourcepack => "resourcepacks",
             Self::Shader => "shaderpacks",
+            Self::World => "saves",
             _ => "mods",
         }
     }

@@ -75,6 +75,7 @@ function gameRange(v: string[]): string {
 
 /** Whether a version can go into an instance (roughly the engine's rule: Quilt takes Fabric files). */
 function fits(v: ProjectVersion, inst: Instance, kind: ProjectHit['kind']): boolean {
+  if (kind === 'world' && v.gameVersions.length === 0) return true
   if (!v.gameVersions.includes(inst.mcVersion)) return false
   if (kind !== 'mod' || v.loaders.length === 0) return true
   const ok = inst.loader === 'quilt' ? ['quilt', 'fabric'] : [inst.loader]

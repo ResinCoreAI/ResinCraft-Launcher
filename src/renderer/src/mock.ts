@@ -534,6 +534,8 @@ export function mockApi(): ResinApi {
         await mockEngine.download({ key: 'modpack.installing', text: 'Installing TerraFirmaGreg-Modern', params: { name: 'TerraFirmaGreg-Modern' } })
         return instances[0]
       },
+      installWorld: () =>
+        wait({ folder: 'Skyblock', name: 'Skyblock', hardcore: false, cheats: false, size: 4_200_000 } as Awaited<ReturnType<ResinApi['content']['installWorld']>>, 1200),
       importModpack: async () => null,
       importModpackFile: () => wait(instances[0], 900),
       exportPreview: () =>
