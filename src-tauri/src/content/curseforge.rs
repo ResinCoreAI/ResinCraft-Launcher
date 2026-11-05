@@ -333,6 +333,7 @@ fn to_hit(m: &CfMod) -> ProjectHit {
         updated: m.date_modified.clone(),
         source: ContentSource::Curseforge,
         url: m.links.website_url.clone(),
+        horizon: None,
     }
 }
 

@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use super::dupes::Guard;
 use super::index::{has_entry, load_index, open_zip, save_index, ContentIndex};
-use super::{atlauncher, curseforge, ftb, github, modrinth, technic};
+use super::{atlauncher, curseforge, ftb, github, horizon, modrinth, technic};
 use crate::core::events::Task;
 use crate::core::instances;
 use crate::core::types::{source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType, ProjectVersion, SearchQuery, SearchResult};
@@ -21,6 +21,7 @@ pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
         Some(ContentSource::Atlauncher) => atlauncher::search(q).await,
         Some(ContentSource::Technic) => technic::search(q).await,
         Some(ContentSource::Github) => github::search_hits(q).await,
+        Some(ContentSource::Horizon) => horizon::search_hits(q).await,
         _ => modrinth::search(q).await,
     }
 }
@@ -32,6 +33,7 @@ pub async fn versions(project_id: &str, instance_id: Option<&str>) -> Result<Vec
         ContentSource::Atlauncher => atlauncher::versions(project_id).await,
         ContentSource::Technic => technic::versions(project_id).await,
         ContentSource::Github => github::versions_for(project_id, instance_id).await,
+        ContentSource::Horizon => horizon::versions_for(project_id).await,
         ContentSource::Modrinth => modrinth::versions(project_id, instance_id).await,
     }
 }
@@ -43,6 +45,7 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
         ContentSource::Atlauncher => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "ATLauncher"),
         ContentSource::Technic => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "Technic"),
         ContentSource::Github => github::install(instance_id, project_id, kind, version_id).await,
+        ContentSource::Horizon => horizon::install(instance_id, project_id, version_id).await,
         ContentSource::Modrinth => modrinth::install(instance_id, project_id, kind, version_id).await,
     }
 }
@@ -54,6 +57,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         ContentSource::Atlauncher => atlauncher::install_modpack(project_id, version_id).await,
         ContentSource::Technic => technic::install_modpack(project_id, version_id).await,
         ContentSource::Github => bail_tr!("github.modsOnly", "GitHub only offers mods here"),
+        ContentSource::Horizon => bail_tr!("horizon.packIntoInstance", "A Horizon modpack goes into a Horizon instance: open Discover from one"),
         ContentSource::Modrinth => modrinth::install_modpack(project_id, version_id).await,
     }
 }
@@ -76,7 +80,9 @@ pub async fn check_updates(instance_id: &str) -> Result<Vec<ContentItem>> {
     let inst = instances::get(instance_id).await?;
     list_content(instance_id, ContentKind::Mod).await?;
     let mut mods = modrinth::check_updates(instance_id).await?;
-    if inst.loader != LoaderType::Vanilla {
+    if inst.loader == LoaderType::Horizon {
+        let _ = horizon::check_updates(&inst, &mut mods).await;
+    } else if inst.loader != LoaderType::Vanilla {
         let _ = curseforge::check_updates(&inst, &mut mods).await;
         let _ = github::check_updates(&inst, &mut mods).await;
     }
@@ -191,6 +197,7 @@ async fn update_one(inst: &Instance, task: &Task, idx: &mut ContentIndex, m: &Co
             r
         }
         ContentSource::Github => github::install_into(inst, task, idx, pid, ContentKind::Mod, vid).await,
+        ContentSource::Horizon => horizon::install_into(inst, task, idx, pid, vid).await,
         ContentSource::Modrinth => {
             let mut guard = Guard::open(inst, ContentKind::Mod, idx).await;
             modrinth::install_into(inst, task, idx, &mut guard, pid, ContentKind::Mod, vid).await

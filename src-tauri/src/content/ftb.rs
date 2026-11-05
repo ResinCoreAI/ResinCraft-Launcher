@@ -163,6 +163,7 @@ fn to_hit(p: &FtbPack) -> ProjectHit {
         updated: iso_from_secs(p.updated),
         source: ContentSource::Ftb,
         url: format!("https://www.feed-the-beast.com/modpacks/{}{}", p.id, p.slug.as_ref().map(|s| format!("-{s}")).unwrap_or_default()),
+        horizon: None,
     }
 }
 

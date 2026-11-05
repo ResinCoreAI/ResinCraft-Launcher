@@ -33,6 +33,8 @@ export default {
   'instance.content.empty.shader': 'No shaders yet',
   'instance.content.emptyHint': 'Find something you like in Discover and it lands right here.',
   'instance.content.shaderHint': 'Shaders need Iris (a mod) or OptiFine installed to show up in game.',
+  'instance.content.horizonModsHint': "Horizon's content mods come from its registry in Discover. Restart the game after turning one on or off.",
+  'instance.content.horizonShaderHint': "Horizon runs its own shader packs and Iris or OptiFine packs. Pick one in the game's Shader Packs settings.",
   'instance.content.vanillaTitle': "Vanilla instances can't use mods",
   'instance.content.vanillaBody': 'Create a new instance with Fabric or Quilt to install mods. Resource packs and shaders still work here.',
   'instance.content.updatesAvailable': { one: '{count} update available', other: '{count} updates available' },

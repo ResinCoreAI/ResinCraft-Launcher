@@ -1706,6 +1706,11 @@ button.stat b {
 .result.selected {
   border-color: var(--accent);
 }
+/* Listed but not installable here (a Horizon native mod, another Minecraft version, a file taken down). */
+.result.unavailable > .ico,
+.result.unavailable > .grow {
+  opacity: 0.55;
+}
 .result .ico {
   width: 56px;
   height: 56px;

@@ -34,6 +34,7 @@ hex = "0.4"
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 base64 = "0.22"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+toml = "0.8"
 flate2 = "1"
 uuid = { version = "1", features = ["v4"] }
 regex = "1"

@@ -654,7 +654,8 @@ async fn pick_meta(inst: &Instance, p: &ModPick) -> Option<JarMeta> {
 /// the rest; failures are listed in the result.
 pub async fn install_many(instance_id: &str, picks: Vec<ModPick>, replace: Vec<Replace>) -> Result<InstallManyResult> {
     let inst = instances::get(instance_id).await?;
-    if picks.iter().any(|p| p.kind == ContentKind::Mod) && matches!(inst.loader, LoaderType::Vanilla | LoaderType::Horizon) {
+    // Horizon's registry has mods for Horizon instances (and refuses any other instance itself).
+    if picks.iter().any(|p| p.kind == ContentKind::Mod && source_of(&p.id) != ContentSource::Horizon) && matches!(inst.loader, LoaderType::Vanilla | LoaderType::Horizon) {
         bail_tr!(
             "modrinth.vanillaInstance",
             "{name} is a vanilla instance. Mods need a mod loader such as Fabric or NeoForge; create a modded instance first.",
@@ -693,6 +694,7 @@ pub async fn install_many(instance_id: &str, picks: Vec<ModPick>, replace: Vec<R
                         curseforge::install_into(&inst, &task, &mut idx, &mut guard, &p.id, kind, p.version_id.clone(), &mut blocked).await
                     }
                     ContentSource::Github => super::github::install_into(&inst, &task, &mut idx, &p.id, kind, p.version_id.clone()).await,
+                    ContentSource::Horizon => super::horizon::install_into(&inst, &task, &mut idx, &p.id, p.version_id.clone()).await,
                     _ => Err(err_tr!("dupes.notSingle", "{name} can't be installed into an instance", name = p.title)),
                 };
                 match r {

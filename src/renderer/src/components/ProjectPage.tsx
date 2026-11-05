@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  Ban,
   BookOpen,
   Blocks,
   Bug,
@@ -22,6 +23,8 @@ import {
   Repeat,
   Scale,
   Search,
+  ShieldCheck,
+  ShieldOff,
   Star,
   X
 } from 'lucide-react'
@@ -33,7 +36,7 @@ import { Empty, Segmented, Switch, useCopy } from './ui'
 import { SafeHtml } from './SafeHtml'
 import '../project.css'
 
-const LOADER_NAMES: Record<string, string> = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge', minecraft: 'Vanilla' }
+const LOADER_NAMES: Record<string, string> = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge', minecraft: 'Vanilla', horizon: 'Horizon' }
 const LINK_KEYS: Record<ProjectLink['kind'], Key> = {
   website: 'project.link.website',
   source: 'project.link.source',
@@ -87,6 +90,8 @@ export interface ProjectPageProps {
   site: { label: string; color: string }
   target?: Instance
   installed?: ContentItem
+  /** Why it can't be installed here (a Horizon native mod, another Minecraft version, a file taken down). */
+  blocked?: string
   state?: 'busy' | 'done'
   backLabel: string
   onBack: () => void
@@ -98,7 +103,7 @@ export interface ProjectPageProps {
   categoryLabel: (c: string) => string
 }
 
-export function ProjectPage({ hit, site, target, installed, state, backLabel, onBack, onOpen, onInstall, onChooseVersion, categoryLabel }: ProjectPageProps) {
+export function ProjectPage({ hit, site, target, installed, blocked, state, backLabel, onBack, onOpen, onInstall, onChooseVersion, categoryLabel }: ProjectPageProps) {
   const [details, setDetails] = useState<ProjectDetails>()
   const [error, setError] = useState<string>()
   const [versions, setVersions] = useState<ProjectVersion[]>()
@@ -221,6 +226,15 @@ export function ProjectPage({ hit, site, target, installed, state, backLabel, on
             <button className="btn sm" disabled>
               <Check /> {t('common.installed')}
             </button>
+          ) : blocked ? (
+            <>
+              <button className="btn" disabled>
+                <Ban /> {t('common.install')}
+              </button>
+              <span className="hint" style={{ maxWidth: 260 }}>
+                {blocked}
+              </span>
+            </>
           ) : (
             <>
               <button
@@ -294,7 +308,7 @@ export function ProjectPage({ hit, site, target, installed, state, backLabel, on
               error={versionsError}
               target={target}
               installed={installed}
-              busy={busy}
+              busy={busy || (!!blocked && !!p.horizon && (p.horizon.native || !!p.horizon.revoked))}
               onOpen={onOpen}
               onInstall={onInstall}
             />
@@ -342,6 +356,20 @@ export function ProjectPage({ hit, site, target, installed, state, backLabel, on
               <span className="side-line">
                 <Scale /> {details.license}
               </span>
+            </section>
+          )}
+          {(hit.horizon ?? p.horizon) && (
+            <section>
+              <h4>{t('project.horizon.title')}</h4>
+              <span className="side-line" title={t((hit.horizon ?? p.horizon)!.signed ? 'project.horizon.signedHint' : 'project.horizon.unsignedHint')}>
+                {(hit.horizon ?? p.horizon)!.signed ? <ShieldCheck /> : <ShieldOff />}{' '}
+                {t((hit.horizon ?? p.horizon)!.signed ? 'project.horizon.signed' : 'project.horizon.unsigned')}
+              </span>
+              {(hit.horizon ?? p.horizon)!.native && (
+                <span className="side-line" title={t('discover.horizon.native')}>
+                  <Code /> {t('discover.horizon.nativeChip')}
+                </span>
+              )}
             </section>
           )}
           {gallery.length > 0 && tab !== 'gallery' && (
@@ -644,7 +672,7 @@ function Versions({
                 {!have && (
                   <button
                     className="btn sm"
-                    disabled={busy}
+                    disabled={busy || (project.source === 'horizon' && !!target && !fits(v, target, project.kind))}
                     title={t('versionPicker.install', { version: v.versionNumber })}
                     onClick={(e) => {
                       e.stopPropagation()

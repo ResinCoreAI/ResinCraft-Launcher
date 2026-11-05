@@ -82,9 +82,12 @@ pub enum ContentSource {
     Technic,
     /// Mods published as GitHub releases ("gh:owner/repo").
     Github,
+    /// Horizon's own registry, for Horizon instances ("hz:<id>").
+    Horizon,
 }
 
-/// Project ids carry their source as a prefix ("cf:238222", "ftb:100", "atl:Foo", "technic:bar", "gh:owner/repo");
+/// Project ids carry their source as a prefix ("cf:238222", "ftb:100", "atl:Foo", "technic:bar", "gh:owner/repo",
+/// "hz:coords_hud");
 /// bare ids are Modrinth.
 pub fn source_of(project_id: &str) -> ContentSource {
     if project_id.starts_with("cf:") {
@@ -97,6 +100,8 @@ pub fn source_of(project_id: &str) -> ContentSource {
         ContentSource::Technic
     } else if project_id.starts_with("gh:") {
         ContentSource::Github
+    } else if project_id.starts_with("hz:") {
+        ContentSource::Horizon
     } else {
         ContentSource::Modrinth
     }
@@ -595,6 +600,24 @@ pub struct ProjectHit {
     pub updated: String,
     pub source: ContentSource,
     pub url: String,
+    /// What Horizon's registry says of a project there.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub horizon: Option<HorizonFacts>,
+}
+
+/// A Horizon registry project's facts for its card and page.
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HorizonFacts {
+    /// A native mod: Horizon's own launcher compiles it into the game, so it can't be installed here.
+    pub native: bool,
+    /// Its author signs every version (minisign).
+    pub signed: bool,
+    /// The Minecraft versions it has versions for.
+    pub games: Vec<String>,
+    /// Why its versions for the game searched for were taken down, when all of them were.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revoked: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

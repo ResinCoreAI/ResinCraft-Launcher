@@ -76,6 +76,7 @@ fn source_name(id: &str) -> &'static str {
     match source_of(id) {
         ContentSource::Curseforge => "curseforge",
         ContentSource::Github => "github",
+        ContentSource::Horizon => "horizon",
         ContentSource::Ftb => "ftb",
         ContentSource::Atlauncher => "atlauncher",
         ContentSource::Technic => "technic",
@@ -88,6 +89,7 @@ fn page_of(id: &str) -> Option<String> {
         ContentSource::Modrinth => Some(format!("https://modrinth.com/project/{id}")),
         ContentSource::Curseforge => id.strip_prefix("cf:").map(|n| format!("https://www.curseforge.com/projects/{n}")),
         ContentSource::Github => id.strip_prefix("gh:").map(|r| format!("https://github.com/{r}")),
+        ContentSource::Horizon => id.strip_prefix("hz:").map(|r| format!("https://playhorizon.dev/mods/{r}")),
         _ => None,
     }
 }

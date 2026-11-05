@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Ban,
   Blocks,
   Calendar,
   Check,
@@ -137,8 +138,18 @@ export const SOURCES: { value: ContentSource; label: string; color: string; kind
   { value: 'ftb', label: 'FTB', color: '#b26bff', kinds: ['modpack'] },
   { value: 'atlauncher', label: 'ATLauncher', color: '#38bdf8', kinds: ['modpack'] },
   { value: 'technic', label: 'Technic', color: '#facc15', kinds: ['modpack'] },
-  { value: 'github', label: 'GitHub', color: '#a8b3c2', kinds: ['mod'] }
+  { value: 'github', label: 'GitHub', color: '#a8b3c2', kinds: ['mod'] },
+  { value: 'horizon', label: 'Horizon', color: '#ff9b52', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] }
 ]
+
+/**
+ * What a Horizon instance can get, by site: everything from Horizon's own registry, and Modrinth's resource packs and
+ * shaders (Iris and OptiFine packs work in Horizon). Fabric and Forge mods, and the modpacks made of them, don't run.
+ */
+const HORIZON_SITES: Partial<Record<ContentSource, ContentKind[]>> = {
+  horizon: ['mod', 'modpack', 'resourcepack', 'shader'],
+  modrinth: ['resourcepack', 'shader']
+}
 
 /** "All": every site that has the chosen kind at once. */
 type Site = ContentSource | 'all'
@@ -154,7 +165,8 @@ const SOURCE_KEY = 'resincraft.discover.source'
 function savedSource(): Site {
   try {
     const v = localStorage.getItem(SOURCE_KEY)
-    if (v === 'all' || (v && SOURCES.some((s) => s.value === v))) return v as Site
+    // Horizon's registry is only offered for Horizon instances.
+    if (v === 'all' || (v && v !== 'horizon' && SOURCES.some((s) => s.value === v))) return v as Site
   } catch {
     // storage unavailable
   }
@@ -201,7 +213,12 @@ const toPick = (h: ProjectHit, versionId?: string): ModPick => ({ id: h.id, kind
 export default function Discover({ initialKind, instanceId, build }: { initialKind?: ContentKind; instanceId?: string; build?: boolean }) {
   const { instances, go, toast, refreshInstances, info, settings, updateSettings } = useStore()
   const target = instances.find((i) => i.id === instanceId)
+  // A Horizon instance gets Horizon's registry (the default) and Modrinth's resource packs and shaders.
+  const horizon = target?.loader === 'horizon'
+  const kindsOf = (s: Site): ContentKind[] =>
+    horizon ? (s === 'all' ? [] : (HORIZON_SITES[s] ?? [])) : s === 'all' ? ALL_KINDS : (SOURCES.find((x) => x.value === s)?.kinds ?? [])
   const [source, setSourceState] = useState<Site>(() => {
+    if (horizon) return 'horizon'
     const s = savedSource()
     // FTB only has modpacks, which can't go into an existing instance.
     return (target || (initialKind && initialKind !== 'modpack')) && modpackOnly(s) ? 'all' : s
@@ -227,20 +244,22 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   }
   const sourceInfo =
     source === 'all'
-      ? { value: 'all' as const, label: t('discover.allSites'), color: 'var(--accent)', kinds: ALL_KINDS }
-      : SOURCES.find((s) => s.value === source)!
+      ? { value: 'all' as const, label: t('discover.allSites'), color: 'var(--accent)', kinds: kindsOf('all') }
+      : { ...SOURCES.find((s) => s.value === source)!, kinds: kindsOf(source) }
   // Builds without a CurseForge key can't search it at all.
   const noCurseForge = !!info && !info.curseforge
   const needsKey = source === 'curseforge' && noCurseForge
 
   const setSource = (s: Site) => {
     setSourceState(s)
-    try {
-      localStorage.setItem(SOURCE_KEY, s)
-    } catch {
-      // storage unavailable
-    }
-    const kinds = s === 'all' ? ALL_KINDS : SOURCES.find((x) => x.value === s)!.kinds
+    // Picking a site for a Horizon instance doesn't change the one ordinary instances open on.
+    if (!horizon)
+      try {
+        localStorage.setItem(SOURCE_KEY, s)
+      } catch {
+        // storage unavailable
+      }
+    const kinds = kindsOf(s)
     if (!kinds.includes(kind)) setKind(kinds[0])
   }
   const [query, setQuery] = useState('')
@@ -274,6 +293,18 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const resultsScroll = useRef(0)
   const selectBar = useRef<HTMLDivElement>(null)
   const canSelect = kind !== 'modpack'
+
+  /** Why a Horizon registry project can't be installed here (greyed out), if it can't. */
+  const blockedWhy = (h: ProjectHit): string | undefined => {
+    const f = h.horizon
+    if (!f) return undefined
+    if (f.native) return t('discover.horizon.native')
+    if (f.revoked) return t('discover.horizon.revoked', { reason: f.revoked })
+    if (target && !f.games.includes(target.mcVersion)) return t('discover.horizon.otherGame', { versions: f.games.join(', ') || '?', mc: target.mcVersion })
+    return undefined
+  }
+  const blockedLabel = (h: ProjectHit): string =>
+    h.horizon?.native ? t('discover.horizon.nativeChip') : h.horizon?.revoked ? t('discover.horizon.revokedChip') : t('discover.horizon.otherGameChip')
 
   useEffect(() => {
     void api.versions.list().then((v) => setVersions(v.filter((x) => x.type === 'release')))
@@ -318,7 +349,10 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   )
   /** The sites "All" asks: those with this kind (not CurseForge without a key; no modpack-only ones for an instance). */
   const allSites = useMemo(
-    () => SOURCES.filter((s) => s.kinds.includes(kind) && !(s.value === 'curseforge' && noCurseForge) && !(target && modpackOnly(s.value))).map((s) => s.value),
+    () =>
+      SOURCES.filter(
+        (s) => s.value !== 'horizon' && s.kinds.includes(kind) && !(s.value === 'curseforge' && noCurseForge) && !(target && modpackOnly(s.value))
+      ).map((s) => s.value),
     [kind, noCurseForge, target]
   )
 
@@ -418,12 +452,14 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
    */
   const install = async (hit: ProjectHit, inst?: Instance, versionId?: string, from?: Element, versionNumber?: string): Promise<boolean> => {
     const into = inst ?? target
-    if (hit.kind !== 'modpack' && !into) {
+    // A Horizon modpack goes into the Horizon instance it's browsed for, like a mod.
+    const intoInstance = hit.kind !== 'modpack' || hit.source === 'horizon'
+    if (intoInstance && !into) {
       setPicking([hit])
       setPickedVersion(versionId ? { id: versionId, number: versionNumber ?? versionId } : undefined)
       return false
     }
-    if (hit.kind !== 'modpack') return installPicks([hit], into!, versionId, from)
+    if (intoInstance) return installPicks([hit], into!, versionId, from)
     const mark = (state?: InstallState) => setInstalling((s) => ({ ...s, [hit.id]: state }))
     mark('busy')
     try {
@@ -542,8 +578,9 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
     const have = installed.get(h.id)
     const state = installing[h.id]
     const busy = state === 'busy'
+    const why = blockedWhy(h)
     return [
-      !have && state !== 'done'
+      !have && state !== 'done' && !why
         ? {
             label:
               h.kind === 'modpack'
@@ -558,8 +595,10 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         : null,
       have
         ? { label: t('discover.result.changeVersion'), icon: <Repeat />, onSelect: () => chooseVersion(h) }
-        : { label: t('menu.discover.installVersion'), icon: <ChevronDown />, disabled: busy, onSelect: () => chooseVersion(h) },
-      canSelect && !have && !busy
+        : why
+          ? null
+          : { label: t('menu.discover.installVersion'), icon: <ChevronDown />, disabled: busy, onSelect: () => chooseVersion(h) },
+      canSelect && !have && !busy && !why
         ? { label: t(selected.has(h.id) ? 'menu.discover.deselect' : 'menu.discover.select'), icon: <SquareCheck />, onSelect: () => toggleSelect(h) }
         : null,
       '-',
@@ -640,6 +679,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
           site={{ label: topSite?.label ?? top.source, color: topSite?.color ?? 'var(--accent)' }}
           target={target}
           installed={installed.get(top.id)}
+          blocked={blockedWhy(top)}
           state={installing[top.id]}
           backLabel={pages.length > 1 ? t('project.backTo', { title: pages[pages.length - 2].title }) : t('project.backToResults')}
           onBack={closeDetails}
@@ -657,8 +697,8 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
               value={source}
               onChange={setSource}
               options={[
-                { value: 'all' as Site, label: <>{t('discover.allSites')}</> },
-                ...SOURCES.filter((s) => !(target && modpackOnly(s.value))).map((s) => ({
+                ...(horizon ? [] : [{ value: 'all' as Site, label: <>{t('discover.allSites')}</> }]),
+                ...SOURCES.filter((s) => (horizon ? !!HORIZON_SITES[s.value] : s.value !== 'horizon' && !(target && modpackOnly(s.value)))).map((s) => ({
                   value: s.value as Site,
                   label: (
                     <>
@@ -672,7 +712,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
             <Segmented
               value={kind}
               onChange={(k) => setKind(k)}
-              options={KINDS.filter((k) => sourceInfo.kinds.includes(k.value) && !(target && k.value === 'modpack')).map((k) => ({
+              options={KINDS.filter((k) => sourceInfo.kinds.includes(k.value) && !(target && !horizon && k.value === 'modpack')).map((k) => ({
                 value: k.value,
                 label: (
                   <>
@@ -709,7 +749,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                 </option>
               ))}
             </select>
-            {kind === 'mod' && (
+            {kind === 'mod' && !horizon && (
               <select
                 className="select"
                 value={loader}
@@ -733,6 +773,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
             </select>
           </div>
 
+          {horizon && source === 'modrinth' && <span className="hint">{t('discover.horizon.modrinthHint')}</span>}
           {source === 'all' && failed.length > 0 && hits && hits.length > 0 && (
             <span className="hint bad">{t('discover.someFailed', { sources: failed.map(siteLabel).join(', ') })}</span>
           )}
@@ -796,10 +837,11 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                 const have = installed.get(h.id)
                 const isSelected = selected.has(h.id)
                 const state = installing[h.id]
+                const why = blockedWhy(h)
                 return (
                   <div
                     key={h.id}
-                    className={`result ${isSelected ? 'selected' : ''}`}
+                    className={`result ${isSelected ? 'selected' : ''} ${why && !have ? 'unavailable' : ''}`}
                     onContextMenu={(e) => openContextMenu(e, resultMenu(h, e.currentTarget))}
                   >
                     {canSelect && (
@@ -808,8 +850,8 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                         role="checkbox"
                         aria-checked={isSelected}
                         aria-label={t('discover.result.select', { title: h.title })}
-                        disabled={!!have || state === 'busy'}
-                        title={have ? t('discover.result.alreadyInstalled') : t('discover.result.selectTooltip')}
+                        disabled={!!have || state === 'busy' || !!why}
+                        title={have ? t('discover.result.alreadyInstalled') : (why ?? t('discover.result.selectTooltip'))}
                         onClick={() => toggleSelect(h)}
                       >
                         {isSelected && <Check strokeWidth={3} />}
@@ -855,7 +897,9 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                             {categoryLabel(c)}
                           </span>
                         ))}
+                        {h.horizon?.native && <span className="chip">{t('discover.horizon.nativeChip')}</span>}
                       </div>
+                      {why && !have && <p className="hint">{why}</p>}
                     </div>
                     <div className="actions">
                       {have ? (
@@ -870,6 +914,10 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                       ) : state === 'done' ? (
                         <button className="btn sm" disabled>
                           <Check /> {t('common.installed')}
+                        </button>
+                      ) : why ? (
+                        <button className="btn sm" disabled title={why}>
+                          <Ban /> {blockedLabel(h)}
                         </button>
                       ) : (
                         <>

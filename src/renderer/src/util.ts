@@ -51,6 +51,8 @@ export function projectUrl(projectId?: string): string | undefined {
       return `https://www.spigotmc.org/resources/${id}/`
     case 'gh':
       return /^[\w.-]+\/[\w.-]+$/.test(rest) ? `https://github.com/${rest}` : undefined
+    case 'hz':
+      return /^[a-z0-9_]{1,64}$/.test(rest) ? `https://playhorizon.dev/mods/${rest}` : undefined
     case 'geysermc':
       return 'https://geysermc.org/download'
     default:

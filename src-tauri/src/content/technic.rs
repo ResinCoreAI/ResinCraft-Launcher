@@ -144,6 +144,7 @@ fn to_hit(p: &TechnicPack) -> ProjectHit {
         updated: String::new(),
         source: ContentSource::Technic,
         url: p.platform_url.clone(),
+        horizon: None,
     }
 }
 

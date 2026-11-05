@@ -58,7 +58,10 @@ export default function VersionPicker({
 
   useEffect(() => {
     ;(load ? load() : api.content.versions(projectId, instance?.id)).then(
-      (list: VersionInfo[]) => {
+      (found: VersionInfo[]) => {
+        // Horizon's registry says each version's Minecraft: one for another can't go into the instance.
+        const list =
+          instance && projectId.startsWith('hz:') ? found.map((v) => ({ ...v, compatible: v.gameVersions.includes(instance.mcVersion) })) : found
         setVersions(list)
         // Nothing compatible, or no stable releases at all? Show everything instead of an empty list.
         const fits = list.filter((v) => v.compatible !== false)

@@ -104,6 +104,7 @@ pub(crate) async fn target(project_id: &str, version_id: &str, work: &Path, task
         (ContentSource::Atlauncher, Side::Client) => atlauncher::pack_target(project_id, version_id, work, task).await,
         (ContentSource::Technic, Side::Client) => technic::pack_target(project_id, version_id, work, task).await,
         (ContentSource::Github, _) => bail_tr!("github.modsOnly", "GitHub only offers mods here"),
+        (ContentSource::Horizon, _) => bail_tr!("horizon.packIntoInstance", "A Horizon modpack goes into a Horizon instance: open Discover from one"),
         (_, Side::Server) => bail_tr!("packswitch.noServerFiles", "This modpack's site doesn't offer files for servers"),
     }
 }

@@ -436,7 +436,15 @@ export function mockApi(): ResinApi {
         const base =
           q.source === 'curseforge'
             ? mockCurseForgeHits(now)
-            : q.source === 'github'
+            : q.source === 'horizon'
+              ? hits.slice(0, 3).map((h, i) => ({
+                  ...h,
+                  id: `hz:sample_${i}`,
+                  source: 'horizon' as const,
+                  follows: 0,
+                  horizon: { native: i === 2, signed: i === 0, games: ['26.3'] }
+                }))
+              : q.source === 'github'
               ? q.kind === 'mod'
                 ? hits
                     .slice(0, 4)

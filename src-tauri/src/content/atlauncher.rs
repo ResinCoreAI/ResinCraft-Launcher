@@ -185,6 +185,7 @@ fn to_hit(p: &AtlPack) -> ProjectHit {
         updated: iso_from_secs(latest.published),
         source: ContentSource::Atlauncher,
         url: format!("https://atlauncher.com/pack/{}", p.safe_name),
+        horizon: None,
     }
 }
 

@@ -325,6 +325,7 @@ fn to_hit(r: Repo) -> ProjectHit {
         source: ContentSource::Github,
         url: r.html_url.clone(),
         title: r.name,
+        horizon: None,
     }
 }
 

@@ -69,11 +69,6 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
   const { instances, go, games, activeAccount } = useStore()
   const inst = instances.find((i) => i.id === id)
   const [tab, setTab] = useState<Tab>(initialTab ?? 'content')
-  // Horizon has its own mods: Fabric and Forge content doesn't run on it.
-  const horizon = inst?.loader === 'horizon'
-  useEffect(() => {
-    if (horizon && tab === 'content') setTab('worlds')
-  }, [horizon, tab])
   const [exporting, setExporting] = useState(false)
   const [editingPack, setEditingPack] = useState(false)
   const [copyingFrom, setCopyingFrom] = useState(false)
@@ -169,11 +164,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
       )}
 
       <div className="tabs" role="tablist">
-        {!horizon && (
-          <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>
-            <Blocks /> {t('instance.tab.content')}
-          </button>
-        )}
+        <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>
+          <Blocks /> {t('instance.tab.content')}
+        </button>
         <button className={tab === 'worlds' ? 'on' : ''} onClick={() => setTab('worlds')}>
           <Earth /> {t('instance.tab.worlds')}
         </button>
@@ -197,7 +190,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         </button>
       </div>
 
-      {tab === 'content' && !horizon && <ContentTab key={copies} inst={inst} />}
+      {tab === 'content' && <ContentTab key={copies} inst={inst} />}
       {tab === 'logs' && <LogsTab inst={inst} />}
       {tab === 'worlds' && <WorldsTab key={copies} inst={inst} />}
       {tab === 'servers' && <ServersTab inst={inst} />}
@@ -222,6 +215,10 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
 type Kind = Exclude<ContentKind, 'modpack'>
 const KINDS: Kind[] = ['mod', 'resourcepack', 'shader']
 const KIND_FOLDER: Record<Kind, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
+/** The folder of a kind in an instance: Horizon's content mods (from its registry) have their own. */
+const folderOf = (inst: Instance, kind: Kind) => (kind === 'mod' && inst.loader === 'horizon' ? 'horizon-mods' : KIND_FOLDER[kind])
+/** A file's name without its extension, for files nobody named. */
+const bareName = (filename: string) => filename.replace(/\.(jar|zip|hmod|hshader)(\.disabled)?$/, '')
 /** Identifies a file across enabling and disabling (which adds or drops ".disabled"). */
 const fileKey = (m: ContentItem) => m.filename.replace(/\.disabled$/, '')
 
@@ -338,7 +335,7 @@ function ContentTab({ inst }: { inst: Instance }) {
     }
   }
 
-  const nameOf = (m: ContentItem) => m.title ?? m.filename.replace(/\.(jar|zip)(\.disabled)?$/, '')
+  const nameOf = (m: ContentItem) => m.title ?? bareName(m.filename)
   const picked = () => shown.filter((m) => selected.has(fileKey(m)))
 
   // Renames run one after another, so quick clicks reach the disk in order while the switches move at once.
@@ -439,9 +436,9 @@ function ContentTab({ inst }: { inst: Instance }) {
             label: t('files.showInExplorer'),
             icon: <FolderOpen />,
             onSelect: () =>
-              void api.files.reveal({ kind: 'instance', id: inst.id }, `${KIND_FOLDER[kind]}/${one.filename}`).catch((e) => toast(e.message, 'error'))
+              void api.files.reveal({ kind: 'instance', id: inst.id }, `${folderOf(inst, kind)}/${one.filename}`).catch((e) => toast(e.message, 'error'))
           }
-        : { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id, KIND_FOLDER[kind]) },
+        : { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id, folderOf(inst, kind)) },
       {
         label: one ? t('menu.copyFileName') : t('menu.copyFileNames', { count: list.length }),
         icon: <Copy />,
@@ -508,7 +505,7 @@ function ContentTab({ inst }: { inst: Instance }) {
             )}
           </>
         )}
-        <button className="btn icon" title={t('common.openFolder')} onClick={() => void api.instances.openFolder(inst.id, KIND_FOLDER[kind])}>
+        <button className="btn icon" title={t('common.openFolder')} onClick={() => void api.instances.openFolder(inst.id, folderOf(inst, kind))}>
           <FolderOpen />
         </button>
         <button
@@ -552,7 +549,11 @@ function ContentTab({ inst }: { inst: Instance }) {
             </button>
           }
         >
-          {kind === 'shader' ? t('instance.content.shaderHint') : t('instance.content.emptyHint')}
+          {inst.loader === 'horizon' && kind !== 'resourcepack'
+            ? t(kind === 'mod' ? 'instance.content.horizonModsHint' : 'instance.content.horizonShaderHint')
+            : kind === 'shader'
+              ? t('instance.content.shaderHint')
+              : t('instance.content.emptyHint')}
         </Empty>
       ) : (
         <div className="list" ref={listRef} tabIndex={-1} aria-multiselectable onKeyDown={onListKey} onContextMenu={listMenu}>
@@ -567,10 +568,15 @@ function ContentTab({ inst }: { inst: Instance }) {
               <div className="ico">{m.iconUrl ? <img src={m.iconUrl} alt="" /> : <Blocks />}</div>
               <div className="grow">
                 <div className="title ellipsis">
-                  {m.title ?? m.filename.replace(/\.(jar|zip)(\.disabled)?$/, '')}
+                  {m.title ?? bareName(m.filename)}
                   {m.projectId?.startsWith('cf:') && (
                     <span className="chip cf" style={{ marginLeft: 8, height: 20, fontSize: 11 }}>
                       CurseForge
+                    </span>
+                  )}
+                  {m.projectId?.startsWith('hz:') && (
+                    <span className="chip" style={{ marginLeft: 8, height: 20, fontSize: 11 }}>
+                      Horizon
                     </span>
                   )}
                 </div>

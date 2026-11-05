@@ -6,17 +6,19 @@ export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack'
 
 /**
  * Where content comes from. Project ids carry the source as a prefix ("cf:238222", "ftb:100",
- * "atl:SkyFactory4", "technic:tekkit"); bare ids are Modrinth, so the rest of the API doesn't need a
+ * "atl:SkyFactory4", "technic:tekkit", "gh:owner/repo", "hz:coords_hud"); bare ids are Modrinth, so the rest of the API doesn't need a
  * separate source argument.
  */
-export type ContentSource = 'modrinth' | 'curseforge' | 'ftb' | 'atlauncher' | 'technic' | 'github'
+/** `horizon` is Horizon's own registry, offered for Horizon instances only. */
+export type ContentSource = 'modrinth' | 'curseforge' | 'ftb' | 'atlauncher' | 'technic' | 'github' | 'horizon'
 
 const PREFIXES: [string, ContentSource][] = [
   ['cf:', 'curseforge'],
   ['ftb:', 'ftb'],
   ['atl:', 'atlauncher'],
   ['technic:', 'technic'],
-  ['gh:', 'github']
+  ['gh:', 'github'],
+  ['hz:', 'horizon']
 ]
 
 export function sourceOf(projectId: string): ContentSource {
@@ -605,6 +607,20 @@ export interface ProjectHit {
   source: ContentSource
   /** Project page on the source's website. */
   url: string
+  /** What Horizon's registry says of a project there. */
+  horizon?: HorizonFacts
+}
+
+/** A Horizon registry project's facts for its card and page. */
+export interface HorizonFacts {
+  /** A native mod: Horizon's own launcher compiles it into the game, so it can't be installed here. */
+  native: boolean
+  /** Its author signs every version. */
+  signed: boolean
+  /** The Minecraft versions it has versions for. */
+  games: string[]
+  /** Why its versions for the game searched for were taken down, when all of them were. */
+  revoked?: string
 }
 
 export interface SearchResult {

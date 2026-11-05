@@ -1,4 +1,5 @@
-//! Content and modpacks: Modrinth, CurseForge, FTB, ATLauncher and Technic, plus modpack import & export.
+//! Content and modpacks: Modrinth, CurseForge, FTB, ATLauncher, Technic, GitHub and Horizon's registry, plus modpack
+//! import & export.
 //! Handles every `content:*` channel (argument order as in `ResinApi` in src/shared/types.ts).
 
 pub mod atlauncher;
@@ -8,6 +9,7 @@ pub mod dupes;
 pub mod export;
 pub mod ftb;
 pub mod github;
+pub mod horizon;
 pub mod index;
 pub mod jarmeta;
 pub mod links;

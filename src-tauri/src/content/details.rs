@@ -8,7 +8,7 @@ use anyhow::Result;
 use pulldown_cmark::{html, Event, Options, Parser};
 use regex::{Captures, Regex};
 
-use super::{atlauncher, curseforge, ftb, github, modrinth, technic};
+use super::{atlauncher, curseforge, ftb, github, horizon, modrinth, technic};
 use crate::core::types::{source_of, ContentSource, ProjectDetails, VersionInfo};
 
 pub async fn details(project_id: &str) -> Result<ProjectDetails> {
@@ -19,6 +19,7 @@ pub async fn details(project_id: &str) -> Result<ProjectDetails> {
         ContentSource::Atlauncher => atlauncher::details(project_id).await,
         ContentSource::Technic => technic::details(project_id).await,
         ContentSource::Github => github::details(project_id).await,
+        ContentSource::Horizon => horizon::details(project_id).await,
     }
 }
 
@@ -29,6 +30,7 @@ pub async fn version_info(project_id: &str, version_id: &str) -> Result<VersionI
         ContentSource::Ftb => ftb::version_info(project_id, version_id).await,
         ContentSource::Atlauncher => atlauncher::version_info(project_id, version_id).await,
         ContentSource::Github => github::version_info(project_id, version_id).await,
+        ContentSource::Horizon => horizon::version_info(project_id, version_id).await,
         // Technic has no changelogs and packs carry no dependencies.
         ContentSource::Technic => Ok(VersionInfo::default()),
     }
@@ -44,6 +46,7 @@ pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::
         ContentSource::Atlauncher => atlauncher::pack_mods(project_id, version_id).await?,
         ContentSource::Technic => technic::pack_mods(project_id, version_id).await?,
         ContentSource::Github => Vec::new(),
+        ContentSource::Horizon => horizon::pack_mods(project_id, version_id).await?,
     };
     list.sort_by_key(|m| m.title.to_lowercase());
     list.dedup_by(|a, b| a.title == b.title && a.id == b.id);

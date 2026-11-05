@@ -193,6 +193,7 @@ pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
                 categories: h.display_categories.unwrap_or(h.categories),
                 updated: h.date_modified,
                 source: ContentSource::Modrinth,
+                horizon: None,
             })
             .collect(),
     })
@@ -377,6 +378,7 @@ pub async fn details(project_id: &str) -> Result<ProjectDetails> {
             categories: p.categories,
             updated: p.updated,
             source: ContentSource::Modrinth,
+            horizon: None,
         },
     })
 }
@@ -562,13 +564,19 @@ fn matches_kind(kind: ContentKind, name: &str) -> bool {
     let n = n.strip_suffix(".disabled").unwrap_or(&n);
     match kind {
         ContentKind::Mod => n.ends_with(".jar"),
-        ContentKind::Resourcepack | ContentKind::Shader => n.ends_with(".zip"),
+        ContentKind::Resourcepack => n.ends_with(".zip"),
+        // Horizon's own shader packs are .hshader files.
+        ContentKind::Shader => n.ends_with(".zip") || n.ends_with(".hshader"),
         ContentKind::Modpack => false,
     }
 }
 
 pub async fn list_content(instance_id: &str, kind: ContentKind) -> Result<Vec<ContentItem>> {
     let inst = instances::get(instance_id).await?;
+    // A Horizon instance's mods are turned on in horizon-mods.txt, not by their file names.
+    if inst.loader == LoaderType::Horizon && kind == ContentKind::Mod {
+        return super::horizon::list_mods(&inst).await;
+    }
     let folder = folder_of(&inst, kind);
     tokio::fs::create_dir_all(&folder).await?;
     let mut names = Vec::new();
@@ -637,7 +645,11 @@ async fn identify_by_hash(inst: &Instance, kind: ContentKind, folder: &Path, unk
 }
 
 pub async fn toggle_content(instance_id: &str, kind: ContentKind, filename: &str) -> Result<()> {
-    let folder = folder_of(&instances::get(instance_id).await?, kind);
+    let inst = instances::get(instance_id).await?;
+    if inst.loader == LoaderType::Horizon && kind == ContentKind::Mod {
+        return super::horizon::toggle_mod(&inst, filename).await;
+    }
+    let folder = folder_of(&inst, kind);
     let from = safe_join(&folder, filename)?;
     let to = match filename.strip_suffix(".disabled") {
         Some(base) => safe_join(&folder, base)?,
@@ -650,6 +662,9 @@ pub async fn toggle_content(instance_id: &str, kind: ContentKind, filename: &str
 /// Moves a file to the Recycle Bin (not a permanent delete) so mistakes are recoverable.
 pub async fn remove_content(instance_id: &str, kind: ContentKind, filename: &str) -> Result<()> {
     let inst = instances::get(instance_id).await?;
+    if inst.loader == LoaderType::Horizon && kind == ContentKind::Mod {
+        return super::horizon::remove_mod(&inst, filename).await;
+    }
     crate::core::shell::trash(&safe_join(&folder_of(&inst, kind), filename)?).await?;
     let mut idx = load_index(&inst.id).await;
     idx.remove(&index_key(kind, filename));

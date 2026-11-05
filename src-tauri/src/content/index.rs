@@ -50,6 +50,10 @@ pub fn index_key(kind: ContentKind, filename: &str) -> String {
 
 /// The folder inside the instance's game directory that holds `kind`.
 pub fn folder_of(inst: &Instance, kind: ContentKind) -> PathBuf {
+    // Horizon's content mods have their own folder.
+    if inst.loader == LoaderType::Horizon && kind == ContentKind::Mod {
+        return paths::game_dir(&inst.id).join(super::horizon::MODS_DIR);
+    }
     paths::game_dir(&inst.id).join(kind.folder())
 }
 
