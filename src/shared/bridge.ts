@@ -176,6 +176,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reinstallPack: fn('content:reinstallPack'),
       packUpdates: fn('content:packUpdates'),
       installModpack: fn('content:installModpack'),
+      installWorld: fn('content:installWorld'),
       importModpack: fn('content:importModpack'),
       importModpackFile: fn('content:importModpackFile'),
       exportPreview: fn('content:exportPreview'),

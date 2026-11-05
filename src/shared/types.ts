@@ -2,7 +2,8 @@
 import type { MigrateApi } from './migrate'
 
 export type LoaderType = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'liteloader' | 'horizon'
-export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack'
+/** `world`: a map from CurseForge's Worlds, unpacked into saves/ (see `content.installWorld`). */
+export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack' | 'world'
 
 /**
  * Where content comes from. Project ids carry the source as a prefix ("cf:238222", "ftb:100",
@@ -2311,6 +2312,8 @@ export interface ResinApi {
     /** Newer modpack versions for installed packs and servers (cached for a few hours unless `force`). */
     packUpdates(force?: boolean): Promise<PackUpdates>
     installModpack(projectId: string, versionId?: string): Promise<InstalledPack>
+    /** Downloads a map (CurseForge) into the instance's saves/ as a new world (a free folder name, never over one). */
+    installWorld(instanceId: string, projectId: string, versionId?: string): Promise<WorldInfo>
     /** Opens a file picker for a .mrpack or CurseForge .zip; null if cancelled. */
     importModpack(): Promise<InstalledPack | null>
     importModpackFile(path: string): Promise<InstalledPack>

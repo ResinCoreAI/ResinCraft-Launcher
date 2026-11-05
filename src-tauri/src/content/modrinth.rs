@@ -567,7 +567,7 @@ fn matches_kind(kind: ContentKind, name: &str) -> bool {
         ContentKind::Resourcepack => n.ends_with(".zip"),
         // Horizon's own shader packs are .hshader files.
         ContentKind::Shader => n.ends_with(".zip") || n.ends_with(".hshader"),
-        ContentKind::Modpack => false,
+        ContentKind::Modpack | ContentKind::World => false,
     }
 }
 

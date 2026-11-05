@@ -263,7 +263,14 @@ fn clean_folder_name(s: &str) -> String {
     let trimmed = replaced.trim_end_matches(['.', ' ']).trim();
     let out: String = trimmed.chars().take(64).collect();
     if out.is_empty() {
-        "World".into()
+        return "World".into();
+    }
+    // Windows won't make a folder called CON, NUL, COM1… (with or without an extension).
+    let stem = out.split('.').next().unwrap_or("").trim().to_ascii_uppercase();
+    let reserved = ["CON", "PRN", "AUX", "NUL"].contains(&stem.as_str())
+        || (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.as_bytes()[3].is_ascii_digit());
+    if reserved {
+        format!("{out}_")
     } else {
         out
     }
@@ -298,6 +305,84 @@ pub async fn delete_backup(id: &str, file: &str) -> Result<()> {
     crate::core::backupfiles::delete(&game_subdir(id, "backups").await?, file).await
 }
 
+/// Where the world sits in a zip: the folder its level.dat is in ("" for the root, else ending in "/") and the
+/// zip entries below it as (index, path inside the world).
+#[derive(Debug, PartialEq)]
+pub(crate) struct WorldPlan {
+    pub prefix: String,
+    pub files: Vec<(usize, String)>,
+}
+
+/// A zip entry's path that stays inside the folder it's unpacked to: relative, no `..`, no drive or stream (`:`).
+fn entry_is_safe(p: &str) -> bool {
+    !p.is_empty() && !p.starts_with('/') && !p.contains([':', '\0']) && p.split('/').all(|s| s != "..")
+}
+
+/// Finds the world in a zip's file entries (paths with `/`). The whole zip is refused if any entry would land
+/// outside the world's folder, or when there's no level.dat within `max_depth` folders of the root (None: any depth).
+pub(crate) fn plan_world(entries: Vec<(usize, String)>, max_depth: Option<usize>) -> Result<WorldPlan> {
+    if let Some((_, bad)) = entries.iter().find(|(_, p)| !entry_is_safe(p)) {
+        bail_tr!("worlds.unsafeZip", "That zip has a file outside its own folders ({path}), so it wasn't unpacked", path = bad.clone());
+    }
+    let depth = |p: &str| p.split('/').count() - 1;
+    let mut levels: Vec<&str> = entries
+        .iter()
+        .map(|(_, p)| p.as_str())
+        .filter(|p| (*p == "level.dat" || p.ends_with("/level.dat")) && max_depth.is_none_or(|m| depth(p) <= m))
+        .collect();
+    if levels.is_empty() {
+        bail_tr!("worlds.noWorldInZip", "That zip doesn't contain a Minecraft world (no level.dat)");
+    }
+    // The shallowest level.dat is the world root; deeper ones belong to nested dimensions or junk.
+    levels.sort_by_key(|p| depth(p));
+    let prefix = levels[0][..levels[0].len() - "level.dat".len()].to_string();
+    let files = entries
+        .into_iter()
+        .filter(|(_, p)| p.starts_with(&prefix) && base_name(p) != "session.lock")
+        .map(|(i, p)| (i, p[prefix.len()..].to_string()))
+        .collect();
+    Ok(WorldPlan { prefix, files })
+}
+
+/// The (index, path) of every file entry in a zip, with `\` turned into `/`.
+fn zip_entries(zip_path: &Path) -> Result<Vec<(usize, String)>> {
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(zip_path)?).map_err(|_| err_tr!("worlds.invalidZip", "That file isn't a valid zip"))?;
+    let mut out = Vec::new();
+    for i in 0..zip.len() {
+        let f = zip.by_index_raw(i)?;
+        if !f.is_dir() {
+            out.push((i, f.name().replace('\\', "/")));
+        }
+    }
+    Ok(out)
+}
+
+/// Writes the planned files into `dest`, which must not exist yet (so nothing is ever overwritten). On failure the
+/// folder this created is removed again.
+fn extract_world(zip_path: &Path, files: &[(usize, String)], dest: &Path, progress: impl Fn(usize, usize)) -> Result<()> {
+    std::fs::create_dir(dest)?;
+    let res = (|| -> Result<()> {
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(zip_path)?)?;
+        let n = files.len();
+        for (k, (i, rel)) in files.iter().enumerate() {
+            let out = safe_join(dest, rel)?;
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let mut entry = zip.by_index(*i)?;
+            let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&out)?;
+            std::io::copy(&mut entry, &mut f)?;
+            progress(k + 1, n);
+        }
+        Ok(())
+    })();
+    if res.is_err() {
+        // Only ever removes the folder this call just created.
+        let _ = std::fs::remove_dir_all(dest);
+    }
+    res
+}
+
 /// Unpacks a world zip into saves/: into a new folder, or into `replace` (whose current world goes to the Recycle
 /// Bin first, so a restore can be undone).
 async fn unpack_world(id: &str, zip_path: &Path, replace: Option<String>) -> Result<WorldInfo> {
@@ -307,30 +392,11 @@ async fn unpack_world(id: &str, zip_path: &Path, replace: Option<String>) -> Res
     }
     let saves = saves_dir(id).await?;
     let zp = zip_path.to_path_buf();
-    // (index, normalised path) of every file entry.
-    let entries: Vec<(usize, String)> = tokio::task::spawn_blocking(move || -> Result<Vec<(usize, String)>> {
-        let mut zip = zip::ZipArchive::new(std::fs::File::open(&zp)?).map_err(|_| err_tr!("worlds.invalidZip", "That file isn't a valid zip"))?;
-        let mut out = Vec::new();
-        for i in 0..zip.len() {
-            let f = zip.by_index_raw(i)?;
-            if !f.is_dir() {
-                out.push((i, f.name().replace('\\', "/")));
-            }
-        }
-        Ok(out)
-    })
-    .await??;
-    let mut levels: Vec<&str> = entries.iter().map(|(_, p)| p.as_str()).filter(|p| *p == "level.dat" || p.ends_with("/level.dat")).collect();
-    if levels.is_empty() {
-        bail_tr!("worlds.noWorldInZip", "That zip doesn't contain a Minecraft world (no level.dat)");
-    }
-    // The shallowest level.dat is the world root; deeper ones belong to nested dimensions or junk.
-    levels.sort_by_key(|p| p.split('/').count());
-    let prefix = levels[0][..levels[0].len() - "level.dat".len()].to_string();
-    let base = if prefix.is_empty() {
+    let plan = tokio::task::spawn_blocking(move || zip_entries(&zp).and_then(|e| plan_world(e, None))).await??;
+    let base = if plan.prefix.is_empty() {
         clean_folder_name(&zip_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())
     } else {
-        clean_folder_name(base_name(&prefix))
+        clean_folder_name(base_name(&plan.prefix))
     };
     let folder = match replace {
         Some(name) => {
@@ -344,42 +410,42 @@ async fn unpack_world(id: &str, zip_path: &Path, replace: Option<String>) -> Res
         None => unique_name(&saves, &base, "").await,
     };
     let dest = child_path(&saves, &folder)?;
-    let files: Vec<(usize, String)> = entries
-        .into_iter()
-        .filter(|(_, p)| p.starts_with(&prefix) && base_name(p) != "session.lock")
-        .map(|(i, p)| (i, p[prefix.len()..].to_string()))
-        .collect();
     let zp = zip_path.to_path_buf();
 
     Task::run_to_end(tr!("worlds.importing", "Importing {folder}", folder = folder), Some(id.to_string()), |t| async move {
-        tokio::fs::create_dir(&dest).await?;
         let d = dest.clone();
-        let res = tokio::task::spawn_blocking(move || -> Result<()> {
-            let mut zip = zip::ZipArchive::new(std::fs::File::open(&zp)?)?;
-            let n = files.len();
-            for (k, (i, rel)) in files.iter().enumerate() {
-                let out = safe_join(&d, rel)?;
-                if let Some(parent) = out.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                let mut entry = zip.by_index(*i)?;
-                let mut f = std::fs::File::create(&out)?;
-                std::io::copy(&mut entry, &mut f)?;
-                t.update(tr!("worlds.extracting", "Extracting ({done}/{total})", done = k + 1, total = n), Some((k + 1) as f64 / n as f64));
-            }
-            Ok(())
+        tokio::task::spawn_blocking(move || {
+            extract_world(&zp, &plan.files, &d, |done, total| {
+                t.update(tr!("worlds.extracting", "Extracting ({done}/{total})", done = done, total = total), Some(done as f64 / total as f64))
+            })
         })
-        .await
-        .map_err(anyhow::Error::from)
-        .and_then(|r| r);
-        if let Err(e) = res {
-            // Only ever removes the folder this import just created.
-            let _ = tokio::fs::remove_dir_all(&dest).await;
-            return Err(e);
-        }
+        .await??;
         Ok(read_world(&dest, &folder).await)
     })
     .await
+}
+
+/// Puts a downloaded map into `saves` under a new folder named after `name` ("name (2)"… when that's taken; an
+/// existing world is never touched). Strict: level.dat must be at the zip's root or one folder down and readable,
+/// or nothing is kept. `progress` gets (done, total) files.
+pub(crate) async fn unpack_download(saves: &Path, zip_path: &Path, name: &str, progress: impl Fn(usize, usize) + Send + 'static) -> Result<WorldInfo> {
+    let zp = zip_path.to_path_buf();
+    let plan = tokio::task::spawn_blocking(move || zip_entries(&zp).and_then(|e| plan_world(e, Some(1)))).await??;
+    let folder = unique_name(saves, &clean_folder_name(name), "").await;
+    let dest = child_path(saves, &folder)?;
+    let (zp, d) = (zip_path.to_path_buf(), dest.clone());
+    tokio::task::spawn_blocking(move || extract_world(&zp, &plan.files, &d, progress)).await??;
+    let info = read_world(&dest, &folder).await;
+    if info.error.is_some() {
+        let _ = tokio::fs::remove_dir_all(&dest).await;
+        bail_tr!("worlds.notAWorld", "That download isn't a Minecraft world (its level.dat can't be read)");
+    }
+    Ok(info)
+}
+
+/// [`unpack_download`] into an instance's saves/.
+pub async fn install_downloaded(id: &str, zip_path: &Path, name: &str, progress: impl Fn(usize, usize) + Send + 'static) -> Result<WorldInfo> {
+    unpack_download(&saves_dir(id).await?, zip_path, name, progress).await
 }
 
 // ---------- Other instances ----------
@@ -537,4 +603,130 @@ pub async fn remove_world(id: &str, folder: &str) -> Result<()> {
     let dir = world_path(id, folder).await?;
     tokio::fs::metadata(&dir).await?;
     crate::core::shell::trash(&dir).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn entries(paths: &[&str]) -> Vec<(usize, String)> {
+        paths.iter().enumerate().map(|(i, p)| (i, p.to_string())).collect()
+    }
+
+    #[test]
+    fn finds_the_world_at_the_root_or_one_folder_down() {
+        let p = plan_world(entries(&["level.dat", "region/r.0.0.mca", "session.lock"]), Some(1)).unwrap();
+        assert_eq!(p.prefix, "");
+        assert_eq!(p.files, vec![(0, "level.dat".into()), (1, "region/r.0.0.mca".into())]);
+
+        let p = plan_world(entries(&["Map/level.dat", "Map/region/r.0.0.mca", "readme.txt", "Map/DIM-1/level.dat"]), Some(1)).unwrap();
+        assert_eq!(p.prefix, "Map/");
+        assert_eq!(p.files, vec![(0, "level.dat".into()), (1, "region/r.0.0.mca".into()), (3, "DIM-1/level.dat".into())]);
+    }
+
+    #[test]
+    fn refuses_zips_that_are_not_worlds() {
+        assert!(plan_world(entries(&["pack.mcmeta", "assets/x.png"]), Some(1)).is_err());
+        assert!(plan_world(entries(&[]), Some(1)).is_err());
+        // Two folders down is too deep for a download, though a backup import still accepts it.
+        assert!(plan_world(entries(&["a/b/level.dat"]), Some(1)).is_err());
+        assert_eq!(plan_world(entries(&["a/b/level.dat"]), None).unwrap().prefix, "a/b/");
+        // Only a file called exactly level.dat counts.
+        assert!(plan_world(entries(&["Map/level.dat_old", "xlevel.dat"]), Some(1)).is_err());
+    }
+
+    #[test]
+    fn refuses_path_traversal() {
+        for bad in ["../evil.txt", "Map/../../evil.txt", "/etc/passwd", "C:/Windows/evil.dll", "Map/file.txt:stream", "Map/..", ""] {
+            let list = entries(&["Map/level.dat", bad]);
+            assert!(plan_world(list, Some(1)).is_err(), "{bad:?} should be refused");
+        }
+        assert!(entry_is_safe("Map/..data/x"));
+        assert!(entry_is_safe("Map/region/r.0.0.mca"));
+    }
+
+    #[test]
+    fn folder_names_are_safe_for_windows() {
+        assert_eq!(clean_folder_name("Sky: Block?"), "Sky_ Block_");
+        assert_eq!(clean_folder_name("  ... "), "World");
+        assert_eq!(clean_folder_name("con"), "con_");
+        assert_eq!(clean_folder_name("COM1.txt"), "COM1.txt_");
+        assert_eq!(clean_folder_name("Console"), "Console");
+    }
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("resincraft-worlds-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write_zip(path: &Path, files: &[(&str, &[u8])]) {
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+        for (name, data) in files {
+            zip.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+            zip.write_all(data).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    /// A minimal level.dat: gzipped NBT with Data.LevelName.
+    fn level_dat(name: &str) -> Vec<u8> {
+        let mut data = Compound::default();
+        data.set("LevelName", Tag::String(name.into()));
+        let mut root = Compound::default();
+        root.set("Data", Tag::Compound(data));
+        nbt::write(&NbtFile { name: String::new(), root, compression: nbt::Compression::Gzip }).unwrap()
+    }
+
+    #[tokio::test]
+    async fn never_overwrites_a_world_with_the_same_name() {
+        let dir = temp_dir("clash");
+        let saves = dir.join("saves");
+        std::fs::create_dir_all(saves.join("Skyblock")).unwrap();
+        std::fs::write(saves.join("Skyblock/level.dat"), b"mine").unwrap();
+        std::fs::create_dir_all(saves.join("skyblock (2)")).unwrap();
+        let zip = dir.join("map.zip");
+        write_zip(&zip, &[("Skyblock/level.dat", &level_dat("Skyblock")), ("Skyblock/region/r.0.0.mca", b"r")]);
+
+        let info = unpack_download(&saves, &zip, "Skyblock", |_, _| {}).await.unwrap();
+        assert_eq!(info.folder, "Skyblock (3)");
+        assert_eq!(info.name, "Skyblock");
+        assert!(info.error.is_none());
+        assert_eq!(std::fs::read(saves.join("Skyblock/level.dat")).unwrap(), b"mine");
+        assert_eq!(std::fs::read(saves.join("Skyblock (3)/region/r.0.0.mca")).unwrap(), b"r");
+
+        let again = unpack_download(&saves, &zip, "Skyblock", |_, _| {}).await.unwrap();
+        assert_eq!(again.folder, "Skyblock (4)");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn bad_downloads_leave_nothing_behind() {
+        let dir = temp_dir("bad");
+        let saves = dir.join("saves");
+        std::fs::create_dir_all(&saves).unwrap();
+        let count = || std::fs::read_dir(&saves).unwrap().count();
+
+        let evil = dir.join("evil.zip");
+        write_zip(&evil, &[("level.dat", &level_dat("X")), ("../../escaped.txt", b"x")]);
+        assert!(unpack_download(&saves, &evil, "Evil", |_, _| {}).await.is_err());
+        assert!(!dir.join("escaped.txt").exists() && !std::env::temp_dir().join("escaped.txt").exists());
+
+        let not_world = dir.join("pack.zip");
+        write_zip(&not_world, &[("pack.mcmeta", b"{}")]);
+        assert!(unpack_download(&saves, &not_world, "Pack", |_, _| {}).await.is_err());
+
+        let broken = dir.join("broken.zip");
+        write_zip(&broken, &[("Map/level.dat", b"not nbt")]);
+        assert!(unpack_download(&saves, &broken, "Broken", |_, _| {}).await.is_err());
+
+        let not_zip = dir.join("x.zip");
+        std::fs::write(&not_zip, b"hello").unwrap();
+        assert!(unpack_download(&saves, &not_zip, "X", |_, _| {}).await.is_err());
+
+        assert_eq!(count(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

@@ -100,6 +100,7 @@ fn kind_word(kind: ContentKind) -> &'static str {
         ContentKind::Resourcepack => "resource packs",
         ContentKind::Shader => "shaders",
         ContentKind::Modpack => "modpacks",
+        ContentKind::World => "worlds",
     }
 }
 

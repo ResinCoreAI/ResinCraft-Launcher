@@ -39,6 +39,9 @@ pub async fn versions(project_id: &str, instance_id: Option<&str>) -> Result<Vec
 }
 
 pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, version_id: Option<String>) -> Result<()> {
+    if kind == ContentKind::World && source_of(project_id) != ContentSource::Curseforge {
+        bail_tr!("content.worldsCurseForgeOnly", "Worlds can only be downloaded from CurseForge");
+    }
     match source_of(project_id) {
         ContentSource::Curseforge => curseforge::install(instance_id, project_id, kind, version_id).await,
         ContentSource::Ftb => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "FTB"),
