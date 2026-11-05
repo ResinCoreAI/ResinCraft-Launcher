@@ -3560,6 +3560,8 @@ const dict: Dict = {
   "native.trust.body": "サンドボックス化されていません。ビルドされると、そのコードはあなたが実行する他のプログラムと同じように、ファイルを読み取り・変更し、ネットワークを使えます。信頼できる Mod だけをビルドしてください。次の Mod がゲームにコンパイルされます:",
   "native.trust.build": "これらの Mod を信頼する: ビルド",
   "native.playWithout": "ネイティブ Mod なしでプレイ",
+  "native.buildAnyway": "それでもビルド",
+  "native.buildAnywayHint": "別々の Horizon バージョン向けのMODを、そのうち最新のバージョンでまとめてビルドします。コンパイルできない、または動かないMODがあるかもしれません。",
   "native.build.title": "{name} のネイティブ Mod をビルド",
   "native.need.firstBuild": "このインスタンスには、まだゲームにビルドされていないネイティブ Mod があります。",
   "native.need.modsChanged": "前回のビルド以降にネイティブ Mod が変更されました。",

@@ -622,6 +622,9 @@ pub struct HorizonFacts {
     /// Why its versions for the game searched for were taken down, when all of them were.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revoked: Option<String>,
+    /// A modpack's native mods (their names), in the version that would install: asked about before it installs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pack_native: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

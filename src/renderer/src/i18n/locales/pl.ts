@@ -3629,6 +3629,8 @@ const dict: Dict = {
   "native.trust.body": "Nie działają w piaskownicy: po skompilowaniu ich kod może czytać i zmieniać Twoje pliki oraz korzystać z Twojej sieci jak każdy program, który uruchamiasz. Kompiluj tylko mody, którym ufasz. Te zostaną skompilowane do gry:",
   "native.trust.build": "Ufam tym modom: kompiluj",
   "native.playWithout": "Graj bez modów natywnych",
+  "native.buildAnyway": "Zbuduj mimo to",
+  "native.buildAnywayHint": "Buduje razem mody zrobione dla różnych wersji Horizon, na najnowszej z nich. Niektóre mogą się nie skompilować albo nie działać.",
   "native.build.title": "Kompiluj mody natywne dla {name}",
   "native.need.firstBuild": "Ta instancja ma mody natywne, które nie są jeszcze skompilowane do jej gry.",
   "native.need.modsChanged": "Jej mody natywne zmieniły się od ostatniej kompilacji.",

@@ -622,6 +622,8 @@ export interface HorizonFacts {
   games: string[]
   /** Why its versions for the game searched for were taken down, when all of them were. */
   revoked?: string
+  /** A modpack's native mods (their names): asked about before it installs. */
+  packNative?: string[]
 }
 
 export interface SearchResult {
@@ -2147,6 +2149,10 @@ export interface ResinApi {
     saveText(fileName: string, text: string): Promise<string | null>
     /** The file ResinCraft was started with (double-clicked in Windows), once; null if none. */
     pendingOpen(): Promise<string | null>
+    /** The hidden window on the old http origin hands its localStorage over (once, after the move to https). */
+    storageExport(entries: Record<string, string>): Promise<void>
+    /** The old origin's localStorage entries, once; null when there is nothing to carry over. */
+    storageImport(): Promise<Record<string, string> | null>
     /** Starts ResinCraft's uninstaller ('uninstaller', ResinCraft then quits) or opens Windows' Installed apps ('settings'). */
     uninstall(): Promise<'uninstaller' | 'settings'>
     /** A .rctheme file's text. */
@@ -2190,7 +2196,8 @@ export interface ResinApi {
     /** An instance's native mods and whether they need building. */
     nativeStatus(instanceId: string): Promise<NativeStatus>
     /** Compiles the instance's native mods (a task); `trusted` is the player's answer to the red warning. */
-    nativeBuild(instanceId: string, trusted: boolean): Promise<NativeBuildRecord>
+    /** `anyway`: build mods made for other Horizon versions together, on the newest of them. */
+    nativeBuild(instanceId: string, trusted: boolean, anyway?: boolean): Promise<NativeBuildRecord>
     /** The last lines of the newest native build's log. */
     nativeLog(lines?: number): Promise<string[]>
     /** The instance's next start plays without its native mods. */

@@ -89,10 +89,10 @@ export function NativeBuildDialog({ instanceId, onDone, offerSkip }: { instanceI
 
   // Closed while it builds: the build goes on (in Tasks), and nothing here answers again when it ends.
   const closed = useRef(false)
-  const build = async () => {
+  const build = async (anyway = false) => {
     setPhase('building')
     try {
-      await api.horizon.nativeBuild(instanceId, true)
+      await api.horizon.nativeBuild(instanceId, true, anyway)
       if (closed.current) return
       setPhase('done')
       onDone('built')
@@ -108,6 +108,8 @@ export function NativeBuildDialog({ instanceId, onDone, offerSkip }: { instanceI
     onDone('cancel')
   }
   const name = inst?.name ?? instanceId
+  // Mods made for different Horizon versions: Horizon's launcher can build them together anyway, on the newest.
+  const mismatch = phase === 'failed' && /version|pin|commit|mismatch/i.test(error + log.join('\n'))
   const why =
     status?.need === 'modsChanged' ? t('native.need.modsChanged') : status?.need === 'baseChanged' ? t('native.need.baseChanged') : t('native.need.firstBuild')
 
@@ -128,7 +130,7 @@ export function NativeBuildDialog({ instanceId, onDone, offerSkip }: { instanceI
                 <Play /> {t('native.playWithout')}
               </button>
             )}
-            <button className="btn danger solid" disabled={!status || status.building} onClick={() => void build()}>
+            <button className="btn danger solid" disabled={!status || status.building} onClick={() => void build(false)}>
               <Hammer /> {t('native.trust.build')}
             </button>
           </>
@@ -137,6 +139,11 @@ export function NativeBuildDialog({ instanceId, onDone, offerSkip }: { instanceI
             <button className="btn ghost" onClick={() => onDone('cancel')}>
               {t('common.close')}
             </button>
+            {mismatch && (
+              <button className="btn danger" title={t('native.buildAnywayHint')} onClick={() => void build(true)}>
+                <Hammer /> {t('native.buildAnyway')}
+              </button>
+            )}
             {offerSkip && (
               <button className="btn primary" onClick={() => onDone('skip')}>
                 <Play /> {t('native.playWithout')}

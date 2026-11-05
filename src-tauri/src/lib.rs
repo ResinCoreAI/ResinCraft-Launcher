@@ -27,6 +27,7 @@ pub mod remote;
 pub mod remoteview;
 pub mod tray;
 pub mod webview;
+pub mod webstorage;
 pub mod updater;
 
 use serde_json::Value;
@@ -70,6 +71,7 @@ pub fn run() {
                 tray::sync(core::settings::get().await.tray);
             });
             tray::build(app.handle())?;
+            webstorage::start(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![ipc])

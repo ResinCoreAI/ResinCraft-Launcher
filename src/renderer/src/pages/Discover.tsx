@@ -26,7 +26,19 @@ import {
   Star,
   X
 } from 'lucide-react'
-import type { ContentFileRef, ContentItem, ContentKind, ContentSource, Instance, LoaderType, McVersion, ModPick, ProjectHit, ProjectVersion, SortMode } from '@shared/types'
+import type {
+  ContentFileRef,
+  ContentItem,
+  ContentKind,
+  ContentSource,
+  Instance,
+  LoaderType,
+  McVersion,
+  ModPick,
+  ProjectHit,
+  ProjectVersion,
+  SortMode
+} from '@shared/types'
 import { api } from '../api'
 import { AutoLoadMore } from '../components/AutoLoadMore'
 import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, useCopy, type ContextEntry } from '../components/ui'
@@ -531,9 +543,11 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const installPicks = async (list: ProjectHit[], inst: Instance, versionId?: string, from?: Element, onStart?: () => void): Promise<boolean> => {
     const mark = (state: InstallState | undefined, hits: ProjectHit[]) =>
       setInstalling((s) => ({ ...s, ...Object.fromEntries(hits.map((h) => [h.id, state])) }))
-    const native = list.filter((h) => h.horizon?.native)
+    const native = list.filter((h) => h.horizon?.native || h.horizon?.packNative?.length)
     if (native.length) {
-      const ok = await new Promise<boolean>((resolve) => setNativeAsk({ names: native.map((h) => h.title), answer: resolve }))
+      // A modpack names its native mods: "Pack (Zoom, Minimap)".
+      const names = native.map((h) => (h.horizon?.packNative?.length ? `${h.title} (${h.horizon.packNative.join(', ')})` : h.title))
+      const ok = await new Promise<boolean>((resolve) => setNativeAsk({ names, answer: resolve }))
       setNativeAsk(undefined)
       if (!ok) return false
     }
@@ -696,8 +710,22 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
               value={view}
               onChange={setView}
               options={[
-                { value: 'content', label: <><Package /> {t('servers.list.tab.content')}</> },
-                { value: 'servers', label: <><Server /> {t('servers.list.tab.servers')}</> }
+                {
+                  value: 'content',
+                  label: (
+                    <>
+                      <Package /> {t('servers.list.tab.content')}
+                    </>
+                  )
+                },
+                {
+                  value: 'servers',
+                  label: (
+                    <>
+                      <Server /> {t('servers.list.tab.servers')}
+                    </>
+                  )
+                }
               ]}
             />
           )}

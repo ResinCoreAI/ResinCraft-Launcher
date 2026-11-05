@@ -271,7 +271,11 @@ impl Index {
         } else {
             None
         };
-        HorizonFacts { native: p.kind() == Kind::NativeMod, signed: p.signed(), games, revoked }
+        let pack_native = candidates
+            .first()
+            .map(|v| v.requires.iter().filter_map(|r| self.project(&r.id)).filter(|q| q.kind() == Kind::NativeMod).map(|q| q.name.clone()).collect())
+            .unwrap_or_default();
+        HorizonFacts { native: p.kind() == Kind::NativeMod, signed: p.signed(), games, revoked, pack_native }
     }
 }
 

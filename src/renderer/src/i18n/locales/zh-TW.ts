@@ -3550,6 +3550,8 @@ const dict: Dict = {
   "native.trust.body": "它們不在沙盒中執行：編譯完成後，它們的程式碼可以像你執行的任何程式一樣讀取和修改你的檔案、使用你的網路。只編譯你信任的模組。以下模組將被編譯進遊戲：",
   "native.trust.build": "我信任這些模組：編譯",
   "native.playWithout": "不使用原生模組遊玩",
+  "native.buildAnyway": "仍然建置",
+  "native.buildAnywayHint": "把為不同 Horizon 版本製作的模組放在其中最新的版本上一起建置。有些可能無法編譯或無法運作。",
   "native.build.title": "為 {name} 編譯原生模組",
   "native.need.firstBuild": "此實例有尚未編譯進遊戲的原生模組。",
   "native.need.modsChanged": "自上次編譯以來，它的原生模組有變動。",

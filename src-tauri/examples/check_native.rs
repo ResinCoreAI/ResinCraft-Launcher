@@ -83,11 +83,11 @@ async fn main() {
 
     let status = horizon_native::status(&inst).await;
     expect("a build is needed before it plays", status.as_ref().is_ok_and(|s| s.need == Need::FirstBuild), status.as_ref().map(|s| s.need).map_err(|e| e.to_string()));
-    let refused = horizon_native::build(&inst.id, false).await;
+    let refused = horizon_native::build(&inst.id, false, false).await;
     expect("nothing is compiled without the player's trust", refused.is_err(), "it built");
 
     let started = Instant::now();
-    let built = report("build the native mods", horizon_native::build(&inst.id, true).await);
+    let built = report("build the native mods", horizon_native::build(&inst.id, true, false).await);
     let secs = started.elapsed().as_secs();
     println!("     build took {}m {}s", secs / 60, secs % 60);
     let tail = horizon_native::log_tail(12).await;

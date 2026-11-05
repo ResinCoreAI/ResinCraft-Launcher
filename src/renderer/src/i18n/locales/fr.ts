@@ -3608,6 +3608,8 @@ const dict: Dict = {
   "native.trust.body": "Ils ne sont pas isolés dans un bac à sable : une fois compilé, leur code peut lire et modifier tes fichiers et utiliser ton réseau comme n'importe quel programme que tu lances. Ne compile que des mods en qui tu as confiance. Ceux-ci seront compilés dans le jeu :",
   "native.trust.build": "J'ai confiance en ces mods : compiler",
   "native.playWithout": "Jouer sans les mods natifs",
+  "native.buildAnyway": "Compiler quand même",
+  "native.buildAnywayHint": "Compile ensemble des mods faits pour différentes versions d’Horizon, sur la plus récente. Certains risquent de ne pas compiler ou de ne pas fonctionner.",
   "native.build.title": "Compiler les mods natifs de {name}",
   "native.need.firstBuild": "Cette instance a des mods natifs qui ne sont pas encore compilés dans son jeu.",
   "native.need.modsChanged": "Ses mods natifs ont changé depuis la dernière compilation.",

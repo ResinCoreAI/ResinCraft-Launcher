@@ -9,6 +9,9 @@ export default {
     "They aren't sandboxed: once built, their code can read and change your files and use your network like any program you run. Build only mods you trust. These will be compiled into the game:",
   'native.trust.build': 'I trust these mods: build',
   'native.playWithout': 'Play without native mods',
+  'native.buildAnyway': 'Build anyway',
+  'native.buildAnywayHint':
+    'Builds mods made for different Horizon versions together, on the newest of them. Some may not compile or may not work there.',
   'native.build.title': 'Build native mods for {name}',
   'native.need.firstBuild': 'This instance has native mods that aren\'t built into its game yet.',
   'native.need.modsChanged': 'Its native mods changed since the last build.',

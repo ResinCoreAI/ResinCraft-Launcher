@@ -4,6 +4,7 @@ import App from './App'
 import { restoreLanguage, setLanguage, useLanguage } from './i18n'
 import { StoreProvider, useStore } from './store'
 import { installDesktopBehaviour } from './desktop'
+import { api, isTauri } from './api'
 import './fonts'
 import './styles.css'
 import './playful.css'
@@ -20,17 +21,44 @@ function Localized() {
   return <App key={lang} />
 }
 
-installDesktopBehaviour()
+/** The launcher's window is on https now; this hidden window on the old http origin only hands its storage over. */
+const oldOrigin = isTauri && location.protocol === 'http:' && location.hostname === 'tauri.localhost'
+
+/** Once, after the move to https: keeps every entry of the old origin's storage that isn't set here yet. */
+async function carryStorage() {
+  try {
+    const old = await api.app.storageImport()
+    for (const [k, v] of Object.entries(old ?? {})) if (localStorage.getItem(k) === null) localStorage.setItem(k, v)
+  } catch {
+    // Nothing to carry over: the launcher starts as it is.
+  }
+}
 
 // Hot reload re-runs this file during development; reuse the existing root instead of creating a second one.
 const holder = window as unknown as { __resinRoot?: Root }
 
-void restoreLanguage().finally(() =>
-  (holder.__resinRoot ??= createRoot(document.getElementById('root')!)).render(
-    <StrictMode>
-      <StoreProvider>
-        <Localized />
-      </StoreProvider>
-    </StrictMode>
-  )
-)
+if (oldOrigin) {
+  const entries: Record<string, string> = {}
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k !== null) entries[k] = localStorage.getItem(k) ?? ''
+    }
+  } catch {
+    // Unreadable: hands over nothing.
+  }
+  void api.app.storageExport(entries)
+} else {
+  installDesktopBehaviour()
+  void carryStorage()
+    .then(() => restoreLanguage())
+    .finally(() =>
+      (holder.__resinRoot ??= createRoot(document.getElementById('root')!)).render(
+        <StrictMode>
+          <StoreProvider>
+            <Localized />
+          </StoreProvider>
+        </StrictMode>
+      )
+    )
+}

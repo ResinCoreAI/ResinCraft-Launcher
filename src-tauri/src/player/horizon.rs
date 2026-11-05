@@ -145,7 +145,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(crate::game::horizon_native::status(&inst).await?)
         }
         // [instance id, trusted]: trusted is the player's answer to the red warning shown before every build.
-        "horizon:nativeBuild" => json(crate::game::horizon_native::build(&args.get::<String>(0)?, args.get::<bool>(1)?).await?),
+        "horizon:nativeBuild" => json(crate::game::horizon_native::build(&args.get::<String>(0)?, args.get::<bool>(1)?, args.get::<Option<bool>>(2)?.unwrap_or(false)).await?),
         "horizon:nativeLog" => json(crate::game::horizon_native::log_tail(args.get::<Option<usize>>(0)?.unwrap_or(40).min(400)).await),
         // The instance's next start plays without its native mods.
         "horizon:nativeSkipOnce" => {

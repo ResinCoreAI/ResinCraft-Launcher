@@ -23,11 +23,12 @@
         "dragDropEnabled": true,
         "center": true,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --js-flags=--optimize-for-size",
-        "maximized": true
+        "maximized": true,
+        "useHttpsScheme": true
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self' https://js.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; img-src 'self' https: data: blob: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://api.stripe.com https://r.stripe.com https://m.stripe.network"
+      "csp": "default-src 'self' ipc: http://ipc.localhost https://ipc.localhost; script-src 'self' https://js.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; img-src 'self' https: data: blob: asset: http://asset.localhost https://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost https://api.stripe.com https://r.stripe.com https://m.stripe.network"
     }
   },
   "bundle": {

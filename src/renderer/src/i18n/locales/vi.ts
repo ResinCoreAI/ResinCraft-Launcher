@@ -3560,6 +3560,8 @@ const dict: Dict = {
   "native.trust.body": "Chúng không chạy trong sandbox: sau khi được biên dịch, mã của chúng có thể đọc và thay đổi tệp của bạn và dùng mạng của bạn như bất kỳ chương trình nào bạn chạy. Chỉ biên dịch những mod bạn tin tưởng. Các mod sau sẽ được biên dịch vào trò chơi:",
   "native.trust.build": "Tôi tin tưởng các mod này: biên dịch",
   "native.playWithout": "Chơi không có mod mã gốc",
+  "native.buildAnyway": "Vẫn biên dịch",
+  "native.buildAnywayHint": "Biên dịch chung các mod làm cho những phiên bản Horizon khác nhau, trên phiên bản mới nhất. Một số có thể không biên dịch được hoặc không chạy.",
   "native.build.title": "Biên dịch mod mã gốc cho {name}",
   "native.need.firstBuild": "Bản cài đặt này có mod mã gốc chưa được biên dịch vào trò chơi.",
   "native.need.modsChanged": "Mod mã gốc của nó đã thay đổi kể từ lần biên dịch trước.",

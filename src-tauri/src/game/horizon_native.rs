@@ -816,7 +816,7 @@ impl Drop for Building {
 
 /// Builds the instance's native mods into the game it plays, with Horizon's launcher. `trusted` is the player's
 /// answer to the warning the UI shows before every build: without it nothing is compiled.
-pub async fn build(instance_id: &str, trusted: bool) -> Result<Record> {
+pub async fn build(instance_id: &str, trusted: bool, anyway: bool) -> Result<Record> {
     if !trusted {
         bail_tr!("horizon.nativeTrust", "Native mods run with full access to this computer: confirm that you trust them before they are built.");
     }
@@ -851,13 +851,25 @@ pub async fn build(instance_id: &str, trusted: bool) -> Result<Record> {
         }
         task.update(tr!("horizon.nativeBase", "Getting Horizon {build} ready to build on…", build = build.id), None);
         link_base(&build).await?;
-        run_build(&exe, &inst, &build, &task).await
+        run_build(&exe, &inst, &build, &task, anyway).await
     })
     .await;
     r
 }
 
-async fn run_build(exe: &Path, inst: &Instance, build: &Build, task: &Arc<Task>) -> Result<Record> {
+/// Stops Horizon's launcher and the compiler it started when the build is dropped before it ended (Cancel in the
+/// dock): `kill_on_drop` alone would leave Cargo and rustc compiling.
+struct StopTree(Option<u32>);
+
+impl Drop for StopTree {
+    fn drop(&mut self) {
+        if let Some(pid) = self.0.take() {
+            super::commands::kill_tree(pid);
+        }
+    }
+}
+
+async fn run_build(exe: &Path, inst: &Instance, build: &Build, task: &Arc<Task>, anyway: bool) -> Result<Record> {
     let game = paths::game_dir(&inst.id);
     let mods_dir = game.join(NATIVE_DIR);
     let mods = installed(&game);
@@ -868,7 +880,12 @@ async fn run_build(exe: &Path, inst: &Instance, build: &Build, task: &Arc<Task>)
         .args(["--version", &build.id, "--trust-native-code", "--profile", PROFILE])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    // The player chose to build mods made for other Horizon versions together: on the newest of them, each on it.
+    if anyway {
+        cmd.args(["--allow-version-mismatch", "--ignore-pins"]);
+    }
     let mut child = cmd.spawn().context("Couldn't start Horizon's launcher")?;
+    let mut stop = StopTree(child.id());
     let (out, err) = (child.stdout.take().unwrap(), child.stderr.take().unwrap());
     let stdout = tokio::spawn(async move {
         let mut text = String::new();
@@ -896,6 +913,7 @@ async fn run_build(exe: &Path, inst: &Instance, build: &Build, task: &Arc<Task>)
         })
     };
     let status = child.wait().await?;
+    stop.0 = None;
     let _ = reader.await;
     let stdout = stdout.await.unwrap_or_default();
     if !status.success() {

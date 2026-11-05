@@ -3573,6 +3573,8 @@ const dict: Dict = {
   "native.trust.body": "Sandbox içinde çalışmazlar: derlendikten sonra kodları, çalıştırdığın herhangi bir program gibi dosyalarını okuyup değiştirebilir ve ağını kullanabilir. Yalnızca güvendiğin modları derle. Şunlar oyuna derlenecek:",
   "native.trust.build": "Bu modlara güveniyorum: derle",
   "native.playWithout": "Yerel modlar olmadan oyna",
+  "native.buildAnyway": "Yine de derle",
+  "native.buildAnywayHint": "Farklı Horizon sürümleri için yapılmış modları en yenisinde birlikte derler. Bazıları derlenmeyebilir ya da çalışmayabilir.",
   "native.build.title": "{name} için yerel modları derle",
   "native.need.firstBuild": "Bu kurulumda henüz oyununa derlenmemiş yerel modlar var.",
   "native.need.modsChanged": "Yerel modları son derlemeden bu yana değişti.",

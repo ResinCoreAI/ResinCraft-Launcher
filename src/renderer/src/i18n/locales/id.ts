@@ -3563,6 +3563,8 @@ const dict: Dict = {
   "native.trust.body": "Mod ini tidak berjalan di sandbox: setelah di-build, kodenya bisa membaca dan mengubah file kamu serta memakai jaringan kamu seperti program lain yang kamu jalankan. Build hanya mod yang kamu percaya. Mod berikut akan dikompilasi ke dalam game:",
   "native.trust.build": "Saya percaya mod ini: build",
   "native.playWithout": "Main tanpa mod native",
+  "native.buildAnyway": "Tetap build",
+  "native.buildAnywayHint": "Mem-build mod yang dibuat untuk versi Horizon berbeda bersama-sama, di versi terbaru. Beberapa mungkin gagal dikompilasi atau tidak berfungsi di sana.",
   "native.build.title": "Build mod native untuk {name}",
   "native.need.firstBuild": "Instalasi ini punya mod native yang belum di-build ke dalam game-nya.",
   "native.need.modsChanged": "Mod native-nya berubah sejak build terakhir.",

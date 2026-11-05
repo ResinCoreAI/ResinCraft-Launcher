@@ -3589,6 +3589,8 @@ const dict: Dict = {
   "native.trust.body": "Eles não ficam em um sandbox: depois de compilado, o código deles pode ler e alterar seus arquivos e usar sua rede como qualquer programa que você executa. Compile só mods em que você confia. Estes serão compilados no jogo:",
   "native.trust.build": "Confio nestes mods: compilar",
   "native.playWithout": "Jogar sem mods nativos",
+  "native.buildAnyway": "Compilar mesmo assim",
+  "native.buildAnywayHint": "Compila juntos mods feitos para versões diferentes do Horizon, na mais nova delas. Alguns podem não compilar ou não funcionar.",
   "native.build.title": "Compilar mods nativos para {name}",
   "native.need.firstBuild": "Esta instância tem mods nativos que ainda não foram compilados no jogo dela.",
   "native.need.modsChanged": "Os mods nativos dela mudaram desde a última build.",

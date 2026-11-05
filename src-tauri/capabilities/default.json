@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "What the ResinCraft UI may do. Everything else goes through the single `ipc` command.",
-  "windows": ["main"],
+  "windows": ["main", "storage-export"],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",

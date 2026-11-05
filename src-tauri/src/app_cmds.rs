@@ -46,6 +46,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // Settings → Uninstall ResinCraft: "uninstaller" (it started; ResinCraft quits) or "settings" (Windows' Installed
         // apps page, for MSI and Store installs).
         "app:uninstall" => json(uninstall()?),
+        // The window moved to https: the old origin's localStorage, handed over once (webstorage.rs).
+        "app:storageExport" => {
+            crate::webstorage::exported(args.get::<serde_json::Value>(0)?);
+            done()
+        }
+        "app:storageImport" => json(crate::webstorage::import().await),
         "app:pendingOpen" => json(crate::openfile::take()),
         "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
         // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.

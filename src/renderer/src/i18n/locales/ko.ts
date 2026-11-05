@@ -3555,6 +3555,8 @@ const dict: Dict = {
   "native.trust.body": "샌드박스에 격리되지 않아요. 빌드되면 그 코드는 여러분이 실행하는 다른 프로그램처럼 파일을 읽고 바꾸고 네트워크를 사용할 수 있어요. 신뢰하는 모드만 빌드하세요. 다음 모드가 게임에 컴파일돼요:",
   "native.trust.build": "이 모드들을 신뢰해요: 빌드",
   "native.playWithout": "네이티브 모드 없이 플레이",
+  "native.buildAnyway": "그래도 빌드",
+  "native.buildAnywayHint": "서로 다른 Horizon 버전용 모드를 그중 최신 버전에서 함께 빌드해요. 일부는 컴파일되지 않거나 작동하지 않을 수 있어요.",
   "native.build.title": "{name}의 네이티브 모드 빌드",
   "native.need.firstBuild": "이 인스턴스에는 아직 게임에 빌드되지 않은 네이티브 모드가 있어요.",
   "native.need.modsChanged": "마지막 빌드 이후 네이티브 모드가 바뀌었어요.",
