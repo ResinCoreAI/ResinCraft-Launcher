@@ -59,7 +59,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       nativeSkipOnce: fn('horizon:nativeSkipOnce'),
       nativeCache: fn('horizon:nativeCache'),
       nativeCacheClear: fn('horizon:nativeCacheClear'),
-      nativeCacheLimit: fn('horizon:nativeCacheLimit')
+      nativeCacheLimit: fn('horizon:nativeCacheLimit'),
+      nativeKeepCache: fn('horizon:nativeKeepCache')
     },
     bedrock: {
       status: fn('bedrock:status'),

@@ -4,7 +4,7 @@ import type { Instance, NativeCacheInfo, NativeStatus } from '@shared/types'
 import { api } from '../api'
 import { engineError, t } from '../i18n'
 import { useStore } from '../store'
-import { Modal } from './ui'
+import { Modal, Switch } from './ui'
 
 /**
  * Horizon native mods: code compiled into the game by Horizon's own launcher before the instance plays. They run
@@ -102,11 +102,7 @@ export function NativeBuildDialog({ instanceId, onDone, offerSkip }: { instanceI
   const close = () => (phase === 'building' ? undefined : onDone('cancel'))
   const name = inst?.name ?? instanceId
   const why =
-    status?.need === 'modsChanged'
-      ? t('native.need.modsChanged')
-      : status?.need === 'baseChanged'
-        ? t('native.need.baseChanged')
-        : t('native.need.firstBuild')
+    status?.need === 'modsChanged' ? t('native.need.modsChanged') : status?.need === 'baseChanged' ? t('native.need.baseChanged') : t('native.need.firstBuild')
 
   return (
     <Modal
@@ -269,37 +265,57 @@ export function NativeCacheSection() {
                   ? t('native.settings.none')
                   : info.busy
                     ? t('native.busy')
-                    : t('native.settings.sizeValue', { size: gib(info.bytes), path: info.path ?? '' })}
+                    : t('native.settings.sizeValue', { size: gib(info.totalBytes), path: info.path ?? '' })}
             </span>
           </div>
           <button
             className="btn danger"
             disabled={busy || !info?.installed || info.busy}
-            onClick={() => void run(() => api.horizon.nativeCacheClear(), (i) => t('native.settings.cleared', { size: gib(i.clearedBytes) }))}
+            onClick={() =>
+              void run(
+                () => api.horizon.nativeCacheClear(),
+                (i) => t('native.settings.cleared', { size: gib(i.clearedBytes) })
+              )
+            }
           >
             {busy ? <Loader2 className="spin" /> : <Trash2 />} {t('native.settings.clear')}
           </button>
         </div>
         <div className="setting">
           <div className="text">
-            <b>{t('native.settings.limit')}</b>
-            <span>{t('native.settings.limitHint')}</span>
+            <b>{t('native.settings.keep')}</b>
+            <span>{t('native.settings.keepHint')}</span>
           </div>
-          <div className="row" style={{ width: 160 }}>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              max={10000}
-              value={limit}
-              disabled={busy || !info?.installed}
-              onChange={(e) => setLimit(e.target.value)}
-              onBlur={saveLimit}
-              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-            />
-            <span className="hint">GiB</span>
+          <Switch on={!!info?.keepCache} disabled={busy || !info || info.busy} onChange={(v) => void run(() => api.horizon.nativeKeepCache(v))} />
+        </div>
+        <div className="setting">
+          <div className="text">
+            <b>{t('native.settings.builds')}</b>
+            <span>{info ? t('native.settings.buildsValue', { size: gib(info.storeBytes) }) : t('common.loading')}</span>
           </div>
         </div>
+        {info?.keepCache && (
+          <div className="setting">
+            <div className="text">
+              <b>{t('native.settings.limit')}</b>
+              <span>{t('native.settings.limitHint')}</span>
+            </div>
+            <div className="row" style={{ width: 160 }}>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={10000}
+                value={limit}
+                disabled={busy || !info?.installed}
+                onChange={(e) => setLimit(e.target.value)}
+                onBlur={saveLimit}
+                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+              />
+              <span className="hint">GiB</span>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )

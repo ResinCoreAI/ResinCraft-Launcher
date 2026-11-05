@@ -154,6 +154,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "horizon:nativeCache" => json(crate::game::horizon_native::cache(false).await?),
         "horizon:nativeCacheClear" => json(crate::game::horizon_native::cache(true).await?),
+        "horizon:nativeKeepCache" => json(crate::game::horizon_native::set_keep_cache(args.get::<bool>(0)?).await?),
         "horizon:nativeCacheLimit" => json(crate::game::horizon_native::set_cache_limit(args.get::<u64>(0)?).await?),
         _ => bail!("Unknown request: {channel}"),
     }

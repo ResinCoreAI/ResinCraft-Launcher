@@ -613,9 +613,10 @@ export function mockApi(): ResinApi {
       },
       nativeLog: async () => [],
       nativeSkipOnce: async () => undefined,
-      nativeCache: async () => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: 30, busy: false }),
-      nativeCacheClear: async () => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: 30, busy: false }),
-      nativeCacheLimit: async (gib: number) => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: gib, busy: false })
+      nativeCache: async () => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: 30, busy: false, totalBytes: 0, storeBytes: 0, keepCache: false }),
+      nativeCacheClear: async () => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: 30, busy: false, totalBytes: 0, storeBytes: 0, keepCache: false }),
+      nativeCacheLimit: async (gib: number) => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: gib, busy: false, totalBytes: 0, storeBytes: 0, keepCache: false }),
+      nativeKeepCache: async (keep: boolean) => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: 30, busy: false, totalBytes: 0, storeBytes: 0, keepCache: keep })
     },
     ...mockFiles(),
     ...migrate,

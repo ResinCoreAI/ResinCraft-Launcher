@@ -1189,6 +1189,11 @@ export interface NativeCacheInfo {
   limitGib: number
   /** A build runs: the cache can't be read now. */
   busy: boolean
+  /** Everything the compiler keeps: its Rust, Cargo's home and its output. */
+  totalBytes: number
+  /** Finished builds kept so the same mods never compile twice. */
+  storeBytes: number
+  keepCache: boolean
 }
 
 export interface HorizonStatus {
@@ -2116,6 +2121,8 @@ export interface ResinApi {
     nativeCache(): Promise<NativeCacheInfo>
     nativeCacheClear(): Promise<NativeCacheInfo>
     nativeCacheLimit(gib: number): Promise<NativeCacheInfo>
+    /** Keep the compile files after a build (quick rebuilds), or delete them (the default). */
+    nativeKeepCache(keep: boolean): Promise<NativeCacheInfo>
   }
   /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
   bedrock: {

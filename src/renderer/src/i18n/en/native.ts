@@ -14,7 +14,7 @@ export default {
   'native.need.modsChanged': 'Its native mods changed since the last build.',
   'native.need.baseChanged': 'It plays another Horizon build now, so its native mods are built again.',
   'native.firstBuildHint':
-    "The first build downloads Horizon's own Rust compiler and the game's source and compiles the whole game: expect 10 to 30 minutes and several GB of disk space. Later builds only compile what changed.",
+    "A build downloads Horizon's own Rust compiler and compiles the whole game: expect 10 to 30 minutes and a few GB of disk space while it runs. The compile files are deleted afterwards, unless Settings keeps them for quick rebuilds. The same mods never compile twice.",
   'native.busy': 'A native build is running. Try again when it finishes.',
   'native.building': 'Building… You can keep using ResinCraft; the build goes on in the background.',
   'native.logTail': 'The end of the build log:',
@@ -29,12 +29,17 @@ export default {
   'native.bar.rebuild': 'Build again',
   'native.settings.title': 'Native mods',
   'native.settings.lead':
-    "Horizon native mods are compiled with Horizon's own launcher. Its compile cache makes later builds quick; it's cleared after a build when it grows past the limit.",
-  'native.settings.size': 'Compile cache',
+    "Horizon native mods are compiled with Horizon's own launcher. Finished builds are kept, so the same mods never compile twice. The compile files are deleted after each build unless you keep them.",
+  'native.settings.size': 'Compile files',
   'native.settings.sizeValue': '{size} GiB in {path}',
   'native.settings.none': 'Nothing yet: no native mod has been built here.',
-  'native.settings.clear': 'Clear native build cache',
-  'native.settings.cleared': 'Cleared {size} GiB. The next build compiles from scratch.',
+  'native.settings.clear': 'Delete compile files',
+  'native.settings.cleared': 'Freed {size} GiB. The next new build compiles the whole game.',
   'native.settings.limit': 'Cache limit',
-  'native.settings.limitHint': 'In GiB, checked after each build. 0 never clears it.'
+  'native.settings.limitHint': 'In GiB, checked after each build. 0 never clears it.',
+  'native.settings.keep': 'Keep compile files for quick rebuilds',
+  'native.settings.keepHint':
+    'On: a changed mod rebuilds in a few minutes, for several GB of disk space. Off: the files are deleted after each build, and each new set of mods compiles the whole game again.',
+  'native.settings.builds': 'Finished builds',
+  'native.settings.buildsValue': '{size} GiB, sharing their files with the Horizon builds they start from'
 }

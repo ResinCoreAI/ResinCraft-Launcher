@@ -209,6 +209,7 @@ export default {
   'engine.horizon.nativeBase': 'Getting Horizon {build} ready to build on…',
   'engine.horizon.nativeBuilding': 'Building native mods for {name}',
   'engine.horizon.nativeBusy': 'A native build is running. Try again when it finishes.',
+  'engine.horizon.nativeCleaning': 'Deleting the compile files to free space…',
   'engine.horizon.nativeFailed': 'The native build failed: {why}',
   'engine.horizon.nativeInstalling': 'Putting the build in {name}…',
   'engine.horizon.nativeLauncher': "Getting Horizon's launcher…",

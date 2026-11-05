@@ -14,6 +14,11 @@
 //!   `horizon-native-build/<version>/`, with a record of what it was made from: a fingerprint of every mod file, the
 //!   base build and the profile. A start plays it while that fingerprint still matches; otherwise it asks for a build
 //!   first (`horizon.nativeNeedsBuild`), and the player can play once without the native mods.
+//! - Finished builds are kept once, by that fingerprint, in `<games>/horizon-native-store/<key>/`: a set of mods
+//!   built before (on any instance, or before a mod was taken out and put back) plays at once, with nothing compiled.
+//!   Files the build shares with its base build are hard links to it, so a build costs about its game program.
+//! - After a build, Horizon's launcher's compile files (its Rust, Cargo's home, the compiler's output) are deleted
+//!   unless the player keeps them for quick rebuilds (`keep_cache`).
 
 use std::collections::HashSet;
 use std::io::{Read, Write as _};
@@ -321,6 +326,9 @@ pub struct Record {
     pub mods: Vec<String>,
     /// Unix seconds.
     pub built: u64,
+    /// `version` is its key in the shared store, not a folder of the instance's own.
+    #[serde(default)]
+    pub stored: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -371,7 +379,7 @@ fn client_in(dir: &Path) -> PathBuf {
 fn built(record: Option<&Record>, inst: &str) -> Option<PathBuf> {
     let r = record?;
     plain_name(&r.version).then_some(())?;
-    let dir = build_dir(inst).join(&r.version);
+    let dir = if r.stored { store().join(&r.version) } else { build_dir(inst).join(&r.version) };
     client_in(&dir).is_file().then_some(dir)
 }
 
@@ -379,7 +387,137 @@ fn need_for(inst: &str, base: &str) -> Result<(Need, Option<Record>, Option<Stri
     let now = fingerprint(&paths::game_dir(inst).join(NATIVE_DIR), base, PROFILE)?;
     let record = read_record(inst);
     let have = built(record.as_ref(), inst).is_some();
-    Ok((need(now.as_deref(), base, record.as_ref(), have), record, now))
+    let need = need(now.as_deref(), base, record.as_ref(), have);
+    // The same mods on the same base were built before: that build plays, nothing is compiled.
+    if need.build() {
+        if let Some(found) = now.as_deref().and_then(from_store) {
+            if write_record(inst, &found).is_ok() {
+                return Ok((Need::UpToDate, Some(found), now));
+            }
+        }
+    }
+    Ok((need, record, now))
+}
+
+fn write_record(inst: &str, r: &Record) -> Result<()> {
+    let dir = build_dir(inst);
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join(RECORD), serde_json::to_string_pretty(r)?)?;
+    Ok(())
+}
+
+// ---------- The shared store ----------
+
+/// Every finished build, once, by what it was made from.
+pub fn store() -> PathBuf {
+    paths::games().join("horizon-native-store")
+}
+
+/// A fingerprint's folder name in the store.
+pub fn store_key(fingerprint: &str) -> String {
+    fingerprint.chars().take(24).collect()
+}
+
+/// The stored build made from exactly this fingerprint, when its game is there.
+fn from_store(fingerprint: &str) -> Option<Record> {
+    let key = store_key(fingerprint);
+    let dir = store().join(&key);
+    let r: Record = serde_json::from_str(&std::fs::read_to_string(dir.join(RECORD)).ok()?).ok()?;
+    (r.fingerprint == fingerprint && r.version == key && r.stored && client_in(&dir).is_file()).then_some(r)
+}
+
+/// Replaces each file of `dir` that is byte for byte the same file of `base` (same path) with a hard link to it.
+/// Returns the bytes saved. Where a link can't be made (another drive), the copy stays.
+pub fn link_to_base(dir: &Path, base: &Path) -> u64 {
+    fn read_full(f: &mut std::fs::File, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut n = 0;
+        while n < buf.len() {
+            match f.read(&mut buf[n..])? {
+                0 => break,
+                k => n += k,
+            }
+        }
+        Ok(n)
+    }
+    fn same(a: &Path, b: &Path) -> bool {
+        let (Ok(mut fa), Ok(mut fb)) = (std::fs::File::open(a), std::fs::File::open(b)) else { return false };
+        let (mut ba, mut bb) = (vec![0u8; 1 << 16], vec![0u8; 1 << 16]);
+        loop {
+            let (Ok(na), Ok(nb)) = (read_full(&mut fa, &mut ba), read_full(&mut fb, &mut bb)) else { return false };
+            if na != nb || ba[..na] != bb[..nb] {
+                return false;
+            }
+            if na == 0 {
+                return true;
+            }
+        }
+    }
+    fn walk(dir: &Path, base: &Path, saved: &mut u64) {
+        let Ok(list) = std::fs::read_dir(dir) else { return };
+        for e in list.flatten() {
+            let Ok(kind) = e.file_type() else { continue };
+            let (path, other) = (e.path(), base.join(e.file_name()));
+            if kind.is_dir() {
+                walk(&path, &other, saved);
+                continue;
+            }
+            if !kind.is_file() {
+                continue;
+            }
+            let (Ok(a), Ok(b)) = (std::fs::metadata(&path), std::fs::metadata(&other)) else { continue };
+            if !b.is_file() || a.len() != b.len() || a.len() == 0 || !same(&path, &other) {
+                continue;
+            }
+            let mut aside = path.clone().into_os_string();
+            aside.push(".resincraft-link");
+            let aside = PathBuf::from(aside);
+            if std::fs::rename(&path, &aside).is_err() {
+                continue;
+            }
+            if std::fs::hard_link(&other, &path).is_ok() {
+                let _ = std::fs::remove_file(&aside);
+                *saved += a.len();
+            } else {
+                let _ = std::fs::rename(&aside, &path);
+            }
+        }
+    }
+    let mut saved = 0;
+    walk(dir, base, &mut saved);
+    saved
+}
+
+/// Deletes stored builds no instance plays, but the newest `spare` of them (taking a mod out and putting it back
+/// then plays at once). Returns the bytes freed.
+pub fn prune_store(used: &HashSet<String>, spare: usize) -> u64 {
+    let Ok(list) = std::fs::read_dir(store()) else { return 0 };
+    let mut unused: Vec<(u64, PathBuf)> = list
+        .flatten()
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+        .filter(|e| !used.contains(&e.file_name().to_string_lossy().into_owned()))
+        .map(|e| {
+            let built = std::fs::read_to_string(e.path().join(RECORD)).ok().and_then(|t| serde_json::from_str::<Record>(&t).ok()).map(|r| r.built).unwrap_or(0);
+            (built, e.path())
+        })
+        .collect();
+    unused.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut freed = 0;
+    for (_, dir) in unused.into_iter().skip(spare) {
+        freed += crate::core::fsutil::dir_size(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    freed
+}
+
+/// The store keys the instances play.
+async fn used_keys() -> HashSet<String> {
+    let mut used = HashSet::new();
+    for inst in crate::core::instances::list().await.unwrap_or_default() {
+        if let Some(r) = read_record(&inst.id).filter(|r| r.stored) {
+            used.insert(r.version);
+        }
+    }
+    used
 }
 
 // ---------- Horizon's launcher ----------
@@ -427,6 +565,39 @@ pub struct CacheInfo {
     pub limit_gib: u64,
     /// A build runs: the cache can't be read now.
     pub busy: bool,
+    /// Everything the compiler keeps: its Rust, Cargo's home and its output.
+    pub total_bytes: u64,
+    /// The finished builds kept in the store.
+    pub store_bytes: u64,
+    pub keep_cache: bool,
+}
+
+/// ResinCraft's own settings for native builds, beside Horizon's launcher's.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Settings {
+    /// Keep the compile files after a build: rebuilds take minutes instead of a full compile, for several GiB.
+    #[serde(default)]
+    keep_cache: bool,
+}
+
+fn settings_file() -> PathBuf {
+    launcher_home().join("resincraft.json")
+}
+
+fn settings() -> Settings {
+    std::fs::read_to_string(settings_file()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+pub fn keep_cache() -> bool {
+    settings().keep_cache
+}
+
+pub async fn set_keep_cache(keep: bool) -> Result<CacheInfo> {
+    tokio::fs::create_dir_all(launcher_home()).await?;
+    let s = Settings { keep_cache: keep };
+    tokio::fs::write(settings_file(), serde_json::to_string_pretty(&s)?).await?;
+    cache(false).await
 }
 
 /// The folder Horizon's launcher builds in (`<build dir>/native`), once read: its log is there.
@@ -438,19 +609,65 @@ fn read_cache(v: &Value) -> CacheInfo {
     if let Some(p) = &path {
         *NATIVE_ROOT.lock().unwrap() = Path::new(p).parent().map(Path::to_path_buf);
     }
-    CacheInfo { installed: true, path, bytes: v["bytes"].as_u64().unwrap_or(0), cleared_bytes: v["cleared_bytes"].as_u64().unwrap_or(0), limit_gib: v["limit_gib"].as_u64().unwrap_or(30), busy: false }
+    CacheInfo {
+        installed: true,
+        path,
+        bytes: v["bytes"].as_u64().unwrap_or(0),
+        cleared_bytes: v["cleared_bytes"].as_u64().unwrap_or(0),
+        limit_gib: v["limit_gib"].as_u64().unwrap_or(30),
+        keep_cache: keep_cache(),
+        ..Default::default()
+    }
+}
+
+/// Horizon's launcher's build folder: its Rust, Cargo's home and `native/`.
+fn build_root() -> Option<PathBuf> {
+    NATIVE_ROOT.lock().unwrap().as_ref().and_then(|r| r.parent().map(Path::to_path_buf))
+}
+
+/// The size of what the compiler keeps, read from disk.
+fn compile_bytes() -> u64 {
+    build_root().map(|b| ["rust", "cargo", "native"].iter().map(|d| crate::core::fsutil::dir_size(&b.join(d))).sum()).unwrap_or(0)
+}
+
+async fn sizes(mut info: CacheInfo) -> CacheInfo {
+    let store = store();
+    let (total, stored) = tokio::task::spawn_blocking(move || (compile_bytes(), crate::core::fsutil::dir_size(&store))).await.unwrap_or((0, 0));
+    info.total_bytes = total;
+    info.store_bytes = stored;
+    info
+}
+
+/// Deletes the compile files: the compiler's output, then Horizon's launcher's Rust and Cargo's home. Finished
+/// builds stay. Returns the bytes freed.
+async fn clean_compile_files(exe: &Path) -> Result<u64> {
+    let before = tokio::task::spawn_blocking(compile_bytes).await.unwrap_or(0);
+    let v = run_json(exe, &["native-cache", "--clear"]).await?;
+    read_cache(&v);
+    run_json(exe, &["rust", "remove"]).await?;
+    let after = tokio::task::spawn_blocking(compile_bytes).await.unwrap_or(0);
+    Ok(before.saturating_sub(after))
 }
 
 pub async fn cache(clear: bool) -> Result<CacheInfo> {
-    let Some(exe) = crate::player::horizon::installed_program() else { return Ok(CacheInfo { limit_gib: 30, ..Default::default() }) };
+    let Some(exe) = crate::player::horizon::installed_program() else {
+        return Ok(sizes(CacheInfo { limit_gib: 30, keep_cache: keep_cache(), ..Default::default() }).await);
+    };
     if BUILDING.load(Ordering::SeqCst) {
         if clear {
             bail_tr!("horizon.nativeBusy", "A native build is running. Try again when it finishes.");
         }
-        return Ok(CacheInfo { installed: true, busy: true, limit_gib: 30, ..Default::default() });
+        return Ok(CacheInfo { installed: true, busy: true, limit_gib: 30, keep_cache: keep_cache(), ..Default::default() });
     }
-    let args: &[&str] = if clear { &["native-cache", "--clear"] } else { &["native-cache"] };
-    Ok(read_cache(&run_json(&exe, args).await?))
+    if clear {
+        let mut freed = clean_compile_files(&exe).await?;
+        let used = used_keys().await;
+        freed += tokio::task::spawn_blocking(move || prune_store(&used, 0)).await.unwrap_or(0);
+        let mut info = read_cache(&run_json(&exe, &["native-cache"]).await?);
+        info.cleared_bytes = freed;
+        return Ok(sizes(info).await);
+    }
+    Ok(sizes(read_cache(&run_json(&exe, &["native-cache"]).await?)).await)
 }
 
 /// The cache's limit in GiB (0: no automatic cleanup), kept in Horizon's launcher's settings.
@@ -625,6 +842,13 @@ pub async fn build(instance_id: &str, trusted: bool) -> Result<Record> {
         if let Ok(v) = run_json(&exe, &["native-cache"]).await {
             read_cache(&v);
         }
+        // Built before with exactly these mods on this base: nothing to compile.
+        if let Some(print) = fingerprint(&paths::game_dir(&inst.id).join(NATIVE_DIR), &build.id, PROFILE)? {
+            if let Some(found) = from_store(&print) {
+                write_record(&inst.id, &found)?;
+                return Ok(found);
+            }
+        }
         task.update(tr!("horizon.nativeBase", "Getting Horizon {build} ready to build on…", build = build.id), None);
         link_base(&build).await?;
         run_build(&exe, &inst, &build, &task).await
@@ -684,30 +908,43 @@ async fn run_build(exe: &Path, inst: &Instance, build: &Build, task: &Arc<Task>)
     let version = built_version(&stdout).ok_or_else(|| anyhow!("Horizon's launcher didn't say which version it built ({})", stdout.trim()))?;
     task.update(tr!("horizon.nativeInstalling", "Putting the build in {name}…", name = inst.name), None);
     let from = launcher_home().join("versions").join(&version);
-    let dir = build_dir(&inst.id);
+    let key = store_key(&print);
     let record = Record {
         fingerprint: print,
         base: build.id.clone(),
         profile: PROFILE.to_string(),
-        version: version.clone(),
+        version: key.clone(),
         mods: mods.iter().map(|m| format!("{} {}", m.id, m.version)).collect(),
         built: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+        stored: true,
     };
-    let r = record.clone();
+    let (r, base_root, inst_id) = (record.clone(), build.root.clone(), inst.id.clone());
     tokio::task::spawn_blocking(move || -> Result<()> {
-        move_dir(&from, &dir.join(&version))?;
-        // Older builds of this instance go.
-        if let Ok(list) = std::fs::read_dir(&dir) {
+        let to = store().join(&key);
+        move_dir(&from, &to)?;
+        let saved = link_to_base(&to, &base_root);
+        eprintln!("[horizon] native build {key}: {} MiB shared with {}", saved >> 20, base_root.display());
+        std::fs::write(to.join(RECORD), serde_json::to_string_pretty(&r)?)?;
+        // The instance's own builds from before the store go.
+        if let Ok(list) = std::fs::read_dir(build_dir(&inst_id)) {
             for e in list.flatten() {
-                if e.file_type().is_ok_and(|t| t.is_dir()) && e.file_name() != std::ffi::OsStr::new(&version) {
+                if e.file_type().is_ok_and(|t| t.is_dir()) {
                     let _ = std::fs::remove_dir_all(e.path());
                 }
             }
         }
-        std::fs::write(dir.join(RECORD), serde_json::to_string_pretty(&r)?)?;
-        Ok(())
+        write_record(&inst_id, &r)
     })
     .await??;
+    let used = used_keys().await;
+    let _ = tokio::task::spawn_blocking(move || prune_store(&used, 1)).await;
+    if !keep_cache() {
+        task.update(tr!("horizon.nativeCleaning", "Deleting the compile files to free space…"), None);
+        match clean_compile_files(exe).await {
+            Ok(freed) => eprintln!("[horizon] freed {} MiB of compile files", freed >> 20),
+            Err(e) => eprintln!("[horizon] couldn't delete the compile files: {e:#}"),
+        }
+    }
     Ok(record)
 }
 
@@ -885,7 +1122,7 @@ mod tests {
 
     #[test]
     fn build_needed_when_mods_or_base_change() {
-        let r = Record { fingerprint: "f1".into(), base: "nightly-a".into(), profile: PROFILE.into(), version: "native-x".into(), mods: vec![], built: 0 };
+        let r = Record { fingerprint: "f1".into(), base: "nightly-a".into(), profile: PROFILE.into(), version: "native-x".into(), mods: vec![], built: 0, stored: false };
         assert_eq!(need(None, "nightly-a", Some(&r), true), Need::NoMods);
         assert_eq!(need(Some("f1"), "nightly-a", Some(&r), true), Need::UpToDate);
         assert_eq!(need(Some("f2"), "nightly-a", Some(&r), true), Need::ModsChanged);
@@ -893,6 +1130,33 @@ mod tests {
         assert_eq!(need(Some("f1"), "nightly-a", Some(&r), false), Need::FirstBuild);
         assert_eq!(need(Some("f1"), "nightly-a", None, false), Need::FirstBuild);
         assert!(!Need::UpToDate.build() && !Need::NoMods.build() && Need::ModsChanged.build());
+    }
+
+    #[test]
+    fn built_files_become_links_to_the_base() {
+        let dir = scratch("links");
+        let (base, built) = (dir.join("base"), dir.join("built"));
+        for d in [&base, &built] {
+            std::fs::create_dir_all(d.join("res/sub")).unwrap();
+            std::fs::write(d.join("res/sub/same.bin"), vec![7u8; 200_000]).unwrap();
+        }
+        std::fs::write(base.join("horizon-client.exe"), "old").unwrap();
+        std::fs::write(built.join("horizon-client.exe"), "new").unwrap();
+        std::fs::write(base.join("res/other.txt"), "aaaa").unwrap();
+        std::fs::write(built.join("res/other.txt"), "aaab").unwrap();
+        assert_eq!(link_to_base(&built, &base), 200_000);
+        assert_eq!(std::fs::read(built.join("res/sub/same.bin")).unwrap(), vec![7u8; 200_000]);
+        assert_eq!(std::fs::read_to_string(built.join("horizon-client.exe")).unwrap(), "new");
+        assert_eq!(std::fs::read_to_string(built.join("res/other.txt")).unwrap(), "aaab");
+        assert!(!built.join("res/sub/same.bin.resincraft-link").exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn store_keys_are_plain_names() {
+        let key = store_key(&"ab12".repeat(16));
+        assert_eq!(key.len(), 24);
+        assert!(plain_name(&key));
     }
 
     #[test]
