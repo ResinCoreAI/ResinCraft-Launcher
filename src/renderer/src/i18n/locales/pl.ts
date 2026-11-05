@@ -3740,6 +3740,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "Zrealizuj",
   "servers.relayPlan.redeemed": "Kod podarunkowy dodano do {account}",
   "engine.hostRelay.codeInvalid": "Ten kod nie działa: {error}",
+  "servers.relayNames.goToRemoteHint": "Żaden serwer na tym PC go nie używa: szuka na Twoich innych PC ze zdalnym sterowaniem",
+  "servers.relayNames.openedOn": "Otwarto na {pc}",
+  "servers.relayNames.notFound": "Żaden serwer na tym ani innych Twoich PC nie używa tej nazwy",
+  "servers.settings.deleteReleasesName": "Jego adres ResinCraft {name} też zostanie zwolniony, chyba że jest teraz online na innym PC.",
+  "servers.people.full": "Pełna kontrola",
+  "servers.people.fullHint": "Także pliki i Java serwerów, do których ma dostęp (Menedżer także argumenty uruchamiania i tokeny). Twoje konto zawsze ma pełną kontrolę.",
 }
 
 export default dict

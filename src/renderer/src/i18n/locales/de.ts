@@ -3688,6 +3688,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "Einlösen",
   "servers.relayPlan.redeemed": "Geschenkcode zu {account} hinzugefügt",
   "engine.hostRelay.codeInvalid": "Dieser Code funktioniert nicht: {error}",
+  "servers.relayNames.goToRemoteHint": "Kein Server auf diesem PC nutzt ihn: sucht auf deinen anderen PCs mit Fernsteuerung",
+  "servers.relayNames.openedOn": "Auf {pc} geöffnet",
+  "servers.relayNames.notFound": "Kein Server auf diesem oder deinen anderen PCs nutzt diesen Namen",
+  "servers.settings.deleteReleasesName": "Seine ResinCraft-Adresse {name} wird auch freigegeben, außer sie ist gerade auf einem anderen PC online.",
+  "servers.people.full": "Volle Kontrolle",
+  "servers.people.fullHint": "Auch die Dateien und Java der Server, die sie erreichen (ein Manager auch Startargumente und Tokens). Dein eigenes Konto hat immer volle Kontrolle.",
 }
 
 export default dict

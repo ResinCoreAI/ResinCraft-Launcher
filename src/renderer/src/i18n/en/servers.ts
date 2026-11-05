@@ -942,5 +942,11 @@ export default {
   "servers.relayPlan.giftCode": "Gift code",
   "servers.relayPlan.giftPlaceholder": "Gift code (XXXX-XXXX-XXXX)",
   "servers.relayPlan.redeem": "Redeem",
-  "servers.relayPlan.redeemed": "Gift code added to {account}"
+  "servers.relayPlan.redeemed": "Gift code added to {account}",
+  "servers.relayNames.goToRemoteHint": "No server on this PC uses it: looks on your other PCs with remote control on",
+  "servers.relayNames.openedOn": "Opened on {pc}",
+  "servers.relayNames.notFound": "No server on this PC or your other PCs uses this name",
+  "servers.settings.deleteReleasesName": "Its ResinCraft address {name} is released too, unless it is online on another PC right now.",
+  "servers.people.full": "Full control",
+  "servers.people.fullHint": "Also the files and Java of the servers they reach (a Manager also launch arguments and tokens). Your own account always has full control."
 }

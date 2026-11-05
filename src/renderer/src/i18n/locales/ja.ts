@@ -3671,6 +3671,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "引き換える",
   "servers.relayPlan.redeemed": "{account} にギフトコードを追加しました",
   "engine.hostRelay.codeInvalid": "そのコードは使えません: {error}",
+  "servers.relayNames.goToRemoteHint": "この PC のサーバーは使っていません。リモート操作が有効な他の PC を探します",
+  "servers.relayNames.openedOn": "{pc} で開きました",
+  "servers.relayNames.notFound": "この PC や他の PC のサーバーはこの名前を使っていません",
+  "servers.settings.deleteReleasesName": "ResinCraft のアドレス {name} も解放されます（今ほかの PC でオンラインの場合を除く）。",
+  "servers.people.full": "フルコントロール",
+  "servers.people.fullHint": "対象サーバーのファイルと Java も操作できます（マネージャーは起動引数とトークンも）。自分のアカウントは常にフルコントロールです。",
 }
 
 export default dict

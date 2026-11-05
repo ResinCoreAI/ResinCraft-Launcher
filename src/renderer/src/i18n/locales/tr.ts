@@ -3684,6 +3684,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "Kullan",
   "servers.relayPlan.redeemed": "Hediye kodu {account} hesabına eklendi",
   "engine.hostRelay.codeInvalid": "Bu kod çalışmıyor: {error}",
+  "servers.relayNames.goToRemoteHint": "Bu bilgisayardaki hiçbir sunucu kullanmıyor: uzaktan kontrolü açık diğer bilgisayarlarınızda arar",
+  "servers.relayNames.openedOn": "{pc} üzerinde açıldı",
+  "servers.relayNames.notFound": "Bu veya diğer bilgisayarlarınızdaki hiçbir sunucu bu adı kullanmıyor",
+  "servers.settings.deleteReleasesName": "ResinCraft adresi {name} de serbest bırakılır; şu anda başka bir bilgisayarda çevrimiçiyse bırakılmaz.",
+  "servers.people.full": "Tam kontrol",
+  "servers.people.fullHint": "Erişebildiği sunucuların dosyaları ve Java'sı da (Yönetici ayrıca başlatma argümanları ve tokenlar). Kendi hesabınız her zaman tam kontrole sahiptir.",
 }
 
 export default dict

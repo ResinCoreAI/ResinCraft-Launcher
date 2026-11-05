@@ -112,6 +112,10 @@ pub struct Grant {
     /// The servers it reaches (None: all of this PC's servers).
     #[serde(default)]
     pub servers: Option<Vec<String>>,
+    /// Full control on the servers it reaches, as far as its role goes: their files, Java and its arguments. Off
+    /// unless the owner switches it on for this person (the owner's own account always has it).
+    #[serde(default)]
+    pub full_control: bool,
 }
 
 const ROLES: &[&str] = &["viewer", "operator", "manager"];
@@ -239,9 +243,24 @@ fn check_shared(method: &str, params: &Value, g: &Grant) -> Result<()> {
         if g.role == "manager" && matches!(method, "versions.list" | "content.versions") {
             return Ok(());
         }
+        // With full control from the owner: a shared server's own files, and where Java is (`check` decided the rest).
+        if g.full_control {
+            if method == "java.list" {
+                return Ok(());
+            }
+            if method.starts_with("files.") {
+                let id = params.get(0).and_then(|r| r["id"].as_str()).unwrap_or_default();
+                if in_scope(g, id) {
+                    return Ok(());
+                }
+                bail!("The owner of this PC hasn't shared that server with you.");
+            }
+        }
         bail!("The owner of this PC hasn't given you access to that.");
     };
-    if !role_allows(&g.role, name) {
+    // A Manager with full control also gets the server actions that need it (launch arguments, tokens…).
+    let full_extra = g.full_control && g.role == "manager" && SERVER_FULL.contains(&name);
+    if !role_allows(&g.role, name) && !full_extra {
         bail!("Your access to this PC ({}) doesn't include that. Ask its owner.", role_name(&g.role));
     }
     if !NO_SERVER.contains(&name) && !in_scope(g, &id_of(params)?) {
@@ -543,8 +562,8 @@ async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> 
         Some(uuid) => Some(grant_of(uuid).ok_or_else(|| anyhow::anyhow!("This PC doesn't share its servers with you any more."))?),
         None => None,
     };
-    // Full control is the owner's alone.
-    let full = grant.is_none() && crate::core::settings::get().await.remote_full_control;
+    // Full control: the owner's own account always; another account when the owner gave it to that person.
+    let full = grant.as_ref().is_none_or(|g| g.full_control);
     let params = if params.is_array() { params } else { json!([]) };
     check(method, &params, full)?;
     if let Some(g) = &grant {
@@ -574,7 +593,10 @@ async fn call(method: &str, params: Value, from: Option<&str>) -> Result<Value> 
         }
         "server.update" => {
             let id = id_of(&params)?;
-            let allowed = |k: &str| if grant.is_some() { SHARED_PATCH.contains(&k) } else { SAFE_PATCH.contains(&k) || (full && FULL_PATCH.contains(&k)) };
+            let allowed = |k: &str| {
+                let base = if grant.is_some() { SHARED_PATCH.contains(&k) } else { SAFE_PATCH.contains(&k) };
+                base || (full && FULL_PATCH.contains(&k))
+            };
             let patch: serde_json::Map<String, Value> =
                 arg(&params, 1).as_object().map(|o| o.iter().filter(|(k, _)| allowed(k)).map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
             public_server(dispatch("server:update", Args::new(vec![json!(id), Value::Object(patch)])).await?, full)
@@ -710,6 +732,7 @@ mod tests {
             name: "Bob".into(),
             role: role.into(),
             servers: servers.map(|s| s.into_iter().map(String::from).collect()),
+            full_control: false,
         };
         let ok = |m: &str, p: Value, g: &Grant| check_shared(m, &p, g).is_ok();
         let viewer = g("viewer", Some(vec!["smp"]));
@@ -726,11 +749,19 @@ mod tests {
             assert!(!ok(owner_only, json!(["smp"]), &manager), "{owner_only}");
         }
         assert!(!ok("server.start", json!([]), &operator), "a server has to be named");
+        // Full control from the owner: the shared servers' files and Java; a Manager also their launch arguments.
+        let trusted = Grant { full_control: true, ..manager.clone() };
+        assert!(ok("files.list", json!([{ "kind": "server", "id": "smp" }, ""]), &trusted) && ok("java.list", json!([]), &trusted));
+        assert!(ok("server.launchArgs", json!(["smp"]), &trusted));
+        assert!(!ok("files.list", json!([{ "kind": "server", "id": "other" }, ""]), &trusted), "only shared servers");
+        assert!(!ok("server.remove", json!(["smp"]), &trusted) && !ok("server.create", json!([]), &trusted), "still never deleting or making");
+        let trusted_viewer = Grant { full_control: true, ..viewer.clone() };
+        assert!(ok("files.list", json!([{ "kind": "server", "id": "smp" }, ""]), &trusted_viewer) && !ok("server.launchArgs", json!(["smp"]), &trusted_viewer));
     }
 
     #[test]
     fn updates_reach_other_accounts_only_for_their_servers() {
-        *GRANTS.lock().unwrap() = vec![Grant { uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5".into(), name: "Bob".into(), role: "viewer".into(), servers: Some(vec!["smp".into()]) }];
+        *GRANTS.lock().unwrap() = vec![Grant { uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5".into(), name: "Bob".into(), role: "viewer".into(), servers: Some(vec!["smp".into()]), full_control: false }];
         let bob = "as:069a79f444e94726a5befca90e38aaf5";
         let watched: HashSet<String> = ["servers".to_string(), format!("{bob}:servers"), format!("{bob}:log:smp"), format!("{bob}:log:other"), "as:ffffffffffffffffffffffffffffffff:servers".into()].into();
         let mut r = route(&watched, "servers", Some("smp"));

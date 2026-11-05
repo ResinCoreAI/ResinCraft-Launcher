@@ -3661,6 +3661,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "兌換",
   "servers.relayPlan.redeemed": "禮物碼已加入 {account}",
   "engine.hostRelay.codeInvalid": "此代碼無效：{error}",
+  "servers.relayNames.goToRemoteHint": "此電腦上沒有伺服器使用它：將在你開啟遠端控制的其他電腦上尋找",
+  "servers.relayNames.openedOn": "已在 {pc} 上開啟",
+  "servers.relayNames.notFound": "此電腦和你的其他電腦上都沒有伺服器使用這個名稱",
+  "servers.settings.deleteReleasesName": "它的 ResinCraft 位址 {name} 也會被釋放，除非它此刻正在另一台電腦上線上。",
+  "servers.people.full": "完全控制",
+  "servers.people.fullHint": "還包括其可存取伺服器的檔案與 Java（管理者另含啟動參數與權杖）。你自己的帳號始終擁有完全控制。",
 }
 
 export default dict

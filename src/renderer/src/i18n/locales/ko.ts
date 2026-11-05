@@ -3666,6 +3666,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "사용",
   "servers.relayPlan.redeemed": "{account}에 선물 코드를 추가했습니다",
   "engine.hostRelay.codeInvalid": "이 코드는 사용할 수 없습니다: {error}",
+  "servers.relayNames.goToRemoteHint": "이 PC의 서버가 사용하지 않습니다. 원격 제어가 켜진 다른 PC에서 찾습니다",
+  "servers.relayNames.openedOn": "{pc}에서 열었습니다",
+  "servers.relayNames.notFound": "이 PC나 다른 PC의 서버가 이 이름을 사용하지 않습니다",
+  "servers.settings.deleteReleasesName": "ResinCraft 주소 {name}도 해제됩니다(지금 다른 PC에서 온라인인 경우 제외).",
+  "servers.people.full": "전체 제어",
+  "servers.people.fullHint": "접근 가능한 서버의 파일과 Java도 다룰 수 있습니다(관리자는 실행 인수와 토큰도). 내 계정은 항상 전체 제어입니다.",
 }
 
 export default dict

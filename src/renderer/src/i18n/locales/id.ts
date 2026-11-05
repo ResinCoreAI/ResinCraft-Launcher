@@ -3674,6 +3674,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "Tukarkan",
   "servers.relayPlan.redeemed": "Kode hadiah ditambahkan ke {account}",
   "engine.hostRelay.codeInvalid": "Kode itu tidak berlaku: {error}",
+  "servers.relayNames.goToRemoteHint": "Tidak ada server di PC ini yang memakainya: mencari di PC lain Anda dengan kontrol jarak jauh",
+  "servers.relayNames.openedOn": "Dibuka di {pc}",
+  "servers.relayNames.notFound": "Tidak ada server di PC ini atau PC lain Anda yang memakai nama ini",
+  "servers.settings.deleteReleasesName": "Alamat ResinCraft-nya {name} juga dilepas, kecuali sedang online di PC lain.",
+  "servers.people.full": "Kontrol penuh",
+  "servers.people.fullHint": "Juga file dan Java server yang bisa dijangkau (Manager juga argumen peluncuran dan token). Akun Anda sendiri selalu punya kontrol penuh.",
 }
 
 export default dict

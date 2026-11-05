@@ -3663,6 +3663,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "แลกใช้",
   "servers.relayPlan.redeemed": "เพิ่มโค้ดของขวัญให้ {account} แล้ว",
   "engine.hostRelay.codeInvalid": "ใช้โค้ดนี้ไม่ได้: {error}",
+  "servers.relayNames.goToRemoteHint": "ไม่มีเซิร์ฟเวอร์บนพีซีนี้ใช้ชื่อนี้ จะค้นหาในพีซีเครื่องอื่นของคุณที่เปิดการควบคุมระยะไกล",
+  "servers.relayNames.openedOn": "เปิดบน {pc} แล้ว",
+  "servers.relayNames.notFound": "ไม่มีเซิร์ฟเวอร์บนพีซีนี้หรือพีซีเครื่องอื่นของคุณใช้ชื่อนี้",
+  "servers.settings.deleteReleasesName": "ที่อยู่ ResinCraft {name} จะถูกคืนด้วย เว้นแต่กำลังออนไลน์อยู่บนพีซีเครื่องอื่น",
+  "servers.people.full": "ควบคุมเต็มรูปแบบ",
+  "servers.people.fullHint": "รวมถึงไฟล์และ Java ของเซิร์ฟเวอร์ที่เข้าถึงได้ (Manager ได้อาร์กิวเมนต์การเปิดและโทเค็นด้วย) บัญชีของคุณเองควบคุมได้เต็มที่เสมอ",
 }
 
 export default dict

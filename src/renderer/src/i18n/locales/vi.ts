@@ -3671,6 +3671,12 @@ const dict: Dict = {
   "servers.relayPlan.redeem": "Đổi mã",
   "servers.relayPlan.redeemed": "Đã thêm mã quà tặng cho {account}",
   "engine.hostRelay.codeInvalid": "Mã này không dùng được: {error}",
+  "servers.relayNames.goToRemoteHint": "Không máy chủ nào trên PC này dùng: tìm trên các PC khác của bạn có bật điều khiển từ xa",
+  "servers.relayNames.openedOn": "Đã mở trên {pc}",
+  "servers.relayNames.notFound": "Không máy chủ nào trên PC này hay các PC khác của bạn dùng tên này",
+  "servers.settings.deleteReleasesName": "Địa chỉ ResinCraft {name} cũng được giải phóng, trừ khi đang trực tuyến trên PC khác.",
+  "servers.people.full": "Toàn quyền",
+  "servers.people.fullHint": "Cả tệp và Java của các máy chủ họ truy cập được (Quản lý thêm tham số khởi chạy và token). Tài khoản của bạn luôn có toàn quyền.",
 }
 
 export default dict
