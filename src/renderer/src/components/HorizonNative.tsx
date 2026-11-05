@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Code, Hammer, Loader2, Play, Trash2 } from 'lucide-react'
 import type { Instance, NativeCacheInfo, NativeStatus } from '@shared/types'
 import { api } from '../api'
@@ -87,19 +87,26 @@ export function NativeBuildDialog({ instanceId, onDone, offerSkip }: { instanceI
     return () => window.clearInterval(timer)
   }, [phase])
 
+  // Closed while it builds: the build goes on (in Tasks), and nothing here answers again when it ends.
+  const closed = useRef(false)
   const build = async () => {
     setPhase('building')
     try {
       await api.horizon.nativeBuild(instanceId, true)
+      if (closed.current) return
       setPhase('done')
       onDone('built')
     } catch (e) {
+      if (closed.current) return
       setError(engineError(e).message)
       setPhase('failed')
     }
   }
 
-  const close = () => (phase === 'building' ? undefined : onDone('cancel'))
+  const close = () => {
+    closed.current = true
+    onDone('cancel')
+  }
   const name = inst?.name ?? instanceId
   const why =
     status?.need === 'modsChanged' ? t('native.need.modsChanged') : status?.need === 'baseChanged' ? t('native.need.baseChanged') : t('native.need.firstBuild')
@@ -136,6 +143,10 @@ export function NativeBuildDialog({ instanceId, onDone, offerSkip }: { instanceI
               </button>
             )}
           </>
+        ) : phase === 'building' ? (
+          <button className="btn ghost" onClick={close}>
+            {t('common.close')}
+          </button>
         ) : undefined
       }
     >
@@ -206,6 +217,12 @@ export function NativeBuildBar({ inst, changed }: { inst: Instance; changed: unk
   const [open, setOpen] = useState(false)
   const load = useCallback(() => void api.horizon.nativeStatus(inst.id).then(setStatus, () => {}), [inst.id])
   useEffect(load, [load, changed])
+  // A build that goes on after its window closed: the bar follows it until it ends.
+  useEffect(() => {
+    if (!status?.building || open) return
+    const timer = window.setInterval(load, 3000)
+    return () => window.clearInterval(timer)
+  }, [status?.building, open, load])
   if (!status || status.mods.length === 0) return null
   const fresh = status.need === 'upToDate'
   return (
