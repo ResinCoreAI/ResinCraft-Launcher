@@ -1,6 +1,7 @@
 // Fake server hosting for the browser preview (see mock.ts): a couple of servers, a simulated boot log,
 // console commands, players joining, and the router port opening.
-import type { RelayNameAccount,
+import type {
+  RelayNameAccount,
   AntiXray,
   ServerRequestsEvent,
   AddonSource,
@@ -39,7 +40,11 @@ function mockRelayBan(): EngineText | undefined {
   const until = Math.floor(Date.now() / 1000) + 3 * 86400 + 3600
   const base: EngineText =
     mode === 'banned'
-      ? { key: 'hostRelay.bannedUntil', text: "You're banned from ResinCraft Relay until 2026-10-24 18:00 UTC (in 3 days).", params: { date: { dateTime: until }, left: { timeLeft: until } } }
+      ? {
+          key: 'hostRelay.bannedUntil',
+          text: "You're banned from ResinCraft Relay until 2026-10-24 18:00 UTC (in 3 days).",
+          params: { date: { dateTime: until }, left: { timeLeft: until } }
+        }
       : { key: 'hostRelay.bannedForever', text: "You're banned from ResinCraft Relay permanently." }
   const reason = 'Griefing other servers through the relay'
   return { key: 'hostRelay.bannedReason', text: `${base.text} Reason: ${reason}`, params: { ban: base, reason } }
@@ -157,7 +162,9 @@ export function mockServers(): {
       modpack: { name: 'Create: Above and Beyond', projectId: MOCK_PACK, versionId: 'tech-1.5.0' },
       launch: { jar: 'fabric-server-launch.jar' },
       builtPack: true,
-      pendingDownloads: [{ title: 'Species', fileName: 'species-3.5.jar', url: 'https://www.curseforge.com/minecraft/mc-mods/species/files/5016536', folder: 'mods' }]
+      pendingDownloads: [
+        { title: 'Species', fileName: 'species-3.5.jar', url: 'https://www.curseforge.com/minecraft/mc-mods/species/files/5016536', folder: 'mods' }
+      ]
     },
     {
       ...base,
@@ -331,6 +338,136 @@ export function mockServers(): {
   const find = (id: string) => servers.find((s) => s.id === id)!
   // Relay names no server here uses, and the preview's request for more.
   let spareNames = ['old-smp']
+  // ResinCraft Relay plans (?plans=off: the relay sells nothing).
+  const plansOn = new URLSearchParams(location.search).get('plans') !== 'off'
+  const g = (servers: number, names: number, traffic_gb: number, unlimited_traffic = false, no_session_limit = false, whitelist_page = false) => ({
+    servers,
+    names,
+    traffic_gb,
+    unlimited_traffic,
+    no_session_limit,
+    whitelist_page
+  })
+  const PLAN_PRODUCTS = [
+    {
+      id: 'addon-server',
+      kind: 'addon',
+      name: '+1 server online',
+      description: 'One more server online through the relay at once',
+      grants: g(1, 0, 0),
+      monthly: 6900
+    },
+    { id: 'addon-name', kind: 'addon', name: '+1 name', description: 'One more reserved name', grants: g(0, 1, 0), monthly: 4900 },
+    { id: 'addon-traffic-20', kind: 'addon', name: '+20 GB traffic', description: '20 GB more traffic every month', grants: g(0, 0, 20), monthly: 1900 },
+    { id: 'addon-traffic-50', kind: 'addon', name: '+50 GB traffic', description: '50 GB more traffic every month', grants: g(0, 0, 50), monthly: 3900 },
+    { id: 'addon-traffic-100', kind: 'addon', name: '+100 GB traffic', description: '100 GB more traffic every month', grants: g(0, 0, 100), monthly: 7500 },
+    { id: 'addon-unlimited-traffic', kind: 'addon', name: 'Unlimited traffic', description: 'No monthly data cap', grants: g(0, 0, 0, true), monthly: 16900 },
+    {
+      id: 'addon-no-session-limit',
+      kind: 'addon',
+      name: 'No session limit',
+      description: 'Servers stay online without pressing Continue',
+      grants: g(0, 0, 0, false, true),
+      monthly: 9900
+    },
+    {
+      id: 'addon-whitelist-page',
+      kind: 'addon',
+      name: 'Whitelist page',
+      description: 'A whitelist request page for every name of the account',
+      grants: g(0, 0, 0, false, false, true),
+      monthly: 1900
+    },
+    { id: 'pack-99', kind: 'pack', name: '+1 server, +1 name', description: 'One more server online and one more name', grants: g(1, 1, 0), monthly: 9900 },
+    {
+      id: 'pack-199',
+      kind: 'pack',
+      name: '+1 server, +1 name, unlimited traffic',
+      description: 'One more server online, one more name and no data cap',
+      grants: g(1, 1, 0, true),
+      monthly: 19900
+    },
+    {
+      id: 'pack-219',
+      kind: 'pack',
+      name: 'Unlimited traffic + no session limit',
+      description: 'No data cap and no session time limit',
+      grants: g(0, 0, 0, true, true),
+      monthly: 21900
+    },
+    {
+      id: 'pack-259',
+      kind: 'pack',
+      name: '+1 server, +1 name, unlimited traffic, no session limit',
+      description: 'Everything but the whitelist page',
+      grants: g(1, 1, 0, true, true),
+      monthly: 25900
+    }
+  ].map((p) => ({ ...p, yearly: p.monthly * 10, owned: false }))
+  type MockSub = import('@shared/types').PlanSub
+  const planAccounts: { account: string; accountName: string; subs: MockSub[] }[] = [
+    { account: PUIRKLE, accountName: 'Puirkle', subs: [] },
+    {
+      account: '2b7c1a56-0d1e-4f7a-9a51-6f2f5d1d0b77',
+      accountName: 'Puirkle_Gamer',
+      subs: [
+        {
+          id: 'sub_mock_alt',
+          product: 'addon-unlimited-traffic',
+          name: 'Unlimited traffic',
+          yearly: false,
+          status: 'active',
+          active: true,
+          period_end: Math.floor(Date.now() / 1000) + 20 * 86400,
+          cancel_at_period_end: false,
+          amount: 16900,
+          paid: true
+        }
+      ]
+    }
+  ]
+  let planSeq = 0
+  const mockPlan = (a: (typeof planAccounts)[number]): import('@shared/types').PlanInfo => {
+    const have = g(0, 0, 0)
+    for (const s of a.subs.filter((x) => x.active)) {
+      const p = PLAN_PRODUCTS.find((x) => x.id === s.product)!.grants
+      have.servers += p.servers
+      have.names += p.names
+      have.traffic_gb += p.traffic_gb
+      have.unlimited_traffic ||= p.unlimited_traffic
+      have.no_session_limit ||= p.no_session_limit
+      have.whitelist_page ||= p.whitelist_page
+    }
+    const owned = (p: (typeof PLAN_PRODUCTS)[number]) => {
+      const x = p.grants
+      const counts = x.servers > 0 || x.names > 0 || x.traffic_gb > 0
+      return (
+        !counts &&
+        !((x.unlimited_traffic && !have.unlimited_traffic) || (x.no_session_limit && !have.no_session_limit) || (x.whitelist_page && !have.whitelist_page))
+      )
+    }
+    const on = plansOn
+    return {
+      enabled: on,
+      currency: 'thb',
+      publishable_key: on ? 'pk_mock' : '',
+      test_mode: true,
+      free: { servers: 1, names: 2, monthly_bytes: 30e9, bonus_bytes: 10e9, session_secs: 7200 },
+      products: on ? PLAN_PRODUCTS.map((p) => ({ ...p, owned: owned(p) })) : [],
+      mine: a.subs.slice().reverse(),
+      totals: on
+        ? {
+            servers: 1 + have.servers,
+            names: 2 + have.names,
+            monthly_bytes: have.unlimited_traffic ? 0 : (40 + have.traffic_gb) * 1e9,
+            unlimited_traffic: have.unlimited_traffic,
+            no_session_limit: have.no_session_limit,
+            whitelist_page: have.whitelist_page,
+            session_secs: have.no_session_limit ? 0 : 7200
+          }
+        : { servers: 3, names: 5, monthly_bytes: 0, unlimited_traffic: true, no_session_limit: true, whitelist_page: true, session_secs: 0 }
+    }
+  }
   let nameRequest: RelayNameAccount['request']
   /** Session fields for a mock relay tunnel; ?relay=warn|soon|low|out|unlimited|paused|off previews those states. */
   const previewSession = (): Partial<ResinNet> => {
@@ -348,7 +485,9 @@ export function mockServers(): {
   const continueSession = (id: string) => {
     const net = find(id).net
     if (!net?.resin) return
-    patch(id, { net: { ...net, resin: { ...net.resin, warning: undefined, soon: false, endsAt: Date.now() + 2 * 3600_000, continues: (net.resin.continues ?? 0) + 1 } } })
+    patch(id, {
+      net: { ...net, resin: { ...net.resin, warning: undefined, soon: false, endsAt: Date.now() + 2 * 3600_000, continues: (net.resin.continues ?? 0) + 1 } }
+    })
     fire(id)
   }
   const patch = (id: string, p: Partial<ServerInfo>) => (servers = servers.map((s) => (s.id === id ? { ...s, ...p } : s)))
@@ -545,7 +684,9 @@ export function mockServers(): {
           patch(id, { net })
           fire(id)
           later(id, 2500, () => {
-            patch(id, { net: { state: 'failed', error: ban.text, errorText: ban, resin: { name: relayName, usedBytes: 0, limitBytes: 0, banned: true, error: ban } } })
+            patch(id, {
+              net: { state: 'failed', error: ban.text, errorText: ban, resin: { name: relayName, usedBytes: 0, limitBytes: 0, banned: true, error: ban } }
+            })
             fire(id)
           })
           return
@@ -611,18 +752,18 @@ export function mockServers(): {
       const flags = pack
         ? pack
         : s.optimizedFlags
-        ? [
-            `-Xmx${mem}`,
-            '-Xms1024M',
-            '-XX:+UseG1GC',
-            '-XX:+ParallelRefProcEnabled',
-            '-XX:MaxGCPauseMillis=200',
-            '-XX:+UnlockExperimentalVMOptions',
-            '-XX:+DisableExplicitGC',
-            '-XX:+AlwaysPreTouch',
-            '-Dusing.aikars.flags=https://mcflags.emc.gs'
-          ]
-        : [`-Xmx${mem}`, '-Xms1024M']
+          ? [
+              `-Xmx${mem}`,
+              '-Xms1024M',
+              '-XX:+UseG1GC',
+              '-XX:+ParallelRefProcEnabled',
+              '-XX:MaxGCPauseMillis=200',
+              '-XX:+UnlockExperimentalVMOptions',
+              '-XX:+DisableExplicitGC',
+              '-XX:+AlwaysPreTouch',
+              '-Dusing.aikars.flags=https://mcflags.emc.gs'
+            ]
+          : [`-Xmx${mem}`, '-Xms1024M']
       return [...flags, ...(s.jvmArgs ? s.jvmArgs.split(' ') : []), '-jar', s.launch.jar ?? 'server.jar', 'nogui']
     },
     properties: () => wait(props),
@@ -719,7 +860,9 @@ export function mockServers(): {
           const versionId = by.get(a.filename)
           if (!versionId) return a
           const number = VERSIONS.find((x) => x.id === versionId)?.versionNumber ?? a.update?.versionNumber ?? versionId
-          return running ? { ...a, pending: 'update', pendingVersion: number, update: undefined } : { ...a, versionId, versionNumber: number, update: undefined, pending: undefined }
+          return running
+            ? { ...a, pending: 'update', pendingVersion: number, update: undefined }
+            : { ...a, versionId, versionNumber: number, update: undefined, pending: undefined }
         })
       )
       const names = list.map((x) => x.filename)
@@ -830,7 +973,8 @@ export function mockServers(): {
     },
     relayContinue: async (id) => {
       const resin = find(id).net?.resin
-      if (!resin?.warning && !(resin?.endsAt && resin.endsAt - Date.now() <= 15 * 60_000)) throw new Error("This server isn't online through ResinCraft Relay right now.")
+      if (!resin?.warning && !(resin?.endsAt && resin.endsAt - Date.now() <= 15 * 60_000))
+        throw new Error("This server isn't online through ResinCraft Relay right now.")
       continueSession(id)
     },
     relayTopUp: async (id) => {
@@ -880,6 +1024,76 @@ export function mockServers(): {
         names: list.map(entry),
         accounts: [{ account: PUIRKLE, accountName: 'Puirkle', used: list.length, limit: list.length, requestsOn: true, request: nameRequest }]
       }
+    },
+    relayPlans: async () => {
+      await wait(null, 300)
+      return { available: true, accounts: planAccounts.map((a) => ({ account: a.account, accountName: a.accountName, unsupported: false, plan: mockPlan(a) })) }
+    },
+    relayPlanRedeem: async (account, code) => {
+      await wait(null, 400)
+      if (code !== 'GIFT-2026') throw new Error("That code doesn't work: no such gift code")
+      const a = planAccounts.find((x) => x.account === account)!
+      a.subs.push({
+        id: `gift_mock_${++planSeq}`,
+        product: 'addon-whitelist-page',
+        name: 'Whitelist page',
+        yearly: false,
+        status: 'granted',
+        active: true,
+        period_end: Math.floor(Date.now() / 1000) + 30 * 86400,
+        cancel_at_period_end: false,
+        amount: 0,
+        paid: false
+      })
+      return mockPlan(a)
+    },
+    relayPlanBuy: async (account, product, yearly) => {
+      await wait(null, 500)
+      const a = planAccounts.find((x) => x.account === account)!
+      const p = PLAN_PRODUCTS.find((x) => x.id === product)
+      if (!p) throw new Error("That isn't for sale, or this account has it already.")
+      const id = `sub_mock_${++planSeq}`
+      a.subs.push({
+        id,
+        product,
+        name: p.name,
+        yearly,
+        status: 'incomplete',
+        active: false,
+        period_end: 0,
+        cancel_at_period_end: false,
+        amount: yearly ? p.yearly : p.monthly,
+        paid: true
+      })
+      return { sub: id, client_secret: 'mock_secret', intent: 'payment', publishable_key: 'pk_mock', amount: yearly ? p.yearly : p.monthly, currency: 'thb' }
+    },
+    relayPlanChange: async (account, sub, product, yearly) => {
+      await wait(null, 500)
+      const s = planAccounts.find((x) => x.account === account)!.subs.find((x) => x.id === sub)!
+      const p = PLAN_PRODUCTS.find((x) => x.id === product)!
+      Object.assign(s, { product, name: p.name, yearly, amount: yearly ? p.yearly : p.monthly })
+      return { sub, client_secret: null, intent: 'none', publishable_key: 'pk_mock', amount: 0, currency: 'thb' }
+    },
+    relayPlanCancel: async (account, sub, resume) => {
+      await wait(null, 400)
+      const a = planAccounts.find((x) => x.account === account)!
+      a.subs.find((x) => x.id === sub)!.cancel_at_period_end = !resume
+      return mockPlan(a)
+    },
+    relayPlanPay: async (_account, sub) => ({
+      sub,
+      client_secret: 'mock_secret',
+      intent: 'payment',
+      publishable_key: 'pk_mock',
+      amount: 6900,
+      currency: 'thb'
+    }),
+    relayPlanRefresh: async (account, sub) => {
+      await wait(null, 400)
+      const a = planAccounts.find((x) => x.account === account)!
+      const s = a.subs.find((x) => x.id === sub)!
+      Object.assign(s, { status: 'active', active: true, period_end: Math.floor(Date.now() / 1000) + (s.yearly ? 365 : 30) * 86400 })
+      return mockPlan(a)
     },
     relayRevoke: async (_account, name) => {
       await wait(null, 400)

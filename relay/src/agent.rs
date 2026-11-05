@@ -477,6 +477,73 @@ impl Connection {
         }
     }
 
+    /// Whether this relay has paid plans (protocol 11).
+    pub fn has_plans(&self) -> bool {
+        self.relay_version >= crate::proto::PAYMENTS_PROTOCOL_VERSION
+    }
+
+    async fn plan_call(&mut self, msg: AgentMsg) -> Result<RelayMsg, AgentError> {
+        if !self.has_plans() {
+            return Err(AgentError::Refused(ErrorCode::PaymentsOff, "this relay has no paid plans".into()));
+        }
+        self.send(&msg).await?;
+        self.recv().await
+    }
+
+    async fn plan_info(&mut self, msg: AgentMsg) -> Result<crate::proto::PlanInfo, AgentError> {
+        match self.plan_call(msg).await? {
+            RelayMsg::Plan { plan } => Ok(plan),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    async fn pay_step(&mut self, msg: AgentMsg) -> Result<crate::proto::PayStep, AgentError> {
+        match self.plan_call(msg).await? {
+            RelayMsg::Pay { pay } => Ok(pay),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// The relay's plans, and what this account has.
+    pub async fn plan(&mut self) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::Plan).await
+    }
+
+    /// Starts buying a product: what the payment form needs.
+    pub async fn plan_buy(&mut self, product: &str, yearly: bool) -> Result<crate::proto::PayStep, AgentError> {
+        self.plan_buy_with(product, yearly, None).await
+    }
+
+    /// The same with a promo code.
+    pub async fn plan_buy_with(&mut self, product: &str, yearly: bool, promo: Option<&str>) -> Result<crate::proto::PayStep, AgentError> {
+        self.pay_step(AgentMsg::PlanBuy { product: product.into(), yearly, promo: promo.map(str::to_string) }).await
+    }
+
+    /// Redeems a gift code for this account.
+    pub async fn plan_redeem(&mut self, code: &str) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::PlanRedeem { code: code.into() }).await
+    }
+
+    /// Moves a subscription to another product or period (prorated, invoiced now).
+    pub async fn plan_change(&mut self, sub: &str, product: &str, yearly: bool) -> Result<crate::proto::PayStep, AgentError> {
+        self.pay_step(AgentMsg::PlanChange { sub: sub.into(), product: product.into(), yearly }).await
+    }
+
+    /// Cancels a subscription at the end of its period, or (`resume`) keeps it.
+    pub async fn plan_cancel(&mut self, sub: &str, resume: bool) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::PlanCancel { sub: sub.into(), resume }).await
+    }
+
+    /// A subscription's open invoice, for the payment form.
+    pub async fn plan_pay(&mut self, sub: &str) -> Result<crate::proto::PayStep, AgentError> {
+        self.pay_step(AgentMsg::PlanPay { sub: sub.into() }).await
+    }
+
+    /// Reads a subscription from Stripe again (after paying).
+    pub async fn plan_refresh(&mut self, sub: &str) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::PlanRefresh { sub: sub.into() }).await
+    }
+
     /// Whether this relay can list the account's names (protocol 10).
     pub fn has_names(&self) -> bool {
         self.relay_version >= NAMES_PROTOCOL_VERSION

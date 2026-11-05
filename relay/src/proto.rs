@@ -56,12 +56,18 @@
 //! Protocol 10 adds `names_mine`, answered with `my_names`: the account's reserved names and how many it may have.
 //! `name_request` asks the admin for more of them (answered `name_requested`), when the admin takes such requests.
 //! `listing_appeal` asks the admin to look at a hidden listing again, and a listing the admin removed reads `removed`.
+//!
+//! Protocol 11 adds paid plans: `plan` (answered with `plan`) says whether the relay sells anything, what, and what
+//! the account has; `plan_buy` starts a subscription and `plan_change` / `plan_pay` move or pay one (answered with
+//! `pay`, whose client secret the launcher's own payment form confirms with Stripe); `plan_cancel` cancels or resumes
+//! one at the end of its period, and `plan_refresh` re-reads one from Stripe after a payment. Older launchers never
+//! hear about any of it.
 
 use serde::{Deserialize, Serialize};
 
 /// The protocol this code speaks; the relay answers versions outside MIN_PROTOCOL_VERSION..=PROTOCOL_VERSION
 /// with `version`.
-pub const PROTOCOL_VERSION: u32 = 10;
+pub const PROTOCOL_VERSION: u32 = 11;
 /// The first protocol with Bedrock (UDP) tunnels.
 pub const BEDROCK_PROTOCOL_VERSION: u32 = 3;
 /// The first protocol with data top-ups.
@@ -78,6 +84,8 @@ pub const LISTINGS_PROTOCOL_VERSION: u32 = 8;
 pub const SHARE_PROTOCOL_VERSION: u32 = 9;
 /// The first protocol where an account can list its reserved names.
 pub const NAMES_PROTOCOL_VERSION: u32 = 10;
+/// The first protocol with paid plans (add-ons and packs).
+pub const PAYMENTS_PROTOCOL_VERSION: u32 = 11;
 /// Longest `call_result` / `push` line (results and log batches can be bigger than other messages).
 pub const MAX_REMOTE_LINE: usize = 1024 * 1024;
 /// The oldest launcher protocol the relay still serves (launcher 0.3).
@@ -223,6 +231,29 @@ pub enum AgentMsg {
     ViewCall { id: u64, device: u64, method: String, params: serde_json::Value },
     /// Start or stop live updates for `topic` from remote launcher `device` (`view_push`). Protocol 9.
     ViewWatch { device: u64, topic: String, on: bool },
+    /// The relay's plans and what this account has. Protocol 11.
+    Plan,
+    /// Buy a product (monthly, or yearly): answered with `pay`. Protocol 11.
+    PlanBuy {
+        product: String,
+        yearly: bool,
+        /// A promo code for a discount.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        promo: Option<String>,
+    },
+    /// Redeem a gift code: answered with `plan`. Protocol 11.
+    PlanRedeem { code: String },
+    /// Move one of the account's subscriptions to another product or period (prorated): answered with `pay`.
+    /// Protocol 11.
+    PlanChange { sub: String, product: String, yearly: bool },
+    /// Cancel a subscription at the end of its period, or (`resume`) keep it after all: answered with `plan`.
+    /// Protocol 11.
+    PlanCancel { sub: String, resume: bool },
+    /// Pay a subscription's open invoice (a failed renewal, or one never paid): answered with `pay`. Protocol 11.
+    PlanPay { sub: String },
+    /// Read a subscription from Stripe again (after the payment form says it went through): answered with `plan`.
+    /// Protocol 11.
+    PlanRefresh { sub: String },
     Ping { seq: u64 },
 }
 
@@ -521,6 +552,10 @@ pub enum RelayMsg {
     },
     /// The answer to `files_offer`: players' downloads of those files come to this connection now. Protocol 8.
     FilesReady {},
+    /// The answer to `plan`, `plan_cancel` and `plan_refresh`. Protocol 11.
+    Plan { plan: PlanInfo },
+    /// What the launcher's payment form needs. Protocol 11.
+    Pay { pay: PayStep },
     Pong { seq: u64 },
     /// The answer to `remote {enabled: true}`: this launcher is listed for its account's console. Protocol 6.
     RemoteReady {
@@ -706,6 +741,15 @@ pub enum ErrorCode {
     AdminDenied,
     /// The dashboard user has 2FA on: a code is needed, or the one sent was wrong. Protocol 8.
     AdminTwoFactor,
+    /// The relay doesn't sell anything right now (everything a purchase would give is free). Protocol 11.
+    PaymentsOff,
+    /// Not a product on sale, or one the account already has (unlimited traffic, no session limit and the
+    /// whitelist page are had once). Protocol 11.
+    NotForSale,
+    /// Stripe refused or couldn't be reached (the message says why). Protocol 11.
+    PaymentFailed,
+    /// A promo or gift code that doesn't work (the message says why). Protocol 11.
+    CodeInvalid,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -1007,6 +1051,152 @@ fn civil(unix_secs: u64) -> (i64, i64, i64) {
 
 pub fn now_secs() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+/// What a product gives an account, on top of the free plan. Counts add up over everything it has; the switches are
+/// on when any of its products has them. Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Grants {
+    /// More servers online at once.
+    pub servers: u32,
+    /// More reserved names.
+    pub names: u32,
+    /// More traffic every month, in GB (10^9 bytes).
+    pub traffic_gb: u32,
+    /// No monthly data cap.
+    pub unlimited_traffic: bool,
+    /// No session time limit (nothing to Continue).
+    pub no_session_limit: bool,
+    /// Whitelist pages for every name of the account.
+    pub whitelist_page: bool,
+}
+
+impl Grants {
+    /// These plus `other` (`times` of it).
+    pub fn add(&mut self, other: &Grants, times: u32) {
+        self.servers = self.servers.saturating_add(other.servers.saturating_mul(times));
+        self.names = self.names.saturating_add(other.names.saturating_mul(times));
+        self.traffic_gb = self.traffic_gb.saturating_add(other.traffic_gb.saturating_mul(times));
+        self.unlimited_traffic |= other.unlimited_traffic;
+        self.no_session_limit |= other.no_session_limit;
+        self.whitelist_page |= other.whitelist_page;
+    }
+
+    /// Only switches `have` already has: buying this again would add nothing.
+    pub fn adds_nothing_to(&self, have: &Grants) -> bool {
+        let counts = self.servers > 0 || self.names > 0 || self.traffic_gb > 0;
+        let new_switch = (self.unlimited_traffic && !have.unlimited_traffic) || (self.no_session_limit && !have.no_session_limit) || (self.whitelist_page && !have.whitelist_page);
+        !counts && !new_switch
+    }
+}
+
+/// The relay's plans as one account sees them (`plan`). Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PlanInfo {
+    /// The relay sells add-ons and packs. Off: nothing is for sale and everything a purchase would give is free.
+    pub enabled: bool,
+    /// ISO currency, lowercase ("thb").
+    pub currency: String,
+    /// Stripe's publishable key for the launcher's payment form (empty: payments can't be taken).
+    pub publishable_key: String,
+    /// Stripe test mode: no real money moves.
+    pub test_mode: bool,
+    /// What every account gets.
+    pub free: FreePlanInfo,
+    /// What's for sale (empty while payments are off).
+    pub products: Vec<ProductInfo>,
+    /// The account's subscriptions (and the admin's grants), newest first.
+    pub mine: Vec<MySub>,
+    /// What the account has now, everything counted.
+    pub totals: PlanTotals,
+}
+
+/// The free plan (while payments are on). Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FreePlanInfo {
+    pub servers: u32,
+    pub names: u32,
+    /// Traffic every month, without the bonus (0: no cap).
+    pub monthly_bytes: u64,
+    /// The bonus on top, every month.
+    pub bonus_bytes: u64,
+    /// One session's length (0: no limit).
+    pub session_secs: u64,
+}
+
+/// One product for sale. Prices are in the currency's smallest unit (satang: 6900 is 69 baht). Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ProductInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    /// "addon" or "pack".
+    pub kind: String,
+    pub grants: Grants,
+    /// 0: not sold monthly.
+    pub monthly: u64,
+    /// 0: not sold yearly.
+    pub yearly: u64,
+    /// The account has everything it gives already (switches only): it can't be bought again.
+    pub owned: bool,
+}
+
+/// One of the account's subscriptions, or a product the admin gave it. Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct MySub {
+    pub id: String,
+    pub product: String,
+    pub name: String,
+    pub yearly: bool,
+    /// Stripe's status: "active", "trialing", "past_due" (a renewal failed; it still works while Stripe retries),
+    /// "incomplete" (not paid yet), "canceled", "unpaid"; "granted" for the admin's.
+    pub status: String,
+    /// It gives its grants now.
+    pub active: bool,
+    /// When the paid period ends (Unix seconds; 0: never, for some of the admin's).
+    pub period_end: u64,
+    /// It ends then instead of renewing.
+    pub cancel_at_period_end: bool,
+    /// The price per period, smallest unit.
+    pub amount: u64,
+    /// Bought through Stripe (the account can cancel or change it); false: given by the admin.
+    pub paid: bool,
+}
+
+/// What an account has, everything counted. Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PlanTotals {
+    pub servers: u32,
+    pub names: u32,
+    /// This month's cap (0: none).
+    pub monthly_bytes: u64,
+    pub unlimited_traffic: bool,
+    pub no_session_limit: bool,
+    pub whitelist_page: bool,
+    /// One session's length (0: no limit).
+    pub session_secs: u64,
+}
+
+/// What the launcher's payment form needs (`pay`). Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PayStep {
+    /// The subscription it's for.
+    pub sub: String,
+    /// The payment to confirm with Stripe.js (None: nothing to pay now, e.g. a downgrade's credit: `plan_refresh`).
+    pub client_secret: Option<String>,
+    /// "payment" (a PaymentIntent) or "setup" (a SetupIntent, when nothing is charged now).
+    pub intent: String,
+    pub publishable_key: String,
+    /// What's charged now, smallest unit.
+    pub amount: u64,
+    pub currency: String,
 }
 
 #[cfg(test)]
