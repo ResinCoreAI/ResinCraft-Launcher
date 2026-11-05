@@ -2625,7 +2625,9 @@ export interface ResinApi {
     /** Every signed-in Microsoft account's ResinCraft Relay plan, and what the relay sells. */
     relayPlans(): Promise<RelayPlans>
     /** Starts buying a product for an account: what the payment form needs. */
-    relayPlanBuy(account: string, product: string, yearly: boolean): Promise<PayStep>
+    relayPlanBuy(account: string, product: string, yearly: boolean, promo?: string | null): Promise<PayStep>
+    /** Redeems a gift code for an account. */
+    relayPlanRedeem(account: string, code: string): Promise<PlanInfo>
     /** Moves a subscription to another product or period (prorated). */
     relayPlanChange(account: string, sub: string, product: string, yearly: boolean): Promise<PayStep>
     /** Cancels a subscription at the end of its period, or (resume) keeps it. */

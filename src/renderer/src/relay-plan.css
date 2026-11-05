@@ -99,3 +99,13 @@
   width: 13px;
   height: 13px;
 }
+
+.rp-redeem {
+  gap: 8px;
+  margin: 6px 0 4px;
+  max-width: 420px;
+}
+
+.rp-redeem .input {
+  flex: 1;
+}

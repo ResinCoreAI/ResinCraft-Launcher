@@ -511,7 +511,17 @@ impl Connection {
 
     /// Starts buying a product: what the payment form needs.
     pub async fn plan_buy(&mut self, product: &str, yearly: bool) -> Result<crate::proto::PayStep, AgentError> {
-        self.pay_step(AgentMsg::PlanBuy { product: product.into(), yearly }).await
+        self.plan_buy_with(product, yearly, None).await
+    }
+
+    /// The same with a promo code.
+    pub async fn plan_buy_with(&mut self, product: &str, yearly: bool, promo: Option<&str>) -> Result<crate::proto::PayStep, AgentError> {
+        self.pay_step(AgentMsg::PlanBuy { product: product.into(), yearly, promo: promo.map(str::to_string) }).await
+    }
+
+    /// Redeems a gift code for this account.
+    pub async fn plan_redeem(&mut self, code: &str) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::PlanRedeem { code: code.into() }).await
     }
 
     /// Moves a subscription to another product or period (prorated, invoiced now).

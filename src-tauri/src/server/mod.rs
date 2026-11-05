@@ -330,7 +330,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "server:relayNames" => json(relay::names().await?),
         "server:relayPlans" => json(plan::plans().await?),
-        "server:relayPlanBuy" => json(plan::buy(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<bool>(2)?).await?),
+        "server:relayPlanBuy" => json(plan::buy(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<bool>(2)?, args.get::<Option<String>>(3)?.as_deref()).await?),
+        "server:relayPlanRedeem" => json(plan::redeem(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:relayPlanChange" => json(plan::change(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?, args.get::<bool>(3)?).await?),
         "server:relayPlanCancel" => json(plan::cancel(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<bool>(2)?).await?),
         "server:relayPlanPay" => json(plan::pay(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),

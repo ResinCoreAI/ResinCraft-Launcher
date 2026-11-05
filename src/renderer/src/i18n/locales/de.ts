@@ -3675,6 +3675,14 @@ const dict: Dict = {
   "engine.hostRelay.paymentsOff": "ResinCraft Relay verkauft gerade nichts: alles ist kostenlos.",
   "engine.hostRelay.notForSale": "Das ist nicht zu kaufen, oder dieses Konto hat es schon.",
   "engine.hostRelay.paymentFailed": "Die Zahlung ist nicht durchgegangen: {error}",
+  "servers.relayPlan.continue": "Weiter zur Zahlung",
+  "servers.relayPlan.promo": "Gutscheincode",
+  "servers.relayPlan.promoPlaceholder": "Optional",
+  "servers.relayPlan.giftCode": "Geschenkcode",
+  "servers.relayPlan.giftPlaceholder": "Geschenkcode (XXXX-XXXX-XXXX)",
+  "servers.relayPlan.redeem": "Einlösen",
+  "servers.relayPlan.redeemed": "Geschenkcode zu {account} hinzugefügt",
+  "engine.hostRelay.codeInvalid": "Dieser Code funktioniert nicht: {error}",
 }
 
 export default dict

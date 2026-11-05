@@ -1029,6 +1029,24 @@ export function mockServers(): {
       await wait(null, 300)
       return { available: true, accounts: planAccounts.map((a) => ({ account: a.account, accountName: a.accountName, unsupported: false, plan: mockPlan(a) })) }
     },
+    relayPlanRedeem: async (account, code) => {
+      await wait(null, 400)
+      if (code !== 'GIFT-2026') throw new Error("That code doesn't work: no such gift code")
+      const a = planAccounts.find((x) => x.account === account)!
+      a.subs.push({
+        id: `gift_mock_${++planSeq}`,
+        product: 'addon-whitelist-page',
+        name: 'Whitelist page',
+        yearly: false,
+        status: 'granted',
+        active: true,
+        period_end: Math.floor(Date.now() / 1000) + 30 * 86400,
+        cancel_at_period_end: false,
+        amount: 0,
+        paid: false
+      })
+      return mockPlan(a)
+    },
     relayPlanBuy: async (account, product, yearly) => {
       await wait(null, 500)
       const a = planAccounts.find((x) => x.account === account)!

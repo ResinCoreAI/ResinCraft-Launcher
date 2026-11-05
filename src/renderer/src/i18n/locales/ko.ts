@@ -3653,6 +3653,14 @@ const dict: Dict = {
   "engine.hostRelay.paymentsOff": "ResinCraft Relay는 지금 아무것도 판매하지 않습니다. 모두 무료입니다.",
   "engine.hostRelay.notForSale": "판매하지 않는 항목이거나 이 계정에 이미 있습니다.",
   "engine.hostRelay.paymentFailed": "결제가 완료되지 않았습니다: {error}",
+  "servers.relayPlan.continue": "결제로 계속",
+  "servers.relayPlan.promo": "프로모션 코드",
+  "servers.relayPlan.promoPlaceholder": "선택 사항",
+  "servers.relayPlan.giftCode": "선물 코드",
+  "servers.relayPlan.giftPlaceholder": "선물 코드 (XXXX-XXXX-XXXX)",
+  "servers.relayPlan.redeem": "사용",
+  "servers.relayPlan.redeemed": "{account}에 선물 코드를 추가했습니다",
+  "engine.hostRelay.codeInvalid": "이 코드는 사용할 수 없습니다: {error}",
 }
 
 export default dict

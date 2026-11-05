@@ -3648,6 +3648,14 @@ const dict: Dict = {
   "engine.hostRelay.paymentsOff": "ResinCraft Relay 目前不出售任何内容：全部免费。",
   "engine.hostRelay.notForSale": "该项目不出售，或此账户已拥有。",
   "engine.hostRelay.paymentFailed": "付款未成功：{error}",
+  "servers.relayPlan.continue": "继续付款",
+  "servers.relayPlan.promo": "优惠码",
+  "servers.relayPlan.promoPlaceholder": "可选",
+  "servers.relayPlan.giftCode": "礼品码",
+  "servers.relayPlan.giftPlaceholder": "礼品码 (XXXX-XXXX-XXXX)",
+  "servers.relayPlan.redeem": "兑换",
+  "servers.relayPlan.redeemed": "礼品码已添加到 {account}",
+  "engine.hostRelay.codeInvalid": "该代码无效：{error}",
 }
 
 export default dict

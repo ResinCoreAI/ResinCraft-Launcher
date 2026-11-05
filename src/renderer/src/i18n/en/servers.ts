@@ -935,5 +935,12 @@ export default {
   "servers.relayPlan.paid": "{name} is active on {account}",
   "servers.relayPlan.loadingForm": "Loading the payment form…",
   "servers.relayPlan.formFailed": "The payment form couldn't load: {error}",
-  "servers.relayPlan.secure": "Card details go straight to Stripe; ResinCraft never sees them."
+  "servers.relayPlan.secure": "Card details go straight to Stripe; ResinCraft never sees them.",
+  "servers.relayPlan.continue": "Continue to payment",
+  "servers.relayPlan.promo": "Promo code",
+  "servers.relayPlan.promoPlaceholder": "Optional",
+  "servers.relayPlan.giftCode": "Gift code",
+  "servers.relayPlan.giftPlaceholder": "Gift code (XXXX-XXXX-XXXX)",
+  "servers.relayPlan.redeem": "Redeem",
+  "servers.relayPlan.redeemed": "Gift code added to {account}"
 }

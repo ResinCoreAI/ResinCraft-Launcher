@@ -260,6 +260,7 @@ export default {
   'engine.hostRelay.bannedForever': "You're banned from ResinCraft Relay permanently.",
   'engine.hostRelay.bannedReason': '{ban} Reason: {reason}',
   'engine.hostRelay.bannedUntil': "You're banned from ResinCraft Relay until {date} ({left}).",
+  'engine.hostRelay.codeInvalid': "That code doesn't work: {error}",
   'engine.hostRelay.domainInvalid': "ResinCraft Relay can't take this domain: {error}",
   'engine.hostRelay.listBanned': "You're banned from the ResinCraft server list.",
   'engine.hostRelay.listBannedReason': '{ban} Reason: {reason}',

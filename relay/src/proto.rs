@@ -234,7 +234,15 @@ pub enum AgentMsg {
     /// The relay's plans and what this account has. Protocol 11.
     Plan,
     /// Buy a product (monthly, or yearly): answered with `pay`. Protocol 11.
-    PlanBuy { product: String, yearly: bool },
+    PlanBuy {
+        product: String,
+        yearly: bool,
+        /// A promo code for a discount.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        promo: Option<String>,
+    },
+    /// Redeem a gift code: answered with `plan`. Protocol 11.
+    PlanRedeem { code: String },
     /// Move one of the account's subscriptions to another product or period (prorated): answered with `pay`.
     /// Protocol 11.
     PlanChange { sub: String, product: String, yearly: bool },
@@ -740,6 +748,8 @@ pub enum ErrorCode {
     NotForSale,
     /// Stripe refused or couldn't be reached (the message says why). Protocol 11.
     PaymentFailed,
+    /// A promo or gift code that doesn't work (the message says why). Protocol 11.
+    CodeInvalid,
     ShuttingDown,
     Internal,
     #[serde(other)]

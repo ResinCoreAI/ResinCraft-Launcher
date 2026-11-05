@@ -2,7 +2,7 @@
 // sells, and buying them with the launcher's own payment form (Stripe's card fields inside it, no Stripe page).
 // While the relay's admin has payments off, nothing is for sale and this shows nothing.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, CreditCard, Loader2, Lock, Package, Puzzle, RefreshCw, Repeat, X } from 'lucide-react'
+import { Check, CreditCard, Gift, Loader2, Lock, Package, Puzzle, RefreshCw, Repeat, X } from 'lucide-react'
 import type { AccountPlan, PayStep, PlanInfo, PlanProduct, PlanSub, RelayPlans } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -159,6 +159,81 @@ function PayModal({
   )
 }
 
+/** Buying: the price and an optional promo code first, then the payment form. */
+function BuyModal({
+  a,
+  p,
+  yearly,
+  onClose,
+  onPaid
+}: {
+  a: AccountPlan
+  p: PlanProduct
+  yearly: boolean
+  onClose: () => void
+  onPaid: (plan: PlanInfo) => void
+}) {
+  const [promo, setPromo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const [step, setStep] = useState<PayStep>()
+  const currency = a.plan!.currency
+  const price = yearly ? p.yearly : p.monthly
+  const title = t('servers.relayPlan.payTitle', { name: p.name })
+  if (step) return <PayModal account={a.account} accountName={a.accountName} title={title} step={step} onClose={onClose} onPaid={onPaid} />
+
+  const go = async () => {
+    setBusy(true)
+    setError(undefined)
+    try {
+      const s = await api.server.relayPlanBuy(a.account, p.id, yearly, promo.trim() || null)
+      // Nothing to pay now (a 100% promo code): it's active already.
+      if (s.client_secret) setStep(s)
+      else onPaid(await api.server.relayPlanRefresh(a.account, s.sub))
+    } catch (e) {
+      setError((e as Error).message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      title={title}
+      subtitle={t('servers.relayPlan.paySubtitle', {
+        account: a.accountName,
+        price: yearly ? t('servers.relayPlan.perYear', { price: money(price, currency) }) : t('servers.relayPlan.perMonth', { price: money(price, currency) })
+      })}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary" disabled={busy} onClick={() => void go()}>
+            {busy ? <Loader2 className="spin" /> : <CreditCard />} {t('servers.relayPlan.continue')}
+          </button>
+        </>
+      }
+    >
+      <p className="hint">{gives(p)}</p>
+      <div className="field">
+        <label htmlFor="rp-promo">{t('servers.relayPlan.promo')}</label>
+        <input
+          id="rp-promo"
+          className="input mono"
+          value={promo}
+          maxLength={40}
+          spellCheck={false}
+          placeholder={t('servers.relayPlan.promoPlaceholder')}
+          onChange={(e) => setPromo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+          onKeyDown={(e) => e.key === 'Enter' && void go()}
+        />
+        {error && <span className="hint it-warn">{error}</span>}
+      </div>
+    </Modal>
+  )
+}
+
 function ChangeModal({ a, sub, onClose, onDone }: { a: AccountPlan; sub: PlanSub; onClose: () => void; onDone: (step: PayStep, name: string) => void }) {
   const plan = a.plan!
   const options = plan.products.filter((p) => (sub.yearly ? p.yearly : p.monthly) > 0 || p.monthly > 0)
@@ -301,6 +376,9 @@ export default function RelayPlan() {
   const [yearly, setYearly] = useState(false)
   const [busy, setBusy] = useState<string>()
   const [paying, setPaying] = useState<{ step: PayStep; title: string; name: string }>()
+  const [buying, setBuying] = useState<PlanProduct>()
+  const [gift, setGift] = useState('')
+  const [redeeming, setRedeeming] = useState(false)
   const [changing, setChanging] = useState<PlanSub>()
   const [cancelling, setCancelling] = useState<PlanSub>()
 
@@ -311,16 +389,18 @@ export default function RelayPlan() {
   const plan = a.plan!
   const put = (p: PlanInfo) => setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })
 
-  const buy = async (p: PlanProduct) => {
-    setBusy(p.id)
+  const buy = (p: PlanProduct) => setBuying(p)
+
+  const redeem = async () => {
+    setRedeeming(true)
     try {
-      const step = await api.server.relayPlanBuy(a.account, p.id, yearly)
-      if (step.client_secret) setPaying({ step, title: t('servers.relayPlan.payTitle', { name: p.name }), name: p.name })
-      else await load()
+      put(await api.server.relayPlanRedeem(a.account, gift.trim()))
+      setGift('')
+      toast(t('servers.relayPlan.redeemed', { account: a.accountName }), 'success')
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
-      setBusy(undefined)
+      setRedeeming(false)
     }
   }
 
@@ -422,6 +502,21 @@ export default function RelayPlan() {
           bonus: gb(plan.free.bonus_bytes)
         })}
       </p>
+      <div className="row rp-redeem">
+        <input
+          className="input mono"
+          value={gift}
+          maxLength={40}
+          spellCheck={false}
+          aria-label={t('servers.relayPlan.giftCode')}
+          placeholder={t('servers.relayPlan.giftPlaceholder')}
+          onChange={(e) => setGift(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+          onKeyDown={(e) => e.key === 'Enter' && gift.trim().length >= 3 && void redeem()}
+        />
+        <button className="btn sm" disabled={redeeming || gift.trim().length < 3} onClick={() => void redeem()}>
+          {redeeming ? <Loader2 className="spin" /> : <Gift />} {t('servers.relayPlan.redeem')}
+        </button>
+      </div>
       {plan.mine.length > 0 && (
         <>
           <h4>{t('servers.relayPlan.mine')}</h4>
@@ -470,6 +565,22 @@ export default function RelayPlan() {
             </>
           )}
         </>
+      )}
+      {buying && (
+        <BuyModal
+          a={a}
+          p={buying}
+          yearly={yearly}
+          onClose={() => {
+            setBuying(undefined)
+            void load()
+          }}
+          onPaid={(plan) => {
+            put(plan)
+            toast(t('servers.relayPlan.paid', { name: buying.name, account: a.accountName }), 'success')
+            setBuying(undefined)
+          }}
+        />
       )}
       {paying && (
         <PayModal

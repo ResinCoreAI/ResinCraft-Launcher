@@ -3658,6 +3658,14 @@ const dict: Dict = {
   "engine.hostRelay.paymentsOff": "ResinCraft Relay hiện không bán gì: mọi thứ đều miễn phí.",
   "engine.hostRelay.notForSale": "Mục này không được bán, hoặc tài khoản này đã có.",
   "engine.hostRelay.paymentFailed": "Thanh toán không thành công: {error}",
+  "servers.relayPlan.continue": "Tiếp tục thanh toán",
+  "servers.relayPlan.promo": "Mã khuyến mãi",
+  "servers.relayPlan.promoPlaceholder": "Không bắt buộc",
+  "servers.relayPlan.giftCode": "Mã quà tặng",
+  "servers.relayPlan.giftPlaceholder": "Mã quà tặng (XXXX-XXXX-XXXX)",
+  "servers.relayPlan.redeem": "Đổi mã",
+  "servers.relayPlan.redeemed": "Đã thêm mã quà tặng cho {account}",
+  "engine.hostRelay.codeInvalid": "Mã này không dùng được: {error}",
 }
 
 export default dict

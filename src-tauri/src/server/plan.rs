@@ -66,8 +66,13 @@ pub async fn plans() -> Result<Plans> {
     Ok(Plans { available: true, accounts: out })
 }
 
-pub async fn buy(account: &str, product: &str, yearly: bool) -> Result<PayStep> {
-    connect(account).await?.plan_buy(product, yearly).await.map_err(|e| relay::describe(&e, ""))
+pub async fn buy(account: &str, product: &str, yearly: bool, promo: Option<&str>) -> Result<PayStep> {
+    connect(account).await?.plan_buy_with(product, yearly, promo).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// A gift code's product for the account.
+pub async fn redeem(account: &str, code: &str) -> Result<PlanInfo> {
+    connect(account).await?.plan_redeem(code).await.map_err(|e| relay::describe(&e, ""))
 }
 
 pub async fn change(account: &str, sub: &str, product: &str, yearly: bool) -> Result<PayStep> {
