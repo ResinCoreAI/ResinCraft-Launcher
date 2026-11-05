@@ -1717,6 +1717,8 @@ export interface RemoteGrant {
   role: RemoteRole
   /** The servers it reaches; null or missing: all of them. */
   servers?: string[] | null
+  /** Full control on those servers (files, Java), as far as the role goes. */
+  fullControl?: boolean
 }
 
 /** A PC with remote control on that this account may open: one of its own, or one shared with it. */

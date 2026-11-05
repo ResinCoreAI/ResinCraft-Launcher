@@ -2,12 +2,13 @@
 // the relay's admin for more names than the account's limit, also offered under a server's relay name.
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowRight, Loader2, Pencil, RefreshCw, Send, Tag, Trash2 } from 'lucide-react'
-import type { RelayNameAccount, RelayNameEntry, RelayNames as Names } from '@shared/types'
+import type { RelayNameAccount, RelayNameEntry, RelayNames as Names, ServerInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t, tx } from '../i18n'
 import { ConfirmModal, Modal } from './ui'
 import { relayNameOk } from './ServerRelay'
+import { setRemotePc } from '../remotePc'
 
 function useNames() {
   const [names, setNames] = useState<Names>()
@@ -100,7 +101,15 @@ function AskModal({ a, onClose, onSent }: { a: RelayNameAccount; onClose: () => 
       </div>
       <div className="field">
         <label htmlFor="names-wanted">{t('servers.relayNames.askWanted')}</label>
-        <input id="names-wanted" className="input" type="number" min={a.limit + 1} max={100} value={wanted} onChange={(e) => setWanted(Number(e.target.value))} />
+        <input
+          id="names-wanted"
+          className="input"
+          type="number"
+          min={a.limit + 1}
+          max={100}
+          value={wanted}
+          onChange={(e) => setWanted(Number(e.target.value))}
+        />
       </div>
       <div className="field">
         <label htmlFor="names-reason">{t('servers.relayNames.askReason')}</label>
@@ -175,10 +184,40 @@ export default function RelayNames({ reload }: { reload: () => Promise<void> }) 
   const { names, load } = useNames()
   const [updating, setUpdating] = useState<RelayNameEntry>()
   const [revoking, setRevoking] = useState<RelayNameEntry>()
+  const [finding, setFinding] = useState<string>()
   if (!names?.available || (names.names.length === 0 && names.accounts.length === 0 && !names.error)) return null
   const changed = async () => {
     await load()
     await reload()
+  }
+
+  /** The server that uses the name: here, or on one of the player's other PCs with remote control on. */
+  const goTo = async (n: RelayNameEntry) => {
+    const here = n.servers[0]
+    if (here) {
+      await setRemotePc(undefined)
+      go({ page: 'servers', id: here.id })
+      return
+    }
+    setFinding(n.name)
+    try {
+      const pcs = (await api.remoteView.devices()).filter((d) => !d.shared)
+      for (const pc of pcs) {
+        const list = (await api.remoteView.call(pc.id, 'server.list', []).catch(() => [])) as ServerInfo[]
+        const found = Array.isArray(list) ? list.find((s) => s.relayName === n.name) : undefined
+        if (found) {
+          await setRemotePc(pc)
+          go({ page: 'servers', id: found.id })
+          toast(t('servers.relayNames.openedOn', { pc: pc.name }))
+          return
+        }
+      }
+      toast(t('servers.relayNames.notFound'), 'info')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setFinding(undefined)
+    }
   }
 
   return (
@@ -207,11 +246,18 @@ export default function RelayNames({ reload }: { reload: () => Promise<void> }) 
                     {n.assigned && <span className="chip compact">{t('servers.relayNames.given')}</span>}
                   </div>
                   <div className="hint ellipsis">
-                    {n.servers.length > 0 ? t('servers.relayNames.usedBy', { servers: n.servers.map((s) => s.name).join(', '), account: n.accountName }) : t('servers.relayNames.unused', { account: n.accountName })}
+                    {n.servers.length > 0
+                      ? t('servers.relayNames.usedBy', { servers: n.servers.map((s) => s.name).join(', '), account: n.accountName })
+                      : t('servers.relayNames.unused', { account: n.accountName })}
                   </div>
                 </div>
-                <button className="btn sm" disabled={!server} title={server ? undefined : t('servers.relayNames.goToHint')} onClick={() => server && go({ page: 'servers', id: server.id })}>
-                  <ArrowRight /> {t('servers.relayNames.goTo')}
+                <button
+                  className="btn sm"
+                  disabled={finding != null}
+                  title={server ? undefined : t('servers.relayNames.goToRemoteHint')}
+                  onClick={() => void goTo(n)}
+                >
+                  {finding === n.name ? <Loader2 className="spin" /> : <ArrowRight />} {t('servers.relayNames.goTo')}
                 </button>
                 <button className="btn sm" onClick={() => setUpdating(n)}>
                   <Pencil /> {t('servers.relayNames.update')}

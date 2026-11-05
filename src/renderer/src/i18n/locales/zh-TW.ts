@@ -3593,6 +3593,12 @@ const dict: Dict = {
   "engine.horizon.nativeNone": "{name} 沒有需要編譯的原生模組。",
   "engine.horizon.nativeRunning": "請先關閉 {name}：它的遊戲正在執行。",
   "engine.horizon.nativeTrust": "原生模組以對這台電腦的完整存取權限執行：請在編譯前確認你信任它們。",
+  "servers.relayNames.goToRemoteHint": "此電腦上沒有伺服器使用它：將在你開啟遠端控制的其他電腦上尋找",
+  "servers.relayNames.openedOn": "已在 {pc} 上開啟",
+  "servers.relayNames.notFound": "此電腦和你的其他電腦上都沒有伺服器使用這個名稱",
+  "servers.settings.deleteReleasesName": "它的 ResinCraft 位址 {name} 也會被釋放，除非它此刻正在另一台電腦上線上。",
+  "servers.people.full": "完全控制",
+  "servers.people.fullHint": "還包括其可存取伺服器的檔案與 Java（管理者另含啟動參數與權杖）。你自己的帳號始終擁有完全控制。",
 }
 
 export default dict

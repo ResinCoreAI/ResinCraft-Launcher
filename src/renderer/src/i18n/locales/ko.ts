@@ -3598,6 +3598,12 @@ const dict: Dict = {
   "engine.horizon.nativeNone": "{name}에는 빌드할 네이티브 모드가 없어요.",
   "engine.horizon.nativeRunning": "먼저 {name}을(를) 닫으세요. 게임이 실행 중이에요.",
   "engine.horizon.nativeTrust": "네이티브 모드는 이 컴퓨터에 대한 전체 접근 권한으로 실행돼요. 빌드하기 전에 신뢰하는지 확인하세요.",
+  "servers.relayNames.goToRemoteHint": "이 PC의 서버가 사용하지 않습니다. 원격 제어가 켜진 다른 PC에서 찾습니다",
+  "servers.relayNames.openedOn": "{pc}에서 열었습니다",
+  "servers.relayNames.notFound": "이 PC나 다른 PC의 서버가 이 이름을 사용하지 않습니다",
+  "servers.settings.deleteReleasesName": "ResinCraft 주소 {name}도 해제됩니다(지금 다른 PC에서 온라인인 경우 제외).",
+  "servers.people.full": "전체 제어",
+  "servers.people.fullHint": "접근 가능한 서버의 파일과 Java도 다룰 수 있습니다(관리자는 실행 인수와 토큰도). 내 계정은 항상 전체 제어입니다.",
 }
 
 export default dict

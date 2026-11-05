@@ -108,7 +108,9 @@ export function RemotePeople() {
   useEffect(() => {
     void api.remote.grants().then(setGrants, () => setGrants([]))
     // This PC's own servers, even while another PC is open on the Servers page.
-    void thisPc().server.list().then(setServers, () => {})
+    void thisPc()
+      .server.list()
+      .then(setServers, () => {})
   }, [])
 
   const save = async (list: RemoteGrant[], done?: string) => {
@@ -124,7 +126,10 @@ export function RemotePeople() {
     setAdding(true)
     try {
       const found = await api.remote.lookupName(name.trim())
-      await save([...grants.filter((g) => g.uuid !== found.uuid), { uuid: found.uuid, name: found.name, role: 'viewer', servers: null }], t('servers.people.added', { name: found.name }))
+      await save(
+        [...grants.filter((g) => g.uuid !== found.uuid), { uuid: found.uuid, name: found.name, role: 'viewer', servers: null }],
+        t('servers.people.added', { name: found.name })
+      )
       setName('')
     } catch (e) {
       toast((e as Error).message, 'error')
@@ -154,7 +159,15 @@ export function RemotePeople() {
                   <div className="title ellipsis">{g.name}</div>
                   <div className="hint">{t(`servers.people.roleHint.${g.role}` as Key)}</div>
                 </div>
-                <Segmented<RemoteRole> value={g.role} onChange={(role) => change(g.uuid, { role })} options={ROLES.map((r) => ({ value: r, label: t(`servers.people.role.${r}` as Key) }))} />
+                <Segmented<RemoteRole>
+                  value={g.role}
+                  onChange={(role) => change(g.uuid, { role })}
+                  options={ROLES.map((r) => ({ value: r, label: t(`servers.people.role.${r}` as Key) }))}
+                />
+                <label className="remote-full" title={t('servers.people.fullHint')}>
+                  <input type="checkbox" checked={!!g.fullControl} onChange={(e) => change(g.uuid, { fullControl: e.target.checked })} />
+                  {t('servers.people.full')}
+                </label>
                 <button className="btn sm" aria-expanded={picking === g.uuid} onClick={() => setPicking(picking === g.uuid ? undefined : g.uuid)}>
                   {g.servers ? t('servers.people.someServers', { count: g.servers.length }) : t('servers.people.allServers')}
                   <ChevronDown size={13} />
@@ -163,7 +176,12 @@ export function RemotePeople() {
                   className="btn sm ghost icon-only"
                   title={t('servers.people.remove', { name: g.name })}
                   aria-label={t('servers.people.remove', { name: g.name })}
-                  onClick={() => void save(grants.filter((x) => x.uuid !== g.uuid), t('servers.people.removed', { name: g.name }))}
+                  onClick={() =>
+                    void save(
+                      grants.filter((x) => x.uuid !== g.uuid),
+                      t('servers.people.removed', { name: g.name })
+                    )
+                  }
                 >
                   <Trash2 />
                 </button>
@@ -172,7 +190,11 @@ export function RemotePeople() {
                 <div className="remote-servers">
                   <span className="hint">{t('servers.people.pickServers')}</span>
                   <label className="remote-server-pick">
-                    <input type="checkbox" checked={!g.servers} onChange={(e) => change(g.uuid, { servers: e.target.checked ? null : servers.map((s) => s.id) })} />
+                    <input
+                      type="checkbox"
+                      checked={!g.servers}
+                      onChange={(e) => change(g.uuid, { servers: e.target.checked ? null : servers.map((s) => s.id) })}
+                    />
                     {t('servers.people.allServers')}
                   </label>
                   {servers.length === 0 && <span className="hint">{t('servers.people.noServers')}</span>}
@@ -182,7 +204,9 @@ export function RemotePeople() {
                         type="checkbox"
                         checked={!g.servers || g.servers.includes(s.id)}
                         disabled={!g.servers}
-                        onChange={(e) => change(g.uuid, { servers: e.target.checked ? [...(g.servers ?? []), s.id] : (g.servers ?? []).filter((x) => x !== s.id) })}
+                        onChange={(e) =>
+                          change(g.uuid, { servers: e.target.checked ? [...(g.servers ?? []), s.id] : (g.servers ?? []).filter((x) => x !== s.id) })
+                        }
                       />
                       {s.name}
                     </label>

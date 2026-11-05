@@ -89,9 +89,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             }
             let meta = store::get(&id).await?;
             let gone = id.clone();
+            let freed = meta.clone();
             tokio::spawn(async move { listing::forget(&gone, &meta).await });
             runtime::forget_link(&id);
             shell::trash(&store::dir(&id)?).await?;
+            // Its ResinCraft address goes too (once the folder is gone, so this server no longer counts as using it).
+            tokio::spawn(relay::release_after_delete(freed));
             let _ = cloudflare::set_token(&id, None).await;
             requests::forget(&id).await;
             done()

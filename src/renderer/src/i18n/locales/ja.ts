@@ -3603,6 +3603,12 @@ const dict: Dict = {
   "engine.horizon.nativeNone": "{name} にはビルドするネイティブ Mod がありません。",
   "engine.horizon.nativeRunning": "先に {name} を閉じてください。ゲームが実行中です。",
   "engine.horizon.nativeTrust": "ネイティブ Mod はこのコンピューターへのフルアクセス権で動作します。ビルドする前に、信頼できることを確認してください。",
+  "servers.relayNames.goToRemoteHint": "この PC のサーバーは使っていません。リモート操作が有効な他の PC を探します",
+  "servers.relayNames.openedOn": "{pc} で開きました",
+  "servers.relayNames.notFound": "この PC や他の PC のサーバーはこの名前を使っていません",
+  "servers.settings.deleteReleasesName": "ResinCraft のアドレス {name} も解放されます（今ほかの PC でオンラインの場合を除く）。",
+  "servers.people.full": "フルコントロール",
+  "servers.people.fullHint": "対象サーバーのファイルと Java も操作できます（マネージャーは起動引数とトークンも）。自分のアカウントは常にフルコントロールです。",
 }
 
 export default dict

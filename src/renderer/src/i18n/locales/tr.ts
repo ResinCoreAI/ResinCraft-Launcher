@@ -3616,6 +3616,12 @@ const dict: Dict = {
   "engine.horizon.nativeNone": "{name} kurulumunda derlenecek yerel mod yok.",
   "engine.horizon.nativeRunning": "Önce {name} kurulumunu kapat: oyunu çalışıyor.",
   "engine.horizon.nativeTrust": "Yerel modlar bu bilgisayara tam erişimle çalışır: derlenmeden önce onlara güvendiğini onayla.",
+  "servers.relayNames.goToRemoteHint": "Bu bilgisayardaki hiçbir sunucu kullanmıyor: uzaktan kontrolü açık diğer bilgisayarlarınızda arar",
+  "servers.relayNames.openedOn": "{pc} üzerinde açıldı",
+  "servers.relayNames.notFound": "Bu veya diğer bilgisayarlarınızdaki hiçbir sunucu bu adı kullanmıyor",
+  "servers.settings.deleteReleasesName": "ResinCraft adresi {name} de serbest bırakılır; şu anda başka bir bilgisayarda çevrimiçiyse bırakılmaz.",
+  "servers.people.full": "Tam kontrol",
+  "servers.people.fullHint": "Erişebildiği sunucuların dosyaları ve Java'sı da (Yönetici ayrıca başlatma argümanları ve tokenlar). Kendi hesabınız her zaman tam kontrole sahiptir.",
 }
 
 export default dict

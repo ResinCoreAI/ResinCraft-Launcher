@@ -878,5 +878,11 @@ export default {
   'servers.multicore.back.title': 'Go back to {kind}',
   'servers.multicore.back.hint': 'Puts the old server software back. The world stays as it is now, and the backup from before the move stays in Backups.',
   'servers.multicore.back.button': 'Go back',
-  'servers.multicore.back.done': 'Back on {kind}.'
+  'servers.multicore.back.done': 'Back on {kind}.',
+  "servers.relayNames.goToRemoteHint": "No server on this PC uses it: looks on your other PCs with remote control on",
+  "servers.relayNames.openedOn": "Opened on {pc}",
+  "servers.relayNames.notFound": "No server on this PC or your other PCs uses this name",
+  "servers.settings.deleteReleasesName": "Its ResinCraft address {name} is released too, unless it is online on another PC right now.",
+  "servers.people.full": "Full control",
+  "servers.people.fullHint": "Also the files and Java of the servers they reach (a Manager also launch arguments and tokens). Your own account always has full control."
 }

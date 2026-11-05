@@ -3620,6 +3620,12 @@ const dict: Dict = {
   "engine.horizon.nativeNone": "{name} hat keine nativen Mods zum Bauen.",
   "engine.horizon.nativeRunning": "Schließe zuerst {name}: Das Spiel läuft.",
   "engine.horizon.nativeTrust": "Native Mods laufen mit vollem Zugriff auf diesen Computer: Bestätige, dass du ihnen vertraust, bevor sie gebaut werden.",
+  "servers.relayNames.goToRemoteHint": "Kein Server auf diesem PC nutzt ihn: sucht auf deinen anderen PCs mit Fernsteuerung",
+  "servers.relayNames.openedOn": "Auf {pc} geöffnet",
+  "servers.relayNames.notFound": "Kein Server auf diesem oder deinen anderen PCs nutzt diesen Namen",
+  "servers.settings.deleteReleasesName": "Seine ResinCraft-Adresse {name} wird auch freigegeben, außer sie ist gerade auf einem anderen PC online.",
+  "servers.people.full": "Volle Kontrolle",
+  "servers.people.fullHint": "Auch die Dateien und Java der Server, die sie erreichen (ein Manager auch Startargumente und Tokens). Dein eigenes Konto hat immer volle Kontrolle.",
 }
 
 export default dict

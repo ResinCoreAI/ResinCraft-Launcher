@@ -3606,6 +3606,12 @@ const dict: Dict = {
   "engine.horizon.nativeNone": "{name} tidak punya mod native untuk di-build.",
   "engine.horizon.nativeRunning": "Tutup {name} dulu: game-nya sedang berjalan.",
   "engine.horizon.nativeTrust": "Mod native berjalan dengan akses penuh ke komputer ini: pastikan kamu memercayainya sebelum di-build.",
+  "servers.relayNames.goToRemoteHint": "Tidak ada server di PC ini yang memakainya: mencari di PC lain Anda dengan kontrol jarak jauh",
+  "servers.relayNames.openedOn": "Dibuka di {pc}",
+  "servers.relayNames.notFound": "Tidak ada server di PC ini atau PC lain Anda yang memakai nama ini",
+  "servers.settings.deleteReleasesName": "Alamat ResinCraft-nya {name} juga dilepas, kecuali sedang online di PC lain.",
+  "servers.people.full": "Kontrol penuh",
+  "servers.people.fullHint": "Juga file dan Java server yang bisa dijangkau (Manager juga argumen peluncuran dan token). Akun Anda sendiri selalu punya kontrol penuh.",
 }
 
 export default dict

@@ -1,6 +1,54 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
-import { Archive, Ban, Blocks, ClipboardCopy, Clock, Copy, Crown, Eraser, ExternalLink, FolderInput, FolderOpen, FolderTree, Gamepad2, Globe, Home as HomeIcon, ImagePlus, Info, Loader2, MoreHorizontal, Play, Plus, Puzzle, RotateCcw, RotateCw, Search, Send, Server, Settings2, SlidersHorizontal, Square, Terminal, Trash2, UserMinus, Users, Wifi, Wrench } from 'lucide-react'
-import type { AntiXray, ContentItem, LogLine, PlayerListKind, PropEntry, ServerCreated, ServerEvent, ServerInfo, ServerListEntry, ServerTunnel } from '@shared/types'
+import {
+  Archive,
+  Ban,
+  Blocks,
+  ClipboardCopy,
+  Clock,
+  Copy,
+  Crown,
+  Eraser,
+  ExternalLink,
+  FolderInput,
+  FolderOpen,
+  FolderTree,
+  Gamepad2,
+  Globe,
+  Home as HomeIcon,
+  ImagePlus,
+  Info,
+  Loader2,
+  MoreHorizontal,
+  Play,
+  Plus,
+  Puzzle,
+  RotateCcw,
+  RotateCw,
+  Search,
+  Send,
+  Server,
+  Settings2,
+  SlidersHorizontal,
+  Square,
+  Terminal,
+  Trash2,
+  UserMinus,
+  Users,
+  Wifi,
+  Wrench
+} from 'lucide-react'
+import type {
+  AntiXray,
+  ContentItem,
+  LogLine,
+  PlayerListKind,
+  PropEntry,
+  ServerCreated,
+  ServerEvent,
+  ServerInfo,
+  ServerListEntry,
+  ServerTunnel
+} from '@shared/types'
 import { BEDROCK_SERVERS, HYBRID_SERVERS, PLUGIN_SERVERS, PROXY_SERVERS } from '@shared/types'
 import { api, isConsole } from '../api'
 import { BedrockJoinSettings, BedrockPlayersCell, useBedrockJoin } from '../components/BedrockJoin'
@@ -60,6 +108,12 @@ function useRemoving(): number {
 }
 
 /** Deletes a server without waiting: it leaves the list at once; if the engine refuses, it comes back with why. */
+/** The delete confirmation: the folder to the Recycle Bin, and its ResinCraft address released too. */
+function deleteBody(s: ServerInfo) {
+  const body = t('servers.settings.deleteBody')
+  return s.relayName ? `${body} ${t('servers.settings.deleteReleasesName', { name: s.relayName })}` : body
+}
+
 function removeServer(s: ServerInfo, toast: (text: string, kind?: 'success' | 'error' | 'info') => void, reload: () => Promise<void>) {
   removing.add(s.id)
   notifyRemoving()
@@ -226,10 +280,21 @@ function ServerIconPicker({ s, onChanged }: { s: ServerInfo; onChanged: () => Pr
       setBusy(false)
     }
   }
-  const { open, modal } = usePicturePicker('icon', (url) => void apply(url), (m) => toast(m, 'error'))
+  const { open, modal } = usePicturePicker(
+    'icon',
+    (url) => void apply(url),
+    (m) => toast(m, 'error')
+  )
   return (
     <div className="row" style={{ gap: 10 }}>
-      <button type="button" className="pic-icon-btn sv-icon-pick" disabled={busy} onClick={open} title={t('servers.icon.choose')} aria-label={t('servers.icon.choose')}>
+      <button
+        type="button"
+        className="pic-icon-btn sv-icon-pick"
+        disabled={busy}
+        onClick={open}
+        title={t('servers.icon.choose')}
+        aria-label={t('servers.icon.choose')}
+      >
         <ServerIcon s={s} size={56} />
         <span className="pic-overlay" aria-hidden="true">
           {busy ? <Loader2 className="spin" /> : <ImagePlus />}
@@ -435,7 +500,7 @@ function ServerList({
       {deleting && (
         <ConfirmModal
           title={t('servers.settings.deleteTitle', { name: deleting.name })}
-          body={t('servers.settings.deleteBody')}
+          body={deleteBody(deleting)}
           confirm={t('common.delete')}
           onClose={() => setDeleting(undefined)}
           onConfirm={() => removeServer(deleting, toast, reload)}
@@ -556,7 +621,7 @@ function ServerDetail({
       {deleting && (
         <ConfirmModal
           title={t('servers.settings.deleteTitle', { name: s.name })}
-          body={t('servers.settings.deleteBody')}
+          body={deleteBody(s)}
           confirm={t('common.delete')}
           onClose={() => setDeleting(false)}
           onConfirm={() => {
@@ -668,11 +733,13 @@ function ConnectCard({ s }: { s: ServerInfo }) {
         </span>
         <CopyAddress value={isBedrock(s) ? `127.0.0.1:${s.port}` : `localhost:${s.port}`} />
         {isBedrock(s) ? (
-          hasBedrockApp && <div className="play-here">
-            <button className="btn primary" disabled={launching || s.state === 'stopped' || s.state === 'crashed'} onClick={() => void openBedrock()}>
-              {launching ? <Loader2 className="spin" /> : <Gamepad2 />} {t('servers.connect.openBedrock')}
-            </button>
-          </div>
+          hasBedrockApp && (
+            <div className="play-here">
+              <button className="btn primary" disabled={launching || s.state === 'stopped' || s.state === 'crashed'} onClick={() => void openBedrock()}>
+                {launching ? <Loader2 className="spin" /> : <Gamepad2 />} {t('servers.connect.openBedrock')}
+              </button>
+            </div>
+          )
         ) : (
           <div className="play-here">
             <select className="select" value={instanceId ?? ''} onChange={(e) => setInstanceId(e.target.value)} disabled={!compatible.length}>
@@ -1085,9 +1152,7 @@ function PropertiesTab({ s, onStart }: { s: ServerInfo; onStart: (s: ServerInfo)
   return (
     <>
       <div className="sv-savebar">
-        <span className="hint grow">
-          {notYet ? '' : live(s) ? t('servers.properties.restartHint') : ''}
-        </span>
+        <span className="hint grow">{notYet ? '' : live(s) ? t('servers.properties.restartHint') : ''}</span>
         <button className="btn ghost" disabled={!dirty || saving} onClick={() => void load()}>
           {t('servers.properties.revert')}
         </button>
@@ -1578,7 +1643,12 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
           </div>
         </div>
       </div>
-      {restoring && <RestoreModal target={{ kind: 'server', id: s.id, name: s.name, running: s.state !== 'stopped' && s.state !== 'crashed' }} onClose={() => setRestoring(false)} />}
+      {restoring && (
+        <RestoreModal
+          target={{ kind: 'server', id: s.id, name: s.name, running: s.state !== 'stopped' && s.state !== 'crashed' }}
+          onClose={() => setRestoring(false)}
+        />
+      )}
 
       <div className="settings-section">
         <h3>{t('servers.settings.dangerZone')}</h3>
@@ -1607,7 +1677,7 @@ function SettingsTab({ s, reload, onDeleted }: { s: ServerInfo; reload: () => Pr
       {deleting && (
         <ConfirmModal
           title={t('servers.settings.deleteTitle', { name: s.name })}
-          body={t('servers.settings.deleteBody')}
+          body={deleteBody(s)}
           confirm={t('common.delete')}
           onClose={() => setDeleting(false)}
           onConfirm={() => {
@@ -1672,7 +1742,9 @@ function RegenerateWorld({ s, onClose }: { s: ServerInfo; onClose: () => void })
             { value: 'custom', label: t('servers.regen.seedCustom') }
           ]}
         />
-        {seedMode === 'custom' && <input className="input mono" value={seed} maxLength={64} placeholder="-4172144997902289642" onChange={(e) => setSeed(e.target.value)} />}
+        {seedMode === 'custom' && (
+          <input className="input mono" value={seed} maxLength={64} placeholder="-4172144997902289642" onChange={(e) => setSeed(e.target.value)} />
+        )}
       </div>
       <div className="setting">
         <div className="text">
@@ -1802,7 +1874,10 @@ function AntiXraySection({ s }: { s: ServerInfo }) {
   const [ax, setAx] = useState<AntiXray | null>()
   useEffect(() => {
     let live = true
-    void api.server.antiXray(s.id).then((v) => live && setAx(v), () => live && setAx(null))
+    void api.server.antiXray(s.id).then(
+      (v) => live && setAx(v),
+      () => live && setAx(null)
+    )
     return () => void (live = false)
   }, [s.id])
   if (!ax) return null
@@ -1857,7 +1932,10 @@ function AntiCheatSetting({ s }: { s: ServerInfo }) {
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     let live = true
-    void api.server.antiCheat(s.id).then((v) => live && setAc(v), () => {})
+    void api.server.antiCheat(s.id).then(
+      (v) => live && setAc(v),
+      () => {}
+    )
     return () => void (live = false)
   }, [s.id])
   if (!ac?.supported) return null

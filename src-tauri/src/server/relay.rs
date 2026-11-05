@@ -986,6 +986,41 @@ pub async fn revoke_name(account: &str, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// After a server was deleted: frees its name on the relay too, unless another server here still uses it, the name is
+/// online right now (on another PC), or the relay's admin gave it (it would be lost for good).
+pub async fn release_after_delete(meta: ServerMeta) {
+    let Some(name) = meta.relay_name.clone() else { return };
+    let Some(s) = settings() else { return };
+    let Ok(metas) = store::list().await else { return };
+    let account = meta.relay_account.clone();
+    let same = |m: &ServerMeta| match (&account, &m.relay_account) {
+        (Some(a), Some(b)) => same_account(a, b),
+        _ => true,
+    };
+    if metas.iter().any(|m| m.id != meta.id && m.relay_name.as_deref() == Some(name.as_str()) && same(m)) {
+        return;
+    }
+    let all = accounts::microsoft_accounts().await;
+    let owner = match &account {
+        Some(a) => all.into_iter().find(|x| same_account(&x.uuid, a)),
+        None => all.into_iter().next(),
+    };
+    let Some(owner) = owner else { return };
+    let Ok(mut conn) = connect(&s, &owner).await else { return };
+    if conn.has_names() {
+        match conn.names_mine().await {
+            Ok(mine) => match mine.names.iter().find(|n| n.name == name) {
+                Some(n) if !n.online && !n.assigned => {}
+                _ => return,
+            },
+            Err(_) => return,
+        }
+    }
+    if conn.release(&name).await.is_ok() {
+        crate::core::events::emit("listChanged", "servers");
+    }
+}
+
 /// Changes a reserved name, for this PC's servers that use it too.
 pub async fn rename_name(account: &str, name: &str, new: &str) -> Result<()> {
     let new = normalize(new);

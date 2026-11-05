@@ -3603,6 +3603,12 @@ const dict: Dict = {
   "engine.horizon.nativeNone": "{name} không có mod mã gốc nào để biên dịch.",
   "engine.horizon.nativeRunning": "Hãy đóng {name} trước: trò chơi đang chạy.",
   "engine.horizon.nativeTrust": "Mod mã gốc chạy với toàn quyền truy cập máy tính này: hãy xác nhận bạn tin tưởng chúng trước khi biên dịch.",
+  "servers.relayNames.goToRemoteHint": "Không máy chủ nào trên PC này dùng: tìm trên các PC khác của bạn có bật điều khiển từ xa",
+  "servers.relayNames.openedOn": "Đã mở trên {pc}",
+  "servers.relayNames.notFound": "Không máy chủ nào trên PC này hay các PC khác của bạn dùng tên này",
+  "servers.settings.deleteReleasesName": "Địa chỉ ResinCraft {name} cũng được giải phóng, trừ khi đang trực tuyến trên PC khác.",
+  "servers.people.full": "Toàn quyền",
+  "servers.people.fullHint": "Cả tệp và Java của các máy chủ họ truy cập được (Quản lý thêm tham số khởi chạy và token). Tài khoản của bạn luôn có toàn quyền.",
 }
 
 export default dict
