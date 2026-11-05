@@ -47,10 +47,10 @@ pub struct Build {
 }
 
 impl Build {
-    fn client(&self) -> PathBuf {
+    pub(crate) fn client(&self) -> PathBuf {
         self.root.join(if cfg!(windows) { "horizon-client.exe" } else { "horizon-client" })
     }
-    fn resources(&self) -> PathBuf {
+    pub(crate) fn resources(&self) -> PathBuf {
         resources(&self.root, &self.mc)
     }
 }
@@ -109,6 +109,11 @@ pub async fn latest() -> Result<(github::Release, String)> {
 async fn installed() -> Option<Build> {
     let id = tokio::fs::read_to_string(builds_dir().join(CURRENT_FILE)).await.ok()?.trim().to_string();
     installed_build(&id).await
+}
+
+/// The id of the newest build installed, without asking GitHub.
+pub async fn current_id() -> Option<String> {
+    installed().await.map(|b| b.id)
 }
 
 /// A build that's downloaded and prepared.
@@ -386,20 +391,29 @@ pub fn check_owner(auth: &LaunchAuth) -> Result<()> {
     Err(err_tr!("horizon.needsOwner", "Horizon only starts for a Microsoft account that owns Minecraft: Java Edition. {name} is an offline account: switch to your Microsoft account to play.", name = auth.username))
 }
 
+/// The build an instance plays: the one it is set to, else the newest (installed if it has to be).
+pub async fn build_for(inst: &Instance, task: &Arc<Task>) -> Result<Build> {
+    match inst.loader_version.as_deref().filter(|v| !v.is_empty()) {
+        Some(id) => ensure_pinned(id, Some(inst.id.clone()), task).await,
+        None => ensure_build(Some(inst.id.clone()), task).await,
+    }
+}
+
 /// The newest build for an instance, and how to start it. The instance follows the Minecraft version of the build.
+/// With native mods, it plays the game built with them (`horizon_native`), from the same game folder.
 pub async fn prepare_launch(inst: &Instance, width: u32, height: u32, target: Option<&Target>, task: &Arc<Task>) -> Result<(String, Vec<String>)> {
-    let build = match inst.loader_version.as_deref().filter(|v| !v.is_empty()) {
-        Some(id) => ensure_pinned(id, Some(inst.id.clone()), task).await?,
-        None => ensure_build(Some(inst.id.clone()), task).await?,
-    };
+    let build = build_for(inst, task).await?;
     if build.mc != inst.mc_version {
         crate::core::instances::update(&inst.id, json!({ "mcVersion": build.mc })).await?;
     }
-    let exe = build.client();
+    let (exe, res) = match super::horizon_native::for_launch(inst, &build).await? {
+        Some(dir) => (super::horizon_native::client(&dir), resources(&dir, &build.mc)),
+        None => (build.client(), build.resources()),
+    };
     let options = launch_options(&exe).await?;
     let game_dir = paths::game_dir(&inst.id);
     tokio::fs::create_dir_all(&game_dir).await.context("Couldn't make the game folder")?;
-    Ok((plain(&exe), game_args(&options, &build.resources(), &game_dir, width, height, target)))
+    Ok((plain(&exe), game_args(&options, &res, &game_dir, width, height, target)))
 }
 
 #[cfg(test)]

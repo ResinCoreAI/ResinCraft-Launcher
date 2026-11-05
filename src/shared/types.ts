@@ -613,7 +613,7 @@ export interface ProjectHit {
 
 /** A Horizon registry project's facts for its card and page. */
 export interface HorizonFacts {
-  /** A native mod: Horizon's own launcher compiles it into the game, so it can't be installed here. */
+  /** A native mod: code compiled into the game (with Horizon's own launcher) before the instance plays. */
   native: boolean
   /** Its author signs every version. */
   signed: boolean
@@ -723,6 +723,8 @@ export interface ContentItem {
   versionNumber?: string
   iconUrl?: string
   update?: { versionId: string; versionNumber: string }
+  /** A Horizon native mod (`<id>.hnmod` here): code compiled into the game, always on. */
+  native?: boolean
 }
 
 /** A project picked in Discover, as the duplicate check and batch installs need it. */
@@ -1142,6 +1144,50 @@ export interface HorizonBuild {
   installed: boolean
   /** Still on GitHub (Horizon deletes dated builds after a week). */
   available: boolean
+}
+
+/** A native mod installed in a Horizon instance (`horizon-native-mods/<id>/`). */
+export interface NativeMod {
+  id: string
+  version: string
+  game: string
+  /** The Horizon commit it pins. */
+  horizon: string
+}
+
+/** Whether an instance's native mods are built into the game it plays. */
+export type NativeNeed = 'noMods' | 'upToDate' | 'firstBuild' | 'modsChanged' | 'baseChanged'
+
+export interface NativeBuildRecord {
+  fingerprint: string
+  base: string
+  profile: string
+  version: string
+  /** `id version` */
+  mods: string[]
+  /** Unix seconds. */
+  built: number
+}
+
+export interface NativeStatus {
+  mods: NativeMod[]
+  need: NativeNeed
+  base?: string | null
+  built?: NativeBuildRecord | null
+  /** No compiler downloaded yet: the first build downloads Rust and compiles the whole game. */
+  firstEver: boolean
+  building: boolean
+}
+
+/** Horizon's native compile cache (its `native/target/`), as its launcher reports it. */
+export interface NativeCacheInfo {
+  installed: boolean
+  path?: string | null
+  bytes: number
+  clearedBytes: number
+  limitGib: number
+  /** A build runs: the cache can't be read now. */
+  busy: boolean
 }
 
 export interface HorizonStatus {
@@ -2058,6 +2104,17 @@ export interface ResinApi {
     open(): Promise<void>
     /** The dated nightly builds an instance can be set to (its loaderVersion), newest first. */
     builds(): Promise<HorizonBuild[]>
+    /** An instance's native mods and whether they need building. */
+    nativeStatus(instanceId: string): Promise<NativeStatus>
+    /** Compiles the instance's native mods (a task); `trusted` is the player's answer to the red warning. */
+    nativeBuild(instanceId: string, trusted: boolean): Promise<NativeBuildRecord>
+    /** The last lines of the newest native build's log. */
+    nativeLog(lines?: number): Promise<string[]>
+    /** The instance's next start plays without its native mods. */
+    nativeSkipOnce(instanceId: string): Promise<void>
+    nativeCache(): Promise<NativeCacheInfo>
+    nativeCacheClear(): Promise<NativeCacheInfo>
+    nativeCacheLimit(gib: number): Promise<NativeCacheInfo>
   }
   /** Minecraft Bedrock Edition as installed from the Microsoft Store (Windows). */
   bedrock: {

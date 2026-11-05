@@ -226,6 +226,7 @@ pub async fn list(id: &str, area: Option<&str>) -> Result<Vec<ServerAddon>> {
                 version_number: e.map(|e| e.version_number.clone()).filter(|v| !v.is_empty()),
                 icon_url: e.and_then(|e| e.icon_url.clone()),
                 update: None,
+                native: false,
                 filename: n,
             },
         });

@@ -604,7 +604,16 @@ export function mockApi(): ResinApi {
       builds: async () => [
         { id: 'nightly-2026-11-04-3fb4c31', date: '2026-11-04', commit: '3fb4c31', installed: true, available: true },
         { id: 'nightly-2026-11-03-9d979ca', date: '2026-11-03', commit: '9d979ca', installed: false, available: true }
-      ]
+      ],
+      nativeStatus: async () => ({ mods: [], need: 'noMods' as const, base: 'nightly-2026-11-04-3fb4c31', built: null, firstEver: true, building: false }),
+      nativeBuild: async () => {
+        throw new Error('The preview has no Horizon launcher to build with.')
+      },
+      nativeLog: async () => [],
+      nativeSkipOnce: async () => undefined,
+      nativeCache: async () => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: 30, busy: false }),
+      nativeCacheClear: async () => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: 30, busy: false }),
+      nativeCacheLimit: async (gib: number) => ({ installed: false, path: null, bytes: 0, clearedBytes: 0, limitGib: gib, busy: false })
     },
     ...mockFiles(),
     ...migrate,

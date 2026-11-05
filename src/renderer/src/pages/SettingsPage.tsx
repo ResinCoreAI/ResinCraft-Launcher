@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, ArrowLeftRight, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { ConfirmModal, Logo, Segmented, Switch } from '../components/ui'
@@ -9,6 +9,7 @@ import { RemoteControlSection } from '../components/RemoteControl'
 import { BackupSection } from '../components/Backup'
 import { UpdatesSection } from '../components/Updates'
 import { PackUpdatesSetting } from '../components/PackUpdates'
+import { NativeCacheSection } from '../components/HorizonNative'
 import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../components/LaunchCommands'
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
@@ -199,6 +200,7 @@ const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'commands', label: 'commands.nav', icon: <Terminal size={16} /> },
   { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
   { id: 'storage', label: 'storage.nav', icon: <HardDrive size={16} /> },
+  { id: 'native-mods', label: 'native.settings.title', icon: <Hammer size={16} /> },
   { id: 'autobackup', label: 'settings.autoBackup', icon: <Archive size={16} /> },
   { id: 'backup', label: 'backup.nav', icon: <ArrowLeftRight size={16} /> },
   { id: 'remote', label: 'settings.remote', icon: <Globe size={16} /> },
@@ -586,6 +588,8 @@ export default function SettingsPage() {
           <StorageSection />
 
           <AutoBackupSection s={s} set={set} />
+
+          <NativeCacheSection />
 
           <BackupSection />
 

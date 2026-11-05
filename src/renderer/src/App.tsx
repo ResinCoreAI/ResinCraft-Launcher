@@ -11,6 +11,7 @@ import ThemeDecor, { SidebarPumpkin } from './components/ThemeDecor'
 import EasterEgg from './components/EasterEgg'
 import ThemeAmbient from './components/ThemeAmbient'
 import CrashFixer from './components/CrashFixer'
+import { NativeBuildHost } from './components/HorizonNative'
 import { PackUpdatesBanner } from './components/PackUpdates'
 import { JoinAnswersNotice } from './components/ServerList'
 import { RelayWatcher } from './components/ServerRelay'
@@ -203,6 +204,7 @@ export default function App() {
       <Dock />
       <UpdateBanner />
       <CrashFixer />
+      <NativeBuildHost />
       <EasterEgg />
       <ThemeDecor />
       <ThemeAmbient />

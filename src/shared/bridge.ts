@@ -52,7 +52,14 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       status: fn('horizon:status'),
       install: fn('horizon:install'),
       open: fn('horizon:open'),
-      builds: fn('horizon:builds')
+      builds: fn('horizon:builds'),
+      nativeStatus: fn('horizon:nativeStatus'),
+      nativeBuild: fn('horizon:nativeBuild'),
+      nativeLog: fn('horizon:nativeLog'),
+      nativeSkipOnce: fn('horizon:nativeSkipOnce'),
+      nativeCache: fn('horizon:nativeCache'),
+      nativeCacheClear: fn('horizon:nativeCacheClear'),
+      nativeCacheLimit: fn('horizon:nativeCacheLimit')
     },
     bedrock: {
       status: fn('bedrock:status'),

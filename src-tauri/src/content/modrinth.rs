@@ -611,6 +611,7 @@ pub async fn list_content(instance_id: &str, kind: ContentKind) -> Result<Vec<Co
             version_number: e.map(|e| e.version_number.clone()),
             icon_url: e.and_then(|e| e.icon_url.clone()),
             update: None,
+            native: false,
         });
     }
     items.sort_by(|a, b| display_cmp(a.title.as_deref().unwrap_or(&a.filename), b.title.as_deref().unwrap_or(&b.filename)));

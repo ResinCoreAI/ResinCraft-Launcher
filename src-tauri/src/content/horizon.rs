@@ -1,8 +1,8 @@
 //! Horizon's mod registry as a place to get content for Horizon instances: content mods (`.hmod`), modpacks
 //! (`.hpack`), resource packs and Horizon shader packs (`.hshader`), as Horizon's own launcher gets them. The
 //! registry is one file, `index.json` (horizon-rust/horizon `docs/api/mod-index.md`, schema 1), kept for half an
-//! hour. Project ids are "hz:<id>". Native mods are listed but can't be installed: Horizon's own launcher compiles
-//! them into the game.
+//! hour. Project ids are "hz:<id>". Native mods (`.hnmod`) are unpacked into `horizon-native-mods/<id>/`; Horizon's
+//! own launcher compiles them into the game before the instance plays (`game::horizon_native`).
 //!
 //! In a Horizon instance's game folder (the one holding `options.txt`): content mods go in `horizon-mods/` and are
 //! turned on in `horizon-mods.txt` (`mod.<id>:true`), resource packs in `resourcepacks/`, shader packs in
@@ -522,11 +522,6 @@ pub async fn versions_for(project_id: &str) -> Result<Vec<ProjectVersion>> {
 /// The version of `p` to install into `inst`: `wanted`, else the newest for its Minecraft version.
 fn choose<'a>(index: &Index, p: &'a Project, inst: &Instance, wanted: Option<&str>) -> Result<&'a Version> {
     match p.kind() {
-        Kind::NativeMod => bail_tr!(
-            "horizon.native",
-            "{name} is a native mod: Horizon's own launcher builds those into the game, so ResinCraft can't install it",
-            name = p.name
-        ),
         Kind::Unknown => bail_tr!("horizon.unknownKind", "ResinCraft can't install {name} ({kind}) yet", name = p.name, kind = p.kind),
         _ => {}
     }
@@ -594,7 +589,47 @@ pub(crate) async fn install_into(inst: &Instance, task: &Task, idx: &mut Content
         let _ = tokio::fs::remove_dir_all(&work).await;
         return result;
     }
+    if p.kind() == Kind::NativeMod {
+        return put_native(&index, &to, idx, p, v).await;
+    }
     put_file(&index, &to, idx, p, v, true).await
+}
+
+/// The content index's key for an installed native mod (its folder isn't a file the Content tab lists by name).
+fn native_key(id: &str) -> String {
+    index_key(ContentKind::Mod, &format!("{id}.hnmod"))
+}
+
+/// Downloads a native mod and unpacks it into `horizon-native-mods/<id>/`, checked as Horizon's registry checks
+/// it, replacing the version that's there. Nothing is compiled here: that waits for the player's go-ahead.
+pub async fn put_native(index: &Index, to: &Target<'_>, idx: &mut ContentIndex, p: &Project, v: &Version) -> Result<()> {
+    use crate::game::horizon_native::{unpack, NATIVE_DIR};
+    check_file(index, p, v)?;
+    let dir = to.game.join(NATIVE_DIR);
+    let work = dir.join(".downloads");
+    tokio::fs::create_dir_all(&work).await?;
+    let file = safe_join(&work, &v.file.name)?;
+    download_file(&download(v, &file)).await?;
+    let sha1 = hash_file(&file, HashAlgo::Sha1).await.unwrap_or_default();
+    let (path, into, id) = (file.clone(), dir.clone(), p.id.clone());
+    let unpacked = tokio::task::spawn_blocking(move || unpack(&path, &into, Some(&id))).await?;
+    let _ = tokio::fs::remove_dir_all(&work).await;
+    let m = unpacked?;
+    if m.version != v.version || m.game != v.game {
+        let _ = tokio::fs::remove_dir_all(dir.join(&p.id)).await;
+        bail_tr!(
+            "horizon.nativeMismatch",
+            "{name}'s file says it is {version} for Minecraft {game}, not what Horizon's registry lists",
+            name = p.name,
+            version = m.version,
+            game = m.game
+        );
+    }
+    idx.insert(
+        native_key(&p.id),
+        IndexEntry { project_id: p.pid(), version_id: v.version.clone(), version_number: v.version.clone(), title: p.name.clone(), icon_url: p.icon.clone(), sha1 },
+    );
+    Ok(())
 }
 
 /// Downloads one mod, resource pack or shader pack into the game folder (an older copy of it goes), a mod turned
@@ -667,24 +702,27 @@ pub async fn install_pack_file(index: &Index, to: &Target<'_>, task: Option<&Tas
                 check_file(index, q, w)?;
                 mods.push((q, w, m.on));
             }
-            Kind::NativeMod => native.push(q.name.clone()),
+            // Always on, as in Horizon: a pack's `on` doesn't apply.
+            Kind::NativeMod => {
+                check_file(index, q, w)?;
+                native.push((q, w));
+            }
             _ => bail_tr!("horizon.unknownKind", "ResinCraft can't install {name} ({kind}) yet", name = q.name, kind = q.kind),
         }
     }
-    if !native.is_empty() {
-        bail_tr!(
-            "horizon.packNative",
-            "{pack} needs native mods ({mods}): Horizon's own launcher builds those into the game, so ResinCraft can't install this pack",
-            pack = title,
-            mods = native.join(", ")
-        );
-    }
-    let total = mods.len().max(1) as f64;
+    let total = (mods.len() + native.len()).max(1) as f64;
+    let content = mods.len() as f64;
     for (n, (q, w, on)) in mods.into_iter().enumerate() {
         if let Some(task) = task {
             task.update(tr!("content.installingItem", "Installing {name}…", name = q.name), Some(n as f64 / total));
         }
         put_file(index, to, idx, q, w, on).await?;
+    }
+    for (n, (q, w)) in native.into_iter().enumerate() {
+        if let Some(task) = task {
+            task.update(tr!("content.installingItem", "Installing {name}…", name = q.name), Some((content + n as f64) / total));
+        }
+        put_native(index, to, idx, q, w).await?;
     }
     let (path, home) = (file.to_path_buf(), to.game.to_path_buf());
     tokio::task::spawn_blocking(move || extract_overrides(&path, &home)).await??;
@@ -822,14 +860,49 @@ pub async fn list_mods(inst: &Instance) -> Result<Vec<ContentItem>> {
             version_number: entry.map(|e| e.version_number.clone()),
             icon_url: entry.and_then(|e| e.icon_url.clone()),
             update: None,
+            native: false,
+        });
+    }
+    // Native mods: always on, shown as `<id>.hnmod`.
+    for m in crate::game::horizon_native::installed(&game) {
+        let entry = idx.get(&native_key(&m.id));
+        items.push(ContentItem {
+            filename: format!("{}.hnmod", m.id),
+            enabled: true,
+            size: dir_size(&game.join(crate::game::horizon_native::NATIVE_DIR).join(&m.id)).await,
+            kind: ContentKind::Mod,
+            title: Some(entry.map(|e| e.title.clone()).unwrap_or_else(|| m.id.clone())),
+            project_id: Some(entry.map(|e| e.project_id.clone()).unwrap_or_else(|| format!("{PREFIX}{}", m.id))),
+            version_id: Some(m.version.clone()),
+            version_number: Some(m.version.clone()),
+            icon_url: entry.and_then(|e| e.icon_url.clone()),
+            update: None,
+            native: true,
         });
     }
     items.sort_by_key(|i| i.title.clone().unwrap_or_else(|| i.filename.clone()).to_lowercase());
     Ok(items)
 }
 
+async fn dir_size(dir: &Path) -> u64 {
+    fn walk(d: &Path) -> u64 {
+        let list = std::fs::read_dir(d).into_iter().flatten().flatten();
+        list.map(|e| if e.file_type().is_ok_and(|t| t.is_dir()) { walk(&e.path()) } else { e.metadata().map(|m| m.len()).unwrap_or(0) }).sum()
+    }
+    let dir = dir.to_path_buf();
+    tokio::task::spawn_blocking(move || walk(&dir)).await.unwrap_or(0)
+}
+
+/// A native mod's id from its Content tab name (`<id>.hnmod`).
+fn native_id(filename: &str) -> Option<&str> {
+    filename.strip_suffix(".hnmod").filter(|id| valid_id(id))
+}
+
 /// Turns a content mod on or off in `horizon-mods.txt` (the file stays where it is).
 pub async fn toggle_mod(inst: &Instance, filename: &str) -> Result<()> {
+    if native_id(filename).is_some() {
+        bail_tr!("horizon.nativeAlwaysOn", "Native mods are always on, as in Horizon: remove one to stop using it.");
+    }
     let game = paths::game_dir(&inst.id);
     let idx = load_index(&inst.id).await;
     let id = mod_id(&game, filename, &idx).await?;
@@ -840,6 +913,12 @@ pub async fn toggle_mod(inst: &Instance, filename: &str) -> Result<()> {
 /// Moves a content mod to the Recycle Bin and drops its line from `horizon-mods.txt`.
 pub async fn remove_mod(inst: &Instance, filename: &str) -> Result<()> {
     let game = paths::game_dir(&inst.id);
+    if let Some(id) = native_id(filename) {
+        crate::game::horizon_native::remove(&game, id).await?;
+        let mut idx = load_index(&inst.id).await;
+        idx.remove(&native_key(id));
+        return save_index(&inst.id, &idx).await;
+    }
     let base = filename.strip_suffix(".disabled").unwrap_or(filename);
     let mut idx = load_index(&inst.id).await;
     let id = mod_id(&game, base, &idx).await.ok();

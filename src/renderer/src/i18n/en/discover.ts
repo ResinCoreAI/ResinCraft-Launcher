@@ -49,7 +49,6 @@ export default {
   'discover.someFailed': "Some results are missing: {sources} didn't answer.",
   'discover.allFailed': 'None of the sites answered. Check the internet connection and try again.',
   'discover.result.stars': 'Stars on GitHub',
-  'discover.horizon.native': "A native mod: Horizon's own launcher builds it into the game, so ResinCraft can't install it.",
   'discover.horizon.nativeChip': 'Native code',
   'discover.horizon.revoked': "Taken down by Horizon's registry: {reason}",
   'discover.horizon.revokedChip': 'Taken down',

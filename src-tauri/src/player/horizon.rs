@@ -105,6 +105,21 @@ fn program(dir: &Path) -> PathBuf {
     }
 }
 
+/// Horizon's launcher, when it is installed.
+pub fn installed_program() -> Option<PathBuf> {
+    let exe = program(&folder());
+    (exe.is_file() && folder().join(VERSION_FILE).is_file()).then_some(exe)
+}
+
+/// Horizon's launcher, installed first if it isn't: native mods are built with it.
+pub async fn ensure_program() -> Result<PathBuf> {
+    if let Some(exe) = installed_program() {
+        return Ok(exe);
+    }
+    install().await?;
+    installed_program().ok_or_else(|| anyhow!("Horizon's launcher didn't install"))
+}
+
 /// Starts Horizon's launcher on its own: it stays open when ResinCraft closes.
 fn open() -> Result<()> {
     let exe = program(&folder());
@@ -115,7 +130,7 @@ fn open() -> Result<()> {
     Ok(())
 }
 
-pub async fn handle(channel: &str, _args: Args) -> Result<Value> {
+pub async fn handle(channel: &str, args: Args) -> Result<Value> {
     match channel {
         "horizon:status" => json(status().await),
         "horizon:install" => json(install().await?),
@@ -124,6 +139,22 @@ pub async fn handle(channel: &str, _args: Args) -> Result<Value> {
             open()?;
             done()
         }
+        // Native mods (game/horizon_native.rs): [instance id].
+        "horizon:nativeStatus" => {
+            let inst = crate::core::instances::get(&args.get::<String>(0)?).await?;
+            json(crate::game::horizon_native::status(&inst).await?)
+        }
+        // [instance id, trusted]: trusted is the player's answer to the red warning shown before every build.
+        "horizon:nativeBuild" => json(crate::game::horizon_native::build(&args.get::<String>(0)?, args.get::<bool>(1)?).await?),
+        "horizon:nativeLog" => json(crate::game::horizon_native::log_tail(args.get::<Option<usize>>(0)?.unwrap_or(40).min(400)).await),
+        // The instance's next start plays without its native mods.
+        "horizon:nativeSkipOnce" => {
+            crate::game::horizon_native::skip_once(&args.get::<String>(0)?);
+            done()
+        }
+        "horizon:nativeCache" => json(crate::game::horizon_native::cache(false).await?),
+        "horizon:nativeCacheClear" => json(crate::game::horizon_native::cache(true).await?),
+        "horizon:nativeCacheLimit" => json(crate::game::horizon_native::set_cache_limit(args.get::<u64>(0)?).await?),
         _ => bail!("Unknown request: {channel}"),
     }
 }

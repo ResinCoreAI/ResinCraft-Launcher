@@ -3,6 +3,7 @@ import type { AccountView, AppInfo, ContentKind, GameEvent, Instance, LogLine, Q
 import { api } from './api'
 import { t, type EngineError } from './i18n'
 import { showTheme } from './customTheme'
+import { askNativeBuild } from './components/HorizonNative'
 
 export type Route =
   | { page: 'home' }
@@ -242,7 +243,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const bump = (n: number) => id && setStarting((s) => ({ ...s, [id]: Math.max(0, (s[id] ?? 0) + n) }))
       bump(1)
       try {
-        await launch()
+        try {
+          await launch()
+        } catch (e) {
+          // A Horizon instance's native mods aren't built: the build dialog (with its warning) first, then again.
+          if (!id || (e as EngineError).key !== 'horizon.nativeNeedsBuild') throw e
+          const answer = await askNativeBuild(id)
+          if (answer === 'cancel') return false
+          if (answer === 'skip') await api.horizon.nativeSkipOnce(id)
+          await launch()
+        }
         return true
       } catch (e) {
         toast((e as Error).message, 'error')

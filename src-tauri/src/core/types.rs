@@ -760,6 +760,9 @@ pub struct ContentItem {
     pub icon_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub update: Option<UpdateRef>,
+    /// A Horizon native mod: code compiled into the game, always on.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub native: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

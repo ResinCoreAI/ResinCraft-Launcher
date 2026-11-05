@@ -47,6 +47,7 @@ import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
 import { PackBuilderBanner } from '../components/OwnPack'
 import { ProjectPage } from '../components/ProjectPage'
 import { ServerList } from '../components/ServerList'
+import { NativeInstallNotice } from '../components/HorizonNative'
 
 /** Which half of Discover was open last (this session). */
 const VIEW_KEY = 'resin.discoverView'
@@ -283,6 +284,8 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const [picking, setPicking] = useState<ProjectHit[]>()
   const [choosing, setChoosing] = useState<{ hit: ProjectHit; inst?: Instance; current?: ContentItem }>()
   const [asking, setAsking] = useState<{ rows: DupRow[]; inst: Instance; total: number; answer: (a: DupAnswer | null) => void }>()
+  /** Horizon native mods about to be installed: what native code is, asked first. */
+  const [nativeAsk, setNativeAsk] = useState<{ names: string[]; answer: (ok: boolean) => void }>()
   const [showSelection, setShowSelection] = useState(false)
   const [checking, setChecking] = useState(false)
   /** Details pages open on top of the results; dependencies stack up, Back goes down one. */
@@ -298,13 +301,11 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const blockedWhy = (h: ProjectHit): string | undefined => {
     const f = h.horizon
     if (!f) return undefined
-    if (f.native) return t('discover.horizon.native')
     if (f.revoked) return t('discover.horizon.revoked', { reason: f.revoked })
     if (target && !f.games.includes(target.mcVersion)) return t('discover.horizon.otherGame', { versions: f.games.join(', ') || '?', mc: target.mcVersion })
     return undefined
   }
-  const blockedLabel = (h: ProjectHit): string =>
-    h.horizon?.native ? t('discover.horizon.nativeChip') : h.horizon?.revoked ? t('discover.horizon.revokedChip') : t('discover.horizon.otherGameChip')
+  const blockedLabel = (h: ProjectHit): string => (h.horizon?.revoked ? t('discover.horizon.revokedChip') : t('discover.horizon.otherGameChip'))
 
   useEffect(() => {
     void api.versions.list().then((v) => setVersions(v.filter((x) => x.type === 'release')))
@@ -517,6 +518,12 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   const installPicks = async (list: ProjectHit[], inst: Instance, versionId?: string, from?: Element, onStart?: () => void): Promise<boolean> => {
     const mark = (state: InstallState | undefined, hits: ProjectHit[]) =>
       setInstalling((s) => ({ ...s, ...Object.fromEntries(hits.map((h) => [h.id, state])) }))
+    const native = list.filter((h) => h.horizon?.native)
+    if (native.length) {
+      const ok = await new Promise<boolean>((resolve) => setNativeAsk({ names: native.map((h) => h.title), answer: resolve }))
+      setNativeAsk(undefined)
+      if (!ok) return false
+    }
     mark('busy', list)
     const plan = await resolveDuplicates(list, inst, versionId)
     if (!plan) {
@@ -897,7 +904,11 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                             {categoryLabel(c)}
                           </span>
                         ))}
-                        {h.horizon?.native && <span className="chip">{t('discover.horizon.nativeChip')}</span>}
+                        {h.horizon?.native && (
+                          <span className="chip" title={t('native.chipHint')}>
+                            {t('discover.horizon.nativeChip')}
+                          </span>
+                        )}
                       </div>
                       {why && !have && <p className="hint">{why}</p>}
                     </div>
@@ -1034,6 +1045,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         />
       )}
 
+      {nativeAsk && <NativeInstallNotice names={nativeAsk.names} onAnswer={nativeAsk.answer} />}
       {asking && <DuplicatesDialog rows={asking.rows} instance={asking.inst} total={asking.total} sites={SOURCES} onAnswer={asking.answer} />}
 
       {choosing && (

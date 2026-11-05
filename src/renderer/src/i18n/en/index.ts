@@ -16,6 +16,7 @@ import home from './home'
 import instance from './instance'
 import library from './library'
 import menu from './menu'
+import native from './native'
 import migrate from './migrate'
 import friends from './friends'
 import quickjoin from './quickjoin'
@@ -38,6 +39,7 @@ const en = {
   ...library,
   ...bedrock,
   ...discover,
+  ...native,
   ...instance,
   ...art,
   ...tabs,

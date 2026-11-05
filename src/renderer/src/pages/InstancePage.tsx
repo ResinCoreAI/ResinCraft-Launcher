@@ -58,6 +58,7 @@ import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 import { instanceOwner, PackChip, PackVersionSetting } from '../components/PackVersion'
 import { VersionSection } from '../components/VersionSettings'
 import { HorizonBuildSection } from '../components/HorizonBuild'
+import { NativeBuildBar } from '../components/HorizonNative'
 import { GameMemoryChip } from '../components/Memory'
 
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
@@ -218,7 +219,7 @@ const KIND_FOLDER: Record<Kind, string> = { mod: 'mods', resourcepack: 'resource
 /** The folder of a kind in an instance: Horizon's content mods (from its registry) have their own. */
 const folderOf = (inst: Instance, kind: Kind) => (kind === 'mod' && inst.loader === 'horizon' ? 'horizon-mods' : KIND_FOLDER[kind])
 /** A file's name without its extension, for files nobody named. */
-const bareName = (filename: string) => filename.replace(/\.(jar|zip|hmod|hshader)(\.disabled)?$/, '')
+const bareName = (filename: string) => filename.replace(/\.(jar|zip|hmod|hnmod|hshader)(\.disabled)?$/, '')
 /** Identifies a file across enabling and disabling (which adds or drops ".disabled"). */
 const fileKey = (m: ContentItem) => m.filename.replace(/\.disabled$/, '')
 
@@ -342,7 +343,8 @@ function ContentTab({ inst }: { inst: Instance }) {
   const toggles = useRef<Promise<void>>(Promise.resolve())
   /** Turns each file on or off (only the ones not already that way): shown right away, renamed in the background. */
   const setEnabled = (list: ContentItem[], enabled: boolean) => {
-    const changing = list.filter((m) => m.enabled !== enabled)
+    // Native mods are always on.
+    const changing = list.filter((m) => m.enabled !== enabled && !m.native)
     if (!changing.length) return
     const keys = new Set(changing.map(fileKey))
     const base = (f: string) => f.replace(/\.disabled$/, '')
@@ -403,7 +405,7 @@ function ContentTab({ inst }: { inst: Instance }) {
     const outdated = list.filter((m) => m.update)
     const page = one && projectUrl(one.projectId)
     return [
-      one
+      one && !one.native
         ? {
             label: t(one.enabled ? 'instance.content.disable' : 'instance.content.enable'),
             icon: one.enabled ? <ToggleLeft /> : <ToggleRight />,
@@ -436,7 +438,9 @@ function ContentTab({ inst }: { inst: Instance }) {
             label: t('files.showInExplorer'),
             icon: <FolderOpen />,
             onSelect: () =>
-              void api.files.reveal({ kind: 'instance', id: inst.id }, `${folderOf(inst, kind)}/${one.filename}`).catch((e) => toast(e.message, 'error'))
+              void api.files
+                .reveal({ kind: 'instance', id: inst.id }, one.native ? `horizon-native-mods/${bareName(one.filename)}` : `${folderOf(inst, kind)}/${one.filename}`)
+                .catch((e) => toast(e.message, 'error'))
           }
         : { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id, folderOf(inst, kind)) },
       {
@@ -530,6 +534,8 @@ function ContentTab({ inst }: { inst: Instance }) {
         </button>
       </div>
 
+      {kind === 'mod' && inst.loader === 'horizon' && items?.some((m) => m.native) && <NativeBuildBar inst={inst} changed={items} />}
+
       {kind === 'mod' && inst.loader === 'vanilla' ? (
         <Empty icon={<Blocks />} title={t('instance.content.vanillaTitle')}>
           {t('instance.content.vanillaBody')}
@@ -579,6 +585,11 @@ function ContentTab({ inst }: { inst: Instance }) {
                       Horizon
                     </span>
                   )}
+                  {m.native && (
+                    <span className="chip" style={{ marginLeft: 8, height: 20, fontSize: 11 }} title={t('native.chipHint')}>
+                      {t('native.chip')}
+                    </span>
+                  )}
                 </div>
                 <div className="file ellipsis">
                   {m.filename} · {bytes(m.size)}
@@ -603,11 +614,17 @@ function ContentTab({ inst }: { inst: Instance }) {
                   {t('instance.content.manualFile')}
                 </span>
               )}
-              <Switch
-                on={m.enabled}
-                label={m.enabled ? t('instance.content.disable') : t('instance.content.enable')}
-                onChange={() => setEnabled([m], !m.enabled)}
-              />
+              {m.native ? (
+                <span className="hint" title={t('native.alwaysOnHint')}>
+                  {t('native.alwaysOn')}
+                </span>
+              ) : (
+                <Switch
+                  on={m.enabled}
+                  label={m.enabled ? t('instance.content.disable') : t('instance.content.enable')}
+                  onChange={() => setEnabled([m], !m.enabled)}
+                />
+              )}
               <button className="btn ghost icon sm danger" title={t('common.remove')} onClick={() => setRemoving([m])}>
                 <Trash2 />
               </button>

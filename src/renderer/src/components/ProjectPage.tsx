@@ -308,7 +308,7 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
               error={versionsError}
               target={target}
               installed={installed}
-              busy={busy || (!!blocked && !!p.horizon && (p.horizon.native || !!p.horizon.revoked))}
+              busy={busy || (!!blocked && !!p.horizon?.revoked)}
               onOpen={onOpen}
               onInstall={onInstall}
             />
@@ -366,7 +366,7 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
                 {t((hit.horizon ?? p.horizon)!.signed ? 'project.horizon.signed' : 'project.horizon.unsigned')}
               </span>
               {(hit.horizon ?? p.horizon)!.native && (
-                <span className="side-line" title={t('discover.horizon.native')}>
+                <span className="side-line" title={t('native.chipHint')}>
                   <Code /> {t('discover.horizon.nativeChip')}
                 </span>
               )}
