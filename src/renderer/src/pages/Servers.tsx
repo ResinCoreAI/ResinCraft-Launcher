@@ -67,7 +67,7 @@ import { RestoreModal } from '../components/BackupRestore'
 import { ServerOriginChips, ServerPackSettings } from '../components/ServerPacks'
 import { PackUpdateBadge } from '../components/PackUpdates'
 import RelayNames from '../components/RelayNames'
-import RelayPlan from '../components/RelayPlan'
+import { StoreLink } from '../components/StoreLink'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
 import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, openMenuBelow, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
@@ -498,7 +498,7 @@ function ServerList({
         </div>
       )}
       {!pc && !isConsole && <RelayNames reload={reload} />}
-      {!pc && !isConsole && <RelayPlan />}
+      {!pc && !isConsole && <StoreLink />}
       {deleting && (
         <ConfirmModal
           title={t('servers.settings.deleteTitle', { name: deleting.name })}

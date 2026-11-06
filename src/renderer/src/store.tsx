@@ -16,6 +16,7 @@ export type Route =
   | { page: 'horizon' }
   | { page: 'quickjoin' }
   | { page: 'admin' }
+  | { page: 'store' }
   | { page: 'settings' }
 
 export type GameState = GameEvent['state']

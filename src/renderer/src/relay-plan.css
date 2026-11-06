@@ -109,3 +109,23 @@
 .rp-redeem .input {
   flex: 1;
 }
+
+/* The Store page (pages/Store.tsx): the same plan, with room for the products. */
+.rp-page .rp-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.rp-page .rp-card {
+  padding: 16px;
+  gap: 8px;
+}
+
+.rp-page .rp-price {
+  font-size: 22px;
+}
+
+.rp-page h4 {
+  font-size: 14px;
+  margin-top: 22px;
+}

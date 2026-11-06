@@ -369,7 +369,8 @@ function SubRow({
   )
 }
 
-export default function RelayPlan() {
+/** The add-ons and packs, the account's subscriptions and gift codes. `page`: as the Store page (no section title). */
+export default function RelayPlan({ page, empty }: { page?: boolean; empty?: React.ReactNode } = {}) {
   const { toast } = useStore()
   const { plans, setPlans, load } = usePlans()
   const [picked, setPicked] = useState<string>()
@@ -384,7 +385,8 @@ export default function RelayPlan() {
 
   // Nothing for sale anywhere (payments off, no relay, an older relay): nothing to show.
   const selling = plans?.accounts.filter((a) => a.plan?.enabled) ?? []
-  if (!plans?.available || selling.length === 0) return null
+  if (!plans) return page ? <Loader2 className="spin" /> : null
+  if (!plans.available || selling.length === 0) return <>{empty ?? null}</>
   const a = selling.find((x) => x.account === picked) ?? selling[0]
   const plan = a.plan!
   const put = (p: PlanInfo) => setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })
@@ -448,9 +450,9 @@ export default function RelayPlan() {
   }
 
   return (
-    <div className="settings-section relay-plan">
+    <div className={page ? 'relay-plan rp-page' : 'settings-section relay-plan'}>
       <div className="row">
-        <h3 className="grow">{t('servers.relayPlan.title')}</h3>
+        <h3 className="grow">{page ? '' : t('servers.relayPlan.title')}</h3>
         {plan.test_mode && <span className="chip compact warn">{t('servers.relayPlan.testMode')}</span>}
         <button className="btn ghost icon sm" title={t('common.refresh')} onClick={() => void load()}>
           <RefreshCw />
