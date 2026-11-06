@@ -3709,7 +3709,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Toplam",
   "servers.relayPlan.discount": "İndirim",
   "servers.relayPlan.discountLine": "{discount} indirimden önce {price}",
-  "servers.relayPlan.cartHint": "Sepetteki her şey tek bir aboneliktir: birlikte ödenir, yenilenir ve iptal edilir.",
+  "servers.relayPlan.cartHint": "Varsayılan olarak seçtiğiniz dönem için bir kez ödenir. Sepeti birlikte yenilenen ve iptal edilen tek bir aboneliğe yalnızca \"Otomatik yenile\" dönüştürür.",
   "servers.relayPlan.belowMin": "Toplam, Stripe'ın en düşük tahsilatının ({min}) altında: şimdi bir şey alınmaz, sonraki faturaya eklenir.",
   "servers.relayPlan.carried": "{amount}, Stripe'ın en düşük tahsilatının altında olduğundan şimdi alınmaz: {date} tarihli sonraki faturanıza eklenir. Bitirmek için kartınızı kaydedin.",
   "servers.relayPlan.renewTitle": "{name} yenile",
@@ -3749,6 +3749,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "{date} tarihine kadar",
   "servers.relayPlan.notForSaleNow": "Verdiği şey artık satılmıyor, bu yüzden yenilenemez.",
   "engine.hostRelay.namePaused": "{name} ResinCraft Relay'i kaybetti: hesabınızın kullandığından daha az adı veya sunucusu var. Mağazada yenileyin ya da Sunucu önceliğinde yukarı taşıyın.",
+  "servers.relayPlan.notPaidQr": "Henüz ödenmedi: QR kodu okutun ya da başka bir ödeme yolu seçin.",
+  "servers.relayPlan.openQr": "QR kodu tarayıcıda aç",
+  "servers.relayPlan.simulateQr": "Okutmayı tarayıcıda dene (test modu)",
+  "servers.relayPlan.checkPaid": "Ödedim: kontrol et",
 }
 
 export default dict

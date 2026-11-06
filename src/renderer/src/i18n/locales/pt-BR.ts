@@ -3725,7 +3725,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Total",
   "servers.relayPlan.discount": "Desconto",
   "servers.relayPlan.discountLine": "{price} antes de um desconto de {discount}",
-  "servers.relayPlan.cartHint": "Tudo no carrinho é uma assinatura: paga, renovada e cancelada junto.",
+  "servers.relayPlan.cartHint": "Por padrão, pago uma vez pelo período escolhido. Só \"Renovar automaticamente\" faz do carrinho uma assinatura renovada e cancelada junto.",
   "servers.relayPlan.belowMin": "O total está abaixo da cobrança mínima da Stripe ({min}): nada é cobrado agora, vai para a próxima fatura.",
   "servers.relayPlan.carried": "{amount} está abaixo da cobrança mínima da Stripe, então nada é cobrado agora: vai para sua próxima fatura em {date}. Salve seu cartão para terminar.",
   "servers.relayPlan.renewTitle": "Renovar {name}",
@@ -3765,6 +3765,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "até {date}",
   "servers.relayPlan.notForSaleNow": "O que ele dava não está mais à venda, então não pode ser renovado.",
   "engine.hostRelay.namePaused": "{name} perdeu o ResinCraft Relay: sua conta tem menos nomes ou servidores do que usa. Renove na Loja ou suba-o em Prioridade dos servidores.",
+  "servers.relayPlan.notPaidQr": "Ainda não pago: escaneie o QR code ou escolha outra forma de pagamento.",
+  "servers.relayPlan.openQr": "Abrir o QR code no navegador",
+  "servers.relayPlan.simulateQr": "Simular a leitura no navegador (modo de teste)",
+  "servers.relayPlan.checkPaid": "Já paguei: verificar",
 }
 
 export default dict

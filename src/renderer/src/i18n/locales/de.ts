@@ -3713,7 +3713,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Gesamt",
   "servers.relayPlan.discount": "Rabatt",
   "servers.relayPlan.discountLine": "{price} vor einem Rabatt von {discount}",
-  "servers.relayPlan.cartHint": "Alles im Warenkorb ist ein Abo: zusammen bezahlt, verlängert und gekündigt.",
+  "servers.relayPlan.cartHint": "Standardmäßig einmal für den gewählten Zeitraum bezahlt. Nur „Automatisch verlängern“ macht den Warenkorb zu einem Abo, das zusammen verlängert und gekündigt wird.",
   "servers.relayPlan.belowMin": "Der Betrag liegt unter Stripes Mindestbetrag ({min}): Jetzt wird nichts berechnet, er kommt auf die nächste Rechnung.",
   "servers.relayPlan.carried": "{amount} liegt unter Stripes Mindestbetrag, daher wird jetzt nichts berechnet: Es kommt auf deine nächste Rechnung am {date}. Speichere deine Karte, um abzuschließen.",
   "servers.relayPlan.renewTitle": "{name} verlängern",
@@ -3753,6 +3753,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "bis {date}",
   "servers.relayPlan.notForSaleNow": "Was es gab, wird nicht mehr verkauft, daher kann es nicht verlängert werden.",
   "engine.hostRelay.namePaused": "{name} hat ResinCraft Relay verloren: Dein Konto hat weniger Namen oder Server, als es nutzt. Verlängere im Store oder schiebe es in der Server-Priorität nach oben.",
+  "servers.relayPlan.notPaidQr": "Noch nicht bezahlt: Scanne den QR-Code oder wähle eine andere Zahlungsart.",
+  "servers.relayPlan.openQr": "QR-Code im Browser öffnen",
+  "servers.relayPlan.simulateQr": "Scan im Browser simulieren (Testmodus)",
+  "servers.relayPlan.checkPaid": "Bezahlt: prüfen",
 }
 
 export default dict

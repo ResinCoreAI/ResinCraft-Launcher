@@ -3732,7 +3732,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Totale",
   "servers.relayPlan.discount": "Sconto",
   "servers.relayPlan.discountLine": "{price} prima di uno sconto di {discount}",
-  "servers.relayPlan.cartHint": "Tutto il carrello è un solo abbonamento: pagato, rinnovato e annullato insieme.",
+  "servers.relayPlan.cartHint": "Di norma si paga una volta per il periodo scelto. Solo «Rinnovo automatico» rende il carrello un abbonamento che si rinnova e si annulla insieme.",
   "servers.relayPlan.belowMin": "Il totale è sotto l'addebito minimo di Stripe ({min}): ora non si paga nulla, si aggiunge alla prossima fattura.",
   "servers.relayPlan.carried": "{amount} è sotto l'addebito minimo di Stripe, quindi ora non si paga nulla: si aggiunge alla prossima fattura del {date}. Salva la carta per finire.",
   "servers.relayPlan.renewTitle": "Rinnova {name}",
@@ -3772,6 +3772,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "fino al {date}",
   "servers.relayPlan.notForSaleNow": "Ciò che dava non è più in vendita, quindi non si può rinnovare.",
   "engine.hostRelay.namePaused": "{name} ha perso ResinCraft Relay: il tuo account ha meno nomi o server di quelli che usa. Rinnova nello Store o spostalo in alto in Priorità dei server.",
+  "servers.relayPlan.notPaidQr": "Non ancora pagato: scansiona il codice QR o scegli un altro modo di pagare.",
+  "servers.relayPlan.openQr": "Apri il codice QR nel browser",
+  "servers.relayPlan.simulateQr": "Simula la scansione nel browser (modalità test)",
+  "servers.relayPlan.checkPaid": "Ho pagato: controlla",
 }
 
 export default dict

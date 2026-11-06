@@ -3686,7 +3686,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "合计",
   "servers.relayPlan.discount": "折扣",
   "servers.relayPlan.discountLine": "折扣 {discount} 前为 {price}",
-  "servers.relayPlan.cartHint": "购物车里的所有内容是同一个订阅：一起付款、续订和取消。",
+  "servers.relayPlan.cartHint": "默认按所选周期一次性付款。只有选择“自动续订”时，购物车才会成为一起续订、一起取消的订阅。",
   "servers.relayPlan.belowMin": "总额低于 Stripe 的最低收费 ({min})：现在不收费，计入下一张账单。",
   "servers.relayPlan.carried": "{amount} 低于 Stripe 的最低收费，现在不收费：将计入 {date} 的下一张账单。保存卡片即可完成。",
   "servers.relayPlan.renewTitle": "续期 {name}",
@@ -3726,6 +3726,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "至 {date}",
   "servers.relayPlan.notForSaleNow": "其内容已不再出售，无法续期。",
   "engine.hostRelay.namePaused": "{name} 已失去 ResinCraft Relay：你的账户可用的名称或服务器少于正在使用的数量。请在商店续期，或在服务器优先级中上移。",
+  "servers.relayPlan.notPaidQr": "尚未付款：请扫描二维码，或选择其他付款方式。",
+  "servers.relayPlan.openQr": "在浏览器中打开二维码",
+  "servers.relayPlan.simulateQr": "在浏览器中模拟扫码（测试模式）",
+  "servers.relayPlan.checkPaid": "我已付款：检查",
 }
 
 export default dict

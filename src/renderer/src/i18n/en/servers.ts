@@ -966,7 +966,7 @@ export default {
   "servers.relayPlan.total": "Total",
   "servers.relayPlan.discount": "Discount",
   "servers.relayPlan.discountLine": "{price} before a discount of {discount}",
-  "servers.relayPlan.cartHint": "Everything in the cart is one subscription: paid together, renewed together and cancelled together.",
+  "servers.relayPlan.cartHint": "Paid once for the period you pick, by default. Only \"Renew automatically\" makes the cart one subscription that renews and is cancelled together.",
   "servers.relayPlan.belowMin": "The total is below Stripe's smallest charge ({min}): nothing is charged now, it's added to the next invoice.",
   "servers.relayPlan.carried": "{amount} is below Stripe's smallest charge, so nothing is charged now: it's added to your next invoice on {date}. Save your card to finish.",
   "servers.relayPlan.renewTitle": "Renew {name}",
@@ -1004,5 +1004,9 @@ export default {
   "servers.relayPlan.method.truemoney": "TrueMoney angpao",
   "servers.relayPlan.method.free": "a promo code",
   "servers.relayPlan.until": "until {date}",
-  "servers.relayPlan.notForSaleNow": "What it gave isn't for sale any more, so it can't be renewed."
+  "servers.relayPlan.notForSaleNow": "What it gave isn't for sale any more, so it can't be renewed.",
+  "servers.relayPlan.notPaidQr": "Not paid yet: scan the QR code, or pick another way to pay.",
+  "servers.relayPlan.openQr": "Open the QR code in your browser",
+  "servers.relayPlan.simulateQr": "Simulate the scan in your browser (test mode)",
+  "servers.relayPlan.checkPaid": "I've paid: check"
 }

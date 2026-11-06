@@ -3765,7 +3765,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Razem",
   "servers.relayPlan.discount": "Rabat",
   "servers.relayPlan.discountLine": "{price} przed rabatem {discount}",
-  "servers.relayPlan.cartHint": "Cały koszyk to jedna subskrypcja: opłacana, odnawiana i anulowana razem.",
+  "servers.relayPlan.cartHint": "Domyślnie płacisz raz za wybrany okres. Tylko „Odnawiaj automatycznie” robi z koszyka jedną subskrypcję odnawianą i anulowaną razem.",
   "servers.relayPlan.belowMin": "Suma jest poniżej minimalnej opłaty Stripe ({min}): nic nie jest pobierane teraz, trafi na następną fakturę.",
   "servers.relayPlan.carried": "{amount} jest poniżej minimalnej opłaty Stripe, więc nic nie jest pobierane teraz: trafi na następną fakturę {date}. Zapisz kartę, aby zakończyć.",
   "servers.relayPlan.renewTitle": "Odnów {name}",
@@ -3805,6 +3805,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "do {date}",
   "servers.relayPlan.notForSaleNow": "To, co dawało, nie jest już w sprzedaży, więc nie da się tego odnowić.",
   "engine.hostRelay.namePaused": "{name} utracił ResinCraft Relay: Twoje konto ma mniej nazw lub serwerów, niż używa. Odnów w Sklepie albo przesuń wyżej w Priorytecie serwerów.",
+  "servers.relayPlan.notPaidQr": "Jeszcze nie zapłacono: zeskanuj kod QR albo wybierz inny sposób płatności.",
+  "servers.relayPlan.openQr": "Otwórz kod QR w przeglądarce",
+  "servers.relayPlan.simulateQr": "Symuluj skanowanie w przeglądarce (tryb testowy)",
+  "servers.relayPlan.checkPaid": "Zapłaciłem: sprawdź",
 }
 
 export default dict

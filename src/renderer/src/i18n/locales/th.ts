@@ -3688,7 +3688,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "รวม",
   "servers.relayPlan.discount": "ส่วนลด",
   "servers.relayPlan.discountLine": "{price} ก่อนส่วนลด {discount}",
-  "servers.relayPlan.cartHint": "ทุกอย่างในตะกร้าเป็นการสมัครเดียวกัน ชำระ ต่ออายุ และยกเลิกพร้อมกัน",
+  "servers.relayPlan.cartHint": "ค่าเริ่มต้นคือจ่ายครั้งเดียวตามรอบที่เลือก เฉพาะ \"ต่ออายุอัตโนมัติ\" ที่ทำให้ตะกร้าเป็นการสมัครเดียวที่ต่ออายุและยกเลิกพร้อมกัน",
   "servers.relayPlan.belowMin": "ยอดรวมต่ำกว่ายอดเรียกเก็บขั้นต่ำของ Stripe ({min}) จึงยังไม่เรียกเก็บตอนนี้ จะรวมในใบแจ้งหนี้รอบถัดไป",
   "servers.relayPlan.carried": "{amount} ต่ำกว่ายอดขั้นต่ำของ Stripe จึงยังไม่เรียกเก็บตอนนี้ จะรวมในใบแจ้งหนี้วันที่ {date} บันทึกบัตรเพื่อทำรายการให้เสร็จ",
   "servers.relayPlan.renewTitle": "ต่ออายุ {name}",
@@ -3728,6 +3728,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "ถึง {date}",
   "servers.relayPlan.notForSaleNow": "รายการนี้ไม่มีขายแล้ว จึงต่ออายุไม่ได้",
   "engine.hostRelay.namePaused": "{name} ไม่ได้ใช้ ResinCraft Relay แล้ว บัญชีมีชื่อหรือเซิร์ฟเวอร์น้อยกว่าที่ใช้ ต่ออายุในร้านค้า หรือเลื่อนขึ้นในลำดับความสำคัญของเซิร์ฟเวอร์",
+  "servers.relayPlan.notPaidQr": "ยังไม่ได้ชำระ สแกน QR Code หรือเลือกวิธีชำระอื่น",
+  "servers.relayPlan.openQr": "เปิด QR Code ในเบราว์เซอร์",
+  "servers.relayPlan.simulateQr": "จำลองการสแกนในเบราว์เซอร์ (โหมดทดสอบ)",
+  "servers.relayPlan.checkPaid": "ชำระแล้ว: ตรวจสอบ",
 }
 
 export default dict

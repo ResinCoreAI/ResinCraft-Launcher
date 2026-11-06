@@ -3758,7 +3758,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Итого",
   "servers.relayPlan.discount": "Скидка",
   "servers.relayPlan.discountLine": "{price} до скидки {discount}",
-  "servers.relayPlan.cartHint": "Вся корзина — одна подписка: оплачивается, продлевается и отменяется целиком.",
+  "servers.relayPlan.cartHint": "По умолчанию оплачивается один раз за выбранный срок. Только «Автопродление» делает корзину одной подпиской, которая продлевается и отменяется целиком.",
   "servers.relayPlan.belowMin": "Сумма ниже минимального платежа Stripe ({min}): сейчас ничего не списывается, сумма добавится к следующему счёту.",
   "servers.relayPlan.carried": "{amount} ниже минимального платежа Stripe, поэтому сейчас ничего не списывается: сумма добавится к счёту {date}. Сохраните карту, чтобы завершить.",
   "servers.relayPlan.renewTitle": "Продлить {name}",
@@ -3798,6 +3798,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "до {date}",
   "servers.relayPlan.notForSaleNow": "То, что оно давало, больше не продаётся, поэтому продлить нельзя.",
   "engine.hostRelay.namePaused": "{name} потерял ResinCraft Relay: у учётной записи меньше имён или серверов, чем используется. Продлите в Магазине или поднимите его в приоритете серверов.",
+  "servers.relayPlan.notPaidQr": "Ещё не оплачено: отсканируйте QR-код или выберите другой способ оплаты.",
+  "servers.relayPlan.openQr": "Открыть QR-код в браузере",
+  "servers.relayPlan.simulateQr": "Имитировать сканирование в браузере (тестовый режим)",
+  "servers.relayPlan.checkPaid": "Я оплатил: проверить",
 }
 
 export default dict

@@ -3686,7 +3686,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "合計",
   "servers.relayPlan.discount": "折扣",
   "servers.relayPlan.discountLine": "折扣 {discount} 前為 {price}",
-  "servers.relayPlan.cartHint": "購物車裡的所有內容是同一個訂閱：一起付款、續訂與取消。",
+  "servers.relayPlan.cartHint": "預設按所選週期一次性付款。只有選擇「自動續訂」時，購物車才會成為一起續訂、一起取消的訂閱。",
   "servers.relayPlan.belowMin": "總額低於 Stripe 的最低收費 ({min})：現在不收費，計入下一張帳單。",
   "servers.relayPlan.carried": "{amount} 低於 Stripe 的最低收費，現在不收費：將計入 {date} 的下一張帳單。儲存卡片即可完成。",
   "servers.relayPlan.renewTitle": "續期 {name}",
@@ -3726,6 +3726,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "至 {date}",
   "servers.relayPlan.notForSaleNow": "其內容已不再販售，無法續期。",
   "engine.hostRelay.namePaused": "{name} 已失去 ResinCraft Relay：你的帳號可用的名稱或伺服器少於正在使用的數量。請在商店續期，或在伺服器優先順序中上移。",
+  "servers.relayPlan.notPaidQr": "尚未付款：請掃描 QR 碼，或選擇其他付款方式。",
+  "servers.relayPlan.openQr": "在瀏覽器中開啟 QR 碼",
+  "servers.relayPlan.simulateQr": "在瀏覽器中模擬掃碼（測試模式）",
+  "servers.relayPlan.checkPaid": "我已付款：檢查",
 }
 
 export default dict

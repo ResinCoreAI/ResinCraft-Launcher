@@ -3696,7 +3696,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Tổng",
   "servers.relayPlan.discount": "Giảm giá",
   "servers.relayPlan.discountLine": "{price} trước khi giảm {discount}",
-  "servers.relayPlan.cartHint": "Mọi thứ trong giỏ là một gói đăng ký: thanh toán, gia hạn và hủy cùng nhau.",
+  "servers.relayPlan.cartHint": "Mặc định trả một lần cho kỳ bạn chọn. Chỉ \"Tự gia hạn\" mới biến giỏ hàng thành một gói đăng ký gia hạn và hủy cùng nhau.",
   "servers.relayPlan.belowMin": "Tổng thấp hơn mức thu tối thiểu của Stripe ({min}): chưa thu bây giờ, sẽ cộng vào hóa đơn kế tiếp.",
   "servers.relayPlan.carried": "{amount} thấp hơn mức thu tối thiểu của Stripe nên chưa thu bây giờ: sẽ cộng vào hóa đơn ngày {date}. Lưu thẻ để hoàn tất.",
   "servers.relayPlan.renewTitle": "Gia hạn {name}",
@@ -3736,6 +3736,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "đến {date}",
   "servers.relayPlan.notForSaleNow": "Mục này không còn bán nữa nên không thể gia hạn.",
   "engine.hostRelay.namePaused": "{name} đã mất ResinCraft Relay: tài khoản có ít tên hoặc máy chủ hơn số đang dùng. Gia hạn trong Cửa hàng, hoặc đưa lên trong Thứ tự ưu tiên máy chủ.",
+  "servers.relayPlan.notPaidQr": "Chưa thanh toán: quét mã QR, hoặc chọn cách thanh toán khác.",
+  "servers.relayPlan.openQr": "Mở mã QR trong trình duyệt",
+  "servers.relayPlan.simulateQr": "Mô phỏng quét trong trình duyệt (chế độ thử)",
+  "servers.relayPlan.checkPaid": "Tôi đã trả: kiểm tra",
 }
 
 export default dict

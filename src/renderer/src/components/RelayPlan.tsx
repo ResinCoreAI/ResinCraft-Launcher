@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  ExternalLink,
   Gift,
   ListOrdered,
   Loader2,
@@ -81,6 +82,7 @@ function PayModal({
   accountName,
   title,
   step,
+  testMode,
   onClose,
   onPaid
 }: {
@@ -88,6 +90,7 @@ function PayModal({
   accountName: string
   title: string
   step: PayStep
+  testMode?: boolean
   onClose: () => void
   onPaid: (plan: PlanInfo) => void
 }) {
@@ -96,7 +99,55 @@ function PayModal({
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  // The PromptPay QR code was closed without paying: the same payment stays open for another try.
+  const [notPaid, setNotPaid] = useState(false)
+  const [qrPage, setQrPage] = useState<string>()
   const mock = step.publishable_key === 'pk_mock'
+
+  /** Where the QR code can be opened: in test mode the code's own link (Stripe's page that simulates the scan), else
+   * Stripe's page with the QR code to scan with a phone. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const qrLink = (pi: any): string | undefined => {
+    const qr = pi?.next_action?.promptpay_display_qr_code
+    if (!qr) return undefined
+    return testMode && typeof qr.data === 'string' && qr.data.startsWith('https://') ? qr.data : qr.hosted_instructions_url
+  }
+
+  /** Paid: the purchase as the relay has it now (a renewal folds into the purchase it renews). */
+  const finish = async () => {
+    let plan = await api.server.relayPlanRefresh(account, step.sub)
+    const done = (p: PlanInfo) => {
+      const m = p.mine.find((x) => x.id === step.sub)
+      return m ? m.active : !!step.once
+    }
+    for (let i = 0; i < 6 && !done(plan); i++) {
+      await new Promise((r) => setTimeout(r, 1500))
+      plan = await api.server.relayPlanRefresh(account, step.sub)
+    }
+    if (!done(plan)) return false
+    onPaid(plan)
+    return true
+  }
+
+  // While a QR code is out (scanned on a phone, or simulated in the browser in test mode): look every few seconds.
+  useEffect(() => {
+    if (!notPaid) return
+    let gone = false
+    const timer = setInterval(async () => {
+      if (gone) return
+      const plan = await api.server.relayPlanRefresh(account, step.sub).catch(() => undefined)
+      const m = plan?.mine.find((x) => x.id === step.sub)
+      if (plan && (m ? m.active : step.once && !plan.mine.some((x) => x.id === step.sub && !x.active)) && !gone) {
+        gone = true
+        onPaid(plan)
+      }
+    }, 4000)
+    return () => {
+      gone = true
+      clearInterval(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notPaid])
 
   useEffect(() => {
     if (mock) {
@@ -127,17 +178,37 @@ function PayModal({
       if (!mock) {
         const s = stripe.current!
         const confirm = step.intent === 'setup' ? s.stripe.confirmSetup : s.stripe.confirmPayment
+        // A QR code that stays open (or was closed without Stripe saying so): after a few seconds the form says it isn't
+        // paid yet, offers the QR page, and keeps looking; the same payment is used for every try.
+        const watchdog = setTimeout(async () => {
+          if (step.intent !== 'payment' || !step.client_secret) return
+          const pi = (await s.stripe.retrievePaymentIntent(step.client_secret).catch(() => ({}))).paymentIntent
+          if (pi?.status === 'requires_action') {
+            setQrPage(qrLink(pi))
+            setNotPaid(true)
+            setBusy(false)
+          }
+        }, 8000)
         // Cards confirm here (3-D Secure opens in Stripe's own frame); return_url only for methods that must redirect.
-        const r = await confirm.call(s.stripe, { elements: s.elements, confirmParams: { return_url: location.href }, redirect: 'if_required' })
+        const r = await confirm
+          .call(s.stripe, { elements: s.elements, confirmParams: { return_url: location.href }, redirect: 'if_required' })
+          .finally(() => clearTimeout(watchdog))
         if (r.error) throw new Error(r.error.message)
+        const status = r.paymentIntent?.status ?? r.setupIntent?.status
+        if (status && status !== 'succeeded' && status !== 'processing') {
+          // The QR code was closed: nothing paid. Its page (to scan, or to simulate in test mode) stays one click away.
+          const pi = r.paymentIntent ?? (await s.stripe.retrievePaymentIntent(step.client_secret)).paymentIntent
+          setQrPage(qrLink(pi))
+          setNotPaid(true)
+          setBusy(false)
+          return
+        }
       }
-      // Stripe has the payment: read the subscription again until it's active (a few seconds at most).
-      let plan = await api.server.relayPlanRefresh(account, step.sub)
-      for (let i = 0; i < 6 && !plan.mine.some((m) => m.id === step.sub && m.active); i++) {
-        await new Promise((r) => setTimeout(r, 1500))
-        plan = await api.server.relayPlanRefresh(account, step.sub)
+      setNotPaid(false)
+      if (!(await finish())) {
+        setNotPaid(true)
+        setBusy(false)
       }
-      onPaid(plan)
     } catch (e) {
       setError((e as Error).message)
       setBusy(false)
@@ -150,13 +221,13 @@ function PayModal({
     <Modal
       title={title}
       subtitle={t('servers.relayPlan.paySubtitle', { account: accountName, price: carried ? money(carried, step.currency) : price })}
-      onClose={busy ? () => undefined : onClose}
+      onClose={onClose}
       footer={
         <>
           <span className="hint grow rp-secure">
             <Lock /> {t('servers.relayPlan.secure')}
           </span>
-          <button className="btn ghost" disabled={busy} onClick={onClose}>
+          <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!ready || busy} onClick={() => void pay()}>
@@ -182,6 +253,26 @@ function PayModal({
         </p>
       )}
       {mock ? <div className="rp-mock-card">4242 4242 4242 4242 · 12/34 · 123</div> : <div ref={box} className="rp-element" />}
+      {notPaid && (
+        <div className="callout pending rp-notice">
+          <span className="grow">{t('servers.relayPlan.notPaidQr')}</span>
+          {qrPage && (
+            <button className="btn sm" onClick={() => void api.app.openExternal(qrPage)}>
+              <ExternalLink /> {testMode ? t('servers.relayPlan.simulateQr') : t('servers.relayPlan.openQr')}
+            </button>
+          )}
+          <button
+            className="btn sm"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              if (!(await finish().catch(() => false))) setBusy(false)
+            }}
+          >
+            <RefreshCw /> {t('servers.relayPlan.checkPaid')}
+          </button>
+        </div>
+      )}
       {error && <p className="hint it-warn">{error}</p>}
     </Modal>
   )
@@ -241,7 +332,8 @@ function CheckoutModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.account, key, yearly, promo])
 
-  if (step) return <PayModal account={a.account} accountName={a.accountName} title={title} step={step} onClose={onClose} onPaid={onPaid} />
+  if (step)
+    return <PayModal account={a.account} accountName={a.accountName} title={title} step={step} testMode={plan.test_mode} onClose={onClose} onPaid={onPaid} />
 
   const go = async () => {
     setBusy(true)
@@ -345,7 +437,7 @@ function CheckoutModal({
           <span className="hint it-warn">{t('servers.relayPlan.angpaoOver')}</span>
         </div>
       )}
-      {items.length > 1 && way === 'renew' && <p className="hint">{t('servers.relayPlan.cartHint')}</p>}
+      {items.length > 1 && <p className="hint">{t('servers.relayPlan.cartHint')}</p>}
       {below && (
         <p className="hint it-warn">
           {way === 'renew'
@@ -961,6 +1053,7 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
         <PayModal
           account={a.account}
           accountName={a.accountName}
+          testMode={plan.test_mode}
           title={paying.title}
           step={paying.step}
           onClose={() => {

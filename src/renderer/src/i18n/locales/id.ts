@@ -3699,7 +3699,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "Total",
   "servers.relayPlan.discount": "Diskon",
   "servers.relayPlan.discountLine": "{price} sebelum diskon {discount}",
-  "servers.relayPlan.cartHint": "Semua isi keranjang adalah satu langganan: dibayar, diperpanjang, dan dibatalkan bersama.",
+  "servers.relayPlan.cartHint": "Secara bawaan dibayar sekali untuk periode yang dipilih. Hanya \"Perpanjang otomatis\" yang menjadikan keranjang satu langganan yang diperpanjang dan dibatalkan bersama.",
   "servers.relayPlan.belowMin": "Totalnya di bawah tagihan minimum Stripe ({min}): tidak ditagih sekarang, ditambahkan ke tagihan berikutnya.",
   "servers.relayPlan.carried": "{amount} di bawah tagihan minimum Stripe, jadi tidak ditagih sekarang: ditambahkan ke tagihan berikutnya pada {date}. Simpan kartu Anda untuk menyelesaikan.",
   "servers.relayPlan.renewTitle": "Perpanjang {name}",
@@ -3739,6 +3739,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "sampai {date}",
   "servers.relayPlan.notForSaleNow": "Yang diberikannya tidak dijual lagi, jadi tidak bisa diperpanjang.",
   "engine.hostRelay.namePaused": "{name} kehilangan ResinCraft Relay: akun Anda punya lebih sedikit nama atau server daripada yang dipakai. Perpanjang di Toko, atau naikkan di Prioritas server.",
+  "servers.relayPlan.notPaidQr": "Belum dibayar: pindai kode QR, atau pilih cara bayar lain.",
+  "servers.relayPlan.openQr": "Buka kode QR di browser",
+  "servers.relayPlan.simulateQr": "Simulasikan pindaian di browser (mode uji)",
+  "servers.relayPlan.checkPaid": "Sudah bayar: periksa",
 }
 
 export default dict

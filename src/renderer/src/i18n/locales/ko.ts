@@ -3691,7 +3691,7 @@ const dict: Dict = {
   "servers.relayPlan.total": "합계",
   "servers.relayPlan.discount": "할인",
   "servers.relayPlan.discountLine": "{discount} 할인 전 {price}",
-  "servers.relayPlan.cartHint": "장바구니 전체가 하나의 구독입니다. 함께 결제, 갱신, 해지됩니다.",
+  "servers.relayPlan.cartHint": "기본적으로 고른 기간만큼 한 번 결제합니다. \"자동 연장\"을 고를 때만 장바구니가 함께 갱신·해지되는 하나의 구독이 됩니다.",
   "servers.relayPlan.belowMin": "합계가 Stripe 최소 결제 금액({min})보다 적어 지금은 청구되지 않고 다음 청구서에 더해집니다.",
   "servers.relayPlan.carried": "{amount}은(는) Stripe 최소 결제 금액보다 적어 지금은 청구되지 않고 {date} 다음 청구서에 더해집니다. 카드를 저장해 마치세요.",
   "servers.relayPlan.renewTitle": "{name} 연장",
@@ -3731,6 +3731,10 @@ const dict: Dict = {
   "servers.relayPlan.until": "{date}까지",
   "servers.relayPlan.notForSaleNow": "더 이상 판매하지 않는 항목이라 연장할 수 없습니다.",
   "engine.hostRelay.namePaused": "{name}이(가) ResinCraft Relay를 잃었습니다. 계정의 이름 또는 서버 수가 사용 중인 것보다 적습니다. 스토어에서 연장하거나 서버 우선순위에서 위로 올리세요.",
+  "servers.relayPlan.notPaidQr": "아직 결제되지 않았습니다. QR 코드를 스캔하거나 다른 결제 방법을 고르세요.",
+  "servers.relayPlan.openQr": "브라우저에서 QR 코드 열기",
+  "servers.relayPlan.simulateQr": "브라우저에서 스캔 시뮬레이션(테스트 모드)",
+  "servers.relayPlan.checkPaid": "결제했어요: 확인",
 }
 
 export default dict
