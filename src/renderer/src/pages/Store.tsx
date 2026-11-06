@@ -15,7 +15,7 @@ export default function Store() {
       <RelayPlan
         page
         empty={
-          <div className="empty">
+          <div className="callout" style={{ alignItems: 'center' }}>
             <ShoppingBag />
             <p>{t('servers.store.closed')}</p>
           </div>
