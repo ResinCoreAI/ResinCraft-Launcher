@@ -282,6 +282,9 @@ pub enum AgentMsg {
         yearly: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         promo: Option<String>,
+        /// The cart is this purchase's renewal (no unused days come off).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        renew_of: Option<String>,
     },
     /// Move one of the account's subscriptions to another product or period (prorated): answered with `pay`.
     /// Protocol 11.
@@ -1156,6 +1159,8 @@ pub struct PlanInfo {
     pub promptpay: bool,
     /// Ended add-ons, grace and cut-off.
     pub access: Access,
+    /// The account is the relay's admin (it's told what the relay has switched off, like TrueMoney).
+    pub admin: bool,
     /// What's for sale (empty while payments are off).
     pub products: Vec<ProductInfo>,
     /// The account's subscriptions (and the admin's grants), newest first.
@@ -1272,6 +1277,10 @@ pub struct Quote {
     pub lines: Vec<QuoteLine>,
     pub subtotal: u64,
     pub discount: u64,
+    /// Unused days of the account's purchases the cart covers, taken off after the discount (0 unless the relay's
+    /// admin counts them as money off).
+    pub credit: u64,
+    pub credits: Vec<CreditLine>,
     pub total: u64,
     pub currency: String,
     /// Stripe's smallest charge in this currency: a total above 0 and below it isn't charged now but added to the
@@ -1281,6 +1290,18 @@ pub struct Quote {
     pub promo_error: Option<String>,
     /// Why the cart can't be bought as it is (an item it has, a duplicate, not for sale).
     pub error: Option<String>,
+}
+
+/// One purchase the cart covers, and what its unused days are worth. Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CreditLine {
+    /// The covered purchase (it ends when the new one is paid).
+    pub sub: String,
+    pub name: String,
+    /// Whole days it had left.
+    pub days_left: u32,
+    pub amount: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -1325,6 +1346,8 @@ pub struct PayStep {
     /// The first invoice before its discount, and the discount.
     pub subtotal: u64,
     pub discount: u64,
+    /// Unused days of purchases this one covers, taken off (the relay's admin decides whether they count).
+    pub credit: u64,
     /// Not charged now because it's below Stripe's smallest charge: added to the invoice of `period_end`.
     pub carried: u64,
     /// When the paid period ends (the next invoice).

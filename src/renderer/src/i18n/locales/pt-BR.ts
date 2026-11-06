@@ -3769,6 +3769,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "Abrir o QR code no navegador",
   "servers.relayPlan.simulateQr": "Simular a leitura no navegador (modo de teste)",
   "servers.relayPlan.checkPaid": "Já paguei: verificar",
+  "servers.relayPlan.creditLine": "Dias não usados de {name} (faltam {days} dias)",
+  "servers.relayPlan.creditHint": "Isto cobre algo que ainda tem dias: o que resta sai do preço, e termina quando isto for pago.",
+  "servers.relayPlan.firstThen": "{first} agora, depois {then}",
+  "servers.relayPlan.credited": "Passou para uma compra nova",
+  "servers.relayPlan.angpaoOffAdmin": "O TrueMoney está desligado neste relay, então os jogadores não o veem. Para oferecê-lo, defina enabled = true e o número da sua carteira (phone) em [payments.truemoney] no relay.toml e reinicie o relay. Só o admin do relay vê isto.",
 }
 
 export default dict

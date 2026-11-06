@@ -1008,5 +1008,10 @@ export default {
   "servers.relayPlan.notPaidQr": "Not paid yet: scan the QR code, or pick another way to pay.",
   "servers.relayPlan.openQr": "Open the QR code in your browser",
   "servers.relayPlan.simulateQr": "Simulate the scan in your browser (test mode)",
-  "servers.relayPlan.checkPaid": "I've paid: check"
+  "servers.relayPlan.checkPaid": "I've paid: check",
+  "servers.relayPlan.creditLine": "Unused days of {name} ({days} days left)",
+  "servers.relayPlan.creditHint": "This covers something you still have days on: what's left of it comes off the price, and it ends when this is paid.",
+  "servers.relayPlan.firstThen": "{first} now, then {then}",
+  "servers.relayPlan.credited": "Moved into a new purchase",
+  "servers.relayPlan.angpaoOffAdmin": "TrueMoney is off on this relay, so players don't see it. To offer it, set enabled = true and your wallet number (phone) under [payments.truemoney] in relay.toml, then restart the relay. Only the relay's admin sees this."
 }

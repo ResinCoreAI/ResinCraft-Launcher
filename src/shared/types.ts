@@ -1407,6 +1407,10 @@ export interface PlanQuote {
   lines: { product: string; name: string; price: number; discount: number }[]
   subtotal: number
   discount: number
+  /** Unused days of purchases the cart covers, taken off after the discount (only when the relay's admin counts
+   * them as money off). */
+  credit?: number
+  credits?: { sub: string; name: string; days_left: number; amount: number }[]
   total: number
   currency: string
   /** Stripe's smallest charge: a total above 0 and below it goes on the next invoice. */
@@ -1430,6 +1434,8 @@ export interface PlanInfo {
   /** PromptPay can be used for one-time payments. */
   promptpay?: boolean
   access?: PlanAccess
+  /** The account is the relay's admin: it's shown what the relay has switched off (TrueMoney). */
+  admin?: boolean
   totals: { servers: number; names: number; monthly_bytes: number; unlimited_traffic: boolean; no_session_limit: boolean; whitelist_page: boolean; session_secs: number }
 }
 
@@ -1444,6 +1450,8 @@ export interface PayStep {
   /** The first invoice before the discount, and the discount. */
   subtotal?: number
   discount?: number
+  /** Unused days of what this covers, taken off. */
+  credit?: number
   /** Below Stripe's smallest charge: not charged now, added to the invoice at `period_end`. */
   carried?: number
   period_end?: number
@@ -2697,7 +2705,7 @@ export interface ResinApi {
     /** The order the account's names keep ResinCraft Relay in. */
     relayPlanPriority(account: string, names: string[]): Promise<PlanInfo>
     /** What a cart costs, with the promo code's discount on each item. */
-    relayPlanQuote(account: string, items: string[], yearly: boolean, promo?: string | null): Promise<PlanQuote>
+    relayPlanQuote(account: string, items: string[], yearly: boolean, promo?: string | null, renewOf?: string | null): Promise<PlanQuote>
     /** Redeems a gift code for an account. */
     relayPlanRedeem(account: string, code: string): Promise<PlanInfo>
     /** Moves a subscription to another product or period (prorated). */

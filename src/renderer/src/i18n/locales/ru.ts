@@ -3802,6 +3802,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "Открыть QR-код в браузере",
   "servers.relayPlan.simulateQr": "Имитировать сканирование в браузере (тестовый режим)",
   "servers.relayPlan.checkPaid": "Я оплатил: проверить",
+  "servers.relayPlan.creditLine": "Неиспользованные дни {name} (осталось {days} дн.)",
+  "servers.relayPlan.creditHint": "Это покрывает то, у чего ещё остались дни: остаток вычитается из цены, а старая покупка завершается после оплаты.",
+  "servers.relayPlan.firstThen": "Сейчас {first}, затем {then}",
+  "servers.relayPlan.credited": "Перенесено в новую покупку",
+  "servers.relayPlan.angpaoOffAdmin": "TrueMoney на этом релее выключен, поэтому игроки его не видят. Чтобы предложить его, задайте enabled = true и номер кошелька (phone) в [payments.truemoney] в relay.toml и перезапустите релей. Это видит только админ релея.",
 }
 
 export default dict

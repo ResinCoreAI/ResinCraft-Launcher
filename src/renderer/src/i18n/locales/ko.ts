@@ -3735,6 +3735,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "브라우저에서 QR 코드 열기",
   "servers.relayPlan.simulateQr": "브라우저에서 스캔 시뮬레이션(테스트 모드)",
   "servers.relayPlan.checkPaid": "결제했어요: 확인",
+  "servers.relayPlan.creditLine": "{name}의 남은 기간 ({days}일 남음)",
+  "servers.relayPlan.creditHint": "아직 기간이 남은 구매를 포함합니다. 남은 만큼 가격에서 빠지고, 결제가 끝나면 그 구매는 종료됩니다.",
+  "servers.relayPlan.firstThen": "지금 {first}, 이후 {then}",
+  "servers.relayPlan.credited": "새 구매로 옮겨짐",
+  "servers.relayPlan.angpaoOffAdmin": "이 릴레이에서는 TrueMoney가 꺼져 있어 플레이어에게 보이지 않습니다. 제공하려면 relay.toml의 [payments.truemoney]에서 enabled = true와 지갑 번호(phone)를 설정하고 릴레이를 다시 시작하세요. 릴레이 관리자만 이 내용을 봅니다.",
 }
 
 export default dict

@@ -542,7 +542,12 @@ impl Connection {
 
     /// What a cart costs, before buying it.
     pub async fn plan_quote(&mut self, items: &[String], yearly: bool, promo: Option<&str>) -> Result<crate::proto::Quote, AgentError> {
-        match self.plan_call(AgentMsg::PlanQuote { items: items.to_vec(), yearly, promo: promo.map(str::to_string) }).await? {
+        self.plan_quote_for(items, yearly, promo, None).await
+    }
+
+    /// `plan_quote`, or with `renew_of` the price of renewing that purchase.
+    pub async fn plan_quote_for(&mut self, items: &[String], yearly: bool, promo: Option<&str>, renew_of: Option<&str>) -> Result<crate::proto::Quote, AgentError> {
+        match self.plan_call(AgentMsg::PlanQuote { items: items.to_vec(), yearly, promo: promo.map(str::to_string), renew_of: renew_of.map(str::to_string) }).await? {
             RelayMsg::Quote { quote } => Ok(quote),
             other => Err(unexpected(&other)),
         }

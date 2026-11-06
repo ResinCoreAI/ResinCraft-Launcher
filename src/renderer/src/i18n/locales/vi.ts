@@ -3740,6 +3740,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "Mở mã QR trong trình duyệt",
   "servers.relayPlan.simulateQr": "Mô phỏng quét trong trình duyệt (chế độ thử)",
   "servers.relayPlan.checkPaid": "Tôi đã trả: kiểm tra",
+  "servers.relayPlan.creditLine": "Số ngày chưa dùng của {name} (còn {days} ngày)",
+  "servers.relayPlan.creditHint": "Mục này bao gồm thứ bạn vẫn còn ngày dùng: phần còn lại được trừ vào giá, và nó kết thúc khi mục này được thanh toán.",
+  "servers.relayPlan.firstThen": "Bây giờ {first}, sau đó {then}",
+  "servers.relayPlan.credited": "Đã chuyển sang lần mua mới",
+  "servers.relayPlan.angpaoOffAdmin": "TrueMoney đang tắt trên relay này nên người chơi không thấy. Để cung cấp, đặt enabled = true và số ví của bạn (phone) trong [payments.truemoney] ở relay.toml, rồi khởi động lại relay. Chỉ quản trị viên relay thấy nội dung này.",
 }
 
 export default dict

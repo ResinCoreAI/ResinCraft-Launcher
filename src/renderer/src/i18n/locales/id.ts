@@ -3743,6 +3743,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "Buka kode QR di browser",
   "servers.relayPlan.simulateQr": "Simulasikan pindaian di browser (mode uji)",
   "servers.relayPlan.checkPaid": "Sudah bayar: periksa",
+  "servers.relayPlan.creditLine": "Hari tersisa dari {name} ({days} hari lagi)",
+  "servers.relayPlan.creditHint": "Ini mencakup sesuatu yang masih punya sisa hari: sisanya dipotong dari harga, dan itu berakhir saat ini dibayar.",
+  "servers.relayPlan.firstThen": "{first} sekarang, lalu {then}",
+  "servers.relayPlan.credited": "Dipindah ke pembelian baru",
+  "servers.relayPlan.angpaoOffAdmin": "TrueMoney nonaktif di relay ini, jadi pemain tidak melihatnya. Untuk menawarkannya, atur enabled = true dan nomor dompet Anda (phone) di [payments.truemoney] pada relay.toml, lalu mulai ulang relay. Hanya admin relay yang melihat ini.",
 }
 
 export default dict

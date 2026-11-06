@@ -321,7 +321,7 @@ function CheckoutModal({
     let gone = false
     const timer = setTimeout(() => {
       api.server
-        .relayPlanQuote(a.account, ids, yearly, promo.trim() || null)
+        .relayPlanQuote(a.account, ids, yearly, promo.trim() || null, renewOf ?? null)
         .then((q) => !gone && setQuote(q))
         .catch(() => {})
     }, 300)
@@ -361,18 +361,28 @@ function CheckoutModal({
   const below = quote && quote.total > 0 && quote.total < quote.min_charge
   // A renewal's items are the account's already: the cart's checks don't apply to it.
   const cartError = renewOf ? null : quote?.error
-  const ways: { value: PayWay; label: string }[] = [
+  const period = yearly ? t('servers.relayPlan.oneYear') : t('servers.relayPlan.oneMonth')
+  const ways: { value: PayWay; label: string; off?: boolean }[] = [
     { value: 'once', label: plan.promptpay ? t('servers.relayPlan.wayOnce') : t('servers.relayPlan.wayOnceCard') }
   ]
   if (!renewOf) ways.push({ value: 'renew', label: t('servers.relayPlan.wayRenew') })
+  // TrueMoney: offered when the relay takes it; greyed out (with how to switch it on) for the relay's admin.
   if (plan.truemoney) ways.push({ value: 'angpao', label: t('servers.relayPlan.wayAngpao') })
-  const period = yearly ? t('servers.relayPlan.oneYear') : t('servers.relayPlan.oneMonth')
+  else if (plan.admin) ways.push({ value: 'angpao', label: t('servers.relayPlan.wayAngpao'), off: true })
+  const credit = quote?.credit ?? 0
+  // A subscription takes the unused days off its first payment only.
+  const totalText =
+    way === 'renew'
+      ? credit > 0
+        ? t('servers.relayPlan.firstThen', { first: money(total, currency), then: per(total + credit) })
+        : per(total)
+      : `${money(total, currency)} · ${period}`
   const ready = !busy && !cartError && (way !== 'angpao' || link.trim().length > 8) && !(below && way === 'once')
 
   return (
     <Modal
       title={title}
-      subtitle={t('servers.relayPlan.paySubtitle', { account: a.accountName, price: way === 'renew' ? per(total) : `${money(total, currency)} · ${period}` })}
+      subtitle={t('servers.relayPlan.paySubtitle', { account: a.accountName, price: totalText })}
       onClose={onClose}
       footer={
         <>
@@ -400,20 +410,34 @@ function CheckoutModal({
             <b>−{money(quote.discount, currency)}</b>
           </div>
         )}
+        {(quote?.credits ?? []).map((c) => (
+          <div key={c.sub} className="rp-line rp-total">
+            <span className="grow">{t('servers.relayPlan.creditLine', { name: c.name, days: c.days_left })}</span>
+            <b>−{money(c.amount, currency)}</b>
+          </div>
+        ))}
         <div className="rp-line rp-total">
           <span className="grow">{t('servers.relayPlan.total')}</span>
-          <b>{way === 'renew' ? per(total) : `${money(total, currency)} · ${period}`}</b>
+          <b>{totalText}</b>
         </div>
       </div>
+      {credit > 0 && <p className="hint">{t('servers.relayPlan.creditHint')}</p>}
       <div className="field">
         <label>{t('servers.relayPlan.payWith')}</label>
         <div className="segmented rp-ways">
           {ways.map((w) => (
-            <button key={w.value} className={way === w.value ? 'on' : undefined} onClick={() => setWay(w.value)}>
+            <button
+              key={w.value}
+              className={way === w.value ? 'on' : undefined}
+              disabled={w.off}
+              title={w.off ? t('servers.relayPlan.angpaoOffAdmin') : undefined}
+              onClick={() => setWay(w.value)}
+            >
               {w.label}
             </button>
           ))}
         </div>
+        {ways.some((w) => w.off) && <span className="hint muted">{t('servers.relayPlan.angpaoOffAdmin')}</span>}
         <span className="hint">
           {way === 'once'
             ? t('servers.relayPlan.wayOnceHint', { period })
@@ -719,7 +743,11 @@ function SubRow({
           {s.active && !unpaid && <span className="chip compact success">{t('servers.relayPlan.active')}</span>}
           {s.status === 'past_due' && <span className="chip compact warn">{t('servers.relayPlan.pastDue')}</span>}
           {s.status === 'incomplete' && <span className="chip compact">{t('servers.relayPlan.unpaid')}</span>}
-          {!s.active && !unpaid && <span className="chip compact danger">{t('servers.relayPlan.ended')}</span>}
+          {s.status === 'credited' ? (
+            <span className="chip compact">{t('servers.relayPlan.credited')}</span>
+          ) : (
+            !s.active && !unpaid && <span className="chip compact danger">{t('servers.relayPlan.ended')}</span>
+          )}
         </div>
         <div className="hint ellipsis">
           {s.once
@@ -733,7 +761,7 @@ function SubRow({
               : `${t('servers.relayPlan.given')}${when ? ` · ${when}` : ''}`}
         </div>
       </div>
-      {s.once && plan.enabled && (
+      {s.once && plan.enabled && s.status !== 'credited' && (
         <button className="btn sm primary" onClick={onRenew}>
           <RefreshCw /> {t('servers.relayPlan.renew')}
         </button>

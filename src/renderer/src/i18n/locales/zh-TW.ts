@@ -3730,6 +3730,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "在瀏覽器中開啟 QR 碼",
   "servers.relayPlan.simulateQr": "在瀏覽器中模擬掃碼（測試模式）",
   "servers.relayPlan.checkPaid": "我已付款：檢查",
+  "servers.relayPlan.creditLine": "{name} 的未用天數（剩 {days} 天）",
+  "servers.relayPlan.creditHint": "這包含了你仍有剩餘天數的購買：剩餘部分從價格中扣除，付款後該購買隨即結束。",
+  "servers.relayPlan.firstThen": "本次 {first}，之後 {then}",
+  "servers.relayPlan.credited": "已轉入新的購買",
+  "servers.relayPlan.angpaoOffAdmin": "此中繼已關閉 TrueMoney，所以玩家看不到它。如需提供，請在 relay.toml 的 [payments.truemoney] 中設定 enabled = true 和你的錢包號碼（phone），然後重新啟動中繼。只有中繼管理員看得到這則提示。",
 }
 
 export default dict

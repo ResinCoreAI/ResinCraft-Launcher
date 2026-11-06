@@ -3757,6 +3757,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "QR-Code im Browser öffnen",
   "servers.relayPlan.simulateQr": "Scan im Browser simulieren (Testmodus)",
   "servers.relayPlan.checkPaid": "Bezahlt: prüfen",
+  "servers.relayPlan.creditLine": "Ungenutzte Tage von {name} (noch {days} Tage)",
+  "servers.relayPlan.creditHint": "Das deckt etwas ab, das noch läuft: Der Rest davon wird vom Preis abgezogen, und es endet, sobald das hier bezahlt ist.",
+  "servers.relayPlan.firstThen": "Jetzt {first}, danach {then}",
+  "servers.relayPlan.credited": "In einen neuen Kauf übernommen",
+  "servers.relayPlan.angpaoOffAdmin": "TrueMoney ist auf diesem Relay aus, daher sehen Spieler es nicht. Zum Anbieten unter [payments.truemoney] in relay.toml enabled = true und deine Wallet-Nummer (phone) setzen, dann das Relay neu starten. Nur der Admin des Relays sieht das.",
 }
 
 export default dict

@@ -88,8 +88,8 @@ pub async fn priority(account: &str, names: &[String]) -> Result<PlanInfo> {
 }
 
 /// What a cart costs, with the promo code's discount on each item.
-pub async fn quote(account: &str, items: &[String], yearly: bool, promo: Option<&str>) -> Result<Quote> {
-    connect(account).await?.plan_quote(items, yearly, promo).await.map_err(|e| relay::describe(&e, ""))
+pub async fn quote(account: &str, items: &[String], yearly: bool, promo: Option<&str>, renew_of: Option<&str>) -> Result<Quote> {
+    connect(account).await?.plan_quote_for(items, yearly, promo, renew_of).await.map_err(|e| relay::describe(&e, ""))
 }
 
 /// A gift code's product for the account.

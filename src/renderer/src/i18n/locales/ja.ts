@@ -3740,6 +3740,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "ブラウザーで QR コードを開く",
   "servers.relayPlan.simulateQr": "ブラウザーで読み取りをシミュレート（テストモード）",
   "servers.relayPlan.checkPaid": "支払いました: 確認",
+  "servers.relayPlan.creditLine": "{name} の未使用日数（残り {days} 日）",
+  "servers.relayPlan.creditHint": "まだ日数が残っている購入をカバーします。残りの分が価格から差し引かれ、支払いが済むとその購入は終了します。",
+  "servers.relayPlan.firstThen": "今回 {first}、以降 {then}",
+  "servers.relayPlan.credited": "新しい購入に移行済み",
+  "servers.relayPlan.angpaoOffAdmin": "この Relay では TrueMoney がオフのため、プレイヤーには表示されません。提供するには relay.toml の [payments.truemoney] で enabled = true とウォレット番号（phone）を設定し、Relay を再起動してください。これは Relay の管理者にだけ表示されます。",
 }
 
 export default dict

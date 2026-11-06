@@ -461,7 +461,9 @@ export function mockServers(): {
         .filter((x) => x.status !== 'pending')
         .slice()
         .reverse(),
-      truemoney: true,
+      // ?plans=notm: the relay doesn't take TrueMoney and this account is its admin (greyed out, with how).
+      truemoney: new URLSearchParams(location.search).get('plans') !== 'notm',
+      admin: new URLSearchParams(location.search).get('plans') === 'notm',
       promptpay: true,
       access: {
         cutoff: true,
@@ -1073,7 +1075,18 @@ export function mockServers(): {
         lines,
         subtotal,
         discount,
-        total: subtotal - discount,
+        // ?plans=credit: unused days of a covered add-on come off (the relay admin's switch).
+        ...(new URLSearchParams(location.search).get('plans') === 'credit' &&
+        items.some((id) => PLAN_PRODUCTS.find((x) => x.id === id)?.grants.unlimited_traffic)
+          ? { credit: 11267, credits: [{ sub: 'pi_mock_unlimited', name: 'Unlimited traffic', days_left: 20, amount: 11267 }] }
+          : { credit: 0, credits: [] }),
+        total:
+          subtotal -
+          discount -
+          (new URLSearchParams(location.search).get('plans') === 'credit' &&
+          items.some((id) => PLAN_PRODUCTS.find((x) => x.id === id)?.grants.unlimited_traffic)
+            ? Math.min(11267, subtotal - discount)
+            : 0),
         currency: 'thb',
         min_charge: 1000,
         promo_error: promoError,

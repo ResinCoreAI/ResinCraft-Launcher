@@ -3732,6 +3732,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "เปิด QR Code ในเบราว์เซอร์",
   "servers.relayPlan.simulateQr": "จำลองการสแกนในเบราว์เซอร์ (โหมดทดสอบ)",
   "servers.relayPlan.checkPaid": "ชำระแล้ว: ตรวจสอบ",
+  "servers.relayPlan.creditLine": "วันที่เหลือของ {name} (เหลือ {days} วัน)",
+  "servers.relayPlan.creditHint": "รายการนี้ครอบคลุมสิ่งที่คุณยังมีวันเหลือ ส่วนที่เหลือจะหักจากราคา และสิ่งนั้นจะสิ้นสุดเมื่อชำระรายการนี้แล้ว",
+  "servers.relayPlan.firstThen": "ครั้งนี้ {first} จากนั้น {then}",
+  "servers.relayPlan.credited": "ย้ายไปยังการซื้อใหม่แล้ว",
+  "servers.relayPlan.angpaoOffAdmin": "TrueMoney ปิดอยู่บนรีเลย์นี้ ผู้เล่นจึงไม่เห็น หากต้องการเปิดให้ใช้ ให้ตั้ง enabled = true และเบอร์วอลเล็ต (phone) ใต้ [payments.truemoney] ใน relay.toml แล้วรีสตาร์ทรีเลย์ เฉพาะแอดมินของรีเลย์เท่านั้นที่เห็นข้อความนี้",
 }
 
 export default dict

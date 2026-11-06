@@ -3753,6 +3753,11 @@ const dict: Dict = {
   "servers.relayPlan.openQr": "QR kodu tarayıcıda aç",
   "servers.relayPlan.simulateQr": "Okutmayı tarayıcıda dene (test modu)",
   "servers.relayPlan.checkPaid": "Ödedim: kontrol et",
+  "servers.relayPlan.creditLine": "{name} için kullanılmayan günler ({days} gün kaldı)",
+  "servers.relayPlan.creditHint": "Bu, hâlâ günü olan bir şeyi kapsıyor: kalanı fiyattan düşülür ve bu ödendiğinde o sona erer.",
+  "servers.relayPlan.firstThen": "Şimdi {first}, sonra {then}",
+  "servers.relayPlan.credited": "Yeni bir satın alıma aktarıldı",
+  "servers.relayPlan.angpaoOffAdmin": "TrueMoney bu relay'de kapalı, bu yüzden oyuncular görmüyor. Sunmak için relay.toml içinde [payments.truemoney] altında enabled = true ve cüzdan numaranızı (phone) ayarlayın, sonra relay'i yeniden başlatın. Bunu yalnızca relay'in yöneticisi görür.",
 }
 
 export default dict
