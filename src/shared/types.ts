@@ -1379,6 +1379,22 @@ export interface PlanSub {
   amount: number
   /** Bought (can be cancelled or changed); false: given by the relay's admin. */
   paid: boolean
+  /** Its products when it was bought as a cart (several items); empty: just `product`. */
+  items?: { product: string; name: string; amount: number }[]
+}
+
+/** What a cart costs before buying it: each item's price and the promo code's discount on it. */
+export interface PlanQuote {
+  lines: { product: string; name: string; price: number; discount: number }[]
+  subtotal: number
+  discount: number
+  total: number
+  currency: string
+  /** Stripe's smallest charge: a total above 0 and below it goes on the next invoice. */
+  min_charge: number
+  promo_error?: string | null
+  /** Why the cart can't be bought as it is. */
+  error?: string | null
 }
 
 export interface PlanInfo {
@@ -1401,6 +1417,12 @@ export interface PayStep {
   publishable_key: string
   amount: number
   currency: string
+  /** The first invoice before the discount, and the discount. */
+  subtotal?: number
+  discount?: number
+  /** Below Stripe's smallest charge: not charged now, added to the invoice at `period_end`. */
+  carried?: number
+  period_end?: number
 }
 
 export interface AccountPlan {
@@ -2640,6 +2662,10 @@ export interface ResinApi {
     relayPlans(): Promise<RelayPlans>
     /** Starts buying a product for an account: what the payment form needs. */
     relayPlanBuy(account: string, product: string, yearly: boolean, promo?: string | null): Promise<PayStep>
+    /** Buys a cart (one subscription with every item, one period for all). */
+    relayPlanCart(account: string, items: string[], yearly: boolean, promo?: string | null): Promise<PayStep>
+    /** What a cart costs, with the promo code's discount on each item. */
+    relayPlanQuote(account: string, items: string[], yearly: boolean, promo?: string | null): Promise<PlanQuote>
     /** Redeems a gift code for an account. */
     relayPlanRedeem(account: string, code: string): Promise<PlanInfo>
     /** Moves a subscription to another product or period (prorated). */

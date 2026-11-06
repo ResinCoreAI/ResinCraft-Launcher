@@ -3688,6 +3688,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "Alamat ResinCraft-nya {name} juga dilepas, kecuali sedang online di PC lain.",
   "servers.people.full": "Kontrol penuh",
   "servers.people.fullHint": "Juga file dan Java server yang bisa dijangkau (Manager juga argumen peluncuran dan token). Akun Anda sendiri selalu punya kontrol penuh.",
+  "servers.relayPlan.addToCart": "Tambah ke keranjang",
+  "servers.relayPlan.inCart": "Di keranjang",
+  "servers.relayPlan.cart": "Keranjang",
+  "servers.relayPlan.checkout": "Bayar",
+  "servers.relayPlan.checkoutTitle": "Pembayaran",
+  "servers.relayPlan.clearCart": "Kosongkan keranjang",
+  "servers.relayPlan.removeFromCart": "Hapus dari keranjang",
+  "servers.relayPlan.notThisPeriod": "Tidak dijual untuk periode ini",
+  "servers.relayPlan.total": "Total",
+  "servers.relayPlan.discount": "Diskon",
+  "servers.relayPlan.discountLine": "{price} sebelum diskon {discount}",
+  "servers.relayPlan.cartHint": "Semua isi keranjang adalah satu langganan: dibayar, diperpanjang, dan dibatalkan bersama.",
+  "servers.relayPlan.belowMin": "Totalnya di bawah tagihan minimum Stripe ({min}): tidak ditagih sekarang, ditambahkan ke tagihan berikutnya.",
+  "servers.relayPlan.carried": "{amount} di bawah tagihan minimum Stripe, jadi tidak ditagih sekarang: ditambahkan ke tagihan berikutnya pada {date}. Simpan kartu Anda untuk menyelesaikan.",
 }
 
 export default dict

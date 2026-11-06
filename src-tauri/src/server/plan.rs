@@ -7,7 +7,7 @@
 
 use anyhow::Result;
 use resincraft_relay::agent::Connection;
-use resincraft_relay::proto::{PayStep, PlanInfo};
+use resincraft_relay::proto::{PayStep, PlanInfo, Quote};
 use serde::Serialize;
 
 use crate::core::text::Text;
@@ -68,6 +68,16 @@ pub async fn plans() -> Result<Plans> {
 
 pub async fn buy(account: &str, product: &str, yearly: bool, promo: Option<&str>) -> Result<PayStep> {
     connect(account).await?.plan_buy_with(product, yearly, promo).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// Buys a cart: one subscription with every item.
+pub async fn cart(account: &str, items: &[String], yearly: bool, promo: Option<&str>) -> Result<PayStep> {
+    connect(account).await?.plan_cart(items, yearly, promo).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// What a cart costs, with the promo code's discount on each item.
+pub async fn quote(account: &str, items: &[String], yearly: bool, promo: Option<&str>) -> Result<Quote> {
+    connect(account).await?.plan_quote(items, yearly, promo).await.map_err(|e| relay::describe(&e, ""))
 }
 
 /// A gift code's product for the account.

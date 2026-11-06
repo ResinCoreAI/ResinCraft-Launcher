@@ -243,6 +243,20 @@ pub enum AgentMsg {
     },
     /// Redeem a gift code: answered with `plan`. Protocol 11.
     PlanRedeem { code: String },
+    /// Buy several products at once (one subscription, one period for all): answered with `pay`. Protocol 11.
+    PlanCart {
+        items: Vec<String>,
+        yearly: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        promo: Option<String>,
+    },
+    /// What a cart costs (each item's price and promo discount), before buying: answered with `quote`. Protocol 11.
+    PlanQuote {
+        items: Vec<String>,
+        yearly: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        promo: Option<String>,
+    },
     /// Move one of the account's subscriptions to another product or period (prorated): answered with `pay`.
     /// Protocol 11.
     PlanChange { sub: String, product: String, yearly: bool },
@@ -556,6 +570,8 @@ pub enum RelayMsg {
     Plan { plan: PlanInfo },
     /// What the launcher's payment form needs. Protocol 11.
     Pay { pay: PayStep },
+    /// The answer to `plan_quote`. Protocol 11.
+    Quote { quote: Quote },
     Pong { seq: u64 },
     /// The answer to `remote {enabled: true}`: this launcher is listed for its account's console. Protocol 6.
     RemoteReady {
@@ -1166,6 +1182,47 @@ pub struct MySub {
     pub amount: u64,
     /// Bought through Stripe (the account can cancel or change it); false: given by the admin.
     pub paid: bool,
+    /// Its products when it has several (a cart); empty: just `product`.
+    pub items: Vec<MySubItem>,
+}
+
+/// One product of a subscription bought as a cart. Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct MySubItem {
+    pub product: String,
+    pub name: String,
+    /// Its price per period, smallest unit.
+    pub amount: u64,
+}
+
+/// What a cart costs (`plan_quote`): each item at its price, a promo code's discount on the items it's for.
+/// Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Quote {
+    pub lines: Vec<QuoteLine>,
+    pub subtotal: u64,
+    pub discount: u64,
+    pub total: u64,
+    pub currency: String,
+    /// Stripe's smallest charge in this currency: a total above 0 and below it isn't charged now but added to the
+    /// next invoice.
+    pub min_charge: u64,
+    /// Why the promo code doesn't apply (None: it applies, or there's none).
+    pub promo_error: Option<String>,
+    /// Why the cart can't be bought as it is (an item it has, a duplicate, not for sale).
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct QuoteLine {
+    pub product: String,
+    pub name: String,
+    pub price: u64,
+    /// Taken off this item by the promo code.
+    pub discount: u64,
 }
 
 /// What an account has, everything counted. Protocol 11.
@@ -1197,6 +1254,13 @@ pub struct PayStep {
     /// What's charged now, smallest unit.
     pub amount: u64,
     pub currency: String,
+    /// The first invoice before its discount, and the discount.
+    pub subtotal: u64,
+    pub discount: u64,
+    /// Not charged now because it's below Stripe's smallest charge: added to the invoice of `period_end`.
+    pub carried: u64,
+    /// When the paid period ends (the next invoice).
+    pub period_end: u64,
 }
 
 #[cfg(test)]

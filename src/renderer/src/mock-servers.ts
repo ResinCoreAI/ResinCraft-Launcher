@@ -430,13 +430,15 @@ export function mockServers(): {
   const mockPlan = (a: (typeof planAccounts)[number]): import('@shared/types').PlanInfo => {
     const have = g(0, 0, 0)
     for (const s of a.subs.filter((x) => x.active)) {
-      const p = PLAN_PRODUCTS.find((x) => x.id === s.product)!.grants
-      have.servers += p.servers
-      have.names += p.names
-      have.traffic_gb += p.traffic_gb
-      have.unlimited_traffic ||= p.unlimited_traffic
-      have.no_session_limit ||= p.no_session_limit
-      have.whitelist_page ||= p.whitelist_page
+      for (const id of s.items?.length ? s.items.map((i) => i.product) : [s.product]) {
+        const p = PLAN_PRODUCTS.find((x) => x.id === id)!.grants
+        have.servers += p.servers
+        have.names += p.names
+        have.traffic_gb += p.traffic_gb
+        have.unlimited_traffic ||= p.unlimited_traffic
+        have.no_session_limit ||= p.no_session_limit
+        have.whitelist_page ||= p.whitelist_page
+      }
     }
     const owned = (p: (typeof PLAN_PRODUCTS)[number]) => {
       const x = p.grants
@@ -1028,6 +1030,69 @@ export function mockServers(): {
     relayPlans: async () => {
       await wait(null, 300)
       return { available: true, accounts: planAccounts.map((a) => ({ account: a.account, accountName: a.accountName, unsupported: false, plan: mockPlan(a) })) }
+    },
+    relayPlanQuote: async (_account, items, yearly, promo) => {
+      await wait(null, 150)
+      const code = (promo ?? '').trim().toUpperCase()
+      const lines = items.map((id) => {
+        const p = PLAN_PRODUCTS.find((x) => x.id === id)!
+        const price = yearly ? p.yearly : p.monthly
+        return { product: id, name: p.name, price, discount: code === 'TEST50' && id === 'addon-whitelist-page' ? Math.round(price / 2) : 0 }
+      })
+      const promoError =
+        code && code !== 'TEST50'
+          ? 'no such promo code'
+          : code === 'TEST50' && !items.includes('addon-whitelist-page')
+            ? 'TEST50 is only for Whitelist page'
+            : null
+      const dupe = items.find((x, i) => items.indexOf(x) !== i)
+      const subtotal = lines.reduce((n, l) => n + l.price, 0)
+      const discount = lines.reduce((n, l) => n + l.discount, 0)
+      return {
+        lines,
+        subtotal,
+        discount,
+        total: subtotal - discount,
+        currency: 'thb',
+        min_charge: 1000,
+        promo_error: promoError,
+        error: dupe ? 'That item is in the cart twice' : null
+      }
+    },
+    relayPlanCart: async (account, items, yearly, promo) => {
+      await wait(null, 500)
+      const a = planAccounts.find((x) => x.account === account)!
+      const ps = items.map((id) => PLAN_PRODUCTS.find((x) => x.id === id)!)
+      const amount = ps.reduce((n, p) => n + (yearly ? p.yearly : p.monthly), 0)
+      const off = (promo ?? '').toUpperCase() === 'TEST50' && items.includes('addon-whitelist-page') ? Math.round((yearly ? 19000 : 1900) / 2) : 0
+      const id = `sub_mock_${++planSeq}`
+      a.subs.push({
+        id,
+        product: items[0],
+        name: ps.map((p) => p.name).join(' + '),
+        yearly,
+        status: 'incomplete',
+        active: false,
+        period_end: 0,
+        cancel_at_period_end: false,
+        amount,
+        paid: true,
+        items: items.length > 1 ? ps.map((p) => ({ product: p.id, name: p.name, amount: yearly ? p.yearly : p.monthly })) : []
+      })
+      const total = amount - off
+      const carried = total > 0 && total < 1000 ? total : 0
+      return {
+        sub: id,
+        client_secret: 'mock_secret',
+        intent: carried ? 'setup' : 'payment',
+        publishable_key: 'pk_mock',
+        amount: carried ? 0 : total,
+        currency: 'thb',
+        subtotal: amount,
+        discount: off,
+        carried,
+        period_end: Math.floor(Date.now() / 1000) + 30 * 86400
+      }
     },
     relayPlanRedeem: async (account, code) => {
       await wait(null, 400)

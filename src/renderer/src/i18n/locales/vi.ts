@@ -3685,6 +3685,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "Địa chỉ ResinCraft {name} cũng được giải phóng, trừ khi đang trực tuyến trên PC khác.",
   "servers.people.full": "Toàn quyền",
   "servers.people.fullHint": "Cả tệp và Java của các máy chủ họ truy cập được (Quản lý thêm tham số khởi chạy và token). Tài khoản của bạn luôn có toàn quyền.",
+  "servers.relayPlan.addToCart": "Thêm vào giỏ",
+  "servers.relayPlan.inCart": "Đã có trong giỏ",
+  "servers.relayPlan.cart": "Giỏ hàng",
+  "servers.relayPlan.checkout": "Thanh toán",
+  "servers.relayPlan.checkoutTitle": "Thanh toán",
+  "servers.relayPlan.clearCart": "Xóa giỏ hàng",
+  "servers.relayPlan.removeFromCart": "Bỏ khỏi giỏ",
+  "servers.relayPlan.notThisPeriod": "Không bán cho kỳ này",
+  "servers.relayPlan.total": "Tổng",
+  "servers.relayPlan.discount": "Giảm giá",
+  "servers.relayPlan.discountLine": "{price} trước khi giảm {discount}",
+  "servers.relayPlan.cartHint": "Mọi thứ trong giỏ là một gói đăng ký: thanh toán, gia hạn và hủy cùng nhau.",
+  "servers.relayPlan.belowMin": "Tổng thấp hơn mức thu tối thiểu của Stripe ({min}): chưa thu bây giờ, sẽ cộng vào hóa đơn kế tiếp.",
+  "servers.relayPlan.carried": "{amount} thấp hơn mức thu tối thiểu của Stripe nên chưa thu bây giờ: sẽ cộng vào hóa đơn ngày {date}. Lưu thẻ để hoàn tất.",
 }
 
 export default dict

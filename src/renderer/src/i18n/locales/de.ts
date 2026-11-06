@@ -3702,6 +3702,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "Seine ResinCraft-Adresse {name} wird auch freigegeben, außer sie ist gerade auf einem anderen PC online.",
   "servers.people.full": "Volle Kontrolle",
   "servers.people.fullHint": "Auch die Dateien und Java der Server, die sie erreichen (ein Manager auch Startargumente und Tokens). Dein eigenes Konto hat immer volle Kontrolle.",
+  "servers.relayPlan.addToCart": "In den Warenkorb",
+  "servers.relayPlan.inCart": "Im Warenkorb",
+  "servers.relayPlan.cart": "Warenkorb",
+  "servers.relayPlan.checkout": "Zur Kasse",
+  "servers.relayPlan.checkoutTitle": "Kasse",
+  "servers.relayPlan.clearCart": "Warenkorb leeren",
+  "servers.relayPlan.removeFromCart": "Aus dem Warenkorb entfernen",
+  "servers.relayPlan.notThisPeriod": "Für diesen Zeitraum nicht erhältlich",
+  "servers.relayPlan.total": "Gesamt",
+  "servers.relayPlan.discount": "Rabatt",
+  "servers.relayPlan.discountLine": "{price} vor einem Rabatt von {discount}",
+  "servers.relayPlan.cartHint": "Alles im Warenkorb ist ein Abo: zusammen bezahlt, verlängert und gekündigt.",
+  "servers.relayPlan.belowMin": "Der Betrag liegt unter Stripes Mindestbetrag ({min}): Jetzt wird nichts berechnet, er kommt auf die nächste Rechnung.",
+  "servers.relayPlan.carried": "{amount} liegt unter Stripes Mindestbetrag, daher wird jetzt nichts berechnet: Es kommt auf deine nächste Rechnung am {date}. Speichere deine Karte, um abzuschließen.",
 }
 
 export default dict

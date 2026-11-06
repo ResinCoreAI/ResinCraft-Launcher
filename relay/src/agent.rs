@@ -519,6 +519,19 @@ impl Connection {
         self.pay_step(AgentMsg::PlanBuy { product: product.into(), yearly, promo: promo.map(str::to_string) }).await
     }
 
+    /// Buys several products in one subscription.
+    pub async fn plan_cart(&mut self, items: &[String], yearly: bool, promo: Option<&str>) -> Result<crate::proto::PayStep, AgentError> {
+        self.pay_step(AgentMsg::PlanCart { items: items.to_vec(), yearly, promo: promo.map(str::to_string) }).await
+    }
+
+    /// What a cart costs, before buying it.
+    pub async fn plan_quote(&mut self, items: &[String], yearly: bool, promo: Option<&str>) -> Result<crate::proto::Quote, AgentError> {
+        match self.plan_call(AgentMsg::PlanQuote { items: items.to_vec(), yearly, promo: promo.map(str::to_string) }).await? {
+            RelayMsg::Quote { quote } => Ok(quote),
+            other => Err(unexpected(&other)),
+        }
+    }
+
     /// Redeems a gift code for this account.
     pub async fn plan_redeem(&mut self, code: &str) -> Result<crate::proto::PlanInfo, AgentError> {
         self.plan_info(AgentMsg::PlanRedeem { code: code.into() }).await

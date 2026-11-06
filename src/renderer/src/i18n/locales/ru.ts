@@ -3747,6 +3747,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "Его адрес ResinCraft {name} тоже освобождается, если он сейчас не онлайн на другом ПК.",
   "servers.people.full": "Полный доступ",
   "servers.people.fullHint": "Также файлы и Java доступных серверов (менеджер — ещё аргументы запуска и токены). У вашей учётной записи полный доступ всегда.",
+  "servers.relayPlan.addToCart": "В корзину",
+  "servers.relayPlan.inCart": "В корзине",
+  "servers.relayPlan.cart": "Корзина",
+  "servers.relayPlan.checkout": "Оформить",
+  "servers.relayPlan.checkoutTitle": "Оформление",
+  "servers.relayPlan.clearCart": "Очистить корзину",
+  "servers.relayPlan.removeFromCart": "Убрать из корзины",
+  "servers.relayPlan.notThisPeriod": "Не продаётся на этот срок",
+  "servers.relayPlan.total": "Итого",
+  "servers.relayPlan.discount": "Скидка",
+  "servers.relayPlan.discountLine": "{price} до скидки {discount}",
+  "servers.relayPlan.cartHint": "Вся корзина — одна подписка: оплачивается, продлевается и отменяется целиком.",
+  "servers.relayPlan.belowMin": "Сумма ниже минимального платежа Stripe ({min}): сейчас ничего не списывается, сумма добавится к следующему счёту.",
+  "servers.relayPlan.carried": "{amount} ниже минимального платежа Stripe, поэтому сейчас ничего не списывается: сумма добавится к счёту {date}. Сохраните карту, чтобы завершить.",
 }
 
 export default dict

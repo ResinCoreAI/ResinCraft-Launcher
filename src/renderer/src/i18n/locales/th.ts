@@ -3677,6 +3677,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "ที่อยู่ ResinCraft {name} จะถูกคืนด้วย เว้นแต่กำลังออนไลน์อยู่บนพีซีเครื่องอื่น",
   "servers.people.full": "ควบคุมเต็มรูปแบบ",
   "servers.people.fullHint": "รวมถึงไฟล์และ Java ของเซิร์ฟเวอร์ที่เข้าถึงได้ (Manager ได้อาร์กิวเมนต์การเปิดและโทเค็นด้วย) บัญชีของคุณเองควบคุมได้เต็มที่เสมอ",
+  "servers.relayPlan.addToCart": "ใส่ตะกร้า",
+  "servers.relayPlan.inCart": "อยู่ในตะกร้า",
+  "servers.relayPlan.cart": "ตะกร้า",
+  "servers.relayPlan.checkout": "ชำระเงิน",
+  "servers.relayPlan.checkoutTitle": "ชำระเงิน",
+  "servers.relayPlan.clearCart": "ล้างตะกร้า",
+  "servers.relayPlan.removeFromCart": "นำออกจากตะกร้า",
+  "servers.relayPlan.notThisPeriod": "ไม่มีขายสำหรับรอบนี้",
+  "servers.relayPlan.total": "รวม",
+  "servers.relayPlan.discount": "ส่วนลด",
+  "servers.relayPlan.discountLine": "{price} ก่อนส่วนลด {discount}",
+  "servers.relayPlan.cartHint": "ทุกอย่างในตะกร้าเป็นการสมัครเดียวกัน ชำระ ต่ออายุ และยกเลิกพร้อมกัน",
+  "servers.relayPlan.belowMin": "ยอดรวมต่ำกว่ายอดเรียกเก็บขั้นต่ำของ Stripe ({min}) จึงยังไม่เรียกเก็บตอนนี้ จะรวมในใบแจ้งหนี้รอบถัดไป",
+  "servers.relayPlan.carried": "{amount} ต่ำกว่ายอดขั้นต่ำของ Stripe จึงยังไม่เรียกเก็บตอนนี้ จะรวมในใบแจ้งหนี้วันที่ {date} บันทึกบัตรเพื่อทำรายการให้เสร็จ",
 }
 
 export default dict

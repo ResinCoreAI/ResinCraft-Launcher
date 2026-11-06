@@ -3680,6 +3680,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "ResinCraft 주소 {name}도 해제됩니다(지금 다른 PC에서 온라인인 경우 제외).",
   "servers.people.full": "전체 제어",
   "servers.people.fullHint": "접근 가능한 서버의 파일과 Java도 다룰 수 있습니다(관리자는 실행 인수와 토큰도). 내 계정은 항상 전체 제어입니다.",
+  "servers.relayPlan.addToCart": "장바구니에 담기",
+  "servers.relayPlan.inCart": "장바구니에 있음",
+  "servers.relayPlan.cart": "장바구니",
+  "servers.relayPlan.checkout": "결제하기",
+  "servers.relayPlan.checkoutTitle": "결제",
+  "servers.relayPlan.clearCart": "장바구니 비우기",
+  "servers.relayPlan.removeFromCart": "장바구니에서 빼기",
+  "servers.relayPlan.notThisPeriod": "이 기간에는 판매하지 않습니다",
+  "servers.relayPlan.total": "합계",
+  "servers.relayPlan.discount": "할인",
+  "servers.relayPlan.discountLine": "{discount} 할인 전 {price}",
+  "servers.relayPlan.cartHint": "장바구니 전체가 하나의 구독입니다. 함께 결제, 갱신, 해지됩니다.",
+  "servers.relayPlan.belowMin": "합계가 Stripe 최소 결제 금액({min})보다 적어 지금은 청구되지 않고 다음 청구서에 더해집니다.",
+  "servers.relayPlan.carried": "{amount}은(는) Stripe 최소 결제 금액보다 적어 지금은 청구되지 않고 {date} 다음 청구서에 더해집니다. 카드를 저장해 마치세요.",
 }
 
 export default dict

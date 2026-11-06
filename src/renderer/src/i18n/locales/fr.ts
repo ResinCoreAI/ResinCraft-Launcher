@@ -3733,6 +3733,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "Son adresse ResinCraft {name} est aussi libérée, sauf si elle est en ligne sur un autre PC en ce moment.",
   "servers.people.full": "Contrôle total",
   "servers.people.fullHint": "Aussi les fichiers et Java des serveurs qu'il atteint (un Gestionnaire aussi les arguments de lancement et les jetons). Votre propre compte a toujours le contrôle total.",
+  "servers.relayPlan.addToCart": "Ajouter au panier",
+  "servers.relayPlan.inCart": "Dans le panier",
+  "servers.relayPlan.cart": "Panier",
+  "servers.relayPlan.checkout": "Commander",
+  "servers.relayPlan.checkoutTitle": "Commande",
+  "servers.relayPlan.clearCart": "Vider le panier",
+  "servers.relayPlan.removeFromCart": "Retirer du panier",
+  "servers.relayPlan.notThisPeriod": "Non vendu pour cette période",
+  "servers.relayPlan.total": "Total",
+  "servers.relayPlan.discount": "Remise",
+  "servers.relayPlan.discountLine": "{price} avant une remise de {discount}",
+  "servers.relayPlan.cartHint": "Tout le panier forme un seul abonnement : payé, renouvelé et résilié ensemble.",
+  "servers.relayPlan.belowMin": "Le total est sous le montant minimum de Stripe ({min}) : rien n'est prélevé maintenant, il s'ajoute à la prochaine facture.",
+  "servers.relayPlan.carried": "{amount} est sous le montant minimum de Stripe : rien n'est prélevé maintenant, il s'ajoute à votre prochaine facture du {date}. Enregistrez votre carte pour terminer.",
 }
 
 export default dict

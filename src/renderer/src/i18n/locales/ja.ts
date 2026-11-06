@@ -3685,6 +3685,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "ResinCraft のアドレス {name} も解放されます（今ほかの PC でオンラインの場合を除く）。",
   "servers.people.full": "フルコントロール",
   "servers.people.fullHint": "対象サーバーのファイルと Java も操作できます（マネージャーは起動引数とトークンも）。自分のアカウントは常にフルコントロールです。",
+  "servers.relayPlan.addToCart": "カートに追加",
+  "servers.relayPlan.inCart": "カートに入っています",
+  "servers.relayPlan.cart": "カート",
+  "servers.relayPlan.checkout": "レジに進む",
+  "servers.relayPlan.checkoutTitle": "お支払い",
+  "servers.relayPlan.clearCart": "カートを空にする",
+  "servers.relayPlan.removeFromCart": "カートから削除",
+  "servers.relayPlan.notThisPeriod": "この期間では販売していません",
+  "servers.relayPlan.total": "合計",
+  "servers.relayPlan.discount": "割引",
+  "servers.relayPlan.discountLine": "割引 {discount} 前の価格 {price}",
+  "servers.relayPlan.cartHint": "カートの中身は 1 つのサブスクリプションです。まとめて支払い、更新、解約されます。",
+  "servers.relayPlan.belowMin": "合計が Stripe の最低請求額 ({min}) 未満のため、今は請求されず次回の請求に加算されます。",
+  "servers.relayPlan.carried": "{amount} は Stripe の最低請求額未満のため今は請求されず、{date} の次回請求に加算されます。カードを保存して完了してください。",
 }
 
 export default dict

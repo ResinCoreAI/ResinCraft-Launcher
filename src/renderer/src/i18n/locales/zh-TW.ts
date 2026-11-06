@@ -3675,6 +3675,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "它的 ResinCraft 位址 {name} 也會被釋放，除非它此刻正在另一台電腦上線上。",
   "servers.people.full": "完全控制",
   "servers.people.fullHint": "還包括其可存取伺服器的檔案與 Java（管理者另含啟動參數與權杖）。你自己的帳號始終擁有完全控制。",
+  "servers.relayPlan.addToCart": "加入購物車",
+  "servers.relayPlan.inCart": "已在購物車",
+  "servers.relayPlan.cart": "購物車",
+  "servers.relayPlan.checkout": "前往結帳",
+  "servers.relayPlan.checkoutTitle": "結帳",
+  "servers.relayPlan.clearCart": "清空購物車",
+  "servers.relayPlan.removeFromCart": "從購物車移除",
+  "servers.relayPlan.notThisPeriod": "此週期不販售",
+  "servers.relayPlan.total": "合計",
+  "servers.relayPlan.discount": "折扣",
+  "servers.relayPlan.discountLine": "折扣 {discount} 前為 {price}",
+  "servers.relayPlan.cartHint": "購物車裡的所有內容是同一個訂閱：一起付款、續訂與取消。",
+  "servers.relayPlan.belowMin": "總額低於 Stripe 的最低收費 ({min})：現在不收費，計入下一張帳單。",
+  "servers.relayPlan.carried": "{amount} 低於 Stripe 的最低收費，現在不收費：將計入 {date} 的下一張帳單。儲存卡片即可完成。",
 }
 
 export default dict

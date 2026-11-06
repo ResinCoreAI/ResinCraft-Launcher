@@ -3698,6 +3698,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "ResinCraft adresi {name} de serbest bırakılır; şu anda başka bir bilgisayarda çevrimiçiyse bırakılmaz.",
   "servers.people.full": "Tam kontrol",
   "servers.people.fullHint": "Erişebildiği sunucuların dosyaları ve Java'sı da (Yönetici ayrıca başlatma argümanları ve tokenlar). Kendi hesabınız her zaman tam kontrole sahiptir.",
+  "servers.relayPlan.addToCart": "Sepete ekle",
+  "servers.relayPlan.inCart": "Sepette",
+  "servers.relayPlan.cart": "Sepet",
+  "servers.relayPlan.checkout": "Ödemeye geç",
+  "servers.relayPlan.checkoutTitle": "Ödeme",
+  "servers.relayPlan.clearCart": "Sepeti boşalt",
+  "servers.relayPlan.removeFromCart": "Sepetten çıkar",
+  "servers.relayPlan.notThisPeriod": "Bu dönem için satılmıyor",
+  "servers.relayPlan.total": "Toplam",
+  "servers.relayPlan.discount": "İndirim",
+  "servers.relayPlan.discountLine": "{discount} indirimden önce {price}",
+  "servers.relayPlan.cartHint": "Sepetteki her şey tek bir aboneliktir: birlikte ödenir, yenilenir ve iptal edilir.",
+  "servers.relayPlan.belowMin": "Toplam, Stripe'ın en düşük tahsilatının ({min}) altında: şimdi bir şey alınmaz, sonraki faturaya eklenir.",
+  "servers.relayPlan.carried": "{amount}, Stripe'ın en düşük tahsilatının altında olduğundan şimdi alınmaz: {date} tarihli sonraki faturanıza eklenir. Bitirmek için kartınızı kaydedin.",
 }
 
 export default dict

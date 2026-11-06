@@ -3754,6 +3754,20 @@ const dict: Dict = {
   "servers.settings.deleteReleasesName": "Jego adres ResinCraft {name} też zostanie zwolniony, chyba że jest teraz online na innym PC.",
   "servers.people.full": "Pełna kontrola",
   "servers.people.fullHint": "Także pliki i Java serwerów, do których ma dostęp (Menedżer także argumenty uruchamiania i tokeny). Twoje konto zawsze ma pełną kontrolę.",
+  "servers.relayPlan.addToCart": "Dodaj do koszyka",
+  "servers.relayPlan.inCart": "W koszyku",
+  "servers.relayPlan.cart": "Koszyk",
+  "servers.relayPlan.checkout": "Do kasy",
+  "servers.relayPlan.checkoutTitle": "Kasa",
+  "servers.relayPlan.clearCart": "Opróżnij koszyk",
+  "servers.relayPlan.removeFromCart": "Usuń z koszyka",
+  "servers.relayPlan.notThisPeriod": "Niedostępne w tym okresie",
+  "servers.relayPlan.total": "Razem",
+  "servers.relayPlan.discount": "Rabat",
+  "servers.relayPlan.discountLine": "{price} przed rabatem {discount}",
+  "servers.relayPlan.cartHint": "Cały koszyk to jedna subskrypcja: opłacana, odnawiana i anulowana razem.",
+  "servers.relayPlan.belowMin": "Suma jest poniżej minimalnej opłaty Stripe ({min}): nic nie jest pobierane teraz, trafi na następną fakturę.",
+  "servers.relayPlan.carried": "{amount} jest poniżej minimalnej opłaty Stripe, więc nic nie jest pobierane teraz: trafi na następną fakturę {date}. Zapisz kartę, aby zakończyć.",
 }
 
 export default dict

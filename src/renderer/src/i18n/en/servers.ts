@@ -954,5 +954,19 @@ export default {
   "servers.relayNames.notFound": "No server on this PC or your other PCs uses this name",
   "servers.settings.deleteReleasesName": "Its ResinCraft address {name} is released too, unless it is online on another PC right now.",
   "servers.people.full": "Full control",
-  "servers.people.fullHint": "Also the files and Java of the servers they reach (a Manager also launch arguments and tokens). Your own account always has full control."
+  "servers.people.fullHint": "Also the files and Java of the servers they reach (a Manager also launch arguments and tokens). Your own account always has full control.",
+  "servers.relayPlan.addToCart": "Add to cart",
+  "servers.relayPlan.inCart": "In cart",
+  "servers.relayPlan.cart": "Cart",
+  "servers.relayPlan.checkout": "Checkout",
+  "servers.relayPlan.checkoutTitle": "Checkout",
+  "servers.relayPlan.clearCart": "Empty the cart",
+  "servers.relayPlan.removeFromCart": "Remove from cart",
+  "servers.relayPlan.notThisPeriod": "Not sold for this period",
+  "servers.relayPlan.total": "Total",
+  "servers.relayPlan.discount": "Discount",
+  "servers.relayPlan.discountLine": "{price} before a discount of {discount}",
+  "servers.relayPlan.cartHint": "Everything in the cart is one subscription: paid together, renewed together and cancelled together.",
+  "servers.relayPlan.belowMin": "The total is below Stripe's smallest charge ({min}): nothing is charged now, it's added to the next invoice.",
+  "servers.relayPlan.carried": "{amount} is below Stripe's smallest charge, so nothing is charged now: it's added to your next invoice on {date}. Save your card to finish."
 }

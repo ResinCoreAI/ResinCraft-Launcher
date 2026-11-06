@@ -2,8 +2,8 @@
 // sells, and buying them with the launcher's own payment form (Stripe's card fields inside it, no Stripe page).
 // While the relay's admin has payments off, nothing is for sale and this shows nothing.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, CreditCard, Gift, Loader2, Lock, Package, Puzzle, RefreshCw, Repeat, X } from 'lucide-react'
-import type { AccountPlan, PayStep, PlanInfo, PlanProduct, PlanSub, RelayPlans } from '@shared/types'
+import { Check, CreditCard, Gift, Loader2, Lock, Package, Plus, Puzzle, RefreshCw, Repeat, ShoppingCart, Trash2, X } from 'lucide-react'
+import type { AccountPlan, PayStep, PlanInfo, PlanProduct, PlanQuote, PlanSub, RelayPlans } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t, tx } from '../i18n'
@@ -128,10 +128,11 @@ function PayModal({
   }
 
   const price = money(step.amount, step.currency)
+  const carried = step.carried ?? 0
   return (
     <Modal
       title={title}
-      subtitle={t('servers.relayPlan.paySubtitle', { account: accountName, price })}
+      subtitle={t('servers.relayPlan.paySubtitle', { account: accountName, price: carried ? money(carried, step.currency) : price })}
       onClose={busy ? () => undefined : onClose}
       footer={
         <>
@@ -153,22 +154,32 @@ function PayModal({
           <Loader2 className="spin" /> {t('servers.relayPlan.loadingForm')}
         </p>
       )}
+      {(step.discount ?? 0) > 0 && (
+        <p className="hint">
+          {t('servers.relayPlan.discountLine', { price: money(step.subtotal ?? 0, step.currency), discount: money(step.discount ?? 0, step.currency) })}
+        </p>
+      )}
+      {carried > 0 && (
+        <p className="hint it-warn">
+          {t('servers.relayPlan.carried', { amount: money(carried, step.currency), date: step.period_end ? day(step.period_end) : '–' })}
+        </p>
+      )}
       {mock ? <div className="rp-mock-card">4242 4242 4242 4242 · 12/34 · 123</div> : <div ref={box} className="rp-element" />}
       {error && <p className="hint it-warn">{error}</p>}
     </Modal>
   )
 }
 
-/** Buying: the price and an optional promo code first, then the payment form. */
-function BuyModal({
+/** Checkout, for one product or the cart: each item's price and promo discount (from the relay), then the payment form. */
+function CheckoutModal({
   a,
-  p,
+  items,
   yearly,
   onClose,
   onPaid
 }: {
   a: AccountPlan
-  p: PlanProduct
+  items: PlanProduct[]
   yearly: boolean
   onClose: () => void
   onPaid: (plan: PlanInfo) => void
@@ -177,16 +188,37 @@ function BuyModal({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const [step, setStep] = useState<PayStep>()
+  const [quote, setQuote] = useState<PlanQuote>()
+  const ids = items.map((p) => p.id)
+  const key = ids.join(',')
   const currency = a.plan!.currency
-  const price = yearly ? p.yearly : p.monthly
-  const title = t('servers.relayPlan.payTitle', { name: p.name })
+  const title = items.length === 1 ? t('servers.relayPlan.payTitle', { name: items[0].name }) : t('servers.relayPlan.checkoutTitle')
+
+  // The quote again whenever the promo code changes (a moment after typing stops).
+  useEffect(() => {
+    let gone = false
+    const timer = setTimeout(() => {
+      api.server
+        .relayPlanQuote(a.account, ids, yearly, promo.trim() || null)
+        .then((q) => !gone && setQuote(q))
+        .catch(() => {})
+    }, 300)
+    return () => {
+      gone = true
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.account, key, yearly, promo])
+
   if (step) return <PayModal account={a.account} accountName={a.accountName} title={title} step={step} onClose={onClose} onPaid={onPaid} />
 
   const go = async () => {
     setBusy(true)
     setError(undefined)
     try {
-      const s = await api.server.relayPlanBuy(a.account, p.id, yearly, promo.trim() || null)
+      const code = promo.trim() || null
+      const s =
+        items.length === 1 ? await api.server.relayPlanBuy(a.account, ids[0], yearly, code) : await api.server.relayPlanCart(a.account, ids, yearly, code)
       // Nothing to pay now (a 100% promo code): it's active already.
       if (s.client_secret) setStep(s)
       else onPaid(await api.server.relayPlanRefresh(a.account, s.sub))
@@ -196,26 +228,49 @@ function BuyModal({
     }
   }
 
+  const per = (n: number) =>
+    yearly ? t('servers.relayPlan.perYear', { price: money(n, currency) }) : t('servers.relayPlan.perMonth', { price: money(n, currency) })
+  const fallback = items.reduce((n, p) => n + (yearly ? p.yearly : p.monthly), 0)
+  const total = quote ? quote.total : fallback
+  const below = quote && quote.total > 0 && quote.total < quote.min_charge
   return (
     <Modal
       title={title}
-      subtitle={t('servers.relayPlan.paySubtitle', {
-        account: a.accountName,
-        price: yearly ? t('servers.relayPlan.perYear', { price: money(price, currency) }) : t('servers.relayPlan.perMonth', { price: money(price, currency) })
-      })}
+      subtitle={t('servers.relayPlan.paySubtitle', { account: a.accountName, price: per(total) })}
       onClose={onClose}
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={busy} onClick={() => void go()}>
+          <button className="btn primary" disabled={busy || !!quote?.error} onClick={() => void go()}>
             {busy ? <Loader2 className="spin" /> : <CreditCard />} {t('servers.relayPlan.continue')}
           </button>
         </>
       }
     >
-      <p className="hint">{gives(p)}</p>
+      <div className="rp-lines">
+        {(quote?.lines ?? items.map((p) => ({ product: p.id, name: p.name, price: yearly ? p.yearly : p.monthly, discount: 0 }))).map((l) => (
+          <div key={l.product} className="rp-line">
+            <span className="grow">{l.name}</span>
+            {l.discount > 0 && <span className="rp-was">{money(l.price, currency)}</span>}
+            <b>{money(l.price - l.discount, currency)}</b>
+          </div>
+        ))}
+        {quote && quote.discount > 0 && (
+          <div className="rp-line rp-total">
+            <span className="grow">{t('servers.relayPlan.discount')}</span>
+            <b>−{money(quote.discount, currency)}</b>
+          </div>
+        )}
+        <div className="rp-line rp-total">
+          <span className="grow">{t('servers.relayPlan.total')}</span>
+          <b>{per(total)}</b>
+        </div>
+      </div>
+      {items.length > 1 && <p className="hint">{t('servers.relayPlan.cartHint')}</p>}
+      {below && <p className="hint it-warn">{t('servers.relayPlan.belowMin', { min: money(quote.min_charge, currency) })}</p>}
+      {quote?.error && <p className="hint it-warn">{quote.error}</p>}
       <div className="field">
         <label htmlFor="rp-promo">{t('servers.relayPlan.promo')}</label>
         <input
@@ -228,10 +283,42 @@ function BuyModal({
           onChange={(e) => setPromo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
           onKeyDown={(e) => e.key === 'Enter' && void go()}
         />
+        {quote?.promo_error && <span className="hint it-warn">{quote.promo_error}</span>}
         {error && <span className="hint it-warn">{error}</span>}
       </div>
     </Modal>
   )
+}
+
+/** The cart of one account, kept on this PC (closing the Store keeps it). */
+function useCart(account: string) {
+  const key = `rc-store-cart:${account}`
+  const read = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(key) ?? '[]')
+      return Array.isArray(v) ? (v.filter((x) => typeof x === 'string') as string[]) : []
+    } catch {
+      return []
+    }
+  }
+  const [items, setItems] = useState<string[]>(read)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setItems(read()), [key])
+  const save = (next: string[]) => {
+    setItems(next)
+    try {
+      localStorage.setItem(key, JSON.stringify(next))
+    } catch {
+      // Storage off: the cart lasts until the Store closes.
+    }
+  }
+  return {
+    items,
+    add: (id: string) => !items.includes(id) && save([...items, id]),
+    remove: (id: string) => save(items.filter((x) => x !== id)),
+    removeAll: (ids: string[]) => save(items.filter((x) => !ids.includes(x))),
+    clear: () => save([])
+  }
 }
 
 function ChangeModal({ a, sub, onClose, onDone }: { a: AccountPlan; sub: PlanSub; onClose: () => void; onDone: (step: PayStep, name: string) => void }) {
@@ -349,7 +436,7 @@ function SubRow({
           <CreditCard /> {t('servers.relayPlan.payNow')}
         </button>
       )}
-      {s.paid && s.active && !unpaid && plan.enabled && (
+      {s.paid && s.active && !unpaid && plan.enabled && !(s.items && s.items.length > 1) && (
         <button className="btn sm" onClick={onChange}>
           <Repeat /> {t('servers.relayPlan.change')}
         </button>
@@ -377,7 +464,7 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
   const [yearly, setYearly] = useState(false)
   const [busy, setBusy] = useState<string>()
   const [paying, setPaying] = useState<{ step: PayStep; title: string; name: string }>()
-  const [buying, setBuying] = useState<PlanProduct>()
+  const [buying, setBuying] = useState<PlanProduct[]>()
   const [gift, setGift] = useState('')
   const [redeeming, setRedeeming] = useState(false)
   const [changing, setChanging] = useState<PlanSub>()
@@ -385,13 +472,15 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
 
   // Nothing for sale anywhere (payments off, no relay, an older relay): nothing to show.
   const selling = plans?.accounts.filter((a) => a.plan?.enabled) ?? []
+  // The cart belongs to the account shown (a hook: before the returns below).
+  const cart = useCart((selling.find((x) => x.account === picked) ?? selling[0])?.account ?? '')
   if (!plans) return page ? <Loader2 className="spin" /> : null
   if (!plans.available || selling.length === 0) return <>{empty ?? null}</>
   const a = selling.find((x) => x.account === picked) ?? selling[0]
   const plan = a.plan!
   const put = (p: PlanInfo) => setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })
 
-  const buy = (p: PlanProduct) => setBuying(p)
+  const buy = (p: PlanProduct) => setBuying([p])
 
   const redeem = async () => {
     setRedeeming(true)
@@ -425,6 +514,11 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
     }
   }
 
+  // What's in the cart and still for sale (a product taken off sale drops out).
+  const inCart = cart.items.map((id) => plan.products.find((p) => p.id === id)).filter((p): p is PlanProduct => !!p)
+  const cartTotal = inCart.reduce((n, p) => n + (yearly ? p.yearly : p.monthly), 0)
+  const cartMissing = inCart.filter((p) => !(yearly ? p.yearly : p.monthly))
+
   const tot = plan.totals
   const addons = plan.products.filter((p) => p.kind !== 'pack')
   const packs = plan.products.filter((p) => p.kind === 'pack')
@@ -441,10 +535,17 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
           <span className="hint"> / {yearly ? t('servers.relayPlan.year') : t('servers.relayPlan.month')}</span>
         </div>
         {others.length > 0 && <div className="hint it-warn">{t('servers.relayPlan.otherHas', { account: others.join(', ') })}</div>}
-        <button className="btn sm primary" disabled={p.owned || busy != null} onClick={() => void buy(p)}>
-          {busy === p.id ? <Loader2 className="spin" /> : p.owned ? <Check /> : <CreditCard />}{' '}
-          {p.owned ? t('servers.relayPlan.owned') : t('servers.relayPlan.buy')}
-        </button>
+        <div className="row rp-card-buttons">
+          <button className="btn sm primary" disabled={p.owned || busy != null} onClick={() => void buy(p)}>
+            {busy === p.id ? <Loader2 className="spin" /> : p.owned ? <Check /> : <CreditCard />}{' '}
+            {p.owned ? t('servers.relayPlan.owned') : t('servers.relayPlan.buy')}
+          </button>
+          {!p.owned && (
+            <button className="btn sm" disabled={cart.items.includes(p.id)} onClick={() => cart.add(p.id)}>
+              {cart.items.includes(p.id) ? <Check /> : <Plus />} {cart.items.includes(p.id) ? t('servers.relayPlan.inCart') : t('servers.relayPlan.addToCart')}
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -550,6 +651,44 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
             </div>
             {yearly && <span className="hint">{t('servers.relayPlan.yearlyHint')}</span>}
           </div>
+          {inCart.length > 0 && (
+            <div className="card rp-cart">
+              <h4>
+                <ShoppingCart /> {t('servers.relayPlan.cart')}
+              </h4>
+              {inCart.map((p) => (
+                <div key={p.id} className="rp-line">
+                  <span className="grow">{p.name}</span>
+                  <b>{(yearly ? p.yearly : p.monthly) ? money(yearly ? p.yearly : p.monthly, plan.currency) : t('servers.relayPlan.notThisPeriod')}</b>
+                  <button
+                    className="btn ghost icon sm"
+                    title={t('servers.relayPlan.removeFromCart')}
+                    aria-label={t('servers.relayPlan.removeFromCart')}
+                    onClick={() => cart.remove(p.id)}
+                  >
+                    <X />
+                  </button>
+                </div>
+              ))}
+              <div className="rp-line rp-total">
+                <span className="grow">{t('servers.relayPlan.total')}</span>
+                <b>
+                  {yearly
+                    ? t('servers.relayPlan.perYear', { price: money(cartTotal, plan.currency) })
+                    : t('servers.relayPlan.perMonth', { price: money(cartTotal, plan.currency) })}
+                </b>
+              </div>
+              <p className="hint">{t('servers.relayPlan.cartHint')}</p>
+              <div className="row">
+                <button className="btn primary" disabled={cartMissing.length > 0} onClick={() => setBuying(inCart)}>
+                  <CreditCard /> {t('servers.relayPlan.checkout')}
+                </button>
+                <button className="btn ghost" onClick={() => cart.clear()}>
+                  <Trash2 /> {t('servers.relayPlan.clearCart')}
+                </button>
+              </div>
+            </div>
+          )}
           {packs.length > 0 && (
             <>
               <h4>
@@ -569,9 +708,9 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
         </>
       )}
       {buying && (
-        <BuyModal
+        <CheckoutModal
           a={a}
-          p={buying}
+          items={buying}
           yearly={yearly}
           onClose={() => {
             setBuying(undefined)
@@ -579,7 +718,9 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
           }}
           onPaid={(plan) => {
             put(plan)
-            toast(t('servers.relayPlan.paid', { name: buying.name, account: a.accountName }), 'success')
+            toast(t('servers.relayPlan.paid', { name: buying.map((p) => p.name).join(' + '), account: a.accountName }), 'success')
+            // Bought from the cart: it's empty again.
+            cart.removeAll(buying.map((p) => p.id))
             setBuying(undefined)
           }}
         />
