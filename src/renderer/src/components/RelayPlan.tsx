@@ -2,11 +2,28 @@
 // sells, and buying them with the launcher's own payment form (Stripe's card fields inside it, no Stripe page).
 // While the relay's admin has payments off, nothing is for sale and this shows nothing.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, CreditCard, Gift, Loader2, Lock, Package, Plus, Puzzle, RefreshCw, Repeat, ShoppingCart, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
+  Gift,
+  ListOrdered,
+  Loader2,
+  Lock,
+  Package,
+  Plus,
+  Puzzle,
+  RefreshCw,
+  Repeat,
+  ShoppingCart,
+  Trash2,
+  X
+} from 'lucide-react'
 import type { AccountPlan, PayStep, PlanInfo, PlanProduct, PlanQuote, PlanSub, RelayPlans } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
-import { t, tx } from '../i18n'
+import { t, tx, type Key } from '../i18n'
 import { ConfirmModal, Modal } from './ui'
 import { loadStripe, stripeAppearance, type StripeJs } from '../stripe'
 import '../relay-plan.css'
@@ -170,29 +187,43 @@ function PayModal({
   )
 }
 
-/** Checkout, for one product or the cart: each item's price and promo discount (from the relay), then the payment form. */
+type PayWay = 'once' | 'renew' | 'angpao'
+
+/** Checkout, for one product, the cart or a renewal: the price and promo discount of each item (from the relay), how
+ * to pay (once by card or PromptPay, the default; a card subscription that renews; a TrueMoney angpao), then the
+ * payment form. */
 function CheckoutModal({
   a,
   items,
   yearly,
+  renewOf,
   onClose,
   onPaid
 }: {
   a: AccountPlan
   items: PlanProduct[]
   yearly: boolean
+  /** Renewing this one-time purchase. */
+  renewOf?: string
   onClose: () => void
   onPaid: (plan: PlanInfo) => void
 }) {
+  const plan = a.plan!
   const [promo, setPromo] = useState('')
+  const [way, setWay] = useState<PayWay>('once')
+  const [link, setLink] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const [step, setStep] = useState<PayStep>()
   const [quote, setQuote] = useState<PlanQuote>()
   const ids = items.map((p) => p.id)
   const key = ids.join(',')
-  const currency = a.plan!.currency
-  const title = items.length === 1 ? t('servers.relayPlan.payTitle', { name: items[0].name }) : t('servers.relayPlan.checkoutTitle')
+  const currency = plan.currency
+  const title = renewOf
+    ? t('servers.relayPlan.renewTitle', { name: items.map((p) => p.name).join(' + ') })
+    : items.length === 1
+      ? t('servers.relayPlan.payTitle', { name: items[0].name })
+      : t('servers.relayPlan.checkoutTitle')
 
   // The quote again whenever the promo code changes (a moment after typing stops).
   useEffect(() => {
@@ -217,8 +248,11 @@ function CheckoutModal({
     setError(undefined)
     try {
       const code = promo.trim() || null
-      const s =
-        items.length === 1 ? await api.server.relayPlanBuy(a.account, ids[0], yearly, code) : await api.server.relayPlanCart(a.account, ids, yearly, code)
+      if (way === 'angpao') {
+        onPaid(await api.server.relayPlanAngpao(a.account, renewOf ? [] : ids, yearly, link.trim(), code, renewOf ?? null))
+        return
+      }
+      const s = await api.server.relayPlanCart(a.account, renewOf ? [] : ids, yearly, code, way === 'renew', renewOf ?? null)
       // Nothing to pay now (a 100% promo code): it's active already.
       if (s.client_secret) setStep(s)
       else onPaid(await api.server.relayPlanRefresh(a.account, s.sub))
@@ -233,18 +267,29 @@ function CheckoutModal({
   const fallback = items.reduce((n, p) => n + (yearly ? p.yearly : p.monthly), 0)
   const total = quote ? quote.total : fallback
   const below = quote && quote.total > 0 && quote.total < quote.min_charge
+  // A renewal's items are the account's already: the cart's checks don't apply to it.
+  const cartError = renewOf ? null : quote?.error
+  const ways: { value: PayWay; label: string }[] = [
+    { value: 'once', label: plan.promptpay ? t('servers.relayPlan.wayOnce') : t('servers.relayPlan.wayOnceCard') }
+  ]
+  if (!renewOf) ways.push({ value: 'renew', label: t('servers.relayPlan.wayRenew') })
+  if (plan.truemoney) ways.push({ value: 'angpao', label: t('servers.relayPlan.wayAngpao') })
+  const period = yearly ? t('servers.relayPlan.oneYear') : t('servers.relayPlan.oneMonth')
+  const ready = !busy && !cartError && (way !== 'angpao' || link.trim().length > 8) && !(below && way === 'once')
+
   return (
     <Modal
       title={title}
-      subtitle={t('servers.relayPlan.paySubtitle', { account: a.accountName, price: per(total) })}
+      subtitle={t('servers.relayPlan.paySubtitle', { account: a.accountName, price: way === 'renew' ? per(total) : `${money(total, currency)} · ${period}` })}
       onClose={onClose}
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={busy || !!quote?.error} onClick={() => void go()}>
-            {busy ? <Loader2 className="spin" /> : <CreditCard />} {t('servers.relayPlan.continue')}
+          <button className="btn primary" disabled={!ready} onClick={() => void go()}>
+            {busy ? <Loader2 className="spin" /> : way === 'angpao' ? <Gift /> : <CreditCard />}{' '}
+            {way === 'angpao' ? t('servers.relayPlan.angpaoPay') : t('servers.relayPlan.continue')}
           </button>
         </>
       }
@@ -265,12 +310,50 @@ function CheckoutModal({
         )}
         <div className="rp-line rp-total">
           <span className="grow">{t('servers.relayPlan.total')}</span>
-          <b>{per(total)}</b>
+          <b>{way === 'renew' ? per(total) : `${money(total, currency)} · ${period}`}</b>
         </div>
       </div>
-      {items.length > 1 && <p className="hint">{t('servers.relayPlan.cartHint')}</p>}
-      {below && <p className="hint it-warn">{t('servers.relayPlan.belowMin', { min: money(quote.min_charge, currency) })}</p>}
-      {quote?.error && <p className="hint it-warn">{quote.error}</p>}
+      <div className="field">
+        <label>{t('servers.relayPlan.payWith')}</label>
+        <div className="segmented rp-ways">
+          {ways.map((w) => (
+            <button key={w.value} className={way === w.value ? 'on' : undefined} onClick={() => setWay(w.value)}>
+              {w.label}
+            </button>
+          ))}
+        </div>
+        <span className="hint">
+          {way === 'once'
+            ? t('servers.relayPlan.wayOnceHint', { period })
+            : way === 'renew'
+              ? t('servers.relayPlan.wayRenewHint')
+              : t('servers.relayPlan.angpaoHint', { price: money(total, currency) })}
+        </span>
+      </div>
+      {way === 'angpao' && (
+        <div className="field">
+          <label htmlFor="rp-angpao">{t('servers.relayPlan.angpaoLink')}</label>
+          <input
+            id="rp-angpao"
+            className="input mono"
+            value={link}
+            maxLength={200}
+            spellCheck={false}
+            placeholder="https://gift.truemoney.com/campaign/?v=…"
+            onChange={(e) => setLink(e.target.value)}
+          />
+          <span className="hint it-warn">{t('servers.relayPlan.angpaoOver')}</span>
+        </div>
+      )}
+      {items.length > 1 && way === 'renew' && <p className="hint">{t('servers.relayPlan.cartHint')}</p>}
+      {below && (
+        <p className="hint it-warn">
+          {way === 'renew'
+            ? t('servers.relayPlan.belowMin', { min: money(quote.min_charge, currency) })
+            : t('servers.relayPlan.belowMinOnce', { min: money(quote.min_charge, currency) })}
+        </p>
+      )}
+      {cartError && <p className="hint it-warn">{cartError}</p>}
       <div className="field">
         <label htmlFor="rp-promo">{t('servers.relayPlan.promo')}</label>
         <input
@@ -281,12 +364,134 @@ function CheckoutModal({
           spellCheck={false}
           placeholder={t('servers.relayPlan.promoPlaceholder')}
           onChange={(e) => setPromo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
-          onKeyDown={(e) => e.key === 'Enter' && void go()}
+          onKeyDown={(e) => e.key === 'Enter' && ready && void go()}
         />
         {quote?.promo_error && <span className="hint it-warn">{quote.promo_error}</span>}
         {error && <span className="hint it-warn">{error}</span>}
       </div>
     </Modal>
+  )
+}
+
+/** Server priority: the order the account's names keep ResinCraft Relay in when it has fewer slots than it uses. */
+function Priority({ a, onSaved }: { a: AccountPlan; onSaved: (p: PlanInfo) => void }) {
+  const { toast } = useStore()
+  const access = a.plan!.access!
+  const start = access.names.filter((n) => !n.assigned).map((n) => n.name)
+  const [order, setOrder] = useState(start)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setOrder(access.names.filter((n) => !n.assigned).map((n) => n.name)), [access])
+  if (start.length < 2) return null
+  const move = (i: number, by: number) => {
+    const next = [...order]
+    const [x] = next.splice(i, 1)
+    next.splice(i + by, 0, x)
+    setOrder(next)
+  }
+  const changed = order.join(',') !== start.join(',')
+  const save = async () => {
+    setBusy(true)
+    try {
+      onSaved(await api.server.relayPlanPriority(a.account, order))
+      toast(t('servers.relayPlan.prioritySaved'), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const info = (n: string) => access.names.find((x) => x.name === n)
+  return (
+    <>
+      <h4>
+        <ListOrdered /> {t('servers.relayPlan.priority')}
+      </h4>
+      <p className="hint">{access.cutoff ? t('servers.relayPlan.priorityHint', { days: access.grace_days }) : t('servers.relayPlan.priorityOff')}</p>
+      <div className="list rp-priority">
+        {order.map((n, i) => (
+          <div key={n} className="list-row">
+            <span className="rp-rank">{i + 1}</span>
+            <div className="grow mono ellipsis">
+              {n}
+              {info(n)?.online && <span className="chip compact success">{t('servers.relayNames.online')}</span>}
+              {info(n)?.paused && <span className="chip compact danger">{t('servers.relayPlan.paused')}</span>}
+            </div>
+            <button
+              className="btn ghost icon sm"
+              disabled={i === 0}
+              title={t('servers.relayPlan.moveUp')}
+              aria-label={t('servers.relayPlan.moveUp')}
+              onClick={() => move(i, -1)}
+            >
+              <ChevronUp />
+            </button>
+            <button
+              className="btn ghost icon sm"
+              disabled={i === order.length - 1}
+              title={t('servers.relayPlan.moveDown')}
+              aria-label={t('servers.relayPlan.moveDown')}
+              onClick={() => move(i, 1)}
+            >
+              <ChevronDown />
+            </button>
+          </div>
+        ))}
+      </div>
+      {changed && (
+        <div className="row">
+          <button className="btn sm primary" disabled={busy} onClick={() => void save()}>
+            {busy ? <Loader2 className="spin" /> : <Check />} {t('servers.relayPlan.prioritySave')}
+          </button>
+          <button className="btn sm ghost" onClick={() => setOrder(start)}>
+            {t('common.cancel')}
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** What's ending or ended: grace, paused names, and one-time purchases that end within a week. */
+function Notices({ a, onRenew }: { a: AccountPlan; onRenew: (s: PlanSub) => void }) {
+  const plan = a.plan!
+  const access = plan.access
+  const now = Date.now() / 1000
+  const soon = plan.mine.filter((s) => s.once && s.active && s.period_end > 0 && s.period_end - now < 7 * 86400)
+  return (
+    <>
+      {access && access.grace_until > 0 && (
+        <div className="callout pending rp-notice">
+          <b>{t('servers.relayPlan.graceTitle')}</b>
+          <span>
+            {t('servers.relayPlan.graceBody', {
+              date: new Date(access.grace_until * 1000).toLocaleString(),
+              servers: access.servers,
+              names: access.will_pause.length ? access.will_pause.join(', ') : '–'
+            })}
+          </span>
+        </div>
+      )}
+      {access && access.paused.length > 0 && (
+        <div className="callout danger rp-notice">
+          <b>{t('servers.relayPlan.pausedTitle')}</b>
+          <span>{t('servers.relayPlan.pausedBody', { names: access.paused.join(', ') })}</span>
+        </div>
+      )}
+      {soon.map((s) => (
+        <div key={s.id} className="callout pending rp-notice">
+          <span className="grow">
+            {t('servers.relayPlan.endsSoon', {
+              name: s.name,
+              date: new Date(s.period_end * 1000).toLocaleString(),
+              days: Math.max(0, Math.ceil((s.period_end - now) / 86400))
+            })}
+          </span>
+          <button className="btn sm primary" onClick={() => onRenew(s)}>
+            <RefreshCw /> {t('servers.relayPlan.renew')}
+          </button>
+        </div>
+      ))}
+    </>
   )
 }
 
@@ -396,7 +601,8 @@ function SubRow({
   onCancel,
   onResume,
   onChange,
-  onPay
+  onPay,
+  onRenew
 }: {
   s: PlanSub
   plan: PlanInfo
@@ -404,6 +610,7 @@ function SubRow({
   onResume: () => void
   onChange: () => void
   onPay: () => void
+  onRenew: () => void
 }) {
   const unpaid = s.status === 'incomplete' || s.status === 'past_due' || s.status === 'unpaid'
   const when = s.period_end
@@ -423,14 +630,22 @@ function SubRow({
           {!s.active && !unpaid && <span className="chip compact danger">{t('servers.relayPlan.ended')}</span>}
         </div>
         <div className="hint ellipsis">
-          {s.paid
-            ? s.yearly
-              ? t('servers.relayPlan.perYear', { price: money(s.amount, plan.currency) })
-              : t('servers.relayPlan.perMonth', { price: money(s.amount, plan.currency) })
-            : t('servers.relayPlan.given')}
-          {when && ` · ${when}`}
+          {s.once
+            ? `${t('servers.relayPlan.paidOnce', { price: money(s.amount, plan.currency), method: t(`servers.relayPlan.method.${s.method || 'card'}` as Key) })}${s.period_end ? ` · ${t('servers.relayPlan.until', { date: day(s.period_end) })}` : ''}`
+            : s.paid
+              ? `${
+                  s.yearly
+                    ? t('servers.relayPlan.perYear', { price: money(s.amount, plan.currency) })
+                    : t('servers.relayPlan.perMonth', { price: money(s.amount, plan.currency) })
+                }${when ? ` · ${when}` : ''}`
+              : `${t('servers.relayPlan.given')}${when ? ` · ${when}` : ''}`}
         </div>
       </div>
+      {s.once && plan.enabled && (
+        <button className="btn sm primary" onClick={onRenew}>
+          <RefreshCw /> {t('servers.relayPlan.renew')}
+        </button>
+      )}
       {s.paid && unpaid && (
         <button className="btn sm primary" onClick={onPay}>
           <CreditCard /> {t('servers.relayPlan.payNow')}
@@ -465,6 +680,7 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
   const [busy, setBusy] = useState<string>()
   const [paying, setPaying] = useState<{ step: PayStep; title: string; name: string }>()
   const [buying, setBuying] = useState<PlanProduct[]>()
+  const [renewing, setRenewing] = useState<PlanSub>()
   const [gift, setGift] = useState('')
   const [redeeming, setRedeeming] = useState(false)
   const [changing, setChanging] = useState<PlanSub>()
@@ -481,6 +697,16 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
   const put = (p: PlanInfo) => setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })
 
   const buy = (p: PlanProduct) => setBuying([p])
+  const productsOf = (s: PlanSub) =>
+    (s.items && s.items.length ? s.items.map((i) => i.product) : [s.product])
+      .map((id) => plan.products.find((p) => p.id === id))
+      .filter((p): p is PlanProduct => !!p)
+  const renew = (s: PlanSub) => {
+    if (productsOf(s).length === 0) return toast(t('servers.relayPlan.notForSaleNow'), 'error')
+    setYearly(s.yearly)
+    setRenewing(s)
+    setBuying(productsOf(s))
+  }
 
   const redeem = async () => {
     setRedeeming(true)
@@ -605,6 +831,7 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
           bonus: gb(plan.free.bonus_bytes)
         })}
       </p>
+      <Notices a={a} onRenew={renew} />
       <div className="row rp-redeem">
         <input
           className="input mono"
@@ -633,11 +860,13 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
                 onResume={() => void resume(s)}
                 onChange={() => setChanging(s)}
                 onPay={() => void payOpen(s)}
+                onRenew={() => renew(s)}
               />
             ))}
           </div>
         </>
       )}
+      {plan.access && <Priority a={a} onSaved={put} />}
       {plan.products.length > 0 && (
         <>
           <div className="row rp-period">
@@ -712,16 +941,19 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
           a={a}
           items={buying}
           yearly={yearly}
+          renewOf={renewing?.id}
           onClose={() => {
             setBuying(undefined)
+            setRenewing(undefined)
             void load()
           }}
           onPaid={(plan) => {
             put(plan)
             toast(t('servers.relayPlan.paid', { name: buying.map((p) => p.name).join(' + '), account: a.accountName }), 'success')
             // Bought from the cart: it's empty again.
-            cart.removeAll(buying.map((p) => p.id))
+            if (!renewing) cart.removeAll(buying.map((p) => p.id))
             setBuying(undefined)
+            setRenewing(undefined)
           }}
         />
       )}

@@ -71,8 +71,20 @@ pub async fn buy(account: &str, product: &str, yearly: bool, promo: Option<&str>
 }
 
 /// Buys a cart: one subscription with every item.
-pub async fn cart(account: &str, items: &[String], yearly: bool, promo: Option<&str>) -> Result<PayStep> {
-    connect(account).await?.plan_cart(items, yearly, promo).await.map_err(|e| relay::describe(&e, ""))
+/// Buys the items (a cart, or one product): one payment for a month or year by card or PromptPay (`renew` false),
+/// or a card subscription that renews; `renew_of` renews a one-time purchase.
+pub async fn cart(account: &str, items: &[String], yearly: bool, promo: Option<&str>, renew: bool, renew_of: Option<&str>) -> Result<PayStep> {
+    connect(account).await?.plan_checkout(items, yearly, promo, renew, renew_of).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// Pays with a TrueMoney angpao link.
+pub async fn angpao(account: &str, items: &[String], yearly: bool, link: &str, promo: Option<&str>, renew_of: Option<&str>) -> Result<PlanInfo> {
+    connect(account).await?.plan_angpao(items, yearly, link, promo, renew_of).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// The order the account's names keep ResinCraft Relay in.
+pub async fn priority(account: &str, names: &[String]) -> Result<PlanInfo> {
+    connect(account).await?.plan_priority(names).await.map_err(|e| relay::describe(&e, ""))
 }
 
 /// What a cart costs, with the promo code's discount on each item.

@@ -270,6 +270,7 @@ export default {
   'engine.hostRelay.listingLimit': "You've already submitted as many servers as the list allows. Remove one first.",
   'engine.hostRelay.mojangDown': "Minecraft's account service didn't answer. Try again in a moment.",
   'engine.hostRelay.nameInvalid': 'Use 3 to 24 lowercase letters, numbers and dashes, not starting or ending with a dash.',
+  'engine.hostRelay.namePaused': '{name} lost ResinCraft Relay: your account has fewer names or servers than it uses. Renew in the Store, or move it up in Server priority.',
   'engine.hostRelay.nameRequestPending': "Your request is already waiting for the relay's admin.",
   'engine.hostRelay.nameRequestsOff': "ResinCraft Relay isn't taking requests for more names right now.",
   'engine.hostRelay.nameReserved': '"{name}" is reserved. Pick another name.',

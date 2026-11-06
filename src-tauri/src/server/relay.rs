@@ -184,6 +184,11 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ),
         ErrorCode::PaymentsOff => err_tr!("hostRelay.paymentsOff", "ResinCraft Relay isn't selling anything right now: everything is free."),
         ErrorCode::NotForSale => err_tr!("hostRelay.notForSale", "That isn't for sale, or this account has it already."),
+        ErrorCode::NamePaused => err_tr!(
+            "hostRelay.namePaused",
+            "{name} lost ResinCraft Relay: your account has fewer names or servers than it uses. Renew in the Store, or move it up in Server priority.",
+            name = name
+        ),
         ErrorCode::CodeInvalid => err_tr!("hostRelay.codeInvalid", "That code doesn't work: {error}", error = admin_message(e)),
         ErrorCode::PaymentFailed => err_tr!("hostRelay.paymentFailed", "The payment didn't go through: {error}", error = admin_message(e)),
         ErrorCode::BedrockUnavailable => err_tr!(

@@ -325,6 +325,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       relayPlanBuy: fn('server:relayPlanBuy'),
       relayPlanRedeem: fn('server:relayPlanRedeem'),
       relayPlanCart: fn('server:relayPlanCart'),
+      relayPlanAngpao: fn('server:relayPlanAngpao'),
+      relayPlanPriority: fn('server:relayPlanPriority'),
       relayPlanQuote: fn('server:relayPlanQuote'),
       relayPlanChange: fn('server:relayPlanChange'),
       relayPlanCancel: fn('server:relayPlanCancel'),

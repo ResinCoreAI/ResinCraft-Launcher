@@ -1381,6 +1381,25 @@ export interface PlanSub {
   paid: boolean
   /** Its products when it was bought as a cart (several items); empty: just `product`. */
   items?: { product: string; name: string; amount: number }[]
+  /** Paid once for a month or a year: it doesn't renew by itself (Renew extends it). */
+  once?: boolean
+  /** How a one-time purchase was paid: "card", "promptpay", "truemoney", "free". */
+  method?: string
+}
+
+/** What happens to the account's relay names and servers when an add-on ends. */
+export interface PlanAccess {
+  /** Names over the limit are paused after the grace (off: nothing is cut; servers over the limit can't come online). */
+  cutoff: boolean
+  grace_days: number
+  /** In grace until (Unix seconds; 0: not in grace): then `will_pause` lose the relay and `servers` can be online. */
+  grace_until: number
+  will_pause: string[]
+  servers: number
+  /** Paused now. */
+  paused: string[]
+  /** The account's names in priority order. */
+  names: { name: string; online: boolean; paused: boolean; assigned: boolean }[]
 }
 
 /** What a cart costs before buying it: each item's price and the promo code's discount on it. */
@@ -1406,6 +1425,11 @@ export interface PlanInfo {
   free: { servers: number; names: number; monthly_bytes: number; bonus_bytes: number; session_secs: number }
   products: PlanProduct[]
   mine: PlanSub[]
+  /** TrueMoney angpao links are taken. */
+  truemoney?: boolean
+  /** PromptPay can be used for one-time payments. */
+  promptpay?: boolean
+  access?: PlanAccess
   totals: { servers: number; names: number; monthly_bytes: number; unlimited_traffic: boolean; no_session_limit: boolean; whitelist_page: boolean; session_secs: number }
 }
 
@@ -1423,6 +1447,10 @@ export interface PayStep {
   /** Below Stripe's smallest charge: not charged now, added to the invoice at `period_end`. */
   carried?: number
   period_end?: number
+  /** A one-time payment (not a subscription). */
+  once?: boolean
+  /** "card", "promptpay". */
+  methods?: string[]
 }
 
 export interface AccountPlan {
@@ -2663,7 +2691,11 @@ export interface ResinApi {
     /** Starts buying a product for an account: what the payment form needs. */
     relayPlanBuy(account: string, product: string, yearly: boolean, promo?: string | null): Promise<PayStep>
     /** Buys a cart (one subscription with every item, one period for all). */
-    relayPlanCart(account: string, items: string[], yearly: boolean, promo?: string | null): Promise<PayStep>
+    relayPlanCart(account: string, items: string[], yearly: boolean, promo?: string | null, renew?: boolean, renewOf?: string | null): Promise<PayStep>
+    /** Pays with a TrueMoney angpao link. */
+    relayPlanAngpao(account: string, items: string[], yearly: boolean, link: string, promo?: string | null, renewOf?: string | null): Promise<PlanInfo>
+    /** The order the account's names keep ResinCraft Relay in. */
+    relayPlanPriority(account: string, names: string[]): Promise<PlanInfo>
     /** What a cart costs, with the promo code's discount on each item. */
     relayPlanQuote(account: string, items: string[], yearly: boolean, promo?: string | null): Promise<PlanQuote>
     /** Redeems a gift code for an account. */

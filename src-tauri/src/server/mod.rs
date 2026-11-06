@@ -334,7 +334,13 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:relayNames" => json(relay::names().await?),
         "server:relayPlans" => json(plan::plans().await?),
         "server:relayPlanBuy" => json(plan::buy(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<bool>(2)?, args.get::<Option<String>>(3)?.as_deref()).await?),
-        "server:relayPlanCart" => json(plan::cart(&args.get::<String>(0)?, &args.get::<Vec<String>>(1)?, args.get::<bool>(2)?, args.get::<Option<String>>(3)?.as_deref()).await?),
+        "server:relayPlanCart" => json(
+            plan::cart(&args.get::<String>(0)?, &args.get::<Vec<String>>(1)?, args.get::<bool>(2)?, args.get::<Option<String>>(3)?.as_deref(), args.get::<Option<bool>>(4)?.unwrap_or(false), args.get::<Option<String>>(5)?.as_deref()).await?,
+        ),
+        "server:relayPlanAngpao" => json(
+            plan::angpao(&args.get::<String>(0)?, &args.get::<Vec<String>>(1)?, args.get::<bool>(2)?, &args.get::<String>(3)?, args.get::<Option<String>>(4)?.as_deref(), args.get::<Option<String>>(5)?.as_deref()).await?,
+        ),
+        "server:relayPlanPriority" => json(plan::priority(&args.get::<String>(0)?, &args.get::<Vec<String>>(1)?).await?),
         "server:relayPlanQuote" => json(plan::quote(&args.get::<String>(0)?, &args.get::<Vec<String>>(1)?, args.get::<bool>(2)?, args.get::<Option<String>>(3)?.as_deref()).await?),
         "server:relayPlanRedeem" => json(plan::redeem(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:relayPlanChange" => json(plan::change(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?, args.get::<bool>(3)?).await?),

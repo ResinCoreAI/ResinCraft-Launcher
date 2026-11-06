@@ -427,6 +427,7 @@ export function mockServers(): {
     }
   ]
   let planSeq = 0
+  const planPriority: Record<string, string[]> = {}
   const mockPlan = (a: (typeof planAccounts)[number]): import('@shared/types').PlanInfo => {
     const have = g(0, 0, 0)
     for (const s of a.subs.filter((x) => x.active)) {
@@ -456,7 +457,27 @@ export function mockServers(): {
       test_mode: true,
       free: { servers: 1, names: 2, monthly_bytes: 30e9, bonus_bytes: 10e9, session_secs: 7200 },
       products: on ? PLAN_PRODUCTS.map((p) => ({ ...p, owned: owned(p) })) : [],
-      mine: a.subs.slice().reverse(),
+      mine: a.subs
+        .filter((x) => x.status !== 'pending')
+        .slice()
+        .reverse(),
+      truemoney: true,
+      promptpay: true,
+      access: {
+        cutoff: true,
+        grace_days: 3,
+        // ?plans=grace: an add-on just ended.
+        grace_until: new URLSearchParams(location.search).get('plans') === 'grace' ? Math.floor(Date.now() / 1000) + 2 * 86400 : 0,
+        will_pause: new URLSearchParams(location.search).get('plans') === 'grace' ? ['old-smp'] : [],
+        servers: 1,
+        paused: [],
+        names: (planPriority[a.account] ?? ['friends-smp', 'cozy', 'old-smp']).map((name) => ({
+          name,
+          online: name === 'friends-smp',
+          paused: false,
+          assigned: false
+        }))
+      },
       totals: on
         ? {
             servers: 1 + have.servers,
@@ -1059,7 +1080,78 @@ export function mockServers(): {
         error: dupe ? 'That item is in the cart twice' : null
       }
     },
-    relayPlanCart: async (account, items, yearly, promo) => {
+    relayPlanAngpao: async (account, items, yearly, link, _promo, renewOf) => {
+      await wait(null, 700)
+      if (!link.includes('v=')) throw new Error("That code doesn't work: that isn't a TrueMoney angpao link")
+      const a = planAccounts.find((x) => x.account === account)!
+      const end = (from: number) => from + (yearly ? 365 : 30) * 86400
+      const now = Math.floor(Date.now() / 1000)
+      if (renewOf) {
+        const s = a.subs.find((x) => x.id === renewOf)!
+        s.period_end = end(Math.max(s.period_end, now))
+        return mockPlan(a)
+      }
+      const ps = items.map((id) => PLAN_PRODUCTS.find((x) => x.id === id)!)
+      a.subs.push({
+        id: `tm_mock_${++planSeq}`,
+        product: items[0],
+        name: ps.map((p) => p.name).join(' + '),
+        yearly,
+        status: 'paid',
+        active: true,
+        period_end: end(now),
+        cancel_at_period_end: false,
+        amount: ps.reduce((n, p) => n + (yearly ? p.yearly : p.monthly), 0),
+        paid: false,
+        once: true,
+        method: 'truemoney',
+        items: items.length > 1 ? ps.map((p) => ({ product: p.id, name: p.name, amount: yearly ? p.yearly : p.monthly })) : []
+      })
+      return mockPlan(a)
+    },
+    relayPlanPriority: async (account, names) => {
+      await wait(null, 300)
+      planPriority[account] = names
+      return mockPlan(planAccounts.find((x) => x.account === account)!)
+    },
+    relayPlanCart: async (account, items, yearly, promo, renew, renewOf) => {
+      if (!renew) {
+        await wait(null, 500)
+        const a = planAccounts.find((x) => x.account === account)!
+        const renewed = renewOf ? a.subs.find((x) => x.id === renewOf) : undefined
+        const ids = renewed ? (renewed.items?.length ? renewed.items.map((i) => i.product) : [renewed.product]) : items
+        const ps = ids.map((id) => PLAN_PRODUCTS.find((x) => x.id === id)!)
+        const amount = ps.reduce((n, p) => n + (yearly ? p.yearly : p.monthly), 0)
+        const id = `pi_mock_${++planSeq}`
+        a.subs.push({
+          id,
+          product: ids[0],
+          name: ps.map((p) => p.name).join(' + '),
+          yearly,
+          status: 'pending',
+          active: false,
+          period_end: 0,
+          cancel_at_period_end: false,
+          amount,
+          paid: false,
+          once: true,
+          method: 'card',
+          items: ids.length > 1 ? ps.map((p) => ({ product: p.id, name: p.name, amount: yearly ? p.yearly : p.monthly })) : [],
+          renewOf
+        } as never)
+        return {
+          sub: id,
+          client_secret: 'mock_secret',
+          intent: 'payment',
+          publishable_key: 'pk_mock',
+          amount,
+          currency: 'thb',
+          subtotal: amount,
+          discount: 0,
+          once: true,
+          methods: ['card', 'promptpay']
+        }
+      }
       await wait(null, 500)
       const a = planAccounts.find((x) => x.account === account)!
       const ps = items.map((id) => PLAN_PRODUCTS.find((x) => x.id === id)!)
@@ -1157,6 +1249,18 @@ export function mockServers(): {
       await wait(null, 400)
       const a = planAccounts.find((x) => x.account === account)!
       const s = a.subs.find((x) => x.id === sub)!
+      const renewOf = (s as { renewOf?: string }).renewOf
+      if (s.status === 'pending' && renewOf) {
+        // A renewal: the purchase gets another period from its end.
+        const old = a.subs.find((x) => x.id === renewOf)!
+        old.period_end = Math.max(old.period_end, Math.floor(Date.now() / 1000)) + (s.yearly ? 365 : 30) * 86400
+        a.subs = a.subs.filter((x) => x.id !== sub)
+        return mockPlan(a)
+      }
+      if (s.status === 'pending') {
+        Object.assign(s, { status: 'paid', active: true, period_end: Math.floor(Date.now() / 1000) + (s.yearly ? 365 : 30) * 86400 })
+        return mockPlan(a)
+      }
       Object.assign(s, { status: 'active', active: true, period_end: Math.floor(Date.now() / 1000) + (s.yearly ? 365 : 30) * 86400 })
       return mockPlan(a)
     },

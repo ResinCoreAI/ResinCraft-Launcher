@@ -240,6 +240,12 @@ pub enum AgentMsg {
         /// A promo code for a discount.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         promo: Option<String>,
+        /// A card subscription that renews by itself; false (the default): one payment for one month or year.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        renew: bool,
+        /// Renewing this one-time purchase (its items, from its end date on) instead of buying anew.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        renew_of: Option<String>,
     },
     /// Redeem a gift code: answered with `plan`. Protocol 11.
     PlanRedeem { code: String },
@@ -249,7 +255,27 @@ pub enum AgentMsg {
         yearly: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         promo: Option<String>,
+        /// A card subscription that renews by itself; false (the default): one payment for one month or year.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        renew: bool,
+        /// Renewing this one-time purchase (its items, from its end date on) instead of buying anew.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        renew_of: Option<String>,
     },
+    /// Pay with a TrueMoney angpao (gift envelope) link: one month or year of the items. Answered with `plan`.
+    /// Protocol 11.
+    PlanAngpao {
+        items: Vec<String>,
+        yearly: bool,
+        link: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        promo: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        renew_of: Option<String>,
+    },
+    /// The order the account's names keep ResinCraft Relay in when it has fewer slots than it uses: answered with
+    /// `plan`. Protocol 11.
+    PlanPriority { names: Vec<String> },
     /// What a cart costs (each item's price and promo discount), before buying: answered with `quote`. Protocol 11.
     PlanQuote {
         items: Vec<String>,
@@ -766,6 +792,9 @@ pub enum ErrorCode {
     PaymentFailed,
     /// A promo or gift code that doesn't work (the message says why). Protocol 11.
     CodeInvalid,
+    /// This name lost ResinCraft Relay: its account has fewer names or servers than it uses (renew, or change the
+    /// priority). Protocol 11.
+    NamePaused,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -1121,6 +1150,12 @@ pub struct PlanInfo {
     pub test_mode: bool,
     /// What every account gets.
     pub free: FreePlanInfo,
+    /// TrueMoney angpao links are taken.
+    pub truemoney: bool,
+    /// PromptPay can be used for one-time payments (Stripe hasn't refused it).
+    pub promptpay: bool,
+    /// Ended add-ons, grace and cut-off.
+    pub access: Access,
     /// What's for sale (empty while payments are off).
     pub products: Vec<ProductInfo>,
     /// The account's subscriptions (and the admin's grants), newest first.
@@ -1184,6 +1219,39 @@ pub struct MySub {
     pub paid: bool,
     /// Its products when it has several (a cart); empty: just `product`.
     pub items: Vec<MySubItem>,
+    /// Paid once for one month or year (it doesn't renew by itself: `plan_cart` with `renew_of` renews it).
+    pub once: bool,
+    /// How it was paid: "card", "promptpay", "truemoney", "free"; empty for subscriptions and grants.
+    pub method: String,
+}
+
+/// What happens to an account's relay names and servers when an add-on ends. Protocol 11.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Access {
+    /// The relay cuts what's over the limits once the grace days are over (off: nothing is cut; servers over the
+    /// limit just can't come online).
+    pub cutoff: bool,
+    pub grace_days: u32,
+    /// In grace: everything keeps working until `until` (Unix seconds); then `will_pause` lose the relay and only
+    /// `servers` can be online at once.
+    pub grace_until: u64,
+    pub will_pause: Vec<String>,
+    pub servers: u32,
+    /// Cut off: these names are paused (renew, or put others first, to bring them back).
+    pub paused: Vec<String>,
+    /// The account's names in priority order (first: kept first).
+    pub names: Vec<PriorityName>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PriorityName {
+    pub name: String,
+    pub online: bool,
+    pub paused: bool,
+    /// Given by the admin: it doesn't count toward the names and is never paused.
+    pub assigned: bool,
 }
 
 /// One product of a subscription bought as a cart. Protocol 11.
@@ -1261,6 +1329,10 @@ pub struct PayStep {
     pub carried: u64,
     /// When the paid period ends (the next invoice).
     pub period_end: u64,
+    /// A one-time payment (PaymentIntent) rather than a subscription.
+    pub once: bool,
+    /// The ways it can be paid ("card", "promptpay").
+    pub methods: Vec<String>,
 }
 
 #[cfg(test)]

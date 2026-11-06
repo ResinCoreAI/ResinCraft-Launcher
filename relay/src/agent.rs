@@ -516,12 +516,28 @@ impl Connection {
 
     /// The same with a promo code.
     pub async fn plan_buy_with(&mut self, product: &str, yearly: bool, promo: Option<&str>) -> Result<crate::proto::PayStep, AgentError> {
-        self.pay_step(AgentMsg::PlanBuy { product: product.into(), yearly, promo: promo.map(str::to_string) }).await
+        self.pay_step(AgentMsg::PlanBuy { product: product.into(), yearly, promo: promo.map(str::to_string), renew: true, renew_of: None }).await
+    }
+
+    /// Buys products: one payment for a month or year (`renew` false), or a card subscription that renews; `renew_of`
+    /// renews a one-time purchase.
+    pub async fn plan_checkout(&mut self, items: &[String], yearly: bool, promo: Option<&str>, renew: bool, renew_of: Option<&str>) -> Result<crate::proto::PayStep, AgentError> {
+        self.pay_step(AgentMsg::PlanCart { items: items.to_vec(), yearly, promo: promo.map(str::to_string), renew, renew_of: renew_of.map(str::to_string) }).await
+    }
+
+    /// Pays with a TrueMoney angpao link.
+    pub async fn plan_angpao(&mut self, items: &[String], yearly: bool, link: &str, promo: Option<&str>, renew_of: Option<&str>) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::PlanAngpao { items: items.to_vec(), yearly, link: link.into(), promo: promo.map(str::to_string), renew_of: renew_of.map(str::to_string) }).await
+    }
+
+    /// Sets the order the account's names keep the relay in.
+    pub async fn plan_priority(&mut self, names: &[String]) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::PlanPriority { names: names.to_vec() }).await
     }
 
     /// Buys several products in one subscription.
     pub async fn plan_cart(&mut self, items: &[String], yearly: bool, promo: Option<&str>) -> Result<crate::proto::PayStep, AgentError> {
-        self.pay_step(AgentMsg::PlanCart { items: items.to_vec(), yearly, promo: promo.map(str::to_string) }).await
+        self.pay_step(AgentMsg::PlanCart { items: items.to_vec(), yearly, promo: promo.map(str::to_string), renew: true, renew_of: None }).await
     }
 
     /// What a cart costs, before buying it.

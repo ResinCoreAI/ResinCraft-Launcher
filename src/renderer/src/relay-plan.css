@@ -176,3 +176,27 @@
 .rp-card .rp-card-buttons .btn {
   margin-top: 0;
 }
+
+/* Ending, grace and paused notices; server priority. */
+.rp-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 8px 0;
+}
+
+.rp-ways {
+  flex-wrap: wrap;
+}
+
+.rp-priority .list-row {
+  gap: 8px;
+}
+
+.rp-rank {
+  width: 22px;
+  text-align: center;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
