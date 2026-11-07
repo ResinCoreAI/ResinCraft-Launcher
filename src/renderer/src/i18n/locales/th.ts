@@ -3913,6 +3913,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "ไม่พอ: ต้องจัดการ",
   "servers.admin.pay.angpaoLine": "ให้ {gave} สำหรับ {price}",
   "servers.admin.pay.overpaid": "เกิน {amount}",
+  "servers.admin.edit": "แก้ไข",
+  "servers.admin.editTitle": "แก้ไข {name}",
+  "servers.admin.edited": "บันทึกแล้ว",
+  "servers.admin.tags": "แท็ก",
+  "servers.admin.tagsTitle": "แท็กของ {name}",
+  "servers.admin.tagsField": "แท็ก (คั่นด้วยจุลภาค)",
+  "servers.admin.tagsHint": "หมวดหมู่ และแท็กของตัวเองได้ถึง 5 แท็ก แต่ละแท็ก 1 ถึง 24 ตัวอักษร ตัวเลข ช่องว่าง หรือขีด",
+  "servers.admin.tagsSaved": "บันทึกแท็กแล้ว",
 }
 
 export default dict

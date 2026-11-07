@@ -3950,6 +3950,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "Faltou: resolva",
   "servers.admin.pay.angpaoLine": "Deu {gave} por {price}",
   "servers.admin.pay.overpaid": "{amount} a mais",
+  "servers.admin.edit": "Editar",
+  "servers.admin.editTitle": "Editar {name}",
+  "servers.admin.edited": "Salvo",
+  "servers.admin.tags": "Tags",
+  "servers.admin.tagsTitle": "Tags de {name}",
+  "servers.admin.tagsField": "Tags (separadas por vírgula)",
+  "servers.admin.tagsHint": "Categorias mais até 5 tags próprias, de 1 a 24 letras, dígitos, espaços ou hifens.",
+  "servers.admin.tagsSaved": "Tags salvas",
 }
 
 export default dict

@@ -1,7 +1,34 @@
 // The Admin page: ResinCraft Relay's server-list tools, for accounts the relay lists as admins (relay protocol 8).
 // Unlocked with the relay dashboard's password; the relay checks every request, this page is only its UI.
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Ban, Check, CreditCard, EyeOff, Eye, Flag, Gauge, Loader2, Lock, Pin, PinOff, Plus, Radio, RefreshCw, ScrollText, Search, Server, Settings2, Shield, ShieldCheck, Star, Tag, Trash2, Users, X } from 'lucide-react'
+import {
+  Ban,
+  Check,
+  CreditCard,
+  EyeOff,
+  Eye,
+  Flag,
+  Gauge,
+  Loader2,
+  Lock,
+  Pencil,
+  Pin,
+  PinOff,
+  Plus,
+  Radio,
+  RefreshCw,
+  ScrollText,
+  Search,
+  Server,
+  Settings2,
+  Shield,
+  ShieldCheck,
+  Star,
+  Tag,
+  Trash2,
+  Users,
+  X
+} from 'lucide-react'
 import type { AdminStatus, ListingInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -30,8 +57,16 @@ interface AdminItem {
   edition: 'java' | 'bedrock'
   version: string
   modded: boolean
-  modpack?: { name: string } | null
+  modpack?: ListingInfo['modpack'] | null
   pack?: { size: number } | null
+  region?: string
+  language?: string
+  crossplay?: boolean
+  offline?: boolean
+  /** The Bedrock address set on the listing (not the one worked out from the ping). */
+  ownBedrockAddress?: string | null
+  website?: string | null
+  discord?: string | null
   pinned: boolean
   promo?: Promo | null
   owner: string
@@ -243,7 +278,8 @@ export default function Admin() {
     )
   }
 
-  const lock = (forget: boolean) =>void api.server.adminLock(forget).then(() => setStatus({ ...status, unlocked: false, remembered: forget ? false : status.remembered }))
+  const lock = (forget: boolean) =>
+    void api.server.adminLock(forget).then(() => setStatus({ ...status, unlocked: false, remembered: forget ? false : status.remembered }))
   return (
     <div className="page admin-page">
       <div className="page-head">
@@ -335,9 +371,23 @@ function ServerListAdmin() {
   }
 
   const tabs: { value: Tab; label: ReactNode }[] = [
-    { value: 'pending', label: <>{t('servers.admin.tab.pending')} {data?.pending.length ? <span className="count">{data.pending.length}</span> : null}</> },
+    {
+      value: 'pending',
+      label: (
+        <>
+          {t('servers.admin.tab.pending')} {data?.pending.length ? <span className="count">{data.pending.length}</span> : null}
+        </>
+      )
+    },
     { value: 'listings', label: t('servers.admin.tab.listings') },
-    { value: 'reports', label: <>{t('servers.admin.tab.reports')} {data?.reports.length ? <span className="count">{data.reports.length}</span> : null}</> },
+    {
+      value: 'reports',
+      label: (
+        <>
+          {t('servers.admin.tab.reports')} {data?.reports.length ? <span className="count">{data.reports.length}</span> : null}
+        </>
+      )
+    },
     { value: 'bans', label: t('servers.admin.tab.bans') },
     { value: 'settings', label: t('servers.admin.tab.settings') },
     { value: 'add', label: t('servers.admin.tab.add') }
@@ -348,7 +398,11 @@ function ServerListAdmin() {
       <div className="toolbar">
         <Segmented<Tab> value={tab} onChange={setTab} options={tabs} />
         <span className="grow" />
-        {data && <span className="hint">{t('servers.admin.counts', { listed: data.counts.listed ?? 0, pending: data.counts.pending ?? 0, hidden: data.counts.hidden ?? 0 })}</span>}
+        {data && (
+          <span className="hint">
+            {t('servers.admin.counts', { listed: data.counts.listed ?? 0, pending: data.counts.pending ?? 0, hidden: data.counts.hidden ?? 0 })}
+          </span>
+        )}
         <button className="btn sm" disabled={loading} onClick={() => void load()}>
           {loading ? <Loader2 className="spin" /> : <RefreshCw />} {t('common.refresh')}
         </button>
@@ -422,6 +476,8 @@ type Act = (route: string, body: unknown, done?: Key) => Promise<boolean>
 
 function ItemList({ items, empty, act, pendingActions }: { items: AdminItem[]; empty: string; act: Act; pendingActions?: boolean }) {
   const [asking, setAsking] = useState<{ item: AdminItem; what: 'reject' | 'hide' | 'ban' | 'promo' | 'remove' }>()
+  const [editing, setEditing] = useState<AdminItem>()
+  const [tagging, setTagging] = useState<AdminItem>()
   if (items.length === 0) return empty ? <p className="hint">{empty}</p> : null
   return (
     <div className="card admin-items">
@@ -429,8 +485,7 @@ function ItemList({ items, empty, act, pendingActions }: { items: AdminItem[]; e
         <div key={it.id} className="setting admin-item">
           <div className="text">
             <b>
-              {it.title}{' '}
-              <span className={`chip compact ${stateChip[it.state]}`}>{t(`servers.list.state.${it.state}` as Key)}</span>
+              {it.title} <span className={`chip compact ${stateChip[it.state]}`}>{t(`servers.list.state.${it.state}` as Key)}</span>
               {it.pinned && (
                 <span className="chip compact">
                   <Pin /> {t('servers.list.pinned')}
@@ -445,8 +500,8 @@ function ItemList({ items, empty, act, pendingActions }: { items: AdminItem[]; e
             </b>
             <span>
               {it.address} · {t(`servers.admin.kind.${it.kind}` as Key)}
-              {it.ownerName ? ` · ${it.ownerName}` : ''} · {it.online ? t('servers.list.players', { count: it.players, max: it.maxPlayers }) : t('servers.list.offline')} ·{' '}
-              ♥ {it.likes}
+              {it.ownerName ? ` · ${it.ownerName}` : ''} ·{' '}
+              {it.online ? t('servers.list.players', { count: it.players, max: it.maxPlayers }) : t('servers.list.offline')} · ♥ {it.likes}
               {it.reports ? ` · ${t('servers.admin.reportCount', { count: it.reports })}` : ''}
               {it.modpack ? ` · ${it.modpack.name}` : ''}
             </span>
@@ -470,13 +525,16 @@ function ItemList({ items, empty, act, pendingActions }: { items: AdminItem[]; e
                   ? { label: t('servers.admin.unpin'), icon: <PinOff />, onSelect: () => void act('unpin', { id: it.id }) }
                   : { label: t('servers.admin.pin'), icon: <Pin />, onSelect: () => void act('pin', { id: it.id }, 'servers.admin.pinned') },
                 { label: t('servers.admin.promote'), icon: <Star />, onSelect: () => setAsking({ item: it, what: 'promo' }) },
+                it.kind === 'admin' && { label: t('servers.admin.edit'), icon: <Pencil />, onSelect: () => setEditing(it) },
+                { label: t('servers.admin.tags'), icon: <Tag />, onSelect: () => setTagging(it) },
                 !!it.promo && { label: t('servers.admin.clearPromo'), icon: <X />, onSelect: () => void act('promo', { id: it.id, promo: null }) },
                 '-',
                 it.state === 'hidden'
                   ? { label: t('servers.admin.unhide'), icon: <Eye />, onSelect: () => void act('unhide', { id: it.id }) }
                   : { label: t('servers.admin.hide'), icon: <EyeOff />, onSelect: () => setAsking({ item: it, what: 'hide' }) },
                 !!it.pack && { label: t('servers.admin.removePack'), icon: <Trash2 />, onSelect: () => void act('pack/remove', { id: it.id }) },
-                !!it.owner && !it.ownerBanned && { label: t('servers.admin.banOwner'), icon: <Ban />, danger: true, onSelect: () => setAsking({ item: it, what: 'ban' }) },
+                !!it.owner &&
+                  !it.ownerBanned && { label: t('servers.admin.banOwner'), icon: <Ban />, danger: true, onSelect: () => setAsking({ item: it, what: 'ban' }) },
                 { label: t('servers.admin.remove'), icon: <Trash2 />, danger: true, onSelect: () => setAsking({ item: it, what: 'remove' }) }
               ]}
             />
@@ -484,6 +542,8 @@ function ItemList({ items, empty, act, pendingActions }: { items: AdminItem[]; e
         </div>
       ))}
       {asking && <Ask item={asking.item} what={asking.what} act={act} onClose={() => setAsking(undefined)} />}
+      {editing && <EditServer item={editing} act={act} onClose={() => setEditing(undefined)} />}
+      {tagging && <EditTags item={tagging} act={act} onClose={() => setTagging(undefined)} />}
     </div>
   )
 }
@@ -503,16 +563,16 @@ function Ask({ item, what, act, onClose }: { item: AdminItem; what: 'reject' | '
       what === 'reject'
         ? await act('reject', { id: item.id, reason }, 'servers.admin.rejected')
         : what === 'hide'
-        ? await act('hide', { id: item.id, reason }, 'servers.admin.hidden')
-        : what === 'ban'
-        ? await act('ban', { id: item.id, reason, hours: Number(hours) > 0 ? Number(hours) : undefined }, 'servers.admin.banned')
-        : what === 'remove'
-        ? await act('remove', { id: item.id }, 'servers.admin.removed')
-        : await act(
-            'promo',
-            { id: item.id, promo: { kind, order: Number(order) || 0, until: days_ > 0 ? Math.floor(Date.now() / 1000 + days_ * 86400) : null } },
-            'servers.admin.promoted'
-          )
+          ? await act('hide', { id: item.id, reason }, 'servers.admin.hidden')
+          : what === 'ban'
+            ? await act('ban', { id: item.id, reason, hours: Number(hours) > 0 ? Number(hours) : undefined }, 'servers.admin.banned')
+            : what === 'remove'
+              ? await act('remove', { id: item.id }, 'servers.admin.removed')
+              : await act(
+                  'promo',
+                  { id: item.id, promo: { kind, order: Number(order) || 0, until: days_ > 0 ? Math.floor(Date.now() / 1000 + days_ * 86400) : null } },
+                  'servers.admin.promoted'
+                )
     setBusy(false)
     if (ok) onClose()
   }
@@ -633,7 +693,14 @@ function Bans({ data, act }: { data: AdminData; act: Act }) {
               </label>
               <label className="field">
                 <span>{t('servers.admin.banHours')}</span>
-                <input className="input" type="number" min={0} value={hours} placeholder={t('servers.admin.forever')} onChange={(e) => setHours(e.target.value)} />
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={hours}
+                  placeholder={t('servers.admin.forever')}
+                  onChange={(e) => setHours(e.target.value)}
+                />
               </label>
             </div>
             <label className="field">
@@ -675,7 +742,14 @@ function AdminSettingsForm({ data, act }: { data: AdminData; act: Act }) {
   useEffect(() => setS(data.settings), [data.settings])
   const dirty = JSON.stringify(s) !== JSON.stringify(data.settings)
   const num = (k: keyof AdminSettings) => (
-    <input className="input" type="number" min={0} style={{ width: 120 }} value={String(s[k])} onChange={(e) => setS({ ...s, [k]: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
+    <input
+      className="input"
+      type="number"
+      min={0}
+      style={{ width: 120 }}
+      value={String(s[k])}
+      onChange={(e) => setS({ ...s, [k]: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+    />
   )
   const approval = (k: 'resincraft_approval' | 'submitted_approval') => (
     <Segmented<'auto' | 'manual'>
@@ -719,6 +793,106 @@ function AdminSettingsForm({ data, act }: { data: AdminData; act: Act }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** The listing as its form shows it. */
+const infoOf = (it: AdminItem): ListingInfo => ({
+  title: it.title,
+  description: it.description,
+  tags: it.tags,
+  region: it.region ?? '',
+  language: it.language ?? '',
+  version: it.version ?? '',
+  edition: it.edition,
+  modded: it.modded,
+  crossplay: !!it.crossplay,
+  offline: !!it.offline,
+  bedrock_address: it.ownBedrockAddress || undefined,
+  modpack: it.modpack ?? undefined,
+  website: it.website || undefined,
+  discord: it.discord || undefined
+})
+
+/** Edits a server the admin added (the relay's Server list → Edit). */
+function EditServer({ item, act, onClose }: { item: AdminItem; act: Act; onClose: () => void }) {
+  const [address, setAddress] = useState(item.address)
+  const [info, setInfo] = useState<ListingInfo>(() => infoOf(item))
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    setBusy(true)
+    const ok = await act('edit', { id: item.id, address: address.trim(), listing: info }, 'servers.admin.edited')
+    setBusy(false)
+    if (ok) onClose()
+  }
+  return (
+    <Modal
+      wide
+      title={t('servers.admin.editTitle', { name: item.title })}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary" disabled={busy || !address.trim() || !info.title.trim()} onClick={() => void save()}>
+            {busy ? <Loader2 className="spin" /> : <Check />} {t('servers.admin.set.save')}
+          </button>
+        </>
+      }
+    >
+      <div className="listing-fields">
+        <label className="field">
+          <span>{t('servers.list.field.address')}</span>
+          <input className="input" value={address} spellCheck={false} onChange={(e) => setAddress(e.target.value)} />
+        </label>
+        <ListingFields info={info} onChange={setInfo} showEdition />
+      </div>
+    </Modal>
+  )
+}
+
+/** Any listing's tags: categories and up to 5 own ones (the relay's Server list → Tags). */
+function EditTags({ item, act, onClose }: { item: AdminItem; act: Act; onClose: () => void }) {
+  const [tags, setTags] = useState(item.tags.join(', '))
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    setBusy(true)
+    const ok = await act(
+      'tags',
+      {
+        id: item.id,
+        tags: tags
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean)
+      },
+      'servers.admin.tagsSaved'
+    )
+    setBusy(false)
+    if (ok) onClose()
+  }
+  return (
+    <Modal
+      title={t('servers.admin.tagsTitle', { name: item.title })}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary" disabled={busy} onClick={() => void save()}>
+            {busy ? <Loader2 className="spin" /> : <Check />} {t('servers.admin.set.save')}
+          </button>
+        </>
+      }
+    >
+      <label className="field">
+        <span>{t('servers.admin.tagsField')}</span>
+        <input className="input" autoFocus spellCheck={false} value={tags} placeholder="smp, survival, my own tag" onChange={(e) => setTags(e.target.value)} />
+      </label>
+      <p className="hint">{t('servers.admin.tagsHint')}</p>
+    </Modal>
   )
 }
 

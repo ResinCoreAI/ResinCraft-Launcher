@@ -3921,6 +3921,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "不足：対応が必要",
   "servers.admin.pay.angpaoLine": "{price} に対して {gave}",
   "servers.admin.pay.overpaid": "{amount} 超過",
+  "servers.admin.edit": "編集",
+  "servers.admin.editTitle": "{name} を編集",
+  "servers.admin.edited": "保存しました",
+  "servers.admin.tags": "タグ",
+  "servers.admin.tagsTitle": "{name} のタグ",
+  "servers.admin.tagsField": "タグ（カンマ区切り）",
+  "servers.admin.tagsHint": "カテゴリーと独自タグ最大5個（英小文字・数字・スペース・ハイフンで1〜24文字）。",
+  "servers.admin.tagsSaved": "タグを保存しました",
 }
 
 export default dict

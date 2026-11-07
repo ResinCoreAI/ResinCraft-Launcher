@@ -3916,6 +3916,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "부족: 처리 필요",
   "servers.admin.pay.angpaoLine": "{price}에 대해 {gave}",
   "servers.admin.pay.overpaid": "{amount} 초과",
+  "servers.admin.edit": "편집",
+  "servers.admin.editTitle": "{name} 편집",
+  "servers.admin.edited": "저장됨",
+  "servers.admin.tags": "태그",
+  "servers.admin.tagsTitle": "{name}의 태그",
+  "servers.admin.tagsField": "태그 (쉼표로 구분)",
+  "servers.admin.tagsHint": "카테고리와 직접 만든 태그 최대 5개 (글자, 숫자, 공백, 하이픈 1~24자).",
+  "servers.admin.tagsSaved": "태그 저장됨",
 }
 
 export default dict

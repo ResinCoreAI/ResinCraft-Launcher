@@ -3924,6 +3924,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "Kurang: selesaikan",
   "servers.admin.pay.angpaoLine": "Memberi {gave} untuk {price}",
   "servers.admin.pay.overpaid": "lebih {amount}",
+  "servers.admin.edit": "Ubah",
+  "servers.admin.editTitle": "Ubah {name}",
+  "servers.admin.edited": "Tersimpan",
+  "servers.admin.tags": "Tag",
+  "servers.admin.tagsTitle": "Tag untuk {name}",
+  "servers.admin.tagsField": "Tag (pisahkan dengan koma)",
+  "servers.admin.tagsHint": "Kategori plus hingga 5 tag sendiri, 1 sampai 24 huruf, angka, spasi, atau tanda hubung.",
+  "servers.admin.tagsSaved": "Tag tersimpan",
 }
 
 export default dict

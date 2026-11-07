@@ -3934,6 +3934,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "Eksik: ilgilenin",
   "servers.admin.pay.angpaoLine": "{price} için {gave} verdi",
   "servers.admin.pay.overpaid": "{amount} fazla",
+  "servers.admin.edit": "Düzenle",
+  "servers.admin.editTitle": "{name} düzenle",
+  "servers.admin.edited": "Kaydedildi",
+  "servers.admin.tags": "Etiketler",
+  "servers.admin.tagsTitle": "{name} etiketleri",
+  "servers.admin.tagsField": "Etiketler (virgülle ayrılmış)",
+  "servers.admin.tagsHint": "Kategoriler ve en fazla 5 kendi etiketi; 1-24 harf, rakam, boşluk veya tire.",
+  "servers.admin.tagsSaved": "Etiketler kaydedildi",
 }
 
 export default dict

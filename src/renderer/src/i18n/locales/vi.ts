@@ -3921,6 +3921,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "Thiếu: cần xử lý",
   "servers.admin.pay.angpaoLine": "Đưa {gave} cho {price}",
   "servers.admin.pay.overpaid": "dư {amount}",
+  "servers.admin.edit": "Sửa",
+  "servers.admin.editTitle": "Sửa {name}",
+  "servers.admin.edited": "Đã lưu",
+  "servers.admin.tags": "Thẻ",
+  "servers.admin.tagsTitle": "Thẻ của {name}",
+  "servers.admin.tagsField": "Thẻ (cách nhau bằng dấu phẩy)",
+  "servers.admin.tagsHint": "Danh mục cùng tối đa 5 thẻ riêng, 1 đến 24 chữ cái, chữ số, dấu cách hoặc gạch nối.",
+  "servers.admin.tagsSaved": "Đã lưu thẻ",
 }
 
 export default dict

@@ -92,6 +92,8 @@ async function mockAdminCall(method: string, path: string, body?: unknown): Prom
   else if (route === 'unban') bans.splice(bans.findIndex((x) => x.uuid === b.uuid), 1)
   else if (route === 'reports/dismiss' || route === 'reports/hide') reports.splice(reports.findIndex((r) => r.id === b.id), 1)
   else if (route === 'settings') Object.assign(adminSettings, b.settings)
+  else if (route === 'tags' && s) s.tags = b.tags
+  else if (route === 'edit' && s) Object.assign(s, b.listing, { address: b.address || s.address })
   else if (route === 'add') {
     const l = b.listing as ListingInfo
     LISTED.push({ ...l, id: 'a-' + Math.random().toString(36).slice(2, 6), address: b.address, resincraft: false, online: false, players: 0, max_players: 0, likes: 0, join_requests: false, listed_at: now(), pinned: !!b.pinned, promo: b.promo?.kind ?? null } as ListedServer)

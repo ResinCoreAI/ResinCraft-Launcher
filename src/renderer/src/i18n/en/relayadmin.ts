@@ -421,5 +421,13 @@ export default {
   "servers.admin.pay.angpaoPaid": "Paid",
   "servers.admin.pay.angpaoShort": "Short: sort it out",
   "servers.admin.pay.angpaoLine": "Gave {gave} for {price}",
-  "servers.admin.pay.overpaid": "{amount} over"
+  "servers.admin.pay.overpaid": "{amount} over",
+  "servers.admin.edit": "Edit",
+  "servers.admin.editTitle": "Edit {name}",
+  "servers.admin.edited": "Saved",
+  "servers.admin.tags": "Tags",
+  "servers.admin.tagsTitle": "Tags for {name}",
+  "servers.admin.tagsField": "Tags (comma-separated)",
+  "servers.admin.tagsHint": "Categories plus up to 5 own tags, 1 to 24 letters, digits, spaces or dashes.",
+  "servers.admin.tagsSaved": "Tags saved"
 }

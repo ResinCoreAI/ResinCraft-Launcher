@@ -3983,6 +3983,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "Недостаточно: разберитесь",
   "servers.admin.pay.angpaoLine": "Дал {gave} за {price}",
   "servers.admin.pay.overpaid": "{amount} сверх",
+  "servers.admin.edit": "Изменить",
+  "servers.admin.editTitle": "Изменить {name}",
+  "servers.admin.edited": "Сохранено",
+  "servers.admin.tags": "Теги",
+  "servers.admin.tagsTitle": "Теги для {name}",
+  "servers.admin.tagsField": "Теги (через запятую)",
+  "servers.admin.tagsHint": "Категории и до 5 своих тегов, от 1 до 24 букв, цифр, пробелов или дефисов.",
+  "servers.admin.tagsSaved": "Теги сохранены",
 }
 
 export default dict

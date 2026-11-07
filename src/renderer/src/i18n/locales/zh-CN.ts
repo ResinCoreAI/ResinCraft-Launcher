@@ -3911,6 +3911,14 @@ const dict: Dict = {
   "servers.admin.pay.angpaoShort": "金额不足：需处理",
   "servers.admin.pay.angpaoLine": "为 {price} 支付了 {gave}",
   "servers.admin.pay.overpaid": "多付 {amount}",
+  "servers.admin.edit": "编辑",
+  "servers.admin.editTitle": "编辑 {name}",
+  "servers.admin.edited": "已保存",
+  "servers.admin.tags": "标签",
+  "servers.admin.tagsTitle": "{name} 的标签",
+  "servers.admin.tagsField": "标签（用逗号分隔）",
+  "servers.admin.tagsHint": "分类加最多 5 个自定义标签，每个 1 到 24 个字母、数字、空格或连字符。",
+  "servers.admin.tagsSaved": "标签已保存",
 }
 
 export default dict
