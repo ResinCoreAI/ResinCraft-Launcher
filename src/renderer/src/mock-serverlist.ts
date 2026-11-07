@@ -119,6 +119,7 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
     return { ...(relayMock('GET', '/api/users', {}) as object), recoveryCodes: ['k7qm-2xpa', 'p3nd-8wqe', 'a9vz-4tkr', 'm2cx-7yhb', 'q8fe-1nsd', 'w4lg-6uop', 'z1rt-5mkc', 'h6bn-3ejv', 'c5ys-9adw', 'v2qp-0gtx'] }
   }
   if (method === 'POST' && p === '/api/service') return (service = { ...service, state: b.state, message: b.message || null, since: now() })
+  if (p === '/api/payments' || p.startsWith('/api/payments/')) return paymentsMock(method, p, b)
   if (method === 'POST' && !p.startsWith('/api/listings')) return { ok: true }
   switch (p) {
     case '/api/service':
@@ -179,6 +180,82 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
       }
   }
   return undefined
+}
+
+/** Admin → Payments for the preview: the relay's /api/payments with a few changes kept. */
+type Row = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+const pay = {
+  enabled: true,
+  switchFromFile: false,
+  creditUnused: false,
+  free: { servers: 1, names: 1, monthly_gb: 20, bonus_gb: 0, session_minutes: 120 },
+  freeFromFile: false,
+  fileFree: { servers: 1, names: 1, monthly_gb: 10, bonus_gb: 0, session_minutes: 120 },
+  currency: 'thb',
+  stripe: { secretKey: true, publishableKey: true, webhookSecret: true, testMode: true, ready: true, webhookUrl: 'https://rscraft.resincore.tech/stripe/webhook' },
+  products: [
+    { id: 'addon-server', name: '+1 server', description: '', kind: 'addon', grants: { servers: 1 }, monthly: 6900, yearly: 69000, on_sale: true, order: 1, stripe_product: 'prod_Mock1', stripe_price_monthly: 'price_M1', stripe_price_yearly: 'price_Y1', active: 4 },
+    { id: 'addon-unlimited-traffic', name: 'Unlimited traffic', description: '', kind: 'addon', grants: { unlimited_traffic: true }, monthly: 16900, yearly: 169000, on_sale: true, order: 3, stripe_product: '', active: 2 },
+    { id: 'pack-219', name: 'Creator pack', description: 'Two servers, unlimited traffic', kind: 'pack', grants: { servers: 1, names: 1, unlimited_traffic: true, no_session_limit: true }, monthly: 21900, yearly: 219000, on_sale: false, order: 10, stripe_product: 'prod_Mock3', active: 0 }
+  ] as Row[],
+  subs: [
+    { id: 'pi_mock1', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Alex', product: 'addon-server', yearly: false, status: 'paid', period_end: now() + 86400 * 12, cancel_at_period_end: false, amount: 6900, source: 'once', method: 'promptpay', active: true },
+    { id: 'sub_mock2', uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle_Gamer', product: 'addon-unlimited-traffic', yearly: true, status: 'active', period_end: now() + 86400 * 200, cancel_at_period_end: false, amount: 169000, source: 'stripe', active: true },
+    { id: 'grant-abc', uuid: '11111111-2222-3333-4444-555566667777', name: 'Steve', product: 'pack-219', yearly: false, status: 'active', period_end: 0, cancel_at_period_end: false, amount: 0, source: 'admin', active: true }
+  ] as Row[],
+  promos: [{ code: 'SUMMER25', percent_off: 25, duration: 'once', products: ['addon-server'], active: true, usable: true, uses: 3, max_redemptions: 50, expires_at: now() + 86400 * 20, below_minimum: [] }] as Row[],
+  gifts: [{ code: 'STREAM-7QX2', product: 'addon-unlimited-traffic', days: 30, max_uses: 1, active: true, usable: false, note: 'giveaway', redeemed: [{ uuid: 'x', name: 'Alex', at: now() - 3600 }] }] as Row[],
+  access: {
+    cutoff: true,
+    graceDays: 3,
+    grace: [{ uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Alex', until: now() + 86400 * 2, servers: 2, names: 2, serversAfter: 1, namesAfter: 1, willPause: ['create-lab'] }],
+    cut: [{ uuid: '22222222-2222-3333-4444-555566667777', name: 'Notch', since: now() - 86400, paused: ['old-smp'] }]
+  },
+  angpao: [
+    { at: now() - 7200, uuid: 'x', name: 'Alex', voucher: '019a2b…', amount: 10000, price: 6900, items: ['addon-server'], result: 'ok', overpaid: 3100, sub: 'pi_tm1' },
+    { at: now() - 3600, uuid: 'y', name: 'Steve', voucher: '77ab01…', amount: 0, price: 6900, items: ['addon-server'], result: 'this angpao has been claimed already', overpaid: 0, sub: '' }
+  ],
+  promptpayRefused: false,
+  truemoney: { on: true, phone: '0369', enabled: true, fromFile: true }
+}
+function paymentsMock(method: string, p: string, b: Row): unknown {
+  const product = pay.products.find((x) => x.id === b.id)
+  if (method !== 'POST') return pay
+  if (p.endsWith('/switch')) pay.enabled = !!b.on
+  else if (p.endsWith('/credit')) pay.creditUnused = !!b.on
+  else if (p.endsWith('/free')) pay.free = b.reset ? { ...pay.fileFree } : { ...pay.free, ...b }
+  else if (p.endsWith('/product/sale') && product) product.on_sale = !!b.on
+  else if (p.endsWith('/product/remove')) pay.products = pay.products.filter((x) => x.id !== b.id)
+  else if (p.endsWith('/product/stripe') && product) product.stripe_product = 'prod_Made'
+  else if (p.endsWith('/product')) {
+    const cents = { monthly: Math.round(b.monthly * 100), yearly: Math.round(b.yearly * 100) }
+    if (product) Object.assign(product, b, cents)
+    else pay.products.push({ ...b, ...cents, active: 0 })
+  } else if (p.endsWith('/promo')) {
+    if (pay.promos.some((x) => x.code === String(b.code).toUpperCase())) throw new Error('The relay refused: that code is taken')
+    pay.promos.unshift({ ...b, code: String(b.code).toUpperCase(), amount_off: b.amount_off ? b.amount_off * 100 : undefined, active: true, usable: true, uses: 0, products: b.products ?? [] })
+  } else if (p.endsWith('/promo/off') || p.endsWith('/gift/off')) {
+    const c = [...pay.promos, ...pay.gifts].find((x) => x.code === b.code)
+    if (c) Object.assign(c, { active: false, usable: false })
+  } else if (p.endsWith('/gift')) {
+    const made: string[] = b.code ? [String(b.code).toUpperCase()] : Array.from({ length: b.count ?? 1 }, () => Math.random().toString(36).slice(2, 10).toUpperCase())
+    for (const code of made) pay.gifts.unshift({ code, product: b.product, days: b.days, max_uses: b.max_uses, active: true, usable: true, note: b.note, redeemed: [] })
+    return { ...pay, made }
+  } else if (p.endsWith('/access')) {
+    if (b.cutoff !== undefined) pay.access.cutoff = !!b.cutoff
+    if (b.grace_days !== undefined) pay.access.graceDays = b.grace_days
+  } else if (p.endsWith('/truemoney')) {
+    const phone = String(b.phone ?? '').replace(/[- ]/g, '')
+    if (b.phone !== undefined && !/^0\d{9}$/.test(phone)) throw new Error("The relay refused: phone: the wallet's 10-digit number, like 0812345678")
+    if (b.reset) pay.truemoney = { on: true, phone: '0369', enabled: true, fromFile: true }
+    else pay.truemoney = { ...pay.truemoney, ...(b.on !== undefined ? { on: !!b.on, enabled: !!b.on } : {}), ...(phone ? { phone: phone.slice(-4) } : {}), fromFile: false }
+  } else if (p.endsWith('/grant')) {
+    pay.subs.unshift({ id: 'grant-' + Math.random().toString(36).slice(2, 6), uuid: b.uuid ?? 'uuid-' + b.name, name: b.name ?? '', product: b.product, yearly: false, status: 'active', period_end: b.days ? now() + b.days * 86400 : 0, cancel_at_period_end: false, amount: 0, source: 'admin', active: true })
+  } else if (p.endsWith('/end')) {
+    const s = pay.subs.find((x) => x.id === b.id)
+    if (s) Object.assign(s, b.at_period_end ? { cancel_at_period_end: true } : { status: 'canceled', active: false })
+  }
+  return pay
 }
 
 const adminSettings = { enabled: true, resincraft_approval: 'auto', submitted_approval: 'manual', max_submissions: 3, report_hide_threshold: 5, max_pack_mb: 50, pack_downloads_per_hour: 60 }

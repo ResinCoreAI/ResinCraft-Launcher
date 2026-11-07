@@ -1,7 +1,7 @@
 // The Admin page: ResinCraft Relay's server-list tools, for accounts the relay lists as admins (relay protocol 8).
 // Unlocked with the relay dashboard's password; the relay checks every request, this page is only its UI.
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Ban, Check, EyeOff, Eye, Flag, Gauge, Loader2, Lock, Pin, PinOff, Plus, Radio, RefreshCw, ScrollText, Search, Server, Settings2, Shield, ShieldCheck, Star, Tag, Trash2, Users, X } from 'lucide-react'
+import { Ban, Check, CreditCard, EyeOff, Eye, Flag, Gauge, Loader2, Lock, Pin, PinOff, Plus, Radio, RefreshCw, ScrollText, Search, Server, Settings2, Shield, ShieldCheck, Star, Tag, Trash2, Users, X } from 'lucide-react'
 import type { AdminStatus, ListingInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -15,6 +15,7 @@ import { UsageAdmin } from '../components/admin/Usage'
 import { TwoFactorSetup, UsersAdmin } from '../components/admin/Users'
 import { RelaySettingsAdmin } from '../components/admin/RelaySettings'
 import { EventsAdmin } from '../components/admin/Events'
+import { PaymentsAdmin } from '../components/admin/Payments'
 import '../serverlist.css'
 
 type Promo = { kind: 'recommended' | 'sponsored'; until?: number | null; order?: number; since?: number; active?: boolean }
@@ -72,12 +73,13 @@ type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
 /** The relay's screens, in the dashboard's order. */
-type Section = 'live' | 'names' | 'bans' | 'usage' | 'list' | 'users' | 'settings' | 'events'
+type Section = 'live' | 'names' | 'bans' | 'usage' | 'payments' | 'list' | 'users' | 'settings' | 'events'
 const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
   { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
   { id: 'names', label: 'servers.admin.nav.names', icon: <Tag size={16} /> },
   { id: 'bans', label: 'servers.admin.nav.bans', icon: <Ban size={16} /> },
   { id: 'usage', label: 'servers.admin.nav.usage', icon: <Gauge size={16} /> },
+  { id: 'payments', label: 'servers.admin.nav.payments', icon: <CreditCard size={16} /> },
   { id: 'list', label: 'servers.admin.nav.list', icon: <Server size={16} /> },
   { id: 'users', label: 'servers.admin.nav.users', icon: <Users size={16} /> },
   { id: 'settings', label: 'servers.admin.nav.settings', icon: <Settings2 size={16} /> },
@@ -279,6 +281,8 @@ export default function Admin() {
             <BansAdmin />
           ) : section === 'usage' ? (
             <UsageAdmin />
+          ) : section === 'payments' ? (
+            <PaymentsAdmin />
           ) : section === 'list' ? (
             <ServerListAdmin />
           ) : section === 'users' ? (

@@ -312,6 +312,10 @@
   align-items: center;
   gap: 6px;
 }
+/* Admin → Payments: each line of a row on its own line. */
+.pay-admin .setting .text > span {
+  display: block;
+}
 .admin-items .chip svg,
 .admin-items svg.inline {
   width: 12px;
