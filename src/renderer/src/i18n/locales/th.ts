@@ -3833,6 +3833,7 @@ const dict: Dict = {
   "servers.admin.pay.noPromos": "ไม่มีโค้ดส่วนลด",
   "servers.admin.pay.usable": "ใช้ได้",
   "servers.admin.pay.ended": "สิ้นสุดแล้ว",
+  "servers.admin.pay.endedLog": "สิ้นสุดแล้ว ({n})",
   "servers.admin.pay.percentOff": "ลด {n}%",
   "servers.admin.pay.amountOff": "ลด {amount}",
   "servers.admin.pay.forMonths": { "other": "เป็นเวลา {n} เดือน" },

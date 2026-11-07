@@ -3831,6 +3831,7 @@ const dict: Dict = {
   "servers.admin.pay.noPromos": "没有优惠码",
   "servers.admin.pay.usable": "可用",
   "servers.admin.pay.ended": "已结束",
+  "servers.admin.pay.endedLog": "已结束（{n}）",
   "servers.admin.pay.percentOff": "减 {n}%",
   "servers.admin.pay.amountOff": "减 {amount}",
   "servers.admin.pay.forMonths": { "other": "持续 {n} 个月" },

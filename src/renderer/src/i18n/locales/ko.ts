@@ -3836,6 +3836,7 @@ const dict: Dict = {
   "servers.admin.pay.noPromos": "프로모 코드가 없습니다",
   "servers.admin.pay.usable": "사용 가능",
   "servers.admin.pay.ended": "종료됨",
+  "servers.admin.pay.endedLog": "종료됨 ({n})",
   "servers.admin.pay.percentOff": "{n}% 할인",
   "servers.admin.pay.amountOff": "{amount} 할인",
   "servers.admin.pay.forMonths": { "other": "{n}개월 동안" },

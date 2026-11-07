@@ -673,3 +673,7 @@
   word-break: break-all;
   text-align: right;
 }
+
+.pay-admin .pay-ended { margin-top: 10px; }
+.pay-admin .pay-ended > summary { cursor: pointer; color: var(--text-dim); font-size: 13px; padding: 4px 2px; }
+.pay-admin .pay-ended[open] > summary { margin-bottom: 8px; }

@@ -3872,6 +3872,7 @@ const dict: Dict = {
   "servers.admin.pay.noPromos": "No hay códigos promocionales",
   "servers.admin.pay.usable": "Disponible",
   "servers.admin.pay.ended": "Terminado",
+  "servers.admin.pay.endedLog": "Terminados ({n})",
   "servers.admin.pay.percentOff": "{n} % de descuento",
   "servers.admin.pay.amountOff": "{amount} de descuento",
   "servers.admin.pay.forMonths": {"one": "durante {n} mes", "many": "durante {n} meses", "other": "durante {n} meses"},

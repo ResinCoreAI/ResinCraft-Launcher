@@ -3854,6 +3854,7 @@ const dict: Dict = {
   "servers.admin.pay.noPromos": "Promosyon kodu yok",
   "servers.admin.pay.usable": "Kullanılabilir",
   "servers.admin.pay.ended": "Bitti",
+  "servers.admin.pay.endedLog": "Sona erenler ({n})",
   "servers.admin.pay.percentOff": "%{n} indirim",
   "servers.admin.pay.amountOff": "{amount} indirim",
   "servers.admin.pay.forMonths": {"one": "{n} ay boyunca", "other": "{n} ay boyunca"},

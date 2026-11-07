@@ -3841,6 +3841,7 @@ const dict: Dict = {
   "servers.admin.pay.noPromos": "Không có mã khuyến mãi",
   "servers.admin.pay.usable": "Dùng được",
   "servers.admin.pay.ended": "Đã kết thúc",
+  "servers.admin.pay.endedLog": "Đã kết thúc ({n})",
   "servers.admin.pay.percentOff": "Giảm {n}%",
   "servers.admin.pay.amountOff": "Giảm {amount}",
   "servers.admin.pay.forMonths": { "other": "trong {n} tháng" },

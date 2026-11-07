@@ -342,6 +342,7 @@ export default {
   "servers.admin.pay.noPromos": "No promo codes",
   "servers.admin.pay.usable": "Usable",
   "servers.admin.pay.ended": "Ended",
+  "servers.admin.pay.endedLog": "Ended ({n})",
   "servers.admin.pay.percentOff": "{n}% off",
   "servers.admin.pay.amountOff": "{amount} off",
   "servers.admin.pay.forMonths": {"one": "for {n} month", "other": "for {n} months"},

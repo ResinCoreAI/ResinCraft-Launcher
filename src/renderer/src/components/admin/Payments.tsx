@@ -1,7 +1,7 @@
 // Admin → Payments: the relay's selling switch, free allowance, products and packs, promo and gift codes, purchases,
 // unused-days credit, ended add-ons (grace and cut-off) and TrueMoney angpao. Same routes as the relay dashboard's
 // Payments page (GET /api/payments, POST /api/payments/…); amounts are in the currency's smallest unit.
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Ban, Check, CloudUpload, Gift, Pencil, Plus, RefreshCw, Search, ShoppingBag, Ticket, Trash2, Wallet, X } from 'lucide-react'
 import { currentLanguage, t, type Key } from '../../i18n'
 import { useStore } from '../../store'
@@ -556,6 +556,17 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
   )
 }
 
+/** Ended, used-up or expired codes, folded under the main list (as on the relay dashboard). */
+function EndedLog({ n, children }: { n: number; children: ReactNode }) {
+  if (!n) return null
+  return (
+    <details className="pay-ended">
+      <summary>{t('servers.admin.pay.endedLog', { n })}</summary>
+      <div className="card admin-items">{children}</div>
+    </details>
+  )
+}
+
 function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknown }) {
   const { toast } = useStore()
   const [promo, setPromo] = useState(false)
@@ -563,6 +574,61 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
   const [made, setMade] = useState<string[]>()
   const cur = d.currency
   const name = (id: string) => d.products.find((p) => p.id === id)?.name ?? id
+  const usablePromos = d.promos.filter((p) => p.usable)
+  const endedPromos = d.promos.filter((p) => !p.usable)
+  const usableGifts = d.gifts.filter((g) => g.usable)
+  const endedGifts = d.gifts.filter((g) => !g.usable)
+  const promoRow = (p: Promo) => (
+    <div key={p.code} className="setting admin-item">
+      <div className="text">
+        <b>
+          <code>{p.code}</code>
+          <span className={`chip compact ${p.usable ? 'success' : 'danger'}`}>{t(p.usable ? 'servers.admin.pay.usable' : 'servers.admin.pay.ended')}</span>
+        </b>
+        <span>
+          {p.percent_off
+            ? t('servers.admin.pay.percentOff', { n: p.percent_off })
+            : t('servers.admin.pay.amountOff', { amount: money(p.amount_off ?? 0, cur) })}{' '}
+          ·{' '}
+          {p.duration === 'repeating'
+            ? t('servers.admin.pay.forMonths', { n: p.months ?? 0 })
+            : t(p.duration === 'forever' ? 'servers.admin.pay.everyPayment' : 'servers.admin.pay.firstPayment')}{' '}
+          · {p.products.length ? t('servers.admin.pay.onlyFor', { names: p.products.map(name).join(', ') }) : t('servers.admin.pay.forEverything')}
+        </span>
+        <span className="hint">
+          {t('servers.admin.pay.used', { n: p.max_redemptions ? `${p.uses} / ${p.max_redemptions}` : p.uses })} ·{' '}
+          {p.expires_at ? t('servers.admin.pay.endsAt', { when: when(p.expires_at) }) : t('servers.admin.pay.neverEnds')}
+        </span>
+        {!!p.below_minimum?.length && <span className="hint warn">{t('servers.admin.pay.belowMin', { names: p.below_minimum.join(', ') })}</span>}
+      </div>
+      {p.active && (
+        <button className="btn sm" onClick={() => void act('/api/payments/promo/off', { code: p.code }, 'servers.admin.pay.saved')}>
+          <Ban /> {t('servers.admin.pay.end')}
+        </button>
+      )}
+    </div>
+  )
+  const giftRow = (g: GiftCode) => (
+    <div key={g.code} className="setting admin-item">
+      <div className="text">
+        <b>
+          <code>{g.code}</code>
+          <span className={`chip compact ${g.usable ? 'success' : 'danger'}`}>{t(g.usable ? 'servers.admin.pay.usable' : 'servers.admin.pay.ended')}</span>
+        </b>
+        <span>
+          {name(g.product)} · {g.days ? t('servers.admin.pay.forDays', { n: g.days }) : t('servers.admin.pay.forGood')} ·{' '}
+          {t('servers.admin.pay.redeemed', { n: g.max_uses ? `${g.redeemed.length} / ${g.max_uses}` : g.redeemed.length })}
+          {g.expires_at ? ` · ${t('servers.admin.pay.endsAt', { when: when(g.expires_at) })}` : ''}
+        </span>
+        {(g.note || g.redeemed.length > 0) && <span className="hint">{[g.note, g.redeemed.map((u) => u.name).join(', ')].filter(Boolean).join(' · ')}</span>}
+      </div>
+      {g.active && (
+        <button className="btn sm" onClick={() => void act('/api/payments/gift/off', { code: g.code }, 'servers.admin.pay.saved')}>
+          <Ban /> {t('servers.admin.pay.end')}
+        </button>
+      )}
+    </div>
+  )
   return (
     <>
       <div className="settings-section">
@@ -578,44 +644,12 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
           </button>
         </div>
         <p className="hint">{t('servers.admin.pay.promosHint')}</p>
-        {d.promos.length === 0 ? (
+        {usablePromos.length === 0 ? (
           <Empty icon={<Ticket />} title={t('servers.admin.pay.noPromos')} />
         ) : (
-          <div className="card admin-items">
-            {d.promos.map((p) => (
-              <div key={p.code} className="setting admin-item">
-                <div className="text">
-                  <b>
-                    <code>{p.code}</code>
-                    <span className={`chip compact ${p.usable ? 'success' : 'danger'}`}>
-                      {t(p.usable ? 'servers.admin.pay.usable' : 'servers.admin.pay.ended')}
-                    </span>
-                  </b>
-                  <span>
-                    {p.percent_off
-                      ? t('servers.admin.pay.percentOff', { n: p.percent_off })
-                      : t('servers.admin.pay.amountOff', { amount: money(p.amount_off ?? 0, cur) })}{' '}
-                    ·{' '}
-                    {p.duration === 'repeating'
-                      ? t('servers.admin.pay.forMonths', { n: p.months ?? 0 })
-                      : t(p.duration === 'forever' ? 'servers.admin.pay.everyPayment' : 'servers.admin.pay.firstPayment')}{' '}
-                    · {p.products.length ? t('servers.admin.pay.onlyFor', { names: p.products.map(name).join(', ') }) : t('servers.admin.pay.forEverything')}
-                  </span>
-                  <span className="hint">
-                    {t('servers.admin.pay.used', { n: p.max_redemptions ? `${p.uses} / ${p.max_redemptions}` : p.uses })} ·{' '}
-                    {p.expires_at ? t('servers.admin.pay.endsAt', { when: when(p.expires_at) }) : t('servers.admin.pay.neverEnds')}
-                  </span>
-                  {!!p.below_minimum?.length && <span className="hint warn">{t('servers.admin.pay.belowMin', { names: p.below_minimum.join(', ') })}</span>}
-                </div>
-                {p.active && (
-                  <button className="btn sm" onClick={() => void act('/api/payments/promo/off', { code: p.code }, 'servers.admin.pay.saved')}>
-                    <Ban /> {t('servers.admin.pay.end')}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+          <div className="card admin-items">{usablePromos.map(promoRow)}</div>
         )}
+        <EndedLog n={endedPromos.length}>{endedPromos.map(promoRow)}</EndedLog>
       </div>
 
       <div className="settings-section">
@@ -648,37 +682,12 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
             </div>
           </div>
         )}
-        {d.gifts.length === 0 ? (
+        {usableGifts.length === 0 ? (
           <Empty icon={<Gift />} title={t('servers.admin.pay.noGifts')} />
         ) : (
-          <div className="card admin-items">
-            {d.gifts.map((g) => (
-              <div key={g.code} className="setting admin-item">
-                <div className="text">
-                  <b>
-                    <code>{g.code}</code>
-                    <span className={`chip compact ${g.usable ? 'success' : 'danger'}`}>
-                      {t(g.usable ? 'servers.admin.pay.usable' : 'servers.admin.pay.ended')}
-                    </span>
-                  </b>
-                  <span>
-                    {name(g.product)} · {g.days ? t('servers.admin.pay.forDays', { n: g.days }) : t('servers.admin.pay.forGood')} ·{' '}
-                    {t('servers.admin.pay.redeemed', { n: g.max_uses ? `${g.redeemed.length} / ${g.max_uses}` : g.redeemed.length })}
-                    {g.expires_at ? ` · ${t('servers.admin.pay.endsAt', { when: when(g.expires_at) })}` : ''}
-                  </span>
-                  {(g.note || g.redeemed.length > 0) && (
-                    <span className="hint">{[g.note, g.redeemed.map((u) => u.name).join(', ')].filter(Boolean).join(' · ')}</span>
-                  )}
-                </div>
-                {g.active && (
-                  <button className="btn sm" onClick={() => void act('/api/payments/gift/off', { code: g.code }, 'servers.admin.pay.saved')}>
-                    <Ban /> {t('servers.admin.pay.end')}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+          <div className="card admin-items">{usableGifts.map(giftRow)}</div>
         )}
+        <EndedLog n={endedGifts.length}>{endedGifts.map(giftRow)}</EndedLog>
       </div>
 
       {promo && (
@@ -757,7 +766,7 @@ function FormModal({
   ok: boolean
   onSubmit: () => Promise<boolean>
   onClose: () => void
-  children: React.ReactNode
+  children: ReactNode
 }) {
   const [busy, setBusy] = useState(false)
   const go = async () => {
