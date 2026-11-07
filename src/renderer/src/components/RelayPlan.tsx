@@ -567,6 +567,26 @@ function Priority({ a, onSaved }: { a: AccountPlan; onSaved: (p: PlanInfo) => vo
   )
 }
 
+/** The Servers tab's server priority: for each signed-in account the relay limits, the order its names stay online in
+ *  when it has fewer slots than it uses (an add-on ended). Shown only while the relay sells and cuts off. */
+export function ServerPriority() {
+  const { plans, setPlans } = usePlans()
+  const rows = (plans?.accounts ?? []).filter((a) => a.plan?.access && a.plan.access.names.filter((n) => !n.assigned).length >= 2)
+  if (rows.length === 0) return null
+  const put = (account: string) => (p: PlanInfo) =>
+    setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === account ? { ...x, plan: p } : x)) })
+  return (
+    <div className="card rp-page" style={{ marginTop: 12 }}>
+      {rows.map((a) => (
+        <div key={a.account}>
+          {rows.length > 1 && <p className="hint">{a.accountName}</p>}
+          <Priority a={a} onSaved={put(a.account)} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** What's ending or ended: grace, paused names, and one-time purchases that end within a week. */
 function Notices({ a, onRenew }: { a: AccountPlan; onRenew: (s: PlanSub) => void }) {
   const plan = a.plan!
@@ -986,7 +1006,6 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
           </div>
         </>
       )}
-      {plan.access && <Priority a={a} onSaved={put} />}
       {plan.products.length > 0 && (
         <>
           <div className="row rp-period">
