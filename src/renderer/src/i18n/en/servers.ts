@@ -941,6 +941,7 @@ export default {
   "servers.relayPlan.moveBilling": "Billing doesn't change: it's still paid the way {from} paid for it.",
   "servers.relayPlan.moveGrace": "If {from} then has more servers or names than its plan allows, the extra ones get the usual grace days, then pause in your priority order.",
   "servers.relayPlan.moved": "Moved {name} to {account}",
+  "servers.relayPlan.storeClosed": "Nothing is for sale right now. Gift codes still work, and what you already have keeps running.",
   "servers.relayPlan.changeHint": "The difference for the time left is charged or credited right away.",
   "servers.relayPlan.changeTo": "Change to",
   "servers.relayPlan.changed": "Changed to {name}",

@@ -72,6 +72,8 @@ interface Payments {
   enabled: boolean
   switchFromFile: boolean
   creditUnused: boolean
+  /** The Store sells while selling is on (fromFile: relay.toml's `[payments] store_open`). */
+  storeOpen?: { on: boolean; fromFile: boolean }
   /** Players may move purchases between their accounts (fromFile: relay.toml's `[payments] moves`). */
   moves?: { on: boolean; fromFile: boolean }
   free: Free
@@ -190,6 +192,7 @@ function SwitchRow({ title, hint, on, onChange }: { title: string; hint: string;
 function Selling({ d, act }: { d: Payments; act: Act }) {
   const st = d.stripe
   const [stopping, setStopping] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [free, setFree] = useState<Record<string, string>>({})
   const ac = d.access ?? { cutoff: true, graceDays: 3, grace: [], cut: [] }
   const [grace, setGrace] = useState(String(ac.graceDays))
@@ -209,6 +212,22 @@ function Selling({ d, act }: { d: Payments; act: Act }) {
           {d.switchFromFile && (
             <div className="setting">
               <span className="hint">{t('servers.admin.pay.fromFile')}</span>
+            </div>
+          )}
+          {d.enabled && d.storeOpen && (
+            <SwitchRow
+              title={t('servers.admin.pay.storeOpen')}
+              hint={t(d.storeOpen.on ? 'servers.admin.pay.storeOpenOn' : 'servers.admin.pay.storeOpenOff')}
+              on={d.storeOpen.on}
+              onChange={(on) => (on ? void act('/api/payments/store', { on: true }, 'servers.admin.pay.saved') : setClosing(true))}
+            />
+          )}
+          {d.enabled && d.storeOpen && !d.storeOpen.fromFile && (
+            <div className="setting">
+              <span className="hint grow">{t('servers.admin.pay.storeOverride')}</span>
+              <button className="btn sm" onClick={() => void act('/api/payments/store', { reset: true }, 'servers.admin.pay.saved')}>
+                {t('servers.admin.set.reset')}
+              </button>
             </div>
           )}
           <div className="setting stack">
@@ -354,6 +373,15 @@ function Selling({ d, act }: { d: Payments; act: Act }) {
         </div>
       </div>
 
+      {closing && (
+        <ConfirmModal
+          title={t('servers.admin.pay.closeTitle')}
+          body={t('servers.admin.pay.closeBody')}
+          confirm={t('servers.admin.pay.close')}
+          onConfirm={() => void act('/api/payments/store', { on: false }, 'servers.admin.pay.saved')}
+          onClose={() => setClosing(false)}
+        />
+      )}
       {stopping && (
         <ConfirmModal
           title={t('servers.admin.pay.stopTitle')}

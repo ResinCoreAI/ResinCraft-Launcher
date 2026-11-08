@@ -457,7 +457,9 @@ export function mockServers(): {
       publishable_key: on ? 'pk_mock' : '',
       test_mode: true,
       free: { servers: 1, names: 2, monthly_bytes: 30e9, bonus_bytes: 10e9, session_secs: 7200 },
-      products: on ? PLAN_PRODUCTS.map((p) => ({ ...p, owned: owned(p) })) : [],
+      // ?plans=closed: selling is on but the Store is closed (gift codes still work).
+      store_closed: on && new URLSearchParams(location.search).get('plans') === 'closed',
+      products: on && new URLSearchParams(location.search).get('plans') !== 'closed' ? PLAN_PRODUCTS.map((p) => ({ ...p, owned: owned(p) })) : [],
       mine: a.subs
         .filter((x) => x.status !== 'pending')
         .map((x) => ({ ...x, movable: x.active && x.status !== 'granted' && x.status !== 'credited' }))

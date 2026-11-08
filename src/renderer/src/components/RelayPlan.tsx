@@ -18,6 +18,7 @@ import {
   Puzzle,
   RefreshCw,
   Repeat,
+  ShoppingBag,
   ShoppingCart,
   Trash2,
   X
@@ -623,9 +624,11 @@ function Notices({ a, onRenew }: { a: AccountPlan; onRenew: (s: PlanSub) => void
               days: Math.max(0, Math.ceil((s.period_end - now) / 86400))
             })}
           </span>
-          <button className="btn sm primary" onClick={() => onRenew(s)}>
-            <RefreshCw /> {t('servers.relayPlan.renew')}
-          </button>
+          {!plan.store_closed && (
+            <button className="btn sm primary" onClick={() => onRenew(s)}>
+              <RefreshCw /> {t('servers.relayPlan.renew')}
+            </button>
+          )}
         </div>
       ))}
     </>
@@ -850,7 +853,7 @@ function SubRow({
               : `${t('servers.relayPlan.given')}${when ? ` · ${when}` : ''}`}
         </div>
       </div>
-      {s.once && plan.enabled && s.status !== 'credited' && (
+      {s.once && plan.enabled && !plan.store_closed && s.status !== 'credited' && (
         <button className="btn sm primary" onClick={onRenew}>
           <RefreshCw /> {t('servers.relayPlan.renew')}
         </button>
@@ -860,7 +863,7 @@ function SubRow({
           <CreditCard /> {t('servers.relayPlan.payNow')}
         </button>
       )}
-      {s.paid && s.active && !unpaid && plan.enabled && !(s.items && s.items.length > 1) && (
+      {s.paid && s.active && !unpaid && plan.enabled && !plan.store_closed && !(s.items && s.items.length > 1) && (
         <button className="btn sm" onClick={onChange}>
           <Repeat /> {t('servers.relayPlan.change')}
         </button>
@@ -1048,6 +1051,12 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
           bonus: gb(plan.free.bonus_bytes)
         })}
       </p>
+      {plan.store_closed && (
+        <div className="callout rp-notice" style={{ alignItems: 'center' }}>
+          <ShoppingBag />
+          <span>{t('servers.relayPlan.storeClosed')}</span>
+        </div>
+      )}
       <Notices a={a} onRenew={renew} />
       <div className="row rp-redeem">
         <input

@@ -1440,6 +1440,8 @@ export interface PlanInfo {
   admin?: boolean
   /** The relay's admin lets players move purchases to another of their accounts. */
   moves?: boolean
+  /** Selling is on but the Store is closed: nothing to buy, renew or change; limits and gift codes still work. */
+  store_closed?: boolean
   totals: { servers: number; names: number; monthly_bytes: number; unlimited_traffic: boolean; no_session_limit: boolean; whitelist_page: boolean; session_secs: number }
 }
 

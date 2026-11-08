@@ -191,6 +191,7 @@ const pay = {
   switchFromFile: false,
   creditUnused: false,
   moves: { on: false, fromFile: true },
+  storeOpen: { on: true, fromFile: true },
   free: { servers: 1, names: 1, monthly_gb: 20, bonus_gb: 0, session_minutes: 120 },
   freeFromFile: false,
   fileFree: { servers: 1, names: 1, monthly_gb: 10, bonus_gb: 0, session_minutes: 120 },
@@ -226,6 +227,7 @@ function paymentsMock(method: string, p: string, b: Row): unknown {
   if (method !== 'POST') return pay
   if (p.endsWith('/switch')) pay.enabled = !!b.on
   else if (p.endsWith('/credit')) pay.creditUnused = !!b.on
+  else if (p.endsWith('/store')) pay.storeOpen = b.reset ? { on: true, fromFile: true } : { on: !!b.on, fromFile: false }
   else if (p.endsWith('/moves')) pay.moves = b.reset ? { on: false, fromFile: true } : { on: !!b.on, fromFile: false }
   else if (p.endsWith('/free')) pay.free = b.reset ? { ...pay.fileFree } : { ...pay.free, ...b }
   else if (p.endsWith('/product/sale') && product) product.on_sale = !!b.on

@@ -1167,6 +1167,9 @@ pub struct PlanInfo {
     pub admin: bool,
     /// The relay's admin lets players move purchases to another of their accounts (`plan_move`).
     pub moves: bool,
+    /// Selling is on but the Store is closed: nothing can be bought, renewed or changed (`products` is empty), while
+    /// the free plan's limits and gift codes (`plan_redeem`) still work.
+    pub store_closed: bool,
     /// What's for sale (empty while payments are off).
     pub products: Vec<ProductInfo>,
     /// The account's subscriptions (and the admin's grants), newest first.
