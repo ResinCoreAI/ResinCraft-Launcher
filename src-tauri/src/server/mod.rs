@@ -349,6 +349,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:relayPlanCancel" => json(plan::cancel(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<bool>(2)?).await?),
         "server:relayPlanPay" => json(plan::pay(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:relayPlanRefresh" => json(plan::refresh(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:relayPlanMove" => json(plan::move_to(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?),
         "server:relayRevoke" => {
             relay::revoke_name(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()

@@ -1385,6 +1385,8 @@ export interface PlanSub {
   once?: boolean
   /** How a one-time purchase was paid: "card", "promptpay", "truemoney", "free". */
   method?: string
+  /** It can be moved to another account (bought or a gift code's, and running) while the plan says `moves`. */
+  movable?: boolean
 }
 
 /** What happens to the account's relay names and servers when an add-on ends. */
@@ -1436,6 +1438,8 @@ export interface PlanInfo {
   access?: PlanAccess
   /** The account is the relay's admin: it's shown what the relay has switched off (TrueMoney). */
   admin?: boolean
+  /** The relay's admin lets players move purchases to another of their accounts. */
+  moves?: boolean
   totals: { servers: number; names: number; monthly_bytes: number; unlimited_traffic: boolean; no_session_limit: boolean; whitelist_page: boolean; session_secs: number }
 }
 
@@ -2716,6 +2720,8 @@ export interface ResinApi {
     relayPlanPay(account: string, sub: string): Promise<PayStep>
     /** Reads a subscription again after paying. */
     relayPlanRefresh(account: string, sub: string): Promise<PlanInfo>
+    /** Moves one of `account`'s purchases to `to`, another Microsoft account signed in here (only while `moves`). */
+    relayPlanMove(account: string, sub: string, to: string): Promise<PlanInfo>
     /** Frees a reserved name. */
     relayRevoke(account: string, name: string): Promise<void>
     /** Changes a reserved name, for the servers here that use it too. */

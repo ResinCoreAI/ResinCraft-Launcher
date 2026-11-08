@@ -3,6 +3,7 @@
 // While the relay's admin has payments off, nothing is for sale and this shows nothing.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ArrowRightLeft,
   Check,
   ChevronDown,
   ChevronUp,
@@ -731,6 +732,71 @@ function ChangeModal({ a, sub, onClose, onDone }: { a: AccountPlan; sub: PlanSub
   )
 }
 
+/** Moves a purchase to another Microsoft account signed in here (only while the relay's admin allows it). */
+function MoveModal({
+  a,
+  sub,
+  targets,
+  onClose,
+  onMoved
+}: {
+  a: AccountPlan
+  sub: PlanSub
+  targets: AccountPlan[]
+  onClose: () => void
+  onMoved: (p: PlanInfo, to: AccountPlan) => void
+}) {
+  const [to, setTo] = useState(targets[0]?.account ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const target = targets.find((x) => x.account === to)
+
+  const save = async () => {
+    if (!target) return
+    setBusy(true)
+    setError(undefined)
+    try {
+      onMoved(await api.server.relayPlanMove(a.account, sub.id, target.account), target)
+    } catch (e) {
+      setError((e as Error).message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      title={t('servers.relayPlan.moveTitle', { name: sub.name })}
+      subtitle={t('servers.relayPlan.moveHint')}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary" disabled={!target || busy} onClick={() => void save()}>
+            {busy ? <Loader2 className="spin" /> : <ArrowRightLeft />} {t('servers.relayPlan.move')}
+          </button>
+        </>
+      }
+    >
+      <div className="field">
+        <label htmlFor="rp-move">{t('servers.relayPlan.moveTo')}</label>
+        <select id="rp-move" className="input" value={to} onChange={(e) => setTo(e.target.value)}>
+          {targets.map((x) => (
+            <option key={x.account} value={x.account}>
+              {x.accountName}
+            </option>
+          ))}
+        </select>
+      </div>
+      {target && <p className="hint">{t('servers.relayPlan.moveWhat', { name: sub.name, from: a.accountName, to: target.accountName })}</p>}
+      {sub.paid && <p className="hint">{t('servers.relayPlan.moveBilling', { from: a.accountName })}</p>}
+      <p className="hint it-warn">{t('servers.relayPlan.moveGrace', { from: a.accountName })}</p>
+      {error && <p className="hint it-warn">{error}</p>}
+    </Modal>
+  )
+}
+
 function SubRow({
   s,
   plan,
@@ -738,7 +804,8 @@ function SubRow({
   onResume,
   onChange,
   onPay,
-  onRenew
+  onRenew,
+  onMove
 }: {
   s: PlanSub
   plan: PlanInfo
@@ -747,6 +814,8 @@ function SubRow({
   onChange: () => void
   onPay: () => void
   onRenew: () => void
+  /** Set when it can be moved to another account signed in here. */
+  onMove?: () => void
 }) {
   const unpaid = s.status === 'incomplete' || s.status === 'past_due' || s.status === 'unpaid'
   const when = s.period_end
@@ -796,6 +865,11 @@ function SubRow({
           <Repeat /> {t('servers.relayPlan.change')}
         </button>
       )}
+      {onMove && (
+        <button className="btn sm" title={t('servers.relayPlan.moveHint')} onClick={onMove}>
+          <ArrowRightLeft /> {t('servers.relayPlan.move')}
+        </button>
+      )}
       {s.paid &&
         s.active &&
         (s.cancel_at_period_end ? (
@@ -825,6 +899,7 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
   const [redeeming, setRedeeming] = useState(false)
   const [changing, setChanging] = useState<PlanSub>()
   const [cancelling, setCancelling] = useState<PlanSub>()
+  const [moving, setMoving] = useState<PlanSub>()
 
   // Nothing for sale anywhere (payments off, no relay, an older relay): nothing to show.
   const selling = plans?.accounts.filter((a) => a.plan?.enabled) ?? []
@@ -835,6 +910,8 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
   const a = selling.find((x) => x.account === picked) ?? selling[0]
   const plan = a.plan!
   const put = (p: PlanInfo) => setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })
+  // Where a purchase can move: the other Microsoft accounts signed in here that the relay answered for.
+  const moveTargets = plan.moves ? plans.accounts.filter((x) => x.account !== a.account && x.plan && !x.error) : []
 
   const buy = (p: PlanProduct) => setBuying([p])
   const productsOf = (s: PlanSub) =>
@@ -1001,6 +1078,7 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
                 onChange={() => setChanging(s)}
                 onPay={() => void payOpen(s)}
                 onRenew={() => renew(s)}
+                onMove={s.movable && moveTargets.length > 0 ? () => setMoving(s) : undefined}
               />
             ))}
           </div>
@@ -1126,6 +1204,21 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
               toast(t('servers.relayPlan.changed', { name }), 'success')
               void api.server.relayPlanRefresh(a.account, step.sub).then(put, () => load())
             }
+          }}
+        />
+      )}
+      {moving && (
+        <MoveModal
+          a={a}
+          sub={moving}
+          targets={moveTargets}
+          onClose={() => setMoving(undefined)}
+          onMoved={(p, to) => {
+            put(p)
+            setMoving(undefined)
+            toast(t('servers.relayPlan.moved', { name: moving.name, account: to.accountName }), 'success')
+            // Both accounts' plans change: read them all again.
+            void load()
           }}
         />
       )}

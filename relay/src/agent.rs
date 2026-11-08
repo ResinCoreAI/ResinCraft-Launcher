@@ -578,6 +578,12 @@ impl Connection {
         self.plan_info(AgentMsg::PlanRefresh { sub: sub.into() }).await
     }
 
+    /// Gives one of the account's purchases to another of the player's accounts (`to_token`: that account's
+    /// Minecraft services token). Only while the plan says `moves`; answers with this account's plan.
+    pub async fn plan_move(&mut self, sub: &str, to_token: &str) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::PlanMove { sub: sub.into(), to_token: to_token.into() }).await
+    }
+
     /// Whether this relay can list the account's names (protocol 10).
     pub fn has_names(&self) -> bool {
         self.relay_version >= NAMES_PROTOCOL_VERSION

@@ -112,3 +112,22 @@ pub async fn pay(account: &str, sub: &str) -> Result<PayStep> {
 pub async fn refresh(account: &str, sub: &str) -> Result<PlanInfo> {
     connect(account).await?.plan_refresh(sub).await.map_err(|e| relay::describe(&e, ""))
 }
+
+/// Moves one of `account`'s purchases to `to`, another Microsoft account signed in here: the relay is shown `to`'s
+/// Minecraft token (it asks Mojang whose it is and forgets it). Answers with `account`'s plan.
+pub async fn move_to(account: &str, sub: &str, to: &str) -> Result<PlanInfo> {
+    let target = owner(to).await?;
+    if relay::same_account(&target.uuid, account) {
+        anyhow::bail!("That's the same account.");
+    }
+    let mut conn = connect(account).await?;
+    let token = accounts::microsoft_token(&target.id, false).await?;
+    match conn.plan_move(sub, &token).await {
+        // A token Mojang no longer takes: a fresh one, once.
+        Err(e) if e.code() == Some(resincraft_relay::proto::ErrorCode::AuthFailed) => {
+            let token = accounts::microsoft_token(&target.id, true).await?;
+            conn.plan_move(sub, &token).await.map_err(|e| relay::describe(&e, ""))
+        }
+        r => r.map_err(|e| relay::describe(&e, "")),
+    }
+}

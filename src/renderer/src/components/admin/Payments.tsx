@@ -38,6 +38,9 @@ interface Sub {
   method?: string
   credit?: number
   active: boolean
+  /** The account it was moved from (its name then), and when. */
+  moved_from?: string
+  moved_at?: number
 }
 interface Promo {
   code: string
@@ -69,6 +72,8 @@ interface Payments {
   enabled: boolean
   switchFromFile: boolean
   creditUnused: boolean
+  /** Players may move purchases between their accounts (fromFile: relay.toml's `[payments] moves`). */
+  moves?: { on: boolean; fromFile: boolean }
   free: Free
   freeFromFile: boolean
   fileFree: Free
@@ -266,6 +271,26 @@ function Selling({ d, act }: { d: Payments; act: Act }) {
             on={d.creditUnused}
             onChange={(on) => void act('/api/payments/credit', { on }, 'servers.admin.pay.saved')}
           />
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>{t('servers.admin.pay.moves')}</h3>
+        <div className="card admin-items">
+          <SwitchRow
+            title={t('servers.admin.pay.movesSwitch')}
+            hint={t(d.moves?.on ? 'servers.admin.pay.movesOn' : 'servers.admin.pay.movesOff')}
+            on={!!d.moves?.on}
+            onChange={(on) => void act('/api/payments/moves', { on }, 'servers.admin.pay.saved')}
+          />
+          {d.moves && !d.moves.fromFile && (
+            <div className="setting">
+              <span className="hint grow">{t('servers.admin.pay.movesOverride')}</span>
+              <button className="btn sm" onClick={() => void act('/api/payments/moves', { reset: true }, 'servers.admin.pay.saved')}>
+                {t('servers.admin.set.reset')}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -960,6 +985,7 @@ function Purchases({ d, act }: { d: Payments; act: Act }) {
                   {s.period_end ? t('servers.admin.pay.periodEnds', { when: when(s.period_end) }) : t('servers.admin.pay.neverEnds')} · {s.id}
                   {s.credit ? ` · ${t('servers.admin.pay.creditTaken', { amount: money(s.credit, cur) })}` : ''}
                 </span>
+                {s.moved_from && <span className="hint">{t('servers.admin.pay.movedFrom', { name: s.moved_from, when: when(s.moved_at ?? 0) })}</span>}
               </div>
               <MoreButton
                 items={() =>

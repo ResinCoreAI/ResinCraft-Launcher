@@ -332,6 +332,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       relayPlanCancel: fn('server:relayPlanCancel'),
       relayPlanPay: fn('server:relayPlanPay'),
       relayPlanRefresh: fn('server:relayPlanRefresh'),
+      relayPlanMove: fn('server:relayPlanMove'),
       relayRevoke: fn('server:relayRevoke'),
       relayRename: fn('server:relayRename'),
       relayRequestNames: fn('server:relayRequestNames'),

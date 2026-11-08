@@ -297,6 +297,10 @@ pub enum AgentMsg {
     /// Read a subscription from Stripe again (after the payment form says it went through): answered with `plan`.
     /// Protocol 11.
     PlanRefresh { sub: String },
+    /// Give one of the account's purchases (`movable` in `plan`) to another of the player's accounts, proven by that
+    /// account's Minecraft services token (the relay asks Mojang whose it is and forgets it). Only while `plan` says
+    /// `moves` (relays without it never set it); answered with this account's `plan`.
+    PlanMove { sub: String, to_token: String },
     Ping { seq: u64 },
 }
 
@@ -1161,6 +1165,8 @@ pub struct PlanInfo {
     pub access: Access,
     /// The account is the relay's admin (it's told what the relay has switched off, like TrueMoney).
     pub admin: bool,
+    /// The relay's admin lets players move purchases to another of their accounts (`plan_move`).
+    pub moves: bool,
     /// What's for sale (empty while payments are off).
     pub products: Vec<ProductInfo>,
     /// The account's subscriptions (and the admin's grants), newest first.
@@ -1228,6 +1234,8 @@ pub struct MySub {
     pub once: bool,
     /// How it was paid: "card", "promptpay", "truemoney", "free"; empty for subscriptions and grants.
     pub method: String,
+    /// It can be moved to another account (bought or a gift code's, and running) while `moves` is on.
+    pub movable: bool,
 }
 
 /// What happens to an account's relay names and servers when an add-on ends. Protocol 11.

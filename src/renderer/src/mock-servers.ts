@@ -460,8 +460,10 @@ export function mockServers(): {
       products: on ? PLAN_PRODUCTS.map((p) => ({ ...p, owned: owned(p) })) : [],
       mine: a.subs
         .filter((x) => x.status !== 'pending')
-        .slice()
+        .map((x) => ({ ...x, movable: x.active && x.status !== 'granted' && x.status !== 'credited' }))
         .reverse(),
+      // ?plans=nomove: the relay's admin hasn't switched moving purchases on.
+      moves: on && new URLSearchParams(location.search).get('plans') !== 'nomove',
       // ?plans=notm: the relay doesn't take TrueMoney and this account is its admin (greyed out, with how).
       truemoney: new URLSearchParams(location.search).get('plans') !== 'notm',
       admin: new URLSearchParams(location.search).get('plans') === 'notm',
@@ -1251,6 +1253,15 @@ export function mockServers(): {
       const a = planAccounts.find((x) => x.account === account)!
       a.subs.find((x) => x.id === sub)!.cancel_at_period_end = !resume
       return mockPlan(a)
+    },
+    relayPlanMove: async (account, sub, to) => {
+      await wait(null, 500)
+      const from = planAccounts.find((x) => x.account === account)!
+      const target = planAccounts.find((x) => x.account === to)!
+      const s = from.subs.find((x) => x.id === sub)!
+      from.subs = from.subs.filter((x) => x.id !== sub)
+      target.subs.push(s)
+      return mockPlan(from)
     },
     relayPlanPay: async (_account, sub) => ({
       sub,
