@@ -72,6 +72,8 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
     let memory = req.memory_mb.or(plan.memory).unwrap_or(if modded { 4096 } else { 2048 }).min((total / 2).max(1024)).max(512);
     // Nobody chose the memory: once the mods are in, a big pack gets more (see `memory_for`).
     let memory_chosen = req.memory_mb.or(plan.memory).is_some();
+    // The Microsoft account it's made with: its ResinCraft Relay name and plan stay that account's.
+    let relay_account = crate::player::accounts::microsoft_account(None).await.map(|a| a.uuid);
     let meta = ServerMeta {
         id: id.clone(),
         name: name.clone(),
@@ -102,7 +104,7 @@ pub async fn create(req: NewServer) -> Result<ServerCreated> {
         domain: None,
         dns_auto: false,
         relay_name: None,
-        relay_account: None,
+        relay_account,
         domain_txt: None,
         pending_downloads: Vec::new(),
         built_pack: false,

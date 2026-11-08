@@ -70,7 +70,7 @@ import RelayNames from '../components/RelayNames'
 import { StoreLink } from '../components/StoreLink'
 import { ServerPriority } from '../components/RelayPlan'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
-import { BlockArt, ConfirmModal, Empty, Modal, openContextMenu, openMenuBelow, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
+import { Avatar, BlockArt, ConfirmModal, Empty, Modal, openContextMenu, openMenuBelow, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
 import { bytes, fixed, serverPath, timeAgo } from '../util'
 import { rich, t, tx, type Key } from '../i18n'
@@ -516,6 +516,25 @@ function ServerList({
 
 // ---------- Detail ----------
 
+/** The Microsoft account the server was made with: its head and name. The server uses that account's ResinCraft Relay plan. */
+function ServerOwnerChip({ s }: { s: ServerInfo }) {
+  const { accounts } = useStore()
+  if (!s.relayAccount) return null
+  const plain = (u: string) => u.replace(/-/g, '').toLowerCase()
+  const owner = accounts.find((a) => a.type === 'msa' && plain(a.uuid) === plain(s.relayAccount!))
+  if (!owner)
+    return (
+      <span className="chip warn" title={t('servers.owner.goneHint')}>
+        {t('servers.owner.gone')}
+      </span>
+    )
+  return (
+    <span className="chip sv-owner" title={t('servers.owner.hint', { name: owner.username })}>
+      <Avatar account={owner} size={16} /> {owner.username}
+    </span>
+  )
+}
+
 function ServerDetail({
   server: s,
   reload,
@@ -600,6 +619,7 @@ function ServerDetail({
               </span>
             )}
             <ServerMemoryChip serverId={s.id} running={live(s)} />
+            <ServerOwnerChip s={s} />
           </div>
         </div>
         <button
