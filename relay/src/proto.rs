@@ -1105,6 +1105,9 @@ pub fn now_secs() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
+/// A count of servers or names this big stands for no limit (∞), like the admin's "unlimited" for an account.
+pub const UNLIMITED_COUNT: u32 = 1_000_000;
+
 /// What a product gives an account, on top of the free plan. Counts add up over everything it has; the switches are
 /// on when any of its products has them. Protocol 11.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -1137,7 +1140,7 @@ impl Grants {
 
     /// Only switches `have` already has: buying this again would add nothing.
     pub fn adds_nothing_to(&self, have: &Grants) -> bool {
-        let counts = self.servers > 0 || self.names > 0 || self.traffic_gb > 0;
+        let counts = (self.servers > 0 && have.servers < UNLIMITED_COUNT) || (self.names > 0 && have.names < UNLIMITED_COUNT) || self.traffic_gb > 0;
         let new_switch = (self.unlimited_traffic && !have.unlimited_traffic) || (self.no_session_limit && !have.no_session_limit) || (self.whitelist_page && !have.whitelist_page);
         !counts && !new_switch
     }

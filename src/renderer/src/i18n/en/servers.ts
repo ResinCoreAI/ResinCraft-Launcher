@@ -913,6 +913,8 @@ export default {
   "servers.relayPlan.addons": "Add-ons",
   "servers.relayPlan.giveServers": "Servers online +{count}",
   "servers.relayPlan.giveNames": "Names +{count}",
+  "servers.relayPlan.giveNamesInf": "Names ∞",
+  "servers.relayPlan.giveServersInf": "Servers online ∞",
   "servers.relayPlan.giveTraffic": "+{amount} traffic a month",
   "servers.relayPlan.buy": "Buy",
   "servers.relayPlan.owned": "You have this",

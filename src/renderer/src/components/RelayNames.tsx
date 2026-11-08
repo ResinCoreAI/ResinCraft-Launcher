@@ -9,6 +9,7 @@ import { t, tx } from '../i18n'
 import { ConfirmModal, Modal } from './ui'
 import { relayNameOk } from './ServerRelay'
 import { setRemotePc } from '../remotePc'
+import { countText } from '../relayCount'
 
 function useNames() {
   const [names, setNames] = useState<Names>()
@@ -33,7 +34,7 @@ function AskLine({ a, showCount, reload }: { a: RelayNameAccount; showCount?: bo
   if (!showCount && !canAsk && !waiting) return null
   return (
     <div className="relay-names-ask">
-      {showCount && a.limit > 0 && <span className="hint">{t('servers.relayNames.count', { used: a.used, limit: a.limit, account: a.accountName })}</span>}
+      {showCount && a.limit > 0 && <span className="hint">{t('servers.relayNames.count', { used: a.used, limit: countText(a.limit), account: a.accountName })}</span>}
       {r && (
         <span className="hint">
           {t(`servers.relayNames.${r.state}`, { wanted: r.wanted })}
@@ -97,7 +98,7 @@ function AskModal({ a, onClose, onSent }: { a: RelayNameAccount; onClose: () => 
     >
       <div className="field">
         <label>{t('servers.relayNames.askAccount')}</label>
-        <span className="hint">{t('servers.relayNames.count', { used: a.used, limit: a.limit, account: a.accountName })}</span>
+        <span className="hint">{t('servers.relayNames.count', { used: a.used, limit: countText(a.limit), account: a.accountName })}</span>
       </div>
       <div className="field">
         <label htmlFor="names-wanted">{t('servers.relayNames.askWanted')}</label>

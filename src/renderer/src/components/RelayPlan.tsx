@@ -30,6 +30,7 @@ import { t, tx, type Key } from '../i18n'
 import { ConfirmModal, Modal } from './ui'
 import { loadStripe, stripeAppearance, type StripeJs } from '../stripe'
 import '../relay-plan.css'
+import { countText, UNLIMITED_COUNT } from '../relayCount'
 
 function money(amount: number, currency: string) {
   try {
@@ -48,8 +49,10 @@ const day = (unix: number) => new Date(unix * 1000).toLocaleDateString()
 function gives(p: PlanProduct) {
   const g = p.grants
   const parts: string[] = []
-  if (g.servers) parts.push(t('servers.relayPlan.giveServers', { count: g.servers }))
-  if (g.names) parts.push(t('servers.relayPlan.giveNames', { count: g.names }))
+  if (g.servers >= UNLIMITED_COUNT) parts.push(t('servers.relayPlan.giveServersInf'))
+  else if (g.servers) parts.push(t('servers.relayPlan.giveServers', { count: g.servers }))
+  if (g.names >= UNLIMITED_COUNT) parts.push(t('servers.relayPlan.giveNamesInf'))
+  else if (g.names) parts.push(t('servers.relayPlan.giveNames', { count: g.names }))
   if (g.traffic_gb) parts.push(t('servers.relayPlan.giveTraffic', { amount: `${g.traffic_gb} GB` }))
   if (g.unlimited_traffic) parts.push(t('servers.relayPlan.trafficUnlimited'))
   if (g.no_session_limit) parts.push(t('servers.relayPlan.sessionUnlimited'))
@@ -603,7 +606,7 @@ function Notices({ a, onRenew }: { a: AccountPlan; onRenew: (s: PlanSub) => void
           <span>
             {t('servers.relayPlan.graceBody', {
               date: new Date(access.grace_until * 1000).toLocaleString(),
-              servers: access.servers,
+              servers: countText(access.servers),
               names: access.will_pause.length ? access.will_pause.join(', ') : '–'
             })}
           </span>
@@ -1031,8 +1034,8 @@ export default function RelayPlan({ page, empty }: { page?: boolean; empty?: Rea
           </p>
         ))}
       <div className="rp-totals">
-        <span className="chip">{t('servers.relayPlan.servers', { count: tot.servers })}</span>
-        <span className="chip">{t('servers.relayPlan.names', { count: tot.names })}</span>
+        <span className="chip">{t('servers.relayPlan.servers', { count: countText(tot.servers) })}</span>
+        <span className="chip">{t('servers.relayPlan.names', { count: countText(tot.names) })}</span>
         <span className="chip">
           {tot.unlimited_traffic ? t('servers.relayPlan.trafficUnlimited') : t('servers.relayPlan.traffic', { amount: gb(tot.monthly_bytes) })}
         </span>

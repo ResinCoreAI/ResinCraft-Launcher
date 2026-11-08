@@ -7,6 +7,7 @@ import { currentLanguage, t, type Key } from '../../i18n'
 import { useStore } from '../../store'
 import { ConfirmModal, Empty, Modal, MoreButton, Segmented, Switch } from '../ui'
 import { account, Loading, post, shortId, useAct, useAdmin, when } from './common'
+import { UNLIMITED_COUNT } from '../../relayCount'
 
 type Grants = { servers?: number; names?: number; traffic_gb?: number; unlimited_traffic?: boolean; no_session_limit?: boolean; whitelist_page?: boolean }
 interface Product {
@@ -112,6 +113,8 @@ interface Payments {
 type View = 'selling' | 'products' | 'codes' | 'purchases' | 'truemoney'
 const COUNTS = ['servers', 'names', 'traffic_gb'] as const
 const SWITCHES = ['unlimited_traffic', 'no_session_limit', 'whitelist_page'] as const
+/** Counts that can be ∞ (no limit), like Unlimited in an account's own settings. */
+const INF = ['servers', 'names'] as const
 const FREE = ['servers', 'names', 'monthly_gb', 'bonus_gb', 'session_minutes'] as const
 
 function money(amount: number, currency: string) {
@@ -128,8 +131,10 @@ function money(amount: number, currency: string) {
 
 function gives(g: Grants) {
   const parts: string[] = []
-  if (g.servers) parts.push(t('servers.admin.pay.giveServers', { count: g.servers }))
-  if (g.names) parts.push(t('servers.admin.pay.giveNames', { count: g.names }))
+  if ((g.servers ?? 0) >= UNLIMITED_COUNT) parts.push(t('servers.admin.pay.giveServersInf'))
+  else if (g.servers) parts.push(t('servers.admin.pay.giveServers', { count: g.servers }))
+  if ((g.names ?? 0) >= UNLIMITED_COUNT) parts.push(t('servers.admin.pay.giveNamesInf'))
+  else if (g.names) parts.push(t('servers.admin.pay.giveNames', { count: g.names }))
   if (g.traffic_gb) parts.push(t('servers.admin.pay.giveTraffic', { count: g.traffic_gb }))
   for (const k of SWITCHES) if (g[k]) parts.push(t(`servers.admin.pay.grant.${k}` as Key))
   return parts.join(', ') || t('servers.admin.pay.giveNothing')
@@ -497,6 +502,14 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
   })
   const [g, setG] = useState<Grants>(p?.grants ?? {})
   const [busy, setBusy] = useState(false)
+  const isInf = (k: (typeof INF)[number]) => (g[k] ?? 0) >= UNLIMITED_COUNT
+  const allInf = INF.every(isInf) && SWITCHES.every((k) => !!g[k])
+  const setAllInf = (on: boolean) => {
+    const next: Grants = { ...g }
+    for (const k of INF) next[k] = on ? UNLIMITED_COUNT : 0
+    for (const k of SWITCHES) next[k] = on
+    setG(next)
+  }
   const cur = d.currency.toUpperCase()
   const text = (k: keyof typeof f, label: string, placeholder?: string) => (
     <label className="field">
@@ -575,18 +588,35 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
           {text('yearly', t('servers.admin.pay.f.yearly', { currency: cur }))}
           {text('order', t('servers.admin.pay.f.order'))}
         </div>
+        <label className="row">
+          <Switch on={allInf} label={t('servers.admin.pay.infinite')} onChange={setAllInf} />
+          <span>
+            {t('servers.admin.pay.infinite')} <span className="hint">{t('servers.admin.pay.infiniteHint')}</span>
+          </span>
+        </label>
         <div className="field-row">
-          {COUNTS.map((k) => (
-            <label key={k} className="field">
-              <span>{t(`servers.admin.pay.grant.${k}` as Key)}</span>
-              <input
-                className="input"
-                inputMode="numeric"
-                value={s(g[k] ?? 0)}
-                onChange={(e) => setG({ ...g, [k]: e.target.value === '' ? 0 : Number(e.target.value) })}
-              />
-            </label>
-          ))}
+          {COUNTS.map((k) => {
+            const inf = k !== 'traffic_gb' && isInf(k)
+            return (
+              <label key={k} className="field">
+                <span>{t(`servers.admin.pay.grant.${k}` as Key)}</span>
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  value={inf ? '' : s(g[k] ?? 0)}
+                  placeholder={inf ? '∞' : undefined}
+                  disabled={inf}
+                  onChange={(e) => setG({ ...g, [k]: e.target.value === '' ? 0 : Number(e.target.value) })}
+                />
+                {k !== 'traffic_gb' && (
+                  <span className="row" style={{ gap: 6, fontWeight: 'normal' }}>
+                    <input type="checkbox" checked={inf} onChange={(e) => setG({ ...g, [k]: e.target.checked ? UNLIMITED_COUNT : 0 })} />
+                    {t('servers.admin.pay.noLimit')}
+                  </span>
+                )}
+              </label>
+            )
+          })}
         </div>
         {SWITCHES.map((k) => (
           <label key={k} className="row">
