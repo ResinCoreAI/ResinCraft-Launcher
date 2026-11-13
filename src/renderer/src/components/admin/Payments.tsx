@@ -959,6 +959,8 @@ function PromoModal({ d, onAdd, onClose }: { d: Payments; onAdd: (body: Record<s
 
 function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<string, unknown>) => Promise<boolean>; onClose: () => void }) {
   const [f, setF] = useState({ product: d.products[0]?.id ?? '', days: '30', code: '', count: '1', uses: '1', expires: '', note: '' })
+  // How long a code gives the product: a month (30 days), a year (365), for good (0) or any number of days.
+  const [len, setLen] = useState<'30' | '365' | '0' | 'custom'>('30')
   const field = (k: Exclude<keyof typeof f, 'product'>, label: string, placeholder?: string) => (
     <label className="field">
       <span>{label}</span>
@@ -966,7 +968,7 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
     </label>
   )
   const submit = () => {
-    const body: Record<string, unknown> = { product: f.product, days: Number(f.days) || 0, max_uses: Number(f.uses) || 0, note: f.note.trim() }
+    const body: Record<string, unknown> = { product: f.product, days: len === 'custom' ? Math.max(1, Math.floor(Number(f.days) || 1)) : Number(len), max_uses: Number(f.uses) || 0, note: f.note.trim() }
     if (f.code.trim()) body.code = f.code.trim()
     else body.count = Math.max(1, Number(f.count) || 1)
     if (Number(f.expires) > 0) body.expires_days = Number(f.expires)
@@ -984,8 +986,21 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
           ))}
         </select>
       </label>
+      <label className="field">
+        <span>{t('servers.admin.pay.f.lasts')}</span>
+        <Segmented<'30' | '365' | '0' | 'custom'>
+          value={len}
+          onChange={setLen}
+          options={[
+            { value: '30', label: t('servers.admin.pay.len.month') },
+            { value: '365', label: t('servers.admin.pay.len.year') },
+            { value: '0', label: t('servers.admin.pay.len.forever') },
+            { value: 'custom', label: t('servers.admin.pay.len.custom') }
+          ]}
+        />
+      </label>
       <div className="field-row">
-        {field('days', t('servers.admin.pay.f.days'))}
+        {len === 'custom' && field('days', t('servers.admin.pay.f.days'))}
         {field('uses', t('servers.admin.pay.f.perCode'))}
         {field('expires', t('servers.admin.pay.f.endsIn'), t('servers.admin.pay.never'))}
       </div>
