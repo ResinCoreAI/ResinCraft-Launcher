@@ -111,10 +111,12 @@ fn gb(mb: u64) -> u64 {
 
 /// The pack size that fits: video memory first (path tracing and big textures share it), then RAM.
 pub fn recommended_pack(spec: &Spec) -> &'static str {
+    // A 256x pack makes a 16384x16384 block atlas, and RTX Remix builds its material maps at the same size: on a
+    // 12 GB card that's enough to lose the device while the world loads. 256x needs 16 GB.
     let by_vram = match spec.vram_mb.map(gb) {
         None => "64",
         Some(v) if v < 8 => "64",
-        Some(v) if v < 12 => "128",
+        Some(v) if v < 16 => "128",
         Some(_) => "256",
     };
     let ram = gb(spec.ram_mb);
@@ -328,10 +330,12 @@ mod tests {
 
     #[test]
     fn sizes_the_pack_for_the_pc() {
-        assert_eq!(recommended_pack(&pc(Some(12), 32, 16)), "256");
+        assert_eq!(recommended_pack(&pc(Some(12), 32, 16)), "128", "12 GB loses the device with 256x");
+        assert_eq!(recommended_pack(&pc(Some(16), 32, 16)), "256");
         assert_eq!(recommended_pack(&pc(Some(8), 32, 16)), "128");
         assert_eq!(recommended_pack(&pc(Some(6), 16, 8)), "64");
         assert_eq!(recommended_pack(&pc(Some(24), 8, 8)), "128", "RAM holds it back");
+        assert_eq!(recommended_pack(&pc(Some(24), 32, 8)), "256");
         assert_eq!(recommended_pack(&pc(None, 32, 8)), "64");
     }
 
@@ -339,7 +343,7 @@ mod tests {
     fn reads_memory_as_sold() {
         // An RTX 4070 Ti and a 40 GB PC, as nvidia-smi and the OS report them.
         let real = Spec { vram_mb: Some(12282), ram_mb: 40764, cores: 12 };
-        assert_eq!(recommended_pack(&real), "256");
+        assert_eq!(recommended_pack(&real), "128");
         assert_eq!(tune(&real, "256").render_distance, 16);
         assert_eq!(recommended_pack(&Spec { vram_mb: Some(8188), ram_mb: 16300, cores: 8 }), "128");
     }

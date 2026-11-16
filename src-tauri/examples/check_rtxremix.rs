@@ -33,15 +33,28 @@ async fn main() {
     };
     println!("spec {:?} → {:?}", c.spec, c.recommended);
     let t = Instant::now();
-    rtxremix::install(&inst.id, Default::default()).await.expect("install");
+    // RTX_PACK / RTX_TUNE pick the texture pack and whether settings are tuned (defaults: auto, tuned).
+    let opts = || {
+        let mut o = resincraft_lib::content::rtxpack::RtxOptions::default();
+        if let Ok(p) = std::env::var("RTX_PACK") {
+            o.pack = p;
+        }
+        if std::env::var("RTX_TUNE").is_ok_and(|v| v == "0") {
+            o.tune = false;
+        }
+        o
+    };
+    rtxremix::install(&inst.id, opts()).await.expect("install");
     println!("installed in {:.0?}", t.elapsed());
     let t = Instant::now();
-    rtxremix::install(&inst.id, Default::default()).await.expect("second install");
+    rtxremix::install(&inst.id, opts()).await.expect("second install");
     println!("second run in {:.1?}", t.elapsed());
 
     let inst = instances::get(&inst.id).await.unwrap();
     assert_eq!((inst.mc_version.as_str(), inst.loader_version.as_deref()), ("1.21.1", Some("0.16.5")));
-    assert_eq!(inst.memory_mb, Some(c.recommended.memory_mb), "tuned memory");
+    if std::env::var("RTX_TUNE").map_or(true, |v| v != "0") {
+        assert_eq!(inst.memory_mb, Some(c.recommended.memory_mb), "tuned memory");
+    }
     let game = paths::game_dir(&inst.id);
     let names = |dir: &str| -> Vec<String> {
         std::fs::read_dir(game.join(dir)).map(|d| d.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect()).unwrap_or_default()
@@ -56,7 +69,9 @@ async fn main() {
     let options = std::fs::read_to_string(game.join("options.txt")).unwrap();
     println!("options.txt: {}", options.trim());
     assert!(packs.iter().any(|p| options.contains(&format!("file/{p}"))));
-    assert!(options.contains(&format!("renderDistance:{}", c.recommended.render_distance)), "tuned render distance");
+    if std::env::var("RTX_TUNE").map_or(true, |v| v != "0") {
+        assert!(options.contains(&format!("renderDistance:{}", c.recommended.render_distance)), "tuned render distance");
+    }
     let pbr: Vec<_> = idx_titles(&inst.id).await;
     println!("PBR pack: {pbr:?}");
     assert_eq!(pbr.len(), 1, "one PBR pack");
