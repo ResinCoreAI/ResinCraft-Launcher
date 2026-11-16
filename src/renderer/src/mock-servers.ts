@@ -50,6 +50,8 @@ function mockRelayBan(): EngineText | undefined {
   return { key: 'hostRelay.bannedReason', text: `${base.text} Reason: ${reason}`, params: { ban: base, reason } }
 }
 
+let bbbSigned = false
+
 export function mockServers(): {
   server: ResinApi['server']
   onServer: ResinApi['on']['server']
@@ -548,7 +550,7 @@ export function mockServers(): {
   const sourcesOf = (id: string, area?: string): AddonSource[] => {
     const type = find(id).type
     if (type === 'vanilla' || type === 'bedrock') return []
-    if (PLUGIN_TYPES.includes(type)) return ['modrinth', 'hangar', 'spigot', 'bukkit', 'github', 'geysermc']
+    if (PLUGIN_TYPES.includes(type)) return ['modrinth', 'hangar', 'spigot', 'bukkit', 'builtbybit', 'github', 'geysermc']
     if (type === 'arclight' && area !== 'mods') return ['modrinth', 'spigot', 'bukkit', 'github', 'geysermc']
     return type === 'forge' ? ['modrinth', 'curseforge', 'github'] : ['modrinth', 'curseforge', 'github', 'geysermc']
   }
@@ -822,6 +824,16 @@ export function mockServers(): {
     reinstall: () => wait(undefined, 1500),
     reinstallPack: () => wait({ versionName: 'current', added: 0, updated: 2, removed: 0, kept: [], pending: 0 } as never, 1500),
     addonSources: async (id, area) => sourcesOf(id, area),
+    bbbStatus: async () => ({ configured: true, signedIn: bbbSigned, username: bbbSigned ? 'Puirkle' : null }),
+    bbbSignIn: async () => {
+      await new Promise((r) => setTimeout(r, 800))
+      bbbSigned = true
+      return { configured: true, signedIn: true, username: 'Puirkle' }
+    },
+    bbbSignOut: async () => {
+      bbbSigned = false
+      return { configured: true, signedIn: false }
+    },
     addons: (_id, area) => wait(listOf(area)),
     addonSearch: (_id, _q, source, offset = 0, area) => {
       if (source === 'geysermc') {
@@ -938,6 +950,10 @@ export function mockServers(): {
         )
       ),
     addonRemove: async (_id, filename, area) => setList(area, (list) => list.filter((a) => a.filename !== filename)),
+    addonFromSite: async (_id, url, options) => {
+      await new Promise((r) => setTimeout(r, 1500))
+      return { file: `${(options?.title ?? new URL(url).hostname).replace(/\W+/g, '-')}.jar`, title: options?.title ?? new URL(url).hostname, queued: false }
+    },
     addonFromLink: async (_id, url, area) => {
       await wait(null, 1100)
       if (!/^https?:\/\//.test(url)) throw new Error("That isn't a web address")

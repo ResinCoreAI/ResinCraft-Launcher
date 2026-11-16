@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Download, ExternalLink, Link2, Loader2, Puzzle, Search, Star } from 'lucide-react'
-import type { AddonArea, AddonSource, ServerAddonHit, ServerInfo } from '@shared/types'
+import { Check, Download, ExternalLink, KeyRound, Link2, Loader2, LogIn, LogOut, Puzzle, Search, Star } from 'lucide-react'
+import type { AddonArea, AddonSource, BuiltByBitStatus, ServerAddonHit, ServerInfo } from '@shared/types'
 import { PLUGIN_SERVERS } from '@shared/types'
 import { api } from '../api'
 import { AutoLoadMore } from './AutoLoadMore'
@@ -14,10 +14,12 @@ export const ADDON_SOURCE_LABEL: Record<AddonSource, string> = {
   modrinth: 'Modrinth',
   hangar: 'Hangar',
   spigot: 'SpigotMC',
+  builtbybit: 'BuiltByBit',
   bukkit: 'dev.bukkit.org',
   curseforge: 'CurseForge',
   github: 'GitHub',
-  geysermc: 'GeyserMC'
+  geysermc: 'GeyserMC',
+  site: 'Website'
 }
 
 type Choice = AddonSource | 'all'
@@ -87,7 +89,33 @@ export default function AddonBrowser({
   const cursor = useRef<Partial<Record<AddonSource, { next: number; total: number }>>>({})
   const plugins = area ? area === 'plugins' : PLUGIN_SERVERS.includes(server.type)
   const noCurseForge = info?.curseforge === false
-  const usable = useMemo(() => sources.filter((s) => !(noCurseForge && (s === 'curseforge' || s === 'bukkit'))), [sources, noCurseForge])
+  // BuiltByBit lists what the player owns, so it needs their sign-in.
+  const [bbb, setBbb] = useState<BuiltByBitStatus>()
+  const [bbbBusy, setBbbBusy] = useState(false)
+  const usable = useMemo(
+    () => sources.filter((s) => !(noCurseForge && (s === 'curseforge' || s === 'bukkit')) && (s !== 'builtbybit' || !!bbb?.signedIn)),
+    [sources, noCurseForge, bbb]
+  )
+  const bbbLocked = choice === 'builtbybit' && !bbb?.signedIn
+
+  useEffect(() => {
+    if (sources.includes('builtbybit')) void api.server.bbbStatus().then(setBbb, () => undefined)
+  }, [sources])
+
+  const bbbSignIn = async () => {
+    setBbbBusy(true)
+    try {
+      setBbb(await api.server.bbbSignIn())
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBbbBusy(false)
+    }
+  }
+  const bbbSignOut = async () => {
+    setBbb(await api.server.bbbSignOut())
+    setChoice('builtbybit')
+  }
 
   useEffect(() => {
     void api.server.addonSources(server.id, area).then((s) => {
@@ -124,7 +152,7 @@ export default function AddonBrowser({
     setHits(undefined)
     setError(undefined)
     setFailed({})
-    if (isLink(query)) {
+    if (isLink(query) || bbbLocked) {
       setHits([])
       return
     }
@@ -157,7 +185,7 @@ export default function AddonBrowser({
       clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [server.id, area, query, choice, usable])
+  }, [server.id, area, query, choice, usable, bbbLocked])
 
   const hasMore = choice === 'all' ? Object.values(cursor.current).some((c) => c && c.next < c.total) : !!hits && hits.length < total
 
@@ -191,6 +219,28 @@ export default function AddonBrowser({
       setBusy((b) => {
         const n = new Set(b)
         n.delete(h.id)
+        return n
+      })
+    }
+  }
+
+  /** A paid plugin, or a store page: the player signs in there and presses Download; the file is installed. */
+  const fromSite = async (url: string, h?: ServerAddonHit) => {
+    const id = h?.id ?? url
+    setBusy((b) => new Set(b).add(id))
+    toast(t('servers.addons.site.opened'), 'info')
+    try {
+      const r = await api.server.addonFromSite(server.id, url, h ? { projectId: h.id, title: h.title } : {}, area)
+      setDone((d) => new Set(d).add(id))
+      toast(t(r.queued ? 'servers.addons.site.queued' : 'servers.addons.installed', { name: r.title }))
+      if (!h) setQuery('')
+      onInstalled()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy((b) => {
+        const n = new Set(b)
+        n.delete(id)
         return n
       })
     }
@@ -237,12 +287,30 @@ export default function AddonBrowser({
         </div>
       </div>
       <span className="hint">{t(`servers.addons.sourceHint.${choice}` as Key)}</span>
+      {choice === 'builtbybit' && bbb?.signedIn && (
+        <div className="row bbb-account">
+          <span className="hint">{t('servers.addons.bbb.signedInAs', { name: bbb.username ?? 'BuiltByBit' })}</span>
+          <button className="btn sm ghost" onClick={() => void bbbSignOut()}>
+            <LogOut /> {t('servers.addons.bbb.signOut')}
+          </button>
+        </div>
+      )}
       {choice === 'all' && missing.length > 0 && hits && hits.length > 0 && (
         <span className="hint bad">{t('servers.addons.someFailed', { sources: missing.map((s) => ADDON_SOURCE_LABEL[s]).join(', ') })}</span>
       )}
 
       <div className="results sv-results">
-        {isLink(query) ? (
+        {bbbLocked ? (
+          <div className="callout bbb-signin">
+            <div className="grow">
+              <b>{t('servers.addons.bbb.title')}</b>
+              <p>{t('servers.addons.bbb.hint')}</p>
+            </div>
+            <button className="btn primary" disabled={bbbBusy} onClick={() => void bbbSignIn()}>
+              {bbbBusy ? <Loader2 className="spin" /> : <LogIn />} {t('servers.addons.bbb.signIn')}
+            </button>
+          </div>
+        ) : isLink(query) ? (
           <div className="result">
             <div className="ico">
               <Link2 />
@@ -257,6 +325,14 @@ export default function AddonBrowser({
             <div className="actions">
               <button className="btn sm primary" disabled={linking} onClick={() => void installLink()}>
                 {linking ? <Loader2 className="spin" /> : <Download />} {t('servers.addons.install')}
+              </button>
+              <button
+                className="btn sm"
+                disabled={busy.has(query.trim())}
+                title={t('servers.addons.site.linkHint')}
+                onClick={() => void fromSite(query.trim())}
+              >
+                {busy.has(query.trim()) ? <Loader2 className="spin" /> : <KeyRound />} {t('servers.addons.site.signInDownload')}
               </button>
             </div>
           </div>
@@ -297,7 +373,7 @@ export default function AddonBrowser({
                       {h.also && (
                         <span className="faint">{t('servers.addons.alsoOn', { sources: h.also.map((a) => ADDON_SOURCE_LABEL[a.source]).join(', ') })}</span>
                       )}
-                      {h.external && <span className="faint">{t('servers.addons.externalHint')}</span>}
+                      {h.paid ? <span className="faint">{t('servers.addons.site.paid')}</span> : h.external && <span className="faint">{t('servers.addons.externalHint')}</span>}
                     </div>
                   </div>
                   <div className="actions">
@@ -305,6 +381,10 @@ export default function AddonBrowser({
                       <span className="chip success">
                         <Check /> {t('servers.addons.installedChip')}
                       </span>
+                    ) : h.paid ? (
+                      <button className="btn sm primary" disabled={busy.has(h.id)} title={t('servers.addons.site.paidHint')} onClick={() => void fromSite(h.url, h)}>
+                        {busy.has(h.id) ? <Loader2 className="spin" /> : <KeyRound />} {t('servers.addons.site.signInDownload')}
+                      </button>
                     ) : h.external ? (
                       <button className="btn sm" onClick={() => void api.app.openExternal(h.url)}>
                         {t('servers.addons.openPage')} <ExternalLink />

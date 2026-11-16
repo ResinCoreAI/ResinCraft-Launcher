@@ -19,13 +19,17 @@ fn main() {
 /// so players never have to set them up. They come from environment variables or the git-ignored
 /// ../keys.local.env file.
 fn embed_keys() {
-    const KEYS: [&str; 6] = [
+    const KEYS: [&str; 10] = [
         "RESINCRAFT_MS_CLIENT_ID",
         "RESINCRAFT_CURSEFORGE_KEY",
         "RESINCRAFT_RELAY_URL",
         "RESINCRAFT_RELAY_DOMAIN",
         "RESINCRAFT_MINESKIN_KEY",
         "RESINCRAFT_DISCORD_APP_ID",
+        "RESINCRAFT_BBB_CLIENT_ID",
+        "RESINCRAFT_BBB_CLIENT_SECRET",
+        "RESINCRAFT_BBB_REDIRECT",
+        "RESINCRAFT_BBB_SCOPES",
     ];
     println!("cargo:rerun-if-changed=../keys.local.env");
     let file = std::fs::read_to_string("../keys.local.env").unwrap_or_default();

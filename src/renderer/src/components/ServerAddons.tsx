@@ -6,6 +6,7 @@ import {
   Copy,
   ExternalLink,
   FolderOpen,
+  KeyRound,
   ListChecks,
   Loader2,
   Plus,
@@ -83,7 +84,8 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
         .filter((a) => `${a.title ?? ''} ${a.filename}`.toLowerCase().includes(q.toLowerCase())),
     [items, found, q]
   )
-  const updatable = shown.filter((a) => a.update)
+  // Paid plugins update on their site, one at a time, with the player's sign-in.
+  const updatable = shown.filter((a) => a.update && !a.site)
   const chosen = shown.filter((a) => selected.has(a.filename))
   const installed = useMemo(() => new Set((items ?? []).map((i) => i.projectId).filter((x): x is string => !!x)), [items])
 
@@ -163,7 +165,23 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
     if (queued) toast(t('servers.addons.queuedCount', { count: queued }), 'info')
     await load()
   }
-  const update = (list: ServerAddon[]) => switchAll(list.filter((a) => a.update).map((a) => ({ a, versionId: a.update!.versionId })))
+  const update = (list: ServerAddon[]) => switchAll(list.filter((a) => a.update && !a.site).map((a) => ({ a, versionId: a.update!.versionId })))
+
+  /** A paid plugin: its page opens for the player to sign in and download; that file replaces this one. */
+  const updateOnSite = async (a: ServerAddon) => {
+    if (!a.site) return
+    mark([a.filename], true)
+    toast(t('servers.addons.site.opened'), 'info')
+    try {
+      const r = await api.server.addonFromSite(s.id, a.site, { replace: a.filename, projectId: a.projectId, title: nameOf(a) }, area)
+      toast(t(r.queued ? 'servers.addons.site.queued' : 'servers.addons.site.updated', { name: r.title }))
+      await load()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      mark([a.filename], false)
+    }
+  }
 
   const toggleMany = async (list: ServerAddon[], enable: boolean) => {
     const todo = list.filter((a) => a.enabled !== enable && a.pending !== (enable ? 'enable' : 'disable'))
@@ -382,11 +400,16 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
                       className="btn sm primary"
                       disabled={working}
                       title={t('servers.addons.updateTo', { version: a.update.versionNumber })}
-                      onClick={() => void update([a])}
+                      onClick={() => void (a.site ? updateOnSite(a) : update([a]))}
                     >
-                      {working ? <Loader2 className="spin" /> : <ArrowUpCircle />} {t('servers.addons.update')}
+                      {working ? <Loader2 className="spin" /> : a.site ? <KeyRound /> : <ArrowUpCircle />} {t(a.site ? 'servers.addons.site.update' : 'servers.addons.update')}
                     </button>
                   </>
+                )}
+                {!a.update && a.site && a.source === 'site' && (
+                  <button className="btn sm" disabled={working} title={t('servers.addons.site.updateHint')} onClick={() => void updateOnSite(a)}>
+                    {working ? <Loader2 className="spin" /> : <KeyRound />} {t('servers.addons.site.update')}
+                  </button>
                 )}
                 {a.projectId && a.source ? (
                   <button className="btn sm ver-btn" disabled={working} title={t('servers.addons.changeVersion')} onClick={() => setPicking(a)}>

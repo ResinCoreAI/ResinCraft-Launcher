@@ -2030,7 +2030,16 @@ export interface ServerListEntry {
 }
 
 /** 'bukkit' is dev.bukkit.org (CurseForge's Bukkit plugins); 'geysermc' only names installed Geyser/Floodgate. */
-export type AddonSource = 'modrinth' | 'hangar' | 'spigot' | 'bukkit' | 'curseforge' | 'github' | 'geysermc'
+export type AddonSource = 'modrinth' | 'hangar' | 'spigot' | 'bukkit' | 'builtbybit' | 'curseforge' | 'github' | 'geysermc' | 'site'
+
+/** The player's BuiltByBit sign-in (server plugins they own). */
+export interface BuiltByBitStatus {
+  /** This build has BuiltByBit's sign-in set up. */
+  configured: boolean
+  signedIn: boolean
+  username?: string | null
+  avatar?: string | null
+}
 
 export interface ServerAddonHit {
   /** Bare id for Modrinth, "hangar:<slug>", "spigot:<id>", "cf:<id>", "gh:<owner>/<repo>". */
@@ -2046,6 +2055,16 @@ export interface ServerAddonHit {
   url: string
   /** Premium or hosted elsewhere: open `url` instead of installing. */
   external?: boolean
+  /** A paid plugin: get it on `url` with the player's own sign-in (addonFromSite). */
+  paid?: boolean
+}
+
+/** What addonFromSite put on the server. */
+export interface SiteDownloadResult {
+  file: string
+  title: string
+  /** Waits for the server to stop. */
+  queued: boolean
 }
 
 export interface ServerAddonResult {
@@ -2063,6 +2082,8 @@ export interface ServerAddon extends ContentItem {
   pendingVersion?: string
   /** Release notes of the available update (after an update check). */
   updateUrl?: string
+  /** A paid plugin's page: its updates are downloaded there with the player's own sign-in (addonFromSite). */
+  site?: string
 }
 
 /** A version of a server plugin or mod, marked for whether it fits the server. */
@@ -2753,6 +2774,11 @@ export interface ResinApi {
     joinStates(): Promise<Record<string, JoinState>>
     // The add-on calls take an optional last `area` for hybrid servers (Arclight): 'plugins' (default) or 'mods'.
     addonSources(id: string, area?: AddonArea): Promise<AddonSource[]>
+    /** BuiltByBit: whether the player is signed in. */
+    bbbStatus(): Promise<BuiltByBitStatus>
+    /** Opens BuiltByBit's sign-in in a window; resolves once the player has signed in. */
+    bbbSignIn(): Promise<BuiltByBitStatus>
+    bbbSignOut(): Promise<BuiltByBitStatus>
     addons(id: string, area?: AddonArea): Promise<ServerAddon[]>
     addonSearch(id: string, query: string, source: AddonSource, offset?: number, area?: AddonArea): Promise<ServerAddonResult>
     /** Every version of an installed project, newest first, marked compatible or not. */
@@ -2771,6 +2797,16 @@ export interface ResinApi {
     /** Installs what a link points to: a project page on a source (Modrinth, CurseForge, dev.bukkit.org, Hangar,
      * SpigotMC, GitHub), with its version when the link names one, or a .jar from anywhere. */
     addonFromLink(id: string, url: string, area?: AddonArea): Promise<void>
+    /**
+     * Paid plugins: opens `url` in a ResinCraft window where the player signs in to the site and presses Download;
+     * that download is installed (or replaces `replace`). Resolves when it's in, rejects if the window is closed.
+     */
+    addonFromSite(
+      id: string,
+      url: string,
+      options?: { replace?: string; projectId?: string; title?: string },
+      area?: AddonArea
+    ): Promise<SiteDownloadResult>
     /** Whether Bedrock players can join this Java server (Geyser + Floodgate installed). */
     bedrockJoin(id: string): Promise<BedrockJoin>
     /** Installs (true) or removes (false) Geyser and Floodgate. */

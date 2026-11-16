@@ -5,6 +5,7 @@
 
 pub mod admin;
 pub mod antixray;
+pub mod builtbybit;
 pub mod clientpack;
 pub mod clientfiles;
 pub mod clientplan;
@@ -26,6 +27,7 @@ pub mod properties;
 pub mod relay;
 pub mod requests;
 pub mod runtime;
+pub mod sitedownload;
 pub mod store;
 pub mod tunnel;
 
@@ -274,6 +276,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             json(runtime::regenerate_world(&args.get::<String>(0)?, backup, seed).await?)
         }
         // The add-on calls end with an optional area ("plugins" / "mods") for hybrid servers.
+        "server:addonFromSite" => json(
+            sitedownload::get(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<sitedownload::SiteOptions>>(2)?.unwrap_or_default(), args.get::<Option<String>>(3)?.as_deref()).await?
+        ),
+        "server:bbbStatus" => json(builtbybit::status().await),
+        "server:bbbSignIn" => json(builtbybit::sign_in().await?),
+        "server:bbbSignOut" => json(builtbybit::sign_out().await?),
         "server:addonSources" => json(plugins::sources(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addons" => json(plugins::list(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addonSearch" => {

@@ -1603,6 +1603,9 @@ pub struct ServerAddonHit {
     /// Can't be installed from the launcher (premium, or hosted on another website): open `url` instead.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub external: bool,
+    /// A paid plugin: the player gets it on `url` with their own sign-in (sitedownload.rs).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub paid: bool,
     pub url: String,
 }
 
@@ -1630,6 +1633,9 @@ pub struct ServerAddon {
     /// Release notes of the available update (set by an update check).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub update_url: Option<String>,
+    /// A paid plugin's page: its updates are downloaded there with the player's own sign-in (sitedownload.rs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub site: Option<String>,
 }
 
 /// One version of a server plugin or mod, marked for whether it fits the server.
