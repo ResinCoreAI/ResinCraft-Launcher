@@ -107,7 +107,7 @@ fn parse_gpus(csv: &str) -> Vec<Gpu> {
         .collect()
 }
 
-async fn gpus() -> Vec<Gpu> {
+pub(crate) async fn gpus() -> Vec<Gpu> {
     if !cfg!(windows) {
         return Vec::new();
     }
@@ -154,7 +154,7 @@ pub async fn check() -> RtxCheck {
     let ready = windows && gpus.iter().any(|g| g.rtx && g.driver_ok);
     let spec = super::rtxpack::spec(gpus.iter().filter_map(|g| g.vram_mb).max()).await;
     let recommended = super::rtxpack::tune(&spec, super::rtxpack::recommended_pack(&spec));
-    let (release, packs) = tokio::join!(latest(), super::rtxpack::pack_infos());
+    let (release, packs) = tokio::join!(latest(), super::rtxpack::pack_infos(MC));
     let mut out = RtxCheck {
         windows,
         gpus,
@@ -302,7 +302,7 @@ pub async fn install(instance_id: &str, opts: super::rtxpack::RtxOptions) -> Res
             fill(&task, &inst, &release, opts.world).await?;
             let vram = gpus().await.iter().filter_map(|g| g.vram_mb).max();
             let spec = super::rtxpack::spec(vram).await;
-            super::rtxpack::apply(&task, &inst, &opts, &spec).await
+            super::rtxpack::apply(&task, &inst, &opts, &spec, false).await
         }
     })
     .await

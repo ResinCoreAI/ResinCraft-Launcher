@@ -219,6 +219,33 @@ export function mockApi(): ResinApi {
     { filename: 'journeymap-6.0.jar', enabled: false, size: 5_100_000, kind: 'mod' }
   ]
   let rtxOn = true
+  const lookIn = new Map<string, { on: boolean; shader: string }>()
+  const lookState = (id: string) => {
+    const inst = instances.find((i) => i.id === id)
+    const ok = !!inst && inst.loader !== 'vanilla'
+    const l = lookIn.get(id)
+    return {
+      supported: ok,
+      why: ok ? null : ('loader' as const),
+      loader: ok ? ('iris' as const) : null,
+      installed: !!l,
+      on: !!l?.on,
+      shader: l?.shader ?? null,
+      spec: { vramMb: 12282, ramMb: 32_000, cores: 16 },
+      recommendedShader: 'voxels',
+      recommended: { pack: '256', renderDistance: 12, simulationDistance: 10, memoryMb: 5120 },
+      shaders: [
+        { key: 'voxels', title: 'Rethinking Voxels', minVram: 6 },
+        { key: 'pathtraced', title: 'Dirt RT', minVram: 12 },
+        { key: 'light', title: 'Shrimple', minVram: 0 }
+      ],
+      packs: [
+        { key: '64', res: 64, title: 'Seraphic PBR', url: 'https://modrinth.com/resourcepack/seraphic-pbr', size: 15_000_000 },
+        { key: '128', res: 128, title: 'AVPBR Retextured', url: 'https://modrinth.com/resourcepack/avpbr-retextured', size: 18_000_000 },
+        { key: '256', res: 256, title: 'PBR JG', url: 'https://modrinth.com/resourcepack/pbr-jg', size: 379_000_000 }
+      ]
+    }
+  }
   const rtxIn = new Set<string>()
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
   const noop = () => () => {}
@@ -547,6 +574,17 @@ export function mockApi(): ResinApi {
       rtxRemixSet: (_id, on) => {
         rtxOn = on
         return wait({ installed: true, on, file: 'rtx-remix-renderer-0.1.1.jar' + (on ? '' : '.disabled'), packs: ['JG.zip', 'RTX-Remix-Materials-0.61.0.zip'] }, 400)
+      },
+      rtxLookState: (id) => wait(lookState(id), 250),
+      rtxLookInstall: async (id, opts) => {
+        await new Promise((r) => setTimeout(r, 2000))
+        lookIn.set(id, { on: true, shader: opts?.shader && opts.shader !== 'auto' ? opts.shader : 'voxels' })
+        return lookState(id)
+      },
+      rtxLookSet: async (id, on) => {
+        const l = lookIn.get(id)
+        if (l) l.on = on
+        return wait(lookState(id), 300)
       },
       rtxPackPickOwn: () => wait('C:\\Users\\you\\Downloads\\Patrix 1024x PBR.zip', 300),
       exportList: (_i, kind) =>

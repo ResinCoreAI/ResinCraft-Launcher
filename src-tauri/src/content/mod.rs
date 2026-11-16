@@ -19,6 +19,7 @@ pub mod modrinth;
 pub mod multicore;
 pub mod packswitch;
 pub mod packupdates;
+pub mod rtxlook;
 pub mod rtxpack;
 pub mod rtxremix;
 pub mod sources;
@@ -56,6 +57,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "content:rtxRemixCheck" => json(rtxremix::check().await),
         "content:rtxRemixCreate" => json(rtxremix::create(args.get::<String>(0)?).await?),
         "content:rtxRemixInstall" => json(rtxremix::install(&args.get::<String>(0)?, args.get::<Option<rtxpack::RtxOptions>>(1)?.unwrap_or_default()).await?),
+        "content:rtxLookState" => json(rtxlook::state(&args.get::<String>(0)?).await?),
+        "content:rtxLookInstall" => json(rtxlook::install(&args.get::<String>(0)?, args.get(1)?).await?),
+        "content:rtxLookSet" => json(rtxlook::set_on(&args.get::<String>(0)?, args.get::<bool>(1)?).await?),
         "content:rtxRemixState" => json(rtxremix::state(&args.get::<String>(0)?).await?),
         "content:rtxRemixSet" => json(rtxremix::set_on(&args.get::<String>(0)?, args.get::<bool>(1)?).await?),
         "content:rtxPackPickOwn" => json(shell::pick_file("Choose a LabPBR texture pack", &[("Resource pack", &["zip"])]).await?.map(|p| p.to_string_lossy().into_owned())),

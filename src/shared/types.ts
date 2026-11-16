@@ -2232,6 +2232,27 @@ export interface RtxPackInfo {
   size?: number | null
 }
 
+/** The RTX look (a traced-light shader, a PBR pack, tuned settings) for instances RTX Remix can't run in. */
+export interface RtxLookState {
+  /** A shader loader fits; else `why`: 'loader' (no mod loader) or 'version'. */
+  supported: boolean
+  why?: 'loader' | 'version' | null
+  loader?: 'iris' | 'oculus' | 'optifine' | null
+  installed: boolean
+  on: boolean
+  shader?: string | null
+  spec: RtxPackSpec
+  recommendedShader: string
+  recommended: RtxPackTuning
+  shaders: { key: string; title: string; minVram: number }[]
+  packs: RtxPackInfo[]
+}
+
+export interface RtxLookOptions extends RtxRemixOptions {
+  /** 'auto' or a shader key. */
+  shader?: string
+}
+
 /** RTX Remix in an instance, for its on/off switch. */
 export interface RtxRemixState {
   installed: boolean
@@ -2549,6 +2570,11 @@ export interface ResinApi {
     rtxRemixState(instanceId: string): Promise<RtxRemixState>
     /** Turns RTX Remix (the renderer and its texture packs) on or off; nothing is removed. */
     rtxRemixSet(instanceId: string, on: boolean): Promise<RtxRemixState>
+    /** The RTX look for any other version: what fits this instance and whether it's in. */
+    rtxLookState(instanceId: string): Promise<RtxLookState>
+    /** Sets up the RTX look: shader loader (Iris/Oculus), traced-light shader, PBR pack, tuned settings. */
+    rtxLookInstall(instanceId: string, options?: RtxLookOptions): Promise<RtxLookState>
+    rtxLookSet(instanceId: string, on: boolean): Promise<RtxLookState>
     exportList(instanceId: string, kind: ContentKind): Promise<string | null>
     /** Installs a list file (asks for it without `path`); null if the dialog was cancelled. */
     importList(instanceId: string, kind: ContentKind, path?: string): Promise<ListImport | null>

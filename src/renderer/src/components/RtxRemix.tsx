@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { CircleCheck, Cpu, ExternalLink, FolderOpen, Layers, Loader2, Sparkles, TriangleAlert } from 'lucide-react'
-import type { Instance, RtxPackChoice, RtxPackSpec, RtxRemixCheck, RtxRemixState } from '@shared/types'
+import type { Instance, RtxLookState, RtxPackChoice, RtxPackSpec, RtxRemixCheck, RtxRemixState } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { bytes } from '../util'
-import { t } from '../i18n'
+import { t, type Key } from '../i18n'
 import { Segmented, Switch, celebrate } from './ui'
 import '../rtx-remix.css'
 import { platform } from '../platform'
@@ -311,7 +311,9 @@ export function InstanceRtxRemix({ inst }: { inst: Instance }) {
     }
   }, [inst.id])
 
-  if (platform !== 'windows' || !state) return null
+  // RTX Remix can't go here: the RTX look (a shader) instead, on any system.
+  if (platform !== 'windows' || (!fits && state && !state.installed)) return <InstanceRtxLook inst={inst} />
+  if (!state) return null
 
   const set = async (on: boolean) => {
     setBusy(true)
@@ -361,6 +363,183 @@ export function InstanceRtxRemix({ inst }: { inst: Instance }) {
             />
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Instance → Settings, for instances RTX Remix can't run in: the RTX look. A traced-light shader (with Iris, Oculus or
+ * the instance's OptiFine), a PBR texture pack from 64x to 256x (or the player's own 512x–4096x zip) and settings sized
+ * for this PC, set up with one button and switched on and off after.
+ */
+export function InstanceRtxLook({ inst }: { inst: Instance }) {
+  const { toast, refreshInstances } = useStore()
+  const [state, setState] = useState<RtxLookState>()
+  const [busy, setBusy] = useState(false)
+  const [setup, setSetup] = useState(false)
+  const [shader, setShader] = useState('auto')
+  const [pack, setPack] = useState<RtxPackChoice>('auto')
+  const [ownPack, setOwnPack] = useState<string>()
+  const [tune, setTune] = useState(true)
+
+  useEffect(() => {
+    let live = true
+    api.content.rtxLookState(inst.id).then((s) => live && setState(s), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [inst.id])
+
+  if (!state) return null
+
+  const shaderTitle = (key: string) => state.shaders.find((x) => x.key === key)?.title ?? key
+  const recPack = state.packs.find((p) => p.key === state.recommended.pack)
+  const picked = pack === 'auto' ? state.recommended.pack : pack
+
+  const install = async () => {
+    setBusy(true)
+    toast(t('rtxLook.downloading', { name: inst.name }), 'info')
+    try {
+      setState(await api.content.rtxLookInstall(inst.id, { shader, pack, ownPack, tune, world: false }))
+      await refreshInstances()
+      setSetup(false)
+      toast(t('rtxLook.ready', { name: inst.name }))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const set = async (on: boolean) => {
+    setBusy(true)
+    try {
+      setState(await api.content.rtxLookSet(inst.id, on))
+      toast(t(on ? 'rtxLook.onDone' : 'rtxLook.offDone', { name: inst.name }))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const form = (
+    <>
+      <div className="setting stack">
+        <div className="text">
+          <b>{t('rtxLook.shader')}</b>
+          <span>{t('rtxLook.shaderHint')}</span>
+        </div>
+        <select className="input" value={shader} disabled={busy} onChange={(e) => setShader(e.target.value)}>
+          <option value="auto">{t('rtxLook.auto', { name: shaderTitle(state.recommendedShader) })}</option>
+          {state.shaders.map((x) => (
+            <option key={x.key} value={x.key}>
+              {`${x.title} · ${t(`rtxLook.kind.${x.key}` as Key)}`}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="setting stack">
+        <div className="text">
+          <b>{t('rtxPack.textures')}</b>
+          <span>{t('rtxPack.texturesHint')}</span>
+        </div>
+        <select className="input" value={pack} disabled={busy} onChange={(e) => setPack(e.target.value as RtxPackChoice)}>
+          <option value="auto">{t('rtxPack.auto', { pack: recPack ? `${recPack.res}x ${recPack.title}` : `${state.recommended.pack}x` })}</option>
+          {state.packs.map((p) => (
+            <option key={p.key} value={p.key}>
+              {`${p.res}x · ${p.title}${p.size ? ` (${bytes(p.size)})` : ''}`}
+            </option>
+          ))}
+          <option value="own">{t('rtxPack.own')}</option>
+          <option value="none">{t('rtxPack.none')}</option>
+        </select>
+        {pack === 'own' && (
+          <div className="rtx-own">
+            <button
+              className="btn sm"
+              disabled={busy}
+              onClick={() => void api.content.rtxPackPickOwn().then((p) => p && setOwnPack(p))}
+            >
+              <FolderOpen /> {t('rtxPack.pick')}
+            </button>
+            <span className="hint">{ownPack ? ownPack.split(/[\\/]/).pop() : t('rtxPack.ownHint')}</span>
+          </div>
+        )}
+      </div>
+      <div className="setting">
+        <div className="text">
+          <b>{t('rtxPack.tune')}</b>
+          <span>
+            {t('rtxPack.tuneHint', {
+              render: state.recommended.renderDistance,
+              simulation: state.recommended.simulationDistance,
+              memory: gb(memoryFor(state.spec, picked))
+            })}
+          </span>
+        </div>
+        <div className="control">
+          <Switch on={tune} onChange={setTune} label={t('rtxPack.tune')} disabled={busy} />
+        </div>
+      </div>
+      <div className="setting">
+        <div className="text">
+          <span>{t('rtxLook.loaderHint', { loader: state.loader === 'oculus' ? 'Oculus' : state.loader === 'optifine' ? 'OptiFine' : 'Iris' })}</span>
+        </div>
+        <div className="control rtx-toggle">
+          <button className="btn primary" disabled={busy || (pack === 'own' && !ownPack)} onClick={() => void install()}>
+            {busy ? <Loader2 className="spin" /> : <Sparkles />} {t(state.installed ? 'rtxLook.apply' : 'rtxLook.get')}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="settings-section rtx-remix">
+      <h3>{t('rtxLook.title')}</h3>
+      <div className="card">
+        {!state.supported ? (
+          <div className="setting">
+            <div className="text">
+              <b>
+                <Sparkles /> {t('rtxLook.title')}
+              </b>
+              <span>{t(state.why === 'loader' ? 'rtxLook.whyLoader' : 'rtxLook.whyVersion', { version: inst.mcVersion })}</span>
+            </div>
+          </div>
+        ) : state.installed ? (
+          <>
+            <div className="setting">
+              <div className="text">
+                <b>
+                  <Sparkles /> {t('rtxLook.switch', { name: shaderTitle(state.shader ?? '') })}
+                </b>
+                <span>{t(state.on ? 'rtxLook.onHint' : 'rtxLook.offHint')}</span>
+              </div>
+              <div className="control rtx-toggle">
+                {busy && <Loader2 className="spin" />}
+                <button className="btn sm ghost" disabled={busy} onClick={() => setSetup((v) => !v)}>
+                  {t('rtxLook.change')}
+                </button>
+                <Switch on={state.on} onChange={(v) => void set(v)} label={t('rtxLook.title')} disabled={busy} />
+              </div>
+            </div>
+            {setup && form}
+          </>
+        ) : (
+          <>
+            <div className="setting">
+              <div className="text">
+                <b>
+                  <Sparkles /> {t('rtxLook.title')}
+                </b>
+                <span>{t('rtxLook.intro')}</span>
+              </div>
+            </div>
+            {form}
+          </>
+        )}
       </div>
     </div>
   )

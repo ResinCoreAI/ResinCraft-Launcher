@@ -153,17 +153,39 @@ pub fn tune(spec: &Spec, pack: &str) -> Tuning {
     Tuning { pack: pack.to_string(), render_distance, simulation_distance, memory_mb: want.min(cap).max(2048) }
 }
 
-/// The newest build of a pack for 1.21.1 (or 1.21): (version id, size).
-async fn pack_version(p: &PbrPack) -> Result<(String, u64)> {
-    let url = format!(r#"https://api.modrinth.com/v2/project/{}/version?game_versions=["1.21.1","1.21"]"#, p.id);
-    let list: Vec<Value> = fetch_json(&url).await?;
+/// The game versions to look for a pack build under: the instance's, then its major line ("1.20.4" → "1.20").
+/// Resource packs mostly carry across versions, so the newest build of all is the last resort.
+fn version_line(mc: &str) -> Vec<String> {
+    let mut out = vec![mc.to_string()];
+    let parts: Vec<&str> = mc.split('.').collect();
+    if parts.len() == 3 {
+        out.push(format!("{}.{}", parts[0], parts[1]));
+    }
+    out
+}
+
+/// A shader pack costs more than RTX Remix's renderer at the same distance: a quarter less, never under 6.
+pub fn with_shader(mut t: Tuning) -> Tuning {
+    t.render_distance = (t.render_distance * 3 / 4).max(6);
+    t.simulation_distance = t.simulation_distance.min(t.render_distance);
+    t
+}
+
+/// The newest build of a pack for `mc` (or its line, or any): (version id, size).
+pub(crate) async fn pack_version(p: &PbrPack, mc: &str) -> Result<(String, u64)> {
+    let versions = serde_json::to_string(&version_line(mc))?;
+    let url = format!("https://api.modrinth.com/v2/project/{}/version?game_versions={}", p.id, urlencoding::encode(&versions));
+    let mut list: Vec<Value> = fetch_json(&url).await?;
+    if list.is_empty() {
+        list = fetch_json(&format!("https://api.modrinth.com/v2/project/{}/version", p.id)).await?;
+    }
     let v = list.first().ok_or_else(|| crate::err_tr!("rtxPack.noBuild", "{name} has no build for Minecraft 1.21.1.", name = p.title))?;
     let size = v["files"].as_array().and_then(|f| f.first()).and_then(|f| f["size"].as_u64()).unwrap_or(0);
     Ok((v["id"].as_str().unwrap_or_default().to_string(), size))
 }
 
-pub async fn pack_infos() -> Vec<PackInfo> {
-    let sizes = futures::future::join_all(PACKS.iter().map(pack_version)).await;
+pub async fn pack_infos(mc: &str) -> Vec<PackInfo> {
+    let sizes = futures::future::join_all(PACKS.iter().map(|p| pack_version(p, mc))).await;
     PACKS
         .iter()
         .zip(sizes)
@@ -214,7 +236,7 @@ async fn edit_options(game: &Path, f: impl FnOnce(&str) -> Result<String>) -> Re
 
 /// Puts the chosen pack in (taking out another size the RTX Pack put in before) and writes the tuned settings.
 /// Runs after the mod and NVIDIA's materials are in, so the pack goes on top of them.
-pub async fn apply(task: &crate::core::events::Task, inst: &Instance, opts: &RtxOptions, spec: &Spec) -> Result<Tuning> {
+pub async fn apply(task: &crate::core::events::Task, inst: &Instance, opts: &RtxOptions, spec: &Spec, shader: bool) -> Result<Tuning> {
     let game = paths::game_dir(&inst.id);
     let pack = if opts.pack == "auto" { recommended_pack(spec).to_string() } else { opts.pack.clone() };
     let chosen = PACKS.iter().find(|p| p.key == pack);
@@ -237,7 +259,7 @@ pub async fn apply(task: &crate::core::events::Task, inst: &Instance, opts: &Rtx
 
     if let Some(p) = chosen {
         task.update(tr!("content.installingItem", "Installing {name}…", name = format!("{} {}x", p.title, p.res)), None);
-        let (version, _) = pack_version(p).await?;
+        let (version, _) = pack_version(p, &inst.mc_version).await?;
         // The same build already there isn't downloaded again (a big pack can still be held open by a virus scan).
         let have = idx.iter().any(|(k, e)| {
             e.project_id == p.id && e.version_id == version && k.split_once('/').is_some_and(|(_, f)| game.join("resourcepacks").join(f).is_file())
@@ -266,7 +288,10 @@ pub async fn apply(task: &crate::core::events::Task, inst: &Instance, opts: &Rtx
         super::rtxremix::enable_pack(&game, &name).await?;
     }
 
-    let tuning = tune(spec, &pack);
+    let mut tuning = tune(spec, &pack);
+    if shader {
+        tuning = with_shader(tuning);
+    }
     if opts.tune {
         edit_options(&game, |t| {
             let t = set_option(t, "renderDistance", &tuning.render_distance.to_string());
@@ -314,6 +339,13 @@ mod tests {
         assert_eq!(tune(&pc(Some(8), 6, 4), "128").memory_mb, 3072);
         assert_eq!(tune(&pc(Some(24), 64, 24), "own").memory_mb, 8192);
         assert_eq!(tune(&pc(Some(24), 3, 24), "own").memory_mb, 2048);
+    }
+
+    #[test]
+    fn looks_for_pack_builds() {
+        assert_eq!(version_line("1.20.4"), vec!["1.20.4", "1.20"]);
+        assert_eq!(version_line("1.21"), vec!["1.21"]);
+        assert_eq!(with_shader(tune(&pc(Some(12), 32, 16), "256")).render_distance, 12);
     }
 
     #[test]
