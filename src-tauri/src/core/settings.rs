@@ -77,6 +77,8 @@ pub struct Settings {
     pub show_memory_on_home: bool,
     /// Discord Rich Presence while a game runs (only in builds with a Discord app ID).
     pub discord_presence: bool,
+    /// Use a game controller in the launcher (gamepad.ts; on by default).
+    pub gamepad: bool,
     /// Rich Presence names the server joined; off by default, the address can be private.
     pub discord_show_server: bool,
     /// Rich Presence shows "In the launcher" while ResinCraft is open and no game runs (on by default).
@@ -134,6 +136,7 @@ impl Default for Settings {
             auto_check_packs: true,
             show_memory_on_home: false,
             discord_presence: true,
+            gamepad: true,
             discord_show_server: false,
             discord_in_launcher: true,
             defaults_version: DEFAULTS_VERSION,

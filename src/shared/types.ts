@@ -451,6 +451,8 @@ export interface Settings {
   showMemoryOnHome: boolean
   /** Discord Rich Presence while a game runs (needs a build with a Discord app ID, see AppInfo.discord). */
   discordPresence: boolean
+  /** Use a game controller in the launcher (on by default). */
+  gamepad: boolean
   /** Rich Presence names the server joined (off by default: the address can be private). */
   discordShowServer: boolean
   /** Rich Presence shows "In the launcher" while ResinCraft is open. */

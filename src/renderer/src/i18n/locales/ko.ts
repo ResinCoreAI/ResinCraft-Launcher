@@ -4022,6 +4022,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "{name}에서 RTX Remix를 껐습니다",
   "engine.rtxRemix.runningToggle": "RTX Remix를 켜거나 끄기 전에 {name}을(를) 종료하세요.",
   "engine.rtxRemix.notInstalled": "{name}에는 RTX Remix가 없습니다.",
+  "gamepad.connected": "컨트롤러 연결됨: {name}. 방향 패드로 이동, A 선택, B 뒤로, LB/RB 페이지 전환.",
+  "settings.gamepad": "컨트롤러 지원",
+  "settings.gamepad.hint": "Xbox, PlayStation 등 게임 컨트롤러로 런처 사용: 방향 패드나 왼쪽 스틱으로 이동, A 선택, B 뒤로, LB/RB 페이지, 오른쪽 스틱 스크롤, Start 홈.",
 }
 
 export default dict

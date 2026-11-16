@@ -12,6 +12,7 @@ import {
   Users,
   Zap
 } from 'lucide-react'
+import { useGamepad } from './gamepad'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
@@ -117,8 +118,13 @@ function accountMenu(accounts: AccountView[], pick: (a: AccountView) => void, ma
 }
 
 export default function App() {
-  const { route, go, instances, games, accounts, activeAccount, switchAccount, toast, newInstanceOpen, setNewInstanceOpen } = useStore()
+  const { route, go, instances, games, accounts, activeAccount, switchAccount, toast, newInstanceOpen, setNewInstanceOpen, settings } = useStore()
   useRemoteActions()
+  useGamepad(
+    settings?.gamepad !== false,
+    (name) => toast(t('gamepad.connected', { name })),
+    () => go({ page: 'home' })
+  )
   const isAdmin = useAdminStatus()
   const storeOpen = useStoreOpen()
   const current = route.page === 'instance' ? 'library' : route.page

@@ -4239,3 +4239,10 @@ textarea.custom-css {
   cursor: default;
   opacity: 0.6;
 }
+
+/* Controller in use (gamepad.ts): a clear ring on the focused control. */
+html.gamepad :focus {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent);
+}

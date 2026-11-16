@@ -4027,6 +4027,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "{name} で RTX Remix をオフにしました",
   "engine.rtxRemix.runningToggle": "RTX Remix を切り替える前に {name} を停止してください。",
   "engine.rtxRemix.notInstalled": "{name} には RTX Remix がありません。",
+  "gamepad.connected": "コントローラーを接続しました: {name}。十字キーで移動、A で決定、B で戻る、LB/RB でページ切り替え。",
+  "settings.gamepad": "コントローラー対応",
+  "settings.gamepad.hint": "Xbox、PlayStation などのコントローラーでランチャーを操作: 十字キーか左スティックで移動、A で決定、B で戻る、LB/RB でページ、右スティックでスクロール、Start でホーム。",
 }
 
 export default dict

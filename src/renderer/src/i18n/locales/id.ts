@@ -4030,6 +4030,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "RTX Remix mati di {name}",
   "engine.rtxRemix.runningToggle": "Hentikan {name} sebelum menyalakan atau mematikan RTX Remix.",
   "engine.rtxRemix.notInstalled": "{name} tidak punya RTX Remix.",
+  "gamepad.connected": "Kontroler tersambung: {name}. D-pad untuk bergerak, A memilih, B kembali, LB/RB ganti halaman.",
+  "settings.gamepad": "Dukungan kontroler",
+  "settings.gamepad.hint": "Pakai kontroler Xbox, PlayStation, atau lainnya di launcher: D-pad atau stik kiri untuk bergerak, A memilih, B kembali, LB/RB untuk halaman, stik kanan menggulir, Start ke Beranda.",
 }
 
 export default dict

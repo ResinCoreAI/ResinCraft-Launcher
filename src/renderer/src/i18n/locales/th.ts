@@ -4019,6 +4019,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "ปิด RTX Remix ใน {name} แล้ว",
   "engine.rtxRemix.runningToggle": "ปิด {name} ก่อนเปิดหรือปิด RTX Remix",
   "engine.rtxRemix.notInstalled": "{name} ไม่มี RTX Remix",
+  "gamepad.connected": "เชื่อมต่อจอยแล้ว: {name} ปุ่มลูกศรเลื่อน A เลือก B ย้อนกลับ LB/RB เปลี่ยนหน้า",
+  "settings.gamepad": "รองรับจอย",
+  "settings.gamepad.hint": "ใช้จอย Xbox, PlayStation หรืออื่น ๆ ใน launcher: ปุ่มลูกศรหรือสติ๊กซ้ายเพื่อเลื่อน A เลือก B ย้อนกลับ LB/RB เปลี่ยนหน้า สติ๊กขวาเลื่อนจอ Start กลับหน้าแรก",
 }
 
 export default dict

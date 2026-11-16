@@ -4075,6 +4075,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "RTX Remix est désactivé dans {name}",
   "engine.rtxRemix.runningToggle": "Arrêtez {name} avant d'activer ou de désactiver RTX Remix.",
   "engine.rtxRemix.notInstalled": "{name} n'a pas RTX Remix.",
+  "gamepad.connected": "Manette connectée : {name}. La croix déplace, A sélectionne, B revient, LB/RB changent de page.",
+  "settings.gamepad": "Prise en charge des manettes",
+  "settings.gamepad.hint": "Utilisez une manette Xbox, PlayStation ou autre dans le launcher : croix ou stick gauche pour se déplacer, A pour choisir, B pour revenir, LB/RB pour les pages, stick droit pour défiler, Start pour l'accueil.",
 }
 
 export default dict

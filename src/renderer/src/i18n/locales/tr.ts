@@ -4040,6 +4040,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "RTX Remix {name} içinde kapalı",
   "engine.rtxRemix.runningToggle": "RTX Remix'i açıp kapatmadan önce {name} kurulumunu durdurun.",
   "engine.rtxRemix.notInstalled": "{name} içinde RTX Remix yok.",
+  "gamepad.connected": "Kumanda bağlandı: {name}. Yön tuşları gezinir, A seçer, B geri gider, LB/RB sayfa değiştirir.",
+  "settings.gamepad": "Kumanda desteği",
+  "settings.gamepad.hint": "Başlatıcıda Xbox, PlayStation veya başka bir kumanda kullanın: gezinmek için yön tuşları ya da sol çubuk, A seçer, B geri, LB/RB sayfalar, sağ çubuk kaydırır, Start ana sayfa.",
 }
 
 export default dict

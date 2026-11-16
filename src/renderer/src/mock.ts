@@ -143,6 +143,7 @@ export function mockApi(): ResinApi {
     autoCheckPacks: true,
     showMemoryOnHome: false,
     discordPresence: true,
+    gamepad: true,
     discordShowServer: false,
     discordInLauncher: true,
     env: [],

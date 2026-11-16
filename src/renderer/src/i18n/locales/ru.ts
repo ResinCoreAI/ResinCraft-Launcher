@@ -4089,6 +4089,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "RTX Remix выключен в {name}",
   "engine.rtxRemix.runningToggle": "Остановите {name}, прежде чем включать или выключать RTX Remix.",
   "engine.rtxRemix.notInstalled": "В {name} нет RTX Remix.",
+  "gamepad.connected": "Геймпад подключён: {name}. Крестовина перемещает, A выбирает, B — назад, LB/RB переключают страницы.",
+  "settings.gamepad": "Поддержка геймпада",
+  "settings.gamepad.hint": "Управляйте лаунчером геймпадом Xbox, PlayStation или другим: крестовина или левый стик — перемещение, A — выбор, B — назад, LB/RB — страницы, правый стик — прокрутка, Start — главная.",
 }
 
 export default dict

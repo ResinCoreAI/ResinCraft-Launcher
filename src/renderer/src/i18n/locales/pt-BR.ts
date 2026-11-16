@@ -4056,6 +4056,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "RTX Remix desligado em {name}",
   "engine.rtxRemix.runningToggle": "Feche {name} antes de ligar ou desligar o RTX Remix.",
   "engine.rtxRemix.notInstalled": "{name} não tem RTX Remix.",
+  "gamepad.connected": "Controle conectado: {name}. O direcional move, A seleciona, B volta, LB/RB trocam de página.",
+  "settings.gamepad": "Suporte a controle",
+  "settings.gamepad.hint": "Use um controle de Xbox, PlayStation ou outro no launcher: direcional ou analógico esquerdo para mover, A para selecionar, B para voltar, LB/RB para páginas, analógico direito para rolar, Start para o Início.",
 }
 
 export default dict

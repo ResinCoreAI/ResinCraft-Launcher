@@ -368,6 +368,13 @@ export default function SettingsPage() {
               </div>
               <div className="setting">
                 <div className="text">
+                  <b>{t('settings.gamepad')}</b>
+                  <span>{t('settings.gamepad.hint')}</span>
+                </div>
+                <Switch on={s.gamepad !== false} onChange={(v) => set({ gamepad: v })} label={t('settings.gamepad')} />
+              </div>
+              <div className="setting">
+                <div className="text">
                   <b>{t('settings.discord')}</b>
                   <span>{info?.discord === false ? t('settings.discord.unavailable') : t('settings.discord.hint')}</span>
                 </div>

@@ -4027,6 +4027,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "Đã tắt RTX Remix trong {name}",
   "engine.rtxRemix.runningToggle": "Hãy dừng {name} trước khi bật hoặc tắt RTX Remix.",
   "engine.rtxRemix.notInstalled": "{name} không có RTX Remix.",
+  "gamepad.connected": "Đã kết nối tay cầm: {name}. D-pad di chuyển, A chọn, B quay lại, LB/RB chuyển trang.",
+  "settings.gamepad": "Hỗ trợ tay cầm",
+  "settings.gamepad.hint": "Dùng tay cầm Xbox, PlayStation hoặc loại khác trong launcher: D-pad hoặc cần trái để di chuyển, A chọn, B quay lại, LB/RB đổi trang, cần phải để cuộn, Start về Trang chủ.",
 }
 
 export default dict

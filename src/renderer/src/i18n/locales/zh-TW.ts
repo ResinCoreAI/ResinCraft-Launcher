@@ -4017,6 +4017,9 @@ const dict: Dict = {
   "rtxRemix.toggle.offDone": "已在 {name} 中關閉 RTX Remix",
   "engine.rtxRemix.runningToggle": "請先停止 {name}，再開啟或關閉 RTX Remix。",
   "engine.rtxRemix.notInstalled": "{name} 沒有 RTX Remix。",
+  "gamepad.connected": "已連接控制器：{name}。方向鍵移動，A 確認，B 返回，LB/RB 切換頁面。",
+  "settings.gamepad": "控制器支援",
+  "settings.gamepad.hint": "在啟動器中使用 Xbox、PlayStation 或其他控制器：方向鍵或左搖桿移動，A 確認，B 返回，LB/RB 切換頁面，右搖桿捲動，Start 回到首頁。",
 }
 
 export default dict
