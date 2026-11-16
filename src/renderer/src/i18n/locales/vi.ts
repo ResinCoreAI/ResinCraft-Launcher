@@ -4061,6 +4061,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "Trả phí: tải bằng tài khoản của bạn",
   "servers.addons.site.update": "Cập nhật trên trang",
   "servers.addons.site.updateHint": "Mở trang nơi plugin này đến. Đăng nhập, bấm Tải xuống và tệp mới sẽ thay tệp này.",
+  "servers.addons.bbb.tokenIntro": "Dùng API token BuiltByBit của bạn để xem, cài và cập nhật plugin trong tài khoản. Token được mã hóa lưu trên máy này và chỉ gửi tới BuiltByBit.",
+  "servers.addons.bbb.tokenLabel": "Private API token của bạn",
+  "servers.addons.bbb.tokenPlaceholder": "Dán token",
+  "servers.addons.bbb.tokenSave": "Dùng token",
+  "servers.addons.bbb.tokenHint": "Tạo trên BuiltByBit: loại Private, với phạm vi Resources/Buyer. Giữ bí mật như mật khẩu:",
+  "engine.builtbybit.badToken": "Đây không giống API token của BuiltByBit. Hãy sao chép toàn bộ Private token từ builtbybit.com/account/api.",
+  "engine.builtbybit.tokenRefused": "BuiltByBit không chấp nhận token này: {error}",
 }
 
 export default dict

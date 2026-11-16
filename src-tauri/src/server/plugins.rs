@@ -97,8 +97,7 @@ fn sources_for(kind: ServerKind) -> Vec<&'static str> {
 }
 
 pub async fn sources(id: &str, area: Option<&str>) -> Result<Vec<&'static str>> {
-    // BuiltByBit only in builds with its sign-in set up.
-    Ok(sources_for(view(id, area).await?.kind).into_iter().filter(|s| *s != "builtbybit" || super::builtbybit::configured()).collect())
+    Ok(sources_for(view(id, area).await?.kind))
 }
 
 fn folder(meta: &ServerMeta) -> Result<PathBuf> {

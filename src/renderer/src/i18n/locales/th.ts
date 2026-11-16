@@ -4053,6 +4053,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "เสียเงิน: ดาวน์โหลดด้วยการลงชื่อเข้าใช้ของคุณเอง",
   "servers.addons.site.update": "อัปเดตบนเว็บ",
   "servers.addons.site.updateHint": "เปิดหน้าที่ปลั๊กอินนี้มา ลงชื่อเข้าใช้ กดดาวน์โหลด แล้วไฟล์ใหม่จะแทนไฟล์นี้",
+  "servers.addons.bbb.tokenIntro": "ใช้ API token ของ BuiltByBit ของคุณเองเพื่อดู ติดตั้ง และอัปเดตปลั๊กอินในบัญชีของคุณ token จะถูกเข้ารหัสเก็บไว้ในเครื่องนี้และส่งไปที่ BuiltByBit เท่านั้น",
+  "servers.addons.bbb.tokenLabel": "Private API token ของคุณ",
+  "servers.addons.bbb.tokenPlaceholder": "วาง token ของคุณ",
+  "servers.addons.bbb.tokenSave": "ใช้ token",
+  "servers.addons.bbb.tokenHint": "สร้างได้ที่ BuiltByBit: เลือกชนิด Private และขอบเขต Resources/Buyer เก็บเป็นความลับเหมือนรหัสผ่าน:",
+  "engine.builtbybit.badToken": "นี่ไม่ใช่ API token ของ BuiltByBit คัดลอก Private token ทั้งหมดจาก builtbybit.com/account/api",
+  "engine.builtbybit.tokenRefused": "BuiltByBit ไม่รับ token นี้: {error}",
 }
 
 export default dict

@@ -4051,6 +4051,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "付费：用你自己的登录下载",
   "servers.addons.site.update": "在网站上更新",
   "servers.addons.site.updateHint": "打开此插件的来源页面。登录并点击下载，新文件会替换这个文件。",
+  "servers.addons.bbb.tokenIntro": "使用你自己的 BuiltByBit API 令牌，查看、安装并更新你账号中的插件。令牌加密保存在这台电脑上，只发送给 BuiltByBit。",
+  "servers.addons.bbb.tokenLabel": "你的 Private API 令牌",
+  "servers.addons.bbb.tokenPlaceholder": "粘贴你的令牌",
+  "servers.addons.bbb.tokenSave": "使用令牌",
+  "servers.addons.bbb.tokenHint": "在 BuiltByBit 创建：令牌类型选 Private，并勾选 Resources/Buyer 范围。像密码一样保密：",
+  "engine.builtbybit.badToken": "这看起来不像 BuiltByBit API 令牌。请从 builtbybit.com/account/api 复制完整的 Private 令牌。",
+  "engine.builtbybit.tokenRefused": "BuiltByBit 不接受这个令牌：{error}",
 }
 
 export default dict

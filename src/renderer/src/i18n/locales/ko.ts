@@ -4056,6 +4056,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "유료: 내 로그인으로 다운로드",
   "servers.addons.site.update": "사이트에서 업데이트",
   "servers.addons.site.updateHint": "이 플러그인을 받은 페이지를 엽니다. 로그인하고 다운로드를 누르면 새 파일이 이 파일을 대체합니다.",
+  "servers.addons.bbb.tokenIntro": "내 BuiltByBit API 토큰으로 계정의 플러그인을 보고, 설치하고, 업데이트합니다. 토큰은 이 PC에 암호화되어 저장되고 BuiltByBit에만 전송됩니다.",
+  "servers.addons.bbb.tokenLabel": "내 Private API 토큰",
+  "servers.addons.bbb.tokenPlaceholder": "토큰 붙여넣기",
+  "servers.addons.bbb.tokenSave": "토큰 사용",
+  "servers.addons.bbb.tokenHint": "BuiltByBit에서 만드세요: 토큰 유형 Private, Resources/Buyer 범위. 비밀번호처럼 비밀로 하세요:",
+  "engine.builtbybit.badToken": "BuiltByBit API 토큰이 아닌 것 같습니다. builtbybit.com/account/api에서 Private 토큰 전체를 복사하세요.",
+  "engine.builtbybit.tokenRefused": "BuiltByBit가 이 토큰을 받지 않았습니다: {error}",
 }
 
 export default dict

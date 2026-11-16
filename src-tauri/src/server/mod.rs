@@ -281,6 +281,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         ),
         "server:bbbStatus" => json(builtbybit::status().await),
         "server:bbbSignIn" => json(builtbybit::sign_in().await?),
+        "server:bbbSetToken" => json(builtbybit::set_token(&args.get::<String>(0)?).await?),
         "server:bbbSignOut" => json(builtbybit::sign_out().await?),
         "server:addonSources" => json(plugins::sources(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "server:addons" => json(plugins::list(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),

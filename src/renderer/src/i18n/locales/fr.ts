@@ -4109,6 +4109,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "Payant : téléchargez-le avec votre propre connexion",
   "servers.addons.site.update": "Mettre à jour sur le site",
   "servers.addons.site.updateHint": "Ouvre la page d'origine de ce plugin. Connectez-vous, appuyez sur Télécharger et le nouveau fichier remplace celui-ci.",
+  "servers.addons.bbb.tokenIntro": "Utilisez votre propre jeton d'API BuiltByBit pour voir, installer et mettre à jour les plugins de votre compte. Il est chiffré sur ce PC et envoyé uniquement à BuiltByBit.",
+  "servers.addons.bbb.tokenLabel": "Votre jeton d'API privé",
+  "servers.addons.bbb.tokenPlaceholder": "Collez votre jeton",
+  "servers.addons.bbb.tokenSave": "Utiliser le jeton",
+  "servers.addons.bbb.tokenHint": "Créez-en un sur BuiltByBit : type Private, avec les droits Resources/Buyer. Gardez-le secret comme un mot de passe :",
+  "engine.builtbybit.badToken": "Cela ne ressemble pas à un jeton d'API BuiltByBit. Copiez tout le jeton Private depuis builtbybit.com/account/api.",
+  "engine.builtbybit.tokenRefused": "BuiltByBit n'a pas accepté ce jeton : {error}",
 }
 
 export default dict

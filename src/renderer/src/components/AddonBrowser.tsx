@@ -102,6 +102,18 @@ export default function AddonBrowser({
     if (sources.includes('builtbybit')) void api.server.bbbStatus().then(setBbb, () => undefined)
   }, [sources])
 
+  const [bbbToken, setBbbToken] = useState('')
+  const bbbUseToken = async () => {
+    setBbbBusy(true)
+    try {
+      setBbb(await api.server.bbbSetToken(bbbToken))
+      setBbbToken('')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBbbBusy(false)
+    }
+  }
   const bbbSignIn = async () => {
     setBbbBusy(true)
     try {
@@ -304,11 +316,39 @@ export default function AddonBrowser({
           <div className="callout bbb-signin">
             <div className="grow">
               <b>{t('servers.addons.bbb.title')}</b>
-              <p>{t('servers.addons.bbb.hint')}</p>
+              <p>{t(bbb?.configured ? 'servers.addons.bbb.hint' : 'servers.addons.bbb.tokenIntro')}</p>
+              {bbb?.configured && (
+                <button className="btn primary" disabled={bbbBusy} onClick={() => void bbbSignIn()}>
+                  {bbbBusy ? <Loader2 className="spin" /> : <LogIn />} {t('servers.addons.bbb.signIn')}
+                </button>
+              )}
+              <div className="bbb-token">
+                <label htmlFor="bbb-token">{t('servers.addons.bbb.tokenLabel')}</label>
+                <div className="row">
+                  <input
+                    id="bbb-token"
+                    className="input grow"
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={t('servers.addons.bbb.tokenPlaceholder')}
+                    value={bbbToken}
+                    disabled={bbbBusy}
+                    onChange={(e) => setBbbToken(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && bbbToken.trim() && void bbbUseToken()}
+                  />
+                  <button className="btn" disabled={bbbBusy || !bbbToken.trim()} onClick={() => void bbbUseToken()}>
+                    {bbbBusy ? <Loader2 className="spin" /> : <KeyRound />} {t('servers.addons.bbb.tokenSave')}
+                  </button>
+                </div>
+                <span className="hint">
+                  {t('servers.addons.bbb.tokenHint')}{' '}
+                  <button className="link" onClick={() => void api.app.openExternal('https://builtbybit.com/account/api')}>
+                    builtbybit.com/account/api <ExternalLink size={12} />
+                  </button>
+                </span>
+              </div>
             </div>
-            <button className="btn primary" disabled={bbbBusy} onClick={() => void bbbSignIn()}>
-              {bbbBusy ? <Loader2 className="spin" /> : <LogIn />} {t('servers.addons.bbb.signIn')}
-            </button>
           </div>
         ) : isLink(query) ? (
           <div className="result">

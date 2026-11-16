@@ -4123,6 +4123,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "Платный: скачайте со своим входом",
   "servers.addons.site.update": "Обновить на сайте",
   "servers.addons.site.updateHint": "Открывает страницу, откуда этот плагин. Войдите, нажмите «Скачать», и новый файл заменит этот.",
+  "servers.addons.bbb.tokenIntro": "Используйте свой API-токен BuiltByBit, чтобы видеть, устанавливать и обновлять плагины с вашего аккаунта. Он хранится зашифрованным на этом ПК и отправляется только в BuiltByBit.",
+  "servers.addons.bbb.tokenLabel": "Ваш Private API-токен",
+  "servers.addons.bbb.tokenPlaceholder": "Вставьте токен",
+  "servers.addons.bbb.tokenSave": "Использовать токен",
+  "servers.addons.bbb.tokenHint": "Создайте его на BuiltByBit: тип Private, с правами Resources/Buyer. Храните в секрете, как пароль:",
+  "engine.builtbybit.badToken": "Это не похоже на API-токен BuiltByBit. Скопируйте весь Private-токен с builtbybit.com/account/api.",
+  "engine.builtbybit.tokenRefused": "BuiltByBit не принял этот токен: {error}",
 }
 
 export default dict

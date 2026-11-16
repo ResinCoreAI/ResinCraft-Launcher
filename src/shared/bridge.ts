@@ -312,6 +312,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       bbbStatus: fn('server:bbbStatus'),
       bbbSignIn: fn('server:bbbSignIn'),
       bbbSignOut: fn('server:bbbSignOut'),
+      bbbSetToken: fn('server:bbbSetToken'),
       addons: fn('server:addons'),
       addonSearch: fn('server:addonSearch'),
       addonVersions: fn('server:addonVersions'),

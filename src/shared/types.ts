@@ -2034,8 +2034,10 @@ export type AddonSource = 'modrinth' | 'hangar' | 'spigot' | 'bukkit' | 'builtby
 
 /** The player's BuiltByBit sign-in (server plugins they own). */
 export interface BuiltByBitStatus {
-  /** This build has BuiltByBit's sign-in set up. */
+  /** This build has BuiltByBit's OAuth sign-in set up (a player's own API token always works). */
   configured: boolean
+  /** Signed in with the player's own API token. */
+  token?: boolean
   signedIn: boolean
   username?: string | null
   avatar?: string | null
@@ -2779,6 +2781,8 @@ export interface ResinApi {
     /** Opens BuiltByBit's sign-in in a window; resolves once the player has signed in. */
     bbbSignIn(): Promise<BuiltByBitStatus>
     bbbSignOut(): Promise<BuiltByBitStatus>
+    /** Signs in with the player's own Private API token (kept encrypted on this PC). */
+    bbbSetToken(token: string): Promise<BuiltByBitStatus>
     addons(id: string, area?: AddonArea): Promise<ServerAddon[]>
     addonSearch(id: string, query: string, source: AddonSource, offset?: number, area?: AddonArea): Promise<ServerAddonResult>
     /** Every version of an installed project, newest first, marked compatible or not. */

@@ -52,6 +52,9 @@ pub fn configured() -> bool {
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 struct Stored {
+    /// "token": the player's own Private API token (in `access`, never expires); otherwise OAuth.
+    #[serde(default)]
+    kind: String,
     access: String,
     refresh: String,
     /// Unix seconds.
@@ -64,7 +67,10 @@ struct Stored {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
+    /// This build has the OAuth sign-in (a player's own API token always works).
     pub configured: bool,
+    /// Signed in with an API token rather than OAuth.
+    pub token: bool,
     pub signed_in: bool,
     pub username: Option<String>,
     pub avatar: Option<String>,
@@ -88,7 +94,13 @@ fn now() -> i64 {
 
 pub async fn status() -> Status {
     let s = load().await;
-    Status { configured: configured(), signed_in: s.is_some(), username: s.as_ref().map(|s| s.username.clone()), avatar: s.and_then(|s| s.avatar) }
+    Status {
+        configured: configured(),
+        token: s.as_ref().is_some_and(|s| s.kind == "token"),
+        signed_in: s.is_some(),
+        username: s.as_ref().map(|s| s.username.clone()),
+        avatar: s.and_then(|s| s.avatar),
+    }
 }
 
 /// A BuiltByBit answer: `{"result":"success","data":…}` or `{"result":"error","error":{"message":…}}`.
@@ -119,6 +131,7 @@ fn stored_from(tok: &Value, username: String, avatar: Option<String>) -> Stored 
     Stored {
         access: seal(tok["access_token"].as_str().unwrap_or_default()),
         refresh: seal(tok["refresh_token"].as_str().unwrap_or_default()),
+        kind: "oauth".into(),
         expires: now() + tok["expires_in"].as_i64().unwrap_or(3600) - 60,
         username,
         avatar,
@@ -130,8 +143,11 @@ async fn access() -> Result<String> {
     let Some(mut s) = load().await else {
         bail_tr!("builtbybit.signedOut", "Sign in with BuiltByBit to see and install the plugins you own.");
     };
+    if s.kind == "token" {
+        return Ok(format!("Private {}", unseal(Some(&s.access))?));
+    }
     if s.expires > now() {
-        return unseal(Some(&s.access));
+        return Ok(format!("Bearer {}", unseal(Some(&s.access))?));
     }
     let refresh = unseal(Some(&s.refresh))?;
     let tok = token(&[("grant_type", "refresh_token"), ("refresh_token", &refresh)]).await.map_err(|_| {
@@ -140,13 +156,13 @@ async fn access() -> Result<String> {
     let fresh = stored_from(&tok, s.username.clone(), s.avatar.clone());
     s = Stored { refresh: if tok["refresh_token"].is_string() { fresh.refresh.clone() } else { s.refresh }, ..fresh };
     store(&s).await?;
-    unseal(Some(&s.access))
+    Ok(format!("Bearer {}", unseal(Some(&s.access))?))
 }
 
 /// GET on the API as the signed-in player.
 async fn get(path: &str) -> Result<Value> {
-    let bearer = access().await?;
-    let res = http().get(format!("{API}{path}")).bearer_auth(bearer).send().await?;
+    let auth = access().await?;
+    let res = http().get(format!("{API}{path}")).header("Authorization", auth).send().await?;
     let status = res.status().as_u16();
     let v: Value = res.json().await.unwrap_or(Value::Null);
     data_of(v, status)
@@ -231,8 +247,30 @@ pub async fn sign_in() -> Result<Status> {
     Ok(status().await)
 }
 
+/// Signs in with the player's own Private API token (builtbybit.com/account/api), checked against their profile.
+pub async fn set_token(token: &str) -> Result<Status> {
+    let token = token.trim().trim_start_matches("Private ").trim();
+    if token.len() < 10 || token.contains(char::is_whitespace) {
+        bail_tr!("builtbybit.badToken", "That doesn't look like a BuiltByBit API token. Copy the whole Private token from builtbybit.com/account/api.");
+    }
+    let res = http().get(format!("{API}/v2/members/self")).header("Authorization", format!("Private {token}")).send().await?;
+    let code = res.status().as_u16();
+    let v: Value = res.json().await.unwrap_or(Value::Null);
+    let me = data_of(v, code).map_err(|e| err_tr!("builtbybit.tokenRefused", "BuiltByBit didn't accept that token: {error}", error = e.to_string()))?;
+    let stored = Stored {
+        kind: "token".into(),
+        access: seal(token),
+        refresh: String::new(),
+        expires: i64::MAX,
+        username: me["self"]["username"].as_str().unwrap_or("BuiltByBit").to_string(),
+        avatar: me["self"]["avatar_url_small"].as_str().map(str::to_string),
+    };
+    store(&stored).await?;
+    Ok(status().await)
+}
+
 pub async fn sign_out() -> Result<Status> {
-    if let Some(s) = load().await {
+    if let Some(s) = load().await.filter(|s| s.kind != "token") {
         if let Ok(t) = unseal(Some(&s.refresh)) {
             let _ = http().post(format!("{API}/oauth2/token/revoke")).basic_auth(client_id(), Some(client_secret())).form(&[("token", t.as_str())]).send().await;
         }

@@ -4051,6 +4051,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "付費：用你自己的登入下載",
   "servers.addons.site.update": "在網站上更新",
   "servers.addons.site.updateHint": "開啟此外掛的來源頁面。登入並按下載，新檔案會取代這個檔案。",
+  "servers.addons.bbb.tokenIntro": "使用你自己的 BuiltByBit API 權杖，查看、安裝並更新你帳號中的外掛。權杖會加密儲存在這台電腦，只傳送給 BuiltByBit。",
+  "servers.addons.bbb.tokenLabel": "你的 Private API 權杖",
+  "servers.addons.bbb.tokenPlaceholder": "貼上你的權杖",
+  "servers.addons.bbb.tokenSave": "使用權杖",
+  "servers.addons.bbb.tokenHint": "在 BuiltByBit 建立：權杖類型選 Private，並勾選 Resources/Buyer 範圍。請像密碼一樣保密：",
+  "engine.builtbybit.badToken": "這看起來不像 BuiltByBit API 權杖。請從 builtbybit.com/account/api 複製完整的 Private 權杖。",
+  "engine.builtbybit.tokenRefused": "BuiltByBit 不接受這個權杖：{error}",
 }
 
 export default dict

@@ -4061,6 +4061,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "有料: 自分のサインインでダウンロード",
   "servers.addons.site.update": "サイトで更新",
   "servers.addons.site.updateHint": "このプラグインの入手元ページを開きます。サインインしてダウンロードを押すと、新しいファイルがこのファイルと置き換わります。",
+  "servers.addons.bbb.tokenIntro": "自分の BuiltByBit API トークンで、アカウントのプラグインを表示・インストール・更新できます。トークンはこの PC に暗号化して保存され、BuiltByBit にだけ送られます。",
+  "servers.addons.bbb.tokenLabel": "あなたの Private API トークン",
+  "servers.addons.bbb.tokenPlaceholder": "トークンを貼り付け",
+  "servers.addons.bbb.tokenSave": "トークンを使う",
+  "servers.addons.bbb.tokenHint": "BuiltByBit で作成: トークンの種類は Private、スコープは Resources/Buyer。パスワードと同じように秘密にしてください:",
+  "engine.builtbybit.badToken": "BuiltByBit の API トークンではないようです。builtbybit.com/account/api から Private トークン全体をコピーしてください。",
+  "engine.builtbybit.tokenRefused": "BuiltByBit がこのトークンを受け付けませんでした: {error}",
 }
 
 export default dict

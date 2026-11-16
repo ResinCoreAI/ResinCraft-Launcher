@@ -4130,6 +4130,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "Płatny: pobierz go ze swoim logowaniem",
   "servers.addons.site.update": "Zaktualizuj na stronie",
   "servers.addons.site.updateHint": "Otwiera stronę, z której pochodzi ten plugin. Zaloguj się, naciśnij Pobierz, a nowy plik zastąpi ten.",
+  "servers.addons.bbb.tokenIntro": "Użyj własnego tokenu API BuiltByBit, aby przeglądać, instalować i aktualizować pluginy z twojego konta. Jest przechowywany zaszyfrowany na tym komputerze i wysyłany tylko do BuiltByBit.",
+  "servers.addons.bbb.tokenLabel": "Twój prywatny token API",
+  "servers.addons.bbb.tokenPlaceholder": "Wklej token",
+  "servers.addons.bbb.tokenSave": "Użyj tokenu",
+  "servers.addons.bbb.tokenHint": "Utwórz go na BuiltByBit: typ Private, z zakresami Resources/Buyer. Trzymaj go w tajemnicy jak hasło:",
+  "engine.builtbybit.badToken": "To nie wygląda na token API BuiltByBit. Skopiuj cały token Private z builtbybit.com/account/api.",
+  "engine.builtbybit.tokenRefused": "BuiltByBit nie przyjął tego tokenu: {error}",
 }
 
 export default dict

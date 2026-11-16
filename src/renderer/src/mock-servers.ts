@@ -830,6 +830,12 @@ export function mockServers(): {
       bbbSigned = true
       return { configured: true, signedIn: true, username: 'Puirkle' }
     },
+    bbbSetToken: async (token) => {
+      await new Promise((r) => setTimeout(r, 600))
+      if (token.trim().length < 10) throw new Error("That doesn't look like a BuiltByBit API token.")
+      bbbSigned = true
+      return { configured: false, token: true, signedIn: true, username: 'Puirkle' }
+    },
     bbbSignOut: async () => {
       bbbSigned = false
       return { configured: true, signedIn: false }

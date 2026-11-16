@@ -4074,6 +4074,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "Ücretli: kendi girişinizle indirin",
   "servers.addons.site.update": "Sitede güncelle",
   "servers.addons.site.updateHint": "Bu eklentinin geldiği sayfayı açar. Giriş yapın, İndir düğmesine basın; yeni dosya bunun yerini alır.",
+  "servers.addons.bbb.tokenIntro": "Hesabınızdaki eklentileri görmek, kurmak ve güncellemek için kendi BuiltByBit API anahtarınızı kullanın. Bu bilgisayarda şifreli saklanır ve yalnızca BuiltByBit'e gönderilir.",
+  "servers.addons.bbb.tokenLabel": "Private API anahtarınız",
+  "servers.addons.bbb.tokenPlaceholder": "Anahtarınızı yapıştırın",
+  "servers.addons.bbb.tokenSave": "Anahtarı kullan",
+  "servers.addons.bbb.tokenHint": "BuiltByBit'te oluşturun: türü Private, Resources/Buyer kapsamlarıyla. Parola gibi gizli tutun:",
+  "engine.builtbybit.badToken": "Bu bir BuiltByBit API anahtarına benzemiyor. builtbybit.com/account/api adresinden Private anahtarın tamamını kopyalayın.",
+  "engine.builtbybit.tokenRefused": "BuiltByBit bu anahtarı kabul etmedi: {error}",
 }
 
 export default dict

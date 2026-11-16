@@ -4064,6 +4064,13 @@ const dict: Dict = {
   "servers.addons.site.paid": "Berbayar: unduh dengan akunmu sendiri",
   "servers.addons.site.update": "Perbarui di situs",
   "servers.addons.site.updateHint": "Membuka halaman asal plugin ini. Masuk, tekan Unduh, dan file baru menggantikan yang ini.",
+  "servers.addons.bbb.tokenIntro": "Pakai token API BuiltByBit milikmu sendiri untuk melihat, memasang, dan memperbarui plugin di akunmu. Token disimpan terenkripsi di PC ini dan hanya dikirim ke BuiltByBit.",
+  "servers.addons.bbb.tokenLabel": "Token API Private-mu",
+  "servers.addons.bbb.tokenPlaceholder": "Tempel token-mu",
+  "servers.addons.bbb.tokenSave": "Pakai token",
+  "servers.addons.bbb.tokenHint": "Buat di BuiltByBit: jenis token Private, dengan cakupan Resources/Buyer. Rahasiakan seperti kata sandi:",
+  "engine.builtbybit.badToken": "Itu tidak tampak seperti token API BuiltByBit. Salin seluruh token Private dari builtbybit.com/account/api.",
+  "engine.builtbybit.tokenRefused": "BuiltByBit tidak menerima token itu: {error}",
 }
 
 export default dict

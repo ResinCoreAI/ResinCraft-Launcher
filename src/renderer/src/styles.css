@@ -4246,3 +4246,21 @@ html.gamepad :focus {
   outline-offset: 2px;
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent);
 }
+
+/* Plugins → BuiltByBit: the sign-in panel (AddonBrowser.tsx). */
+.bbb-signin .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.bbb-signin .bbb-token {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.bbb-signin .bbb-token .row {
+  gap: 8px;
+}
