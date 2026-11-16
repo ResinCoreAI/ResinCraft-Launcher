@@ -4098,6 +4098,7 @@ const dict: Dict = {
   "rtxPack.memoryHint": "이 PC의 RAM {ram} 중 Minecraft가 쓸 양입니다. 자동은 PC와 텍스처 팩에 맞춥니다.",
   "rtxPack.memoryAuto": "자동: {size}",
   "rtxPack.memoryHintRemix": "Minecraft가 쓸 RAM, 최대 {max}. RTX Remix도 자체 텍스처를 RAM에 두므로 이보다 크면 충돌합니다. 자동은 PC와 텍스처 팩에 맞춥니다.",
+  "rtxLook.tuneHint": "렌더 거리 {render}청크, 시뮬레이션 거리 {simulation}, 메모리 {memory}. 셰이더 품질은 설정 → 비디오 설정 → 셰이더 팩에서 바꿀 수 있습니다.",
 }
 
 export default dict

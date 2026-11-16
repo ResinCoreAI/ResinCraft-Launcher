@@ -516,7 +516,7 @@ export function InstanceRtxLook({ inst }: { inst: Instance }) {
         <div className="text">
           <b>{t('rtxPack.tune')}</b>
           <span>
-            {t('rtxPack.tuneHint', {
+            {t('rtxLook.tuneHint', {
               render: state.recommended.renderDistance,
               simulation: state.recommended.simulationDistance,
               memory: gb(memoryMb ?? memoryFor(state.spec, picked))

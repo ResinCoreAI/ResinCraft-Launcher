@@ -234,6 +234,7 @@ export default {
   "rtxLook.onHint": "On: the game starts with the shader and PBR textures.",
   "rtxLook.offHint": "Off: the game starts without the shader. Everything stays installed.",
   "rtxLook.change": "Change",
+  "rtxLook.tuneHint": "Render distance {render} chunks, simulation distance {simulation}, memory {memory}. Change the shader's quality in Options → Video Settings → Shader Packs.",
   "rtxPack.title": "RTX Pack",
   "rtxPack.hint": "A PBR texture pack and game settings sized for this PC.",
   "rtxPack.thisPc": "This PC",

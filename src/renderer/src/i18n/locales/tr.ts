@@ -4116,6 +4116,7 @@ const dict: Dict = {
   "rtxPack.memoryHint": "Bu bilgisayarın {ram} RAM'inin ne kadarını Minecraft kullanabilir. Otomatik, bilgisayara ve doku paketine göre ayarlar.",
   "rtxPack.memoryAuto": "Otomatik: {size}",
   "rtxPack.memoryHintRemix": "Minecraft'ın kullanabileceği RAM, en çok {max}. RTX Remix de kendi dokularını RAM'de tutar; daha büyük bir oyun belleği onu çökertir. Otomatik, bilgisayara ve doku paketine göre ayarlar.",
+  "rtxLook.tuneHint": "Görüş mesafesi {render} chunk, simülasyon mesafesi {simulation}, bellek {memory}. Gölgelendirici kalitesini Seçenekler → Görüntü Ayarları → Gölgelendirici Paketleri bölümünden değiştirin.",
 }
 
 export default dict

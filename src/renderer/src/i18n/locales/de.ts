@@ -4120,6 +4120,7 @@ const dict: Dict = {
   "rtxPack.memoryHint": "Wie viel der {ram} RAM dieses PCs Minecraft nutzen darf. Auto richtet sich nach PC und Texturpaket.",
   "rtxPack.memoryAuto": "Auto: {size}",
   "rtxPack.memoryHintRemix": "Wie viel RAM Minecraft nutzen darf, höchstens {max}. RTX Remix hält auch eigene Texturen im RAM, und ein größerer Spiel-Heap bringt es zum Absturz. Auto richtet sich nach PC und Texturpaket.",
+  "rtxLook.tuneHint": "Sichtweite {render} Chunks, Simulationsdistanz {simulation}, Speicher {memory}. Die Shader-Qualität änderst du unter Optionen → Grafikeinstellungen → Shaderpakete.",
 }
 
 export default dict

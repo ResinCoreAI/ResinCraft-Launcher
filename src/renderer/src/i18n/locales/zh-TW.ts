@@ -4093,6 +4093,7 @@ const dict: Dict = {
   "rtxPack.memoryHint": "Minecraft 可以使用這台電腦 {ram} 記憶體中的多少。自動會依電腦和材質包分配。",
   "rtxPack.memoryAuto": "自動：{size}",
   "rtxPack.memoryHintRemix": "Minecraft 可用的記憶體，最多 {max}。RTX Remix 也會把自己的貼圖放在記憶體中，給遊戲更多會讓它當機。自動會依電腦和材質包分配。",
+  "rtxLook.tuneHint": "顯示距離 {render} 區塊，模擬距離 {simulation}，記憶體 {memory}。光影畫質可在 選項 → 視訊設定 → 光影包 中調整。",
 }
 
 export default dict

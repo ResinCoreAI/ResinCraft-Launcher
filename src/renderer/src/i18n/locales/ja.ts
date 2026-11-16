@@ -4103,6 +4103,7 @@ const dict: Dict = {
   "rtxPack.memoryHint": "この PC の {ram} の RAM のうち Minecraft が使える量。自動では PC とテクスチャパックに合わせます。",
   "rtxPack.memoryAuto": "自動: {size}",
   "rtxPack.memoryHintRemix": "Minecraft が使える RAM (最大 {max})。RTX Remix も自分のテクスチャを RAM に置くため、これより大きいとクラッシュします。自動では PC とテクスチャパックに合わせます。",
+  "rtxLook.tuneHint": "描画距離 {render} チャンク、シミュレーション距離 {simulation}、メモリ {memory}。シェーダーの品質は オプション → ビデオ設定 → シェーダーパック で変えられます。",
 }
 
 export default dict

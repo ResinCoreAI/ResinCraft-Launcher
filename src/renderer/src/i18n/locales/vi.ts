@@ -4103,6 +4103,7 @@ const dict: Dict = {
   "rtxPack.memoryHint": "Minecraft được dùng bao nhiêu trong {ram} RAM của máy này. Tự động sẽ chọn theo máy và gói texture.",
   "rtxPack.memoryAuto": "Tự động: {size}",
   "rtxPack.memoryHintRemix": "Minecraft được dùng bao nhiêu RAM, tối đa {max}. RTX Remix cũng giữ texture của nó trong RAM, heap game lớn hơn sẽ làm nó crash. Tự động sẽ chọn theo máy và gói texture.",
+  "rtxLook.tuneHint": "Khoảng cách hiển thị {render} chunk, khoảng cách mô phỏng {simulation}, bộ nhớ {memory}. Đổi chất lượng shader ở Tùy chọn → Cài đặt video → Gói shader.",
 }
 
 export default dict
