@@ -219,6 +219,7 @@ export function mockApi(): ResinApi {
     { filename: 'journeymap-6.0.jar', enabled: false, size: 5_100_000, kind: 'mod' }
   ]
   let rtxOn = true
+  const rtxIn = new Set<string>()
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
   const noop = () => () => {}
 
@@ -535,10 +536,10 @@ export function mockApi(): ResinApi {
         instances = [...instances, inst]
         return wait(inst, 400)
       },
-      rtxRemixInstall: (id) => wait(instances.find((i) => i.id === id)!, 2500),
+      rtxRemixInstall: (id) => (rtxIn.add(id), wait(instances.find((i) => i.id === id)!, 2500)),
       rtxRemixState: (id) =>
         wait(
-          id.startsWith('rtx-remix')
+          id.startsWith('rtx-remix') || rtxIn.has(id)
             ? { installed: true, on: rtxOn, file: 'rtx-remix-renderer-0.1.1.jar' + (rtxOn ? '' : '.disabled'), packs: ['JG.zip', 'RTX-Remix-Materials-0.61.0.zip'] }
             : { installed: false, on: false, packs: [] },
           200

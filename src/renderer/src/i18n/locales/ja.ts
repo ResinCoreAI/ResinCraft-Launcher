@@ -4068,6 +4068,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "BuiltByBit で作成: トークンの種類は Private、スコープは Resources/Buyer。パスワードと同じように秘密にしてください:",
   "engine.builtbybit.badToken": "BuiltByBit の API トークンではないようです。builtbybit.com/account/api から Private トークン全体をコピーしてください。",
   "engine.builtbybit.tokenRefused": "BuiltByBit がこのトークンを受け付けませんでした: {error}",
+  "rtxRemix.toggle.installHint": "オフ。オンにすると RTX Remix (約 1 GB)、NVIDIA のマテリアル、この PC に合う PBR パックをダウンロードし、設定を調整します。",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix は Fabric {version} でのみ動作します。新しいインスタンス → RTX Remix で作成するか、このインスタンスを Fabric {version} に変更してください。",
+  "rtxRemix.toggle.downloading": "{name} 用に RTX Remix をダウンロード中です。タスク一覧で続きます。",
 }
 
 export default dict

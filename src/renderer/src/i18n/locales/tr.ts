@@ -4081,6 +4081,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "BuiltByBit'te oluşturun: türü Private, Resources/Buyer kapsamlarıyla. Parola gibi gizli tutun:",
   "engine.builtbybit.badToken": "Bu bir BuiltByBit API anahtarına benzemiyor. builtbybit.com/account/api adresinden Private anahtarın tamamını kopyalayın.",
   "engine.builtbybit.tokenRefused": "BuiltByBit bu anahtarı kabul etmedi: {error}",
+  "rtxRemix.toggle.installHint": "Kapalı. Açınca RTX Remix (yaklaşık 1 GB), NVIDIA malzemeleri ve bu bilgisayara uygun bir PBR paketi indirilir, ayarlar düzenlenir.",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix yalnızca Fabric {version} üzerinde çalışır. Yeni kurulum → RTX Remix ile oluşturun ya da bu kurulumu Fabric {version} yapın.",
+  "rtxRemix.toggle.downloading": "{name} için RTX Remix indiriliyor. Görev listesinde sürer.",
 }
 
 export default dict

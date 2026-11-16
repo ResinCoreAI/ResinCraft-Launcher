@@ -4063,6 +4063,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "BuiltByBit에서 만드세요: 토큰 유형 Private, Resources/Buyer 범위. 비밀번호처럼 비밀로 하세요:",
   "engine.builtbybit.badToken": "BuiltByBit API 토큰이 아닌 것 같습니다. builtbybit.com/account/api에서 Private 토큰 전체를 복사하세요.",
   "engine.builtbybit.tokenRefused": "BuiltByBit가 이 토큰을 받지 않았습니다: {error}",
+  "rtxRemix.toggle.installHint": "꺼짐. 켜면 RTX Remix(약 1GB), NVIDIA 머티리얼, 이 PC에 맞는 PBR 팩을 내려받고 설정을 조정합니다.",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix는 Fabric {version}에서만 실행됩니다. 새 인스턴스 → RTX Remix에서 만들거나 이 인스턴스를 Fabric {version}(으)로 바꾸세요.",
+  "rtxRemix.toggle.downloading": "{name}에 RTX Remix를 내려받는 중입니다. 작업 목록에서 계속됩니다.",
 }
 
 export default dict

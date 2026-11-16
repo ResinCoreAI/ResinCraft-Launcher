@@ -4137,6 +4137,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "Utwórz go na BuiltByBit: typ Private, z zakresami Resources/Buyer. Trzymaj go w tajemnicy jak hasło:",
   "engine.builtbybit.badToken": "To nie wygląda na token API BuiltByBit. Skopiuj cały token Private z builtbybit.com/account/api.",
   "engine.builtbybit.tokenRefused": "BuiltByBit nie przyjął tego tokenu: {error}",
+  "rtxRemix.toggle.installHint": "Wył. Włączenie pobierze RTX Remix (ok. 1 GB) z materiałami NVIDIA i paczką PBR dobraną do tego komputera oraz dostosuje ustawienia.",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix działa tylko na Fabric {version}. Utwórz ją w Nowa instancja → RTX Remix albo zmień tę instancję na Fabric {version}.",
+  "rtxRemix.toggle.downloading": "Pobieranie RTX Remix dla {name}. Trwa dalej na liście zadań.",
 }
 
 export default dict

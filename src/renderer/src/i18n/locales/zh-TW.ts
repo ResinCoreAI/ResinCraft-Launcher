@@ -4058,6 +4058,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "在 BuiltByBit 建立：權杖類型選 Private，並勾選 Resources/Buyer 範圍。請像密碼一樣保密：",
   "engine.builtbybit.badToken": "這看起來不像 BuiltByBit API 權杖。請從 builtbybit.com/account/api 複製完整的 Private 權杖。",
   "engine.builtbybit.tokenRefused": "BuiltByBit 不接受這個權杖：{error}",
+  "rtxRemix.toggle.installHint": "已關閉。開啟後會下載 RTX Remix（約 1 GB）、NVIDIA 材質與適合這台電腦的 PBR 材質包，並調整設定。",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix 只能在 Fabric {version} 上執行。可在 新實例 → RTX Remix 建立，或把此實例改為 Fabric {version}。",
+  "rtxRemix.toggle.downloading": "正在為 {name} 下載 RTX Remix，會在工作清單中繼續。",
 }
 
 export default dict

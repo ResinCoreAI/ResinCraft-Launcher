@@ -7,9 +7,12 @@ import { bytes } from '../util'
 import { t } from '../i18n'
 import { Segmented, Switch, celebrate } from './ui'
 import '../rtx-remix.css'
+import { platform } from '../platform'
 
 /** NVIDIA's oldest supported driver; the same as `DRIVER` in content/rtxremix.rs. */
 const DRIVER = '616.92'
+/** The one version NVIDIA's mod runs on; the same as `MC` in content/rtxremix.rs. */
+const RTX_MC = '1.21.1'
 
 const gb = (mb: number) => `${Math.round(mb / 1024)} GB`
 
@@ -289,13 +292,16 @@ export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void;
 }
 
 /**
- * Instance → Settings: RTX Remix on or off. Off plays the instance as plain Fabric (the renderer jar is disabled and
- * its texture packs leave the pack list); nothing is removed. Shown only in instances that have it.
+ * Instance → Settings: RTX Remix on or off, on every instance (Windows). Off plays the instance as plain Fabric (the
+ * renderer jar is disabled and its texture packs leave the pack list); nothing is removed. In a Fabric 1.21.1
+ * instance without it, turning it on downloads and sets up RTX Remix with the RTX Pack sized for this PC. Other
+ * versions show why it can't go there.
  */
 export function InstanceRtxRemix({ inst }: { inst: Instance }) {
-  const { toast } = useStore()
+  const { toast, refreshInstances } = useStore()
   const [state, setState] = useState<RtxRemixState>()
   const [busy, setBusy] = useState(false)
+  const fits = inst.loader === 'fabric' && inst.mcVersion === RTX_MC
 
   useEffect(() => {
     let live = true
@@ -305,19 +311,34 @@ export function InstanceRtxRemix({ inst }: { inst: Instance }) {
     }
   }, [inst.id])
 
-  if (!state?.installed) return null
+  if (platform !== 'windows' || !state) return null
 
   const set = async (on: boolean) => {
     setBusy(true)
     try {
-      setState(await api.content.rtxRemixSet(inst.id, on))
-      toast(t(on ? 'rtxRemix.toggle.onDone' : 'rtxRemix.toggle.offDone', { name: inst.name }))
+      if (on && !state.installed) {
+        // Not there yet: download and set it up, sized for this PC.
+        toast(t('rtxRemix.toggle.downloading', { name: inst.name }), 'info')
+        const done = await api.content.rtxRemixInstall(inst.id, { world: true, pack: 'auto', tune: true })
+        setState(await api.content.rtxRemixState(inst.id))
+        await refreshInstances()
+        toast(t('rtxRemix.ready', { name: done.name }))
+      } else {
+        setState(await api.content.rtxRemixSet(inst.id, on))
+        toast(t(on ? 'rtxRemix.toggle.onDone' : 'rtxRemix.toggle.offDone', { name: inst.name }))
+      }
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
       setBusy(false)
     }
   }
+
+  const hint = !state.installed
+    ? fits
+      ? t('rtxRemix.toggle.installHint')
+      : t('rtxRemix.toggle.wrongVersion', { version: RTX_MC })
+    : t(state.on ? 'rtxRemix.toggle.onHint' : 'rtxRemix.toggle.offHint')
 
   return (
     <div className="settings-section">
@@ -328,11 +349,16 @@ export function InstanceRtxRemix({ inst }: { inst: Instance }) {
             <b>
               <Sparkles /> {t('rtxRemix.toggle.label')}
             </b>
-            <span>{t(state.on ? 'rtxRemix.toggle.onHint' : 'rtxRemix.toggle.offHint')}</span>
+            <span>{busy && !state.installed ? t('rtxRemix.toggle.downloading', { name: inst.name }) : hint}</span>
           </div>
           <div className="control rtx-toggle">
             {busy && <Loader2 className="spin" />}
-            <Switch on={state.on} onChange={(v) => void set(v)} label={t('rtxRemix.toggle.label')} disabled={busy} />
+            <Switch
+              on={state.installed && state.on}
+              onChange={(v) => void set(v)}
+              label={t('rtxRemix.toggle.label')}
+              disabled={busy || (!state.installed && !fits)}
+            />
           </div>
         </div>
       </div>

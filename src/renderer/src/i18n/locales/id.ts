@@ -4071,6 +4071,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "Buat di BuiltByBit: jenis token Private, dengan cakupan Resources/Buyer. Rahasiakan seperti kata sandi:",
   "engine.builtbybit.badToken": "Itu tidak tampak seperti token API BuiltByBit. Salin seluruh token Private dari builtbybit.com/account/api.",
   "engine.builtbybit.tokenRefused": "BuiltByBit tidak menerima token itu: {error}",
+  "rtxRemix.toggle.installHint": "Mati. Menyalakannya mengunduh RTX Remix (sekitar 1 GB) dengan material NVIDIA dan paket PBR yang pas untuk PC ini, lalu menyesuaikan pengaturan.",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix hanya berjalan di Fabric {version}. Buat di Instance baru → RTX Remix, atau ubah instance ini ke Fabric {version}.",
+  "rtxRemix.toggle.downloading": "Mengunduh RTX Remix untuk {name}. Tetap berjalan di daftar tugas.",
 }
 
 export default dict

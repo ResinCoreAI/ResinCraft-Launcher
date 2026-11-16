@@ -4060,6 +4060,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "สร้างได้ที่ BuiltByBit: เลือกชนิด Private และขอบเขต Resources/Buyer เก็บเป็นความลับเหมือนรหัสผ่าน:",
   "engine.builtbybit.badToken": "นี่ไม่ใช่ API token ของ BuiltByBit คัดลอก Private token ทั้งหมดจาก builtbybit.com/account/api",
   "engine.builtbybit.tokenRefused": "BuiltByBit ไม่รับ token นี้: {error}",
+  "rtxRemix.toggle.installHint": "ปิดอยู่ เปิดแล้วจะดาวน์โหลด RTX Remix (ประมาณ 1 GB) พร้อม materials ของ NVIDIA และแพ็ก PBR ที่เหมาะกับเครื่องนี้ แล้วปรับการตั้งค่าให้",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix ใช้ได้กับ Fabric {version} เท่านั้น สร้างได้ที่ อินสแตนซ์ใหม่ → RTX Remix หรือเปลี่ยนอินสแตนซ์นี้เป็น Fabric {version}",
+  "rtxRemix.toggle.downloading": "กำลังดาวน์โหลด RTX Remix ให้ {name} ทำต่อในรายการงาน",
 }
 
 export default dict

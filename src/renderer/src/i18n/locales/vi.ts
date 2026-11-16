@@ -4068,6 +4068,9 @@ const dict: Dict = {
   "servers.addons.bbb.tokenHint": "Tạo trên BuiltByBit: loại Private, với phạm vi Resources/Buyer. Giữ bí mật như mật khẩu:",
   "engine.builtbybit.badToken": "Đây không giống API token của BuiltByBit. Hãy sao chép toàn bộ Private token từ builtbybit.com/account/api.",
   "engine.builtbybit.tokenRefused": "BuiltByBit không chấp nhận token này: {error}",
+  "rtxRemix.toggle.installHint": "Tắt. Bật lên sẽ tải RTX Remix (khoảng 1 GB) cùng materials của NVIDIA và gói PBR hợp với máy này, rồi chỉnh cài đặt.",
+  "rtxRemix.toggle.wrongVersion": "RTX Remix chỉ chạy trên Fabric {version}. Tạo ở Phiên bản mới → RTX Remix, hoặc đổi phiên bản này sang Fabric {version}.",
+  "rtxRemix.toggle.downloading": "Đang tải RTX Remix cho {name}. Vẫn tiếp tục trong danh sách tác vụ.",
 }
 
 export default dict
