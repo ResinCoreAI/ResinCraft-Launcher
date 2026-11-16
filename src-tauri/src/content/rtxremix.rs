@@ -161,7 +161,7 @@ pub async fn check() -> RtxCheck {
             let p = parts_of(&r).expect("latest() only returns releases with a jar");
             out.download_size = p.jar.size + p.materials.map_or(0, |a| a.size);
             out.world_size = p.world.map_or(0, |a| a.size);
-            out.version = Some(r.title());
+            out.version = Some(r.tag_name.clone());
             out.release_url = Some(r.html_url.clone());
         }
         Err(e) => out.error = Some(e.to_string()),
@@ -331,7 +331,7 @@ async fn fill(task: &Arc<Task>, inst: &Instance, release: &Release, with_world: 
         IndexEntry {
             project_id: format!("{}{REPO}", github::PREFIX),
             version_id: release.tag_name.clone(),
-            version_number: release.title(),
+            version_number: release.tag_name.clone(),
             title: "RTX Remix for Minecraft".into(),
             icon_url: repo.as_ref().and_then(|r| r.avatar()),
             sha1: hash_file(&jar, HashAlgo::Sha1).await.unwrap_or_default(),
