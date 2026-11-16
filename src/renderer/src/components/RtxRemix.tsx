@@ -23,6 +23,45 @@ function memoryFor(spec: RtxPackSpec, pack: string): number {
   return Math.max(2048, Math.min(want, cap))
 }
 
+/**
+ * The game's memory for the RTX setup: Auto (sized for the PC and the pack) or the player's own amount, from 2 GB up
+ * to all but 2 GB of the PC's RAM.
+ */
+function MemoryPick({
+  spec,
+  auto,
+  value,
+  onChange,
+  disabled
+}: {
+  spec: RtxPackSpec
+  auto: number
+  value?: number
+  onChange: (mb?: number) => void
+  disabled?: boolean
+}) {
+  const most = Math.max(2, Math.floor((spec.ramMb - 2048) / 1024))
+  const sizes = Array.from({ length: most - 1 }, (_, i) => i + 2).filter((g) => g <= 8 || g % 2 === 0 || g === most)
+  return (
+    <div className="setting">
+      <div className="text">
+        <b>{t('rtxPack.memory')}</b>
+        <span>{t('rtxPack.memoryHint', { ram: gb(spec.ramMb) })}</span>
+      </div>
+      <div className="control">
+        <select className="input" value={value ?? ''} disabled={disabled} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}>
+          <option value="">{t('rtxPack.memoryAuto', { size: gb(auto) })}</option>
+          {sizes.map((g) => (
+            <option key={g} value={g * 1024}>
+              {`${g} GB`}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
 function Row({ ok, title, detail }: { ok: boolean; title: string; detail?: string }) {
   return (
     <div className="setting">
@@ -50,6 +89,7 @@ export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void;
   const [pack, setPack] = useState<RtxPackChoice>('auto')
   const [ownPack, setOwnPack] = useState<string>()
   const [tune, setTune] = useState(true)
+  const [memoryMb, setMemoryMb] = useState<number>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   // The dialog can close while the setup runs on (it's in the task list); then only the toast is left to show.
@@ -103,7 +143,7 @@ export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void;
         made = inst
         await refreshInstances()
       }
-      const done = await api.content.rtxRemixInstall(inst.id, { world, pack, ownPack, tune })
+      const done = await api.content.rtxRemixInstall(inst.id, { world, pack, ownPack, tune, memoryMb })
       await refreshInstances()
       toast(t('rtxRemix.ready', { name: done.name }))
       if (!open.current) return
@@ -235,7 +275,7 @@ export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void;
               {t('rtxPack.tuneHint', {
                 render: rec.renderDistance,
                 simulation: rec.simulationDistance,
-                memory: gb(memoryFor(check.spec, picked))
+                memory: gb(memoryMb ?? memoryFor(check.spec, picked))
               })}
             </span>
           </div>
@@ -243,6 +283,7 @@ export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void;
             <Switch on={tune} onChange={setTune} label={t('rtxPack.tune')} disabled={busy} />
           </div>
         </div>
+        <MemoryPick spec={check.spec} auto={memoryFor(check.spec, picked)} value={memoryMb} onChange={setMemoryMb} disabled={busy} />
       </div>
 
       <div className="field">
@@ -382,6 +423,7 @@ export function InstanceRtxLook({ inst }: { inst: Instance }) {
   const [pack, setPack] = useState<RtxPackChoice>('auto')
   const [ownPack, setOwnPack] = useState<string>()
   const [tune, setTune] = useState(true)
+  const [memoryMb, setMemoryMb] = useState<number>()
 
   useEffect(() => {
     let live = true
@@ -401,7 +443,7 @@ export function InstanceRtxLook({ inst }: { inst: Instance }) {
     setBusy(true)
     toast(t('rtxLook.downloading', { name: inst.name }), 'info')
     try {
-      setState(await api.content.rtxLookInstall(inst.id, { shader, pack, ownPack, tune, world: false }))
+      setState(await api.content.rtxLookInstall(inst.id, { shader, pack, ownPack, tune, memoryMb, world: false }))
       await refreshInstances()
       setSetup(false)
       toast(t('rtxLook.ready', { name: inst.name }))
@@ -474,7 +516,7 @@ export function InstanceRtxLook({ inst }: { inst: Instance }) {
             {t('rtxPack.tuneHint', {
               render: state.recommended.renderDistance,
               simulation: state.recommended.simulationDistance,
-              memory: gb(memoryFor(state.spec, picked))
+              memory: gb(memoryMb ?? memoryFor(state.spec, picked))
             })}
           </span>
         </div>
@@ -482,6 +524,7 @@ export function InstanceRtxLook({ inst }: { inst: Instance }) {
           <Switch on={tune} onChange={setTune} label={t('rtxPack.tune')} disabled={busy} />
         </div>
       </div>
+      <MemoryPick spec={state.spec} auto={memoryFor(state.spec, picked)} value={memoryMb} onChange={setMemoryMb} disabled={busy} />
       <div className="setting">
         <div className="text">
           <span>{t('rtxLook.loaderHint', { loader: state.loader === 'oculus' ? 'Oculus' : state.loader === 'optifine' ? 'OptiFine' : 'Iris' })}</span>

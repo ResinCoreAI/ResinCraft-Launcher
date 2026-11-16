@@ -4099,6 +4099,9 @@ const dict: Dict = {
   "engine.rtxLook.noShader": "{name} をインストールできませんでした。もう一度お試しください。",
   "engine.rtxLook.runningToggle": "RTX ルックを切り替える前に {name} を停止してください。",
   "engine.rtxLook.notInstalled": "{name} に RTX ルックはありません。",
+  "rtxPack.memory": "ゲームのメモリ",
+  "rtxPack.memoryHint": "この PC の {ram} の RAM のうち Minecraft が使える量。自動では PC とテクスチャパックに合わせます。",
+  "rtxPack.memoryAuto": "自動: {size}",
 }
 
 export default dict

@@ -4091,6 +4091,9 @@ const dict: Dict = {
   "engine.rtxLook.noShader": "ติดตั้ง {name} ไม่สำเร็จ ลองอีกครั้ง",
   "engine.rtxLook.runningToggle": "ปิด {name} ก่อนเปิดหรือปิดลุค RTX",
   "engine.rtxLook.notInstalled": "{name} ไม่มีลุค RTX",
+  "rtxPack.memory": "หน่วยความจำของเกม",
+  "rtxPack.memoryHint": "Minecraft ใช้ RAM {ram} ของเครื่องนี้ได้เท่าไร อัตโนมัติจะกำหนดตามเครื่องและแพ็กเท็กซ์เจอร์",
+  "rtxPack.memoryAuto": "อัตโนมัติ: {size}",
 }
 
 export default dict

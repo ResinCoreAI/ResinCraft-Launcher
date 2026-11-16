@@ -4112,6 +4112,9 @@ const dict: Dict = {
   "engine.rtxLook.noShader": "{name} kurulamadı. Yeniden deneyin.",
   "engine.rtxLook.runningToggle": "RTX görünümünü açıp kapatmadan önce {name} kurulumunu durdurun.",
   "engine.rtxLook.notInstalled": "{name} içinde RTX görünümü yok.",
+  "rtxPack.memory": "Oyun belleği",
+  "rtxPack.memoryHint": "Bu bilgisayarın {ram} RAM'inin ne kadarını Minecraft kullanabilir. Otomatik, bilgisayara ve doku paketine göre ayarlar.",
+  "rtxPack.memoryAuto": "Otomatik: {size}",
 }
 
 export default dict

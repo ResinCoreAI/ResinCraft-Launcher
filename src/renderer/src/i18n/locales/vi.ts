@@ -4099,6 +4099,9 @@ const dict: Dict = {
   "engine.rtxLook.noShader": "Không cài được {name}. Thử lại.",
   "engine.rtxLook.runningToggle": "Hãy dừng {name} trước khi bật hoặc tắt giao diện RTX.",
   "engine.rtxLook.notInstalled": "{name} không có giao diện RTX.",
+  "rtxPack.memory": "Bộ nhớ cho game",
+  "rtxPack.memoryHint": "Minecraft được dùng bao nhiêu trong {ram} RAM của máy này. Tự động sẽ chọn theo máy và gói texture.",
+  "rtxPack.memoryAuto": "Tự động: {size}",
 }
 
 export default dict

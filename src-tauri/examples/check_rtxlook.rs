@@ -23,7 +23,7 @@ async fn main() {
     println!("supported {} loader {:?} spec {:?} → shader {} {:?}", st.supported, st.loader, st.spec, st.recommended_shader, st.recommended);
     assert!(st.supported && !st.installed);
 
-    let opts = LookOptions { shader: "auto".into(), pack: RtxOptions { world: false, pack: pack.clone(), own_pack: None, tune: true } };
+    let opts = LookOptions { shader: "auto".into(), pack: RtxOptions { world: false, pack: pack.clone(), own_pack: None, tune: true, memory_mb: None } };
     let st = rtxlook::install(&inst.id, opts).await.expect("install");
     assert!(st.installed && st.on, "installed and on");
     println!("shader: {:?}", st.shader);

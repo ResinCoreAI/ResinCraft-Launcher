@@ -4094,6 +4094,9 @@ const dict: Dict = {
   "engine.rtxLook.noShader": "{name}을(를) 설치하지 못했습니다. 다시 시도하세요.",
   "engine.rtxLook.runningToggle": "RTX 룩을 켜거나 끄기 전에 {name}을(를) 종료하세요.",
   "engine.rtxLook.notInstalled": "{name}에는 RTX 룩이 없습니다.",
+  "rtxPack.memory": "게임 메모리",
+  "rtxPack.memoryHint": "이 PC의 RAM {ram} 중 Minecraft가 쓸 양입니다. 자동은 PC와 텍스처 팩에 맞춥니다.",
+  "rtxPack.memoryAuto": "자동: {size}",
 }
 
 export default dict

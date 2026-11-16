@@ -4089,6 +4089,9 @@ const dict: Dict = {
   "engine.rtxLook.noShader": "{name} 沒有裝好，請重試。",
   "engine.rtxLook.runningToggle": "請先停止 {name}，再開啟或關閉 RTX 效果。",
   "engine.rtxLook.notInstalled": "{name} 沒有 RTX 效果。",
+  "rtxPack.memory": "遊戲記憶體",
+  "rtxPack.memoryHint": "Minecraft 可以使用這台電腦 {ram} 記憶體中的多少。自動會依電腦和材質包分配。",
+  "rtxPack.memoryAuto": "自動：{size}",
 }
 
 export default dict

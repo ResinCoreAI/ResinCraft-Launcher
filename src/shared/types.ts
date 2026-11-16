@@ -2269,6 +2269,8 @@ export interface RtxRemixOptions {
   ownPack?: string
   /** Write the tuned distances and memory. */
   tune?: boolean
+  /** The player's own game memory (MB) instead of the tuned amount. */
+  memoryMb?: number
 }
 
 export interface RtxRemixCheck {

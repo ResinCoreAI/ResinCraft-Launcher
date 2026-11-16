@@ -4135,6 +4135,9 @@ const dict: Dict = {
   "engine.rtxLook.noShader": "{name} non si è installato. Riprova.",
   "engine.rtxLook.runningToggle": "Chiudi {name} prima di attivare o disattivare il look RTX.",
   "engine.rtxLook.notInstalled": "{name} non ha il look RTX.",
+  "rtxPack.memory": "Memoria per il gioco",
+  "rtxPack.memoryHint": "Quanta della RAM da {ram} di questo PC può usare Minecraft. Auto la adatta al PC e al pacchetto di texture.",
+  "rtxPack.memoryAuto": "Auto: {size}",
 }
 
 export default dict

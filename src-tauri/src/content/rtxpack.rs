@@ -81,6 +81,9 @@ pub struct RtxOptions {
     /// Write the tuned distances and memory.
     #[serde(default = "yes")]
     pub tune: bool,
+    /// The player's own memory for the game (MB), instead of the tuned amount; written even with `tune` off.
+    #[serde(default)]
+    pub memory_mb: Option<u32>,
 }
 
 fn yes() -> bool {
@@ -92,7 +95,7 @@ fn auto() -> String {
 
 impl Default for RtxOptions {
     fn default() -> Self {
-        RtxOptions { world: true, pack: auto(), own_pack: None, tune: true }
+        RtxOptions { world: true, pack: auto(), own_pack: None, tune: true, memory_mb: None }
     }
 }
 
@@ -162,6 +165,13 @@ fn version_line(mc: &str) -> Vec<String> {
         out.push(format!("{}.{}", parts[0], parts[1]));
     }
     out
+}
+
+/// The player's own memory, kept between 1 GB and all but 2 GB of the PC's RAM (Windows and the graphics driver
+/// need room too), in whole 256 MB steps.
+pub fn own_memory(spec: &Spec, mb: u32) -> u32 {
+    let most = (spec.ram_mb.saturating_sub(2048) as u32).max(1024);
+    (mb.clamp(1024, most) / 256) * 256
 }
 
 /// A shader pack costs more than RTX Remix's renderer at the same distance: a quarter less, never under 6.
@@ -292,12 +302,17 @@ pub async fn apply(task: &crate::core::events::Task, inst: &Instance, opts: &Rtx
     if shader {
         tuning = with_shader(tuning);
     }
+    if let Some(mb) = opts.memory_mb {
+        tuning.memory_mb = own_memory(spec, mb);
+    }
     if opts.tune {
         edit_options(&game, |t| {
             let t = set_option(t, "renderDistance", &tuning.render_distance.to_string());
             Ok(set_option(&t, "simulationDistance", &tuning.simulation_distance.to_string()))
         })
         .await?;
+    }
+    if opts.tune || opts.memory_mb.is_some() {
         instances::update(&inst.id, json!({ "memoryMb": tuning.memory_mb })).await?;
     }
     Ok(tuning)
@@ -339,6 +354,15 @@ mod tests {
         assert_eq!(tune(&pc(Some(8), 6, 4), "128").memory_mb, 3072);
         assert_eq!(tune(&pc(Some(24), 64, 24), "own").memory_mb, 8192);
         assert_eq!(tune(&pc(Some(24), 3, 24), "own").memory_mb, 2048);
+    }
+
+    #[test]
+    fn keeps_own_memory_sane() {
+        let p = pc(Some(12), 16, 8);
+        assert_eq!(own_memory(&p, 6144), 6144);
+        assert_eq!(own_memory(&p, 64 * 1024), 14 * 1024);
+        assert_eq!(own_memory(&p, 100), 1024);
+        assert_eq!(own_memory(&p, 5000), 4864);
     }
 
     #[test]
