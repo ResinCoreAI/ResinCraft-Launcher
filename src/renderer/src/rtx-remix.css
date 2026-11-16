@@ -27,3 +27,30 @@
 .rtx-remix .setting .control {
   width: auto;
 }
+
+.rtx-remix .setting.stack select {
+  margin-top: 8px;
+}
+.rtx-remix .rtx-own {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  min-width: 0;
+}
+.rtx-remix .rtx-own .hint {
+  overflow-wrap: anywhere;
+}
+
+.rtx-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: auto;
+}
+.settings-section .setting .text b svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}

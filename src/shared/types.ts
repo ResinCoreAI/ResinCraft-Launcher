@@ -2179,6 +2179,50 @@ export interface RtxRemixGpu {
   /** An RTX card from the 30-series on. */
   rtx: boolean
   driverOk: boolean
+  /** Video memory in MB. */
+  vramMb?: number | null
+}
+
+/** The RTX Pack's texture pack: sized for the PC, a size, the player's own zip, or none. */
+export type RtxPackChoice = 'auto' | 'none' | '64' | '128' | '256' | 'own'
+
+export interface RtxPackSpec {
+  vramMb?: number | null
+  ramMb: number
+  cores: number
+}
+
+export interface RtxPackTuning {
+  pack: string
+  renderDistance: number
+  simulationDistance: number
+  memoryMb: number
+}
+
+export interface RtxPackInfo {
+  key: string
+  res: number
+  title: string
+  url: string
+  size?: number | null
+}
+
+/** RTX Remix in an instance, for its on/off switch. */
+export interface RtxRemixState {
+  installed: boolean
+  on: boolean
+  file?: string | null
+  /** NVIDIA's materials and the RTX Pack's PBR pack, turned on and off with it. */
+  packs: string[]
+}
+
+export interface RtxRemixOptions {
+  world?: boolean
+  pack?: RtxPackChoice
+  /** The zip for 'own'. */
+  ownPack?: string
+  /** Write the tuned distances and memory. */
+  tune?: boolean
 }
 
 export interface RtxRemixCheck {
@@ -2194,6 +2238,10 @@ export interface RtxRemixCheck {
   downloadSize: number
   worldSize: number
   error?: string | null
+  /** The RTX Pack: this PC, what it gets, and the texture packs on offer. */
+  spec: RtxPackSpec
+  recommended: RtxPackTuning
+  packs: RtxPackInfo[]
 }
 
 export interface MulticorePlan {
@@ -2469,7 +2517,13 @@ export interface ResinApi {
     rtxRemixCreate(name: string): Promise<Instance>
     /** Puts RTX Remix, its materials pack and (by default) the showcase world into a Fabric 1.21.1 instance. Also
      *  finishes a setup that stopped, or moves the instance to the newest release. */
-    rtxRemixInstall(instanceId: string, withWorld?: boolean): Promise<Instance>
+    rtxRemixInstall(instanceId: string, options?: RtxRemixOptions): Promise<Instance>
+    /** A file picker for the player's own LabPBR pack (.zip); null if cancelled. */
+    rtxPackPickOwn(): Promise<string | null>
+    /** Whether an instance has RTX Remix and whether it's on. */
+    rtxRemixState(instanceId: string): Promise<RtxRemixState>
+    /** Turns RTX Remix (the renderer and its texture packs) on or off; nothing is removed. */
+    rtxRemixSet(instanceId: string, on: boolean): Promise<RtxRemixState>
     exportList(instanceId: string, kind: ContentKind): Promise<string | null>
     /** Installs a list file (asks for it without `path`); null if the dialog was cancelled. */
     importList(instanceId: string, kind: ContentKind, path?: string): Promise<ListImport | null>

@@ -217,6 +217,7 @@ export function mockApi(): ResinApi {
     { filename: 'fabric-api-0.110.jar', enabled: true, size: 2_400_000, kind: 'mod', title: 'Fabric API', versionNumber: '0.110.0', projectId: 'fabric-api' },
     { filename: 'journeymap-6.0.jar', enabled: false, size: 5_100_000, kind: 'mod' }
   ]
+  let rtxOn = true
   const wait = <T>(v: T, ms = 250) => new Promise<T>((r) => setTimeout(() => r(v), ms))
   const noop = () => () => {}
 
@@ -511,13 +512,20 @@ export function mockApi(): ResinApi {
         wait(
           {
             windows: true,
-            gpus: [{ name: 'NVIDIA GeForce RTX 4070', driver: '621.05', rtx: true, driverOk: true }],
+            gpus: [{ name: 'NVIDIA GeForce RTX 4070', driver: '621.05', rtx: true, driverOk: true, vramMb: 12282 }],
             ready: true,
             mcVersion: '1.21.1',
             version: 'v0.1.1',
             releaseUrl: 'https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/releases/tag/v0.1.1',
             downloadSize: 1_055_224_500,
-            worldSize: 216_325_990
+            worldSize: 216_325_990,
+            spec: { vramMb: 12282, ramMb: 32_000, cores: 16 },
+            recommended: { pack: '256', renderDistance: 16, simulationDistance: 10, memoryMb: 5120 },
+            packs: [
+              { key: '64', res: 64, title: 'Seraphic PBR', url: 'https://modrinth.com/resourcepack/seraphic-pbr', size: 15_000_000 },
+              { key: '128', res: 128, title: 'AVPBR Retextured', url: 'https://modrinth.com/resourcepack/avpbr-retextured', size: 18_000_000 },
+              { key: '256', res: 256, title: 'PBR JG', url: 'https://modrinth.com/resourcepack/pbr-jg', size: 379_000_000 }
+            ]
           },
           500
         ),
@@ -527,6 +535,18 @@ export function mockApi(): ResinApi {
         return wait(inst, 400)
       },
       rtxRemixInstall: (id) => wait(instances.find((i) => i.id === id)!, 2500),
+      rtxRemixState: (id) =>
+        wait(
+          id.startsWith('rtx-remix')
+            ? { installed: true, on: rtxOn, file: 'rtx-remix-renderer-0.1.1.jar' + (rtxOn ? '' : '.disabled'), packs: ['JG.zip', 'RTX-Remix-Materials-0.61.0.zip'] }
+            : { installed: false, on: false, packs: [] },
+          200
+        ),
+      rtxRemixSet: (_id, on) => {
+        rtxOn = on
+        return wait({ installed: true, on, file: 'rtx-remix-renderer-0.1.1.jar' + (on ? '' : '.disabled'), packs: ['JG.zip', 'RTX-Remix-Materials-0.61.0.zip'] }, 400)
+      },
+      rtxPackPickOwn: () => wait('C:\\Users\\you\\Downloads\\Patrix 1024x PBR.zip', 300),
       exportList: (_i, kind) =>
         wait(`C:\\Users\\you\\Downloads\\cozy-survival ${kind === 'mod' ? 'mods' : kind === 'shader' ? 'shaders' : 'resource-packs'}.json`, 500),
       importList: (_i, kind) =>

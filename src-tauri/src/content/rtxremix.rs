@@ -43,6 +43,8 @@ pub struct Gpu {
     /// An RTX card from the 30-series (Ampere) on.
     pub rtx: bool,
     pub driver_ok: bool,
+    /// Video memory in MB.
+    pub vram_mb: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -62,6 +64,10 @@ pub struct RtxCheck {
     pub world_size: u64,
     /// Why the release couldn't be read.
     pub error: Option<String>,
+    /// The RTX Pack: this PC, the settings it gets, and the texture packs on offer.
+    pub spec: super::rtxpack::Spec,
+    pub recommended: super::rtxpack::Tuning,
+    pub packs: Vec<super::rtxpack::PackInfo>,
 }
 
 /// "616.92" → (616, 92).
@@ -85,17 +91,18 @@ fn is_supported_rtx(name: &str) -> bool {
     !(digits.len() == 4 && digits.starts_with("20"))
 }
 
-/// nvidia-smi's `name, driver_version` CSV lines → cards.
+/// nvidia-smi's `name, driver_version, memory.total` CSV lines (memory in MiB, no unit) → cards.
 fn parse_gpus(csv: &str) -> Vec<Gpu> {
     csv.lines()
         .filter_map(|line| {
-            let (name, driver) = line.rsplit_once(',')?;
+            let mut parts = line.rsplitn(3, ',');
+            let (memory, driver, name) = (parts.next()?, parts.next()?, parts.next()?);
             let (name, driver) = (name.trim().to_string(), driver.trim().to_string());
             if name.is_empty() {
                 return None;
             }
             let driver_ok = driver_version(&driver).is_some_and(|v| v >= DRIVER);
-            Some(Gpu { rtx: is_supported_rtx(&name), driver_ok, name, driver })
+            Some(Gpu { rtx: is_supported_rtx(&name), driver_ok, vram_mb: memory.trim().parse().ok(), name, driver })
         })
         .collect()
 }
@@ -104,7 +111,7 @@ async fn gpus() -> Vec<Gpu> {
     if !cfg!(windows) {
         return Vec::new();
     }
-    let run = crate::game::java::hidden_command("nvidia-smi").args(["--query-gpu=name,driver_version", "--format=csv,noheader"]).output();
+    let run = crate::game::java::hidden_command("nvidia-smi").args(["--query-gpu=name,driver_version,memory.total", "--format=csv,noheader,nounits"]).output();
     match tokio::time::timeout(Duration::from_secs(10), run).await {
         Ok(Ok(out)) if out.status.success() => parse_gpus(&String::from_utf8_lossy(&out.stdout)),
         _ => Vec::new(),
@@ -145,6 +152,9 @@ pub async fn check() -> RtxCheck {
     let gpus = gpus().await;
     let windows = cfg!(windows);
     let ready = windows && gpus.iter().any(|g| g.rtx && g.driver_ok);
+    let spec = super::rtxpack::spec(gpus.iter().filter_map(|g| g.vram_mb).max()).await;
+    let recommended = super::rtxpack::tune(&spec, super::rtxpack::recommended_pack(&spec));
+    let (release, packs) = tokio::join!(latest(), super::rtxpack::pack_infos());
     let mut out = RtxCheck {
         windows,
         gpus,
@@ -155,8 +165,11 @@ pub async fn check() -> RtxCheck {
         download_size: 0,
         world_size: 0,
         error: None,
+        spec,
+        recommended,
+        packs,
     };
-    match latest().await {
+    match release {
         Ok(r) => {
             let p = parts_of(&r).expect("latest() only returns releases with a jar");
             out.download_size = p.jar.size + p.materials.map_or(0, |a| a.size);
@@ -217,7 +230,7 @@ fn unpack_world(zip_path: &Path, saves: &Path) -> Result<()> {
 }
 
 /// Turns the materials pack on in options.txt, after vanilla's and Fabric's (and any packs already on).
-async fn enable_pack(game: &Path, pack_file: &str) -> Result<()> {
+pub(crate) async fn enable_pack(game: &Path, pack_file: &str) -> Result<()> {
     let options = game.join("options.txt");
     let text = tokio::fs::read_to_string(&options).await.unwrap_or_default();
     tokio::fs::write(&options, with_pack(&text, pack_file)?).await?;
@@ -271,7 +284,7 @@ pub async fn create(name: String) -> Result<Instance> {
 
 /// Puts RTX Remix into a Fabric 1.21.1 instance: a new one from `create`, an existing one, one whose setup stopped,
 /// or one to move to the newest release. Files already there aren't downloaded again.
-pub async fn install(instance_id: &str, with_world: bool) -> Result<Instance> {
+pub async fn install(instance_id: &str, opts: super::rtxpack::RtxOptions) -> Result<Instance> {
     if !cfg!(windows) {
         bail_tr!("rtxRemix.windowsOnly", "RTX Remix for Minecraft only runs on Windows.");
     }
@@ -285,10 +298,15 @@ pub async fn install(instance_id: &str, with_world: bool) -> Result<Instance> {
     let release = latest().await?;
     Task::run(tr!("rtxRemix.installing", "Setting up RTX Remix"), Some(inst.id.clone()), {
         let inst = inst.clone();
-        move |task| async move { fill(&task, &inst, &release, with_world).await }
+        move |task| async move {
+            fill(&task, &inst, &release, opts.world).await?;
+            let vram = gpus().await.iter().filter_map(|g| g.vram_mb).max();
+            let spec = super::rtxpack::spec(vram).await;
+            super::rtxpack::apply(&task, &inst, &opts, &spec).await
+        }
     })
     .await
-    .map_err(|e| {
+    .map_err(|e: anyhow::Error| {
         crate::err_tr!(
             "rtxRemix.stopped",
             "RTX Remix setup stopped: {error}. {name} is kept: pick it under New instance → RTX Remix → Add to an instance to finish.",
@@ -296,7 +314,7 @@ pub async fn install(instance_id: &str, with_world: bool) -> Result<Instance> {
             name = inst.name
         )
     })?;
-    Ok(inst)
+    instances::get(instance_id).await
 }
 
 async fn fill(task: &Arc<Task>, inst: &Instance, release: &Release, with_world: bool) -> Result<()> {
@@ -359,6 +377,88 @@ async fn fill(task: &Arc<Task>, inst: &Instance, release: &Release, with_world: 
     Ok(())
 }
 
+/// Whether an instance has RTX Remix and whether it's on, for the instance page's switch.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RtxState {
+    pub installed: bool,
+    pub on: bool,
+    /// The renderer jar's file name (with `.disabled` when off).
+    pub file: Option<String>,
+    /// The texture packs that go with it (NVIDIA's materials, the RTX Pack's PBR pack).
+    pub packs: Vec<String>,
+}
+
+fn is_renderer_jar(name: &str) -> bool {
+    let n = name.to_lowercase();
+    n.starts_with("rtx-remix-renderer") && (n.ends_with(".jar") || n.ends_with(".jar.disabled"))
+}
+
+/// The resource packs that belong to RTX Remix: NVIDIA's materials and a PBR pack the RTX Pack put in.
+async fn rtx_packs(inst: &Instance) -> Vec<String> {
+    let idx = load_index(&inst.id).await;
+    let pbr: Vec<&str> = super::rtxpack::PACKS.iter().map(|p| p.id).collect();
+    let mut out: Vec<String> = Vec::new();
+    if let Ok(mut dir) = tokio::fs::read_dir(paths::game_dir(&inst.id).join("resourcepacks")).await {
+        while let Ok(Some(e)) = dir.next_entry().await {
+            let n = e.file_name().to_string_lossy().to_string();
+            let ours = n.to_lowercase().starts_with("rtx-remix-materials")
+                || idx.get(&index_key(ContentKind::Resourcepack, &n)).is_some_and(|x| pbr.contains(&x.project_id.as_str()));
+            if ours {
+                out.push(n);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+pub async fn state(instance_id: &str) -> Result<RtxState> {
+    let inst = instances::get(instance_id).await?;
+    let mut file = None;
+    if let Ok(mut dir) = tokio::fs::read_dir(paths::game_dir(&inst.id).join("mods")).await {
+        while let Ok(Some(e)) = dir.next_entry().await {
+            let n = e.file_name().to_string_lossy().to_string();
+            if is_renderer_jar(&n) {
+                file = Some(n);
+                break;
+            }
+        }
+    }
+    let on = file.as_deref().is_some_and(|f| !f.ends_with(".disabled"));
+    Ok(RtxState { installed: file.is_some(), on, file, packs: rtx_packs(&inst).await })
+}
+
+/// Turns RTX Remix on or off in an instance. Off: the renderer jar gets `.disabled` and its texture packs leave
+/// options.txt, so the instance plays as plain Fabric 1.21.1; nothing is removed. On puts both back.
+pub async fn set_on(instance_id: &str, on: bool) -> Result<RtxState> {
+    let inst = instances::get(instance_id).await?;
+    if crate::game::running_ids().contains(&inst.id) {
+        bail_tr!("rtxRemix.runningToggle", "Stop {name} before turning RTX Remix on or off.", name = inst.name);
+    }
+    let now = state(instance_id).await?;
+    let Some(file) = now.file.clone() else {
+        bail_tr!("rtxRemix.notInstalled", "{name} doesn't have RTX Remix.", name = inst.name);
+    };
+    if now.on != on {
+        super::modrinth::toggle_content(&inst.id, ContentKind::Mod, &file).await?;
+    }
+    let game = paths::game_dir(&inst.id);
+    // NVIDIA's materials first, so a PBR pack stays on top of them.
+    let mut packs = now.packs.clone();
+    packs.sort_by_key(|p| !p.to_lowercase().starts_with("rtx-remix-materials"));
+    for p in &packs {
+        if on {
+            enable_pack(&game, p).await?;
+        } else {
+            let path = game.join("options.txt");
+            let text = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+            tokio::fs::write(&path, super::rtxpack::without_pack(&text, p)).await?;
+        }
+    }
+    state(instance_id).await
+}
+
 fn mb(bytes: u64) -> String {
     if bytes >= 1_000_000_000 {
         format!("{:.1} GB", bytes as f64 / 1e9)
@@ -373,11 +473,12 @@ mod tests {
 
     #[test]
     fn reads_nvidia_smi() {
-        let gpus = parse_gpus("NVIDIA GeForce RTX 4070 Ti, 621.05\nNVIDIA GeForce RTX 2080 SUPER, 620.10\nNVIDIA GeForce RTX 3060, 600.12\n");
+        let gpus = parse_gpus("NVIDIA GeForce RTX 4070 Ti, 621.05, 12282\nNVIDIA GeForce RTX 2080 SUPER, 620.10, 8192\nNVIDIA GeForce RTX 3060, 600.12, [N/A]\n");
         assert_eq!(gpus.len(), 3);
         assert!(gpus[0].rtx && gpus[0].driver_ok);
         assert!(!gpus[1].rtx && gpus[1].driver_ok);
         assert!(gpus[2].rtx && !gpus[2].driver_ok);
+        assert_eq!((gpus[0].vram_mb, gpus[2].vram_mb), (Some(12282), None));
     }
 
     #[test]

@@ -54,6 +54,7 @@ import ServersTab from '../components/ServersTab'
 import WorldsTab from '../components/WorldsTab'
 import { OptifineSteps, optifineFits, optifineHow } from '../components/Optifine'
 import { InstanceMulticore } from '../components/Multicore'
+import { InstanceRtxRemix } from '../components/RtxRemix'
 import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 import { instanceOwner, PackChip, PackVersionSetting } from '../components/PackVersion'
 import { VersionSection } from '../components/VersionSettings'
@@ -1114,6 +1115,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
           </div>
         </div>
       </div>
+
+      <InstanceRtxRemix inst={inst} />
 
       <OptifineSection inst={inst} />
 
