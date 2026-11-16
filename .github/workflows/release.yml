@@ -90,6 +90,11 @@ jobs:
           RESINCRAFT_MINESKIN_KEY: ${{ secrets.RESINCRAFT_MINESKIN_KEY }}
           # Optional: Discord application ID for Rich Presence (without it the feature is off).
           RESINCRAFT_DISCORD_APP_ID: ${{ secrets.RESINCRAFT_DISCORD_APP_ID }}
+          # Optional: BuiltByBit OAuth app for Plugins → BuiltByBit (without it that tab is hidden).
+          RESINCRAFT_BBB_CLIENT_ID: ${{ secrets.RESINCRAFT_BBB_CLIENT_ID }}
+          RESINCRAFT_BBB_CLIENT_SECRET: ${{ secrets.RESINCRAFT_BBB_CLIENT_SECRET }}
+          RESINCRAFT_BBB_REDIRECT: ${{ secrets.RESINCRAFT_BBB_REDIRECT }}
+          RESINCRAFT_BBB_SCOPES: ${{ secrets.RESINCRAFT_BBB_SCOPES }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build ${{ matrix.args }}
