@@ -507,6 +507,26 @@ export function mockApi(): ResinApi {
       multicorePlan: async () => ({ items: [{ slot: 'render', state: 'install', title: 'Sodium', version: '0.6.0', test: false }], undo: [] }),
       multicoreApply: async () => ({ items: [{ slot: 'render', state: 'have', title: 'Sodium', version: '0.6.0', test: false }], undo: ['Sodium'] }),
       multicoreUndo: async () => ({ items: [{ slot: 'render', state: 'install', title: 'Sodium', version: '0.6.0', test: false }], undo: [] }),
+      rtxRemixCheck: () =>
+        wait(
+          {
+            windows: true,
+            gpus: [{ name: 'NVIDIA GeForce RTX 4070', driver: '621.05', rtx: true, driverOk: true }],
+            ready: true,
+            mcVersion: '1.21.1',
+            version: 'v0.1.1',
+            releaseUrl: 'https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/releases/tag/v0.1.1',
+            downloadSize: 1_055_224_500,
+            worldSize: 216_325_990
+          },
+          500
+        ),
+      rtxRemixCreate: async (name) => {
+        const inst: Instance = { ...instances[0], id: `rtx-remix-${Date.now()}`, name: name || 'RTX Remix', mcVersion: '1.21.1', loader: 'fabric', loaderVersion: '0.16.5', memoryMb: 2048 }
+        instances = [...instances, inst]
+        return wait(inst, 400)
+      },
+      rtxRemixInstall: (id) => wait(instances.find((i) => i.id === id)!, 2500),
       exportList: (_i, kind) =>
         wait(`C:\\Users\\you\\Downloads\\cozy-survival ${kind === 'mod' ? 'mods' : kind === 'shader' ? 'shaders' : 'resource-packs'}.json`, 500),
       importList: (_i, kind) =>

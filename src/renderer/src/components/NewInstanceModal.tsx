@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Blocks, Download, Hammer, Loader2, Search } from 'lucide-react'
+import { Blocks, Download, Hammer, Loader2, Search, Sparkles } from 'lucide-react'
 import type { LoaderType, LoaderVersion, McVersion, OptifineJar } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -12,6 +12,8 @@ import { OptifineSteps, optifineFits } from './Optifine'
 import { PackFields, type PackDraft } from './OwnPack'
 import { liteloaderFits } from './VersionSettings'
 import { ModpackFinder } from './ModpackFinder'
+import { platform } from '../platform'
+import { RtxRemix } from './RtxRemix'
 
 /** The loaders whose builds depend on the Minecraft version (Vanilla always has one; Horizon brings its own). */
 const CHECKED_LOADERS: LoaderType[] = ['fabric', 'quilt', 'forge', 'neoforge', 'liteloader']
@@ -20,9 +22,11 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const { settings, activeAccount, refreshInstances, go, toast, instances } = useStore()
   // 'pack': the player makes their own modpack, then fills it on Discover (see PackBuilderBanner).
   // 'download': an existing modpack from a site, installed straight from here.
-  const [mode, setMode] = useState<'instance' | 'pack' | 'download'>('instance')
+  // 'rtx': NVIDIA RTX Remix for Minecraft in a new or existing Fabric 1.21.1 instance (Windows).
+  const [mode, setMode] = useState<'instance' | 'pack' | 'download' | 'rtx'>('instance')
   const makingPack = mode === 'pack'
   const downloading = mode === 'download'
+  const rtx = mode === 'rtx'
   const [packBusy, setPackBusy] = useState(false)
   // A new modpack can start empty or as a copy of one of the player's instances (its mods, packs and configs).
   const [fromId, setFromId] = useState<string>()
@@ -206,13 +210,13 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title={t(makingPack ? 'ownPack.title' : downloading ? 'newInstance.download.title' : 'newInstance.title')}
-      subtitle={t(makingPack ? 'ownPack.subtitle' : downloading ? 'newInstance.download.subtitle' : 'newInstance.subtitle')}
+      title={t(makingPack ? 'ownPack.title' : downloading ? 'newInstance.download.title' : rtx ? 'rtxRemix.title' : 'newInstance.title')}
+      subtitle={t(makingPack ? 'ownPack.subtitle' : downloading ? 'newInstance.download.subtitle' : rtx ? 'rtxRemix.subtitle' : 'newInstance.subtitle')}
       onClose={onClose}
       wide
       footer={
-        downloading ? (
-          <button className="btn ghost" disabled={packBusy} onClick={onClose}>
+        downloading || rtx ? (
+          <button className="btn ghost" disabled={downloading && packBusy} onClick={onClose}>
             {t('common.cancel')}
           </button>
         ) : (
@@ -228,7 +232,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="new-mode">
-        <Segmented<'instance' | 'pack' | 'download'>
+        <Segmented<'instance' | 'pack' | 'download' | 'rtx'>
           value={mode}
           onChange={(m) => !packBusy && setMode(m)}
           options={[
@@ -255,7 +259,19 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
                   <Download /> {t('ownPack.mode.download')}
                 </>
               )
-            }
+            },
+            ...(platform === 'windows'
+              ? [
+                  {
+                    value: 'rtx' as const,
+                    label: (
+                      <>
+                        <Sparkles /> RTX Remix
+                      </>
+                    )
+                  }
+                ]
+              : [])
           ]}
         />
       </div>
@@ -263,6 +279,14 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
         <ModpackFinder
           onBusy={setPackBusy}
           onInstalled={(inst) => {
+            onClose()
+            go({ page: 'instance', id: inst.id })
+          }}
+        />
+      ) : rtx ? (
+        <RtxRemix
+          onBusy={setPackBusy}
+          onDone={(inst) => {
             onClose()
             go({ page: 'instance', id: inst.id })
           }}

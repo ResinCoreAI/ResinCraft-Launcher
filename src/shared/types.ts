@@ -2173,6 +2173,29 @@ export interface MulticoreItem {
   versionId?: string
 }
 
+export interface RtxRemixGpu {
+  name: string
+  driver: string
+  /** An RTX card from the 30-series on. */
+  rtx: boolean
+  driverOk: boolean
+}
+
+export interface RtxRemixCheck {
+  windows: boolean
+  /** NVIDIA cards; empty without an NVIDIA driver. */
+  gpus: RtxRemixGpu[]
+  /** Windows and a card that fits with a new enough driver. */
+  ready: boolean
+  mcVersion: string
+  version?: string | null
+  releaseUrl?: string | null
+  /** The mod and the materials pack, in bytes. */
+  downloadSize: number
+  worldSize: number
+  error?: string | null
+}
+
 export interface MulticorePlan {
   reason?: 'vanilla' | 'noLoader' | 'noMods' | 'plugins' | 'hybrid' | 'bedrock' | 'folia' | 'noJavaMods'
   items: MulticoreItem[]
@@ -2440,6 +2463,13 @@ export interface ResinApi {
     multicorePlan(instanceId: string): Promise<MulticorePlan>
     multicoreApply(instanceId: string): Promise<MulticorePlan>
     multicoreUndo(instanceId: string): Promise<MulticorePlan>
+    /** NVIDIA RTX Remix for Minecraft: this PC's cards and the newest release. */
+    rtxRemixCheck(): Promise<RtxRemixCheck>
+    /** Makes an empty Fabric 1.21.1 instance set up for RTX Remix; `rtxRemixInstall` fills it. */
+    rtxRemixCreate(name: string): Promise<Instance>
+    /** Puts RTX Remix, its materials pack and (by default) the showcase world into a Fabric 1.21.1 instance. Also
+     *  finishes a setup that stopped, or moves the instance to the newest release. */
+    rtxRemixInstall(instanceId: string, withWorld?: boolean): Promise<Instance>
     exportList(instanceId: string, kind: ContentKind): Promise<string | null>
     /** Installs a list file (asks for it without `path`); null if the dialog was cancelled. */
     importList(instanceId: string, kind: ContentKind, path?: string): Promise<ListImport | null>

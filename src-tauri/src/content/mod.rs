@@ -19,6 +19,7 @@ pub mod modrinth;
 pub mod multicore;
 pub mod packswitch;
 pub mod packupdates;
+pub mod rtxremix;
 pub mod sources;
 pub mod technic;
 
@@ -51,6 +52,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "content:multicorePlan" => json(multicore::instance_plan(&args.get::<String>(0)?).await?),
         "content:multicoreApply" => json(multicore::instance_apply(&args.get::<String>(0)?).await?),
         "content:multicoreUndo" => json(multicore::instance_undo(&args.get::<String>(0)?).await?),
+        "content:rtxRemixCheck" => json(rtxremix::check().await),
+        "content:rtxRemixCreate" => json(rtxremix::create(args.get::<String>(0)?).await?),
+        "content:rtxRemixInstall" => json(rtxremix::install(&args.get::<String>(0)?, args.get::<Option<bool>>(1)?.unwrap_or(true)).await?),
         "content:exportList" => json(lists::export_list(&args.get::<String>(0)?, args.get::<ContentKind>(1)?).await?),
         "content:importList" => json(lists::import_list(&args.get::<String>(0)?, args.get::<ContentKind>(1)?, args.get(2)?).await?),
         "content:installFromLink" => {

@@ -1,0 +1,29 @@
+/* New instance → RTX Remix (components/RtxRemix.tsx). */
+.rtx-remix {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rtx-remix .setting .text b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rtx-remix .setting .text b svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.rtx-remix .rtx-ok svg {
+  color: var(--success);
+}
+.rtx-remix .rtx-warn svg {
+  color: var(--warning);
+}
+.rtx-remix .rtx-hint {
+  padding: 0 16px 14px;
+  margin: 0;
+}
+.rtx-remix .setting .control {
+  width: auto;
+}
