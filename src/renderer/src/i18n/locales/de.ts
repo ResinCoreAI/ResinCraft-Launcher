@@ -4119,6 +4119,7 @@ const dict: Dict = {
   "rtxPack.memory": "Speicher für das Spiel",
   "rtxPack.memoryHint": "Wie viel der {ram} RAM dieses PCs Minecraft nutzen darf. Auto richtet sich nach PC und Texturpaket.",
   "rtxPack.memoryAuto": "Auto: {size}",
+  "rtxPack.memoryHintRemix": "Wie viel RAM Minecraft nutzen darf, höchstens {max}. RTX Remix hält auch eigene Texturen im RAM, und ein größerer Spiel-Heap bringt es zum Absturz. Auto richtet sich nach PC und Texturpaket.",
 }
 
 export default dict

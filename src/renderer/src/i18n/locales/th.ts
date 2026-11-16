@@ -4094,6 +4094,7 @@ const dict: Dict = {
   "rtxPack.memory": "หน่วยความจำของเกม",
   "rtxPack.memoryHint": "Minecraft ใช้ RAM {ram} ของเครื่องนี้ได้เท่าไร อัตโนมัติจะกำหนดตามเครื่องและแพ็กเท็กซ์เจอร์",
   "rtxPack.memoryAuto": "อัตโนมัติ: {size}",
+  "rtxPack.memoryHintRemix": "Minecraft ใช้ RAM ได้เท่าไร สูงสุด {max} RTX Remix เก็บเท็กซ์เจอร์ของตัวเองไว้ใน RAM ด้วย ถ้าให้เกมมากกว่านี้จะทำให้มันแครช อัตโนมัติจะกำหนดตามเครื่องและแพ็กเท็กซ์เจอร์",
 }
 
 export default dict

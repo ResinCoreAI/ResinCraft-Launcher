@@ -169,6 +169,9 @@ fn version_line(mc: &str) -> Vec<String> {
     out
 }
 
+/// The most memory the RTX Pack gives a game running RTX Remix (NVIDIA's own setup uses 2 GB).
+pub const REMIX_MAX_MB: u32 = 8192;
+
 /// The player's own memory, kept between 1 GB and all but 2 GB of the PC's RAM (Windows and the graphics driver
 /// need room too), in whole 256 MB steps.
 pub fn own_memory(spec: &Spec, mb: u32) -> u32 {
@@ -306,6 +309,11 @@ pub async fn apply(task: &crate::core::events::Task, inst: &Instance, opts: &Rtx
     }
     if let Some(mb) = opts.memory_mb {
         tuning.memory_mb = own_memory(spec, mb);
+        // RTX Remix keeps its own big texture buffers in system memory: a large Java heap starves it, and its
+        // runtime crashes when Windows runs out of committed memory (a 24 GB heap did on a 40 GB PC).
+        if !shader {
+            tuning.memory_mb = tuning.memory_mb.min(REMIX_MAX_MB);
+        }
     }
     if opts.tune {
         edit_options(&game, |t| {

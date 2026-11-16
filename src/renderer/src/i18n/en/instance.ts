@@ -251,6 +251,7 @@ export default {
   "rtxPack.tuneHint": "Render distance {render} chunks, simulation distance {simulation}, memory {memory}. RTX Remix picks its own quality from your graphics card.",
   "rtxPack.memory": "Memory for the game",
   "rtxPack.memoryHint": "How much of this PC's {ram} RAM Minecraft may use. Auto sizes it for the PC and the texture pack.",
+  "rtxPack.memoryHintRemix": "How much RAM Minecraft may use, up to {max}. RTX Remix keeps its own textures in RAM too, and a bigger game heap crashes it. Auto sizes it for the PC and the texture pack.",
   "rtxPack.memoryAuto": "Auto: {size}",
   'newInstance.download.title': 'Download a modpack',
   'newInstance.download.subtitle': 'Pick a modpack from Modrinth, CurseForge, FTB, ATLauncher or Technic; it becomes a new instance.',

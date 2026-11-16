@@ -4102,6 +4102,7 @@ const dict: Dict = {
   "rtxPack.memory": "Bộ nhớ cho game",
   "rtxPack.memoryHint": "Minecraft được dùng bao nhiêu trong {ram} RAM của máy này. Tự động sẽ chọn theo máy và gói texture.",
   "rtxPack.memoryAuto": "Tự động: {size}",
+  "rtxPack.memoryHintRemix": "Minecraft được dùng bao nhiêu RAM, tối đa {max}. RTX Remix cũng giữ texture của nó trong RAM, heap game lớn hơn sẽ làm nó crash. Tự động sẽ chọn theo máy và gói texture.",
 }
 
 export default dict

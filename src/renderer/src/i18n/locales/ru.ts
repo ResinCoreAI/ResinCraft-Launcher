@@ -4164,6 +4164,7 @@ const dict: Dict = {
   "rtxPack.memory": "Память для игры",
   "rtxPack.memoryHint": "Сколько из {ram} ОЗУ этого ПК может использовать Minecraft. «Авто» подбирает объём под ПК и набор текстур.",
   "rtxPack.memoryAuto": "Авто: {size}",
+  "rtxPack.memoryHintRemix": "Сколько ОЗУ может использовать Minecraft, до {max}. RTX Remix тоже держит свои текстуры в ОЗУ, и большая куча игры приводит к его сбою. «Авто» подбирает объём под ПК и набор текстур.",
 }
 
 export default dict

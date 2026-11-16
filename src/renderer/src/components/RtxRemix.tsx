@@ -32,21 +32,24 @@ function MemoryPick({
   auto,
   value,
   onChange,
-  disabled
+  disabled,
+  maxGb
 }: {
   spec: RtxPackSpec
   auto: number
   value?: number
   onChange: (mb?: number) => void
   disabled?: boolean
+  /** RTX Remix: a big Java heap starves its runtime of memory, so it stops at 8 GB. */
+  maxGb?: number
 }) {
-  const most = Math.max(2, Math.floor((spec.ramMb - 2048) / 1024))
+  const most = Math.min(maxGb ?? Infinity, Math.max(2, Math.floor((spec.ramMb - 2048) / 1024)))
   const sizes = Array.from({ length: most - 1 }, (_, i) => i + 2).filter((g) => g <= 8 || g % 2 === 0 || g === most)
   return (
     <div className="setting">
       <div className="text">
         <b>{t('rtxPack.memory')}</b>
-        <span>{t('rtxPack.memoryHint', { ram: gb(spec.ramMb) })}</span>
+        <span>{t(maxGb ? 'rtxPack.memoryHintRemix' : 'rtxPack.memoryHint', { ram: gb(spec.ramMb), max: `${maxGb ?? ''} GB` })}</span>
       </div>
       <div className="control">
         <select className="input" value={value ?? ''} disabled={disabled} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}>
@@ -283,7 +286,7 @@ export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void;
             <Switch on={tune} onChange={setTune} label={t('rtxPack.tune')} disabled={busy} />
           </div>
         </div>
-        <MemoryPick spec={check.spec} auto={memoryFor(check.spec, picked)} value={memoryMb} onChange={setMemoryMb} disabled={busy} />
+        <MemoryPick spec={check.spec} auto={memoryFor(check.spec, picked)} value={memoryMb} onChange={setMemoryMb} disabled={busy} maxGb={8} />
       </div>
 
       <div className="field">
