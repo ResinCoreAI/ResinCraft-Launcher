@@ -22,7 +22,7 @@ use crate::player::accounts::LaunchAuth;
 use crate::{bail_tr, err_tr, tr};
 
 use super::commands;
-use super::java::{cpu_for, find_java_for, hidden_command, host_cpu, install_java_for};
+use super::java::{cpu_for, hidden_command, host_cpu, install_java_for, resolve_java};
 use super::loaders::{JavaPicker, ResolveContext};
 use super::mojang::{asset_items, game_arch, os_name, plain,client_jar, logging_config, materialize_legacy_assets, resolve_libraries, rules_allow, ArgValue, Argument, VersionJson};
 
@@ -241,11 +241,9 @@ async fn choose_java(inst: &Instance, settings: &Settings, required: u32, cpu: &
     if let Some(custom) = non_empty(inst.java_path.as_deref()).or_else(|| non_empty(Some(&settings.java_path))) {
         return Ok(custom);
     }
-    if let Some(found) = find_java_for(required, cpu).await? {
+    let download = settings.auto_java.then_some(|| install_java_for(required, cpu, task));
+    if let Some(found) = resolve_java(required, cpu, download).await? {
         return Ok(found.path);
-    }
-    if settings.auto_java {
-        return Ok(install_java_for(required, cpu, task).await?.path);
     }
     bail_tr!(
         "launch.needJava",

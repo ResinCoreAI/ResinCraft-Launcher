@@ -22,7 +22,7 @@ use crate::core::events::Task;
 use crate::core::net::{download_all, download_file, fetch_json, fetch_text, status_of, DownloadItem, Hash};
 use crate::core::types::{LoaderType, ServerBuild, ServerKind, ServerLaunch, ServerMeta};
 use crate::core::{paths, settings};
-use crate::game::java::{find_java, hidden_command, install_java};
+use crate::game::java::{hidden_command, install_java};
 use crate::game::forge::legacy_lib_bases;
 use crate::game::loaders::{full_forge_version, installer_url, is_ancient_forge, is_legacy_forge, latest_loader, legacy_forge_error, normalize_loader_version};
 use crate::game::horizon;
@@ -111,12 +111,12 @@ pub async fn choose_java(meta: &ServerMeta) -> Result<String> {
 
 /// A detected Java of this major version, else Temurin downloaded into the launcher's Java folder.
 pub async fn java_for(required: u32, owner: Option<String>, mc: &str) -> Result<String> {
-    if let Some(found) = find_java(required).await? {
+    let download = settings::get()
+        .await
+        .auto_java
+        .then_some(|| Task::run(format!("Downloading Java {required}"), owner, move |t| async move { install_java(required, &t).await }));
+    if let Some(found) = crate::game::java::resolve_java(required, crate::game::java::host_cpu(), download).await? {
         return Ok(found.path);
-    }
-    if settings::get().await.auto_java {
-        let installed = Task::run(format!("Downloading Java {required}"), owner, |t| async move { install_java(required, &t).await }).await?;
-        return Ok(installed.path);
     }
     bail!("Minecraft {mc} needs Java {required}. Install it, or turn on automatic Java downloads in Settings.")
 }

@@ -196,6 +196,37 @@ pub async fn find_java(required: u32) -> Result<Option<JavaInstall>> {
     find_java_for(required, host_cpu()).await
 }
 
+/// A Java of exactly `required` (16 also takes 17, which replaced it) that runs as `cpu`.
+pub async fn exact_java_for(required: u32, cpu: &str) -> Result<Option<JavaInstall>> {
+    let all: Vec<JavaInstall> = detect_java().await?.into_iter().filter(|j| fits_cpu(j, cpu)).collect();
+    Ok(all.into_iter().find(|j| j.major == required || (required == 16 && j.major == 17)))
+}
+
+/// The order a game or server gets its Java in: exactly the version it asks for if it's installed, else that
+/// version downloaded (when `download` is allowed), and only then a newer one. A newer Java runs Minecraft itself,
+/// but mod loaders read class files with their own ASM: Forge and Fabric of a Java 21 version fail on Java 25
+/// ("Unsupported class file major version 69"), so a newer Java is the last resort, not the first.
+pub async fn resolve_java<F, Fut>(required: u32, cpu: &str, download: Option<F>) -> Result<Option<JavaInstall>>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<JavaInstall>>,
+{
+    if let Some(j) = exact_java_for(required, cpu).await? {
+        return Ok(Some(j));
+    }
+    let mut failed = None;
+    if let Some(download) = download {
+        match download().await {
+            Ok(j) => return Ok(Some(j)),
+            Err(e) => failed = Some(e),
+        }
+    }
+    match find_java_for(required, cpu).await? {
+        Some(j) => Ok(Some(j)),
+        None => failed.map_or(Ok(None), Err),
+    }
+}
+
 /// A Java for `required` that runs as `cpu` ("x64" or "aarch64").
 pub async fn find_java_for(required: u32, cpu: &str) -> Result<Option<JavaInstall>> {
     let all: Vec<JavaInstall> = detect_java().await?.into_iter().filter(|j| fits_cpu(j, cpu)).collect();
