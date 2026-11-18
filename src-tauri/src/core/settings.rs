@@ -30,6 +30,10 @@ pub struct Settings {
     /// Remote control from the web console (console.<relay domain>) while ResinCraft runs, signed in with the same
     /// Minecraft account (Settings → Remote control; off by default).
     pub remote_control: bool,
+    /// The MCP server for AI assistants on this PC (Settings → AI assistants; off by default).
+    pub mcp: bool,
+    /// Its port on 127.0.0.1 (0 = mcp::DEFAULT_PORT).
+    pub mcp_port: u16,
     /// Remote control may also use the file manager, Java settings and plugins from any link (they can run programs
     /// on this PC). Off by default.
     pub remote_full_control: bool,
@@ -113,6 +117,8 @@ impl Default for Settings {
             auto_backup_minutes: 30,
             auto_backup_keep: 3,
             remote_control: false,
+            mcp: false,
+            mcp_port: 0,
             remote_full_control: false,
             language: "system".into(),
             // A quarter of system RAM, kept between 2 GB and 6 GB, suits most packs.
@@ -233,6 +239,7 @@ pub async fn set(patch: Value) -> Result<Settings> {
     *CACHE.lock().unwrap() = Some(s.clone());
     crate::tray::sync(s.tray);
     crate::remote::sync(s.remote_control);
+    crate::mcp::sync(s.mcp, s.mcp_port);
     Ok(s)
 }
 

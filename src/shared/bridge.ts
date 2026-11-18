@@ -30,6 +30,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       saveText: fn('app:saveText'),
       pendingOpen: fn('app:pendingOpen'),
       pendingLink: fn('app:pendingLink'),
+      mcpInfo: fn('app:mcpInfo'),
+      mcpResetToken: fn('app:mcpResetToken'),
       storageImport: fn('app:storageImport'),
       uninstall: fn('app:uninstall'),
       readThemeFile: fn('app:readThemeFile'),

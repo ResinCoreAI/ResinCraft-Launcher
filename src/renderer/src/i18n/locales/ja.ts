@@ -4117,6 +4117,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "今夜 20 時からイベント、新マップ、セール… (任意)",
   "servers.list.announcementHint": "あなたの掲載ページと、プレイヤーの Quick join に入っていればホームに表示されます。残り {left} 文字。",
   "announcements.close": "次のお知らせまで閉じる",
+  "settings.mcp": "AI アシスタント (MCP)",
+  "settings.mcp.lead": "この PC の AI アシスタント (Claude Code、Claude Desktop、Cursor、VS Code など) が ResinCraft を使えるようにします: インスタンスの一覧、ゲームの起動と終了、クラッシュ調査のためのゲームログの読み取り、Mod の検索とインストール、ホストしているサーバーの操作。",
+  "settings.mcp.switch": "AI アシスタントを許可",
+  "settings.mcp.hint": "この PC のプログラムだけが、下のトークンを使って接続できます。",
+  "settings.mcp.error": "ポート {port} は別のプログラムが使っています。別のポートを選んでください。",
+  "settings.mcp.port": "ポート",
+  "settings.mcp.claude": "Claude Code: ターミナルでこれを実行",
+  "settings.mcp.json": "Claude Desktop、Cursor、VS Code など: これを MCP 設定に追加",
+  "settings.mcp.tokenHint": "このトークンがあるとアシスタントが ResinCraft を操作できます。信頼できるアシスタントにだけ渡し、漏れたら作り直してください。",
+  "settings.mcp.copyClaude": "コマンドをコピー",
+  "settings.mcp.copyJson": "JSON をコピー",
+  "settings.mcp.showToken": "トークンを表示",
+  "settings.mcp.hideToken": "トークンを隠す",
+  "settings.mcp.resetToken": "新しいトークン",
+  "settings.mcp.tokenReset": "新しいトークンを作りました。古いトークンで設定したアシスタントには新しいものが必要です。",
+  "settings.mcp.copied": "コピーしました",
 }
 
 export default dict

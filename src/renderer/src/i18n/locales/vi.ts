@@ -4117,6 +4117,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "Sự kiện tối nay 8 giờ, bản đồ mới, giảm giá… (không bắt buộc)",
   "servers.list.announcementHint": "Người chơi thấy trên trang máy chủ của bạn và trên Trang chủ nếu bạn có trong Quick join của họ. Còn {left} ký tự.",
   "announcements.close": "Đóng cho đến thông báo tiếp theo",
+  "settings.mcp": "Trợ lý AI (MCP)",
+  "settings.mcp.lead": "Cho phép các trợ lý AI trên máy này như Claude Code, Claude Desktop, Cursor hoặc VS Code dùng ResinCraft: xem danh sách bản cài, mở và tắt game, đọc log game để tìm lỗi crash, tìm và cài mod, và điều khiển máy chủ của bạn.",
+  "settings.mcp.switch": "Cho phép trợ lý AI",
+  "settings.mcp.hint": "Chỉ chương trình trên máy này mới kết nối được, và phải có mã bên dưới.",
+  "settings.mcp.error": "Cổng {port} đang bị chương trình khác dùng. Hãy chọn cổng khác.",
+  "settings.mcp.port": "Cổng",
+  "settings.mcp.claude": "Claude Code: chạy lệnh này trong terminal",
+  "settings.mcp.json": "Claude Desktop, Cursor, VS Code và các ứng dụng khác: thêm phần này vào cài đặt MCP",
+  "settings.mcp.tokenHint": "Mã này cho phép trợ lý điều khiển ResinCraft. Chỉ đưa cho trợ lý bạn tin tưởng; nếu bị lộ hãy tạo mã mới.",
+  "settings.mcp.copyClaude": "Sao chép lệnh",
+  "settings.mcp.copyJson": "Sao chép JSON",
+  "settings.mcp.showToken": "Hiện mã",
+  "settings.mcp.hideToken": "Ẩn mã",
+  "settings.mcp.resetToken": "Mã mới",
+  "settings.mcp.tokenReset": "Đã tạo mã mới. Trợ lý đã cài bằng mã cũ cần mã mới.",
+  "settings.mcp.copied": "Đã sao chép",
 }
 
 export default dict

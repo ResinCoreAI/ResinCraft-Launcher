@@ -416,6 +416,10 @@ export interface Settings {
   remoteControl?: boolean
   /** Remote control may also use the file manager, Java settings and plugins from any link (off by default). */
   remoteFullControl?: boolean
+  /** The MCP server for AI assistants on this PC (Settings → AI assistants; off by default). */
+  mcp?: boolean
+  /** Its port on 127.0.0.1 (0 or unset = 47615). */
+  mcpPort?: number
   /** 'system' follows the OS locale; otherwise a locale code such as 'de' or 'pt-BR'. */
   language: string
   memoryMb: number
@@ -1729,6 +1733,15 @@ export interface ListedServer {
   last_seen?: number | null
 }
 
+/** The MCP server for AI assistants (mcp.rs). */
+export interface McpInfo {
+  state: 'off' | 'on' | 'error'
+  port: number
+  error?: string | null
+  url: string
+  token: string
+}
+
 /** A listed server's announcement, for Home. */
 export interface ServerAnnouncement {
   id: string
@@ -2352,6 +2365,10 @@ export interface ResinApi {
     pendingOpen(): Promise<string | null>
     /** The resincraft:// link ResinCraft was started with, once. */
     pendingLink(): Promise<string | null>
+    /** Settings → AI assistants: whether the MCP server runs, its URL and token. */
+    mcpInfo(): Promise<McpInfo>
+    /** A new MCP token (assistants set up with the old one stop working). */
+    mcpResetToken(): Promise<McpInfo>
     /** The old origin's localStorage entries, once; null when there is nothing to carry over. */
     storageImport(): Promise<Record<string, string> | null>
     /** Starts ResinCraft's uninstaller ('uninstaller', ResinCraft then quits) or opens Windows' Installed apps ('settings'). */

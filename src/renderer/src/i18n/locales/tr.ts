@@ -4130,6 +4130,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "Bu akşam 20.00 etkinlik, yeni harita, indirim… (isteğe bağlı)",
   "servers.list.announcementHint": "Oyuncular bunu sunucu kaydınızda ve Quick join'lerinde varsanız Ana sayfalarında görür. {left} karakter kaldı.",
   "announcements.close": "Bir sonraki duyuruya kadar kapat",
+  "settings.mcp": "Yapay zekâ asistanları (MCP)",
+  "settings.mcp.lead": "Bu PC'deki Claude Code, Claude Desktop, Cursor veya VS Code gibi yapay zekâ asistanlarının ResinCraft'ı kullanmasına izin ver: kurulumları listeleme, oyunu başlatıp kapatma, çökmeleri bulmak için oyun günlüğünü okuma, mod arama ve kurma, sunucularını yönetme.",
+  "settings.mcp.switch": "Yapay zekâ asistanlarına izin ver",
+  "settings.mcp.hint": "Yalnızca bu PC'deki programlar, yalnızca aşağıdaki belirteçle bağlanabilir.",
+  "settings.mcp.error": "{port} bağlantı noktası başka bir program tarafından kullanılıyor. Başka bir bağlantı noktası seç.",
+  "settings.mcp.port": "Bağlantı noktası",
+  "settings.mcp.claude": "Claude Code: bunu bir terminalde çalıştır",
+  "settings.mcp.json": "Claude Desktop, Cursor, VS Code ve diğerleri: bunu MCP ayarlarına ekle",
+  "settings.mcp.tokenHint": "Bu belirteç bir asistanın ResinCraft'ı yönetmesini sağlar. Yalnızca güvendiğin asistanlara ver; sızarsa yenisini oluştur.",
+  "settings.mcp.copyClaude": "Komutu kopyala",
+  "settings.mcp.copyJson": "JSON'u kopyala",
+  "settings.mcp.showToken": "Belirteci göster",
+  "settings.mcp.hideToken": "Belirteci gizle",
+  "settings.mcp.resetToken": "Yeni belirteç",
+  "settings.mcp.tokenReset": "Yeni belirteç oluşturuldu. Eskisiyle kurulan asistanların yenisine ihtiyacı var.",
+  "settings.mcp.copied": "Kopyalandı",
 }
 
 export default dict

@@ -292,6 +292,8 @@ export function mockApi(): ResinApi {
       gameTexture: async () => null,
       pendingOpen: async () => null,
       pendingLink: async () => null,
+      mcpInfo: async () => ({ state: 'on' as const, port: 47615, url: 'http://127.0.0.1:47615/mcp', token: 'mock0123456789abcdef0123456789abcdef0123' }),
+      mcpResetToken: async () => ({ state: 'on' as const, port: 47615, url: 'http://127.0.0.1:47615/mcp', token: 'mock0123456789abcdef0123456789abcdef0123' }),
       storageImport: async () => null,
       uninstall: async () => 'settings' as const,
       readThemeFile: async () => {

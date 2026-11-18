@@ -4179,6 +4179,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "Событие сегодня в 20:00, новая карта, скидки… (необязательно)",
   "servers.list.announcementHint": "Игроки видят его в вашей карточке и на своей главной, если ваш сервер есть в их Quick join. Осталось символов: {left}.",
   "announcements.close": "Закрыть до следующего объявления",
+  "settings.mcp": "ИИ-ассистенты (MCP)",
+  "settings.mcp.lead": "Разрешите ИИ-ассистентам на этом ПК, например Claude Code, Claude Desktop, Cursor или VS Code, пользоваться ResinCraft: показывать сборки, запускать и закрывать игру, читать лог игры в поисках вылетов, искать и ставить моды и управлять вашими серверами.",
+  "settings.mcp.switch": "Разрешить ИИ-ассистентов",
+  "settings.mcp.hint": "Подключаться могут только программы на этом ПК и только с токеном ниже.",
+  "settings.mcp.error": "Порт {port} занят другой программой. Выберите другой порт.",
+  "settings.mcp.port": "Порт",
+  "settings.mcp.claude": "Claude Code: выполните это в терминале",
+  "settings.mcp.json": "Claude Desktop, Cursor, VS Code и другие: добавьте это в настройки MCP",
+  "settings.mcp.tokenHint": "С этим токеном ассистент может управлять ResinCraft. Давайте его только надёжным ассистентам; если он утёк, создайте новый.",
+  "settings.mcp.copyClaude": "Копировать команду",
+  "settings.mcp.copyJson": "Копировать JSON",
+  "settings.mcp.showToken": "Показать токен",
+  "settings.mcp.hideToken": "Скрыть токен",
+  "settings.mcp.resetToken": "Новый токен",
+  "settings.mcp.tokenReset": "Создан новый токен. Ассистентам со старым токеном нужен новый.",
+  "settings.mcp.copied": "Скопировано",
 }
 
 export default dict

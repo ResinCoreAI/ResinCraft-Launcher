@@ -4120,6 +4120,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "Event malam ini jam 8, peta baru, diskon… (opsional)",
   "servers.list.announcementHint": "Pemain melihatnya di daftar server kamu dan di Beranda mereka jika server kamu ada di Quick join mereka. Sisa {left} karakter.",
   "announcements.close": "Tutup sampai pengumuman berikutnya",
+  "settings.mcp": "Asisten AI (MCP)",
+  "settings.mcp.lead": "Izinkan asisten AI di PC ini, seperti Claude Code, Claude Desktop, Cursor atau VS Code, memakai ResinCraft: melihat instance, memulai dan menghentikan game, membaca log game untuk mencari crash, mencari dan memasang mod, serta menjalankan server kamu.",
+  "settings.mcp.switch": "Izinkan asisten AI",
+  "settings.mcp.hint": "Hanya program di PC ini yang bisa terhubung, dan hanya dengan token di bawah.",
+  "settings.mcp.error": "Port {port} dipakai program lain. Pilih port lain.",
+  "settings.mcp.port": "Port",
+  "settings.mcp.claude": "Claude Code: jalankan ini di terminal",
+  "settings.mcp.json": "Claude Desktop, Cursor, VS Code dan lainnya: tambahkan ini ke pengaturan MCP",
+  "settings.mcp.tokenHint": "Token ini membuat asisten bisa mengendalikan ResinCraft. Berikan hanya ke asisten yang kamu percaya; buat baru jika bocor.",
+  "settings.mcp.copyClaude": "Salin perintah",
+  "settings.mcp.copyJson": "Salin JSON",
+  "settings.mcp.showToken": "Tampilkan token",
+  "settings.mcp.hideToken": "Sembunyikan token",
+  "settings.mcp.resetToken": "Token baru",
+  "settings.mcp.tokenReset": "Token baru dibuat. Asisten yang memakai token lama butuh yang baru.",
+  "settings.mcp.copied": "Disalin",
 }
 
 export default dict

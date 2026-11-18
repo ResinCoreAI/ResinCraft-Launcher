@@ -50,6 +50,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:storageImport" => json(crate::webstorage::import().await),
         "app:pendingOpen" => json(crate::openfile::take()),
         "app:pendingLink" => json(crate::openfile::take_link()),
+        "app:mcpInfo" => json(crate::mcp::info().await?),
+        "app:mcpResetToken" => json(crate::mcp::reset_token().await?),
         "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
         // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.
         "app:exportTheme" => json(export_theme(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),

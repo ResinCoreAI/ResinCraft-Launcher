@@ -4107,6 +4107,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "今晚 8 點活動、新地圖、特價…（可選）",
   "servers.list.announcementHint": "玩家會在你的伺服器頁面上看到；如果你在他們的 Quick join 裡，也會顯示在他們的首頁。還剩 {left} 個字元。",
   "announcements.close": "關閉，直到下一則公告",
+  "settings.mcp": "AI 助理 (MCP)",
+  "settings.mcp.lead": "讓這台電腦上的 AI 助理（如 Claude Code、Claude Desktop、Cursor 或 VS Code）使用 ResinCraft：列出實例、啟動和關閉遊戲、讀取遊戲記錄排查當機、搜尋並安裝模組，以及管理你架設的伺服器。",
+  "settings.mcp.switch": "允許 AI 助理",
+  "settings.mcp.hint": "只有這台電腦上的程式，且持有下方的權杖，才能連線。",
+  "settings.mcp.error": "連接埠 {port} 被其他程式占用，請換一個連接埠。",
+  "settings.mcp.port": "連接埠",
+  "settings.mcp.claude": "Claude Code：在終端機執行這行指令",
+  "settings.mcp.json": "Claude Desktop、Cursor、VS Code 等：把這段加到 MCP 設定裡",
+  "settings.mcp.tokenHint": "有了這個權杖，助理就能控制 ResinCraft。只交給你信任的助理；外洩了就重新產生。",
+  "settings.mcp.copyClaude": "複製指令",
+  "settings.mcp.copyJson": "複製 JSON",
+  "settings.mcp.showToken": "顯示權杖",
+  "settings.mcp.hideToken": "隱藏權杖",
+  "settings.mcp.resetToken": "新權杖",
+  "settings.mcp.tokenReset": "已產生新權杖。用舊權杖設定的助理需要換成新的。",
+  "settings.mcp.copied": "已複製",
 }
 
 export default dict

@@ -4165,6 +4165,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "Événement ce soir à 20 h, nouvelle map, des soldes… (facultatif)",
   "servers.list.announcementHint": "Les joueurs la voient sur votre fiche et sur leur Accueil si vous êtes dans leur Quick join. Encore {left} caractères.",
   "announcements.close": "Fermer jusqu'à la prochaine annonce",
+  "settings.mcp": "Assistants IA (MCP)",
+  "settings.mcp.lead": "Laissez les assistants IA de ce PC, comme Claude Code, Claude Desktop, Cursor ou VS Code, utiliser ResinCraft : lister vos instances, lancer et arrêter des parties, lire le journal du jeu pour trouver les plantages, chercher et installer des mods et gérer vos serveurs.",
+  "settings.mcp.switch": "Autoriser les assistants IA",
+  "settings.mcp.hint": "Seuls les programmes de ce PC peuvent se connecter, et seulement avec le jeton ci-dessous.",
+  "settings.mcp.error": "Le port {port} est utilisé par un autre programme. Choisissez un autre port.",
+  "settings.mcp.port": "Port",
+  "settings.mcp.claude": "Claude Code : lancez ceci dans un terminal",
+  "settings.mcp.json": "Claude Desktop, Cursor, VS Code et autres : ajoutez ceci aux réglages MCP",
+  "settings.mcp.tokenHint": "Le jeton permet à un assistant de contrôler ResinCraft. Ne le donnez qu'aux assistants de confiance ; créez-en un nouveau s'il fuite.",
+  "settings.mcp.copyClaude": "Copier la commande",
+  "settings.mcp.copyJson": "Copier le JSON",
+  "settings.mcp.showToken": "Afficher le jeton",
+  "settings.mcp.hideToken": "Masquer le jeton",
+  "settings.mcp.resetToken": "Nouveau jeton",
+  "settings.mcp.tokenReset": "Nouveau jeton créé. Les assistants configurés avec l'ancien ont besoin du nouveau.",
+  "settings.mcp.copied": "Copié",
 }
 
 export default dict

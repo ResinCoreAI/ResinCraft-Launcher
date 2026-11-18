@@ -4109,6 +4109,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "อีเวนต์คืนนี้ 2 ทุ่ม แมพใหม่ ลดราคา… (ไม่ใส่ก็ได้)",
   "servers.list.announcementHint": "ผู้เล่นจะเห็นบนรายการเซิร์ฟของคุณ และบนหน้าแรกถ้าเซิร์ฟคุณอยู่ใน Quick join ของเขา เหลืออีก {left} ตัวอักษร",
   "announcements.close": "ปิดไว้จนกว่าจะมีประกาศใหม่",
+  "settings.mcp": "ผู้ช่วย AI (MCP)",
+  "settings.mcp.lead": "ให้ผู้ช่วย AI ในเครื่องนี้ เช่น Claude Code, Claude Desktop, Cursor หรือ VS Code ใช้ ResinCraft ได้: ดูรายการอินสแตนซ์ เปิดและปิดเกม อ่าน log เกมเพื่อหาสาเหตุเกมแครช ค้นหาและติดตั้งม็อด และเปิดเซิร์ฟเวอร์ที่คุณโฮสต์",
+  "settings.mcp.switch": "อนุญาตผู้ช่วย AI",
+  "settings.mcp.hint": "เชื่อมต่อได้เฉพาะโปรแกรมในเครื่องนี้ และต้องใช้โทเค็นด้านล่าง",
+  "settings.mcp.error": "พอร์ต {port} ถูกโปรแกรมอื่นใช้อยู่ เลือกพอร์ตอื่น",
+  "settings.mcp.port": "พอร์ต",
+  "settings.mcp.claude": "Claude Code: รันคำสั่งนี้ในเทอร์มินัล",
+  "settings.mcp.json": "Claude Desktop, Cursor, VS Code และอื่น ๆ: ใส่ส่วนนี้ในการตั้งค่า MCP",
+  "settings.mcp.tokenHint": "โทเค็นนี้ให้ผู้ช่วยควบคุม ResinCraft ได้ ให้เฉพาะผู้ช่วยที่ไว้ใจ ถ้าหลุดไปให้สร้างใหม่",
+  "settings.mcp.copyClaude": "คัดลอกคำสั่ง",
+  "settings.mcp.copyJson": "คัดลอก JSON",
+  "settings.mcp.showToken": "แสดงโทเค็น",
+  "settings.mcp.hideToken": "ซ่อนโทเค็น",
+  "settings.mcp.resetToken": "สร้างโทเค็นใหม่",
+  "settings.mcp.tokenReset": "สร้างโทเค็นใหม่แล้ว ผู้ช่วยที่ตั้งค่าด้วยโทเค็นเก่าต้องใช้โทเค็นใหม่",
+  "settings.mcp.copied": "คัดลอกแล้ว",
 }
 
 export default dict

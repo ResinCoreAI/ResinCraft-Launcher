@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
+import {
+  Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { ConfirmModal, Logo, Segmented, Switch } from '../components/ui'
 import { StorageSection } from '../components/Storage'
 import { ThemePicker } from '../components/ThemePicker'
 import { RemoteControlSection } from '../components/RemoteControl'
+import { McpSection } from '../components/McpSection'
 import { BackupSection } from '../components/Backup'
 import { UpdatesSection } from '../components/Updates'
 import { PackUpdatesSetting } from '../components/PackUpdates'
@@ -204,6 +206,7 @@ const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
   { id: 'autobackup', label: 'settings.autoBackup', icon: <Archive size={16} /> },
   { id: 'backup', label: 'backup.nav', icon: <ArrowLeftRight size={16} /> },
   { id: 'remote', label: 'settings.remote', icon: <Globe size={16} /> },
+  { id: 'mcp', label: 'settings.mcp', icon: <Bot size={16} /> },
   { id: 'updates', label: 'updates.nav', icon: <RefreshCw size={16} /> },
   { id: 'about', label: 'settings.nav.about', icon: <Info size={16} /> }
 ]
@@ -601,6 +604,8 @@ export default function SettingsPage() {
           <BackupSection />
 
           <RemoteControlSection />
+
+          <McpSection />
 
           <UpdatesSection />
 

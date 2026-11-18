@@ -4153,6 +4153,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "Evento stasera alle 20, nuova mappa, saldi… (facoltativo)",
   "servers.list.announcementHint": "I giocatori lo vedono nella tua scheda e nella loro Home se sei nel loro Quick join. Restano {left} caratteri.",
   "announcements.close": "Chiudi fino al prossimo annuncio",
+  "settings.mcp": "Assistenti IA (MCP)",
+  "settings.mcp.lead": "Lascia che gli assistenti IA di questo PC, come Claude Code, Claude Desktop, Cursor o VS Code, usino ResinCraft: elencare le istanze, avviare e chiudere il gioco, leggere il log per trovare i crash, cercare e installare mod e gestire i tuoi server.",
+  "settings.mcp.switch": "Consenti assistenti IA",
+  "settings.mcp.hint": "Possono collegarsi solo i programmi di questo PC, e solo con il token qui sotto.",
+  "settings.mcp.error": "La porta {port} è usata da un altro programma. Scegline un'altra.",
+  "settings.mcp.port": "Porta",
+  "settings.mcp.claude": "Claude Code: esegui questo in un terminale",
+  "settings.mcp.json": "Claude Desktop, Cursor, VS Code e altri: aggiungi questo alle impostazioni MCP",
+  "settings.mcp.tokenHint": "Il token permette a un assistente di controllare ResinCraft. Dallo solo ad assistenti fidati; creane uno nuovo se trapela.",
+  "settings.mcp.copyClaude": "Copia comando",
+  "settings.mcp.copyJson": "Copia JSON",
+  "settings.mcp.showToken": "Mostra token",
+  "settings.mcp.hideToken": "Nascondi token",
+  "settings.mcp.resetToken": "Nuovo token",
+  "settings.mcp.tokenReset": "Nuovo token creato. Gli assistenti configurati con quello vecchio hanno bisogno del nuovo.",
+  "settings.mcp.copied": "Copiato",
 }
 
 export default dict

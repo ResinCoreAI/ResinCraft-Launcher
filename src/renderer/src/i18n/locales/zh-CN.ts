@@ -4107,6 +4107,22 @@ const dict: Dict = {
   "servers.list.announcementPlaceholder": "今晚 8 点活动、新地图、促销…（可选）",
   "servers.list.announcementHint": "玩家会在你的服务器页面上看到；如果你在他们的 Quick join 里，也会显示在他们的主页。还剩 {left} 个字符。",
   "announcements.close": "关闭，直到下一条公告",
+  "settings.mcp": "AI 助手 (MCP)",
+  "settings.mcp.lead": "让这台电脑上的 AI 助手（如 Claude Code、Claude Desktop、Cursor 或 VS Code）使用 ResinCraft：列出实例、启动和关闭游戏、读取游戏日志排查崩溃、搜索并安装模组，以及管理你托管的服务器。",
+  "settings.mcp.switch": "允许 AI 助手",
+  "settings.mcp.hint": "只有这台电脑上的程序，且持有下面的令牌，才能连接。",
+  "settings.mcp.error": "端口 {port} 被其他程序占用，请换一个端口。",
+  "settings.mcp.port": "端口",
+  "settings.mcp.claude": "Claude Code：在终端运行这条命令",
+  "settings.mcp.json": "Claude Desktop、Cursor、VS Code 等：把这段加到 MCP 设置里",
+  "settings.mcp.tokenHint": "有了这个令牌，助手就能控制 ResinCraft。只交给你信任的助手；泄露了就重新生成。",
+  "settings.mcp.copyClaude": "复制命令",
+  "settings.mcp.copyJson": "复制 JSON",
+  "settings.mcp.showToken": "显示令牌",
+  "settings.mcp.hideToken": "隐藏令牌",
+  "settings.mcp.resetToken": "新令牌",
+  "settings.mcp.tokenReset": "已生成新令牌。用旧令牌配置的助手需要换成新的。",
+  "settings.mcp.copied": "已复制",
 }
 
 export default dict
