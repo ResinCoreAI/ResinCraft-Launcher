@@ -4175,6 +4175,10 @@ const dict: Dict = {
   "links.copyFriend": "Копировать ссылку",
   "links.friendHint": "Ссылка открывает ResinCraft с уже введённым кодом. Открыть её может любой, у кого есть ResinCraft.",
   "links.copied": "Ссылка-приглашение скопирована. Открыть её может любой, у кого есть ResinCraft.",
+  "servers.list.field.announcement": "Объявление",
+  "servers.list.announcementPlaceholder": "Событие сегодня в 20:00, новая карта, скидки… (необязательно)",
+  "servers.list.announcementHint": "Игроки видят его в вашей карточке и на своей главной, если ваш сервер есть в их Quick join. Осталось символов: {left}.",
+  "announcements.close": "Закрыть до следующего объявления",
 }
 
 export default dict

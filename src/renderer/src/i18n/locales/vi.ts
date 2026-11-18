@@ -4113,6 +4113,10 @@ const dict: Dict = {
   "links.copyFriend": "Sao chép liên kết",
   "links.friendHint": "Liên kết mở ResinCraft với mã này đã điền sẵn. Ai có ResinCraft cũng bấm được.",
   "links.copied": "Đã sao chép liên kết mời. Ai có ResinCraft cũng mở được.",
+  "servers.list.field.announcement": "Thông báo",
+  "servers.list.announcementPlaceholder": "Sự kiện tối nay 8 giờ, bản đồ mới, giảm giá… (không bắt buộc)",
+  "servers.list.announcementHint": "Người chơi thấy trên trang máy chủ của bạn và trên Trang chủ nếu bạn có trong Quick join của họ. Còn {left} ký tự.",
+  "announcements.close": "Đóng cho đến thông báo tiếp theo",
 }
 
 export default dict

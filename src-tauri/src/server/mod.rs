@@ -203,6 +203,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:appealListing" => json(listing::appeal(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:browseList" => json(listing::browse(args.get(0)?).await?),
         "server:listModpacks" => json(listing::modpacks().await?),
+        "server:listAnnouncements" => json(listing::announcements(args.get::<Vec<String>>(0)?).await?),
         // Client packs: the owner publishes the server's mods; players install them as an instance.
         "server:clientPack" => json(clientpack::info(&args.get::<String>(0)?).await?),
         "server:publishClientPack" => json(clientpack::publish(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<clientpack::PublishOpts>>(2)?.unwrap_or_default()).await?),

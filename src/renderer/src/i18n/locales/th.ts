@@ -4105,6 +4105,10 @@ const dict: Dict = {
   "links.copyFriend": "คัดลอกลิงก์",
   "links.friendHint": "ลิงก์ที่เปิด ResinCraft พร้อมกรอกโค้ดนี้ให้ ใครที่มี ResinCraft ก็กดได้",
   "links.copied": "คัดลอกลิงก์เชิญแล้ว ใครที่มี ResinCraft ก็เปิดได้",
+  "servers.list.field.announcement": "ประกาศ",
+  "servers.list.announcementPlaceholder": "อีเวนต์คืนนี้ 2 ทุ่ม แมพใหม่ ลดราคา… (ไม่ใส่ก็ได้)",
+  "servers.list.announcementHint": "ผู้เล่นจะเห็นบนรายการเซิร์ฟของคุณ และบนหน้าแรกถ้าเซิร์ฟคุณอยู่ใน Quick join ของเขา เหลืออีก {left} ตัวอักษร",
+  "announcements.close": "ปิดไว้จนกว่าจะมีประกาศใหม่",
 }
 
 export default dict

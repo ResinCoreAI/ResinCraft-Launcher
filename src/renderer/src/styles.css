@@ -4264,3 +4264,51 @@ html.gamepad :focus {
 .bbb-signin .bbb-token .row {
   gap: 8px;
 }
+
+/* Server announcements: on a listing (ServerList.tsx) and on Home (Announcements.tsx). */
+.server-announcement {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.server-announcement svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.announcements {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.announcement {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.announcement > img,
+.announcement > svg {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 8px;
+  image-rendering: pixelated;
+  color: var(--accent);
+}
+.announcement p {
+  margin: 4px 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}

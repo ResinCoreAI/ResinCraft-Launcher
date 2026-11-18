@@ -1571,6 +1571,8 @@ export interface ListingInfo {
   modpack?: ListingModpack
   website?: string
   discord?: string
+  /** A short note to players (≤ 280 chars), shown on the listing and on players' Home. */
+  announcement?: string
 }
 
 export interface ListingModpack {
@@ -1720,8 +1722,22 @@ export interface ListedServer {
   promo?: 'recommended' | 'sponsored' | null
   website?: string | null
   discord?: string | null
+  /** The owner's announcement and when it last changed (older relays leave them out). */
+  announcement?: string | null
+  announced_at?: number | null
   listed_at: number
   last_seen?: number | null
+}
+
+/** A listed server's announcement, for Home. */
+export interface ServerAnnouncement {
+  id: string
+  title: string
+  address: string
+  icon?: string | null
+  announcement: string
+  /** Unix seconds. */
+  announced_at: number
 }
 
 export interface ServerListPage {
@@ -2781,6 +2797,8 @@ export interface ResinApi {
     /** Discover → Servers. */
     browseList(query: ServerListQuery): Promise<ServerListPage>
     listModpacks(): Promise<{ modpacks: ServerListModpack[] }>
+    /** Recent owner announcements of listed servers at these addresses, newest first. */
+    listAnnouncements(addresses: string[]): Promise<{ announcements: ServerAnnouncement[] }>
     /** Settings → Server list → Client pack. */
     clientPack(id: string): Promise<ClientPackInfo>
     clientPackChoices(instanceId: string): Promise<ClientPackChoices>

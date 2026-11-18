@@ -7,6 +7,7 @@ import { useStore } from '../store'
 import { describe, greeting, playtime, timeAgo } from '../util'
 import { t } from '../i18n'
 import { MemoryCard } from '../components/Memory'
+import { AnnouncementsCard } from '../components/Announcements'
 
 export default function Home() {
   const { instances, activeAccount, go, setNewInstanceOpen, settings } = useStore()
@@ -105,6 +106,8 @@ export default function Home() {
       </div>
 
       {settings?.showMemoryOnHome && <MemoryCard />}
+
+      <AnnouncementsCard />
 
       <QuickJoinHome />
 

@@ -378,6 +378,22 @@ pub async fn browse(f: Browse) -> Result<Value> {
     Ok(page)
 }
 
+/// Recent announcements of listed servers at these addresses (`GET /api/servers/announcements`), newest first. An
+/// older relay without it, or no relay at all, has none.
+pub async fn announcements(addresses: Vec<String>) -> Result<Value> {
+    let none = serde_json::json!({ "announcements": [] });
+    let Some(s) = relay::settings() else { return Ok(none) };
+    let list: Vec<String> = addresses.into_iter().map(|a| a.trim().to_string()).filter(|a| !a.is_empty()).take(100).collect();
+    if list.is_empty() {
+        return Ok(none);
+    }
+    let url = format!("https://{}/api/servers/announcements?addresses={}", s.domain, urlencoding::encode(&list.join(",")));
+    match crate::core::ctx::http().get(url).timeout(Duration::from_secs(15)).send().await {
+        Ok(r) if r.status().is_success() => Ok(r.json().await.unwrap_or(none)),
+        _ => Ok(none),
+    }
+}
+
 /// Every modpack among listed servers, for the Modpack filter (`GET /api/servers/modpacks`).
 pub async fn modpacks() -> Result<Value> {
     let Some(s) = relay::settings() else { return Err(err_tr!("serverList.noRelay", "This build has no ResinCraft Relay, so there's no server list.")) };

@@ -2,7 +2,8 @@
 // whose owner listed them, plus servers players submitted (the relay's admin approves those). Players filter, like,
 // report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Check, Clock, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
+import {
+  Megaphone, ArrowLeft, Check, Clock, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
 import type { AskJoinOutcome, ClientPackChoices, ClientPackInfo, Instance, JoinAnsweredEvent, JoinState, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -298,6 +299,18 @@ export function ListingFields({ info, onChange, showEdition }: { info: ListingIn
           />
         </label>
       </div>
+      <label className="field">
+        <span>{t('servers.list.field.announcement')}</span>
+        <textarea
+          className="input"
+          rows={2}
+          maxLength={280}
+          value={info.announcement ?? ''}
+          placeholder={t('servers.list.announcementPlaceholder')}
+          onChange={(e) => set({ announcement: e.target.value || undefined })}
+        />
+        <span className="hint">{t('servers.list.announcementHint', { left: 280 - (info.announcement ?? '').length })}</span>
+      </label>
     </div>
   )
 }
@@ -789,6 +802,11 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack, onOpen }: { s: List
           <Heart /> {s.likes}
         </button>
       </header>
+      {s.announcement && (
+        <p className="server-announcement" onClick={onOpen}>
+          <Megaphone size={14} /> {s.announcement}
+        </p>
+      )}
       {s.description && (
         <p className="server-desc" onClick={onOpen}>
           {s.description}
@@ -919,6 +937,12 @@ function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: List
       <div className="server-page-grid">
         <section className="card server-page-section">
           <h2>{t('servers.list.about')}</h2>
+          {s.announcement && (
+            <p className="server-announcement">
+              <Megaphone size={14} /> {s.announcement}
+              {s.announced_at ? <span className="hint"> · {when(s.announced_at)}</span> : null}
+            </p>
+          )}
           {s.description ? <p className="server-page-desc">{s.description}</p> : <p className="hint">{t('servers.list.noDescription')}</p>}
           {s.motd && (
             <>

@@ -358,6 +358,10 @@ pub struct ListingInfo {
     /// discord.gg/… or discord.com/invite/….
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discord: Option<String>,
+    /// The owner's announcement to players (≤ 280 chars, plain text; "" for none). Players' launchers show it on the
+    /// listing and on Home for servers in their Quick join. Older relays and launchers leave it out.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub announcement: String,
 }
 
 /// The modpack a listed server runs. Protocol 8.

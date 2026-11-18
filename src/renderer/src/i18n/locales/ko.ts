@@ -4108,6 +4108,10 @@ const dict: Dict = {
   "links.copyFriend": "링크 복사",
   "links.friendHint": "이 코드가 입력된 채로 ResinCraft를 여는 링크입니다. ResinCraft가 있으면 누구나 열 수 있습니다.",
   "links.copied": "초대 링크를 복사했습니다. ResinCraft가 있으면 누구나 열 수 있습니다.",
+  "servers.list.field.announcement": "공지",
+  "servers.list.announcementPlaceholder": "오늘 밤 8시 이벤트, 새 맵, 할인… (선택)",
+  "servers.list.announcementHint": "플레이어가 내 서버 목록과, 내 서버가 Quick join에 있으면 홈에서 봅니다. {left}자 남음.",
+  "announcements.close": "다음 공지까지 닫기",
 }
 
 export default dict

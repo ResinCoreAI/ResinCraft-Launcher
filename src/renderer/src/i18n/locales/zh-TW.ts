@@ -4103,6 +4103,10 @@ const dict: Dict = {
   "links.copyFriend": "複製連結",
   "links.friendHint": "開啟 ResinCraft 並自動填入此代碼的連結，有 ResinCraft 的人都能點開。",
   "links.copied": "已複製邀請連結，有 ResinCraft 的人都能開啟。",
+  "servers.list.field.announcement": "公告",
+  "servers.list.announcementPlaceholder": "今晚 8 點活動、新地圖、特價…（可選）",
+  "servers.list.announcementHint": "玩家會在你的伺服器頁面上看到；如果你在他們的 Quick join 裡，也會顯示在他們的首頁。還剩 {left} 個字元。",
+  "announcements.close": "關閉，直到下一則公告",
 }
 
 export default dict

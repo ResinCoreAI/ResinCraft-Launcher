@@ -30,5 +30,6 @@ export default {
   'home.instances.title': 'Your instances',
   'home.instances.viewAll': 'View all',
   'home.instances.new': 'New instance',
-  'home.instances.installModpack': 'Install a modpack'
+  'home.instances.installModpack': 'Install a modpack',
+  "announcements.close": "Close until the next announcement",
 }

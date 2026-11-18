@@ -369,6 +369,11 @@ export function mockServerList(find: (id: string) => ServerInfo) {
     },
     removeClientPack: async (id: string) => void delete clientPacks[id],
     installListingPack: () => wait('tech', 2000),
+    listAnnouncements: async (addresses: string[]) => ({
+      announcements: addresses.includes('play.example.com')
+        ? [{ id: 'rc-smp', title: 'Friends SMP', address: 'play.example.com', announcement: 'Halloween event tonight at 8 PM! New map, prizes for the top 3.', announced_at: Math.floor(Date.now() / 1000) - 3600 }]
+        : []
+    }),
     listModpacks: () =>
       wait({
         modpacks: [{ name: 'Create: Above and Beyond', source: 'curseforge', project_id: '542763', servers: 1, online: 0 }]

@@ -296,6 +296,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       setListing: fn('server:setListing'),
       browseList: fn('server:browseList'),
       listModpacks: fn('server:listModpacks'),
+      listAnnouncements: fn('server:listAnnouncements'),
       clientPack: fn('server:clientPack'),
       clientPackChoices: fn('server:clientPackChoices'),
       publishClientPack: fn('server:publishClientPack'),

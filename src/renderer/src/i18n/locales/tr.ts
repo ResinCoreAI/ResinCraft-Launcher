@@ -4126,6 +4126,10 @@ const dict: Dict = {
   "links.copyFriend": "Bağlantıyı kopyala",
   "links.friendHint": "ResinCraft'ı bu kod girilmiş olarak açan bir bağlantı. ResinCraft'ı olan herkes tıklayabilir.",
   "links.copied": "Davet bağlantısı kopyalandı. ResinCraft'ı olan herkes açabilir.",
+  "servers.list.field.announcement": "Duyuru",
+  "servers.list.announcementPlaceholder": "Bu akşam 20.00 etkinlik, yeni harita, indirim… (isteğe bağlı)",
+  "servers.list.announcementHint": "Oyuncular bunu sunucu kaydınızda ve Quick join'lerinde varsanız Ana sayfalarında görür. {left} karakter kaldı.",
+  "announcements.close": "Bir sonraki duyuruya kadar kapat",
 }
 
 export default dict

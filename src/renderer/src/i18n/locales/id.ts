@@ -4116,6 +4116,10 @@ const dict: Dict = {
   "links.copyFriend": "Salin tautan",
   "links.friendHint": "Tautan yang membuka ResinCraft dengan kode ini terisi. Siapa pun yang punya ResinCraft bisa mengekliknya.",
   "links.copied": "Tautan undangan disalin. Siapa pun yang punya ResinCraft bisa membukanya.",
+  "servers.list.field.announcement": "Pengumuman",
+  "servers.list.announcementPlaceholder": "Event malam ini jam 8, peta baru, diskon… (opsional)",
+  "servers.list.announcementHint": "Pemain melihatnya di daftar server kamu dan di Beranda mereka jika server kamu ada di Quick join mereka. Sisa {left} karakter.",
+  "announcements.close": "Tutup sampai pengumuman berikutnya",
 }
 
 export default dict
