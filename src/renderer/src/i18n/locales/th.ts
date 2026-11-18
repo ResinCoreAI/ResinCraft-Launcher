@@ -4096,6 +4096,10 @@ const dict: Dict = {
   "rtxPack.memoryAuto": "อัตโนมัติ: {size}",
   "rtxPack.memoryHintRemix": "Minecraft ใช้ RAM ได้เท่าไร สูงสุด {max} RTX Remix เก็บเท็กซ์เจอร์ของตัวเองไว้ใน RAM ด้วย ถ้าให้เกมมากกว่านี้จะทำให้มันแครช อัตโนมัติจะกำหนดตามเครื่องและแพ็กเท็กซ์เจอร์",
   "rtxLook.tuneHint": "ระยะเรนเดอร์ {render} ชังก์ ระยะจำลอง {simulation} หน่วยความจำ {memory} ปรับคุณภาพเชดเดอร์ได้ที่ ตัวเลือก → การตั้งค่าวิดีโอ → Shader Packs",
+  "updates.channel": "ช่องอัปเดต",
+  "updates.channel.hint": "Beta ได้เวอร์ชันใหม่ก่อนคนอื่น อาจยังมีจุดที่ไม่เรียบร้อย เปลี่ยนกลับเป็น Stable ได้ทุกเมื่อ",
+  "updates.channel.stable": "Stable",
+  "updates.channel.beta": "Beta",
 }
 
 export default dict

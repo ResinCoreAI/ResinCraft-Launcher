@@ -4107,6 +4107,10 @@ const dict: Dict = {
   "rtxPack.memoryAuto": "Otomatis: {size}",
   "rtxPack.memoryHintRemix": "Berapa banyak RAM yang boleh dipakai Minecraft, maksimal {max}. RTX Remix juga menyimpan teksturnya di RAM, dan heap game yang lebih besar membuatnya crash. Otomatis menyesuaikan PC dan paket tekstur.",
   "rtxLook.tuneHint": "Jarak render {render} chunk, jarak simulasi {simulation}, memori {memory}. Ubah kualitas shader di Opsi → Pengaturan Video → Paket Shader.",
+  "updates.channel": "Saluran pembaruan",
+  "updates.channel.hint": "Beta mendapat versi baru lebih dulu. Mungkin masih ada kekurangan; kamu bisa kembali ke Stabil kapan saja.",
+  "updates.channel.stable": "Stabil",
+  "updates.channel.beta": "Beta",
 }
 
 export default dict

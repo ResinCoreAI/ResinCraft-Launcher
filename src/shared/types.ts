@@ -439,6 +439,8 @@ export interface Settings {
   autoUpdate: boolean
   /** Install found updates in the background without asking, once no game or hosted server runs. */
   silentUpdate?: boolean
+  /** 'stable' or 'beta' (pre-releases too). */
+  updateChannel?: 'stable' | 'beta'
   /** Closing the window keeps ResinCraft running in the system tray. */
   tray?: boolean
   /** Which site wins when a mod is on both Modrinth and CurseForge ('ask' shows the duplicate dialog). */

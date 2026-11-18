@@ -4094,6 +4094,10 @@ const dict: Dict = {
   "rtxPack.memoryAuto": "自动：{size}",
   "rtxPack.memoryHintRemix": "Minecraft 可用的内存，最多 {max}。RTX Remix 也会把自己的贴图放在内存中，给游戏更多会让它崩溃。自动会按电脑和材质包分配。",
   "rtxLook.tuneHint": "渲染距离 {render} 区块，模拟距离 {simulation}，内存 {memory}。光影画质可在 选项 → 视频设置 → 光影包 中调整。",
+  "updates.channel": "更新渠道",
+  "updates.channel.hint": "测试版会比其他人更早收到新版本，可能还有不完善的地方，随时可以切回稳定版。",
+  "updates.channel.stable": "稳定版",
+  "updates.channel.beta": "测试版",
 }
 
 export default dict

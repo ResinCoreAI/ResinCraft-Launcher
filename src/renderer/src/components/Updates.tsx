@@ -271,6 +271,21 @@ export function UpdatesSection() {
           </div>
           <Switch on={!!settings.silentUpdate} onChange={(v) => void updateSettings({ silentUpdate: v })} label={t('updates.silent')} />
         </div>
+        <div className="setting">
+          <div className="text">
+            <b>{t('updates.channel')}</b>
+            <span>{t('updates.channel.hint')}</span>
+          </div>
+          <select
+            className="input"
+            style={{ width: 'auto' }}
+            value={settings.updateChannel ?? 'stable'}
+            onChange={(e) => void updateSettings({ updateChannel: e.target.value as 'stable' | 'beta' }).then(() => check())}
+          >
+            <option value="stable">{t('updates.channel.stable')}</option>
+            <option value="beta">{t('updates.channel.beta')}</option>
+          </select>
+        </div>
         <ReinstallLauncherSetting start={() => void start()} busy={busy} />
         <div className="setting">
           <div className="row" style={{ gap: 18 }}>

@@ -4166,6 +4166,10 @@ const dict: Dict = {
   "rtxPack.memoryAuto": "Авто: {size}",
   "rtxPack.memoryHintRemix": "Сколько ОЗУ может использовать Minecraft, до {max}. RTX Remix тоже держит свои текстуры в ОЗУ, и большая куча игры приводит к его сбою. «Авто» подбирает объём под ПК и набор текстур.",
   "rtxLook.tuneHint": "Дальность прорисовки {render} чанков, дальность симуляции {simulation}, память {memory}. Качество шейдера меняется в Настройки → Графика → Наборы шейдеров.",
+  "updates.channel": "Канал обновлений",
+  "updates.channel.hint": "Бета получает новые версии раньше всех. В них могут быть недоработки; вернуться на стабильный канал можно в любой момент.",
+  "updates.channel.stable": "Стабильный",
+  "updates.channel.beta": "Бета",
 }
 
 export default dict

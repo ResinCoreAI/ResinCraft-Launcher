@@ -62,6 +62,8 @@ pub struct Settings {
     /// Install a found update in the background without asking, as soon as no game or hosted server is running
     /// (Settings → Updates).
     pub silent_update: bool,
+    /// "stable" or "beta" (pre-releases too; Settings → Updates).
+    pub update_channel: String,
     /// Closing the window keeps ResinCraft running in the system tray (hosted servers, the Discord bot and
     /// downloads go on); Quit is in the tray icon's menu (Settings → Appearance).
     pub tray: bool,
@@ -130,6 +132,7 @@ impl Default for Settings {
             show_snapshots: false,
             auto_update: false,
             silent_update: false,
+            update_channel: "stable".into(),
             tray: false,
             preferred_mod_source: "ask".into(),
             watch_folders: Vec::new(),

@@ -29,6 +29,8 @@ use crate::core::{ctx, instances, paths, Args};
 use crate::{bail_tr, tr};
 
 const RELEASES: &str = "https://github.com/ResinCoreAI/ResinCraft-Launcher/releases";
+/// The Beta channel's feed (Settings → Updates): pre-releases and stable releases, written by publish-update.yml.
+const BETA_FEED: &str = "https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/updates/beta.json";
 
 /// What the UI shows in Settings → Updates and in the update banner (also sent as the `update` event).
 #[derive(Debug, Clone, Serialize, Default)]
@@ -218,6 +220,9 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     publish(|s| s.state = "checking");
 
     let mut builder = app.updater_builder().timeout(Duration::from_secs(30));
+    if crate::core::settings::get().await.update_channel == "beta" {
+        builder = builder.endpoints(vec![BETA_FEED.parse().expect("beta feed address")])?;
+    }
     if reinstall {
         builder = builder.version_comparator(|current, remote| remote.version >= current);
     }

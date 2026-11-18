@@ -182,5 +182,7 @@ jobs:
             [ "$(gh release view "$TAG" --json isDraft -q .isDraft)" = true ] || { echo "::error::$TAG is already published."; exit 1; }
             gh release upload "$TAG" "${ship[@]}" --clobber
           else
-            gh release create "$TAG" "${ship[@]}" --draft --title "ResinCraft Launcher $TAG" --notes "$NOTES"
+            # A tag like v1.7.0-beta.1 is a pre-release: publishing it offers it on the Beta channel only.
+            pre=(); case "$TAG" in *-*) pre=(--prerelease) ;; esac
+            gh release create "$TAG" "${ship[@]}" --draft "${pre[@]}" --title "ResinCraft Launcher $TAG" --notes "$NOTES"
           fi

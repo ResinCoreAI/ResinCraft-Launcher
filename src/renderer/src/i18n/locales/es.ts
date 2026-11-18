@@ -4135,6 +4135,10 @@ const dict: Dict = {
   "rtxPack.memoryAuto": "Automática: {size}",
   "rtxPack.memoryHintRemix": "Cuánta RAM puede usar Minecraft, hasta {max}. RTX Remix también guarda sus texturas en la RAM y un heap mayor lo hace fallar. Automática la ajusta al PC y al paquete de texturas.",
   "rtxLook.tuneHint": "Distancia de renderizado {render} chunks, distancia de simulación {simulation}, memoria {memory}. Cambia la calidad del shader en Opciones → Gráficos → Paquetes de shaders.",
+  "updates.channel": "Canal de actualizaciones",
+  "updates.channel.hint": "Beta recibe las versiones nuevas antes que nadie. Pueden tener fallos; puedes volver a Estable cuando quieras.",
+  "updates.channel.stable": "Estable",
+  "updates.channel.beta": "Beta",
 }
 
 export default dict
