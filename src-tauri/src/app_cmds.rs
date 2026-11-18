@@ -49,6 +49,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // The window moved to https: the old origin's localStorage, read from WebView2's files once (webstorage.rs).
         "app:storageImport" => json(crate::webstorage::import().await),
         "app:pendingOpen" => json(crate::openfile::take()),
+        "app:pendingLink" => json(crate::openfile::take_link()),
         "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
         // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.
         "app:exportTheme" => json(export_theme(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),

@@ -1,6 +1,7 @@
 // Playing together without a server: Invite friends (for a world opened to LAN) and Join a friend, on the Quick join page.
+import { friendLink } from '../links'
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Copy, Loader2, Play, Square, UserPlus, Users } from 'lucide-react'
+import { Link2, AlertTriangle, Copy, Loader2, Play, Square, UserPlus, Users } from 'lucide-react'
 import type { FriendsInvite, FriendsState } from '@shared/types'
 import { Motd } from './ServersTab'
 import { Switch, useCopy } from './ui'
@@ -74,6 +75,9 @@ function InvitePanel({ state }: { state: FriendsState }) {
           <button className="btn primary sm" onClick={() => void copy(invite.code, t('friends.invite.copied'))}>
             <Copy /> {t('friends.invite.copy')}
           </button>
+          <button className="btn sm" title={t('links.friendHint')} onClick={() => void copy(friendLink(invite.code), t('links.copied'))}>
+            <Link2 /> {t('links.copyFriend')}
+          </button>
           <button className="btn sm" onClick={() => void api.friends.stopInvite()}>
             <Square /> {t('friends.invite.stop')}
           </button>
@@ -124,10 +128,14 @@ function InvitePanel({ state }: { state: FriendsState }) {
   )
 }
 
-function JoinPanel({ state }: { state: FriendsState }) {
+function JoinPanel({ state, initialCode }: { state: FriendsState; initialCode?: string }) {
   const { instances, accounts, joinFriend, games, toast } = useStore()
   const copy = useCopy()
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(initialCode ?? '')
+  // A resincraft://friend link opened while this panel is up.
+  useEffect(() => {
+    if (initialCode) setCode(initialCode)
+  }, [initialCode])
   const [busy, setBusy] = useState(false)
   const [picked, setPicked] = useState<string>()
   const joined = state.joined
@@ -224,7 +232,7 @@ function JoinPanel({ state }: { state: FriendsState }) {
 }
 
 /** Both panels, side by side. */
-export function FriendsSection() {
+export function FriendsSection({ code }: { code?: string } = {}) {
   const state = useFriends()
   return (
     <>
@@ -233,7 +241,7 @@ export function FriendsSection() {
       </h2>
       <div className="friends-card">
         <InvitePanel state={state} />
-        <JoinPanel state={state} />
+        <JoinPanel state={state} initialCode={code} />
       </div>
     </>
   )

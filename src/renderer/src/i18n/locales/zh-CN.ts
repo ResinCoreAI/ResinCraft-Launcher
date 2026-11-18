@@ -4098,6 +4098,11 @@ const dict: Dict = {
   "updates.channel.hint": "测试版会比其他人更早收到新版本，可能还有不完善的地方，随时可以切回稳定版。",
   "updates.channel.stable": "稳定版",
   "updates.channel.beta": "测试版",
+  "links.unknown": "此版本无法识别这个 ResinCraft 链接。",
+  "links.copyJoin": "复制邀请链接",
+  "links.copyFriend": "复制链接",
+  "links.friendHint": "打开 ResinCraft 并自动填入此代码的链接，装有 ResinCraft 的人都能点开。",
+  "links.copied": "已复制邀请链接，装有 ResinCraft 的人都能打开。",
 }
 
 export default dict

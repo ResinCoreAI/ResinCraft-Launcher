@@ -18,6 +18,23 @@ const KINDS: [&str; 4] = ["rctheme", "resincraft", "mrpack", "zip"];
 const MAX_THEME_BYTES: u64 = 16 * 1024 * 1024;
 
 static PENDING: Mutex<Option<String>> = Mutex::new(None);
+static PENDING_LINK: Mutex<Option<String>> = Mutex::new(None);
+
+/// ResinCraft's own links (tauri.conf.json `plugins.deep-link`): `resincraft://join/<address>` and
+/// `resincraft://friend/<code>`. Windows starts ResinCraft with the link as an argument; a running copy gets it
+/// through the single-instance plugin. The UI reads what the link means (links.ts).
+const SCHEME: &str = "resincraft://";
+/// Longer than any address or invite code; anything bigger isn't one of ours.
+const MAX_LINK: usize = 512;
+
+fn link_from_args(args: &[String]) -> Option<String> {
+    args.iter().skip(1).find(|a| a.len() <= MAX_LINK && a.to_ascii_lowercase().starts_with(SCHEME)).cloned()
+}
+
+/// `app:pendingLink`: the link ResinCraft was started with, once.
+pub fn take_link() -> Option<String> {
+    PENDING_LINK.lock().unwrap().take()
+}
 
 /// The file among a start's arguments (the first one is the program itself).
 fn from_args(args: &[String]) -> Option<String> {
@@ -32,8 +49,12 @@ fn from_args(args: &[String]) -> Option<String> {
 
 /// At start: remembers a file ResinCraft was started with, for the UI.
 pub fn at_start() {
-    if let Some(path) = from_args(&std::env::args().collect::<Vec<_>>()) {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(path) = from_args(&args) {
         *PENDING.lock().unwrap() = Some(path);
+    }
+    if let Some(link) = link_from_args(&args) {
+        *PENDING_LINK.lock().unwrap() = Some(link);
     }
 }
 
@@ -46,6 +67,9 @@ pub fn take() -> Option<String> {
 pub fn opened(args: Vec<String>) {
     if let Some(path) = from_args(&args) {
         events::emit("openFile", json!({ "path": path }));
+    }
+    if let Some(url) = link_from_args(&args) {
+        events::emit("openLink", json!({ "url": url }));
     }
 }
 

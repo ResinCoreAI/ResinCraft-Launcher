@@ -2334,6 +2334,8 @@ export interface ResinApi {
     saveText(fileName: string, text: string): Promise<string | null>
     /** The file ResinCraft was started with (double-clicked in Windows), once; null if none. */
     pendingOpen(): Promise<string | null>
+    /** The resincraft:// link ResinCraft was started with, once. */
+    pendingLink(): Promise<string | null>
     /** The old origin's localStorage entries, once; null when there is nothing to carry over. */
     storageImport(): Promise<Record<string, string> | null>
     /** Starts ResinCraft's uninstaller ('uninstaller', ResinCraft then quits) or opens Windows' Installed apps ('settings'). */
@@ -2948,5 +2950,7 @@ export interface ResinApi {
     remoteViewGone(cb: (e: { device: number }) => void): () => void
     /** Windows asked the running ResinCraft to open a file (a theme, backup or modpack double-clicked). */
     openFile(cb: (e: { path: string }) => void): () => void
+    /** A resincraft:// link opened while ResinCraft runs. */
+    openLink(cb: (e: { url: string }) => void): () => void
   }
 }

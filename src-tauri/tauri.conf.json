@@ -72,6 +72,9 @@
         "installMode": "passive"
       },
       "requireSignedVersion": true
+    },
+    "deep-link": {
+      "desktop": { "schemes": ["resincraft"] }
     }
   }
 }

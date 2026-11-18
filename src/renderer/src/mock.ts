@@ -291,6 +291,7 @@ export function mockApi(): ResinApi {
       themeImage: async (id) => mockThemeImages.get(id) ?? null,
       gameTexture: async () => null,
       pendingOpen: async () => null,
+      pendingLink: async () => null,
       storageImport: async () => null,
       uninstall: async () => 'settings' as const,
       readThemeFile: async () => {
@@ -702,7 +703,7 @@ export function mockApi(): ResinApi {
     },
     ...mockFiles(),
     ...migrate,
-    on: { task: mockEngine.onTask, game: runs.onGame, friends: friends.onFriends, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop() },
+    on: { task: mockEngine.onTask, game: runs.onGame, friends: friends.onFriends, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop(), openLink: () => noop() },
     remote: {
       status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }),
       grants: async () => grants,

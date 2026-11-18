@@ -4121,6 +4121,11 @@ const dict: Dict = {
   "updates.channel.hint": "Beta yeni sürümleri herkesten önce alır. Eksikleri olabilir; istediğiniz zaman Kararlı'ya dönebilirsiniz.",
   "updates.channel.stable": "Kararlı",
   "updates.channel.beta": "Beta",
+  "links.unknown": "Bu sürüm o ResinCraft bağlantısını anlamıyor.",
+  "links.copyJoin": "Davet bağlantısını kopyala",
+  "links.copyFriend": "Bağlantıyı kopyala",
+  "links.friendHint": "ResinCraft'ı bu kod girilmiş olarak açan bir bağlantı. ResinCraft'ı olan herkes tıklayabilir.",
+  "links.copied": "Davet bağlantısı kopyalandı. ResinCraft'ı olan herkes açabilir.",
 }
 
 export default dict

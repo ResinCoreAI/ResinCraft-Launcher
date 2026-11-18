@@ -50,6 +50,7 @@ pub fn run() {
             tray::show(app);
             openfile::opened(args);
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -59,6 +60,14 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)?;
             core::ctx::init(data_dir, Some(app.handle().clone()));
             openfile::at_start();
+            // resincraft:// links open this copy. Installed builds only: a test build would take them over.
+            #[cfg(all(not(debug_assertions), any(windows, target_os = "linux")))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(e) = app.deep_link().register_all() {
+                    eprintln!("[links] couldn't register resincraft:// links: {e}");
+                }
+            }
             tauri::async_runtime::spawn(discord::init());
             tauri::async_runtime::spawn(server::discordbot::init());
             tauri::async_runtime::spawn(remote::init());

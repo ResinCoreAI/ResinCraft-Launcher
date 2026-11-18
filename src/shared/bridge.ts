@@ -29,6 +29,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       qrSvg: fn('app:qrSvg'),
       saveText: fn('app:saveText'),
       pendingOpen: fn('app:pendingOpen'),
+      pendingLink: fn('app:pendingLink'),
       storageImport: fn('app:storageImport'),
       uninstall: fn('app:uninstall'),
       readThemeFile: fn('app:readThemeFile'),
@@ -371,6 +372,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile') }
+    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile'), openLink: on('openLink') }
   } as ResinApi
 }

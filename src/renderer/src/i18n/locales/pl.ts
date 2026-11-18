@@ -4177,6 +4177,11 @@ const dict: Dict = {
   "updates.channel.hint": "Beta dostaje nowe wersje wcześniej niż wszyscy. Mogą mieć niedoróbki; w każdej chwili możesz wrócić do Stabilnej.",
   "updates.channel.stable": "Stabilna",
   "updates.channel.beta": "Beta",
+  "links.unknown": "Ta wersja nie rozumie tego linku ResinCraft.",
+  "links.copyJoin": "Kopiuj link zaproszenia",
+  "links.copyFriend": "Kopiuj link",
+  "links.friendHint": "Link, który otwiera ResinCraft z wpisanym kodem. Każdy, kto ma ResinCraft, może go kliknąć.",
+  "links.copied": "Skopiowano link zaproszenia. Każdy, kto ma ResinCraft, może go otworzyć.",
 }
 
 export default dict

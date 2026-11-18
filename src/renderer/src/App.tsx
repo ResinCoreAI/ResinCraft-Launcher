@@ -12,6 +12,7 @@ import {
   Users,
   Zap
 } from 'lucide-react'
+import { OpenLinks } from './components/OpenLinks'
 import { useGamepad } from './gamepad'
 import { lazy, Suspense, type ReactNode } from 'react'
 import type { AccountView, Instance } from '@shared/types'
@@ -238,6 +239,7 @@ export default function App() {
       <ContextMenuHost />
       <DropImport />
       <OpenFiles />
+      <OpenLinks />
       {isTauri ? (
         <WindowControls />
       ) : (

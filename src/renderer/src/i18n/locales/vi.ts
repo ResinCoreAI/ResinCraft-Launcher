@@ -4108,6 +4108,11 @@ const dict: Dict = {
   "updates.channel.hint": "Beta nhận phiên bản mới sớm hơn mọi người. Có thể còn lỗi; bạn có thể quay lại Ổn định bất cứ lúc nào.",
   "updates.channel.stable": "Ổn định",
   "updates.channel.beta": "Beta",
+  "links.unknown": "Phiên bản này không hiểu liên kết ResinCraft đó.",
+  "links.copyJoin": "Sao chép liên kết mời",
+  "links.copyFriend": "Sao chép liên kết",
+  "links.friendHint": "Liên kết mở ResinCraft với mã này đã điền sẵn. Ai có ResinCraft cũng bấm được.",
+  "links.copied": "Đã sao chép liên kết mời. Ai có ResinCraft cũng mở được.",
 }
 
 export default dict

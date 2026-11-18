@@ -17,6 +17,7 @@ import {
   Search,
   Server,
   Trash2,
+  Link2,
   X,
   Zap
 } from 'lucide-react'
@@ -45,6 +46,7 @@ import { api } from '../api'
 import { t } from '../i18n'
 import { RecentWorldsSection } from '../components/RecentWorlds'
 import { FriendsSection } from '../components/Friends'
+import { joinLink } from '../links'
 
 /** What's being dragged (a server row or a group header) and where the pointer is. */
 type Drag = { kind: 'entry' | 'group'; id: string; label: string; x: number; y: number }
@@ -55,9 +57,14 @@ const UNGROUPED = ''
 
 export default function QuickJoin() {
   const q = useQuickJoin()
-  const { toast } = useStore()
+  const { toast, route } = useStore()
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<{ id?: string; draft: EntryDraft }>()
+  // A resincraft://join link: the server, ready to add (the player picks the instance and saves).
+  const linked = route.page === 'quickjoin' ? route.add : undefined
+  useEffect(() => {
+    if (linked) setEditing({ draft: { name: linked.name, address: linked.address, edition: linked.edition, pinned: false } })
+  }, [linked])
   const [removing, setRemoving] = useState<QjItem>()
   const [naming, setNaming] = useState<{ group?: QuickJoinGroup }>()
   const [removingGroup, setRemovingGroup] = useState<QuickJoinGroup>()
@@ -240,6 +247,7 @@ export default function QuickJoin() {
           onSelect: () => setEditing({ draft: newDraft({ name: item.name, address: item.address, instanceId: item.instanceIds[0] }) })
         },
       { label: t('servers.connect.copy'), icon: <Copy />, onSelect: () => void copy(item.address) },
+      { label: t('links.copyJoin'), icon: <Link2 />, onSelect: () => void copy(joinLink(item.address, item.name, item.edition), t('links.copied')) },
       item.edition === 'java' && { label: t('common.refresh'), icon: <RefreshCw />, onSelect: () => pingAddress(item.address, true) },
       e && '-',
       e && groups.length > 0 && { label: t('quickjoin.moveToGroup'), icon: <FolderInput />, items: groupMoveItems(item) },
@@ -334,7 +342,7 @@ export default function QuickJoin() {
             </div>
           )}
 
-          <FriendsSection />
+          <FriendsSection code={route.page === 'quickjoin' ? route.friendCode : undefined} />
 
           <RecentWorldsSection query={query} />
 

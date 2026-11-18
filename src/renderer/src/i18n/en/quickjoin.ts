@@ -56,5 +56,10 @@ export default {
   'quickjoin.form.pinned': 'Pin to the Home page',
   'quickjoin.edition.java': 'Java',
   'quickjoin.edition.bedrock': 'Bedrock',
-  'quickjoin.home.empty': 'Pin servers or join one to see them here.'
+  'quickjoin.home.empty': 'Pin servers or join one to see them here.',
+  "links.unknown": "That ResinCraft link isn't one this version understands.",
+  "links.copyJoin": "Copy invite link",
+  "links.copyFriend": "Copy link",
+  "links.friendHint": "A link that opens ResinCraft with this code filled in. Anyone who has ResinCraft can click it.",
+  "links.copied": "Invite link copied. Anyone with ResinCraft can open it.",
 }

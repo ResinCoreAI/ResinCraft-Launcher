@@ -14,7 +14,8 @@ export type Route =
   | { page: 'servers'; id?: string; fromInstance?: string }
   | { page: 'bedrock' }
   | { page: 'horizon' }
-  | { page: 'quickjoin' }
+  /** `add`: a server from a resincraft://join link, ready to add; `friendCode`: from a resincraft://friend link. */
+  | { page: 'quickjoin'; add?: { name: string; address: string; edition: 'java' | 'bedrock' }; friendCode?: string }
   | { page: 'admin' }
   | { page: 'store' }
   | { page: 'settings' }

@@ -4111,6 +4111,11 @@ const dict: Dict = {
   "updates.channel.hint": "Beta mendapat versi baru lebih dulu. Mungkin masih ada kekurangan; kamu bisa kembali ke Stabil kapan saja.",
   "updates.channel.stable": "Stabil",
   "updates.channel.beta": "Beta",
+  "links.unknown": "Versi ini tidak mengenali tautan ResinCraft itu.",
+  "links.copyJoin": "Salin tautan undangan",
+  "links.copyFriend": "Salin tautan",
+  "links.friendHint": "Tautan yang membuka ResinCraft dengan kode ini terisi. Siapa pun yang punya ResinCraft bisa mengekliknya.",
+  "links.copied": "Tautan undangan disalin. Siapa pun yang punya ResinCraft bisa membukanya.",
 }
 
 export default dict
