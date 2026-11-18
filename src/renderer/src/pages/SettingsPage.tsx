@@ -287,6 +287,13 @@ export default function SettingsPage() {
                 </div>
                 <Switch on={!!s.tray} onChange={(v) => set({ tray: v })} label={t('settings.tray')} />
               </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.freeMemory')}</b>
+                  <span>{t('settings.freeMemory.hint')}</span>
+                </div>
+                <Switch on={s.freeMemoryHidden !== false} onChange={(v) => set({ freeMemoryHidden: v })} label={t('settings.freeMemory')} />
+              </div>
             </div>
           </section>
 

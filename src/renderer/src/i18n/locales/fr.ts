@@ -4181,6 +4181,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "Nouveau jeton",
   "settings.mcp.tokenReset": "Nouveau jeton créé. Les assistants configurés avec l'ancien ont besoin du nouveau.",
   "settings.mcp.copied": "Copié",
+  "settings.freeMemory": "Libérer la mémoire une fois masqué",
+  "settings.freeMemory.hint": "Quand la fenêtre est masquée dans la zone de notification ou pendant que vous jouez, ResinCraft la ferme au bout de 30 secondes et utilise environ 30 Mo au lieu d'environ 240 Mo. La rouvrir prend une seconde.",
 }
 
 export default dict

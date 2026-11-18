@@ -4133,6 +4133,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "Mã mới",
   "settings.mcp.tokenReset": "Đã tạo mã mới. Trợ lý đã cài bằng mã cũ cần mã mới.",
   "settings.mcp.copied": "Đã sao chép",
+  "settings.freeMemory": "Giải phóng bộ nhớ khi ẩn",
+  "settings.freeMemory.hint": "Khi cửa sổ bị ẩn xuống khay hệ thống hoặc trong lúc bạn chơi, ResinCraft đóng nó sau 30 giây và chỉ dùng khoảng 30 MB thay vì khoảng 240 MB. Mở lại mất khoảng một giây.",
 }
 
 export default dict

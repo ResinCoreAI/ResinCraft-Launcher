@@ -4136,6 +4136,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "Token baru",
   "settings.mcp.tokenReset": "Token baru dibuat. Asisten yang memakai token lama butuh yang baru.",
   "settings.mcp.copied": "Disalin",
+  "settings.freeMemory": "Bebaskan memori saat disembunyikan",
+  "settings.freeMemory.hint": "Saat jendela disembunyikan di tray atau selagi kamu bermain, ResinCraft menutupnya setelah 30 detik dan memakai sekitar 30 MB, bukan sekitar 240 MB. Membukanya lagi butuh satu detik.",
 }
 
 export default dict

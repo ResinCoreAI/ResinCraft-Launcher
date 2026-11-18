@@ -4128,6 +4128,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "새 토큰",
   "settings.mcp.tokenReset": "새 토큰을 만들었습니다. 예전 토큰으로 설정한 어시스턴트는 새 토큰이 필요합니다.",
   "settings.mcp.copied": "복사됨",
+  "settings.freeMemory": "숨겨져 있을 때 메모리 비우기",
+  "settings.freeMemory.hint": "창이 트레이에 숨겨져 있거나 게임 중일 때, ResinCraft가 30초 뒤 창을 닫아 약 240MB 대신 약 30MB만 씁니다. 다시 여는 데 1초쯤 걸립니다.",
 }
 
 export default dict

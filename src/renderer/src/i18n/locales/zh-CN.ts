@@ -4123,6 +4123,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "新令牌",
   "settings.mcp.tokenReset": "已生成新令牌。用旧令牌配置的助手需要换成新的。",
   "settings.mcp.copied": "已复制",
+  "settings.freeMemory": "隐藏时释放内存",
+  "settings.freeMemory.hint": "窗口隐藏到托盘或你在玩游戏时，ResinCraft 会在 30 秒后关闭窗口，占用约 30 MB 而不是约 240 MB。重新打开需要一秒左右。",
 }
 
 export default dict

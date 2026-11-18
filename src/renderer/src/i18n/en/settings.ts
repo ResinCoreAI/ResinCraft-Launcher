@@ -220,6 +220,8 @@ export default {
   'settings.parallel': 'Parallel downloads',
   'settings.tray': 'Keep running in the system tray',
   'settings.tray.hint': 'Closing the window keeps ResinCraft in the background: hosted servers, the Discord bot and downloads go on. Quit from the tray icon.',
+  "settings.freeMemory": "Free memory while hidden",
+  "settings.freeMemory.hint": "When the window is hidden in the tray or while you play, ResinCraft closes it after 30 seconds and uses about 30 MB instead of about 240 MB. Opening it again takes a second.",
   'settings.parallel.hint': 'Files fetched at the same time.',
   'settings.preferredSource': 'Preferred source for mods',
   'settings.preferredSource.hint': 'When a mod is on both Modrinth and CurseForge, install it from here.',

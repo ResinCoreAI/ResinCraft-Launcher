@@ -4133,6 +4133,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "新しいトークン",
   "settings.mcp.tokenReset": "新しいトークンを作りました。古いトークンで設定したアシスタントには新しいものが必要です。",
   "settings.mcp.copied": "コピーしました",
+  "settings.freeMemory": "非表示中はメモリを解放",
+  "settings.freeMemory.hint": "ウィンドウがトレイに隠れているときやプレイ中は、30 秒後に ResinCraft がウィンドウを閉じ、約 240 MB の代わりに約 30 MB で動きます。開き直すのに 1 秒ほどかかります。",
 }
 
 export default dict

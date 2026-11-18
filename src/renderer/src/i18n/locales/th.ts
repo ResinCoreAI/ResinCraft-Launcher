@@ -4125,6 +4125,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "สร้างโทเค็นใหม่",
   "settings.mcp.tokenReset": "สร้างโทเค็นใหม่แล้ว ผู้ช่วยที่ตั้งค่าด้วยโทเค็นเก่าต้องใช้โทเค็นใหม่",
   "settings.mcp.copied": "คัดลอกแล้ว",
+  "settings.freeMemory": "คืนหน่วยความจำเมื่อซ่อนหน้าต่าง",
+  "settings.freeMemory.hint": "เมื่อหน้าต่างถูกซ่อนไว้ในถาดระบบหรือระหว่างเล่นเกม ResinCraft จะปิดหน้าต่างหลัง 30 วินาที และใช้แรมราว 30 MB แทนราว 240 MB เปิดกลับมาใช้เวลาประมาณหนึ่งวินาที",
 }
 
 export default dict

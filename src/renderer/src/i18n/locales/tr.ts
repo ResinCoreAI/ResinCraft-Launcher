@@ -4146,6 +4146,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "Yeni belirteç",
   "settings.mcp.tokenReset": "Yeni belirteç oluşturuldu. Eskisiyle kurulan asistanların yenisine ihtiyacı var.",
   "settings.mcp.copied": "Kopyalandı",
+  "settings.freeMemory": "Gizliyken belleği boşalt",
+  "settings.freeMemory.hint": "Pencere sistem tepsisinde gizliyken ya da oynarken ResinCraft onu 30 saniye sonra kapatır ve yaklaşık 240 MB yerine yaklaşık 30 MB kullanır. Yeniden açmak bir saniye sürer.",
 }
 
 export default dict

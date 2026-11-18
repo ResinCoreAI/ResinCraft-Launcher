@@ -4123,6 +4123,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "新權杖",
   "settings.mcp.tokenReset": "已產生新權杖。用舊權杖設定的助理需要換成新的。",
   "settings.mcp.copied": "已複製",
+  "settings.freeMemory": "隱藏時釋放記憶體",
+  "settings.freeMemory.hint": "視窗隱藏到系統匣或你在玩遊戲時，ResinCraft 會在 30 秒後關閉視窗，占用約 30 MB 而不是約 240 MB。重新開啟需要一秒左右。",
 }
 
 export default dict

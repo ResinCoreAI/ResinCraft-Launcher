@@ -69,8 +69,11 @@ pub fn hidden() {
         if window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false) {
             return;
         }
+        // A position far off screen is Windows' parking spot for minimised windows, not a place to come back to.
         if let (Ok(size), Ok(position)) = (window.outer_size(), window.outer_position()) {
-            *PLACE.lock().unwrap() = Some(Place { maximized: window.is_maximized().unwrap_or(true), size, position });
+            if position.x > -10000 && position.y > -10000 {
+                *PLACE.lock().unwrap() = Some(Place { maximized: window.is_maximized().unwrap_or(true), size, position });
+            }
         }
         UNLOADED.store(true, Ordering::SeqCst);
         if window.destroy().is_err() {
@@ -105,10 +108,20 @@ pub fn show(app: &AppHandle) -> bool {
         }
         match tauri::WebviewWindowBuilder::from_config(&app, &config).and_then(|b| b.build()) {
             Ok(w) => {
-                if let Some(p) = place.filter(|p| !p.maximized) {
-                    let _ = w.set_size(p.size);
-                    let _ = w.set_position(p.position);
+                // A window made from the background can open minimised (Windows' focus rules): put it back in front,
+                // maximised or where it was.
+                let _ = w.unminimize();
+                match place {
+                    Some(p) if !p.maximized => {
+                        let _ = w.set_size(p.size);
+                        let _ = w.set_position(p.position);
+                    }
+                    _ if config.maximized => {
+                        let _ = w.maximize();
+                    }
+                    _ => {}
                 }
+                let _ = w.show();
                 let _ = w.set_focus();
                 UNLOADED.store(false, Ordering::SeqCst);
             }

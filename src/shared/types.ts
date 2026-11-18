@@ -447,6 +447,9 @@ export interface Settings {
   updateChannel?: 'stable' | 'beta'
   /** Closing the window keeps ResinCraft running in the system tray. */
   tray?: boolean
+  /** Hidden for 30 s (in the tray, or while a game runs), the window closes completely to free WebView2's memory and
+   *  opens again when wanted (default on). */
+  freeMemoryHidden?: boolean
   /** Which site wins when a mod is on both Modrinth and CurseForge ('ask' shows the duplicate dialog). */
   preferredModSource: ModSourcePreference
   /** Folders besides Downloads where Download all looks for files. */
