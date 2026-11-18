@@ -4148,6 +4148,8 @@ const dict: Dict = {
   "settings.mcp.copied": "Kopyalandı",
   "settings.freeMemory": "Gizliyken belleği boşalt",
   "settings.freeMemory.hint": "Pencere sistem tepsisinde gizliyken ya da oynarken ResinCraft onu 30 saniye sonra kapatır ve yaklaşık 240 MB yerine yaklaşık 30 MB kullanır. Yeniden açmak bir saniye sürer.",
+  "instance.content.local": "Yerel dosya",
+  "instance.content.localHint": "Modrinth veya CurseForge'dan değil, bilgisayarından eklendi; bu yüzden ResinCraft güncellemelerini denetleyemez.",
 }
 
 export default dict

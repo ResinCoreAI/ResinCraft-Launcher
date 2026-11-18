@@ -4152,6 +4152,8 @@ const dict: Dict = {
   "settings.mcp.copied": "Kopiert",
   "settings.freeMemory": "Speicher freigeben, wenn ausgeblendet",
   "settings.freeMemory.hint": "Ist das Fenster im Infobereich oder beim Spielen ausgeblendet, schließt ResinCraft es nach 30 Sekunden und braucht dann etwa 30 MB statt etwa 240 MB. Das Öffnen dauert danach eine Sekunde.",
+  "instance.content.local": "Lokale Datei",
+  "instance.content.localHint": "Von deinem PC hinzugefügt, nicht von Modrinth oder CurseForge, daher kann ResinCraft nicht nach Updates suchen.",
 }
 
 export default dict

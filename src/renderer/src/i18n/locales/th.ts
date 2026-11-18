@@ -4127,6 +4127,8 @@ const dict: Dict = {
   "settings.mcp.copied": "คัดลอกแล้ว",
   "settings.freeMemory": "คืนหน่วยความจำเมื่อซ่อนหน้าต่าง",
   "settings.freeMemory.hint": "เมื่อหน้าต่างถูกซ่อนไว้ในถาดระบบหรือระหว่างเล่นเกม ResinCraft จะปิดหน้าต่างหลัง 30 วินาที และใช้แรมราว 30 MB แทนราว 240 MB เปิดกลับมาใช้เวลาประมาณหนึ่งวินาที",
+  "instance.content.local": "ไฟล์ในเครื่อง",
+  "instance.content.localHint": "เพิ่มจากเครื่องคุณ ไม่ได้มาจาก Modrinth หรือ CurseForge ResinCraft จึงเช็กอัปเดตให้ไม่ได้",
 }
 
 export default dict

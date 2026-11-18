@@ -4125,6 +4125,8 @@ const dict: Dict = {
   "settings.mcp.copied": "已複製",
   "settings.freeMemory": "隱藏時釋放記憶體",
   "settings.freeMemory.hint": "視窗隱藏到系統匣或你在玩遊戲時，ResinCraft 會在 30 秒後關閉視窗，占用約 30 MB 而不是約 240 MB。重新開啟需要一秒左右。",
+  "instance.content.local": "本機檔案",
+  "instance.content.localHint": "從你的電腦加入，不是來自 Modrinth 或 CurseForge，所以 ResinCraft 無法檢查更新。",
 }
 
 export default dict

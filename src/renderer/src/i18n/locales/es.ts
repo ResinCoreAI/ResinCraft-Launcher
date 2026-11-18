@@ -4166,6 +4166,8 @@ const dict: Dict = {
   "settings.mcp.copied": "Copiado",
   "settings.freeMemory": "Liberar memoria al ocultarse",
   "settings.freeMemory.hint": "Cuando la ventana está oculta en la bandeja o mientras juegas, ResinCraft la cierra a los 30 segundos y usa unos 30 MB en vez de unos 240 MB. Volver a abrirla tarda un segundo.",
+  "instance.content.local": "Archivo local",
+  "instance.content.localHint": "Añadido desde tu PC, no desde Modrinth ni CurseForge, así que ResinCraft no puede buscar actualizaciones.",
 }
 
 export default dict

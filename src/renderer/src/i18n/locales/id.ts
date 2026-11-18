@@ -4138,6 +4138,8 @@ const dict: Dict = {
   "settings.mcp.copied": "Disalin",
   "settings.freeMemory": "Bebaskan memori saat disembunyikan",
   "settings.freeMemory.hint": "Saat jendela disembunyikan di tray atau selagi kamu bermain, ResinCraft menutupnya setelah 30 detik dan memakai sekitar 30 MB, bukan sekitar 240 MB. Membukanya lagi butuh satu detik.",
+  "instance.content.local": "File lokal",
+  "instance.content.localHint": "Ditambahkan dari PC kamu, bukan dari Modrinth atau CurseForge, jadi ResinCraft tidak bisa mengecek pembaruannya.",
 }
 
 export default dict

@@ -4130,6 +4130,8 @@ const dict: Dict = {
   "settings.mcp.copied": "복사됨",
   "settings.freeMemory": "숨겨져 있을 때 메모리 비우기",
   "settings.freeMemory.hint": "창이 트레이에 숨겨져 있거나 게임 중일 때, ResinCraft가 30초 뒤 창을 닫아 약 240MB 대신 약 30MB만 씁니다. 다시 여는 데 1초쯤 걸립니다.",
+  "instance.content.local": "로컬 파일",
+  "instance.content.localHint": "Modrinth나 CurseForge가 아니라 PC에서 추가해서 ResinCraft가 업데이트를 확인할 수 없습니다.",
 }
 
 export default dict

@@ -4135,6 +4135,8 @@ const dict: Dict = {
   "settings.mcp.copied": "コピーしました",
   "settings.freeMemory": "非表示中はメモリを解放",
   "settings.freeMemory.hint": "ウィンドウがトレイに隠れているときやプレイ中は、30 秒後に ResinCraft がウィンドウを閉じ、約 240 MB の代わりに約 30 MB で動きます。開き直すのに 1 秒ほどかかります。",
+  "instance.content.local": "ローカルファイル",
+  "instance.content.localHint": "Modrinth や CurseForge ではなく PC から追加されたため、ResinCraft は更新を確認できません。",
 }
 
 export default dict
