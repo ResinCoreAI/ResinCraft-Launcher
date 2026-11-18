@@ -1018,32 +1018,128 @@ a:hover,
 
 /* ---------- Home ---------- */
 
+/* The "continue playing" card: the instance's banner or newest screenshot behind the title, darkened towards the
+   text side so it always reads, in any theme. */
 .hero {
-  display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  gap: 28px;
-  align-items: center;
-  padding: 24px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 248px;
+  display: flex;
+  align-items: flex-end;
+  padding: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
 }
-.hero-art {
-  width: 168px;
-  height: 168px;
-  border-radius: var(--radius-sm);
+.hero-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+}
+.hero-backdrop img,
+.hero-backdrop svg,
+.hero-backdrop > div {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hero-backdrop img {
+  image-rendering: auto;
+  filter: blur(3px) saturate(1.1);
+  transform: scale(1.06);
+  animation: hero-drift 28s ease-in-out infinite alternate;
+}
+.hero.sharp .hero-backdrop img {
+  filter: none;
+  transform: scale(1.02);
+}
+/* No picture yet: the instance's block art, dimmed into a texture. */
+.hero:not(.has-backdrop) .hero-backdrop {
+  opacity: 0.35;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 92%, transparent) 0%, color-mix(in srgb, var(--bg) 70%, transparent) 45%, color-mix(in srgb, var(--bg) 15%, transparent) 100%),
+    linear-gradient(0deg, color-mix(in srgb, var(--bg) 70%, transparent) 0%, transparent 60%);
+}
+@keyframes hero-drift {
+  from {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.12) translate3d(-1.5%, -1%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-backdrop img {
+    animation: none;
+  }
+}
+.hero-body {
+  max-width: 640px;
+  min-width: 0;
+}
+.hero-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hero-icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
   border: 1px solid var(--border-strong);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 .hero .eyebrow {
   font: 500 12px var(--mono);
   color: var(--data);
 }
 .hero h1 {
-  font-size: 34px;
+  font-size: 38px;
   font-weight: 700;
-  line-height: 1.1;
-  margin: 6px 0 10px;
+  line-height: 1.08;
+  margin: 12px 0 10px;
   overflow-wrap: anywhere;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+}
+.hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.hero-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font: 500 12px var(--mono);
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid var(--border-strong);
+  backdrop-filter: blur(6px);
+}
+.hero-chips .chip.live {
+  color: var(--accent-text, var(--text));
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.hero-chips .chip.live .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .hero .meta {
   color: var(--text-dim);
@@ -1062,6 +1158,19 @@ a:hover,
   width: 14px;
   height: 14px;
   color: var(--text-faint);
+}
+.btn.glass {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  backdrop-filter: blur(8px);
+}
+@media (max-width: 720px) {
+  .hero {
+    min-height: 220px;
+    padding: 20px;
+  }
+  .hero h1 {
+    font-size: 28px;
+  }
 }
 
 .welcome {
@@ -1374,7 +1483,8 @@ button.stat b {
 
 .ihead {
   display: flex;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 16px 20px;
   align-items: center;
   padding: 18px;
   border-radius: var(--radius);
@@ -1387,6 +1497,12 @@ button.stat b {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   flex: none;
+}
+/* The name keeps room to read: in a narrow window the action buttons move to their own line instead of squeezing
+   it to one letter per line. */
+.ihead > .grow {
+  flex: 1 1 260px;
+  min-width: 260px;
 }
 .ihead h1 {
   margin: 0 0 8px;
@@ -4338,4 +4454,16 @@ html.gamepad :focus {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
+}
+
+/* Where an installed file came from (instance content lists): Modrinth green, a plain outline for local files. */
+.chip.mr {
+  color: #1bd96a;
+  border-color: color-mix(in srgb, #1bd96a 45%, transparent);
+  background: color-mix(in srgb, #1bd96a 12%, transparent);
+}
+.chip.local {
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px dashed var(--border-strong);
 }

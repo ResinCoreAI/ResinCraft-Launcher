@@ -4123,6 +4123,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "新令牌",
   "settings.mcp.tokenReset": "已生成新令牌。用旧令牌配置的助手需要换成新的。",
   "settings.mcp.copied": "已复制",
+  "instance.content.local": "本地文件",
+  "instance.content.localHint": "从你的电脑添加，不是来自 Modrinth 或 CurseForge，所以 ResinCraft 无法检查更新。",
 }
 
 export default dict

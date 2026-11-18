@@ -4125,6 +4125,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "สร้างโทเค็นใหม่",
   "settings.mcp.tokenReset": "สร้างโทเค็นใหม่แล้ว ผู้ช่วยที่ตั้งค่าด้วยโทเค็นเก่าต้องใช้โทเค็นใหม่",
   "settings.mcp.copied": "คัดลอกแล้ว",
+  "instance.content.local": "ไฟล์ในเครื่อง",
+  "instance.content.localHint": "เพิ่มจากเครื่องคุณ ไม่ได้มาจาก Modrinth หรือ CurseForge ResinCraft จึงเช็กอัปเดตให้ไม่ได้",
 }
 
 export default dict

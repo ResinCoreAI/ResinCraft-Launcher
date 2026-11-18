@@ -1,7 +1,9 @@
-import { Check, Clock, Compass, Gamepad2, Layers, Plus, Sparkles, Timer } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Clock, Compass, Layers, Plus, Sparkles, Timer } from 'lucide-react'
 import type { Instance } from '@shared/types'
 import { InstanceCard, useInstanceMenu } from './Library'
-import { InstanceTile, Logo, PlayButton } from '../components/ui'
+import { BlockArt, InstanceTile, Logo, PlayButton } from '../components/ui'
+import { api } from '../api'
 import { QuickJoinHome } from '../components/QuickJoin'
 import { useStore } from '../store'
 import { describe, greeting, playtime, timeAgo } from '../util'
@@ -116,21 +118,65 @@ export default function Home() {
   )
 }
 
-/** The instance you played last, front and centre; right-click it for the same menu as its card. */
+/** The newest screenshot of an instance as a small JPEG data URL (the hero's backdrop), or undefined. */
+function useLatestShot(inst: Instance, skip: boolean) {
+  const [shot, setShot] = useState<string>()
+  useEffect(() => {
+    setShot(undefined)
+    if (skip) return
+    let live = true
+    void api.screenshots
+      .list(inst.id)
+      .then((list) => {
+        const newest = [...list].sort((a, b) => b.mtime - a.mtime)[0]
+        return newest ? api.screenshots.thumbnail(inst.id, newest.name) : undefined
+      })
+      .then((url) => live && setShot(url))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [inst.id, skip])
+  return shot
+}
+
+/**
+ * The instance you played last, front and centre: its banner (or, without one, its newest screenshot, softly
+ * blurred) fills the card behind the title. Right-click it for the same menu as its card.
+ */
 function Hero({ featured }: { featured: Instance }) {
-  const { go } = useStore()
+  const { go, games } = useStore()
   const menu = useInstanceMenu(featured)
+  const shot = useLatestShot(featured, !!featured.bannerUrl)
+  const backdrop = featured.bannerUrl ?? shot
+  const live = games[featured.id] === 'running'
+  const [version, loader] = describe(featured).split(' · ')
   return (
     <>
-      <section className="hero" onContextMenu={menu.open}>
-        <InstanceTile inst={featured} className="hero-art" />
-        <div>
-          <div className="eyebrow">{featured.lastPlayed ? t('home.hero.continue') : t('home.hero.start')}</div>
+      <section
+        className={`hero ${backdrop ? 'has-backdrop' : ''} ${featured.bannerUrl ? 'sharp' : ''}`}
+        style={{ '--hero-tint': featured.color } as React.CSSProperties}
+        onContextMenu={menu.open}
+      >
+        <div className="hero-backdrop" aria-hidden>
+          {backdrop ? <img src={backdrop} alt="" draggable={false} /> : <BlockArt seed={featured.id} color={featured.color} cols={24} rows={9} />}
+        </div>
+        <div className="hero-body">
+          <div className="hero-top">
+            <InstanceTile inst={featured} className="hero-icon" />
+            <div className="eyebrow">{featured.lastPlayed ? t('home.hero.continue') : t('home.hero.start')}</div>
+          </div>
           <h1>{featured.name}</h1>
+          <div className="hero-chips">
+            <span className="chip">{version}</span>
+            {loader && <span className="chip">{loader}</span>}
+            {live && (
+              <span className="chip live">
+                <span className="dot" aria-hidden /> {t('library.card.running')}
+              </span>
+            )}
+          </div>
           <div className="meta">
-            <span>
-              <Gamepad2 /> {describe(featured)}
-            </span>
             <span>
               <Timer /> {playtime(featured.playtime)}
             </span>
@@ -140,7 +186,7 @@ function Hero({ featured }: { featured: Instance }) {
           </div>
           <div className="row">
             <PlayButton inst={featured} size="lg" />
-            <button className="btn lg" onClick={() => go({ page: 'instance', id: featured.id })}>
+            <button className="btn lg glass" onClick={() => go({ page: 'instance', id: featured.id })}>
               {t('home.hero.manage')}
             </button>
           </div>

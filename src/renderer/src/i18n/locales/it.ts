@@ -4169,6 +4169,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "Nuovo token",
   "settings.mcp.tokenReset": "Nuovo token creato. Gli assistenti configurati con quello vecchio hanno bisogno del nuovo.",
   "settings.mcp.copied": "Copiato",
+  "instance.content.local": "File locale",
+  "instance.content.localHint": "Aggiunto dal tuo PC, non da Modrinth o CurseForge, quindi ResinCraft non può cercare aggiornamenti.",
 }
 
 export default dict

@@ -581,6 +581,16 @@ function ContentTab({ inst }: { inst: Instance }) {
                       CurseForge
                     </span>
                   )}
+                  {m.projectId && !m.projectId.includes(':') && (
+                    <span className="chip mr" style={{ marginLeft: 8, height: 20, fontSize: 11 }}>
+                      Modrinth
+                    </span>
+                  )}
+                  {!m.projectId && !m.native && (
+                    <span className="chip local" style={{ marginLeft: 8, height: 20, fontSize: 11 }} title={t('instance.content.localHint')}>
+                      {t('instance.content.local')}
+                    </span>
+                  )}
                   {m.projectId?.startsWith('hz:') && (
                     <span className="chip" style={{ marginLeft: 8, height: 20, fontSize: 11 }}>
                       Horizon

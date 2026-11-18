@@ -4123,6 +4123,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "新權杖",
   "settings.mcp.tokenReset": "已產生新權杖。用舊權杖設定的助理需要換成新的。",
   "settings.mcp.copied": "已複製",
+  "instance.content.local": "本機檔案",
+  "instance.content.localHint": "從你的電腦加入，不是來自 Modrinth 或 CurseForge，所以 ResinCraft 無法檢查更新。",
 }
 
 export default dict

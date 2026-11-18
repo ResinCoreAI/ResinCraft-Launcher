@@ -4133,6 +4133,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "Mã mới",
   "settings.mcp.tokenReset": "Đã tạo mã mới. Trợ lý đã cài bằng mã cũ cần mã mới.",
   "settings.mcp.copied": "Đã sao chép",
+  "instance.content.local": "Tệp trên máy",
+  "instance.content.localHint": "Được thêm từ máy của bạn, không phải từ Modrinth hay CurseForge, nên ResinCraft không kiểm tra cập nhật được.",
 }
 
 export default dict

@@ -4128,6 +4128,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "새 토큰",
   "settings.mcp.tokenReset": "새 토큰을 만들었습니다. 예전 토큰으로 설정한 어시스턴트는 새 토큰이 필요합니다.",
   "settings.mcp.copied": "복사됨",
+  "instance.content.local": "로컬 파일",
+  "instance.content.localHint": "Modrinth나 CurseForge가 아니라 PC에서 추가해서 ResinCraft가 업데이트를 확인할 수 없습니다.",
 }
 
 export default dict

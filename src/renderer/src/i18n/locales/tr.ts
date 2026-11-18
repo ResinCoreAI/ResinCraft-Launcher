@@ -4146,6 +4146,8 @@ const dict: Dict = {
   "settings.mcp.resetToken": "Yeni belirteç",
   "settings.mcp.tokenReset": "Yeni belirteç oluşturuldu. Eskisiyle kurulan asistanların yenisine ihtiyacı var.",
   "settings.mcp.copied": "Kopyalandı",
+  "instance.content.local": "Yerel dosya",
+  "instance.content.localHint": "Modrinth veya CurseForge'dan değil, bilgisayarından eklendi; bu yüzden ResinCraft güncellemelerini denetleyemez.",
 }
 
 export default dict

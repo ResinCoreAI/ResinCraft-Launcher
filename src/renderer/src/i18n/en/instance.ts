@@ -32,6 +32,8 @@ export default {
   'instance.content.empty.resourcepack': 'No resource packs yet',
   'instance.content.empty.shader': 'No shaders yet',
   'instance.content.emptyHint': 'Find something you like in Discover and it lands right here.',
+  "instance.content.local": "Local file",
+  "instance.content.localHint": "Added from your PC, not from Modrinth or CurseForge, so ResinCraft can't check it for updates.",
   'instance.content.shaderHint': 'Shaders need Iris (a mod) or OptiFine installed to show up in game.',
   'instance.content.horizonModsHint': "Horizon's content mods come from its registry in Discover. Restart the game after turning one on or off.",
   'instance.content.horizonShaderHint': "Horizon runs its own shader packs and Iris or OptiFine packs. Pick one in the game's Shader Packs settings.",
