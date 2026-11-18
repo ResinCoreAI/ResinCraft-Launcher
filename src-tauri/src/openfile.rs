@@ -64,12 +64,22 @@ pub fn take() -> Option<String> {
 }
 
 /// A second start with a file: the running ResinCraft opens it.
-pub fn opened(args: Vec<String>) {
+/// `fresh`: the window is being made again (it had closed to save memory), so there's no page to tell yet; the new
+/// page asks for it once it loads, as at a start.
+pub fn opened(args: Vec<String>, fresh: bool) {
     if let Some(path) = from_args(&args) {
-        events::emit("openFile", json!({ "path": path }));
+        if fresh {
+            *PENDING.lock().unwrap() = Some(path);
+        } else {
+            events::emit("openFile", json!({ "path": path }));
+        }
     }
     if let Some(url) = link_from_args(&args) {
-        events::emit("openLink", json!({ "url": url }));
+        if fresh {
+            *PENDING_LINK.lock().unwrap() = Some(url);
+        } else {
+            events::emit("openLink", json!({ "url": url }));
+        }
     }
 }
 

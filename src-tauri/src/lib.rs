@@ -48,8 +48,8 @@ pub fn run() {
         // A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead, with the file it was
         // asked to open (a theme, backup or modpack double-clicked in Windows).
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            tray::show(app);
-            openfile::opened(args);
+            let fresh = tray::show(app);
+            openfile::opened(args, fresh);
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
@@ -102,7 +102,14 @@ pub fn run() {
                     if let Some(w) = app.get_webview_window(label) {
                         let _ = w.hide();
                     }
-                    webview::set_low_memory(true);
+                    webview::hidden();
+                    return;
+                }
+            }
+            // The window closed to save memory: ResinCraft goes on (tray, hosted servers, the game) until it's opened again.
+            if let tauri::RunEvent::ExitRequested { api, code: None, .. } = &event {
+                if webview::unloaded() {
+                    api.prevent_exit();
                     return;
                 }
             }

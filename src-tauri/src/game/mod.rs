@@ -114,6 +114,8 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
                     }
                     "hide" => {
                         let _ = win.hide();
+                        crate::webview::hidden();
+                        return;
                     }
                     _ => return,
                 }
@@ -125,10 +127,8 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
                 f();
             }
             if exit_mode != "keep" && running_ids().is_empty() {
-                if let Some(win) = main_window() {
-                    let _ = win.show();
-                    let _ = win.unminimize();
-                    low_memory(false);
+                if let Some(app) = ctx::app() {
+                    crate::webview::show(&app);
                 }
             }
         })),

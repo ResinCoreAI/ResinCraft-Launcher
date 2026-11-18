@@ -71,6 +71,9 @@ pub struct Settings {
     /// Closing the window keeps ResinCraft running in the system tray (hosted servers, the Discord bot and
     /// downloads go on); Quit is in the tray icon's menu (Settings → Appearance).
     pub tray: bool,
+    /// Out of sight for a while (in the tray, or hidden while a game runs), the window closes completely and
+    /// WebView2's ~200 MB go back to Windows; it opens again in a second when it's wanted (Settings → Appearance).
+    pub free_memory_hidden: bool,
     /// When the same mod is on Modrinth and CurseForge: "ask" | "modrinth" | "curseforge" (Settings → Downloads,
     /// or "Don't ask again" in the duplicate dialog).
     pub preferred_mod_source: String,
@@ -140,6 +143,7 @@ impl Default for Settings {
             silent_update: false,
             update_channel: "stable".into(),
             tray: false,
+            free_memory_hidden: true,
             preferred_mod_source: "ask".into(),
             watch_folders: Vec::new(),
             auto_check_packs: true,
@@ -161,6 +165,11 @@ static CACHE: Mutex<Option<Settings>> = Mutex::new(None);
 /// button's handler). Off until settings were read once.
 pub fn tray_on() -> bool {
     CACHE.lock().unwrap().as_ref().is_some_and(|s| s.tray)
+}
+
+/// Whether a hidden window may close to free its memory (before the settings are read: yes).
+pub fn free_memory_hidden() -> bool {
+    CACHE.lock().unwrap().as_ref().is_none_or(|s| s.free_memory_hidden)
 }
 
 /// A setting override if present, else the value compiled in by build.rs, else a runtime env var.

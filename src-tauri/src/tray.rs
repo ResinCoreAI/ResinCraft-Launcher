@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const ID: &str = "main";
 
@@ -24,12 +24,9 @@ pub fn quit(app: &AppHandle) {
 }
 
 /// Brings the main window back (from the tray, minimised, or behind other windows).
-pub fn show(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
-        let _ = w.unminimize();
-        let _ = w.show();
-        let _ = w.set_focus();
-    }
+/// True when the window had closed to save memory and is being made again.
+pub fn show(app: &AppHandle) -> bool {
+    crate::webview::show(app)
 }
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
@@ -41,7 +38,9 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, e| match e.id.as_ref() {
-            "open" => show(app),
+            "open" => {
+                show(app);
+            }
             "quit" => self::quit(app),
             _ => {}
         })
