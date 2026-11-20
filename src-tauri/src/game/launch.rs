@@ -1,7 +1,6 @@
 //! Preparing (downloads, natives, Java), building the command line, running the game and streaming its log.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -174,6 +173,8 @@ pub async fn reinstall(id: &str) -> Result<()> {
     for dir in gone {
         let _ = tokio::fs::remove_dir_all(&dir).await;
     }
+    // The natives too: unpacked again from the fresh jars, whatever the folder holds.
+    let _ = tokio::fs::remove_dir_all(natives_for(&inst.id, 1)).await;
     let title = tr!("reinstall.instance", "Reinstalling {name}", name = inst.name);
     Task::run(title, Some(id.to_string()), |t| async move { prepare(&inst, &settings, natives_for(&inst.id, 1), &t).await.map(|_| ()) }).await
 }
@@ -265,8 +266,43 @@ async fn download_checked(items: Vec<DownloadItem>, concurrency: usize, progress
     download_all(remote, concurrency, progress).await
 }
 
+/// One preparation of an instance at a time, by instance id: Play waits for a `get_ready` that is still downloading
+/// (and the other way round) and then finds the files in place, instead of both fetching them.
+static PREPARING: Mutex<Option<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = Mutex::new(None);
+
+/// ResinCraft's own step before Play: gets everything a start of instance `id` needs (the game's version files, its
+/// mod loader, libraries, assets, natives and a Java) in the background, so the first Play doesn't begin with a long
+/// download. Called when an instance is made, its version changes or a modpack is installed; shown in the task
+/// dock like Play's own preparation, and can be cancelled there. It is that same preparation, which still runs at
+/// every Play and then finds everything in place. Quiet when it can't finish (offline, no Java to be had): Play
+/// says what's wrong when it's pressed.
+pub fn get_ready(id: &str) {
+    let id = id.to_string();
+    tokio::spawn(async move {
+        let Ok(inst) = instances::get(&id).await else { return };
+        // Horizon prepares its own way, with the player's account; a game being started is preparing already.
+        if inst.loader == LoaderType::Horizon || running(|m| m.contains_key(&id)) {
+            return;
+        }
+        let settings = crate::core::settings::get().await;
+        let title = tr!("launch.preparing", "Preparing {name}", name = inst.name);
+        let _ = Task::run(title, Some(id.clone()), |t| async move {
+            let _ = prepare(&inst, &settings, natives_for(&inst.id, 1), &t).await;
+            Ok(())
+        })
+        .await;
+        // Deleted meanwhile: the natives just unpacked would be all that's left of its folder.
+        if instances::get(&id).await.is_err() {
+            let _ = tokio::fs::remove_dir_all(natives_for(&id, 1)).await;
+            let _ = tokio::fs::remove_dir(paths::instance_dir(&id)).await;
+        }
+    });
+}
+
 async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &Arc<Task>) -> Result<Prepared> {
     task.update(tr!("launch.readingVersion", "Reading version info…"), None);
+    let turn = PREPARING.lock().unwrap().get_or_insert_with(HashMap::new).entry(inst.id.clone()).or_default().clone();
+    let _turn = turn.lock().await;
     let picker: JavaPicker = {
         let (inst, settings, task) = (inst.clone(), settings.clone(), task.clone());
         Box::new(move |major| {
@@ -303,33 +339,10 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
     let game_assets = materialize_legacy_assets(&assets.index, &assets.id, &paths::game_dir(&inst.id)).await?;
 
     task.update(tr!("launch.unpackingNatives", "Unpacking natives…"), None);
-    let _ = tokio::fs::remove_dir_all(&natives).await;
-    tokio::fs::create_dir_all(&natives).await?;
     let extract: Vec<(PathBuf, Vec<String>)> = libraries.iter().filter(|l| l.extract).map(|l| (l.item.dest.clone(), l.exclude.clone())).collect();
     {
         let natives = natives.clone();
-        tokio::task::spawn_blocking(move || -> Result<()> {
-            let re = regex::Regex::new(r"(?i)\.(dll|so|dylib|jnilib)$").unwrap();
-            for (jar, exclude) in extract {
-                let mut zip = zip::ZipArchive::new(std::fs::File::open(&jar)?).map_err(|e| err_tr!("shell.openFailed", "Couldn't open {path}: {error}", path = jar.display().to_string(), error = e.to_string()))?;
-                for i in 0..zip.len() {
-                    let mut entry = zip.by_index(i)?;
-                    let name = entry.name().to_string();
-                    if entry.is_dir() || name.starts_with("META-INF/") || exclude.iter().any(|x| name.starts_with(x.as_str())) {
-                        continue;
-                    }
-                    if !re.is_match(&name) {
-                        continue;
-                    }
-                    let base = name.rsplit(['/', '\\']).next().unwrap_or(&name).to_string();
-                    let mut buf = Vec::new();
-                    entry.read_to_end(&mut buf)?;
-                    std::fs::write(natives.join(base), buf)?;
-                }
-            }
-            Ok(())
-        })
-        .await??;
+        tokio::task::spawn_blocking(move || unpack_natives(&natives, &extract)).await??;
     }
 
     task.update(tr!("launch.checkingJava", "Checking Java…"), None);
@@ -353,6 +366,99 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         version,
         natives,
     })
+}
+
+/// What a natives folder holds and which jars it was unpacked from, kept in the folder itself, so the next start can
+/// tell that nothing changed.
+#[derive(serde::Serialize, serde::Deserialize, PartialEq)]
+struct Unpacked {
+    /// The native jars: path, size, modified time (ns since 1970) and what is left out of each.
+    jars: Vec<(String, u64, u128, Vec<String>)>,
+    /// The files unpacked from them: name, size and modified time.
+    files: Vec<(String, u64, u128)>,
+}
+
+const UNPACKED: &str = ".unpacked.json";
+
+fn stamp_of(meta: &std::fs::Metadata) -> Option<u128> {
+    meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_nanos())
+}
+
+/// True when `natives` holds exactly the files the last start unpacked from these same `jars`, untouched since.
+fn still_unpacked(natives: &std::path::Path, jars: &[(String, u64, u128, Vec<String>)]) -> bool {
+    let Some(was) = std::fs::read_to_string(natives.join(UNPACKED)).ok().and_then(|t| serde_json::from_str::<Unpacked>(&t).ok()) else { return false };
+    if was.jars != jars {
+        return false;
+    }
+    let Ok(dir) = std::fs::read_dir(natives) else { return false };
+    let mut there = 0;
+    for e in dir.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if name == UNPACKED {
+            continue;
+        }
+        // Anything else in the folder, or a file that isn't as it was written: unpack again.
+        let Ok(meta) = std::fs::metadata(e.path()) else { return false };
+        match was.files.iter().find(|f| f.0 == name) {
+            Some(f) if meta.is_file() && meta.len() == f.1 && stamp_of(&meta) == Some(f.2) => there += 1,
+            _ => return false,
+        }
+    }
+    there == was.files.len()
+}
+
+/// Unpacks the native libraries (DLLs…) of `extract` (jar, entries to leave out) into `natives` (blocking). A folder
+/// that already holds exactly what the last start unpacked from the same jars is left as it is: writing the same
+/// DLLs again on every start took about half of the time between Play and Java starting (0.13 s → 0.07 s), and
+/// virus scanners look at each freshly written DLL. Anything else (another jar, a changed jar, a missing, changed or
+/// extra file) and the folder is emptied and filled again.
+fn unpack_natives(natives: &std::path::Path, extract: &[(PathBuf, Vec<String>)]) -> Result<()> {
+    let jars: Option<Vec<(String, u64, u128, Vec<String>)>> = extract
+        .iter()
+        .map(|(jar, exclude)| {
+            let meta = std::fs::metadata(jar).ok()?;
+            Some((jar.to_string_lossy().into_owned(), meta.len(), stamp_of(&meta)?, exclude.clone()))
+        })
+        .collect();
+    if jars.as_ref().is_some_and(|j| still_unpacked(natives, j)) {
+        return Ok(());
+    }
+    let _ = std::fs::remove_dir_all(natives);
+    std::fs::create_dir_all(natives)?;
+    let re = regex::Regex::new(r"(?i)\.(dll|so|dylib|jnilib)$").unwrap();
+    let mut names: Vec<String> = Vec::new();
+    for (jar, exclude) in extract {
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(jar)?).map_err(|e| err_tr!("shell.openFailed", "Couldn't open {path}: {error}", path = jar.display().to_string(), error = e.to_string()))?;
+        for i in 0..zip.len() {
+            let mut entry = zip.by_index(i)?;
+            let name = entry.name().to_string();
+            if entry.is_dir() || name.starts_with("META-INF/") || exclude.iter().any(|x| name.starts_with(x.as_str())) {
+                continue;
+            }
+            if !re.is_match(&name) {
+                continue;
+            }
+            let base = name.rsplit(['/', '\\']).next().unwrap_or(&name).to_string();
+            std::io::copy(&mut entry, &mut std::fs::File::create(natives.join(&base))?)?;
+            if !names.contains(&base) {
+                names.push(base);
+            }
+        }
+    }
+    // Best effort: without the note, the next start unpacks again.
+    let files: Option<Vec<(String, u64, u128)>> = names
+        .into_iter()
+        .map(|n| {
+            let meta = std::fs::metadata(natives.join(&n)).ok()?;
+            Some((n, meta.len(), stamp_of(&meta)?))
+        })
+        .collect();
+    if let (Some(jars), Some(files)) = (jars, files) {
+        if let Ok(text) = serde_json::to_vec(&Unpacked { jars, files }) {
+            let _ = std::fs::write(natives.join(UNPACKED), text);
+        }
+    }
+    Ok(())
 }
 
 /// Apple Silicon: versions before 1.19 run as x64 through Rosetta 2, which macOS doesn't install by itself.
@@ -1124,6 +1230,73 @@ mod tests {
         assert_eq!(join("[2001:db8::1]:25580"), ["--server", "2001:db8::1", "--port", "25580"]);
         assert_eq!(join("[::1]"), ["--server", "::1", "--port", "25565"]);
         assert_eq!(join("2001:db8::1"), ["--server", "2001:db8::1", "--port", "25565"]);
+    }
+
+    /// A jar holding native libraries, a text file and a signature, like LWJGL's.
+    fn natives_jar(path: &std::path::Path, files: &[(&str, &[u8])]) {
+        use std::io::Write;
+        let mut w = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+        for (name, data) in files {
+            w.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+            w.write_all(data).unwrap();
+        }
+        w.finish().unwrap();
+    }
+
+    #[test]
+    fn natives_are_unpacked_once_and_again_when_anything_changed() {
+        let dir = std::env::temp_dir().join(format!("resin-natives-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (jar, other, natives) = (dir.join("lwjgl-natives.jar"), dir.join("glfw-natives.jar"), dir.join("natives"));
+        natives_jar(&jar, &[("windows/x64/org/lwjgl/lwjgl.dll", b"lwjgl"), ("META-INF/SIG.dll", b"no"), ("readme.txt", b"no"), ("skip/me.dll", b"no")]);
+        natives_jar(&other, &[("glfw.dll", b"glfw"), ("libglfw.so", b"so")]);
+        let extract = vec![(jar.clone(), vec!["skip/".to_string()]), (other.clone(), vec![])];
+        let listing = |d: &std::path::Path| {
+            let mut names: Vec<String> = std::fs::read_dir(d).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n != UNPACKED).collect();
+            names.sort();
+            names
+        };
+        let written = |name: &str| std::fs::metadata(natives.join(name)).unwrap().modified().unwrap();
+
+        // Only the libraries, flat, without what the jar says to leave out.
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so", "lwjgl.dll"]);
+        assert_eq!(std::fs::read(natives.join("lwjgl.dll")).unwrap(), b"lwjgl");
+
+        // Nothing changed: the files aren't written again.
+        let first = written("lwjgl.dll");
+        std::thread::sleep(Duration::from_millis(30));
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(written("lwjgl.dll"), first, "left as it was");
+
+        // A library changed, went missing, or something else turned up: all unpacked afresh.
+        std::fs::write(natives.join("lwjgl.dll"), b"LWJGL").unwrap();
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(std::fs::read(natives.join("lwjgl.dll")).unwrap(), b"lwjgl");
+        std::fs::remove_file(natives.join("glfw.dll")).unwrap();
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so", "lwjgl.dll"]);
+        std::fs::write(natives.join("left-over.dll"), b"old version").unwrap();
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so", "lwjgl.dll"]);
+
+        // Another set of jars (the instance's version changed), or a jar that was downloaded again.
+        let before = written("glfw.dll");
+        std::thread::sleep(Duration::from_millis(30));
+        unpack_natives(&natives, &extract[1..]).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so"]);
+        assert_ne!(written("glfw.dll"), before);
+        std::thread::sleep(Duration::from_millis(30));
+        natives_jar(&other, &[("glfw.dll", b"glfw 2")]);
+        unpack_natives(&natives, &extract[1..]).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll"]);
+        assert_eq!(std::fs::read(natives.join("glfw.dll")).unwrap(), b"glfw 2");
+
+        // A jar that's gone is an error, as before.
+        std::fs::remove_file(&other).unwrap();
+        assert!(unpack_natives(&natives, &extract[1..]).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

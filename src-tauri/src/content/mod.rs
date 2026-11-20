@@ -35,6 +35,13 @@ use crate::core::shell;
 use crate::core::types::{ContentKind, ExportOptions, SearchQuery};
 use crate::core::Args;
 
+/// A modpack instance just installed, as the UI gets it; its game files (Minecraft, the mod loader, assets) start
+/// arriving in the background now instead of at the first Play.
+fn ready(inst: crate::core::types::Instance) -> Result<Value> {
+    crate::game::launch::get_ready(&inst.id);
+    dupes::pack_result(inst)
+}
+
 pub async fn handle(channel: &str, args: Args) -> Result<Value> {
     match channel {
         "content:search" => json(sources::search(&args.get::<SearchQuery>(0)?).await?),
@@ -97,15 +104,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // Puts a modpack instance's own files back as its current version has them (Instance → Reinstall modpack).
         "content:reinstallPack" => json(packswitch::reinstall_pack(&args.get::<String>(0)?).await?),
         "content:switchPack" => json(packswitch::switch_version(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
-        "content:installModpack" => dupes::pack_result(sources::install_modpack(&args.get::<String>(0)?, args.get(1)?).await?),
+        "content:installModpack" => ready(sources::install_modpack(&args.get::<String>(0)?, args.get(1)?).await?),
         "content:importModpack" => {
             let picked = shell::pick_file("Import a modpack", &[("Modrinth or CurseForge modpack", &["mrpack", "zip"])]).await?;
             match picked {
-                Some(file) => dupes::pack_result(sources::import_modpack_file(&file).await?),
+                Some(file) => ready(sources::import_modpack_file(&file).await?),
                 None => done(),
             }
         }
-        "content:importModpackFile" => dupes::pack_result(sources::import_modpack_file(&PathBuf::from(args.get::<String>(0)?)).await?),
+        "content:importModpackFile" => ready(sources::import_modpack_file(&PathBuf::from(args.get::<String>(0)?)).await?),
         "content:exportPreview" => json(export::export_preview(&args.get::<String>(0)?).await?),
         "content:exportModpack" => {
             let id: String = args.get(0)?;

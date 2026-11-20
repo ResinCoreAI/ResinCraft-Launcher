@@ -76,7 +76,8 @@ pub async fn list_content(instance_id: &str, kind: ContentKind) -> Result<Vec<Co
     if identified.is_err() {
         return Ok(items); // offline or CurseForge unavailable
     }
-    modrinth::list_content(instance_id, kind).await
+    // The same list with what CurseForge recognised; Modrinth was asked about these files a moment ago.
+    modrinth::list_known_content(instance_id, kind).await
 }
 
 pub async fn check_updates(instance_id: &str) -> Result<Vec<ContentItem>> {
