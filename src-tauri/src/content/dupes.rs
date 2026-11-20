@@ -15,22 +15,24 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::index::{index_key, load_index, natural_cmp, save_index, ContentIndex};
-use super::jarmeta::{self, JarMeta};
+use super::index::{index_key, load_index, loaders_for, natural_cmp, save_index, ContentIndex};
+use super::jarmeta::{self, JarMeta, RemoteFile};
 use super::{curseforge, modrinth, sources};
 use crate::core::events::Task;
-use crate::core::fsutil::{read_json, write_json};
+use crate::core::fsutil::{in_parallel, read_json, write_json};
 use crate::core::instances;
 use crate::core::paths;
 use crate::core::settings;
 use crate::core::shell;
 use crate::core::text::error_payload;
-use crate::core::types::{source_of, ContentKind, ContentSource, Instance, LoaderType};
+use crate::core::types::{source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType};
 use crate::{bail_tr, err_tr, tr};
 
 // ---------- What the UI sends and gets back ----------
@@ -334,23 +336,67 @@ fn pair(map: &mut Twins, a: &str, b: &str) -> bool {
 
 // ---------- Fetching facts (best effort: failures leave the facts as they were) ----------
 
+/// How long what a site said about a project is reused: one duplicate check asks about the same projects pick after
+/// pick, and the next check (the same picks again, or one more) asks about them all over.
+const FACTS_KEPT: Duration = Duration::from_secs(600);
+
+/// Project id → what its site said about it lately.
+static SITE_FACTS: Mutex<Option<HashMap<String, (Instant, ModFacts)>>> = Mutex::new(None);
+
+/// What Modrinth and CurseForge say about these projects (ids from other sources are skipped): both sites asked at
+/// the same time, each in one request for all its projects. Best effort: projects a site couldn't be asked about
+/// are left out, and the bool says whether every site that was asked answered.
+async fn site_facts(ids: &[String]) -> (HashMap<String, ModFacts>, bool) {
+    let mut found: HashMap<String, ModFacts> = HashMap::new();
+    let (mut mr, mut cf): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
+    {
+        let mut kept = SITE_FACTS.lock().unwrap();
+        let kept = kept.get_or_insert_with(HashMap::new);
+        kept.retain(|_, (at, _)| at.elapsed() < FACTS_KEPT);
+        for id in ids {
+            let list = match source_of(id) {
+                ContentSource::Modrinth => &mut mr,
+                ContentSource::Curseforge => &mut cf,
+                _ => continue,
+            };
+            match kept.get(id) {
+                Some((_, f)) => {
+                    found.insert(id.clone(), f.clone());
+                }
+                None if !list.contains(id) => list.push(id.clone()),
+                None => {}
+            }
+        }
+    }
+    let (from_mr, from_cf) = tokio::join!(
+        async {
+            match mr.is_empty() {
+                true => Ok(vec![]),
+                false => modrinth::facts(&mr).await,
+            }
+        },
+        async {
+            match cf.is_empty() {
+                true => Ok(vec![]),
+                false => curseforge::facts(&cf).await,
+            }
+        },
+    );
+    let answered = from_mr.is_ok() && from_cf.is_ok();
+    let now = Instant::now();
+    for f in [from_mr, from_cf].into_iter().flatten().flatten() {
+        SITE_FACTS.lock().unwrap().get_or_insert_with(HashMap::new).insert(f.id.clone(), (now, f.clone()));
+        found.insert(f.id.clone(), f);
+    }
+    (found, answered)
+}
+
 /// Fills in slugs, authors, links and recent file hashes from each site, and pairs CurseForge projects with
 /// Modrinth projects that publish the same files.
 async fn enrich(facts: &mut [&mut ModFacts], twins: &mut Twins) -> bool {
     let mut changed = false;
-    let mr: Vec<String> = facts.iter().filter(|f| !f.fetched && f.source() == ContentSource::Modrinth).map(|f| f.id.clone()).collect();
-    let cf: Vec<String> = facts.iter().filter(|f| !f.fetched && f.source() == ContentSource::Curseforge).map(|f| f.id.clone()).collect();
-    let mut found: HashMap<String, ModFacts> = HashMap::new();
-    if !mr.is_empty() {
-        if let Ok(list) = modrinth::facts(&mr).await {
-            found.extend(list.into_iter().map(|f| (f.id.clone(), f)));
-        }
-    }
-    if !cf.is_empty() {
-        if let Ok(list) = curseforge::facts(&cf).await {
-            found.extend(list.into_iter().map(|f| (f.id.clone(), f)));
-        }
-    }
+    let ids: Vec<String> = facts.iter().filter(|f| !f.fetched && comparable(f.source())).map(|f| f.id.clone()).collect();
+    let (mut found, _) = site_facts(&ids).await;
     for f in facts.iter_mut() {
         if let Some(more) = found.remove(&f.id) {
             f.merge(more);
@@ -381,6 +427,15 @@ async fn look_up_cf_hashes(facts: &mut [&mut ModFacts], twins: &mut Twins) -> bo
     changed
 }
 
+/// Asks Modrinth which projects publish these files, all in one request, so that `look_up_cf_hashes` finds the
+/// answers already there (`modrinth::projects_by_sha1` keeps them). False when Modrinth couldn't be asked.
+async fn owners_asked(mut sha1s: Vec<String>) -> bool {
+    sha1s.retain(|h| !h.is_empty());
+    sha1s.sort();
+    sha1s.dedup();
+    sha1s.is_empty() || modrinth::projects_by_sha1(&sha1s).await.is_ok()
+}
+
 /// Applies remembered pairs.
 fn recall(f: &mut ModFacts, twins: &Twins) {
     if let Some(t) = twins.get(&f.id) {
@@ -390,8 +445,17 @@ fn recall(f: &mut ModFacts, twins: &Twins) {
 
 // ---------- What an instance already has ----------
 
+/// Where `Guard::copy_of` stands once the files were compared.
+enum ByFiles {
+    /// Settled: the copy, or None when there is nothing from another site to compare with.
+    Done(Option<(ModFacts, Evidence)>),
+    /// Nothing proven yet; these entries of `present` are the ones from the other site.
+    Open(Vec<usize>),
+}
+
 /// The mods of one kind already in an instance (plus ones about to be installed in the same batch), for spotting
 /// a newcomer that is one of them from another site.
+#[derive(Clone)]
 pub struct Guard {
     instance_id: String,
     kind: ContentKind,
@@ -438,21 +502,34 @@ impl Guard {
 
     /// The copy of `cand` this instance already has from another site, and why we think so.
     pub async fn copy_of(&mut self, cand: &mut ModFacts) -> Option<(ModFacts, Evidence)> {
-        if !comparable(cand.source()) {
-            return None;
+        match self.by_files(cand).await {
+            ByFiles::Done(hit) => hit,
+            ByFiles::Open(others) => self.by_names(cand, &others).await,
         }
-        let others: Vec<usize> = (0..self.present.len())
+    }
+
+    /// The entries from the other site than `cand`'s.
+    fn others(&self, cand: &ModFacts) -> Vec<usize> {
+        (0..self.present.len())
             .filter(|&i| {
                 let p = &self.present[i];
                 p.id != cand.id && p.source() != cand.source() && comparable(p.source())
             })
-            .collect();
+            .collect()
+    }
+
+    /// `copy_of`, first half: what is known already, then the same files on both sites.
+    async fn by_files(&mut self, cand: &mut ModFacts) -> ByFiles {
+        if !comparable(cand.source()) {
+            return ByFiles::Done(None);
+        }
+        let others = self.others(cand);
         if others.is_empty() {
-            return None; // nothing from another site: no lookups needed
+            return ByFiles::Done(None); // nothing from another site: no lookups needed
         }
         recall(cand, &self.twins);
         if let Some(hit) = self.best(cand, &others) {
-            return Some(hit);
+            return ByFiles::Done(Some(hit));
         }
 
         // The same files on both sites. A CurseForge project's recent files come with its details.
@@ -467,13 +544,22 @@ impl Guard {
             let mut cf: Vec<&mut ModFacts> = self.present.iter_mut().filter(|p| p.source() == ContentSource::Curseforge).collect();
             self.changed |= look_up_cf_hashes(&mut cf, &mut self.twins).await;
         }
-        if let Some(hit) = self.best(cand, &others) {
-            return Some(hit);
+        match self.best(cand, &others) {
+            Some(hit) => ByFiles::Done(Some(hit)),
+            None => ByFiles::Open(others),
         }
+    }
 
-        // Same name: fetch both sides' details, and fingerprint local Modrinth files for a CurseForge newcomer.
+    /// The entries among `others` with `cand`'s name.
+    fn suspects(&self, cand: &ModFacts, others: &[usize]) -> Vec<usize> {
         let name = norm_title(&cand.title);
-        let suspects: Vec<usize> = others.iter().copied().filter(|&i| !name.is_empty() && norm_title(&self.present[i].title) == name).collect();
+        others.iter().copied().filter(|&i| !name.is_empty() && norm_title(&self.present[i].title) == name).collect()
+    }
+
+    /// `copy_of`, second half. Same name: fetch both sides' details, and fingerprint local Modrinth files for a
+    /// CurseForge newcomer.
+    async fn by_names(&mut self, cand: &mut ModFacts, others: &[usize]) -> Option<(ModFacts, Evidence)> {
+        let suspects = self.suspects(cand, others);
         if suspects.is_empty() {
             return None;
         }
@@ -501,7 +587,88 @@ impl Guard {
                 }
             }
         }
-        self.best(cand, &others)
+        self.best(cand, others)
+    }
+
+    /// Before `copy_of` is asked about each of `cands` in turn: asks the sites, in a few requests for all of them,
+    /// what `copy_of` would ask for one candidate after another. Nothing here changes and nothing is decided: the
+    /// answers are kept where they were asked for (`site_facts`, `modrinth::projects_by_sha1`,
+    /// `curseforge::lookup_files`), and `copy_of` finds them there instead of waiting for each.
+    pub async fn warm(&self, cands: &[ModFacts]) {
+        let mut dry = self.clone();
+        // Comparing files asks for a CurseForge candidate's details, then which Modrinth projects have its files;
+        // a Modrinth candidate has the installed CurseForge files looked up on Modrinth.
+        let (mut ids, mut sha1s, mut installed_cf) = (Vec::new(), Vec::new(), false);
+        for c in cands {
+            let mut c = c.clone();
+            let others = dry.others(&c);
+            if !comparable(c.source()) || others.is_empty() {
+                continue;
+            }
+            recall(&mut c, &dry.twins);
+            if dry.best(&c, &others).is_some() {
+                continue;
+            }
+            if c.source() == ContentSource::Curseforge {
+                if !c.fetched {
+                    ids.push(c.id.clone());
+                }
+                if !c.looked_up {
+                    sha1s.extend(c.sha1s.iter().cloned());
+                }
+            } else {
+                installed_cf = true;
+            }
+        }
+        if ids.is_empty() && sha1s.is_empty() && !installed_cf {
+            return;
+        }
+        let (found, answered) = site_facts(&ids).await;
+        sha1s.extend(found.into_values().flat_map(|f| f.sha1s));
+        if installed_cf && !self.cf_looked_up {
+            sha1s.extend(self.present.iter().filter(|p| p.source() == ContentSource::Curseforge && !p.looked_up).flat_map(|p| p.sha1s.iter().cloned()));
+        }
+        // A site that can't be reached now won't answer the next requests either: leave the rest to `copy_of`.
+        if !answered || !owners_asked(sha1s).await {
+            return;
+        }
+
+        // Who gets as far as comparing names (tried on a copy; the answers are at hand now), and what that asks.
+        let folder = paths::game_dir(&self.instance_id).join(self.kind.folder());
+        let (mut ids, mut cf_suspects, mut sha1s, mut files): (Vec<String>, Vec<String>, Vec<String>, Vec<PathBuf>) = Default::default();
+        for c in cands {
+            let mut c = c.clone();
+            let ByFiles::Open(others) = dry.by_files(&mut c).await else { continue };
+            let suspects = dry.suspects(&c, &others);
+            if suspects.is_empty() {
+                continue;
+            }
+            if !c.fetched {
+                ids.push(c.id.clone());
+            }
+            for &i in &suspects {
+                let p = &dry.present[i];
+                if !p.fetched {
+                    ids.push(p.id.clone());
+                }
+                if p.source() == ContentSource::Curseforge && !p.looked_up {
+                    cf_suspects.push(p.id.clone());
+                    sha1s.extend(p.sha1s.iter().cloned());
+                }
+                if let (ContentSource::Curseforge, ContentSource::Modrinth, Some(f)) = (c.source(), p.source(), &p.file) {
+                    let path = folder.join(f);
+                    if !files.contains(&path) {
+                        files.push(path);
+                    }
+                }
+            }
+        }
+        if ids.is_empty() && files.is_empty() {
+            return;
+        }
+        let ((found, _), _) = tokio::join!(site_facts(&ids), curseforge::lookup_files(files));
+        sha1s.extend(cf_suspects.iter().filter_map(|id| found.get(id)).flat_map(|f| f.sha1s.iter().cloned()));
+        owners_asked(sha1s).await;
     }
 
     fn best(&self, cand: &ModFacts, others: &[usize]) -> Option<(ModFacts, Evidence)> {
@@ -549,25 +716,47 @@ pub async fn check(instance_id: &str, picks: Vec<ModPick>) -> Result<DuplicateCh
     }
     let kinds: Vec<ContentKind> = picks.iter().map(|p| p.kind).collect();
 
-    // The same mod picked from two sites.
+    let mut each_kind: Vec<ContentKind> = Vec::new();
+    for kind in kinds.iter().copied() {
+        if !each_kind.contains(&kind) {
+            each_kind.push(kind);
+        }
+    }
+    // Two things that don't wait for each other, so both at once: the picks' details from their sites, and
+    // recognising the instance's hand-added files (by hash, on Modrinth then CurseForge).
     let both = facts.iter().any(|f| f.source() == ContentSource::Modrinth) && facts.iter().any(|f| f.source() == ContentSource::Curseforge);
+    let (enriched, mut listed) = tokio::join!(
+        async {
+            match both {
+                true => {
+                    let mut all: Vec<&mut ModFacts> = facts.iter_mut().collect();
+                    enrich(&mut all, &mut twins).await
+                }
+                false => false,
+            }
+        },
+        async {
+            let mut listed: Vec<Vec<ContentItem>> = Vec::new();
+            for kind in &each_kind {
+                listed.push(sources::list_content(&inst.id, *kind).await.unwrap_or_default());
+            }
+            listed
+        },
+    );
+    changed |= enriched;
+    // The same mod picked from two sites.
     if both {
-        let mut all: Vec<&mut ModFacts> = facts.iter_mut().collect();
-        changed |= enrich(&mut all, &mut twins).await;
         out.groups = group_picks(&facts, &kinds);
     }
 
     // Already in the instance from another site.
-    let mut done: Vec<ContentKind> = Vec::new();
-    for kind in kinds.iter().copied() {
-        if done.contains(&kind) {
-            continue;
-        }
-        done.push(kind);
-        // Recognise hand-added files first (by hash, on Modrinth then CurseForge).
-        let items = sources::list_content(&inst.id, kind).await.unwrap_or_default();
+    for (n, kind) in each_kind.iter().copied().enumerate() {
+        let items = std::mem::take(&mut listed[n]);
         let idx = load_index(&inst.id).await;
         let mut guard = Guard::with_twins(&inst, kind, &idx, std::mem::take(&mut twins));
+        // What the picks below would each ask the sites, asked for all of them together.
+        let cands: Vec<ModFacts> = facts.iter().zip(&kinds).filter(|(_, k)| **k == kind).map(|(f, _)| f.clone()).collect();
+        guard.warm(&cands).await;
         for (i, f) in facts.iter_mut().enumerate() {
             if kinds[i] != kind {
                 continue;
@@ -609,17 +798,17 @@ async fn hand_added_copies(inst: &Instance, picks: &[&ModPick], unknown: Vec<Str
     }
     let folder = paths::game_dir(&inst.id).join(ContentKind::Mod.folder());
     let jars: Vec<(String, JarMeta)> = tokio::task::spawn_blocking(move || {
-        unknown.into_iter().map(|n| (jarmeta::read_jar(&folder.join(&n)), n)).filter(|(m, _)| !m.ids.is_empty()).map(|(m, n)| (n, m)).collect()
+        let metas = in_parallel(&unknown, |n| jarmeta::read_jar(&folder.join(n)));
+        unknown.into_iter().zip(metas).filter(|(_, m)| !m.ids.is_empty()).collect()
     })
     .await
     .unwrap_or_default();
     if jars.is_empty() {
         return vec![];
     }
-    let mut metas: Vec<Option<JarMeta>> = Vec::new();
-    for chunk in picks.chunks(4) {
-        metas.extend(futures::future::join_all(chunk.iter().map(|&p| pick_meta(inst, p))).await);
-    }
+    // Eight at a time, the next one starting as soon as one is done (in the picks' order).
+    let looks: Vec<_> = picks.iter().map(|&p| pick_meta(inst, p)).collect();
+    let metas: Vec<Option<JarMeta>> = stream::iter(looks).buffered(8).collect().await;
     picks
         .iter()
         .zip(metas)
@@ -639,14 +828,33 @@ async fn hand_added_copies(inst: &Instance, picks: &[&ModPick], unknown: Vec<Str
         .collect()
 }
 
+/// Which file installing a pick would download, as its site said lately (by instance version, loaders and pick):
+/// checking the same picks again shouldn't ask every site about every pick again.
+static PLANNED: Mutex<Option<HashMap<String, (Instant, Option<RemoteFile>)>>> = Mutex::new(None);
+
 /// The metadata inside the file installing a pick would download.
 async fn pick_meta(inst: &Instance, p: &ModPick) -> Option<JarMeta> {
-    let file = match source_of(&p.id) {
-        ContentSource::Modrinth => modrinth::planned_file(inst, &p.id, p.kind, p.version_id.as_deref()).await,
-        ContentSource::Curseforge => curseforge::planned_file(inst, &p.id, p.kind, p.version_id.as_deref()).await,
-        _ => return None,
+    let key = format!("{}|{}|{}|{}|{}", inst.mc_version, loaders_for(inst).join(","), p.kind.as_str(), p.id, p.version_id.as_deref().unwrap_or_default());
+    let kept = {
+        let mut planned = PLANNED.lock().unwrap();
+        let planned = planned.get_or_insert_with(HashMap::new);
+        planned.retain(|_, (at, _)| at.elapsed() < FACTS_KEPT);
+        planned.get(&key).map(|(_, f)| f.clone())
     };
-    jarmeta::remote_meta(&file.ok()??).await
+    let file = match kept {
+        Some(file) => file,
+        None => {
+            let file = match source_of(&p.id) {
+                ContentSource::Modrinth => modrinth::planned_file(inst, &p.id, p.kind, p.version_id.as_deref()).await,
+                ContentSource::Curseforge => curseforge::planned_file(inst, &p.id, p.kind, p.version_id.as_deref()).await,
+                _ => return None,
+            }
+            .ok()?;
+            PLANNED.lock().unwrap().get_or_insert_with(HashMap::new).insert(key, (Instant::now(), file.clone()));
+            file
+        }
+    };
+    jarmeta::remote_meta(&file?).await
 }
 
 /// Installs several projects in one task, each from its own site, after moving `replace` to the Recycle Bin.
@@ -917,7 +1125,7 @@ async fn remove_pack_twins(inst: &Instance, task: &Task, listed: &[String]) -> V
     let mut twins = load_twins().await;
     let metas = {
         let (folder, files) = (folder.clone(), files.clone());
-        tokio::task::spawn_blocking(move || files.iter().map(|f| jarmeta::read_jar(&folder.join(f))).collect::<Vec<_>>()).await.unwrap_or_default()
+        tokio::task::spawn_blocking(move || in_parallel(&files, |f| jarmeta::read_jar(&folder.join(f)))).await.unwrap_or_default()
     };
     let mut jars: Vec<PackJar> = files
         .into_iter()

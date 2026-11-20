@@ -2,7 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -18,7 +19,7 @@ use super::packswitch::{Layer, PackTarget, Side, TargetFile};
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
-use crate::core::net::{download_all, download_file, fetch_json, hash_file, post_json, DownloadItem, Hash, HashAlgo};
+use crate::core::net::{download_all, download_file, fetch_json, file_hash, post_json, save_verified, DownloadItem, Hash, HashAlgo};
 use crate::core::paths;
 use crate::core::types::{
     source_of, ContentItem, ContentKind, ContentSource, GalleryImage, Instance, LoaderType, ModpackRef, NewInstance, ProjectDependency, ProjectDetails,
@@ -572,6 +573,16 @@ fn matches_kind(kind: ContentKind, name: &str) -> bool {
 }
 
 pub async fn list_content(instance_id: &str, kind: ContentKind) -> Result<Vec<ContentItem>> {
+    list_files(instance_id, kind, true).await
+}
+
+/// `list_content` from what the content index already says: no file is hashed and Modrinth isn't asked. For listing
+/// again right after files were looked up (asking twice in a row gets the same answer, a round trip later).
+pub(crate) async fn list_known_content(instance_id: &str, kind: ContentKind) -> Result<Vec<ContentItem>> {
+    list_files(instance_id, kind, false).await
+}
+
+async fn list_files(instance_id: &str, kind: ContentKind, identify: bool) -> Result<Vec<ContentItem>> {
     let inst = instances::get(instance_id).await?;
     // A Horizon instance's mods are turned on in horizon-mods.txt, not by their file names.
     if inst.loader == LoaderType::Horizon && kind == ContentKind::Mod {
@@ -591,7 +602,7 @@ pub async fn list_content(instance_id: &str, kind: ContentKind) -> Result<Vec<Co
 
     // Identify files we didn't install ourselves (dropped in by hand) via their hash.
     let unknown: Vec<&String> = names.iter().filter(|n| !idx.contains_key(&index_key(kind, n))).collect();
-    if !unknown.is_empty() {
+    if identify && !unknown.is_empty() {
         // Offline or Modrinth unavailable: show the bare file names.
         let _ = identify_by_hash(&inst, kind, &folder, &unknown, &mut idx).await;
     }
@@ -621,10 +632,12 @@ pub async fn list_content(instance_id: &str, kind: ContentKind) -> Result<Vec<Co
 async fn identify_by_hash(inst: &Instance, kind: ContentKind, folder: &Path, unknown: &[&String], idx: &mut ContentIndex) -> Result<()> {
     let mut hashes: HashMap<String, String> = HashMap::new();
     for n in unknown {
-        hashes.insert(hash_file(&folder.join(n), HashAlgo::Sha1).await?, (*n).clone());
+        // Remembered from the download check or an earlier look, unless the file changed since.
+        hashes.insert(file_hash(&folder.join(n), HashAlgo::Sha1).await?, (*n).clone());
     }
-    let keys: Vec<&String> = hashes.keys().collect();
-    let found: HashMap<String, MrVersion> = post_json(&format!("{API}/version_files"), &json!({ "hashes": keys, "algorithm": "sha1" })).await?;
+    save_verified().await;
+    let keys: Vec<String> = hashes.keys().cloned().collect();
+    let found = versions_by_sha1(&keys).await?;
     let ids: Vec<String> = found.values().map(|v| v.project_id.clone()).collect::<HashSet<_>>().into_iter().collect();
     let projects: Vec<MrProject> =
         if ids.is_empty() { vec![] } else { fetch_json(&format!("{API}/projects?ids={}", enc(&serde_json::to_string(&ids)?))).await? };
@@ -839,7 +852,7 @@ async fn fill_pack(inst: &Instance, pack: &PackIndex, file: &Path, task: &Arc<Ta
         items.push(DownloadItem::new(url, safe_join(&dir, &f.path)?).hash(Some(Hash::sha1(&f.hashes.sha1))).size(f.file_size));
         listed.extend(f.path.strip_prefix("mods/").filter(|n| !n.contains('/')).map(str::to_string));
     }
-    download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
+    download_all(items, crate::core::settings::parallel_downloads().await, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
 
     task.update(tr!("modpack.applyingSettings", "Applying modpack settings…"), None);
     let (file, dir) = (file.to_path_buf(), dir.clone());
@@ -920,8 +933,7 @@ pub async fn lookup_hashes(sha1s: &[String]) -> Result<HashMap<String, HashHit>>
     if sha1s.is_empty() {
         return Ok(out);
     }
-    let found: HashMap<String, MrVersion> = post_json(&format!("{API}/version_files"), &json!({ "hashes": sha1s, "algorithm": "sha1" })).await?;
-    for (sha1, v) in found {
+    for (sha1, v) in versions_by_sha1(sha1s).await? {
         if let Some(f) = v.files.iter().find(|x| x.hashes.sha1 == sha1) {
             out.insert(sha1.clone(), HashHit { url: f.url.clone(), sha512: f.hashes.sha512.clone(), size: f.size });
         }
@@ -931,10 +943,57 @@ pub async fn lookup_hashes(sha1s: &[String]) -> Result<HashMap<String, HashHit>>
 
 /// Which Modrinth project publishes each of these files (by SHA-1). Unknown hashes are left out.
 pub(crate) async fn projects_by_sha1(sha1s: &[String]) -> Result<HashMap<String, String>> {
-    let mut out = HashMap::new();
-    for chunk in sha1s.chunks(500) {
-        let found: HashMap<String, MrVersion> = post_json(&format!("{API}/version_files"), &json!({ "hashes": chunk, "algorithm": "sha1" })).await?;
-        out.extend(found.into_iter().map(|(h, v)| (h, v.project_id)));
+    Ok(versions_by_sha1(sha1s).await?.into_iter().map(|(h, v)| (h, v.project_id)).collect())
+}
+
+/// How long Modrinth's answer about a file is reused. Asking which version a file belongs to takes Modrinth
+/// anything from a third of a second to ten, and one modpack install, version switch or duplicate check asks about
+/// the same files two to four times.
+const HASH_ANSWER_KEPT: Duration = Duration::from_secs(600);
+
+/// What Modrinth said about a SHA-1 lately: the version the file belongs to, or None for a file it doesn't know.
+static HASH_ANSWERS: Mutex<Option<HashMap<String, (Instant, Option<MrVersion>)>>> = Mutex::new(None);
+
+/// The Modrinth version each of these files (by SHA-1) belongs to; files Modrinth doesn't know are left out.
+/// Hashes it was asked about in the last ten minutes aren't asked about again.
+async fn versions_by_sha1(sha1s: &[String]) -> Result<HashMap<String, MrVersion>> {
+    let mut out: HashMap<String, MrVersion> = HashMap::new();
+    let mut ask: Vec<String> = Vec::new();
+    {
+        let mut answers = HASH_ANSWERS.lock().unwrap();
+        let answers = answers.get_or_insert_with(HashMap::new);
+        answers.retain(|_, (at, _)| at.elapsed() < HASH_ANSWER_KEPT);
+        let mut asking: HashSet<&String> = HashSet::new();
+        for h in sha1s {
+            match answers.get(h) {
+                Some((_, Some(v))) => {
+                    out.insert(h.clone(), v.clone());
+                }
+                Some((_, None)) => {}
+                None => {
+                    if asking.insert(h) {
+                        ask.push(h.clone());
+                    }
+                }
+            }
+        }
+    }
+    for chunk in ask.chunks(500) {
+        let mut found: HashMap<String, MrVersion> = post_json(&format!("{API}/version_files"), &json!({ "hashes": chunk, "algorithm": "sha1" })).await?;
+        // Nobody who asks which version a file belongs to reads its changelog, the biggest part of each answer.
+        for v in found.values_mut() {
+            v.changelog = None;
+        }
+        // Answers come back under the hashes as they were sent; anything else isn't kept, only passed on.
+        if found.keys().all(|k| chunk.contains(k)) {
+            let now = Instant::now();
+            let mut answers = HASH_ANSWERS.lock().unwrap();
+            let answers = answers.get_or_insert_with(HashMap::new);
+            for h in chunk {
+                answers.insert(h.clone(), (now, found.get(h).cloned()));
+            }
+        }
+        out.extend(found);
     }
     Ok(out)
 }

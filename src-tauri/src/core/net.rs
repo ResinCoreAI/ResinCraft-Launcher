@@ -1,18 +1,16 @@
 //! HTTP helpers and the verified, retrying, parallel downloader.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, UNIX_EPOCH};
 
 use anyhow::{anyhow, bail, Result};
-use futures::stream::{self, StreamExt};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha1::Digest;
-use tokio::io::AsyncWriteExt;
 
 use super::ctx::http;
 use crate::err_tr;
@@ -136,34 +134,61 @@ pub fn hash_bytes(data: &[u8], algo: HashAlgo) -> String {
     }
 }
 
+/// A hash worked out piece by piece, as the bytes arrive.
+pub enum RunningHash {
+    Md5(md5::Md5),
+    Sha1(sha1::Sha1),
+    Sha256(sha2::Sha256),
+    Sha512(sha2::Sha512),
+}
+
+impl RunningHash {
+    pub fn new(algo: HashAlgo) -> RunningHash {
+        match algo {
+            HashAlgo::Md5 => RunningHash::Md5(md5::Md5::new()),
+            HashAlgo::Sha1 => RunningHash::Sha1(sha1::Sha1::new()),
+            HashAlgo::Sha256 => RunningHash::Sha256(sha2::Sha256::new()),
+            HashAlgo::Sha512 => RunningHash::Sha512(sha2::Sha512::new()),
+        }
+    }
+
+    pub fn update(&mut self, data: &[u8]) {
+        match self {
+            RunningHash::Md5(h) => h.update(data),
+            RunningHash::Sha1(h) => h.update(data),
+            RunningHash::Sha256(h) => h.update(data),
+            RunningHash::Sha512(h) => h.update(data),
+        }
+    }
+
+    pub fn finish(self) -> String {
+        match self {
+            RunningHash::Md5(h) => hex::encode(h.finalize()),
+            RunningHash::Sha1(h) => hex::encode(h.finalize()),
+            RunningHash::Sha256(h) => hex::encode(h.finalize()),
+            RunningHash::Sha512(h) => hex::encode(h.finalize()),
+        }
+    }
+}
+
+/// Hashes everything `r` has to give (blocking).
+pub fn hash_read(mut r: impl std::io::Read, algo: HashAlgo) -> std::io::Result<String> {
+    let mut h = RunningHash::new(algo);
+    let mut buf = vec![0u8; 1 << 16];
+    loop {
+        let n = r.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        h.update(&buf[..n]);
+    }
+    Ok(h.finish())
+}
+
 /// Hashes a file without blocking the async runtime.
 pub async fn hash_file(path: &Path, algo: HashAlgo) -> Result<String> {
     let path = path.to_path_buf();
-    tokio::task::spawn_blocking(move || -> Result<String> {
-        use std::io::Read;
-        let mut f = std::fs::File::open(&path)?;
-        let mut buf = vec![0u8; 1 << 16];
-        macro_rules! run {
-            ($h:expr) => {{
-                let mut h = $h;
-                loop {
-                    let n = f.read(&mut buf)?;
-                    if n == 0 {
-                        break;
-                    }
-                    h.update(&buf[..n]);
-                }
-                hex::encode(h.finalize())
-            }};
-        }
-        Ok(match algo {
-            HashAlgo::Md5 => run!(md5::Md5::new()),
-            HashAlgo::Sha1 => run!(sha1::Sha1::new()),
-            HashAlgo::Sha256 => run!(sha2::Sha256::new()),
-            HashAlgo::Sha512 => run!(sha2::Sha512::new()),
-        })
-    })
-    .await?
+    tokio::task::spawn_blocking(move || -> Result<String> { Ok(hash_read(std::fs::File::open(&path)?, algo)?) }).await?
 }
 
 // ---------- Verified-file cache ----------
@@ -171,14 +196,61 @@ pub async fn hash_file(path: &Path, algo: HashAlgo) -> Result<String> {
 // already matched is remembered with the size and modified time it had then; while both are unchanged
 // it's trusted without re-hashing. Replacing, editing, truncating or deleting a file changes its size or
 // modified time, so it gets hashed again (and re-downloaded if it no longer matches).
+//
+// The same goes for files the launcher hashes for other reasons (`file_hash`): a modpack's jars are checked when
+// they're downloaded, looked up on Modrinth by hash, fingerprinted for CurseForge, recorded as the pack's files and
+// compared again at every version switch. Each of those asks here first, so a file is read once per kind of hash
+// instead of once per question.
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 struct Verified {
     size: u64,
     /// Modified time in nanoseconds since 1970.
     mtime: u128,
-    /// The hash the file matched, lowercase.
+    /// The hash the file matched (or was found to have), lowercase. Empty when only something in `more` is known.
     hash: String,
+    /// What else is known of the same bytes, by name: hashes with other algorithms ("md5", "sha1"…) and
+    /// `FINGERPRINT`. Older launchers read `hash` only and leave this out when they save.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    more: BTreeMap<String, String>,
+}
+
+/// CurseForge's fingerprint of a file (content/curseforge.rs), as kept in `Verified::more`.
+const FINGERPRINT: &str = "cf";
+
+/// The name a hash made with `algo` is remembered under.
+fn hash_name(algo: HashAlgo) -> &'static str {
+    match algo {
+        HashAlgo::Md5 => "md5",
+        HashAlgo::Sha1 => "sha1",
+        HashAlgo::Sha256 => "sha256",
+        HashAlgo::Sha512 => "sha512",
+    }
+}
+
+impl Verified {
+    fn new(meta: &std::fs::Metadata, mtime: u128) -> Verified {
+        Verified { size: meta.len(), mtime, hash: String::new(), more: BTreeMap::new() }
+    }
+
+    /// Which algorithm `hash` was made with: each one's hex has its own length.
+    fn main_name(&self) -> Option<&'static str> {
+        match self.hash.len() {
+            32 => Some("md5"),
+            40 => Some("sha1"),
+            64 => Some("sha256"),
+            128 => Some("sha512"),
+            _ => None,
+        }
+    }
+
+    fn get(&self, name: &str) -> Option<&str> {
+        if self.main_name() == Some(name) {
+            Some(&self.hash)
+        } else {
+            self.more.get(name).map(String::as_str)
+        }
+    }
 }
 
 /// path → last verification; `None` until loaded. The bool says it changed since the last save.
@@ -191,8 +263,18 @@ fn verified_file() -> Option<PathBuf> {
 fn with_verified<R>(f: impl FnOnce(&mut (HashMap<String, Verified>, bool)) -> R) -> R {
     let mut guard = VERIFIED.lock().unwrap();
     let state = guard.get_or_insert_with(|| {
-        let map = verified_file().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-        (map, false)
+        let mut map: HashMap<String, Verified> = verified_file().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        // Launchers up to 1.6.1 also noted every asset they downloaded (about 4,000 a game version), though assets
+        // are told by their size and nothing ever asks about them here: not kept in memory, and gone from the file
+        // with the next save.
+        let before = map.len();
+        if super::ctx::is_ready() {
+            let assets = format!("{}{}", key(&super::paths::assets().join("objects")), std::path::MAIN_SEPARATOR);
+            map.retain(|path, _| !path.starts_with(&assets));
+            map.shrink_to_fit();
+        }
+        let dropped = map.len() != before;
+        (map, dropped)
     });
     f(state)
 }
@@ -201,27 +283,55 @@ fn stamp(meta: &std::fs::Metadata) -> Option<u128> {
     meta.modified().ok()?.duration_since(UNIX_EPOCH).ok().map(|d| d.as_nanos())
 }
 
+/// A file's name in the cache. Windows takes both slashes, and paths get put together both ways
+/// (`dir.join("mods/a.jar")`, `safe_join`), so one file is always found under its backslash form.
 fn key(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
+    let text = path.to_string_lossy();
+    if cfg!(windows) {
+        text.replace('/', "\\")
+    } else {
+        text.into_owned()
+    }
+}
+
+/// What's remembered as `name` of the file at `path`, if the file hasn't changed since (`meta` is the file's now).
+fn recall(path: &Path, meta: &std::fs::Metadata, name: &str) -> Option<String> {
+    let mtime = stamp(meta)?;
+    with_verified(|(map, _)| map.get(&key(path)).filter(|v| v.size == meta.len() && v.mtime == mtime).and_then(|v| v.get(name)).map(str::to_string))
+}
+
+/// Remembers `value` as `name` of the file at `path`; `meta` is the file's from when `value` was worked out.
+fn remember(path: &Path, meta: &std::fs::Metadata, name: &str, value: &str) {
+    let Some(mtime) = stamp(meta) else { return };
+    let value = value.to_ascii_lowercase();
+    with_verified(|(map, dirty)| {
+        let entry = map.entry(key(path)).or_insert_with(|| Verified::new(meta, mtime));
+        let same_file = entry.size == meta.len() && entry.mtime == mtime;
+        match entry.get(name) {
+            Some(known) if same_file && known == value => return,
+            // Other bytes under the same size and time: nothing else known of them holds either.
+            Some(_) => *entry = Verified::new(meta, mtime),
+            None if !same_file => *entry = Verified::new(meta, mtime),
+            None => {}
+        }
+        if name != FINGERPRINT && (entry.hash.is_empty() || entry.main_name() == Some(name)) {
+            entry.hash = value;
+        } else {
+            entry.more.insert(name.to_string(), value);
+        }
+        *dirty = true;
+    });
 }
 
 /// True when `path` was verified against `hash` and hasn't changed since.
 fn verified_unchanged(path: &Path, meta: &std::fs::Metadata, hash: &Hash) -> bool {
-    let Some(mtime) = stamp(meta) else { return false };
-    with_verified(|(map, _)| map.get(&key(path)).is_some_and(|v| v.size == meta.len() && v.mtime == mtime && v.hash.eq_ignore_ascii_case(&hash.value)))
+    recall(path, meta, hash_name(hash.algo)).is_some_and(|v| v.eq_ignore_ascii_case(&hash.value))
 }
 
 /// Remembers that `path` (as it is on disk now) matched `hash`.
 async fn remember_verified(path: &Path, hash: &Hash) {
     let Ok(meta) = tokio::fs::metadata(path).await else { return };
-    let Some(mtime) = stamp(&meta) else { return };
-    let entry = Verified { size: meta.len(), mtime, hash: hash.value.to_ascii_lowercase() };
-    with_verified(|(map, dirty)| {
-        if map.get(&key(path)) != Some(&entry) {
-            map.insert(key(path), entry);
-            *dirty = true;
-        }
-    });
+    remember(path, &meta, hash_name(hash.algo), &hash.value);
 }
 
 fn forget_verified(path: &Path) {
@@ -245,15 +355,60 @@ pub async fn forget_all_verified() {
 }
 
 /// Writes the verified-file cache if it changed. Losing it only means files get hashed again.
-async fn save_verified() {
+pub async fn save_verified() {
     let Some(file) = verified_file() else { return };
-    let Some(map) = with_verified(|(map, dirty)| std::mem::take(dirty).then(|| map.clone())) else { return };
-    let Ok(json) = serde_json::to_vec(&map) else { return };
+    // Written out under the lock rather than from a copy of the whole map.
+    let Some(json) = with_verified(|(map, dirty)| std::mem::take(dirty).then(|| serde_json::to_vec(map).ok()).flatten()) else { return };
     let tmp = file.with_extension("json.tmp");
     let _ = tokio::fs::create_dir_all(file.parent().unwrap_or(&file)).await;
     if tokio::fs::write(&tmp, json).await.is_ok() {
         let _ = tokio::fs::rename(&tmp, &file).await;
     }
+}
+
+/// Files smaller than this are hashed again each time: reading one costs less than keeping track of it.
+const REMEMBER_FROM: u64 = 64 * 1024;
+
+/// A file's hash: the remembered one if the file was hashed (or checked against that hash) before and has had the
+/// same size and modified time since, read from the file otherwise (blocking). Remembered hashes reach the disk
+/// with the next `save_verified`.
+pub fn file_hash_now(path: &Path, algo: HashAlgo) -> std::io::Result<String> {
+    // The stamp from before reading: a file that changes while it's read gets read again next time.
+    let meta = std::fs::metadata(path)?;
+    if let Some(known) = recall(path, &meta, hash_name(algo)) {
+        return Ok(known);
+    }
+    let hash = hash_read(std::fs::File::open(path)?, algo)?;
+    if meta.len() >= REMEMBER_FROM {
+        remember(path, &meta, hash_name(algo), &hash);
+    }
+    Ok(hash)
+}
+
+/// [`file_hash_now`] without blocking the async runtime.
+pub async fn file_hash(path: &Path, algo: HashAlgo) -> Result<String> {
+    let path = path.to_path_buf();
+    Ok(tokio::task::spawn_blocking(move || file_hash_now(&path, algo)).await??)
+}
+
+/// The CurseForge fingerprint remembered for a file that hasn't changed since (`meta` is the file's now).
+pub fn known_fingerprint(path: &Path, meta: &std::fs::Metadata) -> Option<u32> {
+    recall(path, meta, FINGERPRINT)?.parse().ok()
+}
+
+/// Remembers a file's CurseForge fingerprint; `meta` is the file's from before it was read.
+pub fn learn_fingerprint(path: &Path, meta: &std::fs::Metadata, print: u32) {
+    remember(path, meta, FINGERPRINT, &print.to_string());
+}
+
+/// The file at `from` went to `to` as it is (a rename): what's known of it goes along.
+pub fn file_moved(from: &Path, to: &Path) {
+    with_verified(|(map, dirty)| {
+        if let Some(v) = map.remove(&key(from)) {
+            map.insert(key(to), v);
+            *dirty = true;
+        }
+    });
 }
 
 async fn is_valid(item: &DownloadItem) -> bool {
@@ -284,19 +439,40 @@ async fn is_valid(item: &DownloadItem) -> bool {
 /// library) take turns instead of writing one `.part` file together.
 static IN_FLIGHT: Mutex<Option<HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>>> = Mutex::new(None);
 
+/// Folders made during one `download_all`, so each is made once however many files go into it.
+type Made = Mutex<HashSet<PathBuf>>;
+
 /// Downloads one file to `dest` (via `<dest>.part`), verifying size and hash. Retries 3 times.
 pub async fn download_file(item: &DownloadItem) -> Result<()> {
+    download_one(item, None).await
+}
+
+async fn download_one(item: &DownloadItem, made: Option<&Made>) -> Result<()> {
     if item.url.trim().is_empty() {
         let file = item.dest.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         return Err(err_tr!("download.noAddress", "No download address for {file}", file = file));
     }
     if let Some(parent) = item.dest.parent() {
-        tokio::fs::create_dir_all(parent).await?;
+        if !made.is_some_and(|m| m.lock().unwrap().contains(parent)) {
+            tokio::fs::create_dir_all(parent).await?;
+            if let Some(m) = made {
+                m.lock().unwrap().insert(parent.to_path_buf());
+            }
+        }
     }
     let lock = IN_FLIGHT.lock().unwrap().get_or_insert_with(HashMap::new).entry(item.dest.clone()).or_default().clone();
-    let result = {
-        let _turn = lock.lock().await;
-        download_file_now(item).await
+    let result = match lock.try_lock() {
+        Ok(_turn) => download_file_now(item).await,
+        Err(_) => {
+            let _turn = lock.lock().await;
+            // Someone else was downloading to this place. A file that can be checked (by hash or size) and is
+            // right now isn't fetched a second time.
+            if (item.hash.is_some() || item.size.is_some()) && is_valid(item).await {
+                Ok(())
+            } else {
+                download_file_now(item).await
+            }
+        }
     };
     // The last one out takes the entry away.
     let mut map = IN_FLIGHT.lock().unwrap();
@@ -313,10 +489,11 @@ async fn download_file_now(item: &DownloadItem) -> Result<()> {
     // Left by a run that died: nothing says it belongs to this file.
     let _ = tokio::fs::remove_file(&tmp).await;
     let mut last: Option<anyhow::Error> = None;
+    // How much of the file `tmp` holds.
     let mut have = 0;
     let mut attempt = 0;
     while attempt < 3 {
-        match try_download(item, &tmp).await {
+        match try_download(item, &tmp, have).await {
             Ok(()) => return Ok(()),
             Err(e) => {
                 let not_found = status_of(&e) == Some(404);
@@ -343,8 +520,15 @@ async fn download_file_now(item: &DownloadItem) -> Result<()> {
     Err(last.unwrap_or_else(|| err_tr!("download.failed", "Download failed: {url}", url = item.url)))
 }
 
-async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
-    let have = tokio::fs::metadata(tmp).await.map_or(0, |m| m.len());
+/// Files up to this size are received whole and then checked, written and put in place in one go: for the
+/// thousands of small files among a game's assets, creating each one, writing it, reading it back to hash it and
+/// renaming it as separate steps took several times longer (3,000 files from a server on the same computer: about
+/// 5 s that way, about 1 s this way). Small enough that the files in flight together stay a few megabytes.
+const WHOLE_IN_MEMORY: u64 = 256 * 1024;
+
+/// One try at `item`, into `tmp`, which holds the first `have` bytes from earlier tries.
+async fn try_download(item: &DownloadItem, tmp: &Path, have: u64) -> Result<()> {
+    use std::io::Write;
     let mut request = http().get(&item.url);
     if have > 0 {
         request = request.header(reqwest::header::RANGE, format!("bytes={have}-")).header(reqwest::header::ACCEPT_ENCODING, "identity");
@@ -361,18 +545,88 @@ async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
     }
     // Bytes that were unzipped on the way can't be matched to a position in the file on the host.
     let can_resume = resumed || res.content_length().is_some();
-    let mut file = if resumed {
-        tokio::fs::OpenOptions::new().append(true).open(tmp).await?
-    } else {
-        tokio::fs::File::create(tmp).await?
+
+    // Either way the pieces are used as they arrive, never copied into a second buffer: this used to hold every
+    // file in flight in memory twice (once as received, once in the file's own write buffer).
+    if !resumed && res.content_length().is_some_and(|n| n <= WHOLE_IN_MEMORY) {
+        let mut pieces = Vec::new();
+        loop {
+            match res.chunk().await {
+                Ok(Some(piece)) => pieces.push(piece),
+                Ok(None) => break,
+                Err(e) => {
+                    // What arrived stays for the next try to go on from, as it would in a file being written.
+                    if pieces.iter().any(|p| !p.is_empty()) {
+                        let _ = tokio::fs::write(tmp, pieces.concat()).await;
+                    }
+                    return Err(e.into());
+                }
+            }
+        }
+        // Checked, written, put in place and looked at in one go, off the async runtime.
+        let (tmp, dest, hash) = (tmp.to_path_buf(), item.dest.clone(), item.hash.clone());
+        let placed = tokio::task::spawn_blocking(move || -> std::io::Result<Option<Option<std::fs::Metadata>>> {
+            if let Some(h) = &hash {
+                let mut running = RunningHash::new(h.algo);
+                for p in &pieces {
+                    running.update(p);
+                }
+                if !running.finish().eq_ignore_ascii_case(&h.value) {
+                    // A whole file that's wrong isn't progress: gone, so the next try counts as one.
+                    let _ = std::fs::remove_file(&tmp);
+                    return Ok(None);
+                }
+            }
+            let mut file = std::fs::File::create(&tmp)?;
+            for p in &pieces {
+                file.write_all(p)?;
+            }
+            drop(file);
+            std::fs::rename(&tmp, &dest)?;
+            Ok(Some(std::fs::metadata(&dest).ok()))
+        })
+        .await??;
+        let Some(meta) = placed else { return Err(anyhow!("Checksum mismatch for {}", item.url)) };
+        remember_download(item, meta);
+        return Ok(());
+    }
+
+    let file = {
+        let tmp = tmp.to_path_buf();
+        tokio::task::spawn_blocking(move || match resumed {
+            true => std::fs::OpenOptions::new().append(true).open(&tmp),
+            false => std::fs::File::create(&tmp),
+        })
+        .await??
     };
+    // A file that starts here is hashed as it arrives; the rest of an earlier try is read back once it's whole.
+    let hashing = item.hash.as_ref().filter(|_| !resumed).map(|h| RunningHash::new(h.algo));
+    // The file and its hash so far are either here or with the piece being written on a blocking thread. That
+    // thread gets the piece itself, and the next piece is read from the network while it writes.
+    let mut idle = Some((file, hashing));
+    let mut busy: Option<tokio::task::JoinHandle<std::io::Result<(std::fs::File, Option<RunningHash>)>>> = None;
     loop {
         match res.chunk().await {
-            Ok(Some(chunk)) => file.write_all(&chunk).await?,
+            Ok(Some(piece)) => {
+                let (mut file, mut hashing) = match busy.take() {
+                    Some(write) => write.await??,
+                    None => idle.take().expect("the file is here when nothing is being written"),
+                };
+                busy = Some(tokio::task::spawn_blocking(move || {
+                    if let Some(h) = hashing.as_mut() {
+                        h.update(&piece);
+                    }
+                    file.write_all(&piece)?;
+                    Ok((file, hashing))
+                }));
+            }
             Ok(None) => break,
             Err(e) => {
-                file.flush().await?;
-                drop(file);
+                // What arrived is on disk (and the file closed) before the next try looks at it.
+                if let Some(write) = busy.take() {
+                    let _ = write.await;
+                }
+                drop(idle);
                 if !can_resume {
                     let _ = tokio::fs::remove_file(tmp).await;
                 }
@@ -380,21 +634,52 @@ async fn try_download(item: &DownloadItem, tmp: &Path) -> Result<()> {
             }
         }
     }
-    file.flush().await?;
-    drop(file);
-    if let Some(h) = &item.hash {
-        let got = hash_file(tmp, h.algo).await?;
-        if !got.eq_ignore_ascii_case(&h.value) {
-            // A whole file that's wrong isn't progress: gone, so the next try counts as one.
-            let _ = tokio::fs::remove_file(tmp).await;
-            return Err(anyhow!("Checksum mismatch for {}", item.url));
+    let (file, hashing) = match busy.take() {
+        Some(write) => write.await??,
+        None => idle.take().expect("the file is here when nothing is being written"),
+    };
+    let got = match (&item.hash, hashing) {
+        (Some(_), Some(h)) => Some(h.finish()),
+        (Some(h), None) => {
+            drop(file);
+            let got = hash_file(tmp, h.algo).await?;
+            return finish_download(item, tmp, None, Some(got)).await;
         }
-    }
-    tokio::fs::rename(tmp, &item.dest).await?;
-    if let Some(h) = &item.hash {
-        remember_verified(&item.dest, h).await;
-    }
+        (None, _) => None,
+    };
+    finish_download(item, tmp, Some(file), got).await
+}
+
+/// Closes a finished `.part` file, checks the hash it was found to have and puts it in place.
+async fn finish_download(item: &DownloadItem, tmp: &Path, file: Option<std::fs::File>, got: Option<String>) -> Result<()> {
+    let wrong = match (&item.hash, &got) {
+        (Some(h), Some(got)) => !got.eq_ignore_ascii_case(&h.value),
+        _ => false,
+    };
+    let (tmp, dest) = (tmp.to_path_buf(), item.dest.clone());
+    // Closing a file just written can take a while (virus scanners look at it then), so off the async runtime.
+    let meta = tokio::task::spawn_blocking(move || -> std::io::Result<Option<Option<std::fs::Metadata>>> {
+        drop(file);
+        if wrong {
+            // A whole file that's wrong isn't progress: gone, so the next try counts as one.
+            let _ = std::fs::remove_file(&tmp);
+            return Ok(None);
+        }
+        std::fs::rename(&tmp, &dest)?;
+        Ok(Some(std::fs::metadata(&dest).ok()))
+    })
+    .await??;
+    let Some(meta) = meta else { return Err(anyhow!("Checksum mismatch for {}", item.url)) };
+    remember_download(item, meta);
     Ok(())
+}
+
+/// Remembers that a file just downloaded matched its hash. Not for files trusted by their size (assets): nothing
+/// ever asks about those, and there are thousands of them.
+fn remember_download(item: &DownloadItem, meta: Option<std::fs::Metadata>) {
+    if let (Some(h), Some(meta), false) = (&item.hash, meta, item.trust_size) {
+        remember(&item.dest, &meta, hash_name(h.algo), &h.value);
+    }
 }
 
 /// Where a 206 answer's bytes start: `Content-Range: bytes 1000-1999/2000` → 1000.
@@ -409,37 +694,48 @@ where
     F: Fn(usize, usize) + Send + Sync,
 {
     // De-duplicate by destination.
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     let unique: Vec<DownloadItem> = items.into_iter().filter(|i| seen.insert(i.dest.clone())).collect();
     let total = unique.len();
     on_progress(0, total);
-    let done = Arc::new(AtomicUsize::new(0));
     let failed = Arc::new(AtomicBool::new(false));
+    let made: Arc<Made> = Arc::new(Mutex::new(HashSet::new()));
 
-    let results: Vec<Result<()>> = stream::iter(unique)
-        .map(|item| {
-            let done = done.clone();
-            let failed = failed.clone();
-            let on_progress = &on_progress;
-            async move {
-                if failed.load(Ordering::Relaxed) {
-                    return Ok(());
-                }
+    // Each file is a task of its own, so the files in flight are received, hashed and written on several cores at
+    // once. Dropping this future (Cancel) drops the set, which stops them all.
+    let mut waiting = unique.into_iter();
+    let mut running = tokio::task::JoinSet::new();
+    let mut done = 0;
+    let mut first_error: Option<anyhow::Error> = None;
+    loop {
+        // After a failure the files not yet started are left alone.
+        while running.len() < concurrency.max(1) && !failed.load(Ordering::Relaxed) {
+            let Some(item) = waiting.next() else { break };
+            let (failed, made) = (failed.clone(), made.clone());
+            running.spawn(async move {
                 if !is_valid(&item).await {
-                    if let Err(e) = download_file(&item).await {
+                    if let Err(e) = download_one(&item, Some(&*made)).await {
                         failed.store(true, Ordering::Relaxed);
                         return Err(e);
                     }
                 }
-                on_progress(done.fetch_add(1, Ordering::Relaxed) + 1, total);
                 Ok(())
+            });
+        }
+        let Some(joined) = running.join_next().await else { break };
+        match joined.map_err(anyhow::Error::from).and_then(|r| r) {
+            Ok(()) => {
+                done += 1;
+                on_progress(done, total);
             }
-        })
-        .buffer_unordered(concurrency.max(1))
-        .collect()
-        .await;
+            Err(e) => {
+                failed.store(true, Ordering::Relaxed);
+                first_error.get_or_insert(e);
+            }
+        }
+    }
     save_verified().await;
-    results.into_iter().collect()
+    first_error.map_or(Ok(()), Err)
 }
 
 #[cfg(test)]
@@ -479,5 +775,82 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
         assert!(!is_valid(&item).await);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn running_hash_matches_hashing_at_once() {
+        let data: Vec<u8> = (0..200_000u32).map(|i| (i * 31 % 251) as u8).collect();
+        for algo in [HashAlgo::Md5, HashAlgo::Sha1, HashAlgo::Sha256, HashAlgo::Sha512] {
+            let mut h = RunningHash::new(algo);
+            for piece in data.chunks(7919) {
+                h.update(piece);
+            }
+            assert_eq!(h.finish(), hash_bytes(&data, algo));
+            assert_eq!(hash_read(&data[..], algo).unwrap(), hash_bytes(&data, algo));
+        }
+        assert_eq!(hash_bytes(b"hello world", HashAlgo::Sha1), "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed");
+    }
+
+    #[test]
+    fn remembers_hashes_until_the_file_changes() {
+        let dir = std::env::temp_dir().join(format!("resin-known-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("mod.jar");
+        let big = vec![7u8; REMEMBER_FROM as usize + 1];
+        std::fs::write(&path, &big).unwrap();
+        let sha1 = hash_bytes(&big, HashAlgo::Sha1);
+        let meta = std::fs::metadata(&path).unwrap();
+        assert_eq!(recall(&path, &meta, "sha1"), None);
+
+        // Hashed once, then remembered: for that algorithm only.
+        assert_eq!(file_hash_now(&path, HashAlgo::Sha1).unwrap(), sha1);
+        assert_eq!(recall(&path, &meta, "sha1").as_deref(), Some(sha1.as_str()));
+        assert_eq!(recall(&path, &meta, "sha512"), None);
+        // A second algorithm and a fingerprint sit next to the first; none pushes another out.
+        assert_eq!(file_hash_now(&path, HashAlgo::Sha512).unwrap(), hash_bytes(&big, HashAlgo::Sha512));
+        learn_fingerprint(&path, &meta, 4_000_000_001);
+        assert_eq!(known_fingerprint(&path, &meta), Some(4_000_000_001));
+        assert_eq!(recall(&path, &meta, "sha1").as_deref(), Some(sha1.as_str()));
+        assert_eq!(recall(&path, &meta, "sha512"), Some(hash_bytes(&big, HashAlgo::Sha512)));
+        // What a download check remembers is found by `file_hash` too, and the other way round.
+        assert!(verified_unchanged(&path, &meta, &Hash::sha1(sha1.to_uppercase())));
+        assert!(!verified_unchanged(&path, &meta, &Hash::sha1("0".repeat(40))));
+
+        // A move takes what's known along.
+        let moved = dir.join("moved.jar");
+        std::fs::rename(&path, &moved).unwrap();
+        file_moved(&path, &moved);
+        let meta = std::fs::metadata(&moved).unwrap();
+        assert_eq!(recall(&moved, &meta, "sha1").as_deref(), Some(sha1.as_str()));
+        assert_eq!(known_fingerprint(&moved, &meta), Some(4_000_000_001));
+
+        // Other bytes of the same size: the modified time moves, so everything known is dropped and it's read again.
+        std::thread::sleep(Duration::from_millis(20));
+        let other = vec![8u8; big.len()];
+        std::fs::write(&moved, &other).unwrap();
+        let meta = std::fs::metadata(&moved).unwrap();
+        assert_eq!(recall(&moved, &meta, "sha1"), None);
+        assert_eq!(file_hash_now(&moved, HashAlgo::Sha1).unwrap(), hash_bytes(&other, HashAlgo::Sha1));
+        assert_eq!(known_fingerprint(&moved, &meta), None);
+        assert_eq!(recall(&moved, &meta, "sha512"), None);
+
+        // Small files are read every time and never kept.
+        let small = dir.join("options.txt");
+        std::fs::write(&small, b"fov:70").unwrap();
+        assert_eq!(file_hash_now(&small, HashAlgo::Sha1).unwrap(), hash_bytes(b"fov:70", HashAlgo::Sha1));
+        assert_eq!(recall(&small, &std::fs::metadata(&small).unwrap(), "sha1"), None);
+        assert!(file_hash_now(&dir.join("missing.jar"), HashAlgo::Sha1).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn old_cache_files_still_load() {
+        // As launchers up to 1.6.1 wrote it.
+        let old = r#"{"C:\\libs\\a.jar":{"size":11,"mtime":1700000000000000000,"hash":"2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"}}"#;
+        let map: HashMap<String, Verified> = serde_json::from_str(old).unwrap();
+        let v = &map["C:\\libs\\a.jar"];
+        assert_eq!((v.get("sha1"), v.get("sha256"), v.get(FINGERPRINT)), (Some("2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"), None, None));
+        // Written back without the new field while there's nothing in it, so an older launcher reads it as before.
+        assert_eq!(serde_json::to_string(&map).unwrap(), old);
     }
 }

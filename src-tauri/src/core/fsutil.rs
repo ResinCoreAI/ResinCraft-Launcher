@@ -168,6 +168,31 @@ pub fn copy_many_with(
     out
 }
 
+/// Runs `f` on every item on a few threads and returns the results in the items' order (blocking). For work that is
+/// part reading files and part computing (hashing, reading a jar's metadata), where one thread leaves both the disk's
+/// queue and the other cores idle.
+pub fn in_parallel<T: Sync, R: Send>(items: &[T], f: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8).min(items.len());
+    if threads <= 1 {
+        return items.iter().map(f).collect();
+    }
+    let next = AtomicUsize::new(0);
+    let slots: Vec<Mutex<Option<R>>> = items.iter().map(|_| Mutex::new(None)).collect();
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                let Some(item) = items.get(i) else { break };
+                *slots[i].lock().unwrap() = Some(f(item));
+            });
+        }
+    });
+    slots.into_iter().map(|s| s.into_inner().unwrap().expect("every item was handled")).collect()
+}
+
 /// The disk (or quota) is full: copying more won't help.
 pub fn is_disk_full(e: &std::io::Error) -> bool {
     e.kind() == std::io::ErrorKind::StorageFull || e.raw_os_error() == Some(112) || e.raw_os_error() == Some(28)
@@ -236,6 +261,14 @@ mod tests {
                 .output()
                 .map(|o| o.status.success())
                 .unwrap_or(false);
+    }
+
+    #[test]
+    fn in_parallel_keeps_the_order() {
+        let items: Vec<u32> = (0..1000).collect();
+        assert_eq!(in_parallel(&items, |n| n * 2), items.iter().map(|n| n * 2).collect::<Vec<_>>());
+        assert_eq!(in_parallel(&[7u32], |n| n + 1), [8]);
+        assert!(in_parallel(&[] as &[u32], |n| *n).is_empty());
     }
 
     #[test]
