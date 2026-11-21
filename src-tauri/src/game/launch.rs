@@ -928,6 +928,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         tr!("launch.preparingAs", "Preparing {name} for {player}", name = inst.name, player = auth.username)
     };
     let natives = natives_for(id, slot);
+    let busy = super::priority::preparing();
     let prepared = if horizon {
         Task::run(title, Some(id.to_string()), |t| {
             let (inst, width, height) = (inst.clone(), settings.game_width, settings.game_height);
@@ -947,6 +948,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
             build_args(&inst, settings, &p, &auth, target).map(|args| (p.java, args, major))
         })
     };
+    drop(busy);
     let (java, args, java_major) = match prepared {
         Ok(p) => p,
         Err(e) => {

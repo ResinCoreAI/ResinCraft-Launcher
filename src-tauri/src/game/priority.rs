@@ -7,6 +7,9 @@
 //! screen with all 12 cores busy, against 53-61 s at above normal priority and 28-35 s on a quiet computer. Once the
 //! game is up it is back at normal priority, so playing doesn't crowd out the rest of the computer.
 //!
+//! The launcher itself is at above normal while it prepares a start (version files, libraries, thousands of asset
+//! checks, natives, Java): 0.1-0.3 s on a quiet computer, but it took 2-9 s with every core busy.
+//!
 //! Windows only: elsewhere raising a priority needs privileges the launcher doesn't have.
 
 use std::collections::HashMap;
@@ -38,6 +41,43 @@ impl Drop for Process {
             let _ = windows::Win32::Foundation::CloseHandle(self.0);
         }
     }
+}
+
+/// Preparations going on in the launcher (several games can start at once); while there are any, the launcher's own
+/// process is at above normal priority.
+static PREPARING: Mutex<usize> = Mutex::new(0);
+
+/// The launcher is preparing a start: its process is at above normal priority until the returned guard is dropped
+/// (the last preparation going on puts it back to normal).
+pub fn preparing() -> Preparing {
+    let mut n = PREPARING.lock().unwrap();
+    if *n == 0 {
+        set_own(true);
+    }
+    *n += 1;
+    Preparing(())
+}
+
+pub struct Preparing(());
+
+impl Drop for Preparing {
+    fn drop(&mut self) {
+        let mut n = PREPARING.lock().unwrap();
+        *n = n.saturating_sub(1);
+        if *n == 0 {
+            set_own(false);
+        }
+    }
+}
+
+fn set_own(raised: bool) {
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::System::Threading::{GetCurrentProcess, SetPriorityClass, ABOVE_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS};
+        let _ = SetPriorityClass(GetCurrentProcess(), if raised { ABOVE_NORMAL_PRIORITY_CLASS } else { NORMAL_PRIORITY_CLASS });
+    }
+    #[cfg(not(windows))]
+    let _ = raised;
 }
 
 /// The game's process is created at above normal priority (it doesn't wait for `started` to get there).
@@ -91,6 +131,21 @@ mod tests {
         assert!(says_ready("[13:05:42] [Render thread/INFO]: Sound engine started"));
         assert!(says_ready("[13:05:42] [Client thread/INFO]: Sound engine started"));
         assert!(!says_ready("[13:05:42] [Render thread/INFO]: Starting sound engine"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_launcher_is_raised_while_preparing() {
+        use windows::Win32::System::Threading::{GetCurrentProcess, GetPriorityClass, ABOVE_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS};
+        let own = || unsafe { GetPriorityClass(GetCurrentProcess()) };
+        let a = preparing();
+        let b = preparing();
+        assert_eq!(own(), ABOVE_NORMAL_PRIORITY_CLASS.0);
+        drop(a);
+        // Another preparation still going on.
+        assert_eq!(own(), ABOVE_NORMAL_PRIORITY_CLASS.0);
+        drop(b);
+        assert_eq!(own(), NORMAL_PRIORITY_CLASS.0);
     }
 
     #[test]
