@@ -28,6 +28,9 @@
 //!       `play`, presses Play on the first one two seconds in and says how long that Play took
 //!   cargo run --release --example speed -- prep <instance id> [times]
 //!       what Play does before Java starts, one step at a time
+//!   cargo run --release --example speed -- loader <mcVersion> <forge|neoforge> [loader version] [times]
+//!       installs the mod loader from scratch (its libraries stay once downloaded), each step timed; prints a
+//!       fingerprint of the version JSON and the files the install made, to compare before and after a change
 //!   cargo run --release --example speed -- cdn <Modrinth pack version id> [times] [at once]
 //!       the pack's files through the launcher's downloader into a throwaway folder, with the slowest files each time
 //!       (RESIN_SPEED_SPLIT=1 fetches each file by hand instead and says how long the network and the disk took)
@@ -95,6 +98,7 @@ async fn run() -> Result<()> {
         Some("prep") => prep(&need(1, "an instance id")?, num(2, 1)).await,
         Some("ready") => ready(&argv[1..]).await,
         Some("faults") => faults().await,
+        Some("loader") => loader(&need(1, "a Minecraft version")?, &need(2, "forge or neoforge")?, arg(3), num(4, 1)).await,
         Some("cdn") => cdn(&need(1, "a Modrinth version id")?, num(2, 3), num(3, 16)).await,
         _ => bail!("say what to time: local, game, pack, switch, unknown, picks, dupes, steps, make, launch or tree (see the top of examples/speed.rs)"),
     }
@@ -582,6 +586,53 @@ async fn game(mc: &str, at_once: Option<usize>) -> Result<()> {
     download_all(items, at_once, |_, _| {}).await?;
     download_all(assets.items, at_once * 2, |_, _| {}).await?;
     println!("RESULT game check again    {}  (everything already there)", secs(t.elapsed()));
+    Ok(())
+}
+
+// ---------- A mod loader's install ----------
+
+async fn loader(mc: &str, which: &str, version: Option<String>, times: usize) -> Result<()> {
+    let kind = match which {
+        "forge" => LoaderType::Forge,
+        "neoforge" => LoaderType::Neoforge,
+        _ => bail!("forge or neoforge"),
+    };
+    let ver = match version.filter(|v| v != "latest") {
+        Some(v) => v,
+        None => resincraft_lib::game::loaders::latest_loader(kind, mc).await?,
+    };
+    // Modern versions only (1.13+): old Forge's Maven names carry a branch suffix this doesn't look up.
+    let full = ver.clone();
+    let dir = paths::versions().join(format!("{}-{mc}-{full}", kind.as_str()));
+    let concurrency = settings::get().await.concurrency;
+    for run in 1..=times.max(1) {
+        // The loader's own folder goes, so the installer and its steps run again; libraries already downloaded stay.
+        let _ = tokio::fs::remove_dir_all(&dir).await;
+        let task = events::Task::new(format!("{which} {mc}-{ver} run {run}"), None);
+        let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(concurrency), java: None };
+        let t = Instant::now();
+        let version = resolve_version(mc, kind, Some(&ver), &ctx).await?;
+        let took = t.elapsed();
+        task.done();
+        // What the install made: the version JSON (paths made relative) and each file it lists, by SHA-1.
+        let installed: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("installed.json"))?)?;
+        let slash = |s: &str| s.replace('\\', "/");
+        let games = slash(&paths::games().to_string_lossy());
+        let mut made: Vec<String> = Vec::new();
+        for f in installed["files"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            let bytes = std::fs::read(f).unwrap_or_default();
+            made.push(format!("{} {}", slash(f).replace(&games, ""), hash_bytes(&bytes, HashAlgo::Sha1)));
+        }
+        made.sort();
+        let json = slash(&serde_json::to_string(&version)?).replace("//", "/").replace(&games, "");
+        let print = hash_bytes(format!("{json}\n{}", made.join("\n")).as_bytes(), HashAlgo::Sha1);
+        println!("RESULT loader {which} {mc}-{ver} run {run}  {}  ({} files made, fingerprint {})", secs(took), made.len(), &print[..12]);
+        if run == 1 {
+            for m in &made {
+                println!("  made {m}");
+            }
+        }
+    }
     Ok(())
 }
 

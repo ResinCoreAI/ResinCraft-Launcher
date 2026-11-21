@@ -339,6 +339,10 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         })
     };
     let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(settings.concurrency), java: Some(picker) };
+    // The game's assets come with Minecraft's own version, not the mod loader's: they start downloading now, while
+    // the loader installs (Forge and NeoForge patch the game for a while) and the libraries download, instead of
+    // after both. The assets step below finds them in place, or waits for the ones still on their way.
+    let early_assets = early_assets(&inst.mc_version, settings.concurrency * 2);
     let mut version = super::versionpatch::resolve_instance(inst, &ctx).await?;
 
     let libraries = resolve_libraries(&version);
@@ -364,6 +368,7 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
     }
     download_checked(items, settings.concurrency, task.counter(tr!("launch.downloadingLibraries", "Downloading libraries"))).await?;
     download_all(assets.items, settings.concurrency * 2, task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
+    drop(early_assets);
     let game_assets = materialize_legacy_assets(&assets.index, &assets.id, &paths::game_dir(&inst.id)).await?;
 
     task.update(tr!("launch.unpackingNatives", "Unpacking natives…"), None);
@@ -394,6 +399,30 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         version,
         natives,
     })
+}
+
+/// Minecraft `mc`'s assets downloading on the side (see `prepare`). Best effort and silent: the assets step after
+/// it reports progress and gets whatever this didn't. Nothing when this version's asset index is saved already (its
+/// assets came before: every Play after the first), so Play doesn't check thousands of files twice. Stops when
+/// dropped.
+fn early_assets(mc: &str, concurrency: usize) -> crate::core::net::BackgroundDownload {
+    let mc = mc.to_string();
+    let listing = async move {
+        if assets_listed_before(&mc).await {
+            return Ok(Vec::new());
+        }
+        let vanilla = super::mojang::get_vanilla_version(&mc).await?;
+        asset_items(&vanilla).await.map(|a| a.items)
+    };
+    // Listing needs the version JSON and asset index (a request each the first time), so it goes on the side too.
+    crate::core::net::download_in_background_after(listing, concurrency)
+}
+
+/// Whether Minecraft `mc`'s saved version JSON names an asset index that is saved too.
+async fn assets_listed_before(mc: &str) -> bool {
+    let Ok(text) = tokio::fs::read_to_string(paths::versions().join(mc).join(format!("{mc}.json"))).await else { return false };
+    let Some(id) = serde_json::from_str::<VersionJson>(&text).ok().and_then(|v| v.asset_index).map(|a| a.id) else { return false };
+    crate::core::fsutil::safe_join(&paths::assets().join("indexes"), &format!("{id}.json")).is_ok_and(|f| f.is_file())
 }
 
 /// What a natives folder holds and which jars it was unpacked from, kept in the folder itself, so the next start can

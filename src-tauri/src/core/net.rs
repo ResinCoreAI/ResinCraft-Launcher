@@ -735,6 +735,39 @@ fn range_start(headers: &reqwest::header::HeaderMap) -> Option<u64> {
     value.trim().strip_prefix("bytes ")?.split('-').next()?.trim().parse().ok()
 }
 
+/// Files downloading on the side while something else goes on (`download_in_background`). Dropped (the task that
+/// started it was cancelled or failed), the downloads stop.
+pub struct BackgroundDownload(Option<tokio::task::JoinHandle<Result<()>>>);
+
+impl BackgroundDownload {
+    /// Waits for the downloads to end and says how they went.
+    pub async fn finish(mut self) -> Result<()> {
+        match self.0.take() {
+            Some(handle) => handle.await?,
+            None => Ok(()),
+        }
+    }
+}
+
+impl Drop for BackgroundDownload {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            handle.abort();
+        }
+    }
+}
+
+/// `download_all` on the side, without progress. Another `download_all` of the same files meanwhile doesn't fetch
+/// any twice: a file being downloaded is waited for and then found in place.
+pub fn download_in_background(items: Vec<DownloadItem>, concurrency: usize) -> BackgroundDownload {
+    BackgroundDownload(Some(tokio::spawn(async move { download_all(items, concurrency, |_, _| {}).await })))
+}
+
+/// `download_in_background` of the files `listing` comes up with, once it has.
+pub fn download_in_background_after(listing: impl std::future::Future<Output = Result<Vec<DownloadItem>>> + Send + 'static, concurrency: usize) -> BackgroundDownload {
+    BackgroundDownload(Some(tokio::spawn(async move { download_all(listing.await?, concurrency, |_, _| {}).await })))
+}
+
 /// Downloads every missing or corrupt file, `concurrency` at a time, reporting (done, total).
 pub async fn download_all<F>(items: Vec<DownloadItem>, concurrency: usize, on_progress: F) -> Result<()>
 where
