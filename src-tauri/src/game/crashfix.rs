@@ -34,6 +34,10 @@ pub enum Fix {
     /// Gives the game more memory.
     #[serde(rename_all = "camelCase")]
     Memory { mb: u32 },
+    /// Moves the instance to its mod loader's newest version (a mod needs a newer Fabric or Quilt Loader). `loader` is
+    /// the loader's name and `needs` the version the mod asked for, for the button's words.
+    #[serde(rename_all = "camelCase")]
+    UpdateLoader { loader: String, needs: String },
 }
 
 /// One thing that went wrong.
@@ -61,6 +65,7 @@ pub struct CrashReport {
 
 struct Patterns {
     fabric_missing: Regex,
+    fabric_wrong_version: Regex,
     fabric_incompatible: Regex,
     forge_missing: Regex,
     forge_failed: Regex,
@@ -78,6 +83,12 @@ fn patterns() -> &'static Patterns {
         // newer "… requires version 0.15.x of 'Fabric API' (fabric-api), which is missing!".
         fabric_missing: Regex::new(
             r"Mod '(?P<who>[^']+)' \([\w\-.]+\) \S+ requires (?:any version|version [^,!']+?) of (?:mod (?P<id1>[\w\-.]+)|'(?P<name>[^']+)' \((?P<id2>[\w\-.]+)\)),? which is missing",
+        )
+        .unwrap(),
+        // "Mod 'Controlify' (controlify) 3.0.1 requires version 0.18.0 or later of mod 'Fabric Loader' (fabricloader), but
+        // only the wrong version is present: 0.16.5!" (a mod that's there, in a version too old or too new).
+        fabric_wrong_version: Regex::new(
+            r"Mod '(?P<who>[^']+)' \([\w\-.]+\) \S+ requires (?:any version|version (?P<want>[^,!']+?)) of (?:mod )?'(?P<name>[^']+)' \((?P<id>[\w\-.]+)\), but only the wrong version is present: (?P<have>[^!\s]+)",
         )
         .unwrap(),
         // "Mod 'Iris' (iris) 1.6.4 is incompatible with any version of mod 'OptiFabric' (optifabric), but …"
@@ -160,6 +171,13 @@ pub async fn diagnose(inst: &Instance, since: SystemTime, console: &[String]) ->
         text.push('\n');
         text.push_str(r);
     }
+    let out = problems(inst, &mods, &text, report.as_ref().map(|(_, r)| r.as_str())).await;
+    (out, report.map(|(path, _)| path.to_string_lossy().into_owned()))
+}
+
+/// What went wrong, from the game's output `text` (the log's end, its last console lines and the crash report) and
+/// the crash `report` itself; `mods` is the instance's mods folder.
+async fn problems(inst: &Instance, mods: &Path, text: &str, report: Option<&str>) -> Vec<Problem> {
     let p = patterns();
     let mut out: Vec<Problem> = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
@@ -196,6 +214,34 @@ pub async fn diagnose(inst: &Instance, since: SystemTime, console: &[String]) ->
         );
     }
 
+    // A mod needs another version of something that is there: the mod loader (a newer one is a click away), or
+    // another mod (updated from the Content tab).
+    for c in p.fabric_wrong_version.captures_iter(&text) {
+        let (who, name, id, have) = (c["who"].to_string(), c["name"].to_string(), c["id"].to_string(), c["have"].to_string());
+        let want = c.name("want").map(|m| m.as_str().trim().to_string()).unwrap_or_default();
+        if matches!(id.as_str(), "fabricloader" | "quilt_loader") {
+            add(
+                format!("loader:{id}"),
+                Problem {
+                    title: tr!("crash.loaderTooOld", "{who} needs {loader} {want}, and this instance has {have}", who = who, loader = name.clone(), want = want.clone(), have = have),
+                    detail: None,
+                    fix: Some(Fix::UpdateLoader { loader: name, needs: want }),
+                },
+            );
+        } else if matches!(id.as_str(), "minecraft" | "java") {
+            add(format!("needs:{id}"), Problem { title: tr!("crash.needsLoader", "{who} needs a different version of {what}", who = who, what = name), detail: None, fix: None });
+        } else {
+            add(
+                format!("version:{id}"),
+                Problem {
+                    title: tr!("crash.modTooOld", "{who} needs {dep} {want}, and this instance has {have}", who = who, dep = name.clone(), want = want, have = have),
+                    detail: Some(tr!("crash.modTooOldHint", "Update {dep} in the Content tab.", dep = name)),
+                    fix: None,
+                },
+            );
+        }
+    }
+
     // Two mods that don't work together.
     for c in p.fabric_incompatible.captures_iter(&text) {
         let file = jar_of(&mods, &c["whoid"]);
@@ -211,7 +257,7 @@ pub async fn diagnose(inst: &Instance, since: SystemTime, console: &[String]) ->
 
     // A mod that crashed while loading: Forge's crash report sections, its console line, and mixin failures.
     let mut crashed: Vec<String> = Vec::new();
-    if let Some((_, r)) = &report {
+    if let Some(r) = report {
         for part in r.split("-- MOD ").skip(1) {
             let id = part.split_whitespace().next().unwrap_or("").trim_end_matches('-').to_string();
             if part.contains("has failed to load correctly") && !id.is_empty() {
@@ -280,7 +326,13 @@ pub async fn diagnose(inst: &Instance, since: SystemTime, console: &[String]) ->
             },
         );
     }
-    (out, report.map(|(path, _)| path.to_string_lossy().into_owned()))
+    out
+}
+
+/// `problems` for a test: `text` as the game's output, `dir/mods` as the mods folder.
+#[cfg(test)]
+async fn diagnose_text(inst: &Instance, dir: &Path, text: String) -> Vec<Problem> {
+    problems(inst, &dir.join("mods"), &text, None).await
 }
 
 /// A Modrinth project for mod id `id` (mod ids and Modrinth slugs usually match; `_` is often `-`).
@@ -312,12 +364,62 @@ pub async fn apply(id: &str, fix: &Fix) -> Result<()> {
         }
         Fix::JavaAuto => instances::update(id, json!({ "javaPath": null })).await.map(|_| ()),
         Fix::Memory { mb } => instances::update(id, json!({ "memoryMb": mb })).await.map(|_| ()),
+        // The newest version of the instance's own loader, as Instance settings → Version does when none is picked.
+        Fix::UpdateLoader { .. } => {
+            let inst = instances::get(id).await?;
+            if !matches!(inst.loader, crate::core::types::LoaderType::Fabric | crate::core::types::LoaderType::Quilt) {
+                bail!("{} has no Fabric or Quilt Loader to update", inst.name);
+            }
+            instances::set_version(id, &inst.mc_version, inst.loader, None).await.map(|_| ())
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_a_mod_that_needs_a_newer_loader() {
+        let p = patterns();
+        let fabric = "	 - Mod 'Controlify' (controlify) 3.0.1+lts+1.21.1-fabric requires version 0.18.0 or later of mod 'Fabric Loader' (fabricloader), but only the wrong version is present: 0.16.5!
+	 - Mod 'YetAnotherConfigLib' (yet_another_config_lib_v3) 3.8.2+1.21.1-fabric requires version 0.17.0 or later of mod 'Fabric Loader' (fabricloader), but only the wrong version is present: 0.16.5!
+	 - Mod 'Iris' (iris) 1.8.0 requires version 0.6.0 or later of mod 'Sodium' (sodium), but only the wrong version is present: 0.5.11!";
+        let found: Vec<(String, String, String, String)> =
+            p.fabric_wrong_version.captures_iter(fabric).map(|c| (c["who"].to_string(), c["id"].to_string(), c["want"].to_string(), c["have"].to_string())).collect();
+        assert_eq!(
+            found,
+            [
+                ("Controlify".into(), "fabricloader".into(), "0.18.0 or later".into(), "0.16.5".into()),
+                ("YetAnotherConfigLib".into(), "fabricloader".into(), "0.17.0 or later".into(), "0.16.5".into()),
+                ("Iris".into(), "sodium".into(), "0.6.0 or later".into(), "0.5.11".into()),
+            ]
+        );
+        // Not mistaken for a missing mod.
+        assert!(p.fabric_missing.captures(fabric).is_none());
+        assert!(loader_gave_up("Incompatible mods found!"));
+    }
+
+    #[tokio::test]
+    async fn a_newer_loader_is_offered_once_and_other_mods_get_a_hint() {
+        let dir = std::env::temp_dir().join(format!("resin-crashfix-loader-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("mods")).unwrap();
+        let inst: Instance = serde_json::from_value(json!({ "id": "x", "name": "X", "mcVersion": "1.21.1", "loader": "fabric", "loaderVersion": "0.16.5", "color": "#fff", "createdAt": 0 })).unwrap();
+        let console: Vec<String> = [
+            "Incompatible mods found!",
+            "	 - Mod 'Controlify' (controlify) 3.0.1+lts+1.21.1-fabric requires version 0.18.0 or later of mod 'Fabric Loader' (fabricloader), but only the wrong version is present: 0.16.5!",
+            "	 - Mod 'YetAnotherConfigLib' (yet_another_config_lib_v3) 3.8.2+1.21.1-fabric requires version 0.17.0 or later of mod 'Fabric Loader' (fabricloader), but only the wrong version is present: 0.16.5!",
+        ]
+        .map(String::from)
+        .to_vec();
+        let problems = diagnose_text(&inst, &dir, console.join("
+")).await;
+        let fixes: Vec<&Fix> = problems.iter().filter_map(|p| p.fix.as_ref()).collect();
+        assert_eq!(fixes, [&Fix::UpdateLoader { loader: "Fabric Loader".into(), needs: "0.18.0 or later".into() }]);
+        assert_eq!(serde_json::to_value(fixes[0]).unwrap()["kind"], "updateLoader");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn reads_fabric_and_forge_messages() {
