@@ -26,6 +26,9 @@
 //!   cargo run --release --example speed -- ready <instance id> [<instance id>…] [play]
 //!       gets the instances' files ready in the background, as making an instance does, and waits for it; with
 //!       `play`, presses Play on the first one two seconds in and says how long that Play took
+//!   cargo run --release --example speed -- title <instance id> [times] [memory MB]
+//!       presses Play and times the way to the title screen (the last texture atlas, then 10 s of quiet), with the
+//!       game's milestones on the way; then stops the game. The mods the game found go to <data>/title-mods.txt
 //!   cargo run --release --example speed -- close <instance id> [times]
 //!       starts the game, waits for its title screen, closes its window as a player does and says when the
 //!       launcher noticed: the game saying it stops, its process ending, the "stopped" event and the window hook
@@ -99,6 +102,7 @@ async fn run() -> Result<()> {
         Some("make") => make(&need(1, "a Minecraft version")?, &need(2, "a loader")?, arg(3)).await,
         Some("launch") => launch_times(&need(1, "an instance id")?, num(2, 1), arg(3)).await,
         Some("close") => close_times(&need(1, "an instance id")?, num(2, 1)).await,
+        Some("title") => title_times(&need(1, "an instance id")?, num(2, 1), num(3, 0) as u32).await,
         Some("prep") => prep(&need(1, "an instance id")?, num(2, 1)).await,
         Some("ready") => ready(&argv[1..]).await,
         Some("faults") => faults().await,
@@ -118,6 +122,9 @@ static MARKS: Mutex<Vec<(String, Instant)>> = Mutex::new(Vec::new());
 fn mark(what: impl Into<String>) {
     MARKS.lock().unwrap().push((what.into(), Instant::now()));
 }
+
+/// Mod files the game said it found ("Found mod file …"), for comparing two starts.
+static FOUND: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// How many tasks have ended.
 static TASKS_ENDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -155,12 +162,39 @@ fn watch_tasks() {
                     *COMMAND.lock().unwrap() = Some(c.to_string());
                 }
                 let text = l["text"].as_str().unwrap_or_default();
+                // RESIN_SPEED_LOG=<file>: every line the launcher shows in its log, kept.
+                if let Some(path) = std::env::var_os("RESIN_SPEED_LOG") {
+                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                        let _ = writeln!(f, "{}", text);
+                    }
+                }
                 if text.contains("Created:") && text.contains("atlas") {
                     mark("log atlas");
                 } else if text.contains("Stopping!") {
                     mark("log Stopping!");
                 } else if text.starts_with("Game exited with code") {
                     mark("log exited");
+                }
+                for (needle, name) in [
+                    ("ModLauncher running", "log modlauncher"),
+                    ("Launching target", "log launching target"),
+                    ("Found mod file", "log found mod"),
+                    ("Backend library: LWJGL", "log window"),
+                    ("Sound engine started", "log sound"),
+                    ("Loading Minecraft", "log fabric"),
+                ] {
+                    if text.contains(needle) {
+                        mark(name);
+                    }
+                }
+                if let Some(rest) = text.split("Found mod file ").nth(1) {
+                    FOUND.lock().unwrap().push(rest.split(" of type").next().unwrap_or(rest).to_string());
+                }
+                if l["level"].as_str() == Some("error") {
+                    mark("log error");
+                }
+                if !text.is_empty() && !text.starts_with("ResinCraft is launching") && !text.starts_with("Java: ") && !text.starts_with("Command: ") {
+                    mark("log output");
                 }
             }
         }
@@ -898,6 +932,72 @@ async fn ready(args: &[String]) -> Result<()> {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     println!("RESULT {} instance(s) ready in the background {}", ids.len(), secs(t.elapsed()));
+    Ok(())
+}
+
+async fn title_times(id: &str, times: usize, memory: u32) -> Result<()> {
+    let mut s = settings::get().await;
+    if memory > 0 {
+        s.memory_mb = memory;
+    }
+    let inst = instances::get(id).await?;
+    let mods = std::fs::read_dir(paths::game_dir(id).join("mods")).map(|d| d.count()).unwrap_or(0);
+    println!("title: {} ({} {} {}), {mods} files in mods/, {} MB", inst.name, inst.mc_version, inst.loader.as_str(), inst.loader_version.clone().unwrap_or_default(), inst.memory_mb.unwrap_or(s.memory_mb));
+    for n in 0..times.max(1) {
+        MARKS.lock().unwrap().clear();
+        FOUND.lock().unwrap().clear();
+        let auth = LaunchAuth { account_id: "offline-test".into(), username: "ResinTester".into(), uuid: "00000000-0000-0000-0000-000000000000".into(), access_token: "0".into(), user_type: "legacy", xuid: None };
+        let hooks = launch::LaunchHooks { on_started: Some(Box::new(|| mark("hook started"))), ..Default::default() };
+        let play = Instant::now();
+        launch::launch_instance(id, &s, auth, hooks).await?;
+        // The title screen: the last texture atlas, then nothing more for 10 s (or the game ended, or 10 minutes).
+        let deadline = Instant::now() + Duration::from_secs(600);
+        let mut ended = false;
+        loop {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            let marks = MARKS.lock().unwrap().clone();
+            if marks.iter().any(|m| m.0 == "event stopped" || m.0 == "event crashed") {
+                ended = true;
+                break;
+            }
+            let last_atlas = marks.iter().rev().find(|m| m.0 == "log atlas").map(|m| m.1);
+            if last_atlas.is_some_and(|t| t.elapsed() > Duration::from_secs(10)) || Instant::now() > deadline {
+                break;
+            }
+        }
+        let marks = MARKS.lock().unwrap().clone();
+        let first = |what: &str| marks.iter().find(|m| m.0 == what).map(|m| m.1);
+        let last = |what: &str| marks.iter().rev().find(|m| m.0 == what).map(|m| m.1);
+        let at = |t: Option<Instant>| t.map(|t| format!("{:.1}s", t.duration_since(play).as_secs_f64())).unwrap_or_else(|| "-".into());
+        let title = last("log atlas");
+        println!(
+            "RESULT title #{}  Play → title screen {}  (process {}, first output {}, ModLauncher {}, first mod found {}, last mod found {}, launching target {}, window {}, sound {}){}",
+            n + 1,
+            if ended { "never: the game ended".to_string() } else { at(title) },
+            at(first("hook started")),
+            at(first("log output")),
+            at(first("log modlauncher")),
+            at(first("log found mod")),
+            at(last("log found mod")),
+            at(first("log launching target")),
+            at(first("log window")),
+            at(first("log sound")),
+            if marks.iter().any(|m| m.0 == "log error") { "  [errors logged]" } else { "" }
+        );
+        let mut found = FOUND.lock().unwrap().clone();
+        found.sort();
+        std::fs::write(paths::root().join("title-mods.txt"), found.join("\n"))?;
+        // RESIN_TITLE_QUIT=1: closed as a player does (Java's own exit runs), instead of stopped.
+        let pid = launch::game_processes().into_iter().find(|g| g.instance_id == id).map(|g| g.pid);
+        match pid.filter(|_| std::env::var_os("RESIN_TITLE_QUIT").is_some()) {
+            Some(pid) => {
+                std::process::Command::new("taskkill").args(["/PID", &pid.to_string()]).output()?;
+            }
+            None => launch::kill_instance(id, None),
+        }
+        let _ = tokio::time::timeout(Duration::from_secs(60), STOPPED.notified()).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
     Ok(())
 }
 
