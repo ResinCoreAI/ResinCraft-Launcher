@@ -49,6 +49,7 @@ pub fn focus_changed(focused: bool) {
     let generation = FOCUS.fetch_add(1, Ordering::SeqCst) + 1;
     if focused {
         set_low_memory(false);
+        tauri::async_runtime::spawn(watch_idle(generation));
         return;
     }
     tauri::async_runtime::spawn(async move {
@@ -57,6 +58,57 @@ pub fn focus_changed(focused: bool) {
             set_low_memory(true);
         }
     });
+}
+
+/// How long the launcher may sit in front with nobody using the computer before its page is asked to use little memory.
+const TRIM_AFTER_IDLE: std::time::Duration = std::time::Duration::from_secs(60);
+/// Input this recent means someone's back: normal memory again.
+const BACK_WITHIN: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// While the launcher is in front: low memory once nobody has touched the mouse or keyboard for `TRIM_AFTER_IDLE`
+/// (the launcher left open on screen), normal again at the first input. Not while a task runs (a download's progress
+/// is being watched). Ends when the window loses focus (`focus_changed` takes over).
+async fn watch_idle(generation: u64) {
+    let mut low = false;
+    while FOCUS.load(Ordering::SeqCst) == generation {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        if FOCUS.load(Ordering::SeqCst) != generation {
+            return;
+        }
+        let Some(idle) = input_idle() else { return };
+        let busy = crate::core::events::running_tasks() > 0 || !crate::core::settings::free_memory_hidden();
+        if let Some(now_low) = idle_decision(idle, low, busy) {
+            set_low_memory(now_low);
+            low = now_low;
+        }
+    }
+}
+
+/// What `watch_idle` does now: Some(true) to go low, Some(false) back to normal, None to leave it.
+fn idle_decision(idle: std::time::Duration, low: bool, busy: bool) -> Option<bool> {
+    if low && (idle < BACK_WITHIN || busy) {
+        Some(false)
+    } else if !low && !busy && idle >= TRIM_AFTER_IDLE {
+        Some(true)
+    } else {
+        None
+    }
+}
+
+/// How long since the last mouse or keyboard input anywhere on this computer; None where that can't be told.
+fn input_idle() -> Option<std::time::Duration> {
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::System::SystemInformation::GetTickCount;
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+        let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+        if !GetLastInputInfo(&mut info).as_bool() {
+            return None;
+        }
+        Some(std::time::Duration::from_millis(GetTickCount().wrapping_sub(info.dwTime) as u64))
+    }
+    #[cfg(not(windows))]
+    None
 }
 
 /// The main window is closed to save memory (not quit): the app keeps running and `show` opens it again.
@@ -153,6 +205,26 @@ pub fn show(app: &AppHandle) -> bool {
         }
     });
     true
+}
+
+#[cfg(test)]
+mod idle_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn goes_low_after_a_minute_untouched_and_back_at_the_first_input() {
+        let s = Duration::from_secs;
+        assert_eq!(idle_decision(s(59), false, false), None);
+        assert_eq!(idle_decision(s(60), false, false), Some(true));
+        // Low stays low while nobody's there, and goes back as soon as someone is.
+        assert_eq!(idle_decision(s(300), true, false), None);
+        assert_eq!(idle_decision(Duration::from_millis(500), true, false), Some(false));
+        // Never while a task runs; a task that starts brings it back.
+        assert_eq!(idle_decision(s(600), false, true), None);
+        assert_eq!(idle_decision(s(600), true, true), Some(false));
+        assert!(input_idle().is_some() || cfg!(not(windows)));
+    }
 }
 
 #[cfg(all(test, windows))]
