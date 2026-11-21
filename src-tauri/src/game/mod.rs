@@ -12,6 +12,7 @@ pub mod liteloader;
 pub mod loaders;
 pub mod mojang;
 pub mod optifine;
+pub mod priority;
 pub mod versionpatch;
 
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -950,6 +950,21 @@ async fn title_times(id: &str, times: usize, memory: u32) -> Result<()> {
         let hooks = launch::LaunchHooks { on_started: Some(Box::new(|| mark("hook started"))), ..Default::default() };
         let play = Instant::now();
         launch::launch_instance(id, &s, auth, hooks).await?;
+        // RESIN_TITLE_PRIORITY=above|high: the game's process gets that priority class as soon as it runs (a trial).
+        #[cfg(windows)]
+        if let Some(class) = std::env::var("RESIN_TITLE_PRIORITY").ok() {
+            use windows::Win32::System::Threading::{OpenProcess, SetPriorityClass, ABOVE_NORMAL_PRIORITY_CLASS, HIGH_PRIORITY_CLASS, PROCESS_SET_INFORMATION};
+            if let Some(pid) = launch::game_processes().into_iter().find(|g| g.instance_id == id).map(|g| g.pid) {
+                unsafe {
+                    if let Ok(h) = OpenProcess(PROCESS_SET_INFORMATION, false, pid) {
+                        let c = if class == "high" { HIGH_PRIORITY_CLASS } else { ABOVE_NORMAL_PRIORITY_CLASS };
+                        let ok = SetPriorityClass(h, c).is_ok();
+                        println!("  priority {class}: {ok}");
+                        let _ = windows::Win32::Foundation::CloseHandle(h);
+                    }
+                }
+            }
+        }
         // The title screen: the last texture atlas, then nothing more for 10 s (or the game ended, or 10 minutes).
         let deadline = Instant::now() + Duration::from_secs(600);
         let mut ended = false;
@@ -984,6 +999,17 @@ async fn title_times(id: &str, times: usize, memory: u32) -> Result<()> {
             at(first("log sound")),
             if marks.iter().any(|m| m.0 == "log error") { "  [errors logged]" } else { "" }
         );
+        // The game's priority class now that it's up (0x20 normal, 0x8000 above normal).
+        #[cfg(windows)]
+        if let Some(pid) = launch::game_processes().into_iter().find(|g| g.instance_id == id).map(|g| g.pid) {
+            use windows::Win32::System::Threading::{GetPriorityClass, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+            unsafe {
+                if let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                    println!("  priority at the title screen: {:#x}", GetPriorityClass(h));
+                    let _ = windows::Win32::Foundation::CloseHandle(h);
+                }
+            }
+        }
         let mut found = FOUND.lock().unwrap().clone();
         found.sort();
         std::fs::write(paths::root().join("title-mods.txt"), found.join("\n"))?;

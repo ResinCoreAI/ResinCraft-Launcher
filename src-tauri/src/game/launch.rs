@@ -980,6 +980,9 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         let (pending, console, crash_shown, on_closing) = (pending.clone(), console.clone(), crash_shown.clone(), on_closing.clone());
         let (instance_id, run_id) = (id.to_string(), run.run_id.clone());
         move |l: LogLine| {
+            if super::priority::says_ready(&l.text) {
+                super::priority::ready(&run_id);
+            }
             if says_stopping(&l.text) {
                 let hook = on_closing.lock().unwrap().take();
                 if let Some(f) = hook {
@@ -1076,6 +1079,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         push(LogLine { text: format!("Wrapper: {wrapper}"), level: "info" });
     }
     let mut cmd = hidden_command(&program);
+    super::priority::starting(&mut cmd);
     cmd.args(&program_args)
         .envs(vars.iter().map(|(k, v)| (k, v)))
         .current_dir(&game_dir)
@@ -1114,6 +1118,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         }
     });
     let started = Instant::now();
+    super::priority::started(&run.run_id, pid);
 
     // Readers: stdout as-is, stderr with "info" promoted to "warn".
     let mut readers = Vec::new();
