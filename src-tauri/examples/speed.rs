@@ -26,6 +26,9 @@
 //!   cargo run --release --example speed -- ready <instance id> [<instance id>…] [play]
 //!       gets the instances' files ready in the background, as making an instance does, and waits for it; with
 //!       `play`, presses Play on the first one two seconds in and says how long that Play took
+//!   cargo run --release --example speed -- close <instance id> [times]
+//!       starts the game, waits for its title screen, closes its window as a player does and says when the
+//!       launcher noticed: the game saying it stops, its process ending, the "stopped" event and the window hook
 //!   cargo run --release --example speed -- prep <instance id> [times]
 //!       what Play does before Java starts, one step at a time
 //!   cargo run --release --example speed -- loader <mcVersion> <forge|neoforge> [loader version] [times]
@@ -95,6 +98,7 @@ async fn run() -> Result<()> {
         Some("steps") => steps(&need(1, "an instance id")?).await,
         Some("make") => make(&need(1, "a Minecraft version")?, &need(2, "a loader")?, arg(3)).await,
         Some("launch") => launch_times(&need(1, "an instance id")?, num(2, 1), arg(3)).await,
+        Some("close") => close_times(&need(1, "an instance id")?, num(2, 1)).await,
         Some("prep") => prep(&need(1, "an instance id")?, num(2, 1)).await,
         Some("ready") => ready(&argv[1..]).await,
         Some("faults") => faults().await,
@@ -108,6 +112,13 @@ async fn run() -> Result<()> {
 static COMMAND: Mutex<Option<String>> = Mutex::new(None);
 /// Rung when a game stops.
 static STOPPED: tokio::sync::Notify = tokio::sync::Notify::const_new();
+/// (what, when) for `close`: game events, the game's own milestones and the launch hooks.
+static MARKS: Mutex<Vec<(String, Instant)>> = Mutex::new(Vec::new());
+
+fn mark(what: impl Into<String>) {
+    MARKS.lock().unwrap().push((what.into(), Instant::now()));
+}
+
 /// How many tasks have ended.
 static TASKS_ENDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
@@ -133,6 +144,7 @@ fn watch_tasks() {
             }
         }
         "game" => {
+            mark(format!("event {}", payload["state"].as_str().unwrap_or_default()));
             if matches!(payload["state"].as_str(), Some("stopped" | "crashed")) {
                 STOPPED.notify_one();
             }
@@ -141,6 +153,14 @@ fn watch_tasks() {
             for l in payload["lines"].as_array().into_iter().flatten() {
                 if let Some(c) = l["text"].as_str().and_then(|t| t.strip_prefix("Command: ")) {
                     *COMMAND.lock().unwrap() = Some(c.to_string());
+                }
+                let text = l["text"].as_str().unwrap_or_default();
+                if text.contains("Created:") && text.contains("atlas") {
+                    mark("log atlas");
+                } else if text.contains("Stopping!") {
+                    mark("log Stopping!");
+                } else if text.starts_with("Game exited with code") {
+                    mark("log exited");
                 }
             }
         }
@@ -572,19 +592,20 @@ async fn game(mc: &str, at_once: Option<usize>) -> Result<()> {
     items.extend(mojang::logging_config(&version).into_iter().map(|l| l.item));
     let items: Vec<DownloadItem> = items.into_iter().filter(|i| !i.url.is_empty()).collect();
     let assets = mojang::asset_items(&version).await?;
-    println!("game {mc}: {} libraries and jars, {} assets, {at_once} at once ({} for assets)", items.len(), assets.items.len(), at_once * 2);
+    let for_assets = launch::asset_downloads(at_once);
+    println!("game {mc}: {} libraries and jars, {} assets, {at_once} at once ({for_assets} for assets)", items.len(), assets.items.len());
 
     let size = |list: &[DownloadItem]| -> u64 { list.iter().filter_map(|i| std::fs::metadata(&i.dest).ok()).map(|m| m.len()).sum() };
     let t = Instant::now();
     download_all(items.clone(), at_once, |_, _| {}).await?;
     println!("RESULT game libraries      {}  ({})", secs(t.elapsed()), mb(size(&items)));
     let t = Instant::now();
-    download_all(assets.items.clone(), at_once * 2, |_, _| {}).await?;
+    download_all(assets.items.clone(), for_assets, |_, _| {}).await?;
     println!("RESULT game assets         {}  ({})", secs(t.elapsed()), mb(size(&assets.items)));
     println!("RESULT game total          {}", secs(total.elapsed()));
     let t = Instant::now();
     download_all(items, at_once, |_, _| {}).await?;
-    download_all(assets.items, at_once * 2, |_, _| {}).await?;
+    download_all(assets.items, for_assets, |_, _| {}).await?;
     println!("RESULT game check again    {}  (everything already there)", secs(t.elapsed()));
     Ok(())
 }
@@ -877,6 +898,66 @@ async fn ready(args: &[String]) -> Result<()> {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     println!("RESULT {} instance(s) ready in the background {}", ids.len(), secs(t.elapsed()));
+    Ok(())
+}
+
+async fn close_times(id: &str, times: usize) -> Result<()> {
+    let mut s = settings::get().await;
+    s.memory_mb = 2048;
+    for n in 0..times.max(1) {
+        MARKS.lock().unwrap().clear();
+        let auth = LaunchAuth { account_id: "offline-test".into(), username: "ResinTester".into(), uuid: "00000000-0000-0000-0000-000000000000".into(), access_token: "0".into(), user_type: "legacy", xuid: None };
+        let hooks = launch::LaunchHooks {
+            on_started: Some(Box::new(|| mark("hook started"))),
+            on_closing: Some(Box::new(|| mark("hook closing"))),
+            on_exit: Some(Box::new(|_| mark("hook exit"))),
+        };
+        let play = Instant::now();
+        launch::launch_instance(id, &s, auth, hooks).await?;
+        // Up: the last texture atlas, then quiet for 5 s.
+        let deadline = Instant::now() + Duration::from_secs(180);
+        loop {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            let last_atlas = MARKS.lock().unwrap().iter().rev().find(|m| m.0 == "log atlas").map(|m| m.1);
+            if last_atlas.is_some_and(|t| t.elapsed() > Duration::from_secs(5)) || Instant::now() > deadline {
+                break;
+            }
+        }
+        let pid = launch::game_processes().into_iter().find(|g| g.instance_id == id).map(|g| g.pid).ok_or_else(|| anyhow!("the game isn't running"))?;
+        // When Windows says the process is gone, watched apart from the launcher.
+        #[cfg(windows)]
+        std::thread::spawn(move || unsafe {
+            use windows::Win32::System::Threading::{OpenProcess, WaitForSingleObject, INFINITE, PROCESS_SYNCHRONIZE};
+            if let Ok(h) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) {
+                WaitForSingleObject(h, INFINITE);
+                mark("os exited");
+                let _ = windows::Win32::Foundation::CloseHandle(h);
+            }
+        });
+        // What a click on the window's X does.
+        let close = Instant::now();
+        std::process::Command::new("taskkill").args(["/PID", &pid.to_string()]).output()?;
+        let _ = tokio::time::timeout(Duration::from_secs(60), STOPPED.notified()).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let marks = MARKS.lock().unwrap().clone();
+        let at = |what: &str, after: Instant| marks.iter().find(|m| m.0 == what && m.1 >= after).map(|m| m.1);
+        let since = |t: Option<Instant>, from: Instant| t.map(|t| format!("{:.2}s", t.duration_since(from).as_secs_f64())).unwrap_or_else(|| "never".into());
+        let exited = at("log exited", close);
+        println!(
+            "RESULT close #{}  open: Play → running event {}, → started hook {}  |  close: X → Stopping! {}, → launcher told (closing hook) {}, → Windows says gone {}, → exit logged {}, → stopped event {}, → exit hook {}  |  gone → exit hook {}",
+            n + 1,
+            since(at("event running", play), play),
+            since(at("hook started", play), play),
+            since(at("log Stopping!", close), close),
+            since(at("hook closing", close), close),
+            since(at("os exited", close), close),
+            since(exited, close),
+            since(at("event stopped", close), close),
+            since(at("hook exit", close), close),
+            at("os exited", close).map(|e| since(at("hook exit", e), e)).unwrap_or_else(|| "?".into()),
+        );
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
     Ok(())
 }
 

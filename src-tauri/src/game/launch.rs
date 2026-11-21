@@ -342,7 +342,7 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
     // The game's assets come with Minecraft's own version, not the mod loader's: they start downloading now, while
     // the loader installs (Forge and NeoForge patch the game for a while) and the libraries download, instead of
     // after both. The assets step below finds them in place, or waits for the ones still on their way.
-    let early_assets = early_assets(&inst.mc_version, settings.concurrency * 2);
+    let early_assets = early_assets(&inst.mc_version, asset_downloads(settings.concurrency));
     let mut version = super::versionpatch::resolve_instance(inst, &ctx).await?;
 
     let libraries = resolve_libraries(&version);
@@ -367,7 +367,7 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         items.push(l.item.clone());
     }
     download_checked(items, settings.concurrency, task.counter(tr!("launch.downloadingLibraries", "Downloading libraries"))).await?;
-    download_all(assets.items, settings.concurrency * 2, task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
+    download_all(assets.items, asset_downloads(settings.concurrency), task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
     drop(early_assets);
     let game_assets = materialize_legacy_assets(&assets.index, &assets.id, &paths::game_dir(&inst.id)).await?;
 
@@ -399,6 +399,14 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         version,
         natives,
     })
+}
+
+/// How many of a game's assets download at once, for a Parallel downloads setting of `parallel`: four times as many
+/// (at most 64, at least twice as many as before). Assets are thousands of small files, and each one waits mostly on
+/// its own request: 3,913 assets (829 MB) took 12.3-13.7 s 32 at a time and 9.6-9.8 s 64 at a time, for about 6 MB
+/// more memory; 96 at a time was no faster.
+pub fn asset_downloads(parallel: usize) -> usize {
+    (parallel * 4).min(64).max(parallel * 2)
 }
 
 /// Minecraft `mc`'s assets downloading on the side (see `prepare`). Best effort and silent: the assets step after
@@ -875,7 +883,18 @@ impl LogParser {
 #[derive(Default)]
 pub struct LaunchHooks {
     pub on_started: Option<Box<dyn FnOnce() + Send>>,
+    /// The game said it's stopping (the player quit it): its window closes now, while Java takes about 5 s more to
+    /// end. Not called when the game ends without saying so (a crash, Stop in the launcher).
+    pub on_closing: Option<Box<dyn FnOnce() + Send>>,
     pub on_exit: Option<Box<dyn FnOnce(Option<i32>) + Send>>,
+}
+
+/// The line Minecraft logs when the player quits, right before it closes its window: "[12:00:00] [Render
+/// thread/INFO]: Stopping!" (older versions: "[Client thread/INFO]"). Java then runs for about 5 s more (Minecraft
+/// waits for its background workers), and the launcher used to come back only then.
+pub fn says_stopping(line: &str) -> bool {
+    let line = line.trim_end();
+    line.ends_with("]: Stopping!") && (line.contains("[Render thread/") || line.contains("[Client thread/"))
 }
 
 fn loader_label(inst: &Instance) -> String {
@@ -956,10 +975,17 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     // Set once the "Minecraft crashed" window was shown for this run (Fabric's own error window keeps the game open,
     // so it's shown as soon as the loader says it gave up, not only when the game exits).
     let crash_shown = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let on_closing = Arc::new(Mutex::new(hooks.on_closing));
     let push = {
-        let (pending, console, crash_shown) = (pending.clone(), console.clone(), crash_shown.clone());
+        let (pending, console, crash_shown, on_closing) = (pending.clone(), console.clone(), crash_shown.clone(), on_closing.clone());
         let (instance_id, run_id) = (id.to_string(), run.run_id.clone());
         move |l: LogLine| {
+            if says_stopping(&l.text) {
+                let hook = on_closing.lock().unwrap().take();
+                if let Some(f) = hook {
+                    f();
+                }
+            }
             {
                 let mut c = console.lock().unwrap();
                 c.push_back(l.text.clone());
@@ -1354,6 +1380,17 @@ mod tests {
         std::fs::remove_file(&other).unwrap();
         assert!(unpack_natives(&natives, &extract[1..]).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn knows_when_the_game_says_it_stops() {
+        assert!(says_stopping("[10:49:28] [Render thread/INFO]: Stopping!"));
+        assert!(says_stopping("[10:49:28] [Client thread/INFO]: Stopping!\r"));
+        // A server or a mod saying something like it isn't the game closing.
+        assert!(!says_stopping("[10:49:28] [Server thread/INFO]: Stopping!"));
+        assert!(!says_stopping("[10:49:28] [Server thread/INFO]: Stopping server"));
+        assert!(!says_stopping("[10:49:28] [Render thread/INFO]: Stopping! (not yet)"));
+        assert!(!says_stopping("Stopping!"));
     }
 
     #[test]
