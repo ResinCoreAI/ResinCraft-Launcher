@@ -405,7 +405,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
                 items.push(DownloadItem::new(format!("{base}/Configs.zip"), &zip).hash(hash).size(c.filesize));
                 extracts.push(Extract { zip, to: String::new(), folder: String::new() });
             }
-            download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
+            download_all(items, crate::core::settings::parallel_downloads().await, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
 
             task.update(tr!("modpack.applyingSettings", "Applying modpack settings…"), None);
             let dir2 = dir.clone();

@@ -300,3 +300,83 @@
   resize: vertical;
   font-family: var(--mono, monospace);
 }
+
+/* ---------- The Feed layout (pages/QuickJoin.tsx) ---------- */
+
+/* One centred column, read top to bottom: back to the last server, then friends, worlds and your servers. */
+.qj-feed {
+  max-width: 980px;
+}
+.qj-last {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: 0 0 18px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 6px);
+  background: radial-gradient(120% 160% at 100% 0%, color-mix(in srgb, var(--play) 22%, var(--surface)) 0, var(--surface) 55%);
+}
+.qj-last-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+.qj-last-ico img {
+  width: 100%;
+  height: 100%;
+}
+.qj-last-ico svg {
+  width: 30px;
+  height: 30px;
+}
+.qj-last h2 {
+  margin: 8px 0 4px;
+  font-size: 26px;
+}
+.qj-last .chip svg {
+  width: 12px;
+  height: 12px;
+}
+.qj-last .it-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.qj-last-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.qj-last-actions .btn:not(.card-more) {
+  height: 46px;
+  padding: 0 24px;
+  font-size: 15px;
+}
+.qj-last-actions .btn.play-caret,
+.qj-last-actions .split-btn > .btn:last-child:not(:first-child) {
+  padding: 0 12px;
+}
+.qj-bar .search {
+  flex: 1;
+}
+.qj-section-tools {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+@media (max-width: 760px) {
+  .qj-last {
+    flex-wrap: wrap;
+  }
+}

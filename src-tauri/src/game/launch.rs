@@ -1,7 +1,6 @@
 //! Preparing (downloads, natives, Java), building the command line, running the game and streaming its log.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -174,6 +173,8 @@ pub async fn reinstall(id: &str) -> Result<()> {
     for dir in gone {
         let _ = tokio::fs::remove_dir_all(&dir).await;
     }
+    // The natives too: unpacked again from the fresh jars, whatever the folder holds.
+    let _ = tokio::fs::remove_dir_all(natives_for(&inst.id, 1)).await;
     let title = tr!("reinstall.instance", "Reinstalling {name}", name = inst.name);
     Task::run(title, Some(id.to_string()), |t| async move { prepare(&inst, &settings, natives_for(&inst.id, 1), &t).await.map(|_| ()) }).await
 }
@@ -265,8 +266,71 @@ async fn download_checked(items: Vec<DownloadItem>, concurrency: usize, progress
     download_all(remote, concurrency, progress).await
 }
 
+/// One preparation of an instance at a time, by instance id: Play waits for a `get_ready` that is still downloading
+/// (and the other way round) and then finds the files in place, instead of both fetching them.
+static PREPARING: Mutex<Option<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = Mutex::new(None);
+
+/// ResinCraft's own step before Play: gets everything a start of instance `id` needs (the game's version files, its
+/// mod loader, libraries, assets, natives and a Java) in the background, so the first Play doesn't begin with a long
+/// download. Called when an instance is made, its version changes or a modpack is installed; shown in the task
+/// dock like Play's own preparation, and can be cancelled there. It is that same preparation, which still runs at
+/// every Play and then finds everything in place. Quiet when it can't finish (offline, no Java to be had): Play
+/// says what's wrong when it's pressed.
+pub fn get_ready(id: &str) {
+    if STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).remove(id).is_some() {
+        return;
+    }
+    start_getting_ready(id);
+}
+
+/// Instances whose `get_ready` began while their modpack was still being installed (`get_ready_early`), so the
+/// one at the end of the install isn't run a second time, and a failed or cancelled install can stop it.
+static STARTED_EARLY: Mutex<Option<HashMap<String, tokio::task::AbortHandle>>> = Mutex::new(None);
+
+/// `get_ready` at once, for a modpack instance whose Minecraft version and mod loader are already settled while its
+/// mods are still downloading: the game's own files come at the same time instead of after the last mod (the
+/// install's own call to `get_ready` then does nothing). A failed or cancelled install stops it
+/// (`stop_getting_ready`).
+pub fn get_ready_early(id: &str) {
+    let handle = start_getting_ready(id);
+    STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.to_string(), handle);
+}
+
+/// Stops a `get_ready_early` whose instance is being thrown away (its task shows as cancelled).
+pub fn stop_getting_ready(id: &str) {
+    if let Some(handle) = STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).remove(id) {
+        handle.abort();
+    }
+}
+
+fn start_getting_ready(id: &str) -> tokio::task::AbortHandle {
+    let id = id.to_string();
+    tokio::spawn(async move {
+        let Ok(inst) = instances::get(&id).await else { return };
+        // Horizon prepares its own way, with the player's account; a game being started is preparing already.
+        if inst.loader == LoaderType::Horizon || running(|m| m.contains_key(&id)) {
+            return;
+        }
+        let settings = crate::core::settings::get().await;
+        let title = tr!("launch.preparing", "Preparing {name}", name = inst.name);
+        let _ = Task::run(title, Some(id.clone()), |t| async move {
+            let _ = prepare(&inst, &settings, natives_for(&inst.id, 1), &t).await;
+            Ok(())
+        })
+        .await;
+        // Deleted meanwhile: the natives just unpacked would be all that's left of its folder.
+        if instances::get(&id).await.is_err() {
+            let _ = tokio::fs::remove_dir_all(natives_for(&id, 1)).await;
+            let _ = tokio::fs::remove_dir(paths::instance_dir(&id)).await;
+        }
+    })
+    .abort_handle()
+}
+
 async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &Arc<Task>) -> Result<Prepared> {
     task.update(tr!("launch.readingVersion", "Reading version info…"), None);
+    let turn = PREPARING.lock().unwrap().get_or_insert_with(HashMap::new).entry(inst.id.clone()).or_default().clone();
+    let _turn = turn.lock().await;
     let picker: JavaPicker = {
         let (inst, settings, task) = (inst.clone(), settings.clone(), task.clone());
         Box::new(move |major| {
@@ -275,6 +339,10 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         })
     };
     let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(settings.concurrency), java: Some(picker) };
+    // The game's assets come with Minecraft's own version, not the mod loader's: they start downloading now, while
+    // the loader installs (Forge and NeoForge patch the game for a while) and the libraries download, instead of
+    // after both. The assets step below finds them in place, or waits for the ones still on their way.
+    let early_assets = early_assets(&inst.mc_version, asset_downloads(settings.concurrency));
     let mut version = super::versionpatch::resolve_instance(inst, &ctx).await?;
 
     let libraries = resolve_libraries(&version);
@@ -299,37 +367,15 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         items.push(l.item.clone());
     }
     download_checked(items, settings.concurrency, task.counter(tr!("launch.downloadingLibraries", "Downloading libraries"))).await?;
-    download_all(assets.items, settings.concurrency * 2, task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
+    download_all(assets.items, asset_downloads(settings.concurrency), task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
+    drop(early_assets);
     let game_assets = materialize_legacy_assets(&assets.index, &assets.id, &paths::game_dir(&inst.id)).await?;
 
     task.update(tr!("launch.unpackingNatives", "Unpacking natives…"), None);
-    let _ = tokio::fs::remove_dir_all(&natives).await;
-    tokio::fs::create_dir_all(&natives).await?;
     let extract: Vec<(PathBuf, Vec<String>)> = libraries.iter().filter(|l| l.extract).map(|l| (l.item.dest.clone(), l.exclude.clone())).collect();
     {
         let natives = natives.clone();
-        tokio::task::spawn_blocking(move || -> Result<()> {
-            let re = regex::Regex::new(r"(?i)\.(dll|so|dylib|jnilib)$").unwrap();
-            for (jar, exclude) in extract {
-                let mut zip = zip::ZipArchive::new(std::fs::File::open(&jar)?).map_err(|e| err_tr!("shell.openFailed", "Couldn't open {path}: {error}", path = jar.display().to_string(), error = e.to_string()))?;
-                for i in 0..zip.len() {
-                    let mut entry = zip.by_index(i)?;
-                    let name = entry.name().to_string();
-                    if entry.is_dir() || name.starts_with("META-INF/") || exclude.iter().any(|x| name.starts_with(x.as_str())) {
-                        continue;
-                    }
-                    if !re.is_match(&name) {
-                        continue;
-                    }
-                    let base = name.rsplit(['/', '\\']).next().unwrap_or(&name).to_string();
-                    let mut buf = Vec::new();
-                    entry.read_to_end(&mut buf)?;
-                    std::fs::write(natives.join(base), buf)?;
-                }
-            }
-            Ok(())
-        })
-        .await??;
+        tokio::task::spawn_blocking(move || unpack_natives(&natives, &extract)).await??;
     }
 
     task.update(tr!("launch.checkingJava", "Checking Java…"), None);
@@ -353,6 +399,131 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         version,
         natives,
     })
+}
+
+/// How many of a game's assets download at once, for a Parallel downloads setting of `parallel`: four times as many
+/// (at most 64, at least twice as many as before). Assets are thousands of small files, and each one waits mostly on
+/// its own request: 3,913 assets (829 MB) took 12.3-13.7 s 32 at a time and 9.6-9.8 s 64 at a time, for about 6 MB
+/// more memory; 96 at a time was no faster.
+pub fn asset_downloads(parallel: usize) -> usize {
+    (parallel * 4).min(64).max(parallel * 2)
+}
+
+/// Minecraft `mc`'s assets downloading on the side (see `prepare`). Best effort and silent: the assets step after
+/// it reports progress and gets whatever this didn't. Nothing when this version's asset index is saved already (its
+/// assets came before: every Play after the first), so Play doesn't check thousands of files twice. Stops when
+/// dropped.
+fn early_assets(mc: &str, concurrency: usize) -> crate::core::net::BackgroundDownload {
+    let mc = mc.to_string();
+    let listing = async move {
+        if assets_listed_before(&mc).await {
+            return Ok(Vec::new());
+        }
+        let vanilla = super::mojang::get_vanilla_version(&mc).await?;
+        asset_items(&vanilla).await.map(|a| a.items)
+    };
+    // Listing needs the version JSON and asset index (a request each the first time), so it goes on the side too.
+    crate::core::net::download_in_background_after(listing, concurrency)
+}
+
+/// Whether Minecraft `mc`'s saved version JSON names an asset index that is saved too.
+async fn assets_listed_before(mc: &str) -> bool {
+    let Ok(text) = tokio::fs::read_to_string(paths::versions().join(mc).join(format!("{mc}.json"))).await else { return false };
+    let Some(id) = serde_json::from_str::<VersionJson>(&text).ok().and_then(|v| v.asset_index).map(|a| a.id) else { return false };
+    crate::core::fsutil::safe_join(&paths::assets().join("indexes"), &format!("{id}.json")).is_ok_and(|f| f.is_file())
+}
+
+/// What a natives folder holds and which jars it was unpacked from, kept in the folder itself, so the next start can
+/// tell that nothing changed.
+#[derive(serde::Serialize, serde::Deserialize, PartialEq)]
+struct Unpacked {
+    /// The native jars: path, size, modified time (ns since 1970) and what is left out of each.
+    jars: Vec<(String, u64, u128, Vec<String>)>,
+    /// The files unpacked from them: name, size and modified time.
+    files: Vec<(String, u64, u128)>,
+}
+
+const UNPACKED: &str = ".unpacked.json";
+
+fn stamp_of(meta: &std::fs::Metadata) -> Option<u128> {
+    meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_nanos())
+}
+
+/// True when `natives` holds exactly the files the last start unpacked from these same `jars`, untouched since.
+fn still_unpacked(natives: &std::path::Path, jars: &[(String, u64, u128, Vec<String>)]) -> bool {
+    let Some(was) = std::fs::read_to_string(natives.join(UNPACKED)).ok().and_then(|t| serde_json::from_str::<Unpacked>(&t).ok()) else { return false };
+    if was.jars != jars {
+        return false;
+    }
+    let Ok(dir) = std::fs::read_dir(natives) else { return false };
+    let mut there = 0;
+    for e in dir.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if name == UNPACKED {
+            continue;
+        }
+        // Anything else in the folder, or a file that isn't as it was written: unpack again.
+        let Ok(meta) = std::fs::metadata(e.path()) else { return false };
+        match was.files.iter().find(|f| f.0 == name) {
+            Some(f) if meta.is_file() && meta.len() == f.1 && stamp_of(&meta) == Some(f.2) => there += 1,
+            _ => return false,
+        }
+    }
+    there == was.files.len()
+}
+
+/// Unpacks the native libraries (DLLs…) of `extract` (jar, entries to leave out) into `natives` (blocking). A folder
+/// that already holds exactly what the last start unpacked from the same jars is left as it is: writing the same
+/// DLLs again on every start took about half of the time between Play and Java starting (0.13 s → 0.07 s), and
+/// virus scanners look at each freshly written DLL. Anything else (another jar, a changed jar, a missing, changed or
+/// extra file) and the folder is emptied and filled again.
+fn unpack_natives(natives: &std::path::Path, extract: &[(PathBuf, Vec<String>)]) -> Result<()> {
+    let jars: Option<Vec<(String, u64, u128, Vec<String>)>> = extract
+        .iter()
+        .map(|(jar, exclude)| {
+            let meta = std::fs::metadata(jar).ok()?;
+            Some((jar.to_string_lossy().into_owned(), meta.len(), stamp_of(&meta)?, exclude.clone()))
+        })
+        .collect();
+    if jars.as_ref().is_some_and(|j| still_unpacked(natives, j)) {
+        return Ok(());
+    }
+    let _ = std::fs::remove_dir_all(natives);
+    std::fs::create_dir_all(natives)?;
+    let re = regex::Regex::new(r"(?i)\.(dll|so|dylib|jnilib)$").unwrap();
+    let mut names: Vec<String> = Vec::new();
+    for (jar, exclude) in extract {
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(jar)?).map_err(|e| err_tr!("shell.openFailed", "Couldn't open {path}: {error}", path = jar.display().to_string(), error = e.to_string()))?;
+        for i in 0..zip.len() {
+            let mut entry = zip.by_index(i)?;
+            let name = entry.name().to_string();
+            if entry.is_dir() || name.starts_with("META-INF/") || exclude.iter().any(|x| name.starts_with(x.as_str())) {
+                continue;
+            }
+            if !re.is_match(&name) {
+                continue;
+            }
+            let base = name.rsplit(['/', '\\']).next().unwrap_or(&name).to_string();
+            std::io::copy(&mut entry, &mut std::fs::File::create(natives.join(&base))?)?;
+            if !names.contains(&base) {
+                names.push(base);
+            }
+        }
+    }
+    // Best effort: without the note, the next start unpacks again.
+    let files: Option<Vec<(String, u64, u128)>> = names
+        .into_iter()
+        .map(|n| {
+            let meta = std::fs::metadata(natives.join(&n)).ok()?;
+            Some((n, meta.len(), stamp_of(&meta)?))
+        })
+        .collect();
+    if let (Some(jars), Some(files)) = (jars, files) {
+        if let Ok(text) = serde_json::to_vec(&Unpacked { jars, files }) {
+            let _ = std::fs::write(natives.join(UNPACKED), text);
+        }
+    }
+    Ok(())
 }
 
 /// Apple Silicon: versions before 1.19 run as x64 through Rosetta 2, which macOS doesn't install by itself.
@@ -712,7 +883,26 @@ impl LogParser {
 #[derive(Default)]
 pub struct LaunchHooks {
     pub on_started: Option<Box<dyn FnOnce() + Send>>,
+    /// Once, when the game has finished loading (window.rs `ready_line`), or after `READY_WAIT` if it never says so;
+    /// never when it exits first.
+    pub on_ready: Option<Box<dyn FnOnce() + Send>>,
+    /// The game said it's stopping (the player quit it): its window closes now, while Java takes about 5 s more to
+    /// end. Not called when the game ends without saying so (a crash, Stop in the launcher).
+    pub on_closing: Option<Box<dyn FnOnce() + Send>>,
     pub on_exit: Option<Box<dyn FnOnce(Option<i32>) + Send>>,
+}
+
+/// How long to wait for the game to say it has loaded before running `on_ready` anyway.
+const READY_WAIT: Duration = Duration::from_secs(300);
+/// `on_ready` runs this long after the line, so the launch screen's fold is seen before the window goes.
+const READY_DELAY: Duration = Duration::from_millis(650);
+
+/// The line Minecraft logs when the player quits, right before it closes its window: "[12:00:00] [Render
+/// thread/INFO]: Stopping!" (older versions: "[Client thread/INFO]"). Java then runs for about 5 s more (Minecraft
+/// waits for its background workers), and the launcher used to come back only then.
+pub fn says_stopping(line: &str) -> bool {
+    let line = line.trim_end();
+    line.ends_with("]: Stopping!") && (line.contains("[Render thread/") || line.contains("[Client thread/"))
 }
 
 fn loader_label(inst: &Instance) -> String {
@@ -746,6 +936,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         tr!("launch.preparingAs", "Preparing {name} for {player}", name = inst.name, player = auth.username)
     };
     let natives = natives_for(id, slot);
+    let busy = super::priority::preparing();
     let prepared = if horizon {
         Task::run(title, Some(id.to_string()), |t| {
             let (inst, width, height) = (inst.clone(), settings.game_width, settings.game_height);
@@ -765,6 +956,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
             build_args(&inst, settings, &p, &auth, target).map(|args| (p.java, args, major))
         })
     };
+    drop(busy);
     let (java, args, java_major) = match prepared {
         Ok(p) => p,
         Err(e) => {
@@ -793,10 +985,27 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     // Set once the "Minecraft crashed" window was shown for this run (Fabric's own error window keeps the game open,
     // so it's shown as soon as the loader says it gave up, not only when the game exits).
     let crash_shown = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    // Taken once: by the game's ready line, the fallback timer, or the exit (which drops it).
+    type Hook = Box<dyn FnOnce() + Send>;
+    let ready_hook: Arc<Mutex<Option<Hook>>> = Arc::new(Mutex::new(hooks.on_ready));
+    // The game said it was quitting normally, or that it wrote a crash report: they decide a non-zero exit code.
+    let clean_stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let crash_reported = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let on_closing = Arc::new(Mutex::new(hooks.on_closing));
     let push = {
-        let (pending, console, crash_shown) = (pending.clone(), console.clone(), crash_shown.clone());
+        let (pending, console, crash_shown, ready_hook) = (pending.clone(), console.clone(), crash_shown.clone(), ready_hook.clone());
+        let (clean_stop, crash_reported, on_closing) = (clean_stop.clone(), crash_reported.clone(), on_closing.clone());
         let (instance_id, run_id) = (id.to_string(), run.run_id.clone());
         move |l: LogLine| {
+            if super::priority::says_ready(&l.text) {
+                super::priority::ready(&run_id);
+            }
+            if says_stopping(&l.text) {
+                let hook = on_closing.lock().unwrap().take();
+                if let Some(f) = hook {
+                    f();
+                }
+            }
             {
                 let mut c = console.lock().unwrap();
                 c.push_back(l.text.clone());
@@ -815,6 +1024,21 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
                         emit("gameCrash", super::crashfix::CrashReport { instance_id, run_id, problems, crash_report });
                     }
                 });
+            }
+            if super::window::clean_stop_line(&l.text) {
+                clean_stop.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            if super::window::crash_report_line(&l.text) {
+                crash_reported.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            if super::window::ready_line(&l.text) {
+                emit("gameReady", super::window::GameWindow { instance_id: instance_id.clone(), run_id: run_id.clone() });
+                if let Some(f) = ready_hook.lock().unwrap().take() {
+                    tokio::spawn(async move {
+                        tokio::time::sleep(READY_DELAY).await;
+                        f();
+                    });
+                }
             }
             crate::friends::game_line(&run_id, &instance_id, &l.text);
             pending.lock().unwrap().push(l)
@@ -887,6 +1111,7 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         push(LogLine { text: format!("Wrapper: {wrapper}"), level: "info" });
     }
     let mut cmd = hidden_command(&program);
+    super::priority::starting(&mut cmd);
     cmd.args(&program_args)
         .envs(vars.iter().map(|(k, v)| (k, v)))
         .current_dir(&game_dir)
@@ -925,6 +1150,11 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         }
     });
     let started = Instant::now();
+    // The launch screen folds away when the game's window shows (game/window.rs).
+    if let Some(pid) = pid {
+        super::window::watch(pid, id.to_string(), run_id(id, slot));
+    }
+    super::priority::started(&run.run_id, pid);
 
     // Readers: stdout as-is, stderr with "info" promoted to "warn".
     let mut readers = Vec::new();
@@ -962,10 +1192,21 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     if let Some(f) = hooks.on_started {
         f();
     }
+    {
+        let ready_hook = ready_hook.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(READY_WAIT).await;
+            let f = ready_hook.lock().unwrap().take();
+            if let Some(f) = f {
+                f();
+            }
+        });
+    }
     let _ = instances::update(id, json!({ "lastPlayed": now_ms() })).await;
 
     let id = id.to_string();
     let on_exit = hooks.on_exit;
+    let exit_ready_hook = ready_hook.clone();
     let post_exit = own.post_exit.trim().to_string();
     let wrapped = !wrapper.is_empty();
     tokio::spawn(async move {
@@ -987,13 +1228,19 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         }
         let code = status.as_ref().ok().and_then(|s| s.code());
         let signal = killed || code.is_none();
-        let crashed = !signal && code.is_some_and(|c| c != 0);
+        // A non-zero code after the game said it was quitting normally (and wrote no crash report) is a mod's native
+        // library failing while Java shuts down: the player quit, so it isn't shown as a crash.
+        let quit = clean_stop.load(std::sync::atomic::Ordering::SeqCst) && !crash_reported.load(std::sync::atomic::Ordering::SeqCst);
+        let crashed = !signal && !quit && code.is_some_and(|c| c != 0);
         let shown_code = if killed {
             "SIGTERM".to_string()
         } else {
             code.map(|c| c.to_string()).unwrap_or_else(|| "null".into())
         };
         push(LogLine { text: format!("Game exited with code {shown_code}"), level: if crashed { "error" } else { "info" } });
+        if quit && code.is_some_and(|c| c != 0) {
+            push(LogLine { text: "The game had quit normally; the code comes from a mod's library while Java shut down, not a crash.".into(), level: "info" });
+        }
         if !post_exit.is_empty() {
             push(LogLine { text: format!("Running post-exit command: {post_exit}"), level: "info" });
             let mut vars = vars;
@@ -1011,8 +1258,12 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         flush();
         ticker.abort();
         let secs = (started.elapsed().as_millis() as f64 / 1000.0).round() as i64;
-        let playtime = instances::get(&id).await.map(|i| i.playtime).unwrap_or(inst.playtime);
-        let _ = instances::update(&id, json!({ "playtime": playtime + secs })).await;
+        // The total, and this account's share of it (the overview card lists who played how long).
+        let now = instances::get(&id).await.ok();
+        let playtime = now.as_ref().map(|i| i.playtime).unwrap_or(inst.playtime);
+        let mut by = now.map(|i| i.playtime_by).unwrap_or_default();
+        *by.entry(run.username.clone()).or_insert(0) += secs;
+        let _ = instances::update(&id, json!({ "playtime": playtime + secs, "playtimeBy": by })).await;
         let code = if signal { None } else { code };
         game_event(&run, if crashed { "crashed" } else { "stopped" }, code, None);
         if crashed && !crash_shown.load(std::sync::atomic::Ordering::SeqCst) {
@@ -1027,6 +1278,8 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
         if slot > 1 {
             let _ = tokio::fs::remove_dir_all(natives_for(&id, slot)).await;
         }
+        // Gone before it finished loading: no minimising a launcher nobody is playing from.
+        exit_ready_hook.lock().unwrap().take();
         if let Some(f) = on_exit {
             f(code);
         }
@@ -1124,6 +1377,84 @@ mod tests {
         assert_eq!(join("[2001:db8::1]:25580"), ["--server", "2001:db8::1", "--port", "25580"]);
         assert_eq!(join("[::1]"), ["--server", "::1", "--port", "25565"]);
         assert_eq!(join("2001:db8::1"), ["--server", "2001:db8::1", "--port", "25565"]);
+    }
+
+    /// A jar holding native libraries, a text file and a signature, like LWJGL's.
+    fn natives_jar(path: &std::path::Path, files: &[(&str, &[u8])]) {
+        use std::io::Write;
+        let mut w = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+        for (name, data) in files {
+            w.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+            w.write_all(data).unwrap();
+        }
+        w.finish().unwrap();
+    }
+
+    #[test]
+    fn natives_are_unpacked_once_and_again_when_anything_changed() {
+        let dir = std::env::temp_dir().join(format!("resin-natives-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (jar, other, natives) = (dir.join("lwjgl-natives.jar"), dir.join("glfw-natives.jar"), dir.join("natives"));
+        natives_jar(&jar, &[("windows/x64/org/lwjgl/lwjgl.dll", b"lwjgl"), ("META-INF/SIG.dll", b"no"), ("readme.txt", b"no"), ("skip/me.dll", b"no")]);
+        natives_jar(&other, &[("glfw.dll", b"glfw"), ("libglfw.so", b"so")]);
+        let extract = vec![(jar.clone(), vec!["skip/".to_string()]), (other.clone(), vec![])];
+        let listing = |d: &std::path::Path| {
+            let mut names: Vec<String> = std::fs::read_dir(d).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n != UNPACKED).collect();
+            names.sort();
+            names
+        };
+        let written = |name: &str| std::fs::metadata(natives.join(name)).unwrap().modified().unwrap();
+
+        // Only the libraries, flat, without what the jar says to leave out.
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so", "lwjgl.dll"]);
+        assert_eq!(std::fs::read(natives.join("lwjgl.dll")).unwrap(), b"lwjgl");
+
+        // Nothing changed: the files aren't written again.
+        let first = written("lwjgl.dll");
+        std::thread::sleep(Duration::from_millis(30));
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(written("lwjgl.dll"), first, "left as it was");
+
+        // A library changed, went missing, or something else turned up: all unpacked afresh.
+        std::fs::write(natives.join("lwjgl.dll"), b"LWJGL").unwrap();
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(std::fs::read(natives.join("lwjgl.dll")).unwrap(), b"lwjgl");
+        std::fs::remove_file(natives.join("glfw.dll")).unwrap();
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so", "lwjgl.dll"]);
+        std::fs::write(natives.join("left-over.dll"), b"old version").unwrap();
+        unpack_natives(&natives, &extract).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so", "lwjgl.dll"]);
+
+        // Another set of jars (the instance's version changed), or a jar that was downloaded again.
+        let before = written("glfw.dll");
+        std::thread::sleep(Duration::from_millis(30));
+        unpack_natives(&natives, &extract[1..]).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll", "libglfw.so"]);
+        assert_ne!(written("glfw.dll"), before);
+        std::thread::sleep(Duration::from_millis(30));
+        natives_jar(&other, &[("glfw.dll", b"glfw 2")]);
+        unpack_natives(&natives, &extract[1..]).unwrap();
+        assert_eq!(listing(&natives), ["glfw.dll"]);
+        assert_eq!(std::fs::read(natives.join("glfw.dll")).unwrap(), b"glfw 2");
+
+        // A jar that's gone is an error, as before.
+        std::fs::remove_file(&other).unwrap();
+        assert!(unpack_natives(&natives, &extract[1..]).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn knows_when_the_game_says_it_stops() {
+        assert!(says_stopping("[10:49:28] [Render thread/INFO]: Stopping!"));
+        assert!(says_stopping("[10:49:28] [Client thread/INFO]: Stopping!\r"));
+        // A server or a mod saying something like it isn't the game closing.
+        assert!(!says_stopping("[10:49:28] [Server thread/INFO]: Stopping!"));
+        assert!(!says_stopping("[10:49:28] [Server thread/INFO]: Stopping server"));
+        assert!(!says_stopping("[10:49:28] [Render thread/INFO]: Stopping! (not yet)"));
+        assert!(!says_stopping("Stopping!"));
     }
 
     #[test]

@@ -141,7 +141,7 @@ export function DuplicatesDialog({
           return (
             <div key={row.key} className="dupe-row">
               <div className="dupe-head">
-                <div className="ico">{first.iconUrl ? <img src={first.iconUrl} alt="" /> : <Blocks />}</div>
+                <div className="ico">{first.iconUrl ? <img loading="lazy" decoding="async" src={first.iconUrl} alt="" /> : <Blocks />}</div>
                 <div className="grow" style={{ minWidth: 0 }}>
                   <b className="ellipsis">{first.title}</b>
                   <div className="hint">

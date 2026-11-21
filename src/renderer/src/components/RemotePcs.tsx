@@ -154,7 +154,7 @@ export function RemotePeople() {
           {grants.map((g) => (
             <div key={g.uuid} className="remote-person">
               <div className="list-row">
-                <img className="remote-head" src={`https://mc-heads.net/avatar/${g.uuid}/32`} alt="" width={28} height={28} />
+                <img loading="lazy" decoding="async" className="remote-head" src={`https://mc-heads.net/avatar/${g.uuid}/32`} alt="" width={28} height={28} />
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="title ellipsis">{g.name}</div>
                   <div className="hint">{t(`servers.people.roleHint.${g.role}` as Key)}</div>

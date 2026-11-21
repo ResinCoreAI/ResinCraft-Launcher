@@ -200,3 +200,174 @@
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- The Store page: the Split layout (components/RelayPlan.tsx with `page`) ---------- */
+
+.rp-split {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+/* The account's side: what it has, the cart, gift codes. Stays put while the products scroll. */
+.rp-aside {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+.rp-aside h1 {
+  margin: 0;
+  font-size: 28px;
+}
+.rp-aside .hint {
+  margin: 4px 0 0;
+}
+.rp-have {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.rp-have .rp-totals {
+  margin: 10px 0 4px;
+}
+.rp-aside .rp-cart {
+  margin: 0;
+}
+.rp-aside .rp-redeem {
+  margin: 0;
+}
+.rp-aside .rp-redeem .input {
+  flex: 1;
+  min-width: 0;
+}
+.rp-main h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 28px 0 12px;
+  font-size: 22px;
+}
+.rp-main h2 svg {
+  width: 20px;
+  height: 20px;
+  color: var(--text-faint);
+}
+.rp-main-head {
+  align-items: center;
+  margin: 0 0 12px;
+}
+/* Below your own purchases, the shop starts as its own section, not straight under the last of them. */
+.rp-main > * + .rp-main-head {
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.rp-main > h4 {
+  margin: 0 0 10px;
+  font: 600 16px var(--font-display);
+}
+.rp-main > .list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-main-head h2 {
+  margin: 0;
+}
+.rp-main-head .rp-period {
+  margin: 0;
+}
+.rp-main > .callout,
+.rp-main > .rp-notice {
+  margin-bottom: 16px;
+}
+/* One product per row, so they can be compared down the page. */
+.rp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rp-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  transition: border-color 0.14s var(--ease);
+}
+.rp-row:hover {
+  border-color: var(--border-strong);
+}
+.rp-row.owned {
+  border-color: color-mix(in srgb, var(--play) 50%, transparent);
+}
+.rp-row-ic {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.rp-row-ic svg {
+  width: 22px;
+  height: 22px;
+}
+.rp-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rp-row-text b {
+  font-size: 15px;
+}
+.rp-row-price {
+  font: 700 20px var(--font-display);
+  white-space: nowrap;
+  text-align: right;
+}
+.rp-row-price .hint {
+  font: 400 12.5px var(--font);
+}
+.rp-row-buttons {
+  display: flex;
+  gap: 6px;
+}
+@media (max-width: 1000px) {
+  .rp-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rp-aside {
+    position: static;
+    max-height: none;
+  }
+}
+@media (max-width: 640px) {
+  .rp-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .rp-row-price,
+  .rp-row-buttons {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* The relay admin's note on a purchase, under its line. */
+.rp-note {
+  margin-top: 2px;
+  font-style: italic;
+}

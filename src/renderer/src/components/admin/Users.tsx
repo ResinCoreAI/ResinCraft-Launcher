@@ -343,7 +343,7 @@ export function TwoFactorSetup({ onClose, onDone }: { onClose: () => void; onDon
         <div className="listing-fields">
           {qr && (
             <div className="twofa-qr">
-              <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr)}`} alt={t('servers.admin.relay.qrAlt')} width={200} height={200} />
+              <img loading="lazy" decoding="async" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr)}`} alt={t('servers.admin.relay.qrAlt')} width={200} height={200} />
               <span className="hint">{t('servers.admin.relay.qrHint')}</span>
             </div>
           )}

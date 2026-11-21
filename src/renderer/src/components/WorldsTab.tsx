@@ -178,7 +178,7 @@ export default function WorldsTab({ inst }: { inst: Instance }) {
         <div className="list">
           {shown.map((w) => (
             <div key={w.folder} className="list-row" onContextMenu={(e) => openContextMenu(e, menuFor(w))}>
-              <div className="ico">{w.icon ? <img src={w.icon} alt="" /> : <Earth />}</div>
+              <div className="ico">{w.icon ? <img loading="lazy" decoding="async" src={w.icon} alt="" /> : <Earth />}</div>
               <div className="grow" style={{ minWidth: 0 }}>
                 <div className="title ellipsis">
                   {w.name}

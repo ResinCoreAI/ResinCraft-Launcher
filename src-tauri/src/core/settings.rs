@@ -234,6 +234,11 @@ pub async fn get() -> Settings {
     s
 }
 
+/// How many files download at once: Settings → Downloads → Parallel downloads.
+pub async fn parallel_downloads() -> usize {
+    get().await.concurrency.clamp(1, 64)
+}
+
 /// Merges a partial settings object (as sent by the UI) and saves.
 pub async fn set(patch: Value) -> Result<Settings> {
     let mut current = serde_json::to_value(get().await)?;

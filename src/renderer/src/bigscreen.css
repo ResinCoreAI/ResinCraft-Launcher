@@ -1,0 +1,1238 @@
+/* Big screen mode (components/BigScreen.tsx). Sized from the screen's width, so it reads from a couch on a TV and still
+   fits a laptop: 1em ≈ 22px at 1920 px wide. Theme variables only, like styles.css. */
+
+.bigscreen {
+  --bs: clamp(13px, 1.15vw, 30px);
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* One column no wider than the screen, however many page tabs there are (they scroll sideways). */
+  grid-template-columns: minmax(0, 1fr);
+  /* The player's own size (big screen Settings) on top of the size from the screen. */
+  font-size: calc(var(--bs) * var(--bs-scale, 1));
+  background: var(--bg-deep, #08080a);
+  color: var(--text);
+  overflow: hidden;
+  animation: bs-in 0.25s var(--ease) both;
+}
+@keyframes bs-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+.bigscreen.idle,
+.bigscreen.idle * {
+  cursor: none !important;
+}
+.bigscreen .grow {
+  flex: 1;
+}
+.bigscreen :focus-visible {
+  outline: none;
+}
+/* Where the controller is: a thick white ring and a small lift, on whatever has focus. */
+.bigscreen :is(button, label):focus-visible,
+html.gamepad .bigscreen :is(button, label):focus {
+  outline: 0.22em solid #fff;
+  outline-offset: 0.22em;
+}
+
+/* Top bar */
+.bs-top {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 1.3em;
+  padding: 1.4em 2.9em 0.8em;
+}
+.bs-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  font: 700 1.35em var(--font-display);
+}
+.bs-logo-mark {
+  width: 1.2em;
+  height: 1.5em;
+}
+.bs-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+}
+.bs-bumper {
+  display: grid;
+  place-items: center;
+  min-width: 2.3em;
+  height: 1.5em;
+  padding: 0 0.4em;
+  border-radius: 0.45em;
+  border: 0.1em solid color-mix(in srgb, var(--text) 30%, transparent);
+  font: 600 0.72em var(--mono);
+  color: var(--text-dim);
+}
+.bs-tab {
+  padding: 0.5em 1em;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+  font: 600 1.05em var(--font-display);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bs-tab.active {
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  color: var(--text);
+}
+.bs-clock {
+  white-space: nowrap;
+  flex: none;
+  font: 500 1.05em var(--mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.bs-me {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.25em 0.8em 0.25em 0.25em;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+  font: 600 0.95em var(--font);
+  cursor: pointer;
+}
+.bs-me .avatar {
+  border-radius: 0.5em;
+  overflow: hidden;
+}
+
+/* Pages */
+.bs-main {
+  position: relative;
+  min-height: 0;
+  overflow: hidden auto;
+  scrollbar-width: none;
+}
+/* Home: the hero stays put and only the shelves under it scroll (up/down through the rows; each row scrolls sideways
+   on its own). */
+.bigscreen.on-home .bs-main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+.bs-page {
+  padding: 1em 2.9em 2em;
+  display: grid;
+  gap: 1.3em;
+  align-content: start;
+}
+.bs-title {
+  font-size: 2.4em;
+}
+.bs-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 1.05em;
+}
+
+/* Home: the instance in focus as the backdrop */
+.bigscreen.on-home {
+  background: #08080a;
+}
+.bs-hero {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 62vh;
+  z-index: 0;
+  pointer-events: none;
+}
+.bs-hero-art {
+  position: absolute;
+  inset: 0;
+}
+.bs-hero-art img,
+.bs-hero-art svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bs-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(8, 8, 10, 0.95) 0%, rgba(8, 8, 10, 0.6) 45%, transparent 78%),
+    linear-gradient(transparent 50%, #08080a);
+}
+.bs-hero-info {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.9em;
+  max-width: 40em;
+  padding: 5.5vh 2.9em 0;
+}
+.bs-kick {
+  color: var(--data);
+  font: 500 0.95em var(--mono);
+}
+.bs-hero-info h1 {
+  font-size: 3.8em;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  text-shadow: 0 0.08em 0.5em rgba(0, 0, 0, 0.5);
+}
+.bs-chips,
+.bs-actions,
+.bs-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55em;
+}
+.bs-actions {
+  gap: 0.7em;
+  margin-top: 0.4em;
+}
+.bs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  height: 1.8em;
+  padding: 0 0.75em;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 13%, transparent);
+  color: color-mix(in srgb, var(--text) 90%, transparent);
+  font: 500 0.85em var(--font);
+  white-space: nowrap;
+}
+.bs-chip.ok {
+  background: color-mix(in srgb, var(--play) 20%, transparent);
+  color: color-mix(in srgb, var(--play) 70%, #fff);
+}
+.bs-chip.big {
+  height: 2.2em;
+  padding: 0 1em;
+  font-size: 0.95em;
+  cursor: pointer;
+}
+.bs-chip.big.on {
+  background: var(--text);
+  color: #0b0b0e;
+}
+.bs-big {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  height: 2.9em;
+  padding: 0 1.4em;
+  border: 0;
+  border-radius: 0.75em;
+  background: color-mix(in srgb, var(--text) 13%, transparent);
+  color: var(--text);
+  font: 600 1.15em var(--font-display);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bs-big svg {
+  width: 1em;
+  height: 1em;
+}
+.bs-big.play {
+  background: var(--play);
+  color: #04170c;
+  padding: 0 1.9em;
+}
+.bs-big.play svg {
+  fill: currentColor;
+}
+.bs-big.stop {
+  background: var(--danger);
+  color: #fff;
+}
+.bs-shelves {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 1.4em;
+  min-height: 0;
+  margin-top: calc(7vh - 1.2em);
+  padding: 1.2em 0 2em 2.9em;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  /* Rows fade out under the hero instead of being cut off by a hard edge. */
+  mask-image: linear-gradient(transparent, #000 1.2em);
+}
+.bs-shelf h2 {
+  margin: 0 0 0.6em;
+  font-size: 1.25em;
+  color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+.bs-strip {
+  display: flex;
+  gap: 1.1em;
+  /* Room on every side for the focused card's lift and ring, which the row would otherwise cut off. */
+  margin-left: -0.8em;
+  padding: 0.8em 2.9em 0.9em 0.8em;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-padding: 0 3em;
+}
+
+/* Cards */
+.bs-card {
+  position: relative;
+  flex: none;
+  width: 16.4em;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: 0.8em;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease);
+}
+.bs-card:focus-visible,
+html.gamepad .bs-card:focus,
+.bs-card:hover {
+  transform: scale(1.05);
+}
+.bs-art {
+  position: absolute;
+  inset: 0;
+}
+.bs-art img,
+.bs-art > svg,
+.bs-art > div {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bs-card-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  padding: 0.8em 0.9em 0.7em;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+}
+.bs-card-cap b {
+  font: 600 1.05em var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-card-cap > span {
+  font-size: 0.8em;
+  color: #d6d6de;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-card-run {
+  position: absolute;
+  top: 0.6em;
+  left: 0.6em;
+}
+.bs-card.server {
+  background: linear-gradient(135deg, var(--surface-2), var(--surface));
+}
+.bs-server-icon {
+  position: absolute;
+  top: 0.9em;
+  left: 0.9em;
+  width: 3em;
+  height: 3em;
+  display: grid;
+  place-items: center;
+  border-radius: 0.5em;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text-dim);
+  overflow: hidden;
+}
+.bs-server-icon img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.bs-server-icon svg {
+  width: 1.5em;
+  height: 1.5em;
+}
+.bs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15em, 1fr));
+  gap: 1.3em;
+}
+.bs-grid .bs-card {
+  width: auto;
+}
+
+/* Settings and sheets: big rows */
+.bs-settings {
+  max-width: 46em;
+}
+.bs-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9em;
+  min-height: 3.6em;
+  padding: 0.7em 1.1em;
+  border: 0;
+  border-radius: 0.8em;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bs-row > svg {
+  width: 1.3em;
+  height: 1.3em;
+  flex: none;
+  color: var(--text-dim);
+}
+.bs-row .grow {
+  display: grid;
+}
+.bs-row b {
+  font-size: 1.05em;
+}
+.bs-row span span,
+.bs-row .grow > span {
+  font-size: 0.85em;
+  color: var(--text-dim);
+}
+.bs-row.on {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.bs-row .switch {
+  transform: scale(1.3);
+}
+.bs-row-art {
+  position: relative;
+  width: 5.5em;
+  aspect-ratio: 16 / 9;
+  border-radius: 0.4em;
+  overflow: hidden;
+  flex: none;
+}
+.bs-empty {
+  display: grid;
+  justify-items: start;
+  gap: 1em;
+  padding: 12vh 2.9em;
+}
+.bs-empty h1 {
+  font-size: 2.8em;
+}
+.bs-empty p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 1.1em;
+}
+
+.bs-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 5, 8, 0.72);
+  backdrop-filter: blur(6px);
+  animation: bs-in 0.16s var(--ease) both;
+}
+.bs-sheet {
+  width: min(34em, calc(100vw - 4em));
+  max-height: 80vh;
+  display: grid;
+  gap: 0.8em;
+  padding: 1.6em;
+  border-radius: 1em;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 1.5em 4em rgba(0, 0, 0, 0.6);
+  overflow: auto;
+}
+.bs-sheet h2 {
+  margin: 0;
+  font-size: 1.6em;
+}
+.bs-sheet p {
+  margin: 0;
+  color: var(--text-dim);
+}
+.bs-sheet-list {
+  display: grid;
+  gap: 0.5em;
+}
+.bs-sheet-list.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7em;
+}
+
+/* Button hints along the bottom */
+.bs-hints {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 1.7em;
+  padding: 0.9em 2.9em 1.2em;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: var(--text-dim);
+  font-size: 0.95em;
+}
+.bs-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  white-space: nowrap;
+}
+.bs-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75em;
+  height: 1.75em;
+  border-radius: 50%;
+  font: 700 0.85em var(--font-display);
+  color: #0b0b0e;
+}
+.bs-glyph.xb-a {
+  background: #9be27a;
+}
+.bs-glyph.xb-b {
+  background: #f08a8a;
+}
+.bs-glyph.xb-x {
+  background: #7fb3ff;
+}
+.bs-glyph.xb-y {
+  background: #f5d36b;
+}
+.bs-glyph.ps {
+  background: #1c1c22;
+  border: 0.1em solid color-mix(in srgb, var(--text) 30%, transparent);
+}
+.bs-glyph.ps svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.bs-glyph.ps-a {
+  color: #8fb3ff;
+}
+.bs-glyph.ps-b {
+  color: #ff8a8a;
+}
+.bs-glyph.ps-x {
+  color: #f59bd6;
+}
+.bs-glyph.ps-y {
+  color: #6be0c0;
+}
+.bs-glyph.bs-glyph-wide {
+  width: auto;
+  padding: 0 0.6em;
+  border-radius: 0.4em;
+  background: #d9d9e3;
+  font: 600 0.72em var(--font);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bigscreen,
+  .bs-sheet-backdrop {
+    animation: none;
+  }
+  .bs-card {
+    transition: none;
+  }
+}
+
+/* Fullscreen: the window's own buttons and the update button stay out of the way (B or the menu leaves). */
+html.bigscreen-on .win-controls {
+  display: none;
+}
+
+.bs-art .rtx-banner {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---------- A launcher page inside big screen mode (bs-framed) ----------
+   Big screen keeps its top and bottom bars; between them the launcher's own page shows, without its header and
+   docks, made bigger for the TV. The controller moves through it like any page. */
+.bigscreen.bs-framed {
+  background: transparent;
+  pointer-events: none;
+  animation: none;
+}
+.bigscreen.bs-framed > :is(.bs-top, .bs-hints, .bs-sheet-backdrop) {
+  pointer-events: auto;
+}
+.bigscreen.bs-framed .bs-top,
+.bigscreen.bs-framed .bs-hints {
+  background: #08080a;
+}
+.bigscreen.bs-framed .bs-main {
+  visibility: hidden;
+}
+html.bs-framed .app {
+  grid-template-rows: minmax(0, 1fr);
+  padding: var(--bs-top-h, 90px) 0 var(--bs-foot-h, 60px);
+  box-sizing: border-box;
+  height: 100vh;
+  background: #08080a;
+}
+html.bs-framed .app > .sidebar,
+html.bs-framed .idock,
+html.bs-framed .idock-edge,
+html.bs-framed .idock-tab {
+  display: none;
+}
+html.bs-framed .main {
+  margin: 0 1.2vw;
+  zoom: 1.15;
+}
+@media (min-width: 1700px) {
+  html.bs-framed .main {
+    zoom: 1.3;
+  }
+}
+@media (min-width: 2300px) {
+  html.bs-framed .main {
+    zoom: 1.7;
+  }
+}
+/* Many pages: the tabs scroll sideways rather than squeeze. */
+.bs-tabs {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bs-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.bs-tab svg {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+/* The launcher's other pages: an icon each, with the name on the one that's open; a wide TV has room for every name. */
+.bs-tab.page:not(.active) .bs-tab-label {
+  display: none;
+}
+.bs-tab.page:not(.active) {
+  padding: 0.5em 0.7em;
+}
+.bs-tab.page svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+@media (min-width: 2200px) {
+  .bs-tab.page:not(.active) .bs-tab-label {
+    display: inline;
+  }
+}
+.bs-tabs {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 1.5em), transparent);
+}
+.bs-top {
+  gap: 1.1em;
+}
+
+/* ---------- Big screen's own pages (components/bigscreen/*) ---------- */
+.bs-page.fill {
+  height: 100%;
+  min-height: 0;
+}
+.bs-h {
+  margin: 0.4em 0 0.6em;
+  font-size: 1.25em;
+  color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+.bs-big.on {
+  background: color-mix(in srgb, var(--play) 22%, transparent);
+  color: color-mix(in srgb, var(--play) 70%, #fff);
+}
+.bs-big:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.bs-card.bs-new {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.4em;
+  background: none;
+  border: 0.14em dashed var(--border-strong);
+  color: var(--text-dim);
+  font: 600 1.05em var(--font-display);
+  text-align: center;
+}
+.bs-card.bs-new svg {
+  width: 2em;
+  height: 2em;
+  color: var(--accent);
+}
+.bs-filters {
+  align-items: center;
+}
+.bs-sheet.wide {
+  width: min(64em, calc(100vw - 4em));
+}
+
+/* Instance */
+.bsi {
+  position: relative;
+  min-height: 100%;
+  padding-bottom: 2em;
+}
+.bsi-hero {
+  position: absolute;
+  inset: -6em 0 auto 0;
+  height: 30em;
+  z-index: 0;
+  pointer-events: none;
+}
+.bsi-hero .bs-hero-art {
+  position: absolute;
+  inset: 0;
+}
+.bsi-hero .bs-hero-art img,
+.bsi-hero .bs-hero-art svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bsi-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(8, 8, 10, 0.95), rgba(8, 8, 10, 0.45) 60%, rgba(8, 8, 10, 0.2)), linear-gradient(transparent 35%, #08080a);
+}
+.bsi-head {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 1.4em;
+  padding: 3vh 2.9em 0;
+}
+.bsi-title {
+  display: grid;
+  gap: 0.7em;
+  justify-items: start;
+}
+.bsi-title h1 {
+  font-size: 3.2em;
+  line-height: 1;
+  text-wrap: balance;
+}
+.bsi-stats {
+  display: flex;
+  gap: 2em;
+  margin: 0;
+}
+.bsi-stats div {
+  display: grid;
+}
+.bsi-stats dt {
+  order: 2;
+  font-size: 0.82em;
+  color: var(--text-dim);
+}
+.bsi-stats dd {
+  margin: 0;
+  font: 600 1.5em var(--font-display);
+}
+.bsi-tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  margin: 1.6em 2.9em 0;
+  border-bottom: 0.09em solid #1f1f26;
+}
+.bsi-tab {
+  padding: 0.7em 1.1em;
+  border: 0;
+  border-bottom: 0.18em solid transparent;
+  margin-bottom: -0.09em;
+  background: none;
+  color: color-mix(in srgb, var(--text) 55%, transparent);
+  font: 600 1.05em var(--font-display);
+  cursor: pointer;
+}
+.bsi-tab.on {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.bsi-body {
+  position: relative;
+  z-index: 1;
+  padding: 1.2em 2.9em 0;
+}
+.bsi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15em, 1fr));
+  gap: 1.1em;
+}
+.bsi-grid.shots {
+  grid-template-columns: repeat(auto-fill, minmax(12em, 1fr));
+}
+.bsi-world,
+.bsi-shot {
+  display: grid;
+  padding: 0;
+  border: 0;
+  border-radius: 0.8em;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease);
+}
+.bsi-world:focus-visible,
+html.gamepad .bsi-world:focus,
+.bsi-world:hover,
+.bsi-shot:focus-visible,
+html.gamepad .bsi-shot:focus,
+.bsi-shot:hover {
+  transform: scale(1.04);
+}
+.bsi-world-pic {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+.bsi-world-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.bsi-world-pic svg {
+  width: 2em;
+  height: 2em;
+}
+.bsi-world-text {
+  display: grid;
+  gap: 0.1em;
+  padding: 0.7em 0.9em 0.8em;
+}
+.bsi-world-text b {
+  font: 600 1.05em var(--font-display);
+}
+.bsi-world-text span {
+  font-size: 0.8em;
+  color: var(--text-faint);
+}
+.bsi-shot {
+  aspect-ratio: 16 / 9;
+  place-items: center;
+}
+.bsi-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bsi-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(22em, 1fr));
+  gap: 0.6em;
+}
+.bsi-mod {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  padding: 0.6em 0.9em;
+  border: 0;
+  border-radius: 0.7em;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.bsi-mod.off {
+  opacity: 0.6;
+}
+.bsi-mod-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.4em;
+  height: 2.4em;
+  border-radius: 0.45em;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+.bsi-mod-ic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.bsi-mod-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.bsi-mod-text b,
+.bsi-mod-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bsi-mod-text span {
+  font-size: 0.8em;
+  color: var(--text-faint);
+}
+.bsi-viewer {
+  display: grid;
+  place-items: center;
+  min-height: 12em;
+}
+.bsi-viewer img {
+  max-width: 100%;
+  max-height: 62vh;
+  border-radius: 0.5em;
+}
+
+/* Quick join */
+.bsj-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28em, 1fr));
+  gap: 1em;
+  margin-bottom: 1em;
+}
+.bsj-card {
+  display: grid;
+  grid-template-columns: 4.4em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1em;
+  padding: 0.9em;
+  border: 0;
+  border-radius: 0.95em;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease);
+}
+.bsj-card:focus-visible,
+html.gamepad .bsj-card:focus,
+.bsj-card:hover {
+  transform: scale(1.03);
+}
+.bsj-ic {
+  display: grid;
+  place-items: center;
+  width: 4.4em;
+  height: 4.4em;
+  border-radius: 0.7em;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+.bsj-ic img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.bsj-ic svg {
+  width: 1.6em;
+  height: 1.6em;
+}
+.bsj-text {
+  display: grid;
+  min-width: 0;
+  gap: 0.15em;
+}
+.bsj-text b {
+  font: 600 1.2em var(--font-display);
+}
+.bsj-motd {
+  font-size: 0.85em;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bsj-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em 0.9em;
+  font-size: 0.8em;
+  color: var(--text-faint);
+}
+.bsj-meta .ok {
+  color: var(--play);
+}
+.bsj-meta .mono {
+  color: var(--data);
+}
+.bsj-players {
+  display: grid;
+  justify-items: end;
+}
+.bsj-players b {
+  font: 600 1.45em var(--font-display);
+}
+.bsj-players span {
+  font-size: 0.75em;
+  color: var(--text-faint);
+}
+
+/* Discover and Settings: a rail of kinds or groups beside the content */
+.bsd,
+.bss {
+  display: grid;
+  grid-template-columns: 13em minmax(0, 1fr);
+  gap: 1.8em;
+  height: 100%;
+  min-height: 0;
+}
+.bsd-rail {
+  display: grid;
+  align-content: start;
+  gap: 0.35em;
+}
+.bsd-kind {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  height: 3em;
+  padding: 0 1em;
+  border: 0;
+  border-radius: 0.7em;
+  background: none;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+  font: 600 1.05em var(--font-display);
+  text-align: left;
+  cursor: pointer;
+}
+.bsd-kind svg {
+  width: 1.2em;
+  height: 1.2em;
+}
+.bsd-kind.on {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+}
+.bsd-main {
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  padding: 0.3em;
+}
+.bsd-search {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  height: 3.3em;
+  padding: 0 1em;
+  margin-bottom: 1em;
+  border-radius: 0.8em;
+  background: var(--surface);
+  color: var(--text-faint);
+}
+.bsd-search svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+.bsd-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 400 1.05em var(--font);
+  outline: none;
+}
+.bsd-search:focus-within {
+  outline: 0.22em solid #fff;
+  outline-offset: 0.15em;
+}
+.bsd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19em, 1fr));
+  gap: 1em;
+}
+.bsd-card {
+  display: grid;
+  grid-template-columns: 4.2em minmax(0, 1fr);
+  gap: 0.9em;
+  padding: 0.95em;
+  border: 0;
+  border-radius: 0.9em;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease);
+}
+.bsd-card:focus-visible,
+html.gamepad .bsd-card:focus,
+.bsd-card:hover {
+  transform: scale(1.03);
+}
+.bsd-ic {
+  display: grid;
+  place-items: center;
+  width: 4.2em;
+  height: 4.2em;
+  border-radius: 0.7em;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+.bsd-ic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bsd-text {
+  display: grid;
+  gap: 0.25em;
+  min-width: 0;
+}
+.bsd-text b {
+  font: 600 1.1em var(--font-display);
+}
+.bsd-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.8em;
+  color: var(--text-dim);
+  line-height: 1.35;
+}
+.bsd-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  font-size: 0.75em;
+  color: var(--text-faint);
+}
+.bsd-meta .bs-chip {
+  height: 1.7em;
+  font-size: 0.95em;
+}
+
+/* Settings */
+.bss-rows {
+  display: grid;
+  align-content: start;
+  gap: 0.6em;
+  max-width: 52em;
+}
+.bss-row {
+  min-height: 4.4em;
+  cursor: default;
+}
+button.bss-row {
+  cursor: pointer;
+}
+.bss-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7em;
+  flex: none;
+}
+.bss-pick b {
+  min-width: 6em;
+  text-align: center;
+  font: 600 1em var(--font-display);
+}
+.bss-step {
+  display: grid;
+  place-items: center;
+  width: 2em;
+  height: 2em;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.bss-step:disabled {
+  opacity: 0.35;
+}
+.bss-step svg {
+  width: 1em;
+  height: 1em;
+}
+.bss-meter {
+  position: relative;
+  width: 9em;
+  height: 0.5em;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+.bss-meter i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: var(--data);
+}
+
+/* Dialogs and the on-screen keyboard over big screen mode: as big as the pages shown inside it, for reading from the
+   couch. */
+html.bigscreen-on .backdrop > * {
+  --bs-dz: 1.15;
+  zoom: var(--bs-dz);
+}
+html.bigscreen-on .backdrop > .modal {
+  /* The window's height in the zoomed dialog's own units, so it still fits. */
+  max-height: calc(100vh / var(--bs-dz) - 48px);
+}
+@media (min-width: 1700px) {
+  html.bigscreen-on .backdrop > * {
+    --bs-dz: 1.3;
+  }
+}
+@media (min-width: 2300px) {
+  html.bigscreen-on .backdrop > * {
+    --bs-dz: 1.7;
+  }
+}
+
+/* As in the launcher's long lists: big screen's mod rows and Discover cards off screen aren't drawn. */
+.bsi-mod,
+.bsd-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4em;
+}

@@ -55,7 +55,7 @@ function WorldIcon({ w }: { w: RecentWorld }) {
   const { instances } = useStore()
   const inst = instances.find((i) => i.id === w.instanceId)
   const src = w.icon ?? inst?.iconUrl
-  return <div className="ico">{src ? <img src={src} alt="" /> : <Earth />}</div>
+  return <div className="ico">{src ? <img loading="lazy" decoding="async" src={src} alt="" /> : <Earth />}</div>
 }
 
 /** Quick join page: the worlds you played last, each a click away. */

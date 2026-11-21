@@ -309,3 +309,311 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- The Skin tab: one box on top, the editor (2D texture + 3D figure), your skins beside it ---------- */
+.modal.wide:has(.pm-edit) {
+  width: min(1060px, 100%);
+}
+.pm.pm-edit {
+  grid-template-columns: minmax(0, 1fr);
+}
+.pm-skin-edit {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.se-omni {
+  display: flex;
+  gap: 8px;
+}
+.se-omni-box {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.se-omni-box > svg {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.se-omni-box .input {
+  height: 40px;
+  padding-left: 38px;
+  padding-right: 84px;
+}
+.se-omni-box .btn {
+  position: absolute;
+  right: 5px;
+}
+.se-open-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 20px;
+  margin-top: -4px;
+}
+.se-open-what {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.pm-edit-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 14px;
+  align-items: start;
+}
+
+/* The editor */
+.se {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-areas:
+    'rail views'
+    'rail where'
+    'bar1 bar1'
+    'bar2 bar2';
+  gap: 8px 10px;
+  min-width: 0;
+}
+.se-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  align-self: start;
+}
+.se-rail-gap {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+.se-tool {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.se-tool svg {
+  width: 16px;
+  height: 16px;
+}
+.se-tool:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.se-tool.on {
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+}
+.se-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.se-views {
+  grid-area: views;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.se-view {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.se-flat {
+  display: block;
+  width: 384px;
+  height: 384px;
+  max-width: 100%;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: crosshair;
+  touch-action: none;
+}
+.se-3d {
+  width: 280px;
+  height: 384px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: radial-gradient(180px 120px at 50% 88%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), var(--bg);
+  cursor: grab;
+  touch-action: none;
+  overflow: hidden;
+}
+.se-3d canvas {
+  display: block;
+}
+.se-caption {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.se-where {
+  grid-area: where;
+  min-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.se-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.se-colors {
+  grid-area: bar1;
+}
+.se-layers {
+  grid-area: bar2;
+}
+.se-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.se-color input[type='color'] {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.se-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.se-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.se-swatch.on {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.se-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+/* Your skins, beside the editor */
+.se-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-height: 470px;
+}
+.se-shelf-head {
+  display: grid;
+  gap: 2px;
+}
+.se-shelf-head b {
+  font-size: 13px;
+}
+.se-shelf-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.se-shelf-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+}
+.se-shelf-row + .se-shelf-row {
+  border-top: 1px solid var(--border);
+}
+.se-shelf-row.on {
+  background: var(--accent-soft);
+}
+.se-shelf-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.se-shelf-open:hover {
+  background: var(--surface-2);
+}
+.se-shelf-text {
+  display: grid;
+  min-width: 0;
+  font-size: 13px;
+}
+.se-shelf-text .hint {
+  font-size: 11.5px;
+}
+.se-shelf-confirm {
+  display: flex;
+  gap: 4px;
+}
+
+/* Dropping a PNG anywhere on the tab */
+.pm-skin-edit.dropping > :not(.se-drop) {
+  opacity: 0.4;
+}
+.se-drop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+@media (max-width: 1040px) {
+  .pm-edit-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .se-shelf {
+    max-height: 260px;
+  }
+}

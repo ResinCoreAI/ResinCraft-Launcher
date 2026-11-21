@@ -8,8 +8,9 @@ import { askNativeBuild } from './components/HorizonNative'
 export type Route =
   | { page: 'home' }
   | { page: 'library' }
-  | { page: 'instance'; id: string; tab?: 'content' | 'worlds' | 'logs' | 'settings' }
-  | { page: 'discover'; kind?: ContentKind; instanceId?: string; build?: boolean }
+  | { page: 'instance'; id: string; tab?: 'content' | 'worlds' | 'servers' | 'screenshots' | 'notes' | 'files' | 'logs' | 'options' | 'settings' }
+  /** `query`: what to search for as it opens (from the quick search). */
+  | { page: 'discover'; kind?: ContentKind; instanceId?: string; build?: boolean; query?: string }
   | { page: 'accounts' }
   | { page: 'servers'; id?: string; fromInstance?: string }
   | { page: 'bedrock' }
@@ -18,7 +19,12 @@ export type Route =
   | { page: 'quickjoin'; add?: { name: string; address: string; edition: 'java' | 'bedrock' }; friendCode?: string }
   | { page: 'admin' }
   | { page: 'store' }
-  | { page: 'settings' }
+  /** The public server list. */
+  | { page: 'findservers' }
+  /** `section`: the section to open at (its element id); `find`: a setting in it, by its label as shown. */
+  | { page: 'settings'; section?: string; find?: string }
+  /** Report a problem (pages/Report.tsx); the crash window fills in `type`, `title` and `message`. */
+  | { page: 'report'; type?: 'bug' | 'crash' | 'idea' | 'question' | 'down'; title?: string; message?: string }
 
 export type GameState = GameEvent['state']
 
@@ -50,6 +56,8 @@ interface Store {
   go: (r: Route) => void
   info?: AppInfo
   settings?: Settings
+  /** The first load of instances and accounts has finished (so "none yet" really means none). */
+  ready: boolean
   updateSettings: (p: Partial<Settings>) => Promise<void>
   instances: Instance[]
   refreshInstances: () => Promise<void>
@@ -102,6 +110,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [removing, setRemoving] = useState<Set<string>>(new Set())
   const instances = useMemo(() => (removing.size ? allInstances.filter((i) => !removing.has(i.id)) : allInstances), [allInstances, removing])
   const [accounts, setAccounts] = useState<AccountView[]>([])
+  const [ready, setReady] = useState(false)
   const [runs, setRuns] = useState<Record<string, Run[]>>({})
   // Play pressed, no "preparing" from the engine yet (it may be refreshing the account's token first).
   const [starting, setStarting] = useState<Record<string, number>>({})
@@ -165,8 +174,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void api.app.info().then(setInfo)
     void api.settings.get().then(setSettings)
-    void refreshInstances()
-    void refreshAccounts()
+    void Promise.allSettled([refreshInstances(), refreshAccounts()]).then(() => setReady(true))
     void api.instances.runs().then((list) => {
       const next: Record<string, Run[]> = {}
       for (const { instanceId, ...r } of list) (next[instanceId] ??= []).push(r)
@@ -320,6 +328,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       go,
       info,
       settings,
+      ready,
       updateSettings,
       instances,
       refreshInstances,
@@ -350,6 +359,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       go,
       info,
       settings,
+      ready,
       updateSettings,
       instances,
       refreshInstances,

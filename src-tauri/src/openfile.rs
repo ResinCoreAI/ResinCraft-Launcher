@@ -27,8 +27,34 @@ const SCHEME: &str = "resincraft://";
 /// Longer than any address or invite code; anything bigger isn't one of ours.
 const MAX_LINK: usize = 512;
 
+/// The one kind of link that is never taken from a real URL: it starts a game, so only a desktop shortcut's
+/// `--play=` argument makes it (see `play_from_args`).
+const PLAY_LINK: &str = "resincraft://play";
+
 fn link_from_args(args: &[String]) -> Option<String> {
-    args.iter().skip(1).find(|a| a.len() <= MAX_LINK && a.to_ascii_lowercase().starts_with(SCHEME)).cloned()
+    args.iter()
+        .skip(1)
+        .find(|a| {
+            let lower = a.to_ascii_lowercase();
+            a.len() <= MAX_LINK && lower.starts_with(SCHEME) && !is_play_link(&lower)
+        })
+        .cloned()
+        .or_else(|| play_from_args(args))
+}
+
+/// Whether a link asks to start a game, however it is spelled. The UI skips empty path parts, so
+/// `resincraft:///play/x` and `resincraft://play//x` mean the same as `resincraft://play/x`.
+fn is_play_link(lower: &str) -> bool {
+    let rest = lower.strip_prefix(SCHEME).unwrap_or(lower);
+    let path = rest.split(['?', '#']).next().unwrap_or("");
+    path.split(['/', '\\']).map(str::trim).find(|s| !s.is_empty()) == Some("play")
+}
+
+/// `--play=<instance id>` (a desktop shortcut, core/shortcut.rs), as the internal link the UI starts the instance
+/// for. A web page can open `resincraft://` links but can't add an argument, so it can't reach this.
+fn play_from_args(args: &[String]) -> Option<String> {
+    let id = args.iter().skip(1).find_map(|a| a.strip_prefix(crate::core::shortcut::PLAY_ARG))?;
+    crate::core::shortcut::plausible_id(id).then(|| format!("{PLAY_LINK}/{id}"))
 }
 
 /// `app:pendingLink`: the link ResinCraft was started with, once.
@@ -113,5 +139,16 @@ mod tests {
         assert_eq!(from_args(&[exe.clone(), dir.join("notes.txt").to_string_lossy().to_string()]), None);
         assert_eq!(from_args(&[exe, dir.join("gone.rctheme").to_string_lossy().to_string()]), None);
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_web_link_never_starts_a_game() {
+        let exe = "C:\\ResinCraft\\resincraft.exe".to_string();
+        for link in ["resincraft://play/abc", "RESINCRAFT://PLAY/abc", "resincraft:///play/abc", "resincraft:////play//abc", "resincraft://play?x=1"] {
+            let got = link_from_args(&[exe.clone(), link.into()]);
+            assert!(got.as_deref().map_or(true, |l| !l.to_ascii_lowercase().contains("play")), "{link} -> {got:?}");
+        }
+        assert_eq!(link_from_args(&[exe.clone(), "resincraft://join/play.example.com".into()]).as_deref(), Some("resincraft://join/play.example.com"));
+        assert_eq!(link_from_args(&[exe.clone(), "resincraft://join/a.b".into(), "--play=abc".into()]).as_deref(), Some("resincraft://join/a.b"));
     }
 }

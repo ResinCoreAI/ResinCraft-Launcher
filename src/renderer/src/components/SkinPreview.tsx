@@ -202,3 +202,44 @@ export function guessVariant(dataUrl: string): Promise<SkinVariant> {
     img.src = dataUrl
   })
 }
+
+/** A plain skin to start the editor from when the account wears Minecraft's default one (whose picture ResinCraft doesn't ship). */
+export function blankSkin(): string {
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')!
+  const fill = (color: string, x: number, y: number, w: number, h: number) => {
+    g.fillStyle = color
+    g.fillRect(x, y, w, h)
+  }
+  const skin = '#c9936b'
+  const shirt = '#4f6d8f'
+  const trousers = '#3d3f5a'
+  // Head (every face), hair, eyes.
+  fill(skin, 8, 0, 16, 8)
+  fill(skin, 0, 8, 32, 8)
+  fill('#3b2a1e', 8, 0, 8, 8)
+  fill('#3b2a1e', 0, 8, 32, 2)
+  fill('#3b2a1e', 24, 8, 8, 6)
+  fill('#ffffff', 9, 12, 2, 1)
+  fill('#ffffff', 13, 12, 2, 1)
+  fill('#2b4b8c', 10, 12, 1, 1)
+  fill('#2b4b8c', 13, 12, 1, 1)
+  // Body and arms (right arm at 40,16; left at 32,48), hands at the bottom of the arms.
+  fill(shirt, 20, 16, 16, 4)
+  fill(shirt, 16, 20, 24, 12)
+  fill(shirt, 44, 16, 8, 4)
+  fill(shirt, 40, 20, 16, 12)
+  fill(shirt, 36, 48, 8, 4)
+  fill(shirt, 32, 52, 16, 12)
+  fill(skin, 40, 29, 16, 3)
+  fill(skin, 32, 61, 16, 3)
+  // Legs (right at 0,16; left at 16,48) and shoes.
+  fill(trousers, 4, 16, 8, 4)
+  fill(trousers, 0, 20, 16, 12)
+  fill(trousers, 20, 48, 8, 4)
+  fill(trousers, 16, 52, 16, 12)
+  fill('#2a2a2a', 0, 30, 16, 2)
+  fill('#2a2a2a', 16, 62, 16, 2)
+  return c.toDataURL('image/png')
+}

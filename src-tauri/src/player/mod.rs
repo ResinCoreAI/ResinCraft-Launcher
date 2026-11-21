@@ -3,7 +3,10 @@
 
 pub mod accounts;
 pub mod bedrock;
+pub mod bedrock_backup;
 pub mod bedrock_store;
+pub mod bedrock_switch;
+pub mod bedrock_versions;
 pub mod horizon;
 pub mod carry;
 pub mod files;
@@ -66,6 +69,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "skins:lookupPlayer" => json(skins::lookup_player(&args.get::<String>(0)?).await?),
         "skins:search" => json(skins::search(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "skins:saveOnline" => json(skins::save_online(&args.get::<OnlineSkin>(0)?).await?),
+        "skins:fetchPng" => json(skins::fetch_png(&args.get::<String>(0)?).await?),
 
         "notes:get" => json(notes::get_notes(&args.get::<String>(0)?).await?),
         "notes:set" => {

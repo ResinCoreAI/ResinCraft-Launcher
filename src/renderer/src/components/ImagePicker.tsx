@@ -2,10 +2,12 @@
 // The cropped result is a data URL; the engine re-encodes it (instances.setImage), so nothing
 // unchecked reaches the disk.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { ImagePlus, Trash2, ZoomIn, ZoomOut } from 'lucide-react'
 import type { Instance, InstanceImage } from '@shared/types'
 import { InstanceTile, Modal } from './ui'
+import { BASIC_ICONS, BasicIcon, basicIconUrl, iconPng, LOADER_ICONS, pictureAsPng, RTX_ICON } from './BasicIcons'
+import { useStore } from '../store'
 import { t } from '../i18n'
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
@@ -182,7 +184,7 @@ function CropModal({ src, kind, onDone, onCancel }: { src: string; kind: Instanc
         onPointerCancel={onPointerUp}
         onKeyDown={onKeyDown}
       >
-        {img && <img src={src} alt="" draggable={false} style={{ width: size.w, height: size.h, transform: `translate(${pos.x}px, ${pos.y}px)` }} />}
+        {img && <img loading="lazy" decoding="async" src={src} alt="" draggable={false} style={{ width: size.w, height: size.h, transform: `translate(${pos.x}px, ${pos.y}px)` }} />}
       </div>
       <div className="crop-zoom">
         <button className="btn ghost icon sm" onClick={() => zoomTo(zoom / 1.25)} aria-label={t('art.zoomOut')}>
@@ -218,7 +220,41 @@ export function usePicturePicker(kind: InstanceImage, onChange: (dataUrl: string
   return { open, modal }
 }
 
-/** The square icon: click it to choose a picture; the block art shows until one is set. */
+/** One modpack's logo in the chooser; it steps aside if its site won't let the page read the picture. */
+function PackLogo({ name, url, onPick }: { name: string; url: string; onPick: (png: string) => void }) {
+  const [gone, setGone] = useState(false)
+  if (gone) return null
+  return (
+    <button
+      type="button"
+      role="listitem"
+      className="pic-basic-item"
+      title={name}
+      aria-label={name}
+      onClick={() => void pictureAsPng(url).then((png) => (png ? onPick(png) : setGone(true)))}
+    >
+      <img loading="lazy" decoding="async" src={url} alt="" crossOrigin="anonymous" draggable={false} onError={() => setGone(true)} />
+      <span>{name}</span>
+    </button>
+  )
+}
+
+/** A loader's (or RTX Remix's) icon in the chooser: its real logo, or its drawing while that can't be had. */
+function LoaderLogo({ icon, onPick }: { icon: (typeof LOADER_ICONS)[number]; onPick: (png: string) => void }) {
+  const [drawn, setDrawn] = useState(!icon.logo)
+  return (
+    <button type="button" role="listitem" className="pic-basic-item" title={icon.name} aria-label={icon.name} onClick={() => void iconPng(icon).then(onPick)}>
+      {drawn ? <BasicIcon icon={icon} /> : <img loading="lazy" decoding="async" src={icon.logo} alt="" crossOrigin="anonymous" draggable={false} onError={() => setDrawn(true)} />}
+      <span>{icon.name}</span>
+    </button>
+  )
+}
+
+/**
+ * The square icon: click it for the chooser (the basic icons, an icon for its mod loader or for RTX Remix, the logo
+ * of a modpack you have installed, your own picture, or back to the one it came with). The block art shows until
+ * one is set.
+ */
 export function IconPicker({
   inst,
   onChange,
@@ -231,10 +267,34 @@ export function IconPicker({
   size?: number
 }) {
   const { open, modal } = usePicturePicker('icon', onChange, onError)
+  const { instances } = useStore()
+  const [choosing, setChoosing] = useState(false)
   const custom = !!inst.iconUrl?.startsWith('data:')
+  // The logos of the modpacks you have installed, each once.
+  const packs = useMemo(() => {
+    const seen = new Set<string>()
+    return instances.flatMap((i) => {
+      const url = i.packIconUrl ?? i.iconUrl
+      if (!i.modpack || !url || url.startsWith('data:') || seen.has(url)) return []
+      seen.add(url)
+      return [{ url, name: i.modpack.name }]
+    })
+  }, [instances])
+  const pick = (png: string) => {
+    setChoosing(false)
+    onChange(png)
+  }
   return (
     <div className="pic-icon" style={{ width: size }}>
-      <button type="button" className="pic-icon-btn" onClick={open} title={t('art.chooseIcon')} aria-label={t('art.chooseIcon')} style={{ width: size, height: size }}>
+      <button
+        type="button"
+        className="pic-icon-btn"
+        onClick={() => setChoosing(true)}
+        title={t('art.chooseIcon')}
+        aria-label={t('art.chooseIcon')}
+        aria-haspopup="dialog"
+        style={{ width: size, height: size }}
+      >
         <InstanceTile inst={inst} style={{ width: '100%', height: '100%' }} />
         <span className="pic-overlay" aria-hidden="true">
           <ImagePlus />
@@ -244,6 +304,56 @@ export function IconPicker({
         <button type="button" className="link pic-remove" onClick={() => onChange(null)}>
           {t('art.remove')}
         </button>
+      )}
+      {choosing && (
+        <Modal
+          title={t('art.chooseIcon')}
+          subtitle={t('art.iconHint')}
+          onClose={() => setChoosing(false)}
+          footer={
+            <>
+              {custom && (
+                <button type="button" className="btn ghost" onClick={() => (setChoosing(false), onChange(null))}>
+                  <Trash2 /> {t('art.remove')}
+                </button>
+              )}
+              <button type="button" className="btn primary" onClick={() => (setChoosing(false), void open())}>
+                <ImagePlus /> {t('art.upload')}
+              </button>
+            </>
+          }
+        >
+          <div className="pic-basic" role="list">
+            {BASIC_ICONS.map((icon, n) => (
+              <button
+                key={icon.id}
+                type="button"
+                role="listitem"
+                className="pic-basic-item"
+                aria-label={`${t('art.icon')} ${n + 1}`}
+                onClick={() => pick(basicIconUrl(icon))}
+              >
+                <BasicIcon icon={icon} />
+              </button>
+            ))}
+          </div>
+          <h3 className="pic-title">{t('newInstance.modLoader')}</h3>
+          <div className="pic-basic" role="list">
+            {[...LOADER_ICONS, RTX_ICON].map((icon) => (
+              <LoaderLogo key={icon.id} icon={icon} onPick={pick} />
+            ))}
+          </div>
+          {packs.length > 0 && (
+            <>
+              <h3 className="pic-title">{t('discover.kind.modpack')}</h3>
+              <div className="pic-basic" role="list">
+                {packs.map((p) => (
+                  <PackLogo key={p.url} name={p.name} url={p.url} onPick={pick} />
+                ))}
+              </div>
+            </>
+          )}
+        </Modal>
       )}
       {modal}
     </div>
@@ -258,7 +368,7 @@ export function BannerPicker({ value, onChange, onError }: { value?: string; onC
       <label>{t('art.banner')}</label>
       {value ? (
         <div className="pic-banner has">
-          <img src={value} alt="" />
+          <img loading="lazy" decoding="async" src={value} alt="" />
           <div className="pic-banner-actions">
             <button type="button" className="btn sm" onClick={open}>
               <ImagePlus /> {t('art.changeBanner')}

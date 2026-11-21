@@ -12,7 +12,12 @@ pub mod liteloader;
 pub mod loaders;
 pub mod mojang;
 pub mod optifine;
+pub mod priority;
 pub mod versionpatch;
+pub mod window;
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use serde_json::Value;
@@ -105,8 +110,16 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
     let auth = crate::player::accounts::launch_auth_for(account).await?;
     let mode = settings.on_launch.clone();
     let exit_mode = mode.clone();
+    let closing_mode = mode.clone();
+    // Set once the launcher came back as the game closed its window, so the end of Java doesn't pull it to the front
+    // a second time.
+    let back = Arc::new(AtomicBool::new(false));
+    let back_at_exit = back.clone();
+    // The launcher's "When the game starts" action waits for the game to finish loading (window.rs `ready_line`):
+    // the launch screen shows until then, then folds away, and only then does the window minimise or hide.
     let hooks = launch::LaunchHooks {
-        on_started: Some(Box::new(move || {
+        on_started: None,
+        on_ready: Some(Box::new(move || {
             if let Some(win) = main_window() {
                 match mode.as_str() {
                     "minimize" => {
@@ -122,11 +135,22 @@ pub async fn launch_then(id: &str, account: Option<&str>, target: Option<launch:
                 low_memory(true);
             }
         })),
+        // The player quit the game: its window goes now, so the launcher comes back now (if no other game is running),
+        // not about 5 s later when Java has ended.
+        on_closing: Some(Box::new(move || {
+            let others = launch::runs().iter().filter(|r| r.state == "running").count() > 1;
+            if closing_mode != "keep" && !others {
+                if let Some(app) = ctx::app() {
+                    back.store(true, Ordering::SeqCst);
+                    crate::webview::show(&app);
+                }
+            }
+        })),
         on_exit: Some(Box::new(move |_code| {
             if let Some(f) = after {
                 f();
             }
-            if exit_mode != "keep" && running_ids().is_empty() {
+            if exit_mode != "keep" && running_ids().is_empty() && !back_at_exit.load(Ordering::SeqCst) {
                 if let Some(app) = ctx::app() {
                     crate::webview::show(&app);
                 }

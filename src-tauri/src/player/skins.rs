@@ -124,6 +124,22 @@ async fn download_texture(url: &str) -> Result<Vec<u8>> {
     decode_skin_png(&base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 
+/// A skin from a link, as a data: URL for the skin editor: Minecraft's texture server or any https address, checked to
+/// be a 64×64 (or old 64×32) PNG like every other skin.
+pub async fn fetch_png(url: &str) -> Result<String> {
+    let url = https_texture(url.trim());
+    if !url.starts_with("https://") {
+        bail_tr!("skins.linkHttps", "Use an https:// link to a skin PNG.");
+    }
+    let res = http().get(&url).timeout(TIMEOUT).send().await.map_err(|_| offline())?;
+    if !res.status().is_success() {
+        bail_tr!("skins.linkMissing", "That link didn't give a skin (the server answered {status}).", status = res.status().as_u16());
+    }
+    let bytes = res.bytes().await.map_err(|_| offline())?;
+    let png = decode_skin_png(&base64::engine::general_purpose::STANDARD.encode(&bytes))?;
+    Ok(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(png)))
+}
+
 fn offline() -> anyhow::Error {
     err_tr!("skins.offline", "Couldn't reach the skin servers. Check your internet connection, then try again.")
 }

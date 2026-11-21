@@ -57,9 +57,25 @@ export function mockRuns(getInstances: () => Instance[], getAccounts: () => Acco
       live.state = 'running'
       log(live, `ResinCraft is launching ${inst?.name} (Minecraft ${inst?.mcVersion})`)
       if (slot > 1) log(live, `Playing as ${acc.username} alongside another run of this instance (run ${slot})`)
-      log(live, `[Render thread/INFO]: Setting user: ${acc.username}`)
+      // A Fabric game's start as its log tells it: the mods, Minecraft, resources, then ready for the title screen
+      // (the launch screen's stage bars follow these lines, and it folds on the last).
+      const MODS = ['fabric-api', 'sodium', 'lithium', 'iris', 'modernfix', 'ferritecore', 'entityculling', 'controlify']
+      const steps: [number, string][] = [
+        [300, `[main/INFO]: Loading Minecraft ${inst?.mcVersion} with Fabric Loader 0.16.10`],
+        [700, `[main/INFO]: Loading ${MODS.length} mods:`],
+        ...MODS.map((m, i) => [900 + i * 280, `\t- ${m} 1.${i}.0`] as [number, string]),
+        [3600, '[main/INFO]: ModernFix reached bootstrap stage (3.61 s after launch)'],
+        [4200, `[Render thread/INFO]: Setting user: ${acc.username}`],
+        [5000, '[Render thread/INFO]: Reloading ResourceManager: vanilla, fabric'],
+        [5800, '[Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas'],
+        [6700, '[Render thread/INFO]: Created: 256x256x4 minecraft:textures/atlas/particles.png-atlas'],
+        [7600, '[Render thread/INFO]: Created: 512x256x4 minecraft:textures/atlas/gui.png-atlas'],
+        [9000, '[Render thread/INFO]: Sound engine started']
+      ]
+      for (const [ms, line] of steps) setTimeout(() => live.state === 'running' && log(live, line), ms)
+      // Once in the game: a line every 2 s, as a world being played logs.
       let tick = 0
-      live.timer = setInterval(() => log(live, `[Server thread/INFO]: ${acc.username} tick ${++tick}`, tick % 7 ? 'info' : 'warn'), 2000)
+      live.timer = setInterval(() => tick++ >= 5 && log(live, `[Server thread/INFO]: ${acc.username} tick ${tick}`, tick % 7 ? 'info' : 'warn'), 2000)
       game(live, 'running')
       // ?crash=1 in the preview URL: the game crashes after a few seconds, as a pack missing a mod would.
       if (new URLSearchParams(location.search).get('crash')) {

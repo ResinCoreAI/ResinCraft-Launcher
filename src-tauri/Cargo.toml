@@ -80,7 +80,7 @@ libc = "0.2"
 # WebView2's memory target (webview.rs); the same versions Tauri's own wry uses.
 webview2-com = "0.39"
 windows-core = "0.62"
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns", "Win32_Storage_FileSystem", "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_Storage_Packaging_Appx"] }
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_NetworkManagement_Dns", "Win32_Storage_FileSystem", "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_Storage_Packaging_Appx", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
 codegen-units = 1

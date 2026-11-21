@@ -82,6 +82,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         created_at: now_ms(),
         last_played: None,
         playtime: 0,
+        playtime_by: Default::default(),
         memory_mb: None,
         java_path: None,
         jvm_args: None,

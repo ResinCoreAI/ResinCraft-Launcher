@@ -125,15 +125,52 @@ fn pack_page(project_id: &str) -> Option<String> {
         .then(|| format!("https://modrinth.com/modpack/{project_id}"))
 }
 
+/// The launcher's name and version, as the button that leads to it says ("ResinCraft Launcher v1.6.1").
+fn version_label() -> String {
+    format!("{LAUNCHER} v{}", env!("CARGO_PKG_VERSION"))
+}
+
 /// Buttons under the presence (Discord shows them to others, up to two): the modpack's page when there is one,
-/// and where to get the launcher.
+/// and the launcher with its version, which leads to where to get it.
 fn buttons(pack_url: Option<&str>) -> Value {
     let mut out = Vec::new();
     if let Some(url) = pack_url {
         out.push(json!({ "label": "View modpack", "url": url }));
     }
-    out.push(json!({ "label": "Get ResinCraft", "url": DOWNLOAD_URL }));
+    out.push(json!({ "label": version_label(), "url": DOWNLOAD_URL }));
     Value::Array(out)
+}
+
+/// What the player is doing in the launcher, as two lines for friends ("Browsing Modpacks" / "Looking for
+/// modpacks"), from the page they are on (`page`: the UI's route), what kind of content a Discover page shows, and
+/// the instance's name on an instance's page. Pages others shouldn't learn about (the relay's Admin page) and unknown
+/// ones read as just "In the launcher".
+pub fn page_lines(page: &str, kind: Option<&str>, name: Option<&str>) -> (String, String) {
+    let (d, s): (&str, String) = match page {
+        "home" => ("In the launcher", "On the home page".into()),
+        "library" => ("Browsing their library", "Picking something to play".into()),
+        "instance" => match name.map(str::trim).filter(|n| !n.is_empty()) {
+            Some(n) => ("Looking at an instance", field(n)),
+            None => ("Looking at an instance", "Getting ready to play".into()),
+        },
+        "discover" => match kind.unwrap_or("mod") {
+            "modpack" => ("Browsing Modpacks", "Looking for modpacks".into()),
+            "resourcepack" => ("Browsing Resource Packs", "Looking for resource packs".into()),
+            "shader" => ("Browsing Shaders", "Looking for shaders".into()),
+            "datapack" => ("Browsing Data Packs", "Looking for data packs".into()),
+            "world" => ("Browsing Worlds", "Looking for maps to play".into()),
+            _ => ("Browsing Mods", "Looking for mods".into()),
+        },
+        "quickjoin" => ("Picking a server", "Quick join".into()),
+        "findservers" => ("Finding servers", "Browsing the server list".into()),
+        "servers" => ("Hosting servers", "Running a server for friends".into()),
+        "bedrock" => ("Bedrock Edition", "Minecraft for Windows".into()),
+        "store" => ("In the store", "Looking at add-ons".into()),
+        "settings" => ("Changing settings", "Making it their own".into()),
+        "accounts" => ("Managing accounts", "Skins and profiles".into()),
+        _ => ("In the launcher", String::new()),
+    };
+    (d.to_string(), s)
 }
 
 /// "host:25565" reads as just "host".
@@ -143,18 +180,24 @@ fn shown_address(addr: &str) -> &str {
 
 /// The `activity` for `SET_ACTIVITY`: the newest game when one runs, else "In the launcher" if wanted, else none
 /// (which clears the presence).
-pub fn activity(playing: Option<&Playing>, opts: Options, launcher_since_ms: i64) -> Option<Value> {
+pub fn activity(playing: Option<&Playing>, opts: Options, launcher_since_ms: i64, page: Option<&(String, String)>) -> Option<Value> {
     if !opts.enabled {
         return None;
     }
     let Some(p) = playing else {
         return opts.in_launcher.then(|| {
-            json!({
-                "details": field("In the launcher"),
+            let (details, state) = page.cloned().unwrap_or_else(|| ("In the launcher".into(), String::new()));
+            let mut a = json!({
+                "details": field(&details),
                 "timestamps": { "start": launcher_since_ms },
-                "assets": { "large_image": LOGO, "large_text": LAUNCHER },
+                "assets": { "large_image": LOGO, "large_text": version_label() },
                 "buttons": buttons(None),
-            })
+            });
+            // Discord wants 2+ characters in a line it is given, so an empty one is left out.
+            if state.chars().count() >= 2 {
+                a["state"] = json!(field(&state));
+            }
+            a
         });
     };
     let version = p.version_line();
@@ -317,6 +360,8 @@ static WORKER: Mutex<Option<mpsc::Sender<Msg>>> = Mutex::new(None);
 /// Running games, oldest first; the newest is shown.
 static PLAYING: Mutex<Vec<Playing>> = Mutex::new(Vec::new());
 static LAUNCHER_SINCE: OnceLock<i64> = OnceLock::new();
+/// The launcher page's two lines (`page_lines`), shown while no game runs.
+static PAGE: Mutex<Option<(String, String)>> = Mutex::new(None);
 
 /// Keeps Discord showing the latest wanted activity. Quiet when Discord isn't there; tries again every `RESEND`.
 fn worker(app_id: String, rx: mpsc::Receiver<Msg>) {
@@ -405,7 +450,21 @@ pub async fn refresh() {
     let opts = Options::from_settings(&settings::get().await);
     let since = *LAUNCHER_SINCE.get_or_init(now_ms);
     let newest = PLAYING.lock().unwrap().last().cloned();
-    show(activity(newest.as_ref(), opts, since));
+    let page = PAGE.lock().unwrap().clone();
+    show(activity(newest.as_ref(), opts, since, page.as_ref()));
+}
+
+/// The player opened another page in the launcher (`app:discordPage`): friends see what they are doing there.
+pub async fn page(page: &str, kind: Option<&str>, name: Option<&str>) {
+    let lines = page_lines(page, kind, name);
+    {
+        let mut now = PAGE.lock().unwrap();
+        if now.as_ref() == Some(&lines) {
+            return;
+        }
+        *now = Some(lines);
+    }
+    refresh().await;
 }
 
 /// The launcher opened (shows "In the launcher" when that's turned on).
@@ -457,7 +516,7 @@ mod tests {
     #[test]
     fn a_game_shows_name_version_loader_and_start() {
         let p = Playing::new("abc", &instance(), None, 1_700_000_000_000);
-        let a = activity(Some(&p), ON, 0).unwrap();
+        let a = activity(Some(&p), ON, 0, None).unwrap();
         assert_eq!(a["details"], "My Fabric world");
         assert_eq!(a["state"], "Minecraft 1.21.1 · Fabric 0.16.5");
         assert_eq!(a["timestamps"]["start"], 1_700_000_000_000i64);
@@ -466,20 +525,20 @@ mod tests {
 
     #[test]
     fn buttons_link_the_modpack_and_the_download() {
-        let get = json!({ "label": "Get ResinCraft", "url": DOWNLOAD_URL });
-        let a = activity(Some(&Playing::new("abc", &instance(), None, 0)), ON, 0).unwrap();
+        let get = json!({ "label": version_label(), "url": DOWNLOAD_URL });
+        let a = activity(Some(&Playing::new("abc", &instance(), None, 0)), ON, 0, None).unwrap();
         assert_eq!(a["buttons"], json!([get]));
         let mut inst = instance();
         for (id, page) in [("1KVo5zza", Some("https://modrinth.com/modpack/1KVo5zza")), ("cf:285109", Some("https://www.curseforge.com/projects/285109")), ("ftb:23", None)] {
             inst.modpack = Some(ModpackRef { project_id: Some(id.into()), version_id: None, name: "Pack".into() });
-            let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0).unwrap();
+            let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0, None).unwrap();
             let want = match page {
                 Some(url) => json!([{ "label": "View modpack", "url": url }, get]),
                 None => json!([get]),
             };
             assert_eq!(a["buttons"], want, "{id}");
         }
-        let idle = activity(None, Options { in_launcher: true, ..ON }, 0).unwrap();
+        let idle = activity(None, Options { in_launcher: true, ..ON }, 0, None).unwrap();
         assert_eq!(idle["buttons"], json!([get]));
     }
 
@@ -488,7 +547,7 @@ mod tests {
         let mut inst = instance();
         inst.loader = LoaderType::Vanilla;
         inst.loader_version = None;
-        let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0).unwrap();
+        let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0, None).unwrap();
         assert_eq!(a["state"], "Minecraft 1.21.1");
     }
 
@@ -497,7 +556,7 @@ mod tests {
         let mut inst = instance();
         inst.modpack = Some(ModpackRef { project_id: Some("1".into()), version_id: None, name: "All the Mods 10".into() });
         inst.icon_url = Some("https://cdn.modrinth.com/data/abc/icon.png".into());
-        let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0).unwrap();
+        let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0, None).unwrap();
         assert_eq!(a["details"], "All the Mods 10");
         assert_eq!(a["assets"]["large_image"], "https://cdn.modrinth.com/data/abc/icon.png");
         assert_eq!(a["assets"]["small_image"], "logo");
@@ -512,7 +571,7 @@ mod tests {
     fn targets_show_singleplayer_or_server_only_when_allowed() {
         let state = |target: Target, show_server: bool| {
             let p = Playing::new("abc", &instance(), Some(&target), 0);
-            activity(Some(&p), Options { show_server, ..ON }, 0).unwrap()["state"].clone()
+            activity(Some(&p), Options { show_server, ..ON }, 0, None).unwrap()["state"].clone()
         };
         assert_eq!(state(Target::World("New World".into()), true), "Singleplayer");
         assert_eq!(state(Target::Server("play.example.org:25565".into()), false), "Multiplayer");
@@ -522,12 +581,12 @@ mod tests {
 
     #[test]
     fn launcher_presence_only_when_wanted_and_off_clears() {
-        assert_eq!(activity(None, ON, 5), None);
-        let a = activity(None, Options { in_launcher: true, ..ON }, 5).unwrap();
+        assert_eq!(activity(None, ON, 5, None), None);
+        let a = activity(None, Options { in_launcher: true, ..ON }, 5, None).unwrap();
         assert_eq!(a["details"], "In the launcher");
         assert_eq!(a["timestamps"]["start"], 5);
         let p = Playing::new("abc", &instance(), None, 0);
-        assert_eq!(activity(Some(&p), Options { enabled: false, ..ON }, 0), None);
+        assert_eq!(activity(Some(&p), Options { enabled: false, ..ON }, 0, None), None);
     }
 
     #[test]
@@ -593,5 +652,23 @@ mod tests {
         assert_eq!(c.reply(None).unwrap()["evt"], "READY");
         let answer = c.set_activity(Some(&json!({ "details": "Pack" }))).unwrap();
         assert_eq!(answer["cmd"], "SET_ACTIVITY");
+    }
+
+    #[test]
+    fn the_launcher_page_shows_what_the_player_is_doing() {
+        let opts = Options { in_launcher: true, ..ON };
+        let lines = page_lines("discover", Some("modpack"), None);
+        assert_eq!(lines, ("Browsing Modpacks".to_string(), "Looking for modpacks".to_string()));
+        let a = activity(None, opts, 5, Some(&lines)).unwrap();
+        assert_eq!(a["details"], "Browsing Modpacks");
+        assert_eq!(a["state"], "Looking for modpacks");
+        assert_eq!(a["timestamps"]["start"], 5);
+        assert_eq!(a["buttons"], json!([{ "label": version_label(), "url": DOWNLOAD_URL }]));
+        // Nothing about the relay's admin page; an empty second line is left out.
+        let admin = page_lines("admin", None, None);
+        assert_eq!(admin.0, "In the launcher");
+        assert!(activity(None, opts, 5, Some(&admin)).unwrap().get("state").is_none());
+        assert_eq!(page_lines("instance", None, Some("  Cozy Survival ")).1, "Cozy Survival");
+        assert!(version_label().len() <= 32, "Discord cuts button labels at 32");
     }
 }

@@ -33,7 +33,7 @@ fn offline(name: &str) -> LaunchAuth {
 
 async fn start(instance: &str, auth: LaunchAuth, target: Option<Target>) {
     let settings = settings::get().await;
-    let hooks = LaunchHooks { on_started: None, on_exit: Some(Box::new(|code| println!("game exited: {code:?}"))) };
+    let hooks = LaunchHooks { on_started: None, on_exit: Some(Box::new(|code| println!("game exited: {code:?}"))), ..Default::default() };
     launch::launch_instance_to(instance, &settings, auth, hooks, target.as_ref()).await.expect("launch");
 }
 

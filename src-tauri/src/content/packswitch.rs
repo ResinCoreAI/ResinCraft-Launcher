@@ -23,9 +23,9 @@ use super::dupes::dedupe_pack;
 use super::index::{index_key, load_index, open_zip, save_index, IndexEntry};
 use super::{atlauncher, curseforge, ftb, modrinth, technic};
 use crate::core::events::Task;
-use crate::core::fsutil::{read_json, safe_join, write_json};
+use crate::core::fsutil::{in_parallel, read_json, safe_join, write_json};
 use crate::core::instances;
-use crate::core::net::{download_all, DownloadItem, Hash, HashAlgo};
+use crate::core::net::{download_all, file_hash_now, file_moved, save_verified, DownloadItem, Hash, HashAlgo, RunningHash};
 use crate::core::paths;
 use crate::core::types::{source_of, ContentKind, ContentSource, Instance, LoaderType, PendingDownload};
 use crate::{bail_tr, err_tr, tr};
@@ -281,11 +281,14 @@ struct Hasher {
 }
 
 impl Hasher {
+    /// Starts out knowing the SHA-1 of these files (worked out a moment ago, while they were downloaded or unpacked).
+    fn knowing(sha1s: HashMap<PathBuf, String>) -> Hasher {
+        Hasher { seen: sha1s.into_iter().map(|(p, h)| ((p, HashAlgo::Sha1 as u8), Some(h))).collect() }
+    }
+
     fn of(&mut self, p: &Path, algo: HashAlgo) -> Option<String> {
-        self.seen
-            .entry((p.to_path_buf(), algo as u8))
-            .or_insert_with(|| std::fs::File::open(p).ok().filter(|_| p.is_file()).and_then(|f| hash_reader(std::io::BufReader::new(f), algo).ok()))
-            .clone()
+        // A file hashed before (or checked against its hash when it was downloaded) is only read again if it changed.
+        self.seen.entry((p.to_path_buf(), algo as u8)).or_insert_with(|| if p.is_file() { file_hash_now(p, algo).ok() } else { None }).clone()
     }
     fn matches(&mut self, p: &Path, h: &Hash) -> bool {
         self.of(p, h.algo).is_some_and(|v| v.eq_ignore_ascii_case(&h.value))
@@ -358,9 +361,28 @@ pub fn plan(
     project_of: &HashMap<String, String>,
     keep: &Keep,
 ) -> Plan {
+    plan_knowing(game, stage, old, new, project_of, keep, &BTreeMap::new())
+}
+
+/// `plan`, with the SHA-1s of staged files that were just worked out (`staged`: path → hash), so those files aren't
+/// read again.
+pub fn plan_knowing(
+    game: &Path,
+    stage: &Path,
+    old: Option<&BTreeMap<String, Option<Hash>>>,
+    new: &BTreeMap<String, NewEntry>,
+    project_of: &HashMap<String, String>,
+    keep: &Keep,
+    staged: &BTreeMap<String, Option<Hash>>,
+) -> Plan {
     let empty = BTreeMap::new();
     let old = old.unwrap_or(&empty);
-    let mut h = Hasher::default();
+    let known = staged
+        .iter()
+        .filter(|(p, _)| matches!(new.get(*p), Some(NewEntry::Staged)))
+        .filter_map(|(p, h)| h.as_ref().filter(|h| h.algo == HashAlgo::Sha1).map(|h| (stage.join(p), h.value.clone())))
+        .collect();
+    let mut h = Hasher::knowing(known);
     let mut out = Plan::default();
 
     // Projects whose old file the player had disabled, by folder: their new file stays disabled too.
@@ -548,7 +570,10 @@ pub fn apply(game: &Path, stage: &Path, work: &Path, steps: &[Step]) -> Result<(
                 }
                 make_parents(game, to, &mut j)?;
                 log(&mut j, "added", to)?;
-                move_file(&safe_join(stage, path)?, &dest)?;
+                let staged = safe_join(stage, path)?;
+                move_file(&staged, &dest)?;
+                // Its hash was worked out while it was staged; the next look at the instance needn't read it again.
+                file_moved(&staged, &dest);
             }
             Step::Remove { path } => {
                 let src = safe_join(game, path)?;
@@ -737,17 +762,17 @@ async fn write_record(root: &Path, version_id: &str, files: &BTreeMap<String, Op
     write_json(&root.join(RECORD), &rec).await
 }
 
-/// Every file under `game` with its SHA-1, leaving out what `keep` excludes (blocking).
+/// Every file under `game` with its SHA-1, leaving out what `keep` excludes (blocking). Files whose hash is
+/// remembered (the ones just downloaded and checked) aren't read again; the rest are read on a few threads.
 pub fn hash_tree(game: &Path, keep: &Keep) -> BTreeMap<String, Option<Hash>> {
-    let mut files = BTreeMap::new();
+    let mut found: Vec<(String, PathBuf)> = Vec::new();
     walk(game, game, &mut |rel, p| {
-        if keep.excluded(&rel) {
-            return;
+        if !keep.excluded(&rel) {
+            found.push((rel, p.to_path_buf()));
         }
-        let sha1 = std::fs::File::open(p).ok().and_then(|f| hash_reader(std::io::BufReader::new(f), HashAlgo::Sha1).ok());
-        files.insert(rel, sha1.map(Hash::sha1));
     });
-    files
+    let sha1s = in_parallel(&found, |(_, p)| file_hash_now(p, HashAlgo::Sha1).ok());
+    found.into_iter().zip(sha1s).map(|((rel, _), sha1)| (rel, sha1.map(Hash::sha1))).collect()
 }
 
 /// Records every file of a freshly installed modpack instance (all of them are the pack's), so a later version
@@ -766,6 +791,7 @@ pub async fn record_install(inst: &Instance) {
     .await
     .unwrap_or_default();
     let _ = write_record(&paths::instance_dir(&inst.id), &version_id, &files).await;
+    save_verified().await;
 }
 
 /// The same for a server just filled from a modpack (before its server software is installed).
@@ -878,15 +904,28 @@ async fn stage_new(t: &PackTarget, game: &Path, stage: &Path, task: &Arc<Task>, 
     let mut entries = BTreeMap::new();
     let mut hashes = BTreeMap::new();
     let mut items = Vec::new();
-    let mut unpack: Vec<(usize, String, PathBuf)> = Vec::new();
+    let mut unpack: Vec<(usize, String, String, PathBuf)> = Vec::new();
     {
-        let mut h = Hasher::default();
+        // Which of the pack's files are on disk already as the pack ships them: hashed off the async runtime.
+        let mut on_disk: Vec<(PathBuf, Hash)> = Vec::new();
+        for (rel, s) in &src {
+            if let Src::File(i) = s {
+                if let Some(x) = &t.files[*i].hash {
+                    on_disk.push((safe_join(game, rel)?, x.clone()));
+                }
+            }
+        }
+        let mut current = tokio::task::spawn_blocking(move || {
+            let mut h = Hasher::default();
+            on_disk.iter().map(|(cur, x)| h.matches(cur, x)).collect::<Vec<bool>>()
+        })
+        .await?
+        .into_iter();
         for (rel, s) in &src {
             match s {
                 Src::File(i) => {
                     let f = &t.files[*i];
-                    let cur = safe_join(game, rel)?;
-                    if f.hash.as_ref().is_some_and(|x| h.matches(&cur, x)) {
+                    if f.hash.is_some() && current.next().unwrap_or(false) {
                         entries.insert(rel.clone(), NewEntry::Current);
                         hashes.insert(rel.clone(), f.hash.clone());
                     } else {
@@ -895,7 +934,7 @@ async fn stage_new(t: &PackTarget, game: &Path, stage: &Path, task: &Arc<Task>, 
                     }
                 }
                 Src::Layer(li, name) => {
-                    unpack.push((*li, name.clone(), safe_join(stage, rel)?));
+                    unpack.push((*li, name.clone(), rel.clone(), safe_join(stage, rel)?));
                     entries.insert(rel.clone(), NewEntry::Staged);
                 }
                 Src::Pending(i) => {
@@ -906,31 +945,46 @@ async fn stage_new(t: &PackTarget, game: &Path, stage: &Path, task: &Arc<Task>, 
             }
         }
     }
-    download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
+    download_all(items, crate::core::settings::parallel_downloads().await, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
 
     task.update(tr!("packswitch.unpacking", "Unpacking the new version…"), None);
     let layers = t.layers.clone();
     let stage2 = stage.to_path_buf();
     let staged: Vec<String> = entries.iter().filter(|(_, e)| matches!(e, NewEntry::Staged)).map(|(k, _)| k.clone()).collect();
     let fresh = tokio::task::spawn_blocking(move || -> Result<BTreeMap<String, Option<Hash>>> {
-        let mut by_zip: BTreeMap<usize, Vec<(String, PathBuf)>> = BTreeMap::new();
-        for (li, name, dest) in unpack {
-            by_zip.entry(li).or_default().push((name, dest));
+        let mut out = BTreeMap::new();
+        let mut by_zip: BTreeMap<usize, Vec<(String, String, PathBuf)>> = BTreeMap::new();
+        for (li, name, rel, dest) in unpack {
+            by_zip.entry(li).or_default().push((name, rel, dest));
         }
+        let mut buf = vec![0u8; 1 << 16];
         for (li, list) in by_zip {
             let mut zip = open_zip(&layers[li].zip)?;
-            for (name, dest) in list {
+            for (name, rel, dest) in list {
                 let mut entry = zip.by_name(&name)?;
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
-                std::io::copy(&mut entry, &mut std::fs::File::create(&dest)?)?;
+                // Hashed as it's unpacked, instead of being read back afterwards.
+                let mut file = std::fs::File::create(&dest)?;
+                let mut hash = RunningHash::new(HashAlgo::Sha1);
+                loop {
+                    let n = entry.read(&mut buf)?;
+                    if n == 0 {
+                        break;
+                    }
+                    hash.update(&buf[..n]);
+                    file.write_all(&buf[..n])?;
+                }
+                out.insert(rel, Some(Hash::sha1(hash.finish())));
             }
         }
-        let mut out = BTreeMap::new();
+        // The downloaded ones were hashed as they arrived (remembered unless the pack names another kind of hash).
         for rel in staged {
-            let f = std::fs::File::open(stage2.join(&rel))?;
-            out.insert(rel, Some(Hash::sha1(hash_reader(std::io::BufReader::new(f), HashAlgo::Sha1)?)));
+            if !out.contains_key(&rel) {
+                let sha1 = file_hash_now(&stage2.join(&rel), HashAlgo::Sha1)?;
+                out.insert(rel, Some(Hash::sha1(sha1)));
+            }
         }
         Ok(out)
     })
@@ -1110,12 +1164,13 @@ pub(crate) async fn switch_files(
     }
 
     task.update(tr!("packswitch.comparing", "Comparing with your files…"), None);
-    let (g, s, o, n, k) = (game.clone(), stage.clone(), old.clone(), staged.entries.clone(), keep.clone());
-    let plan = tokio::task::spawn_blocking(move || plan(&g, &s, o.as_ref(), &n, &project_of, &k)).await?;
+    let (g, s, o, n, k, known) = (game.clone(), stage.clone(), old.clone(), staged.entries.clone(), keep.clone(), staged.hashes.clone());
+    let plan = tokio::task::spawn_blocking(move || plan_knowing(&g, &s, o.as_ref(), &n, &project_of, &k, &known)).await?;
 
     task.update(tr!("packswitch.applying", "Backing up and applying the changes…"), None);
     applier.apply(&stage, plan.steps.clone()).await?;
     write_record(&root, &target_.version_id, &staged.hashes).await?;
+    save_verified().await;
     Ok(Switched { target: target_, loader_version, plan, staged, old, dropped })
 }
 

@@ -425,6 +425,33 @@ export function mockServers(): {
           cancel_at_period_end: false,
           amount: 16900,
           paid: true
+        },
+        {
+          id: 'once_mock_alt',
+          product: 'addon-traffic-20',
+          name: '+20 GB traffic',
+          yearly: false,
+          status: 'paid',
+          active: true,
+          period_end: Math.floor(Date.now() / 1000) + 18 * 86400,
+          cancel_at_period_end: false,
+          amount: 1900,
+          paid: false,
+          once: true,
+          method: 'truemoney'
+        },
+        {
+          id: 'grant_mock_alt',
+          product: 'addon-no-session-limit',
+          name: 'No session limit',
+          yearly: false,
+          status: 'granted',
+          active: true,
+          period_end: 0,
+          cancel_at_period_end: false,
+          amount: 0,
+          paid: false,
+          note: 'Thanks for helping test the relay'
         }
       ]
     }

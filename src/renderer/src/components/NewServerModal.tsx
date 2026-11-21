@@ -568,7 +568,7 @@ export default function NewServerModal({
             )}
             {packs?.map((p) => (
               <button key={p.id} className={`sv-pick ${pack?.id === p.id ? 'on' : ''}`} onClick={() => setPack(p)}>
-                <span className="ico">{p.iconUrl ? <img src={p.iconUrl} alt="" /> : <Package />}</span>
+                <span className="ico">{p.iconUrl ? <img loading="lazy" decoding="async" src={p.iconUrl} alt="" /> : <Package />}</span>
                 <span className="grow">
                   <b className="ellipsis">{p.title}</b>
                   <span className="ellipsis">{p.description}</span>
@@ -603,7 +603,7 @@ export default function NewServerModal({
             <div className="sv-pick-list">
               {instances.map((i: Instance) => (
                 <button key={i.id} className={`sv-pick ${i.id === instanceId ? 'on' : ''}`} onClick={() => setInstanceId(i.id)}>
-                  <span className="ico">{i.iconUrl ? <img src={i.iconUrl} alt="" /> : <BlockArt seed={i.id} color={i.color} />}</span>
+                  <span className="ico">{i.iconUrl ? <img loading="lazy" decoding="async" src={i.iconUrl} alt="" /> : <BlockArt seed={i.id} color={i.color} />}</span>
                   <span className="grow">
                     <b className="ellipsis">{i.name}</b>
                     <span className="ellipsis">

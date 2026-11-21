@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { ArrowUpCircle, Package, Repeat } from 'lucide-react'
 import type { Instance, ProjectVersion, ServerInfo } from '@shared/types'
 import { api } from '../api'
+import { onTrim } from '../memory'
 import { useStore } from '../store'
 import { t } from '../i18n'
 import VersionPicker from './VersionPicker'
@@ -39,6 +40,8 @@ export const serverOwner = (s: ServerInfo): PackOwner => ({
 
 // A pack's version list, fetched once per project while the app runs (the header chip and Settings share it).
 const lists = new Map<string, Promise<ProjectVersion[]>>()
+// Fetched again when next shown.
+onTrim(() => lists.clear())
 
 function packVersions(projectId: string): Promise<ProjectVersion[]> {
   let p = lists.get(projectId)

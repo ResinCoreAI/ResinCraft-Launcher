@@ -1,3 +1,4 @@
+import { SourceBadge } from './SourceMark'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -172,14 +173,12 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
       </button>
 
       <header className="project-head">
-        <div className="ico">{p.iconUrl ? <img src={p.iconUrl} alt="" /> : <Blocks />}</div>
+        <div className="ico">{p.iconUrl ? <img loading="lazy" decoding="async" src={p.iconUrl} alt="" /> : <Blocks />}</div>
         <div className="grow">
           <h1>{p.title}</h1>
           <div className="project-by">
             {p.author && <span>{t('discover.result.by', { author: p.author })}</span>}
-            <span>
-              <span className="source-dot" style={{ background: site.color }} /> {site.label}
-            </span>
+            <SourceBadge source={p.source} label={site.label} color={site.color} />
           </div>
           {p.description && <p>{p.description}</p>}
           <div className="stats-line">
@@ -295,7 +294,7 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
             <div className="gallery">
               {gallery.map((g, i) => (
                 <button key={g.url} className="shot" onClick={() => setViewing(i)} title={g.title}>
-                  <img src={g.thumb ?? g.url} alt={g.title ?? ''} loading="lazy" referrerPolicy="no-referrer" />
+                  <img decoding="async" src={g.thumb ?? g.url} alt={g.title ?? ''} loading="lazy" referrerPolicy="no-referrer" />
                   {g.title && <span>{g.title}</span>}
                 </button>
               ))}
@@ -379,7 +378,7 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
               <div className="side-shots">
                 {gallery.slice(0, 4).map((g, i) => (
                   <button key={g.url} className="shot" onClick={() => setViewing(i)} title={g.title}>
-                    <img src={g.thumb ?? g.url} alt={g.title ?? ''} loading="lazy" referrerPolicy="no-referrer" />
+                    <img decoding="async" src={g.thumb ?? g.url} alt={g.title ?? ''} loading="lazy" referrerPolicy="no-referrer" />
                   </button>
                 ))}
               </div>
@@ -442,7 +441,7 @@ function PackModList({
         {shown.map((m, i) => {
           const body = (
             <>
-              <span className="thumb">{m.iconUrl ? <img src={m.iconUrl} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <Blocks />}</span>
+              <span className="thumb">{m.iconUrl ? <img decoding="async" src={m.iconUrl} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <Blocks />}</span>
               <span className="grow ellipsis" title={m.file}>
                 {m.title}
               </span>
@@ -497,7 +496,7 @@ function DependencyList({ list, project, onOpen }: { list: VersionInfo['dependen
       {(all ? list : list.slice(0, DEPS_SHOWN)).map((d, i) => {
         const body = (
           <>
-            <span className="thumb">{d.iconUrl ? <img src={d.iconUrl} alt="" loading="lazy" /> : <Blocks />}</span>
+            <span className="thumb">{d.iconUrl ? <img decoding="async" src={d.iconUrl} alt="" loading="lazy" /> : <Blocks />}</span>
             <span className="grow ellipsis">{d.title}</span>
             <span className={`chip ${d.type === 'required' ? 'accent' : d.type === 'incompatible' ? 'danger' : ''}`}>{t(DEP_KEYS[d.type])}</span>
           </>
@@ -764,7 +763,7 @@ function Lightbox({ images, at, onMove, onClose }: { images: GalleryImage[]; at:
         </button>
       )}
       <figure>
-        <img src={img.url} alt={img.title ?? ''} referrerPolicy="no-referrer" />
+        <img loading="lazy" decoding="async" src={img.url} alt={img.title ?? ''} referrerPolicy="no-referrer" />
         <figcaption>
           {img.title && <b>{img.title}</b>}
           {img.description && <span>{img.description}</span>}

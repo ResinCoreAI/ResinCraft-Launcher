@@ -3,7 +3,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use serde::de::DeserializeOwned;
@@ -21,7 +22,7 @@ use crate::core::ctx::http;
 use crate::core::events::Task;
 use crate::core::fsutil::safe_join;
 use crate::core::instances;
-use crate::core::net::{download_all, download_file, send_json, status_of, DownloadItem, Hash};
+use crate::core::net::{download_all, download_file, known_fingerprint, learn_fingerprint, save_verified, send_json, status_of, DownloadItem, Hash};
 use crate::core::paths;
 use crate::core::settings;
 use crate::core::text::Text;
@@ -763,9 +764,116 @@ pub fn fingerprint(data: &[u8]) -> u32 {
     h
 }
 
-/// Fingerprints files without blocking the async runtime.
+/// `fingerprint` of a file, read in pieces (blocking): reading it whole and then copying it without its whitespace
+/// held a file in memory twice over, 600 MB for a 300 MB resource pack. The seed needs the length without
+/// whitespace, so the file is read twice instead: once to count, once to hash.
+pub fn fingerprint_file(path: &Path) -> std::io::Result<u32> {
+    use std::io::{Read, Seek, SeekFrom};
+    const M: u32 = 0x5bd1_e995;
+    let counts = |b: &&u8| !matches!(**b, 9 | 10 | 13 | 32);
+    let mut file = std::fs::File::open(path)?;
+    let mut buf = vec![0u8; 1 << 16];
+    let mut len: u64 = 0;
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        len += buf[..n].iter().filter(counts).count() as u64;
+    }
+    file.seek(SeekFrom::Start(0))?;
+    let mut h: u32 = 1 ^ (len as u32);
+    // The bytes of the four-byte group being put together, and how many there are.
+    let (mut k, mut have, mut seen) = (0u32, 0u32, 0u64);
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        for &b in buf[..n].iter().filter(counts) {
+            seen += 1;
+            k |= (b as u32) << (8 * have);
+            have += 1;
+            if have == 4 {
+                k = k.wrapping_mul(M);
+                k ^= k >> 24;
+                k = k.wrapping_mul(M);
+                h = h.wrapping_mul(M) ^ k;
+                (k, have) = (0, 0);
+            }
+        }
+    }
+    if seen != len {
+        // The file changed between the two readings: fingerprint one reading of it, as before.
+        return Ok(fingerprint(&std::fs::read(path)?));
+    }
+    if have > 0 {
+        h ^= k;
+        h = h.wrapping_mul(M);
+    }
+    h ^= h >> 13;
+    h = h.wrapping_mul(M);
+    h ^= h >> 15;
+    Ok(h)
+}
+
+/// Fingerprints files without blocking the async runtime. A file fingerprinted before is only read again if it
+/// changed since (its size or modified time; see `net::file_hash_now`).
 async fn fingerprints(files: Vec<PathBuf>) -> Result<Vec<(u32, PathBuf)>> {
-    tokio::task::spawn_blocking(move || files.into_iter().map(|p| Ok((fingerprint(&std::fs::read(&p)?), p))).collect::<Result<Vec<_>>>()).await?
+    let prints = tokio::task::spawn_blocking(move || {
+        files
+            .into_iter()
+            .map(|p| {
+                let meta = std::fs::metadata(&p)?;
+                if let Some(known) = known_fingerprint(&p, &meta) {
+                    return Ok((known, p));
+                }
+                let print = fingerprint_file(&p)?;
+                learn_fingerprint(&p, &meta, print);
+                Ok((print, p))
+            })
+            .collect::<Result<Vec<_>>>()
+    })
+    .await?;
+    save_verified().await;
+    prints
+}
+
+/// How long CurseForge's answer about a fingerprint is reused: the mods list and the duplicate check ask about the
+/// same hand-added files every time they run.
+const PRINT_ANSWER_KEPT: Duration = Duration::from_secs(600);
+
+/// What CurseForge said about a fingerprint lately: the (project, file) it belongs to, or None for one it doesn't know.
+static PRINT_ANSWERS: Mutex<Option<HashMap<u32, (Instant, Option<(u64, u64)>)>>> = Mutex::new(None);
+
+fn print_answers<R>(f: impl FnOnce(&mut HashMap<u32, (Instant, Option<(u64, u64)>)>) -> R) -> R {
+    let mut answers = PRINT_ANSWERS.lock().unwrap();
+    let answers = answers.get_or_insert_with(HashMap::new);
+    answers.retain(|_, (at, _)| at.elapsed() < PRINT_ANSWER_KEPT);
+    f(answers)
+}
+
+/// Asks CurseForge which files have these fingerprints, and keeps what it said about each.
+async fn exact_matches(prints: &[u32]) -> Result<Vec<FingerprintMatch>> {
+    if prints.is_empty() {
+        return Ok(vec![]);
+    }
+    let res: FingerprintRes = cf(&format!("/fingerprints/{MINECRAFT}"), Some(json!({ "fingerprints": prints }))).await?;
+    // Which fingerprints it didn't know is only certain when every match says which one it is for.
+    if res.exact_matches.iter().all(|m| m.file.file_fingerprint.is_some()) {
+        let now = Instant::now();
+        print_answers(|answers| {
+            for p in prints {
+                answers.insert(*p, (now, None));
+            }
+            for m in &res.exact_matches {
+                if let Some(p) = m.file.file_fingerprint {
+                    answers.insert(p as u32, (now, Some((m.id, m.file.id))));
+                }
+            }
+        });
+    }
+    Ok(res.exact_matches)
 }
 
 #[derive(Deserialize)]
@@ -789,15 +897,17 @@ pub async fn identify(inst: &Instance, kind: ContentKind, filenames: &[String]) 
     }
     let folder = folder_of(inst, kind);
     let prints = fingerprints(filenames.iter().map(|n| folder.join(n)).collect()).await?;
-    let res: FingerprintRes = cf(&format!("/fingerprints/{MINECRAFT}"), Some(json!({ "fingerprints": prints.iter().map(|p| p.0).collect::<Vec<_>>() }))).await?;
-    if res.exact_matches.is_empty() {
+    // Not the ones it said it didn't know a moment ago.
+    let ask: Vec<u32> = print_answers(|answers| prints.iter().map(|p| p.0).filter(|p| !matches!(answers.get(p), Some((_, None)))).collect());
+    let matches = exact_matches(&ask).await?;
+    if matches.is_empty() {
         return Ok(());
     }
-    let ids: Vec<u64> = res.exact_matches.iter().map(|x| x.id).collect::<HashSet<_>>().into_iter().collect();
+    let ids: Vec<u64> = matches.iter().map(|x| x.id).collect::<HashSet<_>>().into_iter().collect();
     let mods: Vec<CfMod> = cf("/mods", Some(json!({ "modIds": ids }))).await?;
     let mut idx = load_index(&inst.id).await;
     let names: Vec<String> = prints.iter().map(|(_, p)| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect();
-    for FingerprintMatch { id, file } in res.exact_matches {
+    for FingerprintMatch { id, file } in matches {
         let Some(m) = mods.iter().find(|x| x.id == id) else { continue };
         let name = filenames
             .iter()
@@ -852,8 +962,20 @@ pub async fn lookup_files(files: Vec<PathBuf>) -> Result<HashMap<PathBuf, (u64, 
         return Ok(out);
     }
     let by_print: HashMap<u32, PathBuf> = fingerprints(files).await?.into_iter().collect();
-    let res: FingerprintRes = cf(&format!("/fingerprints/{MINECRAFT}"), Some(json!({ "fingerprints": by_print.keys().collect::<Vec<_>>() }))).await?;
-    for FingerprintMatch { id, file } in res.exact_matches {
+    // What it said about a fingerprint lately stands; the rest is asked about in one request.
+    let mut ask: Vec<u32> = Vec::new();
+    print_answers(|answers| {
+        for (print, path) in &by_print {
+            match answers.get(print) {
+                Some((_, Some(owner))) => {
+                    out.insert(path.clone(), *owner);
+                }
+                Some((_, None)) => {}
+                None => ask.push(*print),
+            }
+        }
+    });
+    for FingerprintMatch { id, file } in exact_matches(&ask).await? {
         if let Some(path) = file.file_fingerprint.and_then(|fp| by_print.get(&(fp as u32))) {
             out.insert(path.clone(), (id, file.id));
         }
@@ -978,6 +1100,8 @@ pub async fn install_cf_zip(archive: &Path, meta: CfPackMeta) -> Result<Instance
         // On the Library at once, with this task's progress on its card.
         task.set_instance(&inst.id);
         crate::core::events::list_changed("instances");
+        // Minecraft and the loader come while the pack's files do.
+        crate::game::launch::get_ready_early(&inst.id);
         let result: Result<Instance> = async {
             let pending = fill_pack(&inst, &manifest, &archive, &task).await?;
             if !pending.is_empty() {
@@ -1017,7 +1141,7 @@ async fn fill_pack(inst: &Instance, manifest: &CfManifest, archive: &Path, task:
         items.push(DownloadItem::new(url, safe_join(&dir.join(folder), safe_name(&f.file_name)?)?).hash(sha1.clone().map(Hash::sha1)).size(f.file_length));
         idx.insert(index_key(kind_of_class(class).unwrap_or(ContentKind::Mod), &f.file_name), entry_of(m, f));
     }
-    download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
+    download_all(items, crate::core::settings::parallel_downloads().await, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
     save_index(&inst.id, &idx).await?;
 
     task.update(tr!("modpack.applyingSettings", "Applying modpack settings…"), None);
@@ -1196,6 +1320,33 @@ pub async fn pack_mods(project_id: &str, version_id: &str) -> Result<Vec<crate::
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_file_read_in_pieces_gets_the_same_fingerprint() {
+        let dir = std::env::temp_dir().join(format!("resin-fingerprint-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("file.bin");
+        // Every length around the four-byte groups and the 64 KiB reads, with whitespace bytes (which are left
+        // out) at the start, the end and across the seams.
+        let mut x: u32 = 12345;
+        let mut byte = || {
+            x = x.wrapping_mul(1_103_515_245).wrapping_add(12345);
+            // One byte in five is one of the four left out.
+            match (x >> 16) % 5 {
+                0 => [9u8, 10, 13, 32][((x >> 20) % 4) as usize],
+                _ => (x >> 24) as u8,
+            }
+        };
+        for len in [0usize, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1000, 65_535, 65_536, 65_537, 131_073, 200_001] {
+            let data: Vec<u8> = (0..len).map(|_| byte()).collect();
+            std::fs::write(&path, &data).unwrap();
+            assert_eq!(fingerprint_file(&path).unwrap(), fingerprint(&data), "{len} bytes");
+        }
+        std::fs::write(&path, [32u8, 9, 13, 10, 32]).unwrap();
+        assert_eq!(fingerprint_file(&path).unwrap(), fingerprint(b""));
+        assert!(fingerprint_file(&dir.join("missing.bin")).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn file(id: u64, versions: &[&str]) -> CfFile {
         serde_json::from_value(json!({ "id": id, "modId": 1, "fileName": format!("{id}.zip"), "gameVersions": versions })).unwrap()

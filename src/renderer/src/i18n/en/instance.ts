@@ -434,6 +434,7 @@ export default {
   'packUpdates.syncAvailable': 'Sync available',
   'packUpdates.instanceChanged': 'its instance changed',
   'packUpdates.review': 'Review…',
+  'packUpdates.dontRemind': "Don't remind me",
   // Syncing a server from the instance it was made from (components/ServerPacks.tsx)
   'sync.section': 'Made from an instance',
   'sync.from': 'From {name}',

@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   ArrowUp,
   ArrowUpRight,
+  ChartNoAxesColumn,
   ChevronRight,
   ClipboardCopy,
   Copy,
@@ -15,6 +16,7 @@ import {
   ImagePlus,
   Layers,
   Loader2,
+  MonitorDown,
   PackageOpen,
   Palette,
   Pencil,
@@ -32,6 +34,8 @@ import { createPortal } from 'react-dom'
 import type { Instance, InstancePatch } from '@shared/types'
 import { api } from '../api'
 import ExportModal from '../components/ExportModal'
+import OverviewModal from '../components/Overview'
+import { pictureAsPng } from '../components/BasicIcons'
 import { ReinstallInstanceModal } from '../components/Reinstall'
 import MigrateModal from '../components/MigrateModal'
 import { packDupesNote } from '../components/DuplicatesDialog'
@@ -706,7 +710,7 @@ export function useInstanceMenu(inst: Instance) {
   const { go, games, runs, accounts, play, stop, refreshInstances, toast, info } = useStore()
   const names = useGroupNames()
   const copy = useCopy()
-  const [dialog, setDialog] = useState<'delete' | 'rename' | 'newGroup' | 'export' | 'reinstallGame' | 'reinstallPack'>()
+  const [dialog, setDialog] = useState<'delete' | 'rename' | 'newGroup' | 'export' | 'reinstallGame' | 'reinstallPack' | 'overview'>()
   const close = () => setDialog(undefined)
   const state = games[inst.id]
 
@@ -739,6 +743,17 @@ export function useInstanceMenu(inst: Instance) {
     }
   }
 
+  const shortcut = async () => {
+    try {
+      // The shortcut wears the instance's own picture (its modpack's logo, or the icon you chose).
+      await api.instances.shortcut(inst.id, await pictureAsPng(inst.iconUrl))
+      toast(t('menu.shortcut.done'))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
+  // Each action says what it does in a line under its name (the `hint`s).
   const items = (): ContextEntry[] => {
     const current = inst.group?.trim() ?? ''
     return [
@@ -756,11 +771,18 @@ export function useInstanceMenu(inst: Instance) {
         icon: <UserRound />,
         items: playAsEntries(inst, accounts, runs[inst.id] ?? [], (id, accountId) => void play(id, accountId))
       },
-      { label: t('menu.open'), icon: <ArrowUpRight />, shortcut: 'Enter', onSelect: () => go({ page: 'instance', id: inst.id }) },
-      { label: t('menu.instance.settings'), icon: <Settings2 />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
+      { label: t('menu.open'), hint: t('menu.hint.open'), icon: <ArrowUpRight />, shortcut: 'Enter', onSelect: () => go({ page: 'instance', id: inst.id }) },
+      {
+        label: t('menu.instance.settings'),
+        hint: t('menu.hint.settings'),
+        icon: <Settings2 />,
+        onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' })
+      },
+      { label: t('menu.overview'), hint: t('menu.hint.overview'), icon: <ChartNoAxesColumn />, onSelect: () => setDialog('overview') },
       '-',
       {
         label: t('menu.instance.group'),
+        hint: t('menu.hint.group'),
         icon: <FolderInput />,
         items: [
           { label: t('library.group.none'), checked: current === '', onSelect: () => void moveTo(null) },
@@ -769,23 +791,32 @@ export function useInstanceMenu(inst: Instance) {
           { label: t('menu.instance.newGroup'), icon: <FolderPlus />, onSelect: () => setDialog('newGroup') }
         ]
       },
-      { label: t('menu.rename'), icon: <Pencil />, shortcut: 'F2', onSelect: () => setDialog('rename') },
+      { label: t('menu.rename'), hint: t('menu.hint.rename'), icon: <Pencil />, shortcut: 'F2', onSelect: () => setDialog('rename') },
+      // How it looks, in one place: its block-art colour, its icon and banner, and back to the icon it came with.
       {
-        label: t('menu.instance.color'),
+        label: t('art.appearance'),
+        hint: t('menu.hint.look'),
         icon: <Palette />,
-        items: COLORS.map((c, i) => ({
-          label: t(COLOR_NAMES[i]),
-          icon: <span className="ctx-swatch" style={{ background: c }} />,
-          checked: inst.color === c,
-          onSelect: () => void update({ color: c })
-        }))
+        items: [
+          {
+            label: t('menu.instance.color'),
+            icon: <Palette />,
+            items: COLORS.map((c, i) => ({
+              label: t(COLOR_NAMES[i]),
+              icon: <span className="ctx-swatch" style={{ background: c }} />,
+              checked: inst.color === c,
+              onSelect: () => void update({ color: c })
+            }))
+          },
+          { label: t('art.menu'), icon: <ImagePlus />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
+          hasCustomIcon(inst) && { label: t('menu.instance.resetIcon'), icon: <RotateCcw />, onSelect: () => void resetIcon() }
+        ]
       },
-      { label: t('art.menu'), icon: <ImagePlus />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
-      hasCustomIcon(inst) && { label: t('menu.instance.resetIcon'), icon: <RotateCcw />, onSelect: () => void resetIcon() },
-      { label: t('library.card.duplicate'), icon: <Copy />, onSelect: () => void duplicate() },
-      { label: t('menu.instance.export'), icon: <PackageOpen />, onSelect: () => setDialog('export') },
+      { label: t('library.card.duplicate'), hint: t('menu.hint.duplicate'), icon: <Copy />, onSelect: () => void duplicate() },
+      { label: t('menu.instance.export'), hint: t('menu.hint.export'), icon: <PackageOpen />, onSelect: () => setDialog('export') },
       {
         label: t('reinstall.menu'),
+        hint: t('menu.hint.reinstall'),
         icon: <Wrench />,
         disabled: state === 'running' || state === 'preparing',
         items: [
@@ -794,16 +825,18 @@ export function useInstanceMenu(inst: Instance) {
         ]
       },
       '-',
-      { label: t('common.openFolder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id) },
+      { label: t('common.openFolder'), hint: t('menu.hint.folder'), icon: <FolderOpen />, onSelect: () => void api.instances.openFolder(inst.id) },
+      { label: t('menu.shortcut'), hint: t('menu.hint.shortcut'), icon: <MonitorDown />, onSelect: () => void shortcut() },
       info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copy(instancePath(info.dataDir, inst.id)) },
       '-',
-      { label: t('common.delete'), icon: <Trash2 />, danger: true, shortcut: 'Del', onSelect: () => setDialog('delete') }
+      { label: t('common.delete'), hint: t('menu.hint.delete'), icon: <Trash2 />, danger: true, shortcut: 'Del', onSelect: () => setDialog('delete') }
     ]
   }
 
   const dialogs = (
     <>
       {dialog === 'delete' && <DeleteInstance inst={inst} onClose={close} />}
+      {dialog === 'overview' && <OverviewModal inst={inst} onClose={close} />}
       {dialog === 'reinstallGame' && <ReinstallInstanceModal inst={inst} what="game" onClose={close} />}
       {dialog === 'reinstallPack' && <ReinstallInstanceModal inst={inst} what="pack" onClose={close} />}
       {dialog === 'rename' && (

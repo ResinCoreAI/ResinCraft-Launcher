@@ -22,8 +22,7 @@ export const GUIDE_VARS: [string, Key][] = [
 /** Parts of the app a selector can reach. */
 const GUIDE_PARTS: [string, Key][] = [
   ['body', 'settings.cssGuide.part.body'],
-  ['.sidebar', 'settings.cssGuide.part.sidebar'],
-  ['.topbar', 'settings.cssGuide.part.topbar'],
+  ['.sidebar', 'settings.cssGuide.part.topbar'],
   ['.content', 'settings.cssGuide.part.content'],
   ['.card', 'settings.cssGuide.part.card'],
   ['.icard', 'settings.cssGuide.part.icard'],

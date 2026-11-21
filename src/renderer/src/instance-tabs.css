@@ -240,3 +240,183 @@
   gap: 2px;
   min-width: 0;
 }
+
+/* ---------- Game options (components/GameOptions.tsx) ---------- */
+
+.gopt-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.gopt-head p {
+  flex: 1;
+  margin: 0;
+}
+.gopt .callout {
+  margin-bottom: 12px;
+}
+/* The groups (the game's own Options screens) and the search, on one line. */
+.gopt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-bottom: 12px;
+}
+.gopt-groups {
+  flex: 1 1 520px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.gopt-groups button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-dim);
+  font: 500 13px var(--font);
+  cursor: pointer;
+  transition:
+    background-color 0.14s var(--ease),
+    color 0.14s var(--ease),
+    border-color 0.14s var(--ease);
+}
+.gopt-groups button:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.gopt-groups button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.gopt-groups button svg {
+  width: 15px;
+  height: 15px;
+}
+.gopt-groups button.on svg {
+  color: var(--accent);
+}
+.gopt-search {
+  flex: 0 1 260px;
+}
+/* Every option is one row of the same height: its name on the left, its control in a column on the right. */
+.gopt-list {
+  padding: 0;
+  overflow: hidden;
+}
+.gopt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: center;
+  gap: 16px;
+  min-height: 54px;
+  padding: 8px 16px;
+}
+.gopt-row + .gopt-row {
+  border-top: 1px solid var(--border);
+}
+.gopt-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gopt-name b {
+  font-weight: 600;
+}
+.gopt-name .mono {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.gopt-control {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.gopt-control .input,
+.gopt-control .select {
+  width: 100%;
+  height: 34px;
+}
+.gopt-range {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.gopt-range input {
+  flex: 1;
+  min-width: 0;
+}
+.gopt-value {
+  flex: none;
+  min-width: 78px;
+  text-align: right;
+  font: 500 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--data);
+}
+/* A key bind: a key cap you click, then press the new key. */
+.gopt-key {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--control-border, var(--border-strong));
+  border-bottom-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 13px var(--mono);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    border-color 0.12s var(--ease),
+    background-color 0.12s var(--ease);
+}
+.gopt-key:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.gopt-key.listening {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+/* The same key on two actions. */
+.gopt-key.clash:not(.listening) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.gopt-key:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.gopt-keyhint {
+  margin: 0 0 4px;
+}
+.gopt-cat {
+  margin: 18px 0 8px;
+  font: 600 14px var(--font);
+  color: var(--text-dim);
+}
+.gopt-empty {
+  margin: 0;
+  padding: 18px;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .gopt-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .gopt-control {
+    justify-content: flex-start;
+  }
+}

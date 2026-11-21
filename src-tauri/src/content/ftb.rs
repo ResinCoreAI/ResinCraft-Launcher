@@ -319,7 +319,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
                 let hash = (!f.sha1.is_empty()).then(|| Hash::sha1(&f.sha1));
                 items.push(DownloadItem::new(&f.url, dest).hash(hash).size(f.size));
             }
-            download_all(items, 8, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
+            download_all(items, crate::core::settings::parallel_downloads().await, task.counter(tr!("modpack.downloadingFiles", "Downloading modpack files"))).await?;
             let listed: Vec<String> = version.files.iter().filter(|f| !f.serveronly && !f.url.is_empty() && f.path.trim_matches(['.', '/']) == "mods").map(|f| f.name.clone()).collect();
             dedupe_pack(&inst, &task, &listed).await;
             if !pending.is_empty() {

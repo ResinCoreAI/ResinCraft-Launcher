@@ -165,6 +165,12 @@ function mockSkins(
       const next = start + 12 < hits.length ? String(start + 12) : undefined
       return wait({ skins: hits.slice(start, start + 12), next }, 600)
     },
+    // The preview's skins are data: URLs already; a real link becomes a made-up skin, like the engine's download would.
+    fetchPng: async (url) => {
+      if (url.startsWith('data:')) return wait(url, 150)
+      if (!/^https:\/\//i.test(url)) throw new Error('Use an https:// link to a skin PNG.')
+      return wait(fakeSkin('#e11d48', '#1f2937'), 500)
+    },
     saveOnline: async (s) =>
       wait(
         add({

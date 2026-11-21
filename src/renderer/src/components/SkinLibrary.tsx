@@ -471,3 +471,138 @@ export function FindSkins({
     </div>
   )
 }
+
+/**
+ * The skin library as a list beside the skin editor: press a skin to open it in the editor. Each one can be worn
+ * straight away, renamed, given other arms or deleted from its menu.
+ */
+export function SkinShelf({
+  library,
+  error,
+  reload,
+  busy,
+  wearing,
+  open,
+  opened,
+  use,
+  toast
+}: {
+  library?: SavedSkin[]
+  error?: string
+  reload: () => Promise<void>
+  busy?: string
+  wearing?: string
+  open: (s: SavedSkin) => void
+  /** The library skin open in the editor. */
+  opened?: string
+  use: (s: SavedSkin) => Promise<void>
+  toast: (text: string, kind?: 'error') => void
+}) {
+  const [renaming, setRenaming] = useState<{ id: string; name: string }>()
+  const [deleting, setDeleting] = useState<string>()
+
+  const change = async (id: string, name?: string, variant?: SkinVariant) => {
+    try {
+      await api.skins.update(id, name, variant)
+      await reload()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+  const remove = async (s: SavedSkin) => {
+    try {
+      await api.skins.remove(s.id)
+      await reload()
+      toast(t('profile.lib.removed', { name: s.name }))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setDeleting(undefined)
+    }
+  }
+
+  return (
+    <aside className="se-shelf" aria-label={t('profile.lib.titlePlain')}>
+      <div className="se-shelf-head">
+        <b>{library ? t('profile.lib.title', { count: library.length }) : t('profile.lib.titlePlain')}</b>
+        <span className="hint">{t('skinTab.shelfHint')}</span>
+      </div>
+      {error ? (
+        <span className="pm-error">{error}</span>
+      ) : !library ? (
+        <div className="row hint">
+          <Loader2 className="spin" size={14} /> {t('common.loading')}
+        </div>
+      ) : !library.length ? (
+        <div className="pm-lib-empty hint">{t('skinTab.shelfEmpty')}</div>
+      ) : (
+        <ul className="se-shelf-list">
+          {library.map((s) => (
+            <li key={s.id} className={`se-shelf-row ${opened === s.id ? 'on' : ''}`}>
+              <button className="se-shelf-open" onClick={() => open(s)} aria-pressed={opened === s.id} title={t('skinTab.openInEditor')}>
+                <SkinView url={s.preview} variant={s.variant} side="front" scale={2} label={s.name} />
+                <span className="se-shelf-text">
+                  {renaming?.id === s.id ? (
+                    <input
+                      className="input sm"
+                      value={renaming.name}
+                      autoFocus
+                      maxLength={40}
+                      aria-label={t('common.rename')}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setRenaming({ id: s.id, name: e.target.value })}
+                      onBlur={() => {
+                        if (renaming.name.trim() && renaming.name !== s.name) void change(s.id, renaming.name)
+                        setRenaming(undefined)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') e.currentTarget.blur()
+                        if (e.key === 'Escape') setRenaming(undefined)
+                      }}
+                    />
+                  ) : (
+                    <b className="ellipsis" title={s.name}>
+                      {s.name}
+                    </b>
+                  )}
+                  <span className="hint ellipsis" title={new Date(s.addedAt).toLocaleString()}>
+                    {wearing === s.id ? t('profile.lib.wearing') : `${t(`profile.lib.source.${s.source}`)} · ${timeAgo(s.addedAt)}`}
+                  </span>
+                </span>
+              </button>
+              {deleting === s.id ? (
+                <span className="se-shelf-confirm">
+                  <button className="btn sm danger" onClick={() => void remove(s)}>
+                    {t('common.delete')}
+                  </button>
+                  <button className="btn sm ghost" onClick={() => setDeleting(undefined)}>
+                    {t('common.cancel')}
+                  </button>
+                </span>
+              ) : (
+                <MoreButton
+                  className="sm ghost"
+                  title={s.name}
+                  items={() => [
+                    { label: t('skinTab.wearNow'), icon: busy === `use:${s.id}` ? <Loader2 className="spin" /> : <Shirt />, disabled: !!busy || wearing === s.id, onSelect: () => void use(s) },
+                    { label: t('common.rename'), icon: <Pencil />, onSelect: () => setRenaming({ id: s.id, name: s.name }) },
+                    {
+                      label: t('profile.skin.arms'),
+                      items: (['classic', 'slim'] as const).map((v) => ({
+                        label: t(v === 'slim' ? 'profile.skin.slim' : 'profile.skin.classic'),
+                        checked: s.variant === v,
+                        onSelect: () => void change(s.id, undefined, v)
+                      }))
+                    },
+                    '-',
+                    { label: t('common.delete'), icon: <Trash2 />, danger: true, onSelect: () => setDeleting(s.id) }
+                  ]}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </aside>
+  )
+}

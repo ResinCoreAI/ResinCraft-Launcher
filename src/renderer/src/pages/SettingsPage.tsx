@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
-  Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sun, Terminal, Trash2 } from 'lucide-react'
+  Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sparkles, Sun, Terminal, Trash2, Tv } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
+import { showWelcome } from '../welcomeState'
+import { bigScreenPrefs, setBigScreen, setBigScreenPrefs } from '../bigScreen'
 import { ConfirmModal, Logo, Segmented, Switch } from '../components/ui'
 import { StorageSection } from '../components/Storage'
 import { ThemePicker } from '../components/ThemePicker'
@@ -15,7 +17,11 @@ import { NativeCacheSection } from '../components/HorizonNative'
 import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../components/LaunchCommands'
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
-import { fixed } from '../util'
+import { DISCLAIMER, fixed } from '../util'
+import { SETTING_SECTIONS } from '../settingsIndex'
+import { setLaunchScreen, useLaunchScreen } from '../launchScreenState'
+import { setGuideOn, startGuide, useGuide } from '../guideState'
+import { setWindowButtons, useWindowButtons, WINDOW_BUTTON_STYLES, type WindowButtonStyle } from '../windowButtonsState'
 
 /** Starts ResinCraft's uninstaller after asking (it closes ResinCraft and asks about the data itself). */
 function UninstallSetting() {
@@ -174,45 +180,28 @@ function AutoBackupSection({ s, set }: { s: Settings; set: (p: Partial<Settings>
   )
 }
 
-/** A new GitHub issue, with the version and system filled in (nothing is sent until the player submits it there). */
-function issueUrl(version?: string, platform?: string): string {
-  const body = [
-    '**What happened?**',
-    '',
-    '',
-    '**What did you expect to happen?**',
-    '',
-    '',
-    '**Steps to make it happen again**',
-    '1. ',
-    '',
-    '---',
-    `ResinCraft Launcher ${version ? `v${version}` : '(version unknown)'} · ${platform ?? navigator.userAgent}`
-  ].join('\n')
-  return `https://github.com/ResinCoreAI/ResinCraft-Launcher/issues/new?body=${encodeURIComponent(body)}`
+/** Each section's icon in the side list (the sections themselves are listed in settingsIndex.ts). */
+const SECTION_ICONS: Record<string, React.ReactNode> = {
+  appearance: <Palette size={16} />,
+  game: <Gamepad2 size={16} />,
+  java: <Coffee size={16} />,
+  commands: <Terminal size={16} />,
+  downloads: <Download size={16} />,
+  storage: <HardDrive size={16} />,
+  'native-mods': <Hammer size={16} />,
+  autobackup: <Archive size={16} />,
+  backup: <ArrowLeftRight size={16} />,
+  remote: <Globe size={16} />,
+  mcp: <Bot size={16} />,
+  updates: <RefreshCw size={16} />,
+  about: <Info size={16} />
 }
-
-/** Mojang's usage guidelines ask for this line word for word, so it isn't translated. */
-const DISCLAIMER = 'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'
-
-const SECTIONS: { id: string; label: Key; icon: React.ReactNode }[] = [
-  { id: 'appearance', label: 'settings.nav.appearance', icon: <Palette size={16} /> },
-  { id: 'game', label: 'settings.nav.game', icon: <Gamepad2 size={16} /> },
-  { id: 'java', label: 'settings.nav.java', icon: <Coffee size={16} /> },
-  { id: 'commands', label: 'commands.nav', icon: <Terminal size={16} /> },
-  { id: 'downloads', label: 'settings.nav.downloads', icon: <Download size={16} /> },
-  { id: 'storage', label: 'storage.nav', icon: <HardDrive size={16} /> },
-  { id: 'native-mods', label: 'native.settings.title', icon: <Hammer size={16} /> },
-  { id: 'autobackup', label: 'settings.autoBackup', icon: <Archive size={16} /> },
-  { id: 'backup', label: 'backup.nav', icon: <ArrowLeftRight size={16} /> },
-  { id: 'remote', label: 'settings.remote', icon: <Globe size={16} /> },
-  { id: 'mcp', label: 'settings.mcp', icon: <Bot size={16} /> },
-  { id: 'updates', label: 'updates.nav', icon: <RefreshCw size={16} /> },
-  { id: 'about', label: 'settings.nav.about', icon: <Info size={16} /> }
-]
+const SECTIONS = SETTING_SECTIONS.map((x) => ({ ...x, icon: SECTION_ICONS[x.id] }))
 
 export default function SettingsPage() {
-  const { settings: s, updateSettings, info, toast } = useStore()
+  const { settings: s, updateSettings, info, toast, route, go } = useStore()
+  const launchScreen = useLaunchScreen()
+  const guide = useGuide()
   const [javas, setJavas] = useState<JavaInstall[]>()
   const [scanning, setScanning] = useState(false)
   const [mem, setMem] = useState(s?.memoryMb ?? 4096)
@@ -226,6 +215,76 @@ export default function SettingsPage() {
   useEffect(() => {
     void scan()
   }, [])
+
+  // Opened from the quick search: go to the section asked for and, in it, to the one setting, which flashes once
+  // so the eye lands on it.
+  const loaded = !!s
+  useEffect(() => {
+    if (!loaded || route.page !== 'settings' || !route.section) return
+    const { section, find } = route
+    const show = (flash: boolean) => {
+      const sec = document.getElementById(section)
+      if (!sec) return
+      const label = find ? [...sec.querySelectorAll('b')].find((b) => b.textContent?.trim() === find) : undefined
+      const row = label ? (label.closest<HTMLElement>('.setting') ?? label.parentElement) : undefined
+      ;(row ?? sec).scrollIntoView({ block: row ? 'center' : 'start' })
+      if (flash && row) {
+        row.classList.remove('found')
+        void row.offsetWidth
+        row.classList.add('found')
+      }
+    }
+    show(true)
+    // Parts of the page fill in after it opens (the Java list, storage sizes) and push what is below them down.
+    const again = window.setTimeout(() => show(false), 500)
+    return () => window.clearTimeout(again)
+  }, [route, loaded])
+
+  // The side list follows the page: whichever section is at the reading line (a little below the top) is the one
+  // marked, so you always know where in Settings you are. Positions are measured, not assumed: the sections' order
+  // on the page is the page's business.
+  const [here, setHere] = useState(SECTIONS[0].id)
+  useEffect(() => {
+    const page = document.querySelector('.content')
+    if (!page || !loaded) return
+    let frame = 0
+    const look = () => {
+      frame = 0
+      const line = page.getBoundingClientRect().top + 150
+      let best = SECTIONS[0].id
+      let bestTop = -Infinity
+      for (const x of SECTIONS) {
+        const top = document.getElementById(x.id)?.getBoundingClientRect().top
+        if (top != null && top <= line && top > bestTop) {
+          best = x.id
+          bestTop = top
+        }
+      }
+      // At the very end, the last section may be too short ever to reach the line.
+      if (page.scrollTop + page.clientHeight >= page.scrollHeight - 4) {
+        let lowest = -Infinity
+        for (const x of SECTIONS) {
+          const top = document.getElementById(x.id)?.getBoundingClientRect().top
+          if (top != null && top > lowest) {
+            best = x.id
+            lowest = top
+          }
+        }
+      }
+      setHere(best)
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(look)
+    }
+    look()
+    page.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      page.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [loaded])
 
   if (!s) return null
   const set = (p: Partial<Settings>) => void updateSettings(p)
@@ -245,7 +304,12 @@ export default function SettingsPage() {
       <div className="settings-grid">
         <nav className="settings-nav">
           {SECTIONS.map((x) => (
-            <button key={x.id} className="nav-item" onClick={() => document.getElementById(x.id)?.scrollIntoView({ behavior: 'smooth' })}>
+            <button
+              key={x.id}
+              className={`nav-item ${here === x.id ? 'active' : ''}`}
+              aria-current={here === x.id ? 'true' : undefined}
+              onClick={() => document.getElementById(x.id)?.scrollIntoView({ behavior: 'smooth' })}
+            >
               {x.icon} <span className="ellipsis">{t(x.label)}</span>
             </button>
           ))}
@@ -257,6 +321,7 @@ export default function SettingsPage() {
             <p>{t('settings.appearance.lead')}</p>
             <div className="card">
               <ThemePicker s={s} set={set} />
+              <WindowButtonsPicker />
               <div className="setting">
                 <div className="text">
                   <b>{t('settings.language')}</b>
@@ -293,6 +358,16 @@ export default function SettingsPage() {
                   <span>{t('settings.freeMemory.hint')}</span>
                 </div>
                 <Switch on={s.freeMemoryHidden !== false} onChange={(v) => set({ freeMemoryHidden: v })} label={t('settings.freeMemory')} />
+              </div>
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.guide')}</b>
+                  <span>{t('settings.guide.hint')}</span>
+                </div>
+                <button className="btn sm" onClick={startGuide}>
+                  {t('settings.guide.again')}
+                </button>
+                <Switch on={guide.on} onChange={setGuideOn} label={t('settings.guide')} />
               </div>
             </div>
           </section>
@@ -371,6 +446,13 @@ export default function SettingsPage() {
               </div>
               <div className="setting">
                 <div className="text">
+                  <b>{t('settings.launchScreen')}</b>
+                  <span>{t('settings.launchScreen.hint')}</span>
+                </div>
+                <Switch on={launchScreen} onChange={setLaunchScreen} label={t('settings.launchScreen')} />
+              </div>
+              <div className="setting">
+                <div className="text">
                   <b>{t('settings.snapshots')}</b>
                   <span>{t('settings.snapshots.hint')}</span>
                 </div>
@@ -383,6 +465,7 @@ export default function SettingsPage() {
                 </div>
                 <Switch on={s.gamepad !== false} onChange={(v) => set({ gamepad: v })} label={t('settings.gamepad')} />
               </div>
+              <BigScreenSettings />
               <div className="setting">
                 <div className="text">
                   <b>{t('settings.discord')}</b>
@@ -639,13 +722,94 @@ export default function SettingsPage() {
                   {DISCLAIMER}
                 </div>
               </div>
-              <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void api.app.openExternal(issueUrl(info?.version, info?.platform))}>
-                <Bug /> {t('settings.about.report')}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button className="btn" onClick={() => go({ page: 'report' })}>
+                  <Bug /> {t('settings.about.report')}
+                </button>
+                <button className="btn" onClick={showWelcome}>
+                  <Sparkles /> {t('welcome.again')}
+                </button>
+              </div>
             </div>
           </section>
         </div>
       </div>
     </div>
+  )
+}
+
+const WINDOW_BUTTON_NAMES: Record<WindowButtonStyle, Key> = {
+  ubuntu: 'settings.winButtons.ubuntu',
+  windows: 'settings.winButtons.windows',
+  pill: 'settings.winButtons.pill',
+  mac: 'settings.winButtons.mac',
+  minimal: 'settings.winButtons.minimal',
+  soft: 'settings.winButtons.soft'
+}
+
+/** Appearance → Window buttons: how minimise, maximise and close look, and which side they are on. */
+function WindowButtonsPicker() {
+  const { style, side } = useWindowButtons()
+  return (
+    <div className="setting stack">
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <div className="text grow">
+          <b>{t('settings.winButtons')}</b>
+          <span>{t('settings.winButtons.hint')}</span>
+        </div>
+        <Segmented
+          value={side}
+          onChange={(v) => setWindowButtons({ side: v })}
+          options={[
+            { value: 'left', label: t('settings.winButtons.left') },
+            { value: 'right', label: t('settings.winButtons.right') }
+          ]}
+        />
+      </div>
+      <div className="wb-choices" role="radiogroup" aria-label={t('settings.winButtons')}>
+        {WINDOW_BUTTON_STYLES.map((st) => (
+          <button key={st} role="radio" aria-checked={style === st} className={`wb-choice ${style === st ? 'on' : ''}`} onClick={() => setWindowButtons({ style: st })}>
+            <span className={`wb-mini ${st} ${side}`} aria-hidden>
+              <i className="min" />
+              <i className="max" />
+              <i className="close" />
+            </span>
+            <span>{t(WINDOW_BUTTON_NAMES[st])}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Settings → big screen mode: open it now, and whether a controller opens it by itself. */
+function BigScreenSettings() {
+  const [auto, setAuto] = useState(() => bigScreenPrefs().autoController)
+  return (
+    <>
+      <div className="setting">
+        <div className="text">
+          <b>{t('bigscreen.title')}</b>
+          <span>{t('bigscreen.settingHint')}</span>
+        </div>
+        <button className="btn" onClick={() => void setBigScreen(true)}>
+          <Tv /> {t('bigscreen.enter')}
+        </button>
+      </div>
+      <div className="setting">
+        <div className="text">
+          <b>{t('bigscreen.autoOpen')}</b>
+          <span>{t('bigscreen.autoOpenHint')}</span>
+        </div>
+        <Switch
+          on={auto}
+          onChange={(v) => {
+            setAuto(v)
+            setBigScreenPrefs({ autoController: v })
+          }}
+          label={t('bigscreen.autoOpen')}
+        />
+      </div>
+    </>
   )
 }

@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Ban, Check, CloudUpload, Gift, Pencil, Plus, RefreshCw, Search, ShoppingBag, Ticket, Trash2, Wallet, X } from 'lucide-react'
 import { currentLanguage, t, type Key } from '../../i18n'
 import { useStore } from '../../store'
-import { ConfirmModal, Empty, Modal, MoreButton, Segmented, Switch } from '../ui'
+import { ConfirmModal, Empty, Modal, MoreButton, Segmented, Switch, type ContextEntry } from '../ui'
 import { account, Loading, post, shortId, useAct, useAdmin, when } from './common'
 import { UNLIMITED_COUNT } from '../../relayCount'
 
@@ -42,6 +42,8 @@ interface Sub {
   /** The account it was moved from (its name then), and when. */
   moved_from?: string
   moved_at?: number
+  /** The admin's note to the player. */
+  note?: string
 }
 interface Promo {
   code: string
@@ -1016,6 +1018,7 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
 function Purchases({ d, act }: { d: Payments; act: Act }) {
   const [giving, setGiving] = useState(false)
   const [ending, setEnding] = useState<Sub>()
+  const [noting, setNoting] = useState<Sub>()
   const [q, setQ] = useState('')
   const cur = d.currency
   const name = (id: string) => d.products.find((p) => p.id === id)?.name ?? id
@@ -1059,12 +1062,15 @@ function Purchases({ d, act }: { d: Payments; act: Act }) {
                   {s.credit ? ` · ${t('servers.admin.pay.creditTaken', { amount: money(s.credit, cur) })}` : ''}
                 </span>
                 {s.moved_from && <span className="hint">{t('servers.admin.pay.movedFrom', { name: s.moved_from, when: when(s.moved_at ?? 0) })}</span>}
+                {s.note && <span className="admin-note">“{s.note}”</span>}
               </div>
               <MoreButton
-                items={() =>
-                  s.source === 'admin'
-                    ? [{ label: t('servers.admin.pay.takeAway'), icon: <Trash2 />, danger: true, onSelect: () => setEnding(s) }]
-                    : [
+                items={(): ContextEntry[] => [
+                  { label: t(s.note ? 'servers.admin.pay.editNote' : 'servers.admin.pay.addNote'), icon: <Pencil />, onSelect: () => setNoting(s) },
+                  '-',
+                  ...(s.source === 'admin'
+                    ? ([{ label: t('servers.admin.pay.takeAway'), icon: <Trash2 />, danger: true, onSelect: () => setEnding(s) }] as ContextEntry[])
+                    : ([
                         s.source === 'stripe' && {
                           label: t('servers.admin.pay.sync'),
                           icon: <RefreshCw />,
@@ -1079,14 +1085,15 @@ function Purchases({ d, act }: { d: Payments; act: Act }) {
                           },
                         s.status !== 'canceled' && '-',
                         s.status !== 'canceled' && { label: t('servers.admin.pay.endNow'), icon: <Ban />, danger: true, onSelect: () => setEnding(s) }
-                      ]
-                }
+                      ] as ContextEntry[]))
+                ]}
               />
             </div>
           ))}
         </div>
       )}
       {giving && <GiveModal d={d} act={act} onClose={() => setGiving(false)} />}
+      {noting && <NoteModal sub={noting} who={noting.name || shortId(noting.uuid)} act={act} onClose={() => setNoting(undefined)} />}
       {ending && (
         <ConfirmModal
           title={t('servers.admin.pay.endTitle', { name: `${ending.name || shortId(ending.uuid)} · ${name(ending.product)}` })}
@@ -1100,16 +1107,43 @@ function Purchases({ d, act }: { d: Payments; act: Act }) {
   )
 }
 
+/** The admin's note to the player on one purchase or grant; empty clears it. */
+function NoteModal({ sub, who, act, onClose }: { sub: Sub; who: string; act: Act; onClose: () => void }) {
+  const [note, setNote] = useState(sub.note ?? '')
+  return (
+    <FormModal
+      title={t('servers.admin.pay.noteTitle', { name: who })}
+      confirm={t('common.save')}
+      ok={note.trim() !== (sub.note ?? '')}
+      onSubmit={() => act('/api/payments/note', { id: sub.id, note: note.trim() }, 'servers.admin.pay.saved')}
+      onClose={onClose}
+    >
+      <label className="field">
+        <span>{t('servers.admin.pay.f.note')}</span>
+        <input className="input" autoFocus maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
+        <span className="hint">{t('servers.admin.pay.notePlayerHint')}</span>
+      </label>
+    </FormModal>
+  )
+}
+
 function GiveModal({ d, act, onClose }: { d: Payments; act: Act; onClose: () => void }) {
   const [who, setWho] = useState('')
   const [product, setProduct] = useState(d.products[0]?.id ?? '')
   const [days, setDays] = useState('')
+  const [note, setNote] = useState('')
   return (
     <FormModal
       title={t('servers.admin.pay.giveFree')}
       confirm={t('servers.admin.pay.give')}
       ok={!!who.trim() && !!product}
-      onSubmit={() => act('/api/payments/grant', { ...account(who), product, ...(Number(days) > 0 ? { days: Number(days) } : {}) }, 'servers.admin.pay.given')}
+      onSubmit={() =>
+        act(
+          '/api/payments/grant',
+          { ...account(who), product, ...(Number(days) > 0 ? { days: Number(days) } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
+          'servers.admin.pay.given'
+        )
+      }
       onClose={onClose}
     >
       <label className="field">
@@ -1145,6 +1179,11 @@ function GiveModal({ d, act, onClose }: { d: Payments; act: Act; onClose: () => 
           />
         </label>
       </div>
+      <label className="field">
+        <span>{t('servers.admin.pay.f.note')}</span>
+        <input className="input" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
+        <span className="hint">{t('servers.admin.pay.notePlayerHint')}</span>
+      </label>
     </FormModal>
   )
 }

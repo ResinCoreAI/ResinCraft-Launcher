@@ -6,6 +6,7 @@ import { useStore } from '../store'
 import { t } from '../i18n'
 import { contrast, FONTS, forgetPicture, pictureFor, showCustom, showTheme, toHex } from '../customTheme'
 import { CssGuide } from './CssGuide'
+import { Switch } from './ui'
 
 const MAX_PICTURE = 8 * 1024 * 1024
 
@@ -240,6 +241,11 @@ export function ThemeMaker({
           </select>
         )}
         {field(t('settings.themeMaker.darken'), range('darken', 0, 90, '%'))}
+        <div className="field">
+          {t('settings.themeMaker.headerBlur')}
+          <Switch on={d.headerBlur !== false} onChange={(v) => edit({ headerBlur: v })} label={t('settings.themeMaker.headerBlur')} />
+          <span className="hint">{t('settings.themeMaker.headerBlurHint')}</span>
+        </div>
       </div>
 
       <details className="theme-maker-tune" open={!!(d.css || Object.keys(d.vars ?? {}).length)}>

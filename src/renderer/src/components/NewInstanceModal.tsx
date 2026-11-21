@@ -278,6 +278,11 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       {downloading ? (
         <ModpackFinder
           onBusy={setPackBusy}
+          // Picking a pack closes this at once: the Library shows it installing.
+          onStarted={() => {
+            onClose()
+            go({ page: 'library' })
+          }}
           onInstalled={(inst) => {
             onClose()
             go({ page: 'instance', id: inst.id })
@@ -286,6 +291,11 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
       ) : rtx ? (
         <RtxRemix
           onBusy={setPackBusy}
+          // As soon as the setup starts, this closes and the instance's own page shows it going.
+          onStarted={(inst) => {
+            onClose()
+            go({ page: 'instance', id: inst.id })
+          }}
           onDone={(inst) => {
             onClose()
             go({ page: 'instance', id: inst.id })

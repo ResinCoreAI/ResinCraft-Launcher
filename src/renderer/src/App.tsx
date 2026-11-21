@@ -1,25 +1,33 @@
 import {
+  ChevronDown,
   ChevronRight,
-  ChevronsUpDown,
   Compass,
   Home as HomeIcon,
   Layers,
+  Radar,
   Server,
   Settings as SettingsIcon,
   Shield,
   ShoppingBag,
   Smartphone,
+  Tv,
   Users,
   Zap
 } from 'lucide-react'
 import { OpenLinks } from './components/OpenLinks'
 import { useGamepad } from './gamepad'
-import { lazy, Suspense, type ReactNode } from 'react'
-import type { AccountView, Instance } from '@shared/types'
-import { ACCOUNT_KIND_SHORT, Avatar, BlockArt, ContextMenuHost, Dock, Logo, openContextMenu, type ContextEntry } from './components/ui'
+import { bigScreenPrefs, setBigScreen, toggleBigScreen, useBigScreen } from './bigScreen'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import type { AccountView } from '@shared/types'
+import { ACCOUNT_KIND_SHORT, Avatar, ContextMenuHost, Dock, Logo, openMenuBelow, type ContextEntry } from './components/ui'
 import DropImport from './components/DropImport'
 import OpenFiles from './components/OpenFiles'
 import WindowControls from './components/WindowControls'
+import QuickSearch from './components/QuickSearch'
+import InstanceDock from './components/InstanceDock'
+import LaunchScreen from './components/LaunchScreen'
+import PageGuide from './components/PageGuide'
+import HeaderNav from './components/HeaderNav'
 import { UpdateBanner, UpdateTitleButton } from './components/Updates'
 import { useRemoteActions } from './components/RemoteControl'
 import ThemeDecor, { SidebarPumpkin } from './components/ThemeDecor'
@@ -30,19 +38,21 @@ import { NativeBuildHost } from './components/HorizonNative'
 import { PackUpdatesBanner } from './components/PackUpdates'
 import { JoinAnswersNotice } from './components/ServerList'
 import { RelayWatcher } from './components/ServerRelay'
-import { isTauri } from './api'
+import { api, isTauri } from './api'
 import NewInstanceModal from './components/NewInstanceModal'
 import Home from './pages/Home'
-import Library, { useInstanceMenu } from './pages/Library'
+import Library from './pages/Library'
 import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
 import { useAdminStatus } from './adminStatus'
 import { useStoreOpen } from './storeStatus'
+import { decideWelcome, useWelcome } from './welcomeState'
 
 // Home and the Library are where the launcher opens; every other page (and what only it uses, like the theme
 // editor in Settings) loads on its first visit, so starting up parses less.
 const Servers = lazy(() => import('./pages/Servers'))
+const BigScreen = lazy(() => import('./components/BigScreen'))
 const InstancePage = lazy(() => import('./pages/InstancePage'))
 const Discover = lazy(() => import('./pages/Discover'))
 const QuickJoin = lazy(() => import('./pages/QuickJoin'))
@@ -51,59 +61,35 @@ const Bedrock = lazy(() => import('./pages/Bedrock'))
 const Horizon = lazy(() => import('./pages/Horizon'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const StorePage = lazy(() => import('./pages/Store'))
+const FindServers = lazy(() => import('./pages/FindServers'))
+const Report = lazy(() => import('./pages/Report'))
 const Admin = lazy(() => import('./pages/Admin'))
+// Only a brand-new launcher (or Settings → About) ever shows it.
+const Welcome = lazy(() => import('./components/Welcome'))
 
-const NAV: { page: Route['page']; label: Key; icon: ReactNode }[] = [
-  { page: 'home', label: 'nav.home', icon: <HomeIcon /> },
-  { page: 'library', label: 'nav.library', icon: <Layers /> },
-  { page: 'quickjoin', label: 'quickjoin.nav', icon: <Zap /> },
-  { page: 'bedrock', label: 'nav.bedrock', icon: <Smartphone /> },
+/**
+ * The header's pages, in three groups: `play` (what you already have) and `get` (where more comes from) are its
+ * links; `you` (your accounts and the launcher itself) sits at its right end, as icons and the account's menu.
+ */
+const NAV: { page: Route['page']; label: Key; icon: ReactNode; group: 'play' | 'get' | 'you' }[] = [
+  { page: 'home', label: 'nav.home', icon: <HomeIcon />, group: 'play' },
+  { page: 'library', label: 'nav.library', icon: <Layers />, group: 'play' },
+  { page: 'quickjoin', label: 'quickjoin.nav', icon: <Zap />, group: 'play' },
+  // The public server list: somewhere new to play.
+  { page: 'findservers', label: 'servers.find.nav', icon: <Radar />, group: 'play' },
+  { page: 'bedrock', label: 'nav.bedrock', icon: <Smartphone />, group: 'play' },
   // Horizon's own launcher (pages/Horizon.tsx) is hidden: Horizon instances and servers don't need it.
-  { page: 'discover', label: 'nav.discover', icon: <Compass /> },
-  { page: 'servers', label: 'servers.nav', icon: <Server /> },
+  { page: 'discover', label: 'nav.discover', icon: <Compass />, group: 'get' },
+  { page: 'servers', label: 'servers.nav', icon: <Server />, group: 'get' },
   // While ResinCraft Relay sells add-ons and packs (useStoreOpen).
-  { page: 'store', label: 'servers.store.nav', icon: <ShoppingBag /> },
-  { page: 'accounts', label: 'nav.accounts', icon: <Users /> },
-  { page: 'settings', label: 'nav.settings', icon: <SettingsIcon /> },
+  { page: 'store', label: 'servers.store.nav', icon: <ShoppingBag />, group: 'get' },
+  { page: 'accounts', label: 'nav.accounts', icon: <Users />, group: 'you' },
+  { page: 'settings', label: 'nav.settings', icon: <SettingsIcon />, group: 'you' },
   // Only for ResinCraft Relay's admin accounts (useAdminStatus).
-  { page: 'admin', label: 'servers.admin.nav', icon: <Shield /> }
+  { page: 'admin', label: 'servers.admin.nav', icon: <Shield />, group: 'you' }
 ]
 
-/** The sidebar's line under the account name. */
-const ACCOUNT_KIND: Record<AccountView['type'], Key> = { msa: 'app.microsoftAccount', bedrock: 'app.bedrockProfile', offline: 'app.offlineProfile' }
-
-const TITLES: Record<Route['page'], Key> = {
-  home: 'nav.home',
-  library: 'nav.library',
-  quickjoin: 'quickjoin.nav',
-  bedrock: 'nav.bedrock',
-  horizon: 'servers.horizon.nav',
-  instance: 'nav.library',
-  discover: 'nav.discover',
-  servers: 'servers.nav',
-  accounts: 'nav.accounts',
-  settings: 'nav.settings',
-  admin: 'servers.admin.nav',
-  store: 'servers.store.nav'
-}
-
-/** An instance under "Jump back in"; right-click for the same menu as its Library card. */
-function RecentItem({ inst, active, running }: { inst: Instance; active: boolean; running: boolean }) {
-  const { go } = useStore()
-  const menu = useInstanceMenu(inst)
-  return (
-    <>
-      <button className={`nav-item ${active ? 'active' : ''}`} onClick={() => go({ page: 'instance', id: inst.id })} onContextMenu={menu.open}>
-        <span className="nav-dot">{inst.iconUrl ? <img src={inst.iconUrl} alt="" /> : <BlockArt seed={inst.id} color={inst.color} />}</span>
-        <span className="ellipsis">{inst.name}</span>
-        {running && <span className="live" title={t('app.running')} />}
-      </button>
-      {menu.dialogs}
-    </>
-  )
-}
-
-/** The sidebar account chip's menu: switch the active account right here, or go manage them. */
+/** The header's account menu: switch the active account right here, or go manage them. */
 function accountMenu(accounts: AccountView[], pick: (a: AccountView) => void, manage: () => void): ContextEntry[] {
   return [
     ...accounts.map((a) => ({
@@ -119,100 +105,151 @@ function accountMenu(accounts: AccountView[], pick: (a: AccountView) => void, ma
 }
 
 export default function App() {
-  const { route, go, instances, games, accounts, activeAccount, switchAccount, toast, newInstanceOpen, setNewInstanceOpen, settings } = useStore()
+  const { route, go, instances, games, accounts, activeAccount, switchAccount, toast, newInstanceOpen, setNewInstanceOpen, settings, ready } = useStore()
+  const welcome = useWelcome()
+  useEffect(() => {
+    if (ready) decideWelcome(!accounts.length && !instances.length)
+  }, [ready])
   useRemoteActions()
+  // Discord's presence while no game runs says what the player is doing here (discord.rs `page_lines`). Sent once
+  // the page has settled for a moment: Discord only takes a few changes a minute.
+  const presenceName = route.page === 'instance' ? instances.find((i) => i.id === route.id)?.name : undefined
+  const presenceKind = route.page === 'discover' ? (route.kind ?? null) : null
+  useEffect(() => {
+    const timer = window.setTimeout(() => void api.app.discordPage(route.page, presenceKind, presenceName ?? null).catch(() => {}), 1200)
+    return () => window.clearTimeout(timer)
+  }, [route.page, presenceKind, presenceName])
   useGamepad(
     settings?.gamepad !== false,
-    (name) => toast(t('gamepad.connected', { name })),
+    (name) => {
+      // Big screen mode by itself when a controller connects, if the player asked for that.
+      if (bigScreenPrefs().autoController) void setBigScreen(true)
+      else toast(t('gamepad.connected', { name }))
+    },
     () => go({ page: 'home' })
   )
+  const bigScreen = useBigScreen()
+  // F11: big screen mode on or off.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'F11') return
+      e.preventDefault()
+      void toggleBigScreen()
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [])
   const isAdmin = useAdminStatus()
   const storeOpen = useStoreOpen()
   const current = route.page === 'instance' ? 'library' : route.page
   const instance = route.page === 'instance' ? instances.find((i) => i.id === route.id) : undefined
-  const recent = instances.filter((i) => i.lastPlayed || games[i.id]).slice(0, 6)
+  const nav = NAV.filter((n) => (n.page !== 'bedrock' || hasBedrockApp) && (n.page !== 'admin' || isAdmin) && (n.page !== 'store' || storeOpen))
+  const playing = Object.values(games).some((g) => g === 'running')
+
+  // The window buttons float over the header's right end; it keeps clear of however wide they are just now
+  // (an "Update" button joins them when there is one).
+  useEffect(() => {
+    const el = document.querySelector('.win-controls')
+    if (!el) return
+    const set = () => document.documentElement.style.setProperty('--win-w', `${Math.ceil(el.getBoundingClientRect().width)}px`)
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    set()
+    return () => ro.disconnect()
+  }, [])
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      {/* The site header, which is also the window's title bar. It keeps the class it had as a left bar, so themes
+          and custom CSS written for .sidebar still colour it. Its empty parts drag the window. */}
+      <header className="sidebar" data-tauri-drag-region>
         <div className="brand" data-tauri-drag-region>
           <Logo />
-          <div className="brand-name">
-            ResinCraft
-            <small>{t('app.tagline')}</small>
-          </div>
+          <div className="brand-name">ResinCraft</div>
         </div>
 
-        <nav className="nav">
-          {NAV.filter((n) => (n.page !== 'bedrock' || hasBedrockApp) && (n.page !== 'admin' || isAdmin) && (n.page !== 'store' || storeOpen)).map((n) => (
-            <button key={n.page} className={`nav-item ${current === n.page ? 'active' : ''}`} onClick={() => go({ page: n.page } as Route)}>
-              {n.icon}
-              <span className="ellipsis">{t(n.label)}</span>
-              {n.page === 'library' && instances.length > 0 && <span className="count">{instances.length}</span>}
-            </button>
-          ))}
-        </nav>
+        <HeaderNav
+          current={current}
+          onGo={(page) => go({ page } as Route)}
+          items={nav
+            .filter((n) => n.group !== 'you')
+            .map((n) => ({
+              page: n.page,
+              label: t(n.label),
+              icon: n.icon,
+              extra:
+                n.page === 'library' ? (
+                  <>
+                    {instances.length > 0 && <span className="count">{instances.length}</span>}
+                    {playing && <span className="live" title={t('app.running')} />}
+                  </>
+                ) : undefined
+            }))}
+        />
 
-        <div className="nav-label">{t('app.jumpBackIn')}</div>
-        <div className="nav nav-recent" style={{ marginTop: 0 }}>
-          {recent.length === 0 && (
-            <div className="hint" style={{ padding: '0 12px' }}>
-              {t('app.recentEmpty')}
+        <div className="head-tools" data-tauri-drag-region>
+          <QuickSearch pages={nav.map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))} />
+          <button className="head-btn" title={`${t('bigscreen.enter')} (F11)`} aria-label={t('bigscreen.enter')} onClick={() => void setBigScreen(true)}>
+            <Tv />
+          </button>
+          {nav
+            .filter((n) => n.group === 'you' && n.page !== 'accounts')
+            .map((n) => (
+              <button
+                key={n.page}
+                className={`head-btn ${current === n.page ? 'active' : ''}`}
+                title={t(n.label)}
+                aria-label={t(n.label)}
+                aria-current={current === n.page ? 'page' : undefined}
+                onClick={() => go({ page: n.page } as Route)}
+              >
+                {n.icon}
+              </button>
+            ))}
+          <button
+            className={`account-chip ${current === 'accounts' ? 'active' : ''}`}
+            title={accounts.length ? t('account.switch') : t('app.clickToSignIn')}
+            aria-haspopup={accounts.length ? 'menu' : undefined}
+            onClick={(e) => {
+              if (!accounts.length) return go({ page: 'accounts' })
+              const pick = (a: AccountView) => void switchAccount(a.id).then((ok) => ok && toast(t('account.switched', { name: a.username }), 'info'))
+              openMenuBelow(e.currentTarget, accountMenu(accounts, pick, () => go({ page: 'accounts' })), e.detail === 0, t('account.switch'))
+            }}
+          >
+            <Avatar account={activeAccount} size={26} />
+            <div className="who">
+              <b>{activeAccount?.username ?? t('app.notSignedIn')}</b>
             </div>
-          )}
-          {recent.map((i) => (
-            <RecentItem key={i.id} inst={i} active={route.page === 'instance' && route.id === i.id} running={games[i.id] === 'running'} />
-          ))}
+            {accounts.length > 0 && <ChevronDown className="chip-caret" />}
+          </button>
         </div>
-
-        <SidebarPumpkin />
-        <button
-          className="account-chip"
-          title={accounts.length ? t('account.switch') : undefined}
-          aria-haspopup={accounts.length ? 'menu' : undefined}
-          onClick={(e) => {
-            if (!accounts.length) return go({ page: 'accounts' })
-            // Opens upward from the chip's top-left (it sits at the bottom of the sidebar).
-            const r = e.currentTarget.getBoundingClientRect()
-            const pick = (a: AccountView) => void switchAccount(a.id).then((ok) => ok && toast(t('account.switched', { name: a.username }), 'info'))
-            openContextMenu(
-              { x: r.left, y: r.top - 4, keyboard: e.detail === 0, origin: e.currentTarget },
-              accountMenu(accounts, pick, () => go({ page: 'accounts' })),
-              t('account.switch')
-            )
-          }}
-        >
-          <Avatar account={activeAccount} size={34} />
-          <div className="who">
-            <b>{activeAccount?.username ?? t('app.notSignedIn')}</b>
-            <span>{t(activeAccount ? ACCOUNT_KIND[activeAccount.type] : 'app.clickToSignIn')}</span>
-          </div>
-          {accounts.length > 0 && <ChevronsUpDown className="chip-caret" />}
-        </button>
-      </aside>
+      </header>
 
       <main className="main">
-        <header className="topbar" data-tauri-drag-region>
-          <div className="crumb">
-            {instance ? (
-              <>
+        <div className="content">
+          {/* The way back from an instance; it scrolls away with the page. */}
+          {instance && (
+            <div className="topbar">
+              <div className="crumb">
                 <button onClick={() => go({ page: 'library' })}>{t('nav.library')}</button>
                 <ChevronRight size={14} />
                 <b>{instance.name}</b>
-              </>
-            ) : (
-              <b>{t(TITLES[route.page])}</b>
-            )}
-          </div>
-        </header>
-        <div className="content">
+              </div>
+            </div>
+          )}
           <Suspense fallback={null}>
             {route.page === 'home' && <Home />}
             {route.page === 'library' && <Library />}
             {route.page === 'quickjoin' && <QuickJoin />}
-            {route.page === 'instance' && <InstancePage key={route.id} id={route.id} tab={route.tab} />}
+            {route.page === 'instance' && <InstancePage key={`${route.id}:${route.tab ?? ''}`} id={route.id} tab={route.tab} />}
             {route.page === 'discover' && (
-              <Discover key={`${route.instanceId ?? ''}${route.kind ?? ''}`} initialKind={route.kind} instanceId={route.instanceId} build={route.build} />
+              <Discover
+                key={`${route.instanceId ?? ''}${route.kind ?? ''}${route.query ?? ''}`}
+                initialKind={route.kind}
+                instanceId={route.instanceId}
+                build={route.build}
+                initialQuery={route.query}
+              />
             )}
             {route.page === 'accounts' && <Accounts />}
             {route.page === 'bedrock' && <Bedrock />}
@@ -220,18 +257,37 @@ export default function App() {
             {route.page === 'settings' && <SettingsPage />}
             {route.page === 'admin' && <Admin />}
             {route.page === 'store' && <StorePage />}
+            {route.page === 'findservers' && <FindServers />}
+            {route.page === 'report' && <Report type={route.type} title={route.title} message={route.message} />}
             {route.page === 'servers' && <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />}
           </Suspense>
         </div>
       </main>
 
+      {welcome.open && (
+        <Suspense fallback={null}>
+          <Welcome />
+        </Suspense>
+      )}
       {newInstanceOpen && <NewInstanceModal onClose={() => setNewInstanceOpen(false)} />}
+      {bigScreen && (
+        <Suspense fallback={null}>
+          <BigScreen pages={nav.filter((n) => n.page !== 'home' && n.page !== 'library').map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))} />
+        </Suspense>
+      )}
+      <LaunchScreen />
+      <InstanceDock />
       <Dock />
+      <PageGuide />
       <UpdateBanner />
       <CrashFixer />
       <NativeBuildHost />
       <EasterEgg />
       <ThemeDecor />
+      {/* The holiday piece (a pumpkin, a Christmas chest) stands in the window's bottom-left corner. */}
+      <div className="shell-decor" aria-hidden>
+        <SidebarPumpkin />
+      </div>
       <ThemeAmbient />
       <PackUpdatesBanner />
       <JoinAnswersNotice />
@@ -242,6 +298,9 @@ export default function App() {
       <OpenLinks />
       {isTauri ? (
         <WindowControls />
+      ) : import.meta.env.DEV ? (
+        // The browser preview shows them, to see their style; they do nothing there.
+        <WindowControls live={false} />
       ) : (
         <div className="win-controls">
           <UpdateTitleButton />

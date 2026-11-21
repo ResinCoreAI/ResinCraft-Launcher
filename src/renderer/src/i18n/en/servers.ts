@@ -651,7 +651,8 @@ export default {
   'servers.settings.deleted': '{name} was deleted',
   'servers.settings.deleteBody': 'The server folder, including its worlds and backups, goes to the Recycle Bin.',
 
-  // The public server list (Discover → Servers, Settings → Server list).
+  // The public server list (its own page, Find servers; a hosted server's Settings → Server list).
+  'servers.find.nav': 'Find servers',
   'servers.list.subtitle': 'Servers hosted with ResinCraft and servers players added. Filter, like, and join in one click.',
   'servers.list.tab.content': 'Content',
   'servers.list.tab.servers': 'Servers',
@@ -680,12 +681,12 @@ export default {
   'servers.list.installJoinPlanHint': 'Makes an instance with {name}, the mods this server needs, then joins.',
   'servers.clientPack.section': 'Client pack',
   'servers.clientPack.title': 'Let players install this server’s mods',
-  'servers.clientPack.hint': 'Publish the mods players need as a pack. In Discover → Servers they get Install & join, which makes an instance with them and joins.',
+  'servers.clientPack.hint': 'Publish the mods players need as a pack. In Find servers they get Install & join, which makes an instance with them and joins.',
   'servers.clientPack.live': 'Published',
   'servers.clientPack.current': '{name} {version} · updated {when}',
   'servers.clientPack.from': 'Mods from',
   'servers.clientPack.titlePlain': 'Let players install a ready instance',
-  'servers.clientPack.hintPlain': 'Publish an instance for this server: client mods like Sodium, resource packs and shaders. In Discover → Servers players get Install & join, which makes the instance and joins.',
+  'servers.clientPack.hintPlain': 'Publish an instance for this server: client mods like Sodium, resource packs and shaders. In Find servers players get Install & join, which makes the instance and joins.',
   'servers.clientPack.fromPlain': 'Instance',
   'servers.clientPack.noInstancePlain': 'Make an instance with Minecraft {version}, add the client mods, resource packs and shaders you suggest, then publish it here.',
   'servers.clientPack.madeFrom': 'the server was made from it',
@@ -818,7 +819,7 @@ export default {
   "servers.list.announcementHint": "Players see it on your listing and on their Home if you are in their Quick join. {left} characters left.",
   'servers.list.settings.section': 'Server list',
   'servers.list.settings.show': 'Show in the ResinCraft server list',
-  'servers.list.settings.showHint': 'Anyone can find it in Discover → Servers and join. Off by default.',
+  'servers.list.settings.showHint': 'Anyone can find it in Find servers and join. Off by default.',
   'servers.list.settings.needsRelay': 'Start the server once with ResinCraft Relay to get its address, then list it here.',
   'servers.list.settings.unsupported': 'ResinCraft Relay doesn’t have the server list yet.',
   'servers.list.settings.joinHint': 'Turn on whitelist requests from the web page so players can ask to join from the list.',

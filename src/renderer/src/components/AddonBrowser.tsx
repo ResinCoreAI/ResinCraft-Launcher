@@ -390,7 +390,7 @@ export default function AddonBrowser({
               return (
                 <div key={h.id} className="result">
                   <div className="ico">
-                    {h.iconUrl ? <img src={h.iconUrl} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} /> : null}
+                    {h.iconUrl ? <img loading="lazy" decoding="async" src={h.iconUrl} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} /> : null}
                     <Puzzle />
                   </div>
                   <div className="grow" style={{ minWidth: 0 }}>

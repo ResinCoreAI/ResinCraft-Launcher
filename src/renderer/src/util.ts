@@ -124,3 +124,24 @@ export function greeting(): string {
   const h = new Date().getHours()
   return t(h < 5 ? 'greeting.late' : h < 12 ? 'greeting.morning' : h < 18 ? 'greeting.afternoon' : 'greeting.evening')
 }
+
+/** A new GitHub issue, with the version and system filled in (nothing is sent until the player submits it there). */
+export function issueUrl(version?: string, platform?: string): string {
+  const body = [
+    '**What happened?**',
+    '',
+    '',
+    '**What did you expect to happen?**',
+    '',
+    '',
+    '**Steps to make it happen again**',
+    '1. ',
+    '',
+    '---',
+    `ResinCraft Launcher ${version ? `v${version}` : '(version unknown)'} · ${platform ?? navigator.userAgent}`
+  ].join('\n')
+  return `https://github.com/ResinCoreAI/ResinCraft-Launcher/issues/new?body=${encodeURIComponent(body)}`
+}
+
+/** Mojang's usage guidelines ask for this line word for word, so it isn't translated. */
+export const DISCLAIMER = 'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.'

@@ -18,8 +18,18 @@ button.chip.pack-chip .mono {
 .update-banner.pack-updates {
   width: 360px;
 }
+/* How it arrives: its title and what to do about it, with the list a click away. */
+.update-banner.pack-updates.compact {
+  width: auto;
+  max-width: 360px;
+}
+.update-banner.pack-updates.compact .actions {
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
 .update-banner ~ .update-banner.pack-updates {
-  top: calc(var(--titlebar) + 150px);
+  bottom: calc(var(--float-bottom) + 150px);
 }
 .pack-updates-list {
   list-style: none;

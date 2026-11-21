@@ -356,7 +356,7 @@ export default function ServerAddons({ s, area }: { s: ServerInfo; area?: AddonA
                   {on && <Check strokeWidth={3} />}
                 </button>
                 <div className="ico">
-                  {a.iconUrl ? <img src={a.iconUrl} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} /> : <Puzzle />}
+                  {a.iconUrl ? <img loading="lazy" decoding="async" src={a.iconUrl} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} /> : <Puzzle />}
                 </div>
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="title ellipsis">

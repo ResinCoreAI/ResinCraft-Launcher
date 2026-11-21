@@ -62,6 +62,8 @@ export default function Skin3D({
       v.controls.removeEventListener('start', hold)
       v.controls.removeEventListener('end', release)
       v.dispose()
+      // Give the WebGL context back now rather than whenever it's garbage collected.
+      v.renderer.forceContextLoss()
       viewer.current = undefined
     }
   }, [width, height])

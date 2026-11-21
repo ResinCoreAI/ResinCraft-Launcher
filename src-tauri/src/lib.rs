@@ -26,6 +26,7 @@ pub mod player;
 pub mod server;
 pub mod remote;
 pub mod remoteview;
+pub mod report;
 pub mod tray;
 pub mod webview;
 pub mod webstorage;
@@ -43,7 +44,30 @@ async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, Value> {
     })
 }
 
+/// ResinCraft's identity on the taskbar: the same id tauri.conf.json has (`identifier`), which the installer also
+/// puts on ResinCraft's own shortcuts.
+#[cfg(windows)]
+const APP_ID: &str = "ai.resincore.resincraft";
+
+/// Tells Windows which app this process is, before any window exists. Without it, a launcher started from an
+/// instance's desktop shortcut (core/shortcut.rs) is taken for that shortcut: its taskbar button wears the
+/// instance's icon instead of ResinCraft's, and doesn't sit with a pinned ResinCraft.
+#[cfg(windows)]
+fn claim_taskbar_identity() {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+    // A Store (MSIX) copy already has its identity from the package; setting another one would split its taskbar
+    // button from the pinned Store app.
+    if crate::updater::packaged() {
+        return;
+    }
+    // Safety: a plain Win32 call with a string that outlives it. A failure only leaves things as they were.
+    let _ = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(APP_ID)) };
+}
+
 pub fn run() {
+    #[cfg(windows)]
+    claim_taskbar_identity();
     tauri::Builder::default()
         // A second start (e.g. while hidden in the tray) brings the running ResinCraft back instead, with the file it was
         // asked to open (a theme, backup or modpack double-clicked in Windows).
@@ -120,4 +144,13 @@ pub fn run() {
                 tauri::async_runtime::block_on(server::runtime::shutdown_all(std::time::Duration::from_secs(20)));
             }
         });
+}
+
+#[cfg(all(test, windows))]
+mod taskbar_identity {
+    #[test]
+    fn app_id_is_the_configured_identifier() {
+        let conf = include_str!("../tauri.conf.json");
+        assert!(conf.contains(&format!("\"identifier\": \"{}\"", super::APP_ID)), "APP_ID must match tauri.conf.json's identifier");
+    }
 }

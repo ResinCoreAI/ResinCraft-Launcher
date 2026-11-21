@@ -26,6 +26,9 @@ import settings from './settings'
 import storage from './storage'
 import tabs from './tabs'
 import updates from './updates'
+import gamepad from './gamepad'
+import welcome from './welcome'
+import extras from './extras'
 
 const en = {
   ...common,
@@ -36,6 +39,8 @@ const en = {
   ...storage,
   ...backups,
   ...home,
+  ...welcome,
+  ...extras,
   ...library,
   ...bedrock,
   ...discover,
@@ -53,6 +58,7 @@ const en = {
   ...friends,
   ...commands,
   ...updates,
+  ...gamepad,
   ...engine
 }
 export default en

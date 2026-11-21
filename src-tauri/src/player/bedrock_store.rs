@@ -273,7 +273,13 @@ pub async fn run(edition: Edition, mode: Mode) -> Result<Outcome> {
         Edition::Release => "release",
         Edition::Preview => "preview",
     });
-    Task::run(title, Some(owner), move |task: Arc<Task>| async move {
+    Task::run(title, Some(owner), move |task: Arc<Task>| async move { run_in(&task, edition, mode).await }).await
+}
+
+/// Installs, updates or repairs an edition inside a task that is already running (a version switch puts the Store
+/// version back this way), showing the Store's progress on it.
+pub(crate) async fn run_in(task: &Task, edition: Edition, mode: Mode) -> Result<Outcome> {
+    {
         use tokio::io::{AsyncBufReadExt, BufReader};
         task.update(tr!("bedrock.store.queued", "Waiting for the Microsoft Store"), None);
         // The ids are fixed strings; the script has no double quotes, so it passes through -Command as it is.
@@ -290,7 +296,7 @@ pub async fn run(edition: Edition, mode: Mode) -> Result<Outcome> {
         let mut lines = BufReader::new(child.stdout.take().expect("piped")).lines();
         let mut result = None;
         while let Some(line) = lines.next_line().await? {
-            if let Some(r) = parse_line(&line).and_then(|l| step(&task, edition, mode, l)) {
+            if let Some(r) = parse_line(&line).and_then(|l| step(task, edition, mode, l)) {
                 result = Some(r);
                 break;
             }
@@ -299,8 +305,7 @@ pub async fn run(edition: Edition, mode: Mode) -> Result<Outcome> {
         guard.armed = false;
         let _ = child.wait().await;
         result.unwrap_or_else(|| Err(failure(edition, mode, 0x8000_4005, "")))
-    })
-    .await
+    }
 }
 
 #[cfg(test)]

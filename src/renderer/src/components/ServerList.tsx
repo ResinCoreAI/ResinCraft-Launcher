@@ -1,9 +1,9 @@
-// Discover → Servers: the public server list on ResinCraft Relay (relay protocol 8). Servers hosted through the relay
+// Find servers (pages/FindServers.tsx): the public server list on ResinCraft Relay (relay protocol 8). Servers hosted through the relay
 // whose owner listed them, plus servers players submitted (the relay's admin approves those). Players filter, like,
 // report and join them, and ask ResinCraft servers to whitelist them under their own Minecraft account.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  Megaphone, ArrowLeft, Check, Clock, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
+  Megaphone, ArrowLeft, Check, Clock, Copy, Download, ExternalLink, Flag, Heart, Loader2, Gamepad2, MessageCircle, Package, Pin, Plus, Search, Server, SlidersHorizontal, Smartphone, Star, Trash2, Upload, UserPlus, UserRound, Users, Zap } from 'lucide-react'
 import type { AskJoinOutcome, ClientPackChoices, ClientPackInfo, Instance, JoinAnsweredEvent, JoinState, ListedServer, ListingInfo, ListingState, MyListing, ServerInfo, ServerListing, ServerListModpack, ServerListQuery } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -341,6 +341,8 @@ export function ServerList() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showMine, setShowMine] = useState(false)
+  /** The filters people reach for less (language, modded, modpack, the two switches), folded under one button. */
+  const [moreOpen, setMoreOpen] = useState(false)
   const [reporting, setReporting] = useState<ListedServer>()
   /** The server whose own page is open (the list stays loaded underneath). */
   const [open, setOpen] = useState<ListedServer>()
@@ -439,29 +441,22 @@ export function ServerList() {
     )
   }
 
+  const moreActive = [lang, modded, modpack].filter(Boolean).length + (online ? 1 : 0) + (offline ? 1 : 0)
+  const [hero, ...recommended] = error ? [] : featured
+  const card = (s: ListedServer) => (
+    <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} onOpen={() => setOpen(s)} />
+  )
+
   return (
     <div className="server-list">
-      <div className="toolbar">
+      {/* The admin's first recommended (or sponsored) server, front and centre. */}
+      {hero && <FeaturedServer s={hero} onLike={() => void like(hero)} onReport={() => setReporting(hero)} onOpen={() => setOpen(hero)} />}
+
+      <div className="toolbar sl-bar">
         <div className="search">
           <Search />
           <input className="input" placeholder={t('servers.list.search')} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         </div>
-        <select className="select" value={sort} aria-label={t('servers.list.sort')} onChange={(e) => setSort(e.target.value as typeof sort)}>
-          {SORTS.map((s) => (
-            <option key={s} value={s}>
-              {t(`servers.list.sort.${s}` as Key)}
-            </option>
-          ))}
-        </select>
-        <span className="grow" />
-        <button className="btn sm" onClick={() => setShowMine(true)}>
-          {t('servers.list.mine')}
-        </button>
-        <button className="btn sm primary" onClick={() => setSubmitting(true)}>
-          <Plus /> {t('servers.list.submit')}
-        </button>
-      </div>
-      <div className="toolbar wrap">
         <select className="select" value={edition} aria-label={t('servers.list.field.edition')} onChange={(e) => setEdition(e.target.value as typeof edition)}>
           <option value="">{t('servers.list.allEditions')}</option>
           <option value="java">Java</option>
@@ -475,40 +470,64 @@ export function ServerList() {
             </option>
           ))}
         </select>
-        <select className="select" value={lang} aria-label={t('servers.list.field.language')} onChange={(e) => setLang(e.target.value)}>
-          <option value="">{t('servers.list.allLanguages')}</option>
-          {LANGUAGES.map((l) => (
-            <option key={l} value={l}>
-              {languageLabel(l)}
+        <select className="select" value={sort} aria-label={t('servers.list.sort')} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          {SORTS.map((s) => (
+            <option key={s} value={s}>
+              {t(`servers.list.sort.${s}` as Key)}
             </option>
           ))}
         </select>
-        <select className="select" value={modded} aria-label={t('servers.list.field.modded')} onChange={(e) => setModded(e.target.value as typeof modded)}>
-          <option value="">{t('servers.list.moddedAny')}</option>
-          <option value="no">{t('servers.list.moddedNo')}</option>
-          <option value="yes">{t('servers.list.moddedYes')}</option>
-        </select>
-        {(packs.length > 0 || modpack) && (
-          <select className="select" value={modpack} aria-label={t('servers.list.modpack')} onChange={(e) => setModpack(e.target.value)}>
-            <option value="">{t('servers.list.allModpacks')}</option>
-            {modpack && !packs.some((m) => packKey(m) === modpack) && <option value={modpack}>{modpack.replace(/^[a-z]+:/, '')}</option>}
-            {packs.map((m) => (
-              <option key={packKey(m)} value={packKey(m)}>
-                {t('servers.list.modpackOption', { name: m.name, count: m.servers })}
+        <button className={`btn ${moreOpen || moreActive ? 'on' : ''}`} aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
+          <SlidersHorizontal /> {t('servers.list.moreFilters')}
+          {moreActive > 0 && <span className="sl-count">{moreActive}</span>}
+        </button>
+        <button className="btn" onClick={() => setShowMine(true)}>
+          {t('servers.list.mine')}
+        </button>
+        <button className="btn primary" onClick={() => setSubmitting(true)}>
+          <Plus /> {t('servers.list.submit')}
+        </button>
+      </div>
+      {moreOpen && (
+        <div className="toolbar wrap sl-more">
+          <select className="select" value={lang} aria-label={t('servers.list.field.language')} onChange={(e) => setLang(e.target.value)}>
+            <option value="">{t('servers.list.allLanguages')}</option>
+            {LANGUAGES.map((l) => (
+              <option key={l} value={l}>
+                {languageLabel(l)}
               </option>
             ))}
           </select>
-        )}
-        <label className="inline-switch">
-          <Switch on={online} onChange={setOnline} label={t('servers.list.onlineOnly')} />
-          {t('servers.list.onlineOnly')}
-        </label>
-        <label className="inline-switch">
-          <Switch on={offline} onChange={setOffline} label={t('servers.list.offlineOk')} />
-          {t('servers.list.offlineOk')}
-        </label>
-      </div>
-      <div className="tag-picker filters" role="group" aria-label={t('servers.list.field.tags')}>
+          <select className="select" value={modded} aria-label={t('servers.list.field.modded')} onChange={(e) => setModded(e.target.value as typeof modded)}>
+            <option value="">{t('servers.list.moddedAny')}</option>
+            <option value="no">{t('servers.list.moddedNo')}</option>
+            <option value="yes">{t('servers.list.moddedYes')}</option>
+          </select>
+          {(packs.length > 0 || modpack) && (
+            <select className="select" value={modpack} aria-label={t('servers.list.modpack')} onChange={(e) => setModpack(e.target.value)}>
+              <option value="">{t('servers.list.allModpacks')}</option>
+              {modpack && !packs.some((m) => packKey(m) === modpack) && <option value={modpack}>{modpack.replace(/^[a-z]+:/, '')}</option>}
+              {packs.map((m) => (
+                <option key={packKey(m)} value={packKey(m)}>
+                  {t('servers.list.modpackOption', { name: m.name, count: m.servers })}
+                </option>
+              ))}
+            </select>
+          )}
+          <label className="inline-switch">
+            <Switch on={online} onChange={setOnline} label={t('servers.list.onlineOnly')} />
+            {t('servers.list.onlineOnly')}
+          </label>
+          <label className="inline-switch">
+            <Switch on={offline} onChange={setOffline} label={t('servers.list.offlineOk')} />
+            {t('servers.list.offlineOk')}
+          </label>
+        </div>
+      )}
+      <div className="tag-picker filters sl-cats" role="group" aria-label={t('servers.list.field.tags')}>
+        <button className={`tag-toggle ${tags.length === 0 ? 'on' : ''}`} aria-pressed={tags.length === 0} onClick={() => setTags([])}>
+          {t('common.all')}
+        </button>
         {CATEGORIES.map((c) => (
           <button key={c} className={`tag-toggle ${tags.includes(c) ? 'on' : ''}`} aria-pressed={tags.includes(c)} onClick={() => toggleTag(c)}>
             {tagLabel(c)}
@@ -523,19 +542,21 @@ export function ServerList() {
           ))}
       </div>
 
-      {!error && featured.length > 0 && (
+      {recommended.length > 0 && (
         <section className="featured-servers" aria-label={t('servers.list.featured')}>
-          <h2>
+          <h2 className="sl-head">
             <Star /> {t('servers.list.featured')}
           </h2>
-          <div className="server-grid">
-            {featured.map((s) => (
-              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} onOpen={() => setOpen(s)} />
-            ))}
-          </div>
+          <div className="server-grid">{recommended.map(card)}</div>
         </section>
       )}
 
+      {servers !== undefined && !error && servers.length > 0 && (
+        <h2 className="sl-head">
+          {t('servers.list.allServers')}
+          <span className="hint">{total}</span>
+        </h2>
+      )}
       {servers === undefined ? (
         <div className="server-grid">
           {Array.from({ length: 6 }, (_, i) => (
@@ -552,11 +573,7 @@ export function ServerList() {
         </Empty>
       ) : (
         <>
-          <div className="server-grid">
-            {servers.map((s) => (
-              <ServerCard key={s.id} s={s} onLike={() => void like(s)} onReport={() => setReporting(s)} onTag={(tag) => !tags.includes(tag) && toggleTag(tag)} onModpack={setModpack} onOpen={() => setOpen(s)} />
-            ))}
-          </div>
+          <div className="server-grid">{servers.map(card)}</div>
           {servers.length < total && (
             <div className="load-more">
               <button className="btn" disabled={loadingMore} onClick={() => void load(page + 1)}>
@@ -755,14 +772,88 @@ function JoinButtons({ s, a, size = 'sm', ask = true }: { s: ListedServer; a: Re
   )
 }
 
+/** A colour of its own for a server without an icon: the same every time for the same name. */
+function hueOf(name: string): number {
+  let h = 0
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360
+  return h
+}
+
+/**
+ * The first recommended server, shown big above the list: its picture across the whole width, and a plate with its
+ * name, what it is, whether it's up, and Join.
+ */
+function FeaturedServer({ s, onLike, onReport, onOpen }: { s: ListedServer; onLike: () => void; onReport: () => void; onOpen: () => void }) {
+  const a = useServerActions(s, onReport)
+  return (
+    <section className="server-hero" aria-label={t('servers.list.featured')} style={{ '--server-hue': hueOf(s.title) } as React.CSSProperties}>
+      <div className="server-hero-pic" aria-hidden>
+        {s.icon && <img loading="lazy" decoding="async" className="blur" src={s.icon} alt="" />}
+        {s.icon ? <img loading="lazy" decoding="async" className="mark" src={s.icon} alt="" /> : <span className="mark fallback"><Server /></span>}
+      </div>
+      <div className="server-hero-plate">
+        <div className="server-hero-tags">
+          {s.promo === 'sponsored' ? (
+            <span className="chip warn compact" title={t('servers.list.sponsoredHint')}>
+              {t('servers.list.sponsored')}
+            </span>
+          ) : (
+            <span className="chip success compact" title={t('servers.list.recommendedHint')}>
+              <Star /> {t('servers.list.recommended')}
+            </span>
+          )}
+          {s.resincraft && <span className="chip accent compact">ResinCraft</span>}
+        </div>
+        <h2>
+          <button className="link server-title" onClick={onOpen}>
+            {s.title}
+          </button>
+        </h2>
+        {s.description && <p>{s.description}</p>}
+        <div className="server-meta">
+          <span className={`dot ${s.online ? 'on' : ''}`} aria-hidden />
+          {s.online ? (
+            <span>
+              <Users /> {t('servers.list.players', { count: s.players, max: s.max_players })}
+            </span>
+          ) : (
+            <span>{t('servers.list.offline')}</span>
+          )}
+          <span>{versionsText(s)}</span>
+          {a.bedrockOk && (
+            <span className="chip success compact">
+              <Smartphone /> <BedrockCanJoin s={s} />
+            </span>
+          )}
+        </div>
+        <div className="row server-hero-actions">
+          <JoinButtons s={s} a={a} size="" />
+          <button className="btn" onClick={() => void a.copy(s.address)}>
+            <Copy /> {t('servers.connect.copy')}
+          </button>
+          <button className={`btn icon like ${s.liked ? 'on' : ''}`} aria-pressed={!!s.liked} title={t(s.liked ? 'servers.list.unlike' : 'servers.list.like')} onClick={onLike}>
+            <Heart />
+          </button>
+          <span className="hint">{s.likes}</span>
+          <MoreButton items={a.menu} />
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function ServerCard({ s, onLike, onReport, onTag, onModpack, onOpen }: { s: ListedServer; onLike: () => void; onReport: () => void; onTag: (tag: string) => void; onModpack: (key: string) => void; onOpen: () => void }) {
   const a = useServerActions(s, onReport)
   const { bedrockOk, copy } = a
   return (
     <article className="card server-card">
+      {/* The picture: the server's own icon, enlarged and out of focus, as a band across the top. */}
+      <div className="server-pic" aria-hidden style={{ '--server-hue': hueOf(s.title) } as React.CSSProperties}>
+        {s.icon && <img loading="lazy" decoding="async" src={s.icon} alt="" />}
+      </div>
       <header>
         <button className="server-open" title={t('servers.list.openPage', { name: s.title })} onClick={onOpen}>
-          {s.icon ? <img className="server-icon" src={s.icon} alt="" /> : <span className="server-icon fallback" aria-hidden><Server /></span>}
+          {s.icon ? <img loading="lazy" decoding="async" className="server-icon" src={s.icon} alt="" /> : <span className="server-icon fallback" aria-hidden><Server /></span>}
         </button>
         <div className="grow">
           <h3 title={s.title}>
@@ -811,6 +902,11 @@ function ServerCard({ s, onLike, onReport, onTag, onModpack, onOpen }: { s: List
         <p className="server-desc" onClick={onOpen}>
           {s.description}
         </p>
+      )}
+      {s.online && s.max_players > 0 && (
+        <div className="server-fill" title={t('servers.list.players', { count: s.players, max: s.max_players })}>
+          <i style={{ width: `${Math.min(100, Math.max(3, (s.players / s.max_players) * 100))}%` }} />
+        </div>
       )}
       <div className="server-tags">
         {s.modpack && (
@@ -870,7 +966,7 @@ function ServerPage({ s, onBack, onLike, onReport, onTag, onModpack }: { s: List
         <ArrowLeft /> {t('servers.list.back')}
       </button>
       <header className="card server-page-head">
-        {s.icon ? <img className="server-icon big" src={s.icon} alt="" /> : <span className="server-icon big fallback" aria-hidden><Server /></span>}
+        {s.icon ? <img loading="lazy" decoding="async" className="server-icon big" src={s.icon} alt="" /> : <span className="server-icon big fallback" aria-hidden><Server /></span>}
         <div className="grow">
           <h1>{s.title}</h1>
           <div className="server-meta">
@@ -1144,7 +1240,7 @@ function ReportServer({ s, onClose }: { s: ListedServer; onClose: () => void }) 
   )
 }
 
-/** A hosted server's Settings → Server list: off by default; on lists it in Discover → Servers for everyone. */
+/** A hosted server's Settings → Server list: off by default; on lists it in Find servers for everyone. */
 export function ServerListSettings({ s }: { s: ServerInfo }) {
   const { toast } = useStore()
   const [l, setL] = useState<ServerListing>()
@@ -1419,13 +1515,8 @@ export function JoinAnswersNotice() {
   )
   if (!shown.length) return null
   const open = () => {
-    try {
-      sessionStorage.setItem('resin.discoverView', 'servers')
-    } catch {
-      /* private storage: Discover opens on content */
-    }
     setShown([])
-    go({ page: 'discover' })
+    go({ page: 'findservers' })
   }
   return (
     <div className="update-banner join-answers" role="status">

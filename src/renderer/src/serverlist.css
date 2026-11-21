@@ -456,8 +456,8 @@
   letter-spacing: 0.04em;
   user-select: all;
 }
-/* Where the launcher folds its side menus away (styles.css, 1100px), the relay menu becomes a row of tabs. */
-@media (max-width: 1100px) {
+/* Where the launcher folds its side menus away (styles.css, 880px), the relay menu becomes a row of tabs. */
+@media (max-width: 880px) {
   .admin-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
@@ -677,3 +677,440 @@
 .pay-admin .pay-ended { margin-top: 10px; }
 .pay-admin .pay-ended > summary { cursor: pointer; color: var(--text-dim); font-size: 13px; padding: 4px 2px; }
 .pay-admin .pay-ended[open] > summary { margin-bottom: 8px; }
+
+/* ---------- Admin: the Split layout (pages/Admin.tsx) ---------- */
+
+/* Signing in: the page's name over a picture of a shield on one side, the form on the other. */
+.admin-gate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  min-height: min(640px, calc(100vh - 140px));
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 6px);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.admin-gate-art {
+  grid-row: 1;
+  grid-column: 1;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 30%, transparent 85%);
+  mask-image: radial-gradient(circle at 50% 45%, #000 30%, transparent 85%);
+}
+.admin-gate-shield {
+  width: 150px;
+  height: 170px;
+  animation: page-in 0.5s var(--ease) 0.05s backwards;
+}
+.admin-gate-shield path,
+.admin-gate-shield rect {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.admin-gate-shield > path:first-child {
+  fill: var(--accent-soft);
+}
+.admin-gate-shield circle {
+  fill: var(--play);
+}
+.admin-gate-text {
+  grid-row: 2;
+  grid-column: 1;
+  padding: 0 40px 40px;
+}
+.admin-gate-text h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+}
+.admin-gate-text p {
+  margin: 0;
+  max-width: 380px;
+  color: var(--text-dim);
+}
+.admin-gate .admin-unlock {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  justify-self: center;
+  width: min(400px, calc(100% - 64px));
+  max-width: none;
+  padding: 0;
+  gap: 12px;
+  border-left: 0;
+}
+.admin-gate::before {
+  content: '';
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  z-index: -1;
+}
+.admin-gate {
+  isolation: isolate;
+}
+.admin-unlock h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+.admin-unlock h2 svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+.admin-unlock .input {
+  height: 44px;
+}
+.admin-code {
+  font: 600 20px var(--mono) !important;
+  letter-spacing: 0.3em;
+}
+.admin-unlock-go {
+  height: 46px;
+  margin-top: 6px;
+}
+@media (max-width: 820px) {
+  .admin-gate {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+  .admin-gate-art {
+    min-height: 200px;
+  }
+  .admin-gate .admin-unlock {
+    grid-row: 3;
+    grid-column: 1;
+    padding: 28px 0 36px;
+  }
+  .admin-gate::before {
+    display: none;
+  }
+}
+
+/* The relay screens: a panel that stays on the left, the screen on the right. */
+.admin-split {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.admin-aside {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+.admin-aside h1 {
+  margin: 0;
+  font-size: 26px;
+}
+.admin-aside .hint {
+  margin: 2px 0 0;
+}
+/* The relay's state and switches, stacked to fit the panel. */
+.admin-aside .admin-service {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.admin-aside .admin-service .setting {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+}
+.admin-aside .admin-service .setting + .setting {
+  margin-top: 12px;
+}
+.admin-aside .admin-service .row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.admin-aside .admin-service .row .btn {
+  width: 100%;
+  padding: 0 6px;
+}
+.admin-aside .admin-nav {
+  position: static;
+  display: flex;
+  flex-direction: column;
+}
+.admin-aside-foot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.admin-split .admin-section-title {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+@media (max-width: 980px) {
+  .admin-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-aside {
+    position: static;
+    max-height: none;
+  }
+  .admin-aside .admin-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+/* The admin's note to the player on a purchase (Admin › Payments). */
+.admin-note {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* ---------- Find servers: the Showcase layout (components/ServerList.tsx) ---------- */
+
+/* The featured server: its picture across the page, a plate with its name and Join in the corner. */
+.server-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  min-height: 280px;
+  margin: 0 0 22px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 6px);
+  background: radial-gradient(120% 120% at 85% 10%, hsl(var(--server-hue) 60% 32%) 0, hsl(var(--server-hue) 40% 14%) 45%, var(--bg) 80%);
+}
+.server-hero-pic {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.server-hero-pic .blur {
+  position: absolute;
+  inset: -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  object-fit: cover;
+  filter: blur(48px) saturate(1.3);
+  opacity: 0.55;
+}
+.server-hero-pic .mark {
+  position: absolute;
+  right: 7%;
+  top: 50%;
+  width: clamp(120px, 18vw, 200px);
+  height: clamp(120px, 18vw, 200px);
+  border-radius: 28%;
+  object-fit: cover;
+  transform: translateY(-50%) rotate(-6deg);
+  border: 1px solid var(--border-strong);
+  image-rendering: pixelated;
+}
+.server-hero-pic .mark.fallback {
+  display: grid;
+  place-items: center;
+  background: hsl(var(--server-hue) 55% 45%);
+  color: #fff;
+}
+.server-hero-pic .mark.fallback svg {
+  width: 40%;
+  height: 40%;
+}
+.server-hero-plate {
+  position: relative;
+  width: min(580px, 100%);
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--bg);
+}
+.server-hero-tags {
+  display: flex;
+  gap: 6px;
+}
+.server-hero-plate h2 {
+  margin: 8px 0 6px;
+  font-size: 30px;
+  line-height: 1.1;
+}
+.server-hero-plate h2 .server-title {
+  font: inherit;
+  color: var(--text);
+}
+.server-hero-plate p {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+}
+.server-hero-actions {
+  margin-top: 16px;
+  gap: 8px;
+  align-items: center;
+}
+.server-hero-actions .btn:not(.icon) {
+  height: 42px;
+  padding: 0 18px;
+}
+.server-hero-actions .btn.icon {
+  width: 42px;
+  height: 42px;
+}
+@media (max-width: 760px) {
+  .server-hero-pic .mark {
+    display: none;
+  }
+}
+
+/* One row: search, the main filters, and the buttons; the rest folds under More filters. */
+.sl-bar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sl-bar .search {
+  flex: 1 1 260px;
+}
+.sl-bar .btn.on {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.sl-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: 600 11px var(--mono);
+}
+.sl-more {
+  margin-top: -4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+/* The categories as round chips, All first. */
+.sl-cats .tag-toggle {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.sl-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  font: 600 20px var(--font-display);
+}
+.sl-head svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+.sl-head .hint {
+  font: 500 13px var(--mono);
+}
+/* The recommended row sits on the page like the rest, under its own heading. */
+.server-list .featured-servers {
+  margin: 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* The cards: a picture band on top, the icon set on its edge. */
+.server-grid .server-card {
+  position: relative;
+  overflow: hidden;
+  padding-top: 0;
+}
+.server-pic {
+  position: relative;
+  height: 84px;
+  margin: 0 -14px;
+  overflow: hidden;
+  background: linear-gradient(135deg, hsl(var(--server-hue) 55% 40%), hsl(var(--server-hue) 45% 18%));
+}
+.server-pic img {
+  position: absolute;
+  inset: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  object-fit: cover;
+  filter: blur(26px) saturate(1.3);
+  opacity: 0.85;
+}
+/* Only the icon reaches up into the picture; the name sits beside it, on the card. The header itself stays
+   unpositioned, so the heart (below) is placed against the card and lands on the picture. */
+.server-grid .server-card header > :not(.like) {
+  position: relative;
+  z-index: 1;
+}
+.server-grid .server-card .server-open {
+  margin-top: -32px;
+}
+.server-grid .server-card .server-icon {
+  width: 56px;
+  height: 56px;
+  border: 3px solid var(--surface);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.server-grid .server-card .like {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+}
+.server-grid .server-card .like:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.server-grid .server-card .like.on svg {
+  fill: currentColor;
+  color: #ff6b8a;
+}
+.server-grid .server-card header .grow {
+  padding-top: 2px;
+}
+/* How full it is. */
+.server-fill {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.server-fill i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--play);
+}

@@ -580,7 +580,7 @@
 }
 
 /* Four cells only fit side by side on wide windows: two by two below that. */
-@media (max-width: 1280px) {
+@media (max-width: 1050px) {
   .sv-connect.four {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

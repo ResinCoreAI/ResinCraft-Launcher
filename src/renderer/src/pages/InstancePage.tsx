@@ -26,6 +26,7 @@ import {
   ScrollText,
   Search,
   Settings2,
+  SlidersHorizontal,
   Sparkles,
   Square,
   Timer,
@@ -36,7 +37,19 @@ import {
 } from 'lucide-react'
 import type { ContentItem, ContentKind, Instance, InstanceImage, JavaInstall } from '@shared/types'
 import { api } from '../api'
-import { ConfirmModal, Empty, fromKeyboard, InstanceTile, openContextMenu, PlayButton, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
+import {
+  ConfirmModal,
+  Empty,
+  fromKeyboard,
+  InstanceProgress,
+  InstanceTile,
+  openContextMenu,
+  PlayButton,
+  Segmented,
+  Switch,
+  useCopy,
+  type ContextEntry
+} from '../components/ui'
 import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../components/LaunchCommands'
 import { isLive, useStore } from '../store'
 import { bytes, COLORS, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
@@ -49,11 +62,13 @@ import { DeleteInstance } from './Library'
 import { Camera, Earth, FolderInput, FolderTree, NotebookPen, Server } from 'lucide-react'
 import CopyFromModal from '../components/CopyFromModal'
 import NotesTab from '../components/NotesTab'
+import GameOptionsTab from '../components/GameOptions'
 import ScreenshotsTab from '../components/ScreenshotsTab'
 import ServersTab from '../components/ServersTab'
 import WorldsTab from '../components/WorldsTab'
 import { OptifineSteps, optifineFits, optifineHow } from '../components/Optifine'
 import { InstanceMulticore } from '../components/Multicore'
+import { InstanceController } from '../components/ControllerSupport'
 import { InstanceRtxRemix } from '../components/RtxRemix'
 import { OwnPackChip, PackDetailsModal } from '../components/OwnPack'
 import { instanceOwner, PackChip, PackVersionSetting } from '../components/PackVersion'
@@ -65,7 +80,7 @@ import { GameMemoryChip } from '../components/Memory'
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
 const FileManager = lazy(() => import('../components/FileManager'))
 
-type Tab = 'content' | 'worlds' | 'servers' | 'screenshots' | 'notes' | 'files' | 'logs' | 'settings'
+type Tab = 'content' | 'worlds' | 'servers' | 'screenshots' | 'notes' | 'files' | 'logs' | 'options' | 'settings'
 
 export default function InstancePage({ id, tab: initialTab }: { id: string; tab?: Tab }) {
   const { instances, go, games, activeAccount } = useStore()
@@ -96,7 +111,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
     <div className="page">
       {inst.bannerUrl && (
         <div className="ibanner" aria-hidden="true">
-          <img src={inst.bannerUrl} alt="" />
+          <img loading="lazy" decoding="async" src={inst.bannerUrl} alt="" />
         </div>
       )}
       <div className={`ihead ${inst.bannerUrl ? 'on-banner' : ''}`}>
@@ -153,6 +168,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         </button>
         <PlayButton inst={inst} size="lg" />
       </div>
+      <InstanceProgress id={inst.id} />
       {exporting && <ExportModal inst={inst} onClose={() => setExporting(false)} />}
       {copyingFrom && <CopyFromModal inst={inst} onClose={() => setCopyingFrom(false)} onCopied={() => setCopies((n) => n + 1)} />}
       {editingPack && (
@@ -187,6 +203,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         <button className={tab === 'logs' ? 'on' : ''} onClick={() => setTab('logs')}>
           <ScrollText /> {t('instance.tab.logs')}
         </button>
+        <button className={tab === 'options' ? 'on' : ''} onClick={() => setTab('options')}>
+          <SlidersHorizontal /> {t('options.tab')}
+        </button>
         <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>
           <Settings2 /> {t('instance.tab.settings')}
         </button>
@@ -207,6 +226,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
           />
         </Suspense>
       )}
+      {tab === 'options' && <GameOptionsTab inst={inst} />}
       {tab === 'settings' && <SettingsTab inst={inst} />}
     </div>
   )
@@ -572,7 +592,7 @@ function ContentTab({ inst }: { inst: Instance }) {
               onClick={(e) => clickRow(e, m)}
               onContextMenu={(e) => rowMenu(e, m)}
             >
-              <div className="ico">{m.iconUrl ? <img src={m.iconUrl} alt="" /> : <Blocks />}</div>
+              <div className="ico">{m.iconUrl ? <img loading="lazy" decoding="async" src={m.iconUrl} alt="" /> : <Blocks />}</div>
               <div className="grow">
                 <div className="title ellipsis">
                   {m.title ?? bareName(m.filename)}
@@ -1014,6 +1034,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
           </div>
         </div>
       </div>
+
+      <InstanceController inst={inst} />
 
       {inst.modpack && !inst.ownPack && <PackVersionSetting owner={instanceOwner(inst, games)} />}
 

@@ -108,6 +108,12 @@ const relayEvents = [
   { id: 2, at: now() - 1800, kind: 'join', text: 'a player joined puirkle3' },
   { id: 3, at: now() - 600, kind: 'admin', text: 'admin Puirkle_Gamer (Puirkle_Gamer) via launcher: approved Ocean Kingdoms' }
 ]
+const relayReports = [
+  { id: '1044', type: 'down', title: 'Can’t join any server through the relay', message: 'Every server says “Connection timed out” since about 20 minutes ago.', steps: '', expected: '', service: 'java,console', address: 'mc.example.net', since: 'hour', version: '1.6.1', os: 'windows', name: 'Alex', email: '', at: Math.floor(Date.now() / 1000) - 600, seen: false },
+  { id: '1043', type: 'crash', title: 'Crash when opening Discover on a modpack', message: 'The launcher closes as soon as I click Discover inside my Fabric pack.', steps: '1. Open the pack\n2. Click Discover', expected: 'The mod list opens.', service: '', address: '', since: '', version: '1.6.1', os: 'windows', name: 'Puirkle_Gamer', email: '', at: Math.floor(Date.now() / 1000) - 7200, seen: false },
+  { id: '1041', type: 'idea', title: 'Let me pin instances to the top', message: 'I play two packs a lot; pinning them above the rest would save a scroll.', steps: '', expected: '', service: '', address: '', since: '', version: '1.6.0', os: 'macos', name: '', email: 'player@example.com', at: Math.floor(Date.now() / 1000) - 86400 * 2, seen: true }
+]
+
 function relayMock(method: string, path: string, b: Record<string, any>): unknown { // eslint-disable-line @typescript-eslint/no-explicit-any
   const p = path.split('?')[0]
   const limits = { tunnels_per_account: 3, names_per_account: 5, connections_per_tunnel: 50, connections_per_ip: 0, agents_per_ip: 0, monthly_gb_per_account: 100, handshake_timeout_secs: 10, idle_timeout_secs: 300, logins_per_ip_per_hour: 30, name_expiry_days: 180, session_days: 30, max_pending_handshakes: 200, session_minutes: 120, session_warn_minutes: [15, 5, 1], session_continue_minutes: 15, topup_gb: 30, topups_per_month: 3, topup_low_gb: 1, max_domains: 3, join_requests_per_ip: 5, join_requests_per_server: 30 }
@@ -122,6 +128,13 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
   }
   if (method === 'POST' && p === '/api/service') return (service = { ...service, state: b.state, message: b.message || null, since: now() })
   if (p === '/api/payments' || p.startsWith('/api/payments/')) return paymentsMock(method, p, b)
+  if (method === 'POST' && p.startsWith('/api/reports/')) {
+    const r = relayReports.find((x) => x.id === b.id)
+    if (p === '/api/reports/seen-all') relayReports.forEach((x) => (x.seen = true))
+    else if (p === '/api/reports/delete' && r) relayReports.splice(relayReports.indexOf(r), 1)
+    else if (r) r.seen = p === '/api/reports/seen'
+    return { ok: true }
+  }
   if (method === 'POST' && !p.startsWith('/api/listings')) return { ok: true }
   switch (p) {
     case '/api/service':
@@ -166,6 +179,8 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
       return { ok: true }
     case '/api/settings':
       return { limits, fileLimits: { ...limits, session_minutes: 90 }, limitsOverridden: true, noServer: { message: true, version: 'Offline', title: 'This server is offline' }, restartOnly: ['max_pending_handshakes'] }
+    case '/api/reports':
+      return { reports: relayReports, unseen: relayReports.filter((r) => !r.seen).length, keepDays: 90, keep: 500 }
     case '/api/events':
       return relayEvents.filter((e) => e.id > Number(new URLSearchParams(path.split('?')[1] ?? '').get('since') ?? 0))
     case '/api/users':
@@ -205,7 +220,7 @@ const pay = {
   subs: [
     { id: 'pi_mock1', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Alex', product: 'addon-server', yearly: false, status: 'paid', period_end: now() + 86400 * 12, cancel_at_period_end: false, amount: 6900, source: 'once', method: 'promptpay', active: true },
     { id: 'sub_mock2', uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle_Gamer', product: 'addon-unlimited-traffic', yearly: true, status: 'active', period_end: now() + 86400 * 200, cancel_at_period_end: false, amount: 169000, source: 'stripe', active: true },
-    { id: 'grant-abc', uuid: '11111111-2222-3333-4444-555566667777', name: 'Steve', product: 'pack-219', yearly: false, status: 'active', period_end: 0, cancel_at_period_end: false, amount: 0, source: 'admin', active: true }
+    { id: 'grant-abc', uuid: '11111111-2222-3333-4444-555566667777', name: 'Steve', product: 'pack-219', yearly: false, status: 'active', period_end: 0, cancel_at_period_end: false, amount: 0, source: 'admin', active: true, note: 'Thanks for testing the relay' }
   ] as Row[],
   promos: [{ code: 'SUMMER25', percent_off: 25, duration: 'once', products: ['addon-server'], active: true, usable: true, uses: 3, max_redemptions: 50, expires_at: now() + 86400 * 20, below_minimum: [] }] as Row[],
   gifts: [{ code: 'STREAM-7QX2', product: 'addon-unlimited-traffic', days: 30, max_uses: 1, active: true, usable: false, note: 'giveaway', redeemed: [{ uuid: 'x', name: 'Alex', at: now() - 3600 }] }] as Row[],
@@ -255,8 +270,11 @@ function paymentsMock(method: string, p: string, b: Row): unknown {
     if (b.phone !== undefined && !/^0\d{9}$/.test(phone)) throw new Error("The relay refused: phone: the wallet's 10-digit number, like 0812345678")
     if (b.reset) pay.truemoney = { on: true, phone: '0369', enabled: true, fromFile: true }
     else pay.truemoney = { ...pay.truemoney, ...(b.on !== undefined ? { on: !!b.on, enabled: !!b.on } : {}), ...(phone ? { phone: phone.slice(-4) } : {}), fromFile: false }
+  } else if (p.endsWith('/note')) {
+    const s = pay.subs.find((x) => x.id === b.id)
+    if (s) s.note = String(b.note ?? '').trim() || undefined
   } else if (p.endsWith('/grant')) {
-    pay.subs.unshift({ id: 'grant-' + Math.random().toString(36).slice(2, 6), uuid: b.uuid ?? 'uuid-' + b.name, name: b.name ?? '', product: b.product, yearly: false, status: 'active', period_end: b.days ? now() + b.days * 86400 : 0, cancel_at_period_end: false, amount: 0, source: 'admin', active: true })
+    pay.subs.unshift({ id: 'grant-' + Math.random().toString(36).slice(2, 6), uuid: b.uuid ?? 'uuid-' + b.name, name: b.name ?? '', product: b.product, yearly: false, status: 'active', period_end: b.days ? now() + b.days * 86400 : 0, cancel_at_period_end: false, amount: 0, source: 'admin', active: true, note: b.note || undefined })
   } else if (p.endsWith('/end')) {
     const s = pay.subs.find((x) => x.id === b.id)
     if (s) Object.assign(s, b.at_period_end ? { cancel_at_period_end: true } : { status: 'canceled', active: false })

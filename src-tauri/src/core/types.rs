@@ -161,6 +161,10 @@ pub struct Instance {
     pub last_played: Option<i64>,
     #[serde(default)]
     pub playtime: i64,
+    /// Seconds played per account name, for the instance's overview card. Counted from the version that added it,
+    /// so it can add up to less than `playtime`.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub playtime_by: std::collections::BTreeMap<String, i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory_mb: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

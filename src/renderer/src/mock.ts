@@ -37,7 +37,8 @@ export function mockApi(): ResinApi {
       color: '#39e58c',
       createdAt: now - 9e8,
       lastPlayed: now - 7.2e6,
-      playtime: 186_000
+      playtime: 186_000,
+      playtimeBy: { Puirkle: 141_000, PuirkleBE: 31_000, Sprout: 14_000 }
     },
     {
       id: 'create',
@@ -111,6 +112,12 @@ export function mockApi(): ResinApi {
     () => instances,
     () => accounts
   )
+  // Games whose process has started, for the fake "window is up" below (by run id; gone when they stop).
+  const startedGames = new Map<string, { instanceId: string; runId: string }>()
+  runs.onGame((e) => {
+    if (e.state === 'running') startedGames.set(e.runId, { instanceId: e.instanceId, runId: e.runId })
+    else startedGames.delete(e.runId)
+  })
   const profileMock = mockProfile(
     () => accounts,
     (list) => (accounts = list)
@@ -292,6 +299,16 @@ export function mockApi(): ResinApi {
       gameTexture: async () => null,
       pendingOpen: async () => null,
       pendingLink: async () => null,
+      copyPng: async () => {},
+      savePng: async (name) => `C:\\Users\\you\\Downloads\\${name}.png`,
+      discordPage: async () => {},
+      sendReport: async () => {
+        await new Promise((r) => setTimeout(r, 700))
+        return { id: '1042' }
+      },
+      imageData: async (url) => url,
+      artData: async (url) => url,
+      serviceStatus: async () => ({ website: 'operational', tools: 'operational', java: 'degraded', agents: 'operational', list: 'operational', console: 'major', payments: 'operational' }),
       mcpInfo: async () => ({ state: 'on' as const, port: 47615, url: 'http://127.0.0.1:47615/mcp', token: 'mock0123456789abcdef0123456789abcdef0123' }),
       mcpResetToken: async () => ({ state: 'on' as const, port: 47615, url: 'http://127.0.0.1:47615/mcp', token: 'mock0123456789abcdef0123456789abcdef0123' }),
       storageImport: async () => null,
@@ -420,6 +437,7 @@ export function mockApi(): ResinApi {
         return instances.find((i) => i.id === id)!
       },
       remove: async (id) => void (instances = instances.filter((i) => i.id !== id)),
+      shortcut: async (id) => `C:\\Users\\you\\Desktop\\${id}.lnk`,
       openFolder: async () => {},
       launch: runs.launch,
       crashFix: () => new Promise((r) => setTimeout(r, 600)),
@@ -537,7 +555,14 @@ export function mockApi(): ResinApi {
           600
         )
       },
-      install: () => wait(undefined, 800),
+      // The preview keeps what was added, so pages that look for a mod afterwards (the controller switch) find it.
+      install: async (_id, projectId, kind) => {
+        const names: Record<string, string> = { DOUdJVEm: 'Controlify', bXX9h73M: 'MidnightControls' }
+        const title = names[projectId] ?? projectId
+        if (kind === 'mod' && !mods.some((m) => m.projectId === projectId))
+          mods.push({ filename: `${title.replace(/\W/g, '').toLowerCase()}-2.0.jar`, enabled: true, size: 2_400_000, kind: 'mod', title, projectId, versionNumber: '2.0' })
+        return wait(undefined, 800)
+      },
       multicorePlan: async () => ({ items: [{ slot: 'render', state: 'install', title: 'Sodium', version: '0.6.0', test: false }], undo: [] }),
       multicoreApply: async () => ({ items: [{ slot: 'render', state: 'have', title: 'Sodium', version: '0.6.0', test: false }], undo: ['Sodium'] }),
       multicoreUndo: async () => ({ items: [{ slot: 'render', state: 'install', title: 'Sodium', version: '0.6.0', test: false }], undo: [] }),
@@ -602,7 +627,10 @@ export function mockApi(): ResinApi {
       duplicates: (i, picks) => wait(mockDuplicates(picks, contentOf(i)), 500),
       installMany: (i, picks, replace) => wait(mockInstallMany(contentOf(i), picks, replace), 900),
       list: (i, kind) => wait(packContent.has(i) ? packContent.get(i)!.filter((m) => m.kind === kind) : kind === 'mod' ? [...mods] : []),
-      toggle: async () => {},
+      toggle: async (_i, kind, filename) => {
+        const m = mods.find((x) => x.kind === kind && x.filename === filename)
+        if (m) m.enabled = !m.enabled
+      },
       remove: async () => {},
       checkUpdates: () =>
         wait(
@@ -705,7 +733,16 @@ export function mockApi(): ResinApi {
     },
     ...mockFiles(),
     ...migrate,
-    on: { task: mockEngine.onTask, game: runs.onGame, friends: friends.onFriends, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop(), openLink: () => noop() },
+    on: { task: mockEngine.onTask, game: runs.onGame, friends: friends.onFriends, log: runs.onLog, login: noop, server: servers.onServer, serverLog: servers.onServerLog, serverRequests: servers.onServerRequests, joinAnswered: onJoinAnswered, joinStates: onJoinStates, gameCrash: runs.onGameCrash, gameWindow: (cb) => {
+        // The game's window "appears" 4 s after its process starts, or 4 s from now for one already running.
+        const at = (e: { instanceId: string; runId: string }) => window.setTimeout(() => cb(e), 4000)
+        const timers = [...startedGames.values()].map(at)
+        const off = runs.onGame((e) => void (e.state === 'running' && timers.push(at({ instanceId: e.instanceId, runId: e.runId }))))
+        return () => {
+          off()
+          timers.forEach((t) => window.clearTimeout(t))
+        }
+      }, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop(), openLink: () => noop() },
     remote: {
       status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }),
       grants: async () => grants,

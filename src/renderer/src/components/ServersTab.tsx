@@ -4,7 +4,7 @@ import type { Instance, ServerEntry, ServerStatus } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t } from '../i18n'
-import { ConfirmModal, Empty, Modal, openContextMenu, useCopy } from './ui'
+import { ConfirmModal, Empty, Modal, openContextMenu, RackArt, useCopy } from './ui'
 import '../instance-tabs.css'
 
 export type Ping = { state: 'loading' } | { state: 'ok'; status: ServerStatus } | { state: 'error'; error: string }
@@ -143,6 +143,7 @@ export default function ServersTab({ inst }: { inst: Instance }) {
       ) : visible.length === 0 ? (
         <Empty
           icon={<Server />}
+          art={<RackArt />}
           title={t('servers.empty.title')}
           action={
             <button className="btn primary" onClick={() => setEditing({ index: null, entry: { name: 'Minecraft Server', ip: '' } })}>
@@ -185,7 +186,7 @@ export default function ServersTab({ inst }: { inst: Instance }) {
                     <ChevronDown />
                   </button>
                 </div>
-                <div className="ico">{icon ? <img src={icon} alt="" style={{ imageRendering: 'pixelated' }} /> : <Server />}</div>
+                <div className="ico">{icon ? <img loading="lazy" decoding="async" src={icon} alt="" style={{ imageRendering: 'pixelated' }} /> : <Server />}</div>
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="title ellipsis">{s.name || s.ip}</div>
                   <div className="it-meta">

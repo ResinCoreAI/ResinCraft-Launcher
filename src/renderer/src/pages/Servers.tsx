@@ -70,7 +70,20 @@ import RelayNames from '../components/RelayNames'
 import { StoreLink } from '../components/StoreLink'
 import { ServerPriority } from '../components/RelayPlan'
 import { RelayNotes, RelayOutOfData, RelaySessionBanner, RelaySettings, useRelayInfo } from '../components/ServerRelay'
-import { Avatar, BlockArt, ConfirmModal, Empty, Modal, openContextMenu, openMenuBelow, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
+import {
+  Avatar,
+  BlockArt,
+  ConfirmModal,
+  Empty,
+  Modal,
+  openContextMenu,
+  openMenuBelow,
+  RackArt,
+  Segmented,
+  Switch,
+  useCopy,
+  type ContextEntry
+} from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
 import { bytes, fixed, serverPath, timeAgo } from '../util'
 import { rich, t, tx, type Key } from '../i18n'
@@ -240,7 +253,7 @@ export default function Servers({ id, fromInstance }: { id?: string; fromInstanc
 function ServerIcon({ s, size = 48 }: { s: ServerInfo; size?: number }) {
   return (
     <div className="sv-icon" style={{ width: size, height: size }}>
-      {s.iconUrl ? <img src={s.iconUrl} alt="" /> : <BlockArt seed={s.id} color={isPluginServer(s) ? '#22d3ee' : s.loader ? '#b26bff' : '#39e58c'} />}
+      {s.iconUrl ? <img loading="lazy" decoding="async" src={s.iconUrl} alt="" /> : <BlockArt seed={s.id} color={isPluginServer(s) ? '#22d3ee' : s.loader ? '#b26bff' : '#39e58c'} />}
     </div>
   )
 }
@@ -446,6 +459,7 @@ function ServerList({
       ) : servers.length === 0 ? (
         <Empty
           icon={<Server />}
+          art={<RackArt />}
           title={t('servers.empty.title')}
           action={
             !canMake ? undefined : (
@@ -1018,7 +1032,7 @@ function PlayersTab({ s, reload }: { s: ServerInfo; reload: () => Promise<void> 
             {s.players.map((p) => (
               <div key={p} className="list-row">
                 <div className="ico">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={`https://mc-heads.net/avatar/${encodeURIComponent(p)}/40`}
                     alt=""
                     onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
@@ -1077,7 +1091,7 @@ function PlayersTab({ s, reload }: { s: ServerInfo; reload: () => Promise<void> 
               <div key={en.name} className="list-row">
                 <div className="ico">
                   {kind !== 'ipBans' && (
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={`https://mc-heads.net/avatar/${encodeURIComponent(en.uuid ?? en.name)}/40`}
                       alt=""
                       onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}

@@ -1,42 +1,58 @@
 /*
  * ResinCraft design system.
- * Direction: an instrument panel, not a SaaS dashboard. Flat tinted surfaces, 1px rules,
- * small square corners, no gradients, no glows. Colour has one job each:
+ * Direction: a player's guide. A solid cover colour (--cover) wraps the window and carries the navigation; the
+ * page sits inside it, and the section you are on is a tab cut from the page. Everything is flat: solid colour,
+ * 1px rules, no gradients, glows or soft shadows. Pictures are shown bright. Colour has one job each:
  *   purple = you can click this · cyan = data (versions, progress, codes) · green = play / status.
  */
 
 :root {
-  --bg: #0a0912;
-  --bg-sidebar: #0d0b16;
-  --surface: #13111d;
-  --surface-2: #1a1727;
-  --surface-3: #231f33;
-  --border: #262238;
-  --border-strong: #372f4f;
-  --text: #eeecf6;
-  --text-dim: #a8a3bd;
-  --text-faint: #7a7492;
+  /* Neutral charcoal with a trace of violet: colour comes from the pictures and from the three role colours. */
+  --bg: #121215;
+  --bg-sidebar: #0a0a0c;
+  --surface: #1a1a1f;
+  --surface-2: #23232a;
+  --surface-3: #2e2e37;
+  --border: #2a2a33;
+  --border-strong: #3d3d4a;
+  --text: #f1f1f4;
+  --text-dim: #b2b2bf;
+  --text-faint: #8b8b99;
+  /* The cover: what wraps the page and holds the navigation. Here it is a shade darker than the page, so the page
+     reads as a sheet lying on it. Other themes mix theirs from their own accent. */
+  --cover: #0a0a0c;
+  --cover-fg: #f1f1f4;
+  --cover-dim: rgba(255, 255, 255, 0.62);
+  --cover-hover: rgba(255, 255, 255, 0.07);
+  /* The edge of something you type into or flip: clearly visible against the page (3:1), unlike a panel's rule. */
+  --control-border: #62626f;
 
   --accent: #b26bff; /* purple: interactive */
   --accent-hover: #c48bff;
-  --accent-soft: rgba(178, 107, 255, 0.13);
+  --accent-soft: rgba(178, 107, 255, 0.15);
   --accent-fg: #0b0616;
   --data: #22d3ee; /* cyan: data */
-  --play: #39ff88; /* green: play / status */
-  --play-hover: #6dffa8;
+  --play: #3ddc84; /* green: play / status */
+  --play-hover: #5fe89c;
   --play-fg: #03140b;
-  --success: #39ff88;
-  --success-soft: rgba(57, 255, 136, 0.12);
+  --success: #3ddc84;
+  --success-soft: rgba(61, 220, 132, 0.12);
   --warning: #f5c542;
   --danger: #ff5c6a;
   --danger-soft: rgba(255, 92, 106, 0.12);
   --cf: #f16436;
 
-  --shadow: 0 10px 28px rgba(0, 0, 0, 0.5); /* menus and modals only */
-  --radius: 6px;
-  --radius-sm: 4px;
-  --titlebar: 44px;
-  --sidebar-w: 236px;
+  --shadow: 0 12px 28px rgba(0, 0, 0, 0.55); /* menus and modals only: they float over the page */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --titlebar: 54px;
+  /* There is no left bar any more; what was placed beside it (holiday pieces, notices) starts at the edge. */
+  --sidebar-w: 0px;
+  /* The page's margins inside its sheet. */
+  --page-x: 32px;
+  --page-top: 28px;
+  /* How far notices and the task list keep from the window's bottom edge. */
+  --float-bottom: 18px;
   --ease: cubic-bezier(0.2, 0, 0, 1);
   /* Overshoots a touch, then settles: presses and pops. */
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -57,7 +73,8 @@
   --border-strong: #c9c3dc;
   --text: #16131f;
   --text-dim: #4f4966;
-  --text-faint: #7d7896;
+  --text-faint: #6a6485;
+  --control-border: #8e88a6;
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   --accent-soft: rgba(124, 58, 237, 0.1);
@@ -70,7 +87,13 @@
   --success-soft: rgba(21, 128, 61, 0.1);
   --danger: #dc2626;
   --danger-soft: rgba(220, 38, 38, 0.08);
-  --shadow: 0 10px 28px rgba(22, 19, 31, 0.14);
+  --shadow: 0 12px 28px rgba(40, 24, 96, 0.2);
+  --cover: #2a1a66;
+  /* The mark on the cover (the current page's icon): the accent itself is too dark to show on it. */
+  --cover-mark: #cdb4ff;
+  --cover-fg: #ffffff;
+  --cover-dim: rgba(255, 255, 255, 0.74);
+  --cover-hover: rgba(255, 255, 255, 0.12);
   color-scheme: light;
 }
 
@@ -88,6 +111,11 @@
   --surface-3: #1a1722;
   --border: #1d1a26;
   --border-strong: #2c2738;
+  --text: #eeecf6;
+  --text-dim: #a8a3bd;
+  --text-faint: #7a7492;
+  /* True black stays true black. */
+  --cover: #000000;
 }
 
 /* Deepslate: cool grey stone with a blue accent. */
@@ -232,12 +260,15 @@ body,
 }
 
 body {
-  background: var(--bg);
+  background: var(--cover);
   color: var(--text);
   font: 14px/1.5 var(--font);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
+  /* The parts the browser draws take the theme's colours too. */
+  caret-color: var(--accent);
+  accent-color: var(--accent);
 }
 
 input,
@@ -253,25 +284,38 @@ h2,
 h3 {
   font-family: var(--font-display);
   font-style: normal;
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
 }
 
 ::selection {
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
+/* Scrollbars stay out of sight: a bar shows only while the pointer is over the thing it scrolls, and the page
+   itself has none at all (the wheel, the keys and touch still scroll it). */
 ::-webkit-scrollbar-thumb {
-  background: var(--surface-3);
+  background: transparent;
   border: 3px solid transparent;
   background-clip: padding-box;
-  border-radius: 2px;
+  border-radius: 999px;
+}
+:hover::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-strong);
   background-clip: padding-box;
+}
+.content::-webkit-scrollbar {
+  display: none;
 }
 
 :focus-visible {
@@ -281,62 +325,69 @@ h3 {
 
 /* ---------- Shell ---------- */
 
+/*
+ * The window is laid out like a site, in the manner of a desktop app's header bar: one bar across the top (it is
+ * the title bar too) with the pages as a row of pills, and under it the page, a rounded sheet set into the cover.
+ */
 .app {
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: var(--titlebar) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
 }
 
+/* The header bar. It keeps the class it had as a left bar, so themes and custom CSS written for .sidebar still
+   colour it. It is the cover itself: no panel, no rule. Its text takes the cover's own colours. */
 .sidebar {
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
   display: flex;
-  flex-direction: column;
-  padding: 0 12px 12px;
-  min-height: 0;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  /* Clear of the window buttons, which float over its right end (App.tsx measures them). */
+  padding: 0 calc(var(--win-w, 0px) + 8px) 0 16px;
+  color: var(--cover-fg);
+  -webkit-app-region: drag;
+}
+.sidebar button,
+.sidebar input {
+  -webkit-app-region: no-drag;
 }
 
 .brand {
-  height: calc(var(--titlebar) + 18px);
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 6px 0;
-  -webkit-app-region: drag;
+  gap: 9px;
+  height: 100%;
+  padding-right: 14px;
+}
+/* Clicks land on the brand itself, which drags the window. */
+.brand > * {
+  pointer-events: none;
 }
 .brand svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   flex: none;
 }
 .brand-name {
-  font: 700 17px/1.05 var(--font-display);
+  font: 700 17px/1 var(--font-display);
   letter-spacing: 0.01em;
-}
-.brand-name small {
-  display: block;
-  font: 400 11px/1.5 var(--font);
-  color: var(--text-faint);
-  letter-spacing: 0;
+  white-space: nowrap;
 }
 
+/* A list of places: a column inside a page (Settings, Admin), a row of pills in the header. */
 .nav {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  margin-top: 16px;
-}
-.nav-label {
-  font-size: 12px;
-  color: var(--text-faint);
-  padding: 18px 10px 6px;
 }
 .nav-item {
   position: relative;
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   border-radius: var(--radius-sm);
   border: 0;
   background: none;
@@ -345,25 +396,18 @@ h3 {
   cursor: pointer;
   text-align: left;
   transition:
-    background-color 0.12s var(--ease),
-    color 0.12s var(--ease);
+    background-color 0.14s var(--ease),
+    color 0.14s var(--ease);
 }
 .nav-item:hover {
   background: var(--surface);
   color: var(--text);
 }
-.nav-item.active {
+.nav-item.active,
+.nav-item.active:hover {
   background: var(--surface-2);
   color: var(--text);
-}
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  background: var(--accent);
+  font-weight: 600;
 }
 .nav-item.active svg {
   color: var(--accent);
@@ -374,20 +418,16 @@ h3 {
   flex: none;
 }
 .nav-item .count {
-  margin-left: auto;
-  font: 500 11px/18px var(--mono);
-  color: var(--text-faint);
+  font: 500 11px/1 var(--mono);
+  color: inherit;
+  opacity: 0.7;
 }
-
-.nav-recent {
-  overflow: auto;
-  min-height: 0;
-  flex: 1;
-}
-.nav-recent .nav-item {
-  padding: 5px 10px;
-  font-size: 13px;
-  font-weight: 400;
+/* Something is running. */
+.nav-item .live {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--play);
 }
 .nav-dot {
   width: 18px;
@@ -404,82 +444,220 @@ h3 {
   object-fit: cover;
   display: block;
 }
-.nav-item .live {
+
+/* The header's own list: the pages, side by side. A narrow window scrolls it sideways rather than dropping one. */
+.sidebar .nav {
+  flex: 0 1 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sidebar .nav::-webkit-scrollbar {
+  display: none;
+}
+.sidebar .nav-item {
+  flex: none;
+  gap: 7px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  color: var(--cover-dim);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.sidebar .nav-item:hover {
+  background: var(--cover-hover);
+  color: var(--cover-fg);
+}
+.sidebar .nav-item svg {
+  width: 15px;
+  height: 15px;
+}
+/* The page you are on: a filled pill. Same weight as the others, so nothing shifts when it moves. */
+.sidebar .nav-item.active,
+.sidebar .nav-item.active:hover {
+  background: color-mix(in srgb, var(--cover-fg) 14%, transparent);
+  color: var(--cover-fg);
+  font-weight: 500;
+}
+.sidebar .nav-item.active svg {
+  color: var(--cover-mark, var(--accent));
+}
+
+/* The header's right end: search, the launcher's own pages as icons, and who is signed in. */
+.head-tools {
+  flex: none;
   margin-left: auto;
-  width: 6px;
-  height: 6px;
-  background: var(--play);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  padding-left: 20px;
+}
+.head-btn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--cover-dim);
+  cursor: pointer;
+  transition:
+    background-color 0.14s var(--ease),
+    color 0.14s var(--ease);
+}
+.head-btn:hover {
+  background: var(--cover-hover);
+  color: var(--cover-fg);
+}
+.head-btn.active {
+  background: color-mix(in srgb, var(--cover-fg) 14%, transparent);
+  color: var(--cover-fg);
+}
+.head-btn svg {
+  width: 17px;
+  height: 17px;
 }
 
 .account-chip {
-  margin-top: 10px;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  gap: 8px;
+  height: 34px;
+  margin-left: 4px;
+  padding: 0 9px 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--cover-hover);
+  color: inherit;
   cursor: pointer;
   text-align: left;
-  width: 100%;
-  transition: border-color 0.12s var(--ease);
+  transition: background-color 0.12s var(--ease);
 }
-.account-chip:hover {
-  border-color: var(--border-strong);
+.account-chip:hover,
+.account-chip.active {
+  background: color-mix(in srgb, var(--cover-fg) 16%, transparent);
+}
+.account-chip .avatar {
+  border-radius: 50%;
 }
 .account-chip .chip-caret {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   flex: none;
-  color: var(--text-faint);
-}
-.account-chip:hover .chip-caret {
-  color: var(--text-dim);
+  color: var(--cover-dim);
 }
 .account-chip .who {
   min-width: 0;
-  flex: 1;
 }
 .account-chip .who b {
   display: block;
+  max-width: 132px;
+  font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.account-chip .who span {
-  font-size: 12px;
-  color: var(--text-faint);
+
+/* In a narrower window the header keeps every page, each with its icon, and gives up the rest instead, least missed
+   first: the search box's words (see quick-search.css) and some of the room around each page here; then, only as far
+   as it really has to (components/HeaderNav.tsx measures, data-squeeze), the player's name, the launcher's own name,
+   and last the names of the pages you aren't on. */
+@media (max-width: 1400px) {
+  .account-chip .who b {
+    max-width: 110px;
+  }
+  .sidebar .nav {
+    gap: 0;
+  }
+  .sidebar .nav-item {
+    padding: 0 9px;
+  }
+  .head-tools {
+    padding-left: 8px;
+  }
+}
+@media (max-width: 1280px) {
+  .sidebar .nav-item {
+    gap: 5px;
+    padding: 0 8px;
+  }
+}
+.sidebar[data-squeeze] .account-chip .who {
+  display: none;
+}
+.sidebar[data-squeeze] .account-chip {
+  padding-right: 6px;
+}
+.sidebar[data-squeeze='2'] .brand-name {
+  display: none;
+}
+.sidebar[data-squeeze='2'] .brand {
+  padding-right: 8px;
+}
+.sidebar[data-squeeze='2'] {
+  padding-left: 12px;
+}
+/* The window can be made much smaller than a desk-sized one: the page gives up its wide margins, the header its
+   spare room, and the pages scroll sideways in the header instead of being dropped. */
+@media (max-width: 760px) {
+  :root {
+    --page-x: 16px;
+    --page-top: 18px;
+  }
+  .sidebar {
+    gap: 2px;
+    padding-left: 8px;
+  }
+  .brand {
+    padding-right: 4px;
+  }
+  .head-tools {
+    gap: 2px;
+    padding-left: 4px;
+  }
+  .main {
+    margin: 0 4px 4px;
+    border-radius: 12px;
+  }
 }
 
+/* The page: a sheet set into the cover, rounded like a window of its own. */
 .main {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  margin: 0 8px 8px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg);
 }
 
+/* The way back from an instance's page: above its heading, and it scrolls away with it. */
 .topbar {
-  height: var(--titlebar);
-  flex: none;
+  max-width: 1220px;
+  margin: -8px auto 12px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 150px 0 32px;
-  -webkit-app-region: drag;
   color: var(--text-faint);
   font-size: 13px;
-  border-bottom: 1px solid var(--border);
-}
-.topbar button,
-.topbar input {
-  -webkit-app-region: no-drag;
 }
 .crumb {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 .crumb button {
   background: none;
@@ -487,6 +665,7 @@ h3 {
   color: var(--text-faint);
   cursor: pointer;
   padding: 2px 4px;
+  margin-left: -4px;
   border-radius: var(--radius-sm);
 }
 .crumb button:hover {
@@ -495,13 +674,17 @@ h3 {
 .crumb b {
   color: var(--text-dim);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .content {
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 20px 32px 48px;
+  /* The bottom leaves room for the dock, so a page's last row is never under it. */
+  padding: var(--page-top) var(--page-x) 112px;
   min-height: 0;
 }
 .page {
@@ -525,10 +708,10 @@ h3 {
   flex-wrap: wrap;
 }
 .page-head h1 {
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: 0;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   margin: 0;
 }
 .page-head p {
@@ -540,7 +723,7 @@ h3 {
 }
 
 h2.section {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
   margin: 32px 0 12px;
   display: flex;
@@ -635,6 +818,7 @@ h2.section .link {
   height: 42px;
   padding: 0 20px;
   font-size: 15px;
+  border-radius: calc(var(--radius) - 2px);
 }
 .btn.icon {
   width: 34px;
@@ -647,9 +831,13 @@ h2.section .link {
   width: 42px;
 }
 
-/* Play is the launcher's main action, so it gets the green. */
+/* Play is the launcher's main action, so it gets the green: solid, a little bolder than other buttons, its
+   triangle in a soft disc, and it lifts under the pointer. */
 .play-btn {
   min-width: 124px;
+  gap: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 .play-btn.primary {
   background: var(--play);
@@ -659,6 +847,22 @@ h2.section .link {
 .play-btn.primary:hover:not(:disabled) {
   background: var(--play-hover);
   border-color: var(--play-hover);
+}
+.play-btn.primary > svg:first-child:not(.spin) {
+  box-sizing: content-box;
+  width: 12px;
+  height: 12px;
+  padding: 5px 4px 5px 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--play-fg) 16%, transparent);
+}
+.play-btn.lg.primary > svg:first-child:not(.spin) {
+  width: 14px;
+  height: 14px;
+}
+.play-btn:active:not(:disabled),
+.play-caret:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .play-btn.running {
   background: var(--surface-2);
@@ -673,32 +877,56 @@ h2.section .link {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
-/* Play plus a ▾ that picks who plays (shown with two or more accounts). */
+/* Play plus a ▾ that picks who plays (shown with two or more accounts): one green piece. The pair is clipped to a
+   single rounded shape, so its outer corners match Play's and the inside edge is straight; the ▾ is a shade
+   darker, so it reads as part of Play and still as its own button. */
 .split-btn {
   display: inline-flex;
   flex: none;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  transition: transform 0.22s var(--spring);
 }
-.split-btn > .play-btn {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+.split-btn:has(.lg) {
+  border-radius: calc(var(--radius) - 2px);
+}
+.split-btn:hover {
+  transform: translateY(-1px);
+}
+.split-btn > .btn {
+  border-radius: 0;
+}
+.split-btn > .btn:active:not(:disabled) {
+  transform: none;
+}
+.split-btn:active {
+  transform: scale(0.98);
 }
 .play-caret {
-  padding: 0 7px;
-  margin-left: 1px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+  min-width: 34px;
+  padding: 0 9px;
+  margin-left: 0;
 }
 .play-caret.lg {
-  padding: 0 10px;
+  min-width: 44px;
+  padding: 0 12px;
+}
+.play-caret svg {
+  width: 16px;
+  height: 16px;
 }
 .play-caret.primary {
-  background: var(--play);
-  border-color: var(--play);
+  background: color-mix(in srgb, var(--play) 86%, var(--play-fg));
+  border-color: transparent;
   color: var(--play-fg);
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--play-fg) 18%, transparent);
 }
 .play-caret.primary:hover {
   background: var(--play-hover);
-  border-color: var(--play-hover);
+  border-color: transparent;
+}
+.split-btn > .play-btn.primary {
+  border-color: transparent;
 }
 .play-caret.running {
   background: var(--surface-2);
@@ -715,7 +943,7 @@ textarea.input {
   height: 36px;
   padding: 0 11px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border, var(--border-strong));
   background: var(--bg);
   color: var(--text);
   outline: none;
@@ -840,7 +1068,7 @@ textarea.input {
   flex: none;
   border-radius: var(--radius-sm);
   background: var(--surface-3);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--control-border, var(--border-strong));
   cursor: pointer;
   padding: 0;
   transition:
@@ -854,7 +1082,8 @@ textarea.input {
   left: 2px;
   width: 14px;
   height: 14px;
-  border-radius: 2px;
+  /* The knob is as round as its track: square-ish in a square theme, a full circle once the track is a pill. */
+  border-radius: clamp(2px, calc(var(--radius-sm) - 3px), 7px);
   background: var(--text-faint);
   transition:
     transform 0.15s var(--ease),
@@ -1018,24 +1247,20 @@ a:hover,
 
 /* ---------- Home ---------- */
 
-/* The "continue playing" card: the instance's banner or newest screenshot behind the title, darkened towards the
-   text side so it always reads, in any theme. */
+/* The "continue playing" picture: the instance's banner or newest screenshot fills it, bright and uncovered. The
+   name, facts and Play sit on a solid plate in its corner, like a caption on a photograph, so they read on any
+   picture in any theme. */
 .hero {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: 248px;
-  display: flex;
-  align-items: flex-end;
-  padding: 28px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  /* It runs the full width of the sheet, straight under the header: no frame of its own. */
+  min-height: clamp(250px, 56vh, 600px);
   background: var(--surface);
 }
 .hero-backdrop {
   position: absolute;
   inset: 0;
-  z-index: -2;
   overflow: hidden;
 }
 .hero-backdrop img,
@@ -1048,33 +1273,59 @@ a:hover,
 }
 .hero-backdrop img {
   image-rendering: auto;
-  filter: blur(3px) saturate(1.1);
+  /* A screenshot arrives as a small thumbnail: soften it rather than show it stretched. */
+  filter: blur(2px);
   transform: scale(1.06);
-  animation: hero-drift 28s ease-in-out infinite alternate;
+  /* One slow drift, then it rests: drifting for as long as Home is open kept a window-wide blurred layer being
+     redrawn, and its graphics memory held, the whole time. */
+  animation: hero-drift 28s ease-in-out both;
 }
 .hero.sharp .hero-backdrop img {
   filter: none;
   transform: scale(1.02);
 }
-/* No picture yet: the instance's block art, dimmed into a texture. */
-.hero:not(.has-backdrop) .hero-backdrop {
-  opacity: 0.35;
+/* No picture of its own: its logo, far out of focus, colours the space, and the logo itself stands to the right. */
+.hero.logo .hero-backdrop img {
+  filter: blur(56px) saturate(1.25);
+  transform: scale(1.6);
+  opacity: 0.75;
+  animation: none;
 }
-.hero::before {
-  content: '';
+.hero-logo {
   position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--bg) 92%, transparent) 0%, color-mix(in srgb, var(--bg) 70%, transparent) 45%, color-mix(in srgb, var(--bg) 15%, transparent) 100%),
-    linear-gradient(0deg, color-mix(in srgb, var(--bg) 70%, transparent) 0%, transparent 60%);
+  top: 50%;
+  right: max(var(--page-x), calc((100% - 1220px) / 2));
+  width: clamp(150px, 20vw, 232px);
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 22%;
+  overflow: hidden;
+  background: var(--surface-2);
+  animation: plate-in 0.5s var(--ease) 0.14s backwards;
+}
+.hero-logo img,
+.hero-logo svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@media (max-width: 1000px) {
+  .hero-logo {
+    display: none;
+  }
+}
+/* Nothing at all to show: its block pattern, kept quiet behind the plate. */
+.hero:not(.has-backdrop):not(.logo) .hero-backdrop {
+  opacity: 0.3;
 }
 @keyframes hero-drift {
   from {
-    transform: scale(1.06) translate3d(0, 0, 0);
+    transform: scale(1.06) translate(0, 0);
   }
   to {
-    transform: scale(1.12) translate3d(-1.5%, -1%, 0);
+    transform: scale(1.12) translate(-1.5%, -1%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1082,14 +1333,49 @@ a:hover,
     animation: none;
   }
 }
+/* The plate. */
 .hero-body {
-  max-width: 640px;
-  min-width: 0;
+  position: absolute;
+  /* Its left edge lines up with the column of sections below. */
+  left: max(var(--page-x), calc((100% - 1220px) / 2));
+  bottom: 28px;
+  width: min(560px, calc(100% - 2 * var(--page-x)));
+  padding: 20px 24px 24px;
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--bg);
+  animation: plate-in 0.5s var(--ease) 0.08s backwards;
 }
-.hero-top {
+/* The greeting: who this front page is for. */
+.hero-hello {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+@keyframes plate-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+.hero-body > .row {
+  margin-top: 18px;
+}
+.hero-body > .row .btn.lg {
+  height: 48px;
+  padding: 0 26px;
+  font-size: 16px;
+}
+.hero-body > .row .play-caret.lg {
+  padding: 0 14px;
+}
+.hero-body > .row .play-btn {
+  min-width: 168px;
+}
+.hero-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  margin-bottom: 12px;
 }
 .hero-icon {
   width: 44px;
@@ -1099,17 +1385,14 @@ a:hover,
   border: 1px solid var(--border-strong);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
-.hero .eyebrow {
-  font: 500 12px var(--mono);
-  color: var(--data);
-}
 .hero h1 {
-  font-size: 38px;
+  font-size: 40px;
   font-weight: 700;
   line-height: 1.08;
-  margin: 12px 0 10px;
+  letter-spacing: -0.01em;
+  margin: 0;
+  min-width: 0;
   overflow-wrap: anywhere;
-  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
 }
 .hero-chips {
   display: flex;
@@ -1125,9 +1408,8 @@ a:hover,
   border-radius: 999px;
   font: 500 12px var(--mono);
   color: var(--text);
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  background: var(--surface-2);
   border: 1px solid var(--border-strong);
-  backdrop-filter: blur(6px);
 }
 .hero-chips .chip.live {
   color: var(--accent-text, var(--text));
@@ -1146,7 +1428,6 @@ a:hover,
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
   font-size: 13px;
 }
 .hero .meta span {
@@ -1159,14 +1440,15 @@ a:hover,
   height: 14px;
   color: var(--text-faint);
 }
-.btn.glass {
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
-  backdrop-filter: blur(8px);
-}
 @media (max-width: 720px) {
-  .hero {
-    min-height: 220px;
-    padding: 20px;
+  .hero-body {
+    left: 12px;
+    bottom: 12px;
+    width: calc(100% - 24px);
+    padding: 16px 18px 18px;
+  }
+  .hero h1 {
+    font-size: 30px;
   }
   .hero h1 {
     font-size: 28px;
@@ -1249,16 +1531,16 @@ a:hover,
 .stats {
   display: flex;
   flex-wrap: wrap;
-  border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  margin-top: 20px;
 }
 .stat {
-  padding: 12px 28px 12px 0;
-  margin-right: 28px;
+  padding: 18px 32px 18px 0;
+  margin-right: 32px;
   border: 0;
   border-right: 1px solid var(--border);
   background: none;
+  color: inherit;
+  font: inherit;
   text-align: left;
 }
 .stat:last-child {
@@ -1266,7 +1548,7 @@ a:hover,
 }
 .stat b {
   display: block;
-  font: 600 20px/1.2 var(--font-display);
+  font: 600 22px/1.2 var(--font-display);
   font-variant-numeric: tabular-nums;
 }
 .stat span {
@@ -1285,10 +1567,11 @@ button.stat b {
 
 /* ---------- Instance grid ---------- */
 
+/* Picture-first cards: a wide picture of the instance, with its name on a band underneath. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+  gap: 18px;
 }
 
 .icard {
@@ -1312,15 +1595,20 @@ button.stat b {
   z-index: 30;
 }
 .icard .tile {
-  height: 104px;
+  aspect-ratio: 16 / 9;
   border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   border-bottom: 1px solid var(--border);
 }
 .icard .body {
-  padding: 10px 12px 12px;
+  /* A fixed band, so Play can sit on the picture just above it. */
+  height: 66px;
+  padding: 11px 14px 0;
 }
 .icard .name {
-  font: 600 14.5px/1.3 var(--font-display);
+  font: 600 16px/1.3 var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .icard .sub {
   color: var(--text-faint);
@@ -1333,11 +1621,11 @@ button.stat b {
 /* Always visible (no hover-only actions), squared, green = play. */
 .icard .quick {
   position: absolute;
-  top: 66px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
+  bottom: 78px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
   border: 1px solid var(--play);
   display: grid;
   place-items: center;
@@ -1359,8 +1647,8 @@ button.stat b {
   color: #fff;
 }
 .icard .quick svg {
-  width: 14px;
-  height: 14px;
+  width: 17px;
+  height: 17px;
 }
 .icard .badge-live {
   position: absolute;
@@ -1377,8 +1665,8 @@ button.stat b {
   align-items: flex-start;
   justify-content: flex-end;
   gap: 8px;
-  min-height: 170px;
-  padding: 14px;
+  min-height: 190px;
+  padding: 16px;
   color: var(--text-dim);
   font: 600 14px var(--font-display);
 }
@@ -1531,6 +1819,10 @@ button.stat b {
   align-items: center;
   gap: 7px;
   white-space: nowrap;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition:
+    color 0.14s var(--ease),
+    background-color 0.14s var(--ease);
 }
 .tabs button svg {
   width: 15px;
@@ -1538,6 +1830,7 @@ button.stat b {
 }
 .tabs button:hover {
   color: var(--text);
+  background: var(--surface);
 }
 .tabs button.on {
   color: var(--text);
@@ -1690,6 +1983,10 @@ button.stat b {
   flex-direction: column;
   gap: 1px;
 }
+/* The section in view as the page scrolls: marked with a bar in the accent, so the place can be found at a glance. */
+.settings-nav .nav-item.active {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .settings-section {
   margin-bottom: 24px;
 }
@@ -1801,6 +2098,73 @@ button.stat b {
   height: 7px;
   flex: none;
 }
+/* A site's own icon, in the dot's place. */
+.source-logo {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border-radius: 3px;
+  object-fit: contain;
+  vertical-align: -3px;
+}
+/* GitHub's mark is black on nothing: a white disc keeps it visible on a dark theme. */
+.source-logo.github {
+  border-radius: 50%;
+  background: #fff;
+}
+/* Where something comes from, as a chip in the site's colour (components/SourceMark.tsx). */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border: 1px solid color-mix(in srgb, var(--site, var(--border-strong)) 60%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--site, var(--surface-3)) 14%, transparent);
+  color: var(--text);
+  font: 600 12px var(--font);
+  white-space: nowrap;
+}
+.source-badge .source-logo {
+  width: 14px;
+  height: 14px;
+  vertical-align: 0;
+}
+/* A second place the same thing is found. */
+.source-badge.also {
+  border-style: dashed;
+  background: none;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+/* The site's mark on the corner of a result's picture. */
+.ico-wrap {
+  position: relative;
+  flex: none;
+  align-self: flex-start;
+}
+.ico-source {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+.ico-source .source-logo {
+  width: 15px;
+  height: 15px;
+  vertical-align: 0;
+}
+.ico-source .source-dot {
+  width: 9px;
+  height: 9px;
+}
 
 .results {
   display: flex;
@@ -1823,7 +2187,7 @@ button.stat b {
   border-color: var(--accent);
 }
 /* Listed but not installable here (a Horizon native mod, another Minecraft version, a file taken down). */
-.result.unavailable > .ico,
+.result.unavailable > .ico-wrap,
 .result.unavailable > .grow {
   opacity: 0.55;
 }
@@ -2275,12 +2639,13 @@ button.stat b {
 .dock {
   position: fixed;
   right: 18px;
-  bottom: 18px;
+  bottom: var(--float-bottom);
   width: 330px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  z-index: 90;
+  /* Over the welcome (95) and the launch screen (96), so a failed start's message is seen; under dialogs (100). */
+  z-index: 97;
 }
 .task,
 .toast {
@@ -2310,11 +2675,23 @@ button.stat b {
 .task .top .task-cancel {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  margin: -3px -4px -3px 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: -4px -5px -4px 0;
+  padding: 0;
+  /* A plain mark until pointed at: without these it wears the browser's own grey button. */
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition:
+    background-color 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.task .top .task-cancel:disabled {
+  cursor: default;
 }
 .task .top .task-cancel svg {
   color: inherit;
@@ -2395,7 +2772,7 @@ button.stat b {
   flex: none;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 880px) {
   .welcome {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2442,7 +2819,7 @@ button.stat b {
   justify-self: start;
 }
 
-/* ---------- Tauri window controls (frameless window) ---------- */
+/* ---------- Window buttons (components/WindowControls.tsx; style and side: windowButtonsState.ts) ---------- */
 
 .win-controls {
   position: fixed;
@@ -2450,31 +2827,197 @@ button.stat b {
   right: 0;
   height: var(--titlebar);
   display: flex;
+  align-items: center;
   z-index: 150;
 }
-.win-controls button {
-  width: 46px;
+.wc-group {
+  display: flex;
+  align-items: center;
   height: 100%;
+}
+.wc-group button {
   border: 0;
+  padding: 0;
   background: transparent;
-  color: var(--text-dim);
+  /* They sit on the header, so they take the cover's colours, not the page's. */
+  color: var(--cover-dim);
   display: grid;
   place-items: center;
   cursor: pointer;
   transition:
-    background-color 0.1s var(--ease),
-    color 0.1s var(--ease);
+    background-color 0.12s var(--ease),
+    color 0.12s var(--ease),
+    border-color 0.12s var(--ease);
 }
-.win-controls button svg {
+.wc-group button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* On the left (macOS's place): the header keeps clear of them there instead. */
+:root[data-winside='left'] .win-controls {
+  right: auto;
+  left: 0;
+  flex-direction: row-reverse;
+}
+:root[data-winside='left'] .sidebar {
+  padding: 0 16px 0 calc(var(--win-w, 0px) + 8px);
+}
+:root[data-winside='left'] .win-controls .title-update {
+  margin: 0 0 0 8px;
+}
+
+/* Windows: flat symbols with a wide click area; close turns red. */
+:root[data-winbtn='windows'] .wc-group button {
+  width: 46px;
+  height: 100%;
+}
+:root[data-winbtn='windows'] .wc-group button svg {
   width: 15px;
   height: 15px;
 }
-.win-controls button:hover {
-  background: var(--surface-2);
-  color: var(--text);
+:root[data-winbtn='windows'] .wc-group button:hover {
+  background: var(--cover-hover);
+  color: var(--cover-fg);
 }
-.win-controls button.close:hover {
+:root[data-winbtn='windows'] .wc-group .close:hover {
   background: #e81123;
+  color: #fff;
+}
+
+/* Ubuntu (Yaru): round grey buttons, the close one orange. The default. */
+:root[data-winbtn='ubuntu'] .wc-group {
+  gap: 10px;
+  margin: 0 14px;
+}
+:root[data-winbtn='ubuntu'] .wc-group button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cover-fg) 12%, transparent);
+  color: var(--cover-fg);
+}
+:root[data-winbtn='ubuntu'] .wc-group button svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5;
+}
+:root[data-winbtn='ubuntu'] .wc-group button:hover {
+  background: color-mix(in srgb, var(--cover-fg) 22%, transparent);
+}
+:root[data-winbtn='ubuntu'] .wc-group .close {
+  background: #e95420;
+  color: #fff;
+}
+:root[data-winbtn='ubuntu'] .wc-group .close:hover {
+  background: #f06a3a;
+}
+
+/* Pill: the three in one rounded capsule, like the header's tabs. */
+:root[data-winbtn='pill'] .wc-group {
+  height: auto;
+  margin: 0 10px;
+  padding: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cover-fg) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cover-fg) 10%, transparent);
+}
+:root[data-winbtn='pill'] .wc-group button {
+  width: 34px;
+  height: 28px;
+  border-radius: 999px;
+}
+:root[data-winbtn='pill'] .wc-group button svg {
+  width: 14px;
+  height: 14px;
+}
+:root[data-winbtn='pill'] .wc-group button:hover {
+  background: color-mix(in srgb, var(--cover-fg) 12%, transparent);
+  color: var(--cover-fg);
+}
+:root[data-winbtn='pill'] .wc-group .close:hover {
+  background: #e5484d;
+  color: #fff;
+}
+
+/* macOS: red, yellow and green dots in macOS's order; their symbols show when the pointer is on them. */
+:root[data-winbtn='mac'] .wc-group {
+  gap: 8px;
+  margin: 0 16px;
+}
+:root[data-winbtn='mac'] .wc-group .close {
+  order: -1;
+  background: #ff5f57;
+}
+:root[data-winbtn='mac'] .wc-group .min {
+  background: #febc2e;
+}
+:root[data-winbtn='mac'] .wc-group .max {
+  background: #28c840;
+}
+:root[data-winbtn='mac'] .wc-group button {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  color: transparent;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+}
+:root[data-winbtn='mac'] .wc-group button svg {
+  width: 8px;
+  height: 8px;
+  stroke-width: 3;
+}
+:root[data-winbtn='mac'] .wc-group:hover button,
+:root[data-winbtn='mac'] .wc-group:focus-within button {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Minimal: only the symbols, quiet until pointed at; close goes soft red. */
+:root[data-winbtn='minimal'] .wc-group {
+  gap: 4px;
+  margin: 0 10px;
+}
+:root[data-winbtn='minimal'] .wc-group button {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+:root[data-winbtn='minimal'] .wc-group button svg {
+  width: 14px;
+  height: 14px;
+}
+:root[data-winbtn='minimal'] .wc-group button:hover {
+  background: var(--cover-hover);
+  color: var(--cover-fg);
+}
+:root[data-winbtn='minimal'] .wc-group .close:hover {
+  background: rgba(229, 72, 77, 0.18);
+  color: #ff6b6f;
+}
+
+/* Soft squares: small rounded squares like the launcher's other buttons; the theme's accent on hover. */
+:root[data-winbtn='soft'] .wc-group {
+  gap: 6px;
+  margin: 0 10px;
+}
+:root[data-winbtn='soft'] .wc-group button {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--cover-fg) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cover-fg) 14%, transparent);
+}
+:root[data-winbtn='soft'] .wc-group button svg {
+  width: 14px;
+  height: 14px;
+}
+:root[data-winbtn='soft'] .wc-group button:hover {
+  border-color: var(--accent);
+  color: var(--cover-fg);
+}
+:root[data-winbtn='soft'] .wc-group .close:hover {
+  background: #e5484d;
+  border-color: #e5484d;
   color: #fff;
 }
 
@@ -2614,13 +3157,14 @@ button.stat b {
   }
 }
 .drag-ghost .tile {
-  height: 104px;
+  aspect-ratio: 16 / 9;
 }
 .drag-ghost .body {
-  padding: 10px 12px 12px;
+  height: 66px;
+  padding: 11px 14px 0;
 }
 .drag-ghost .name {
-  font: 600 14.5px/1.3 var(--font-display);
+  font: 600 16px/1.3 var(--font-display);
 }
 .drag-ghost .sub {
   font-size: 12px;
@@ -2731,6 +3275,57 @@ body.dragging * {
 }
 .pic-remove {
   font-size: 12px;
+}
+/* The chooser's basic icons (components/BasicIcons.tsx). */
+.pic-basic {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 10px;
+}
+/* A heading between the chooser's groups. */
+.pic-title {
+  margin: 18px 0 8px;
+  font: 600 13px var(--font);
+  color: var(--text-dim);
+}
+.pic-basic-item {
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: none;
+  cursor: pointer;
+  transition:
+    transform 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.pic-basic-item svg,
+.pic-basic-item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+/* What it is, under the picture: a loader's or a modpack's name. */
+.pic-basic-item span {
+  display: block;
+  padding: 4px 5px 5px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: 500 11.5px var(--font);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pic-basic-item:hover,
+.pic-basic-item:focus-visible {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.pic-basic-item:active {
+  transform: scale(0.96);
 }
 
 .pic-banner {
@@ -2912,58 +3507,307 @@ body.dragging * {
   box-shadow: 0 3px 0 0 var(--accent);
 }
 
-/* ---------- Bedrock ---------- */
-.bd-editions {
+/* ---------- Bedrock (pages/Bedrock.tsx) ---------- */
+
+.bd-page {
+  max-width: 1180px;
+}
+/* The cover: Minecraft for Windows over a sky and stepped hills, darkened on the left where its name sits. The
+   picture is the same on every theme (it's a picture), so what is on it keeps its own light colours. */
+.bd-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 300px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: #0c0c0f;
+  color: #f1f1f4;
+  isolation: isolate;
+}
+.bd-scene,
+.bd-scene i {
+  position: absolute;
+  inset: 0;
+}
+.bd-scene {
+  z-index: -1;
+}
+.bd-scene .sky {
+  background: linear-gradient(180deg, #2a5f86 0%, #3f88b3 48%, #8fc6de 100%);
+}
+.bd-scene .far {
+  top: auto;
+  height: 60%;
+  opacity: 0.45;
+  background: #2f5f7a;
+  clip-path: polygon(0 50%, 14% 50%, 14% 30%, 30% 30%, 30% 42%, 52% 42%, 52% 20%, 66% 20%, 66% 36%, 84% 36%, 84% 14%, 100% 14%, 100% 100%, 0 100%);
+}
+.bd-scene .hill {
+  top: auto;
+  height: 46%;
+  background: linear-gradient(180deg, #5aa83b 0 14%, #3f7f2a 14% 22%, #7a5634 22% 100%);
+  clip-path: polygon(0 34%, 9% 34%, 9% 22%, 22% 22%, 22% 10%, 41% 10%, 41% 26%, 58% 26%, 58% 4%, 74% 4%, 74% 18%, 88% 18%, 88% 30%, 100% 30%, 100% 100%, 0 100%);
+}
+.bd-scene .shade {
+  background: linear-gradient(90deg, rgba(10, 10, 12, 0.92) 0%, rgba(10, 10, 12, 0.72) 42%, rgba(10, 10, 12, 0.05) 82%);
+}
+.bd-hero.missing .bd-scene {
+  filter: grayscale(0.7) brightness(0.8);
+}
+.bd-hero-in {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  max-width: 640px;
+  padding: 32px 36px 30px;
+}
+.bd-hero h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.05;
+  max-width: 9.5em;
+}
+.bd-hero p {
+  margin: 0;
+  max-width: 440px;
+  color: #cfd6e0;
+  font-size: 14px;
+}
+.bd-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 10, 12, 0.5);
+  color: #d4d4dc;
+  font-size: 12px;
+  font-weight: 500;
+}
+.bd-tag.ok {
+  border-color: rgba(61, 220, 132, 0.4);
+  color: #8ff0b8;
+}
+.bd-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3ddc84;
+  box-shadow: 0 0 0 3px rgba(61, 220, 132, 0.2);
+}
+.bd-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+/* Over the picture the plain buttons need their own dark glass, whatever the theme's surfaces are. */
+.bd-hero .bd-acts .btn:not(.primary) {
+  background: rgba(10, 10, 12, 0.55);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f1f1f4;
+  backdrop-filter: blur(10px);
+}
+.bd-hero .bd-acts .btn.ghost:not(:hover) {
+  background: transparent;
+  border-color: transparent;
+  backdrop-filter: none;
+}
+.bd-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #cfd6e0;
+  font-size: 13px;
+}
+.bd-hero .bd-task {
+  width: min(460px, 100%);
+  color: #f1f1f4;
+}
+.bd-hero .bd-callout {
+  max-width: 560px;
+}
+/* The version it is on, in a plate in the picture's corner. */
+.bd-version {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 10, 12, 0.72);
+  backdrop-filter: blur(14px);
+  font-family: var(--mono);
+  font-size: 13.5px;
+}
+
+/* Preview and the servers: two cards under the cover. */
+.bd-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 18px;
+  margin-top: 14px;
 }
-.bd-edition {
+.bd-mini {
   display: flex;
+  align-items: center;
   gap: 14px;
-  align-items: flex-start;
   padding: 16px;
+  min-width: 0;
 }
-.bd-edition h3 {
-  margin: 0 0 4px;
-  font-size: 16px;
+.bd-mini b {
+  display: block;
+  font-weight: 600;
 }
-.bd-icon {
+.bd-mini .hint {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.bd-mini .bd-task {
+  margin-top: 8px;
+}
+.bd-mini-icon {
   flex: none;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.bd-edition.missing .bd-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
   background: var(--surface-2);
   color: var(--text-dim);
 }
-/* Installing, updating or repairing from the launcher: the task's line and bar on the edition's card. */
-.bd-task {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 13px;
+.bd-mini-icon svg {
+  width: 22px;
+  height: 22px;
 }
-.bd-task .bar {
-  border-radius: 2px;
+/* Preview's mark: a grass block in Preview's violet. */
+.bd-cube {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #5a3f8a;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
-.bd-edition .bd-callout {
+.bd-cube::before,
+.bd-cube::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+.bd-cube::before {
+  top: 0;
+  height: 36%;
+  background: #b26bff;
+}
+.bd-cube::after {
+  top: 36%;
+  height: 12%;
+  background: repeating-linear-gradient(90deg, #b26bff 0 8px, transparent 8px 16px);
+}
+.bd-callout {
   margin-top: 12px;
 }
-.bd-editions + .bd-callout {
+.bd-page > .bd-callout {
   align-items: center;
-  margin-bottom: 18px;
+}
+
+.bd-section {
+  margin-top: 30px;
+}
+.bd-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.bd-section-head > svg {
+  width: 17px;
+  height: 17px;
+  color: var(--text-faint);
+}
+.bd-section-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 19px;
+}
+/* Worlds as pictures: a sky and a strip of ground in the world's own colour, then its name. */
+.bd-worlds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+.bd-world {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 8px;
+  padding: 0 12px 12px 0;
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s var(--ease),
+    transform 0.15s var(--ease);
+}
+.bd-world:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+.bd-world-pic {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 92px;
+  margin-bottom: 11px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 14px, transparent 14px 28px) bottom / 100% 30% no-repeat,
+    linear-gradient(160deg, hsl(var(--h) 52% 44%) 0 55%, hsl(calc(var(--h) + 40) 58% 50%) 55% 100%);
+}
+.bd-world-text {
+  display: grid;
+  min-width: 0;
+  padding-left: 12px;
+}
+.bd-world-text b {
+  font-weight: 600;
+}
+.bd-live {
+  color: var(--play);
+}
+.bd-note {
+  margin: 28px 2px 0;
+  max-width: 760px;
+  line-height: 1.55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bd-world:hover {
+    transform: none;
+  }
 }
 @media (max-width: 860px) {
-  .bd-editions {
+  .bd-pair {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .bd-hero-in {
+    padding: 24px 22px 22px;
+  }
+  .bd-version {
+    position: static;
+    margin: 0 22px 20px;
+    display: inline-flex;
   }
 }
 
@@ -3912,6 +4756,13 @@ textarea.custom-css {
   position: relative;
 }
 
+/* The picture runs behind the header too. There it is frosted and lightly tinted with the theme's own
+   background by default, so the header's words stay easy to read on any picture (the theme can turn this off). */
+:root[data-theme='custom'][data-theme-image][data-theme-header='blur'] .sidebar {
+  background: color-mix(in srgb, var(--bg) 46%, transparent);
+  backdrop-filter: blur(22px) saturate(1.3);
+}
+
 :root[data-theme='custom'][data-theme-blur] :is(.card, .sidebar, .ihead, .modal, .menu, .dock) {
   backdrop-filter: blur(var(--theme-blur));
 }
@@ -4466,4 +5317,2202 @@ html.gamepad :focus {
   color: var(--text-dim);
   background: transparent;
   border: 1px dashed var(--border-strong);
+}
+
+/* ---------- Cover and page: the other themes ---------- */
+
+/* A theme without its own cover uses its bar colour (--bg-sidebar: the shade its left bar had, and what a custom
+   theme sets for it), so the header stays as quiet as the page; its text keeps the theme's own colours. */
+:root[data-theme]:not([data-theme='dark'], [data-theme='light'], [data-theme='obsidian'], [data-theme='liquid']) {
+  --cover: var(--bg-sidebar);
+  --cover-fg: var(--text);
+  --cover-dim: var(--text-dim);
+  --cover-hover: color-mix(in srgb, var(--text) 10%, transparent);
+}
+:root[data-theme='obsidian'] {
+  --cover-hover: rgba(255, 255, 255, 0.08);
+}
+:root[data-theme='obsidian'] .main {
+  border: 1px solid var(--border);
+}
+/* A custom theme's picture shows through the page, as before. */
+:root[data-theme='custom'][data-theme-image] .main {
+  background: transparent;
+}
+
+/* ---------- The front page (pages/Home.tsx) ---------- */
+
+/* Home reads like a site's front page: the picture runs edge to edge under the header, the sections follow in
+   the same centred column other pages use, and a footer closes it. */
+.page.home {
+  max-width: none;
+  /* Its footer ends the page; the room other pages leave for the dock would only be a blank band under it. */
+  margin: calc(-1 * var(--page-top)) calc(-1 * var(--page-x)) -64px;
+}
+.home-col {
+  max-width: calc(1220px + 2 * var(--page-x));
+  margin: 0 auto;
+  padding: 0 var(--page-x);
+}
+/* Without a picture above it (nothing to continue yet), the column starts where any page does. */
+.home-col.first {
+  padding-top: var(--page-top);
+}
+.home h2.section {
+  margin: 44px 0 16px;
+  font-size: 24px;
+}
+
+.site-foot {
+  margin-top: 72px;
+  border-top: 1px solid var(--border);
+}
+.site-foot-in {
+  max-width: calc(1220px + 2 * var(--page-x));
+  margin: 0 auto;
+  padding: 28px var(--page-x) 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 20px 32px;
+}
+.site-foot-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.site-foot-brand svg {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.site-foot-brand b {
+  display: block;
+  font: 700 18px/1.15 var(--font-display);
+}
+.site-foot-brand span {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.site-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.site-foot-links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font: 500 13px var(--font);
+  cursor: pointer;
+  transition:
+    background-color 0.14s var(--ease),
+    color 0.14s var(--ease);
+}
+.site-foot-links button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.site-foot-note {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.site-foot-note .legal {
+  flex-basis: 100%;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+@media (max-width: 760px) {
+  .site-foot-in {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .site-foot-links {
+    justify-content: flex-start;
+    margin-left: -12px;
+  }
+}
+
+/* ---------- The dock (components/InstanceDock.tsx) ---------- */
+
+/* The instances you played last, a click away from any page: a small bar floating at the foot of the window.
+   It slides out of the way while you scroll down a page and comes back when you scroll up. */
+.idock {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow);
+  transform: translateX(-50%);
+  transition:
+    transform 0.32s var(--ease),
+    opacity 0.2s var(--ease);
+}
+.idock.away {
+  transform: translate(-50%, calc(100% + 32px));
+  opacity: 0;
+  pointer-events: none;
+}
+/* Along the window's bottom edge: bringing the pointer here calls the dock back. */
+.idock-edge {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  width: 380px;
+  max-width: 60vw;
+  height: 8px;
+  z-index: 59;
+  transform: translateX(-50%);
+}
+.idock-item {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.idock-item .tile {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.2s var(--spring);
+}
+.idock-item .tile img,
+.idock-item .tile svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.idock-item:hover .tile,
+.idock-item:focus-visible .tile {
+  transform: translateY(-6px) scale(1.12);
+}
+.idock-item:active .tile {
+  transform: translateY(-2px) scale(1.04);
+}
+/* The instance whose page is open. */
+.idock-item.current .tile {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Running: a dot under it. */
+.idock-item.running::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: var(--play);
+}
+/* Its name, above it. */
+.idock-item::after {
+  content: attr(data-name);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 16px);
+  max-width: 240px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--text);
+  font: 500 12px/1.4 var(--font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 0.12s var(--ease),
+    transform 0.12s var(--ease);
+}
+.idock-item:hover::after,
+.idock-item:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+/* Being installed or prepared: an outline around the tile fills as it goes (cyan: progress). */
+.idock-ring {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  pointer-events: none;
+  transition: transform 0.2s var(--spring);
+}
+.idock-ring rect {
+  fill: none;
+  stroke-width: 3;
+}
+.idock-ring .track {
+  stroke: var(--surface-3);
+}
+.idock-ring .fill {
+  stroke: var(--data);
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s var(--ease);
+}
+/* No figure yet: a quarter of the outline goes round until there is one. */
+.idock-ring.unknown .fill {
+  animation: idock-round 1.6s linear infinite;
+}
+@keyframes idock-round {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+.idock-item.busy .tile {
+  transform: scale(0.86);
+}
+.idock-item.busy:hover .tile,
+.idock-item.busy:focus-visible .tile {
+  transform: scale(0.86);
+}
+.idock-item:hover .idock-ring,
+.idock-item:focus-visible .idock-ring {
+  transform: scale(1.06);
+}
+
+/* ---------- An instance's progress strip (InstanceProgress in components/ui.tsx) ---------- */
+
+/* Under the instance's header while something is being installed or prepared for it: the step, the file, how far. */
+.iprogress {
+  margin-top: 10px;
+  padding: 12px 16px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  animation: page-in 0.24s var(--ease);
+}
+.iprogress-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.iprogress-top svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--data);
+}
+.iprogress-top b {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.iprogress-detail {
+  flex: 1;
+  min-width: 0;
+  font: 12px var(--mono);
+  color: var(--text-faint);
+}
+.iprogress-pct {
+  flex: none;
+  font: 600 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--data);
+}
+.iprogress .bar {
+  height: 6px;
+  border-radius: 999px;
+}
+.iprogress .bar i {
+  border-radius: 999px;
+}
+
+.idock-sep {
+  flex: none;
+  width: 1px;
+  height: 30px;
+  margin: 0 3px;
+  background: var(--border-strong);
+}
+.idock-add {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--control-border, var(--border-strong));
+  transition:
+    color 0.14s var(--ease),
+    border-color 0.14s var(--ease);
+}
+.idock-add:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+.idock-add svg {
+  width: 18px;
+  height: 18px;
+}
+/* Puts the dock away, and the small tab at the window's foot that brings it back. */
+.idock-stow {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition:
+    background-color 0.14s var(--ease),
+    color 0.14s var(--ease);
+}
+.idock-stow:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.idock-stow svg,
+.idock-tab svg {
+  width: 16px;
+  height: 16px;
+}
+.idock-tab {
+  position: fixed;
+  left: 50%;
+  bottom: 8px;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: var(--surface-2);
+  color: var(--text-faint);
+  cursor: pointer;
+  transform: translateX(-50%);
+  transition:
+    height 0.16s var(--ease),
+    color 0.14s var(--ease);
+}
+.idock-tab:hover {
+  height: 26px;
+  color: var(--text);
+}
+/* Something is being installed while the dock is away: the tab says so. */
+.idock-tab.busy {
+  color: var(--data);
+  border-color: var(--data);
+}
+@media (prefers-reduced-motion: reduce) {
+  .idock,
+  .idock-item .tile,
+  .idock-ring,
+  .idock-item::after {
+    transition: none;
+  }
+  .idock-ring.unknown .fill {
+    animation: none;
+  }
+  .idock-item:hover .tile,
+  .idock-item:focus-visible .tile {
+    transform: none;
+  }
+}
+
+/* The holiday piece (a pumpkin, a Christmas chest): in the window's bottom-left corner. */
+.shell-decor {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* ---------- The launch screen (components/LaunchScreen.tsx) ---------- */
+
+/* From Play until the game's window takes over: the instance, dimmed, across the whole window, with its icon and
+   name at the foot and what is being prepared along the bottom edge. */
+.launch-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: var(--cover);
+  color: var(--cover-fg);
+  animation: fade 0.2s var(--ease);
+}
+.launch-drag {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--titlebar);
+  -webkit-app-region: drag;
+}
+.launch-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #07070a;
+}
+/* A photo (banner, modpack art) or the RTX scene: full, then darkened from the foot where the name sits. */
+.launch-art .launch-photo,
+.launch-art > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.55;
+  animation: launch-drift 24s ease-in-out infinite alternate;
+}
+/* Once the game's process runs, the background holds still: a drifting full-window (or blurred) picture is redrawn
+   every frame, and the loading game wants that time. */
+.launch-screen.loading .launch-art .launch-photo,
+.launch-screen.loading .launch-art > svg,
+.launch-screen.loading .launch-glow img {
+  animation-play-state: paused;
+}
+/* No picture: the icon blown up and blurred into a glow of its colours, drifting slowly, on its own colour. */
+.launch-glow {
+  position: absolute;
+  inset: -10%;
+  background:
+    radial-gradient(60% 70% at 78% 30%, color-mix(in srgb, var(--glow) 55%, transparent), transparent 70%),
+    radial-gradient(50% 60% at 12% 85%, color-mix(in srgb, var(--glow) 35%, transparent), transparent 70%),
+    #07070a;
+}
+.launch-glow img {
+  position: absolute;
+  right: 4%;
+  top: 0;
+  width: 70%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(70px) saturate(1.5);
+  opacity: 0.75;
+  animation: launch-drift 24s ease-in-out infinite alternate;
+}
+.launch-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(0deg, rgba(5, 5, 7, 0.96) 0%, rgba(5, 5, 7, 0.7) 32%, rgba(5, 5, 7, 0.1) 70%),
+    linear-gradient(90deg, rgba(5, 5, 7, 0.55), transparent 55%);
+}
+@keyframes launch-drift {
+  to {
+    transform: scale(1.08) translate(-1.5%, 1%);
+  }
+}
+/* The game's window is up: the screen folds back and away, as if the game opened out of it. */
+.launch-screen.folding {
+  pointer-events: none;
+  transform-origin: 50% 0;
+  animation: launch-fold 0.56s cubic-bezier(0.55, 0, 0.35, 1) forwards;
+}
+@keyframes launch-fold {
+  to {
+    transform: perspective(1600px) rotateX(72deg) translateY(-4%) scale(0.96);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .launch-art .launch-photo,
+  .launch-art > svg,
+  .launch-glow img {
+    animation: none;
+  }
+  .launch-screen.folding {
+    animation: fade 0.3s var(--ease) reverse forwards;
+  }
+}
+.launch-close {
+  position: absolute;
+  top: calc(var(--titlebar) + 8px);
+  right: 16px;
+  color: var(--cover-dim);
+}
+.launch-close:hover {
+  color: var(--cover-fg);
+}
+.launch-body {
+  position: relative;
+  padding: 0 48px 28px;
+  animation: plate-in 0.5s var(--ease) 0.05s backwards;
+}
+.launch-icon {
+  width: 104px;
+  height: 104px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+}
+.launch-icon img,
+.launch-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.launch-body h1 {
+  margin: 20px 0 14px;
+  font-size: clamp(36px, 5vw, 60px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.launch-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.launch-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 500 12px var(--mono);
+}
+.launch-chips .chip svg {
+  width: 13px;
+  height: 13px;
+  color: var(--text-faint);
+}
+/* What is being prepared: a strip along the bottom edge, its bar the full width of the window. */
+.launch-progress {
+  position: relative;
+  background: var(--bg);
+  color: var(--text);
+}
+.launch-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 48px;
+}
+.launch-status svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--data);
+}
+.launch-status b {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.launch-detail {
+  flex: 1;
+  min-width: 0;
+  font: 12px var(--mono);
+  color: var(--text-faint);
+}
+.launch-pct {
+  flex: none;
+  font: 600 14px var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--data);
+}
+.launch-progress .bar {
+  height: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .launch-screen,
+  .launch-body {
+    animation: none;
+  }
+}
+
+/* ---------- The overview card (components/Overview.tsx) ---------- */
+
+/* The card is a picture (a canvas): what you see is what Copy and Save give you. */
+.overview-card {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1200 / 630;
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.overview-note {
+  margin: 10px 0 0;
+}
+
+/* ---------- Liquid Glass ---------- */
+
+/*
+ * A theme of its own kind: panes of frosted, lightly tinted glass over a soft field of colour. What lies behind a
+ * pane shows through it, blurred, and each pane catches a line of light along its top edge. The other themes are
+ * flat on purpose; here the blur and the colour field are the whole point, so they are used freely.
+ * The role colours keep their jobs: purple is clickable, cyan is data, green is play.
+ */
+:root[data-theme='liquid'] {
+  --bg: rgba(18, 20, 34, 0.46);
+  --bg-sidebar: rgba(11, 13, 28, 0.55);
+  --surface: rgba(255, 255, 255, 0.07);
+  --surface-2: rgba(255, 255, 255, 0.11);
+  --surface-3: rgba(255, 255, 255, 0.17);
+  --border: rgba(255, 255, 255, 0.13);
+  --border-strong: rgba(255, 255, 255, 0.24);
+  --control-border: rgba(255, 255, 255, 0.42);
+  --text: #f6f7fb;
+  --text-dim: rgba(246, 247, 251, 0.78);
+  --text-faint: rgba(246, 247, 251, 0.6);
+  --accent: #c3a6ff;
+  --accent-hover: #d6c2ff;
+  --accent-soft: rgba(195, 166, 255, 0.2);
+  --accent-fg: #14092b;
+  --data: #7fe3ff;
+  --play: #62f0a4;
+  --play-hover: #8af7bd;
+  --play-fg: #04180d;
+  --success: #62f0a4;
+  --success-soft: rgba(98, 240, 164, 0.16);
+  /* The header has no pane of its own: it lies straight on the colour field. Screens that cover the whole window
+     (the welcome, the launch screen) use the same tint, frosted (below). */
+  --cover: rgba(11, 13, 28, 0.55);
+  --cover-fg: #f6f7fb;
+  --cover-dim: rgba(246, 247, 251, 0.72);
+  --cover-hover: rgba(255, 255, 255, 0.1);
+  --shadow: 0 18px 50px rgba(4, 6, 20, 0.45);
+  --radius: 18px;
+  --radius-sm: 12px;
+  /* What a pane of glass is made of. */
+  --glass-light: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --glass-frost: blur(30px) saturate(1.6);
+  color-scheme: dark;
+}
+/* The colour field everything floats on. */
+:root[data-theme='liquid'] body {
+  background:
+    radial-gradient(60% 70% at 10% 6%, #5b3df0 0%, transparent 62%),
+    radial-gradient(55% 60% at 90% 10%, #0fa9c4 0%, transparent 62%),
+    radial-gradient(70% 70% at 72% 96%, #c8419a 0%, transparent 60%),
+    radial-gradient(50% 60% at 16% 92%, #1f6bff 0%, transparent 60%),
+    #0b0d1c;
+  background-attachment: fixed;
+}
+/* The page: one large pane. */
+:root[data-theme='liquid'] .main {
+  border: 1px solid var(--border-strong);
+  backdrop-filter: blur(38px) saturate(1.5);
+  box-shadow: var(--glass-light);
+}
+/* Panes inside the page: tinted, edged with light. The page behind them is already frosted, so they don't blur. */
+:root[data-theme='liquid'] :is(.card, .ihead, .icard, .callout, .iprogress, .pic-basic-item, .gopt-all) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+/* Panes that float over something busy: more tint and their own frost, so what is on them stays easy to read. */
+:root[data-theme='liquid'] :is(.ctx-menu, .modal, .qs, .idock, .idock-tab, .task, .toast, .update-banner, .welcome-panel, .hero-body, .launch-progress) {
+  background: rgba(24, 26, 44, 0.6);
+  border-color: var(--border-strong);
+  backdrop-filter: var(--glass-frost);
+  box-shadow: var(--glass-light), var(--shadow);
+}
+:root[data-theme='liquid'] .hero-body {
+  border: 1px solid var(--border-strong);
+}
+:root[data-theme='liquid'] :is(.welcome-screen, .launch-screen) {
+  backdrop-filter: blur(44px) saturate(1.4);
+}
+/* The header's current page and its round controls are small panes too. */
+:root[data-theme='liquid'] .sidebar .nav-item.active,
+:root[data-theme='liquid'] :is(.head-btn.active, .account-chip, .sidebar .qs-open) {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: var(--glass-light);
+}
+/* Buttons are pills of glass; the two that mean "go" stay solid so they can't be missed. */
+:root[data-theme='liquid'] .btn {
+  border-radius: 999px;
+}
+:root[data-theme='liquid'] .btn:not(.primary, .ghost, .danger, .play-btn, .play-caret) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+/* Play is a pill too: on its own, or the Play-and-▾ pair clipped to one pill. */
+:root[data-theme='liquid'] .play-btn,
+:root[data-theme='liquid'] .split-btn {
+  border-radius: 999px;
+}
+:root[data-theme='liquid'] .split-btn > .btn {
+  border-radius: 0;
+}
+:root[data-theme='liquid'] :is(.input, .select, textarea) {
+  background: rgba(8, 10, 22, 0.36);
+}
+/* Without frost (reduced transparency or motion asked for), panes get a solid tint instead. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme='liquid'] {
+    --bg: #161829;
+    --surface: #1e2136;
+    --surface-2: #272a44;
+    --surface-3: #323655;
+  }
+  :root[data-theme='liquid'] :is(.main, .ctx-menu, .modal, .qs, .idock, .task, .toast, .update-banner, .welcome-panel, .hero-body, .launch-progress, .welcome-screen, .launch-screen) {
+    backdrop-filter: none;
+    background: #1b1d31;
+  }
+}
+
+/* A narrow window has no room beside the instance dock (centred at the foot): the task stack and the update notice
+   then sit above it instead of on it. */
+@media (max-width: 1180px) {
+  :root:has(.idock:not(.away)) {
+    --float-bottom: 92px;
+  }
+}
+
+/* The Bedrock cover's version plate (components/BedrockVersions.tsx): the version, where it came from, Switch version. */
+.bd-version {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  max-width: 320px;
+  padding: 12px 14px;
+}
+.bd-version-text {
+  display: grid;
+  gap: 2px;
+}
+.bd-version-text b {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 500;
+}
+.bd-version-text span {
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b8bfca;
+}
+.bd-version-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bd-version-acts .btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f1f1f4;
+}
+.bd-section-hint {
+  margin: -4px 0 12px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+@media (max-width: 860px) {
+  .bd-version {
+    max-width: none;
+  }
+}
+
+/* ---------- The download island (components/TaskIsland.tsx) ---------- */
+
+/* In the bottom-right stack with the short messages: a black card, the same on every theme, with its bar along the
+   foot. Several tasks open upwards into a list. */
+.island {
+  position: relative;
+  order: 1;
+  border-radius: 16px;
+  border: 1px solid #2a2a33;
+  background: #08080a;
+  color: #f1f1f4;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  animation: island-in 0.24s var(--ease);
+  transition: border-color 0.2s var(--ease);
+}
+/* Under the messages: they come and go above it, so it doesn't jump. */
+.dock > .toast {
+  order: 0;
+}
+.island.done {
+  border-color: rgba(61, 220, 132, 0.55);
+}
+.island.error {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+@keyframes island-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+.island-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+}
+.island-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 6px 12px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+button.island-toggle {
+  cursor: pointer;
+}
+button.island-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+.island-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  font-size: 12px;
+}
+.island-text b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.island-text > span {
+  color: #a3a3b0;
+}
+.island-text .island-err {
+  color: #fca5a5;
+  line-height: 1.4;
+}
+.island.error .island-head .island-text b {
+  color: #fca5a5;
+}
+.island-pic {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #1c1c22;
+}
+.island-plain {
+  display: grid;
+  place-items: center;
+  color: #22d3ee;
+}
+.island-plain svg {
+  width: 17px;
+  height: 17px;
+}
+/* Bedrock's grass block (Preview's in violet). */
+.island-cube {
+  position: relative;
+  overflow: hidden;
+  background: #7a5634;
+}
+.island-cube::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 38%;
+  background: #5aa83b;
+}
+.island-cube.preview {
+  background: #5a3f8a;
+}
+.island-cube.preview::before {
+  background: #b26bff;
+}
+/* The bar along the island's foot. */
+.island-mini {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+.island-mini i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 0 3px 3px 0;
+  background: #22d3ee;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.55);
+  transition: width 0.3s var(--ease);
+}
+.island-mini.unknown i {
+  width: 35%;
+  border-radius: 3px;
+  animation: island-sweep 1.4s ease-in-out infinite;
+}
+@keyframes island-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+.island-num {
+  flex: none;
+  min-width: 36px;
+  text-align: right;
+  font: 500 13px var(--mono);
+  color: #22d3ee;
+}
+.island-busy {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: #22d3ee;
+}
+.island-ok,
+.island-bad {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+.island-ok {
+  color: #3ddc84;
+}
+.island-bad {
+  color: #f87171;
+}
+.island-chev {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: #8b8b99;
+  transition: transform 0.2s var(--ease);
+}
+.island.open .island-chev {
+  transform: rotate(180deg);
+}
+.island .task-cancel {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #8b8b99;
+  cursor: pointer;
+}
+.island .task-cancel:hover:not(:disabled) {
+  background: #23232a;
+  color: #f1f1f4;
+}
+
+/* Opened: each task above the summary. */
+.island-list {
+  display: grid;
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+  border-bottom: 1px solid #1f1f26;
+  animation: island-list-in 0.2s var(--ease);
+}
+@keyframes island-list-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.island-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 11px;
+  padding: 10px 8px 10px 10px;
+}
+.island-row + .island-row {
+  border-top: 1px solid #1a1a20;
+}
+.island-row .island-pic {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  justify-self: center;
+}
+.island-row-bar {
+  grid-column: 2 / -1;
+}
+.island-row-bar .bar {
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.island-row-bar .bar i {
+  background: #22d3ee;
+}
+@media (prefers-reduced-motion: reduce) {
+  .island,
+  .island-list {
+    animation: none;
+  }
+  .island-mini.unknown i {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+
+/* ---------- Page tips (components/PageGuide.tsx) ---------- */
+
+/* Never blocks the page: only the card takes clicks. The ring darkens everything around what it points at. */
+.guide-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 94;
+  pointer-events: none;
+}
+.guide-ring {
+  position: fixed;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 9999px rgba(4, 4, 8, 0.5);
+  transition:
+    left 0.3s var(--ease),
+    top 0.3s var(--ease),
+    width 0.3s var(--ease),
+    height 0.3s var(--ease);
+  animation: guide-pulse 2.2s ease-in-out infinite;
+}
+@keyframes guide-pulse {
+  50% {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 0 0 9999px rgba(4, 4, 8, 0.5);
+  }
+}
+.guide-card {
+  position: fixed;
+  pointer-events: auto;
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  animation: guide-in 0.22s var(--ease);
+  transition:
+    left 0.3s var(--ease),
+    top 0.3s var(--ease);
+}
+/* The little point towards what it is about. */
+.guide-card::before {
+  content: '';
+  position: absolute;
+  left: var(--arrow, 24px);
+  width: 12px;
+  height: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  transform: translateX(-50%) rotate(45deg);
+}
+.guide-card.below::before {
+  top: -7px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.guide-card.above::before {
+  bottom: -7px;
+  border-left: 0;
+  border-top: 0;
+}
+@keyframes guide-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.guide-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.guide-count {
+  font: 500 11.5px var(--mono);
+  color: var(--accent);
+}
+.guide-x {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -4px -6px -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.guide-x:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.guide-card b {
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+.guide-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.guide-acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-ring,
+  .guide-card {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Appearance → Window buttons: a small picture of each style on a strip of header. */
+.wb-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.wb-choice {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.wb-choice:hover {
+  border-color: var(--border-strong);
+}
+.wb-choice.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  color: var(--text);
+}
+.wb-mini {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--cover);
+}
+.wb-mini.left {
+  justify-content: flex-start;
+}
+.wb-mini i {
+  display: block;
+  flex: none;
+}
+.wb-mini.ubuntu i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cover-fg) 25%, transparent);
+}
+.wb-mini.ubuntu .close {
+  background: #e95420;
+}
+.wb-mini.windows {
+  gap: 0;
+  padding: 0;
+}
+.wb-mini.windows i {
+  width: 22px;
+  height: 100%;
+  background: linear-gradient(var(--cover-dim), var(--cover-dim)) center / 8px 1.5px no-repeat;
+}
+.wb-mini.windows .close {
+  background:
+    linear-gradient(#fff, #fff) center / 8px 1.5px no-repeat,
+    #e81123;
+}
+.wb-mini.pill {
+  gap: 0;
+}
+.wb-mini.pill i {
+  width: 16px;
+  height: 14px;
+  background: color-mix(in srgb, var(--cover-fg) 12%, transparent);
+}
+.wb-mini.pill .min {
+  border-radius: 999px 0 0 999px;
+}
+.wb-mini.pill .close {
+  border-radius: 0 999px 999px 0;
+}
+.wb-mini.mac i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.wb-mini.mac .close {
+  order: -1;
+  background: #ff5f57;
+}
+.wb-mini.mac .min {
+  background: #febc2e;
+}
+.wb-mini.mac .max {
+  background: #28c840;
+}
+.wb-mini.minimal i {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--cover-dim);
+  border-radius: 2px;
+}
+.wb-mini.minimal .min {
+  height: 0;
+  border-width: 1.5px 0 0;
+}
+.wb-mini.soft i {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--cover-fg) 18%, transparent);
+  background: color-mix(in srgb, var(--cover-fg) 8%, transparent);
+}
+
+/* ---------- The header's page tabs, by stage (components/HeaderNav.tsx sets data-stage) ---------- */
+
+.sidebar .navbox {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.sidebar .navbox .nav {
+  scroll-behavior: smooth;
+}
+/* 2: pages lose their names one at a time from the right end (data-compact), as far as needed; 3: every page but
+   the one you are on is an icon. The name is the tooltip. */
+.navbox[data-stage='2'] .nav-item[data-compact] .nav-label,
+.navbox[data-stage='3'] .nav-item:not(.active) .nav-label {
+  display: none;
+}
+.navbox[data-stage='2'] .nav-item[data-compact],
+.navbox[data-stage='3'] .nav-item:not(.active) {
+  padding: 0 9px;
+}
+.navbox[data-stage='2'] .nav-item[data-compact] .count,
+.navbox[data-stage='3'] .nav-item:not(.active) .count {
+  display: none;
+}
+
+/* 3: ‹ › on the side that has more, which also glows; dots under the tabs. */
+.nav-step {
+  display: none;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--cover-fg) 18%, transparent);
+  background: color-mix(in srgb, var(--cover-fg) 8%, transparent);
+  color: var(--cover-fg);
+  cursor: pointer;
+}
+.nav-step:hover {
+  background: color-mix(in srgb, var(--cover-fg) 16%, transparent);
+}
+.nav-step svg {
+  width: 14px;
+  height: 14px;
+}
+.navbox[data-stage='3'].more-l .nav-step.prev,
+.navbox[data-stage='3'].more-r .nav-step.next {
+  display: grid;
+}
+.navbox[data-stage='3'].more-r .nav {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+}
+.navbox[data-stage='3'].more-l .nav {
+  mask-image: linear-gradient(-90deg, #000 calc(100% - 24px), transparent);
+}
+.navbox[data-stage='3'].more-l.more-r .nav {
+  mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+}
+/* The side with more: a soft wash of the accent fading in from the ‹ › button, not a line over the tabs. */
+.navbox::before,
+.navbox::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 22px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease);
+}
+.navbox::before {
+  left: 26px;
+  border-radius: 0 10px 10px 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), transparent);
+}
+.navbox::after {
+  right: 26px;
+  border-radius: 10px 0 0 10px;
+  background: linear-gradient(-90deg, color-mix(in srgb, var(--accent) 30%, transparent), transparent);
+}
+.navbox[data-stage='3'].more-l::before,
+.navbox[data-stage='3'].more-r::after {
+  opacity: 1;
+  animation: nav-glow 1.8s ease-in-out infinite;
+}
+@keyframes nav-glow {
+  50% {
+    opacity: 0.45;
+  }
+}
+.nav-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  display: flex;
+  gap: 4px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.nav-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cover-fg) 22%, transparent);
+  transition: width 0.2s var(--ease);
+}
+.nav-dots i.on {
+  width: 14px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+/* The one-time tip. */
+.nav-hint {
+  position: absolute;
+  right: 0;
+  top: calc(100% - 4px);
+  z-index: 160;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  animation: guide-in 0.22s var(--ease);
+}
+.nav-hint::before {
+  content: '';
+  position: absolute;
+  right: 18px;
+  top: -6px;
+  width: 10px;
+  height: 10px;
+  background: var(--surface-2);
+  border-left: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+.nav-hint button {
+  border: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav-mouse {
+  position: relative;
+  flex: none;
+  width: 12px;
+  height: 18px;
+  border: 1.5px solid var(--text-dim);
+  border-radius: 7px;
+}
+.nav-mouse::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 2px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translateX(-50%);
+  animation: nav-wheel 1.2s ease-in-out infinite;
+}
+@keyframes nav-wheel {
+  50% {
+    transform: translate(-50%, 4px);
+    opacity: 0.3;
+  }
+}
+
+/* 4: one switcher button for the page you are on; its list has every page, a search box and the shortcuts. */
+.nav-switch {
+  display: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px 0 5px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--cover-fg) 16%, transparent);
+  background: color-mix(in srgb, var(--cover-fg) 8%, transparent);
+  color: var(--cover-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav-switch > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s var(--ease);
+}
+.nav-switch.open > svg {
+  transform: rotate(180deg);
+}
+.nav-switch-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--cover-mark, var(--accent));
+}
+.nav-switch-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.navbox[data-stage='4'] .nav,
+.navbox[data-stage='4'] .nav-step {
+  display: none;
+}
+.navbox[data-stage='4'] .nav-switch {
+  display: inline-flex;
+}
+.nav-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% - 6px);
+  z-index: 160;
+  display: grid;
+  gap: 2px;
+  width: 270px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+  animation: guide-in 0.18s var(--ease);
+  -webkit-app-region: no-drag;
+}
+.nav-menu .input {
+  height: 34px;
+  margin-bottom: 6px;
+}
+.nav-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-menu-item svg {
+  width: 16px;
+  height: 16px;
+}
+.nav-menu-item:hover,
+.nav-menu-item:focus-visible {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.nav-menu-item.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.nav-menu-item kbd {
+  font: 500 10.5px var(--mono);
+  color: var(--text-faint);
+}
+@media (prefers-reduced-motion: reduce) {
+  .navbox::before,
+  .navbox::after,
+  .nav-mouse::after {
+    animation: none;
+  }
+  .sidebar .navbox .nav {
+    scroll-behavior: auto;
+  }
+}
+
+/* The launch screen's live memory chip: used / allowed, with a thin fill along its foot. */
+.launch-chips .launch-ram {
+  position: relative;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.launch-ram-max {
+  opacity: 0.6;
+}
+.launch-ram i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--data);
+  transition: width 0.6s var(--ease);
+}
+
+/* The launch screen once the game runs, like the old Forge loader: the stage bar, the mods bar, the last line. */
+.launch-stages {
+  display: grid;
+  gap: 9px;
+  padding: 14px 48px 14px;
+}
+.launch-stage {
+  display: grid;
+  gap: 5px;
+}
+.launch-stage-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+}
+.launch-stage-top > svg {
+  align-self: center;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--data);
+}
+/* Both rows start their words at the same place: the second keeps the spinner's room empty. */
+.launch-stage.sub .launch-stage-top::before {
+  content: '';
+  flex: none;
+  width: 15px;
+}
+.launch-said {
+  margin-left: 25px;
+}
+.launch-stage-top b {
+  font-weight: 600;
+}
+.launch-stage-top .launch-detail {
+  flex: 1;
+  min-width: 0;
+}
+.launch-stage-count {
+  margin-left: auto;
+  font: 500 12px var(--mono);
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.launch-stage .bar {
+  height: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+.launch-stage .bar i {
+  border-radius: 4px;
+  transition: width 0.4s var(--ease);
+}
+.launch-stage.sub {
+  padding-left: 0;
+}
+.launch-stage.sub .launch-stage-top {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.launch-stage.sub .bar {
+  height: 4px;
+}
+.launch-stage.sub .bar i {
+  background: color-mix(in srgb, var(--data) 70%, var(--text));
+}
+.launch-said {
+  padding-left: 0;
+  font: 11.5px var(--mono);
+  color: color-mix(in srgb, var(--text-faint) 80%, transparent);
+}
+
+/* ---------- Report a problem (pages/Report.tsx) ---------- */
+
+.report-page {
+  max-width: 920px;
+}
+/* Each step: its number on the left, a thin line down to the next, the card beside it. */
+.report-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.report-step::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 44px;
+  bottom: -16px;
+  border-left: 1px dashed var(--border-strong);
+}
+.report-step:last-of-type::before {
+  display: none;
+}
+.report-num {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font: 500 13px var(--mono);
+  color: var(--text-dim);
+}
+.report-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+}
+.report-card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.report-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.report-kind {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease);
+}
+.report-kind svg {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+.report-kind b {
+  color: var(--text);
+  font-size: 14px;
+}
+.report-kind:hover {
+  border-color: var(--border-strong);
+}
+.report-kind.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+}
+.report-down {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+.report-status-lead {
+  margin-top: 6px;
+}
+.report-label-note {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+/* "Service down": tick one or more, each with what it covers and the status page's light. */
+.report-services {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+.report-service {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease);
+}
+.report-service:hover {
+  border-color: var(--border-strong);
+}
+.report-service.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+}
+.report-tick {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  color: #fff;
+}
+.report-service.on .report-tick {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.report-service-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.report-service-text b {
+  color: var(--text);
+  font-size: 13px;
+}
+.report-lamp {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.report-lamp.lamp-operational {
+  background: var(--play);
+}
+.report-lamp.lamp-maintenance {
+  background: var(--data, #4cc3ff);
+}
+.report-lamp.lamp-degraded,
+.report-lamp.lamp-partial {
+  background: var(--warning);
+}
+.report-lamp.lamp-major {
+  background: var(--danger);
+}
+.report-status-note {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--play) 10%, transparent);
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.report-status-note.bad {
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+.report-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.report-row .grow {
+  min-width: 220px;
+}
+.report-field {
+  display: grid;
+  gap: 6px;
+}
+.report-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 600 11.5px var(--font);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.report-count {
+  margin-left: auto;
+  font: 500 11px var(--mono);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.report-count.ok {
+  color: var(--play);
+}
+.report-field textarea.input {
+  height: auto;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.report-field .hint.bad {
+  color: var(--danger);
+}
+.report-setup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.report-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 24px 56px;
+}
+.report-private {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 220px;
+}
+.report-error {
+  flex-basis: 100%;
+  color: var(--danger);
+  font-size: 13px;
+}
+.report-done {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 560px;
+  margin: 48px auto;
+  padding: 36px 28px;
+  text-align: center;
+}
+.report-done h1 {
+  margin: 0;
+}
+.report-done p {
+  margin: 0;
+  color: var(--text-dim);
+}
+.report-done-mark {
+  width: 44px;
+  height: 44px;
+  color: var(--play);
+}
+@media (max-width: 620px) {
+  .report-step {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .report-step::before,
+  .report-num {
+    display: none;
+  }
+  .report-send {
+    margin-left: 0;
+  }
+}
+
+/* ---------- Admin → Reports (components/admin/Reports.tsx) ---------- */
+
+.admin-reports {
+  display: grid;
+  gap: 10px;
+}
+.admin-report {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.admin-report.unseen {
+  border-left: 3px solid var(--accent);
+}
+.admin-report-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.admin-report-head h3 {
+  margin: 0;
+  min-width: 200px;
+  font-size: 15px;
+}
+.admin-report .report-type-down {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.admin-report .report-type-crash {
+  color: var(--warning, #e0a03a);
+}
+.admin-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12.5px;
+}
+.admin-report-meta b {
+  color: var(--text);
+}
+.admin-report-block {
+  display: grid;
+  gap: 4px;
+}
+.admin-report-block p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.admin-report-actions {
+  gap: 6px;
+}
+
+/* The download island's Hide, and the round pill it tucks into (components/TaskIsland.tsx). */
+.island .island-tuck {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #8b8b99;
+  cursor: pointer;
+}
+.island .island-tuck svg {
+  width: 16px;
+  height: 16px;
+}
+.island .island-tuck:hover {
+  background: #23232a;
+  color: #f1f1f4;
+}
+.island-pill {
+  --p: 0%;
+  position: relative;
+  order: 1;
+  align-self: flex-end;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  /* The progress runs round the edge. */
+  background: conic-gradient(var(--data) var(--p), #2a2a33 0);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  color: #f1f1f4;
+  cursor: pointer;
+  animation: island-in 0.2s var(--ease);
+}
+.island-pill.unknown {
+  background: conic-gradient(var(--data) 0 22%, #2a2a33 0);
+  animation: island-in 0.2s var(--ease), island-spin 1.1s linear infinite;
+}
+.island-pill.done {
+  background: var(--play);
+}
+.island-pill.error {
+  background: #f87171;
+}
+.island-pill-in {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #08080a;
+  font: 600 12px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.island-pill.unknown .island-pill-in {
+  animation: island-spin 1.1s linear infinite reverse;
+}
+.island-pill-in svg {
+  width: 16px;
+  height: 16px;
+}
+.island-pill-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 11px/20px var(--font);
+  text-align: center;
+}
+.island-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@keyframes island-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .island-pill.unknown,
+  .island-pill.unknown .island-pill-in {
+    animation: none;
+  }
+}
+
+/* Bedrock: which account the game plays as (pages/Bedrock.tsx XboxAccountNote). */
+.bd-xbox-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 8px;
+  margin: 12px 0 0;
+  max-width: 560px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--cover-fg, #fff) 72%, transparent);
+}
+.bd-xbox-note svg {
+  margin-top: 2px;
+}
+.bd-xbox-note .link {
+  grid-column: 2;
+  justify-self: start;
+}
+
+/* Long lists (an instance's mods, Library's cards, Discover's results): rows off screen aren't laid out or drawn
+   until they scroll near, so a pack with hundreds of mods doesn't hold graphics memory for all of them. The
+   browser remembers each row's real height once it has been drawn. */
+.list > .list-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
+}
+.grid > .icard {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+.results > .result {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 110px;
+}
+
+/* An instance with no picture of its own: its loader's logo on that project's colours (LoaderArt.tsx). */
+.loader-art {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(65% 85% at 50% 42%, color-mix(in srgb, var(--la-glow) 30%, transparent), transparent 72%),
+    linear-gradient(160deg, color-mix(in srgb, var(--la-glow) 10%, var(--la-ground)), var(--la-ground));
+}
+.loader-art .loader-art-logo {
+  width: 62%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  image-rendering: auto;
+  border-radius: 22%;
+  overflow: hidden;
+  box-shadow: 0 0.4em 1.6em rgba(0, 0, 0, 0.35);
+}
+.loader-art .loader-art-logo.drawn svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.loader-art.wide .loader-art-logo {
+  width: auto;
+  height: 44%;
+  margin-bottom: 9%;
 }

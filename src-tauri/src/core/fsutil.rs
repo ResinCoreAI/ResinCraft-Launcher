@@ -149,7 +149,7 @@ pub fn copy_many_with(
                 if failed_dirs.contains(&i) {
                     continue;
                 }
-                match std::fs::copy(from, to) {
+                match copy_file(from, to) {
                     Ok(_) => {
                         done.fetch_add(*size, Ordering::Relaxed);
                     }
@@ -166,6 +166,61 @@ pub fn copy_many_with(
     let mut out = failures.into_inner().unwrap();
     out.sort_by_key(|(i, _)| *i);
     out
+}
+
+/// Runs `f` on every item on a few threads and returns the results in the items' order (blocking). For work that is
+/// part reading files and part computing (hashing, reading a jar's metadata), where one thread leaves both the disk's
+/// queue and the other cores idle.
+pub fn in_parallel<T: Sync, R: Send>(items: &[T], f: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8).min(items.len());
+    if threads <= 1 {
+        return items.iter().map(f).collect();
+    }
+    let next = AtomicUsize::new(0);
+    let slots: Vec<Mutex<Option<R>>> = items.iter().map(|_| Mutex::new(None)).collect();
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                let Some(item) = items.get(i) else { break };
+                *slots[i].lock().unwrap() = Some(f(item));
+            });
+        }
+    });
+    slots.into_iter().map(|s| s.into_inner().unwrap().expect("every item was handled")).collect()
+}
+
+/// Windows' "The specified file could not be encrypted" (ERROR_ENCRYPTION_FAILED).
+const ENCRYPTION_FAILED: i32 = 6000;
+
+/// Copies one file, like `std::fs::copy`. Minecraft for Windows keeps its worlds and settings encrypted for the
+/// app (EFS, "Application Protected"). This user can read them, but Windows' own copy also tries to encrypt the
+/// copy the same way, which only the app may do, and fails with "The specified file could not be encrypted"
+/// (os error 6000). Such a file is copied by reading and writing its contents instead: a plain file with the same
+/// bytes and modified time.
+pub fn copy_file(from: &Path, to: &Path) -> std::io::Result<u64> {
+    match std::fs::copy(from, to) {
+        Err(e) if e.raw_os_error() == Some(ENCRYPTION_FAILED) => copy_contents(from, to),
+        result => result,
+    }
+}
+
+/// Copies the bytes of `from` into a new plain file `to`, keeping the modified time and read-only flag.
+fn copy_contents(from: &Path, to: &Path) -> std::io::Result<u64> {
+    let mut src = std::fs::File::open(from)?;
+    let meta = src.metadata()?;
+    let mut dst = std::fs::File::create(to)?;
+    let n = std::io::copy(&mut src, &mut dst)?;
+    if let Ok(time) = meta.modified() {
+        dst.set_modified(time)?;
+    }
+    if meta.permissions().readonly() {
+        dst.set_permissions(meta.permissions())?;
+    }
+    Ok(n)
 }
 
 /// The disk (or quota) is full: copying more won't help.
@@ -239,6 +294,14 @@ mod tests {
     }
 
     #[test]
+    fn in_parallel_keeps_the_order() {
+        let items: Vec<u32> = (0..1000).collect();
+        assert_eq!(in_parallel(&items, |n| n * 2), items.iter().map(|n| n * 2).collect::<Vec<_>>());
+        assert_eq!(in_parallel(&[7u32], |n| n + 1), [8]);
+        assert!(in_parallel(&[] as &[u32], |n| *n).is_empty());
+    }
+
+    #[test]
     fn copies_many_files_and_reports_failures() {
         use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
         let (root, _) = sandbox("copy");
@@ -271,6 +334,45 @@ mod tests {
         let again: Vec<_> = jobs[..5].iter().map(|(f, t, s)| (f.clone(), empty.join(t.file_name().unwrap()), *s)).collect();
         assert!(copy_many(&again, &stopped, &AtomicU64::new(0)).is_empty());
         assert!(!empty.join("f0.txt").exists());
+    }
+
+    #[test]
+    fn plain_copy_keeps_bytes_and_modified_time() {
+        let (root, _) = sandbox("plain");
+        let (from, to) = (root.join("level.dat"), root.join("copy.dat"));
+        std::fs::write(&from, b"world data").unwrap();
+        let old = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000);
+        std::fs::File::options().write(true).open(&from).unwrap().set_modified(old).unwrap();
+        // A longer file already there is replaced, not left with a tail.
+        std::fs::write(&to, b"an older and much longer file").unwrap();
+        assert_eq!(copy_contents(&from, &to).unwrap(), 10);
+        assert_eq!(std::fs::read(&to).unwrap(), b"world data");
+        assert_eq!(std::fs::metadata(&to).unwrap().modified().unwrap(), old);
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
+    }
+
+    /// Minecraft for Windows' own files (app-protected EFS), on a PC where it is installed:
+    /// `cargo test --lib copies_minecraft_protected_files -- --ignored --nocapture`. Only reads them.
+    #[test]
+    #[ignore]
+    #[cfg(windows)]
+    fn copies_minecraft_protected_files() {
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+        let local = PathBuf::from(std::env::var("LOCALAPPDATA").unwrap());
+        let mojang = local.join(r"Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\LocalState\games\com.mojang");
+        if !mojang.is_dir() {
+            println!("Minecraft for Windows isn't installed here");
+            return;
+        }
+        let (root, _) = sandbox("efs");
+        let jobs = list_copy(&mojang, &root.join("copy"), &[]).unwrap();
+        let failed = copy_many(&jobs, &AtomicBool::new(false), &AtomicU64::new(0));
+        assert!(failed.is_empty(), "{failed:?}");
+        for (from, to, _) in &jobs {
+            assert_eq!(std::fs::read(from).unwrap(), std::fs::read(to).unwrap(), "{}", from.display());
+        }
+        println!("copied {} files", jobs.len());
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
     }
 
     /// Timing: `cargo test --lib copy_speed -- --ignored --nocapture`. A folder like a played instance: thousands

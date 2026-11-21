@@ -1,0 +1,28 @@
+// Controller support: the on-screen keyboard (components/PadKeyboard.tsx) and the list of controls (components/PadHelp.tsx).
+export default {
+  'pad.keyboard': 'On-screen keyboard',
+  'pad.space': 'Space',
+  'pad.backspace': 'Delete',
+  'pad.shift': 'Shift',
+  'pad.caretLeft': 'Move left',
+  'pad.caretRight': 'Move right',
+  'pad.enter': 'Enter',
+  'pad.clear': 'Clear',
+  'pad.help.title': 'Controller',
+  'pad.help.move': 'Move',
+  'pad.help.select': 'Select, or type in a text box',
+  'pad.help.back': 'Back, or close',
+  'pad.help.pages': 'Previous / next page',
+  'pad.help.tabs': 'Previous / next tab',
+  'pad.help.menu': 'More actions for what’s selected',
+  'pad.help.search': 'Search this page',
+  'pad.help.scroll': 'Scroll',
+  'pad.help.home': 'Home',
+  'pad.help.help': 'Show or hide this list',
+  'pad.help.kbClose': 'Close the keyboard',
+  'pad.help.kbBackspace': 'Delete',
+  'pad.help.kbSpace': 'Space',
+  'pad.help.kbCaret': 'Move the cursor',
+  'pad.help.kbShift': 'Shift / symbols',
+  'pad.help.kbDone': 'Done'
+}

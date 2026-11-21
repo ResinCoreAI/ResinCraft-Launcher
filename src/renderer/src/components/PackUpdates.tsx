@@ -44,6 +44,9 @@ function loadHidden(): string[] {
   }
 }
 
+/** Updates put off with "Later": out of the notice until ResinCraft next starts. */
+let later: string[] = []
+
 let started = false
 function startSchedule() {
   if (started) return
@@ -84,11 +87,15 @@ export function PackUpdatesBanner() {
   const { data } = usePackUpdates()
   const { instances, games, go } = useStore()
   const [hidden, setHidden] = useState(loadHidden)
+  // It arrives as one line; the list opens when asked for, so it never lands on top of what you were doing.
+  const [open, setOpen] = useState(false)
   const run = useSwitchPack()
   useEffect(startSchedule, [])
 
-  const shown = (data?.updates ?? []).filter((u) => !hidden.includes(keyOf(u)))
+  const [, setPutOff] = useState(0)
+  const shown = (data?.updates ?? []).filter((u) => !hidden.includes(keyOf(u)) && !later.includes(keyOf(u)))
   if (!shown.length) return null
+  /** "Don't remind me": these versions never come up in the notice again (a newer one does). */
   const hide = (keys: string[]) => {
     const next = [...new Set([...hidden, ...keys])]
     setHidden(next)
@@ -98,7 +105,13 @@ export function PackUpdatesBanner() {
       // Private window: hidden until the app restarts.
     }
   }
-  const open = (u: PackUpdate) => (u.target === 'instance' ? go({ page: 'instance', id: u.id, tab: 'settings' }) : go({ page: 'servers', id: u.id }))
+  /** "Later": away for now, back the next time ResinCraft starts. */
+  const putOff = () => {
+    later = [...new Set([...later, ...shown.map(keyOf)])]
+    setOpen(false)
+    setPutOff((n) => n + 1)
+  }
+  const visit = (u: PackUpdate) => (u.target === 'instance' ? go({ page: 'instance', id: u.id, tab: 'settings' }) : go({ page: 'servers', id: u.id }))
   const update = async (u: PackUpdate) => {
     hide([keyOf(u)])
     if (u.target === 'instance') {
@@ -109,6 +122,27 @@ export function PackUpdatesBanner() {
       if (s?.modpack) await run(serverOwner(s), u.latestId!)
     }
   }
+
+  if (!open)
+    return (
+      <div className="update-banner pack-updates compact" role="status">
+        <PackageCheck className="icon" />
+        <div className="grow">
+          <b>{t('packUpdates.title', { count: shown.length })}</b>
+          <div className="row actions">
+            <button className="btn sm primary" onClick={() => setOpen(true)}>
+              {t('packUpdates.review')}
+            </button>
+            <button className="btn sm ghost" onClick={putOff}>
+              {t('updates.later')}
+            </button>
+            <button className="btn sm ghost" onClick={() => hide(shown.map(keyOf))}>
+              {t('packUpdates.dontRemind')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
 
   return (
     <div className="update-banner pack-updates" role="status">
@@ -128,7 +162,7 @@ export function PackUpdatesBanner() {
                     {t('common.update')}
                   </button>
                 )}
-                <button className="btn sm ghost" onClick={() => open(u)}>
+                <button className="btn sm ghost" onClick={() => visit(u)}>
                   {t(u.kind === 'sync' ? 'packUpdates.review' : 'packVersion.changeEllipsis')}
                 </button>
               </div>
@@ -137,8 +171,11 @@ export function PackUpdatesBanner() {
         </ul>
         {shown.length > 4 && <p>{t('packUpdates.more', { count: shown.length - 4 })}</p>}
         <div className="row actions">
-          <button className="btn sm ghost" onClick={() => hide(shown.map(keyOf))}>
+          <button className="btn sm ghost" onClick={putOff}>
             {t('updates.later')}
+          </button>
+          <button className="btn sm ghost" onClick={() => hide(shown.map(keyOf))}>
+            {t('packUpdates.dontRemind')}
           </button>
         </div>
       </div>

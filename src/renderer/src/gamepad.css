@@ -1,0 +1,204 @@
+/* Controller support (padNav.ts, PadKeyboard.tsx, PadHelp.tsx). <html> has the class "gamepad" while the pad is
+   in use; moving the mouse takes it away. */
+
+/* The focused control: a thick accent ring with a soft halo, clear on any background, and room kept above and below
+   it when it scrolls into view (the page header is sticky). */
+html.gamepad :focus {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 28%, transparent) !important;
+  scroll-margin-block: 72px 40px;
+  scroll-margin-inline: 16px;
+}
+/* Inside lists that clip their rows, an outer ring would be cut off: draw it inside. */
+html.gamepad :is(.ctx-menu, .segmented, .tabs, .nav, .padkb-keys) :focus {
+  outline-offset: -3px;
+  box-shadow: none !important;
+}
+html.gamepad .ctx-menu .ctx-item:focus {
+  background: var(--accent-soft);
+}
+/* No pointer while the pad drives. */
+html.gamepad,
+html.gamepad * {
+  cursor: none !important;
+}
+/* Buttons that only show on hover (a card's actions) show while one of them has focus. */
+html.gamepad .pad-reveal {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html.gamepad :focus {
+    transition:
+      outline-offset 0.12s var(--ease),
+      box-shadow 0.12s var(--ease);
+  }
+}
+
+/* ---------- On-screen keyboard ---------- */
+
+.backdrop.padkb {
+  place-items: end center;
+  background: rgba(4, 3, 9, 0.38);
+  z-index: 400;
+  padding: 16px;
+}
+.padkb-panel {
+  width: min(860px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: padkb-in 0.16s var(--ease);
+}
+@keyframes padkb-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.padkb-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.padkb-icon {
+  color: var(--text-faint);
+  flex: none;
+}
+.padkb-preview {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: 16px;
+  white-space: pre;
+  overflow: hidden;
+}
+.padkb-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.padkb-preview span:first-child {
+  /* Long text: keep the end (where you're typing) in view. */
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+.padkb-hint {
+  color: var(--text-faint);
+}
+.padkb-caret {
+  flex: none;
+  width: 2px;
+  height: 20px;
+  margin: 0 1px;
+  background: var(--accent);
+  animation: padkb-blink 1s steps(2, start) infinite;
+}
+@keyframes padkb-blink {
+  to {
+    visibility: hidden;
+  }
+}
+.padkb-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.padkb-row {
+  display: flex;
+  gap: 6px;
+}
+.padkb-key {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: 500 17px var(--font);
+}
+.padkb-key svg {
+  width: 20px;
+  height: 20px;
+}
+.padkb-key:hover {
+  background: var(--surface-3);
+}
+.padkb-key.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+.padkb-key:focus {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.padkb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.padkb-legend b,
+.padhelp-list kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  margin-right: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: 600 11px var(--mono);
+  text-align: center;
+}
+
+/* ---------- List of controls ---------- */
+
+.backdrop.padhelp {
+  z-index: 390;
+}
+.padhelp-panel .modal-head > svg {
+  color: var(--accent);
+  flex: none;
+}
+.padhelp-list {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.padhelp-list > div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.padhelp-list dt {
+  display: flex;
+  gap: 4px;
+}
+.padhelp-list dd {
+  margin: 0;
+  color: var(--text-dim);
+}
+.padhelp-list kbd {
+  font-size: 12px;
+  padding: 3px 8px;
+}

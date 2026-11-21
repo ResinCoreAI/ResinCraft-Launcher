@@ -11,13 +11,14 @@ export interface ThemeInfo {
 }
 
 export const THEMES: ThemeInfo[] = [
-  { id: 'dark', label: 'settings.theme.dark', swatch: ['#0a0912', '#b26bff', '#22d3ee', '#39ff88'] },
+  { id: 'dark', label: 'settings.theme.dark', swatch: ['#111114', '#b26bff', '#22d3ee', '#3ddc84'] },
   { id: 'light', label: 'settings.theme.light', swatch: ['#f4f3f8', '#7c3aed', '#0e7490', '#15803d'] },
   { id: 'obsidian', label: 'settings.theme.obsidian', swatch: ['#000000', '#b26bff', '#22d3ee', '#39ff88'] },
   { id: 'deepslate', label: 'settings.theme.deepslate', swatch: ['#0e1116', '#6ea8ff', '#7fe0d0', '#39ff88'] },
   { id: 'cherry', label: 'settings.theme.cherry', swatch: ['#120a10', '#ff8cc6', '#ffd1e6', '#9dffb5'] },
   { id: 'nether', label: 'settings.theme.nether', swatch: ['#120807', '#ff7a3d', '#ffc85c', '#5cf2c8'] },
   { id: 'end', label: 'settings.theme.end', swatch: ['#0b0a10', '#e6e58c', '#c79bff', '#39ff88'] },
+  { id: 'liquid', label: 'settings.theme.liquid', swatch: ['#2a2f6e', '#c3a6ff', '#7fe3ff', '#62f0a4'] },
   { id: 'halloween', label: 'settings.theme.halloween', swatch: ['#0c0710', '#ff8c1a', '#c084fc', '#9dff4f'], seasonal: true },
   { id: 'christmas', label: 'settings.theme.christmas', swatch: ['#07110c', '#ff5a6a', '#f2cf6b', '#6ff0a0'], seasonal: true }
 ]

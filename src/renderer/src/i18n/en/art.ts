@@ -4,6 +4,7 @@ export default {
   'art.icon': 'Icon',
   'art.iconHint': 'A square picture for the instance, shown in lists and on its page.',
   'art.chooseIcon': 'Choose an icon',
+  'art.upload': 'Your own picture…',
   'art.remove': 'Remove',
   'art.banner': 'Banner',
   'art.addBanner': 'Add a banner',

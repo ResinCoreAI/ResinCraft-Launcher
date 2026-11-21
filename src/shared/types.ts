@@ -104,6 +104,8 @@ export interface Instance {
   lastPlayed?: number
   /** Total play time in seconds. */
   playtime: number
+  /** Seconds played per account name, for the overview card. Counted since the version that added it. */
+  playtimeBy?: Record<string, number>
   memoryMb?: number
   javaPath?: string
   jvmArgs?: string
@@ -388,6 +390,8 @@ export interface CustomTheme {
   imageFit: 'cover' | 'contain' | 'tile' | 'center'
   /** Darkens the picture, 0–90 %, so text stays readable. */
   darken: number
+  /** The header frosts the picture behind it; on unless set to false. */
+  headerBlur?: boolean
   effect: 'none' | 'snow' | 'petals' | 'embers' | 'fireflies' | 'rain'
   /** Fine-tuned colours (e.g. { '--border': '#3a2f4f' }), over the ones made from the four above. */
   vars?: Record<string, string>
@@ -1076,6 +1080,13 @@ export interface BedrockWorld {
   modified: number
 }
 
+/**
+ * How a version of Minecraft for Windows is packaged. `gdk` (1.21.120 onwards): Windows installs Microsoft's own
+ * package as it is, which needs Gaming Services. `uwp` (up to 1.21.114): the package is unpacked and registered
+ * with Windows, which needs Developer Mode.
+ */
+export type BedrockFormat = 'gdk' | 'uwp'
+
 export interface BedrockEdition {
   edition: BedrockEditionKind
   installed: boolean
@@ -1083,6 +1094,10 @@ export interface BedrockEdition {
   version?: string
   /** The most recently played first. */
   worlds: BedrockWorld[]
+  /** How the installed copy is packaged. */
+  format?: BedrockFormat
+  /** ResinCraft switched it to this version (it isn't the Store's current one). */
+  switched?: boolean
 }
 
 export interface BedrockStatus {
@@ -1091,6 +1106,63 @@ export interface BedrockStatus {
   editions: BedrockEdition[]
   /** Gaming Services (the Xbox service Store games need) is installed. The Store usually adds it with the game. */
   gamingServices?: boolean
+  /** Windows' Developer Mode is on (the `uwp` versions need it). ResinCraft only reads the setting. */
+  developerMode?: boolean
+}
+
+/** A version Minecraft for Windows can be switched to. */
+export interface BedrockVersion {
+  /** The game version, e.g. "1.21.114.1". */
+  version: string
+  format: BedrockFormat
+  /** The download's size in bytes, when known. */
+  size?: number
+}
+
+/** Something to put right before a switch can start. */
+export type BedrockSwitchBlocker = 'notInstalled' | 'sameVersion' | 'running' | 'developerMode' | 'gamingServices' | 'diskSpace'
+
+/** What switching Minecraft for Windows to a version would do and need on this PC. */
+export interface BedrockSwitchPlan {
+  version: string
+  format: BedrockFormat
+  size?: number
+  /** The installed version and its format. */
+  from?: string
+  fromFormat?: BedrockFormat
+  /** The version is older than the installed one. */
+  older: boolean
+  /** Worlds that are backed up first, and their size in bytes. */
+  worlds: number
+  worldsBytes: number
+  /** The version reads the same worlds folder as the installed one. Otherwise it starts with its own worlds. */
+  sharesWorlds: boolean
+  /** Free disk space the switch should have (an estimate), and what there is. */
+  neededBytes: number
+  freeBytes?: number
+  blockers: BedrockSwitchBlocker[]
+}
+
+/** A checked copy of an edition's worlds in ResinCraft's bedrock-backups folder. */
+export interface BedrockBackup {
+  id: string
+  edition: BedrockEditionKind
+  /** When it was made (ms since 1970). */
+  created: number
+  /** The game version that was installed then, when known. */
+  version?: string
+  /** The worlds' names. */
+  worlds: string[]
+  bytes: number
+  /** The backup's folder. */
+  path: string
+}
+
+export interface BedrockSwitchResult {
+  /** The version now installed. */
+  version: string
+  /** The backup made first (none when there were no worlds). */
+  backup?: BedrockBackup
 }
 
 /** install: get it; update: install an update if there is one; repair: install it again over itself (worlds stay). */
@@ -1398,6 +1470,8 @@ export interface PlanSub {
   method?: string
   /** It can be moved to another account (bought or a gift code's, and running) while the plan says `moves`. */
   movable?: boolean
+  /** The relay admin's note to the player about it (shown instead of "Given by the relay admin" on a grant). */
+  note?: string
 }
 
 /** What happens to the account's relay names and servers when an add-on ends. */
@@ -2018,6 +2092,8 @@ export type CrashFix =
   | { kind: 'disableMod'; file: string }
   | { kind: 'javaAuto' }
   | { kind: 'memory'; mb: number }
+  /** Moves the instance to its loader's newest version (a mod needs a newer Fabric Loader, say). */
+  | { kind: 'updateLoader'; loader: string; needs: string }
 
 export interface CrashProblem {
   title: EngineText
@@ -2368,6 +2444,31 @@ export interface ResinApi {
     pendingOpen(): Promise<string | null>
     /** The resincraft:// link ResinCraft was started with, once. */
     pendingLink(): Promise<string | null>
+    /** Copies a picture the UI drew (a PNG data URL) to the clipboard. */
+    copyPng(dataUrl: string): Promise<void>
+    /** Saves such a picture where the player picks; resolves with the path, or null if cancelled. */
+    savePng(name: string, dataUrl: string): Promise<string | null>
+    /** The page the player is on, for Discord's presence while no game runs (discord.rs `page_lines`). */
+    discordPage(page: string, kind?: string | null, name?: string | null): Promise<void>
+    /** Sends a report to the ResinCraft team (report.rs); its number there when the site gives one. */
+    sendReport(report: {
+      type: string
+      title: string
+      message: string
+      steps?: string
+      expected?: string
+      services?: string[]
+      address?: string
+      since?: string
+      name?: string
+      email?: string
+    }): Promise<{ id?: string | null }>
+    /** The status page's word for each service right now ("java" → "operational"); empty when it can't be reached. */
+    serviceStatus(): Promise<Record<string, string>>
+    /** An https picture as a data: URL (for pictures the UI draws on a canvas, like the overview card). */
+    imageData(url: string): Promise<string>
+    /** A modpack's gallery picture shrunk for a backdrop (at most 1280 wide), as a data: URL; fetched once, then cached. */
+    artData(url: string): Promise<string>
     /** Settings → AI assistants: whether the MCP server runs, its URL and token. */
     mcpInfo(): Promise<McpInfo>
     /** A new MCP token (assistants set up with the old one stop working). */
@@ -2448,10 +2549,41 @@ export interface ResinApi {
     uninstall(edition: BedrockEditionKind): Promise<{ backup?: string; worlds: number }>
     /** Opens Gaming Services in the Microsoft Store. */
     gamingServices(): Promise<void>
+    /** Opens the Xbox app, where the Windows account Bedrock signs in with is switched (its Store page if missing). */
+    xboxAccount(): Promise<void>
     /** Opens the Microsoft Store's Downloads and updates page. */
     update(): Promise<void>
     /** Opens a world's folder, or the edition's worlds folder. */
     openFolder(edition: BedrockEditionKind, worldId?: string): Promise<void>
+    /** The older versions Minecraft for Windows can be switched to, the newest first. */
+    versions(): Promise<BedrockVersion[]>
+    /** What a switch to a version needs and what is in its way. Changes nothing. */
+    switchPlan(version: string): Promise<BedrockSwitchPlan>
+    /**
+     * Switches Minecraft for Windows to a version, as a cancellable task tied to `bedrock:release`: backs the
+     * worlds up and checks the copy (stopping if that fails), downloads Microsoft's package for the version, removes
+     * the installed game and has Windows install the other one. If Windows refuses it, the Store version is put
+     * back. The license is checked by Windows as for the Store's copy. Failures carry keys under `bedrock.switch.*`.
+     */
+    switchTo(version: string): Promise<BedrockSwitchResult>
+    /**
+     * Puts the Microsoft Store's current version back after a switch (a cancellable task tied to
+     * `bedrock:release`): backs the worlds up first, then has the Store install its version.
+     */
+    backToStore(): Promise<BedrockSwitchResult>
+    /** Backs up an edition's worlds now (a task tied to `bedrock:<edition>`). Null when it has no worlds. */
+    backup(edition: BedrockEditionKind): Promise<BedrockBackup | null>
+    /** Every world backup, the newest first. */
+    backups(): Promise<BedrockBackup[]>
+    /**
+     * Copies a backup's worlds into the worlds folder the installed game reads (a task tied to its edition).
+     * A world that is already there is kept as it is.
+     */
+    restore(id: string): Promise<{ restored: number; kept: number }>
+    /** Opens a backup's folder. */
+    openBackup(id: string): Promise<void>
+    /** Opens Windows' settings page with the Developer Mode switch. */
+    developerSettings(): Promise<void>
   }
   /** ResinCraft's own updates. */
   remote: {
@@ -2535,6 +2667,11 @@ export interface ResinApi {
     /** Sets a picture the player chose (a cropped image as a data URL), or removes it with null. */
     setImage(id: string, kind: InstanceImage, dataUrl: string | null): Promise<Instance>
     remove(id: string): Promise<void>
+    /**
+     * Puts a shortcut on the desktop that starts this instance; resolves with where it is. `iconPng`: the
+     * instance's picture as a PNG data URL, for the shortcut's icon (without it: its saved icon, or ResinCraft's).
+     */
+    shortcut(id: string, iconPng?: string): Promise<string>
     openFolder(id: string, sub?: string): Promise<void>
     /** `accountId`: play this once as that account; the active account stays as it is. */
     launch(id: string, accountId?: string): Promise<void>
@@ -2577,6 +2714,8 @@ export interface ResinApi {
     /** MineSkin's public gallery; an empty query lists the newest. */
     search(query: string, after?: string): Promise<OnlineSkinPage>
     saveOnline(skin: OnlineSkin): Promise<SavedSkin>
+    /** A skin from a link (Minecraft's texture server or any https address) as a data: URL, for the skin editor. */
+    fetchPng(url: string): Promise<string>
   }
   java: {
     list(): Promise<JavaInstall[]>
@@ -2976,6 +3115,8 @@ export interface ResinApi {
     joinAnswered(cb: (e: JoinAnsweredEvent) => void): () => void
     joinStates(cb: (e: Record<string, JoinState>) => void): () => void
     gameCrash(cb: (e: GameCrashEvent) => void): () => void
+    /** The game's own window has appeared (Windows only; game/window.rs): the launch screen folds away. */
+    gameWindow(cb: (e: { instanceId: string; runId: string }) => void): () => void
     update(cb: (s: UpdateStatus) => void): () => void
     /** A list changed on disk (an install made an entry, or one went): fetch it again. */
     listChanged(cb: (what: 'instances' | 'servers') => void): () => void

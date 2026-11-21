@@ -33,8 +33,9 @@ pub fn open_url(url: &str) -> Result<()> {
     app()?.opener().open_url(url, None::<&str>).map_err(|e| err_tr!("shell.openLinkFailed", "Couldn't open the link: {error}", error = e.to_string()))
 }
 
-/// Links that start another app on purpose: Minecraft Bedrock, Minecraft Preview and the Microsoft Store.
-const APP_SCHEMES: [&str; 3] = ["minecraft:", "minecraft-preview:", "ms-windows-store:"];
+/// Links that start another app on purpose: Minecraft Bedrock, Minecraft Preview, the Microsoft Store and the Xbox app
+/// (where Windows' game account is switched).
+const APP_SCHEMES: [&str; 4] = ["minecraft:", "minecraft-preview:", "ms-windows-store:", "msxbox:"];
 
 /// Opens a link to one of those apps (`open_url` takes https only, so it can't start them).
 fn is_app_link(url: &str) -> bool {

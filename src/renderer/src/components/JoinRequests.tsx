@@ -166,7 +166,7 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
               waiting.map((r) => (
                 <div key={r.id} className="list-row">
                   <div className="ico">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={`https://mc-heads.net/avatar/${encodeURIComponent(r.username.replace(/^\./, ''))}/40`}
                       alt=""
                       onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}

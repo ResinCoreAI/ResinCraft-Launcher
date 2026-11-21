@@ -15,6 +15,7 @@ pub mod paths;
 pub mod router;
 pub mod settings;
 pub mod shell;
+pub mod shortcut;
 pub mod storage;
 pub mod text;
 pub mod types;

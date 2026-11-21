@@ -9,6 +9,7 @@ import {
   Eye,
   Flag,
   Gauge,
+  Inbox,
   Loader2,
   Lock,
   Pencil,
@@ -38,6 +39,7 @@ import { ListingFields, stateChip } from '../components/ServerList'
 import { ServiceCard, LiveTunnels } from '../components/admin/Live'
 import { NamesAdmin } from '../components/admin/Names'
 import { BansAdmin } from '../components/admin/Bans'
+import { ReportsAdmin, ReportsCount } from '../components/admin/Reports'
 import { UsageAdmin } from '../components/admin/Usage'
 import { TwoFactorSetup, UsersAdmin } from '../components/admin/Users'
 import { RelaySettingsAdmin } from '../components/admin/RelaySettings'
@@ -108,14 +110,15 @@ type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
 /** The relay's screens, in the dashboard's order. */
-type Section = 'live' | 'names' | 'bans' | 'usage' | 'payments' | 'list' | 'users' | 'settings' | 'events'
+type Section = 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'settings' | 'events'
 const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
   { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
   { id: 'names', label: 'servers.admin.nav.names', icon: <Tag size={16} /> },
   { id: 'bans', label: 'servers.admin.nav.bans', icon: <Ban size={16} /> },
   { id: 'usage', label: 'servers.admin.nav.usage', icon: <Gauge size={16} /> },
-  { id: 'payments', label: 'servers.admin.nav.payments', icon: <CreditCard size={16} /> },
   { id: 'list', label: 'servers.admin.nav.list', icon: <Server size={16} /> },
+  { id: 'reports', label: 'servers.admin.nav.reports', icon: <Inbox size={16} /> },
+  { id: 'payments', label: 'servers.admin.nav.payments', icon: <CreditCard size={16} /> },
   { id: 'users', label: 'servers.admin.nav.users', icon: <Users size={16} /> },
   { id: 'settings', label: 'servers.admin.nav.settings', icon: <Settings2 size={16} /> },
   { id: 'events', label: 'servers.admin.nav.events', icon: <ScrollText size={16} /> }
@@ -192,22 +195,31 @@ export default function Admin() {
     )
   }
   if (!status.unlocked) {
+    // Split: what this is on one side, over a picture of a shield; signing in on the other.
     return (
-      <div className="page">
-        <div className="page-head">
-          <div>
-            <h1>{t('servers.admin.title')}</h1>
-            <p>{t('servers.admin.subtitle')}</p>
-          </div>
+      <div className="page admin-gate">
+        <div className="admin-gate-art" aria-hidden>
+          <svg className="admin-gate-shield" viewBox="0 0 150 170" fill="none">
+            <path d="M75 8 18 30v42c0 44 25 70 57 88 32-18 57-44 57-88V30z" />
+            <rect x="52" y="78" width="46" height="36" rx="7" />
+            <path d="M60 78V66a15 15 0 0 1 30 0v12" />
+            <circle cx="75" cy="96" r="4" />
+          </svg>
+        </div>
+        <div className="admin-gate-text">
+          <h1>{t('servers.admin.title')}</h1>
+          <p>{t('servers.admin.subtitle')}</p>
         </div>
         <form
-          className="card admin-unlock"
+          className="admin-unlock"
           onSubmit={(e) => {
             e.preventDefault()
             void unlock()
           }}
         >
-          <Lock />
+          <h2>
+            <Lock /> {t('servers.admin.unlock')}
+          </h2>
           <label className="field">
             <span>{t('servers.admin.password')}</span>
             <input className="input" type="password" autoFocus autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -217,7 +229,7 @@ export default function Admin() {
             <label className="field">
               <span>{t('servers.admin.code')}</span>
               <input
-                className="input"
+                className="input admin-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 autoFocus
@@ -239,8 +251,8 @@ export default function Admin() {
               {error}
             </span>
           )}
-          <button className="btn primary" disabled={(!password && !needCode) || (needCode && !code) || unlocking}>
-            {unlocking && <Loader2 className="spin" />} {t('servers.admin.unlock')}
+          <button className="btn primary admin-unlock-go" disabled={(!password && !needCode) || (needCode && !code) || unlocking}>
+            {unlocking ? <Loader2 className="spin" /> : <Lock />} {t('servers.admin.unlock')}
           </button>
         </form>
       </div>
@@ -280,14 +292,25 @@ export default function Admin() {
 
   const lock = (forget: boolean) =>
     void api.server.adminLock(forget).then(() => setStatus({ ...status, unlocked: false, remembered: forget ? false : status.remembered }))
+  // Split: a panel that stays put on the left (who, the relay's state and switches, the screens, Lock), and the screen
+  // you are on to its right.
   return (
-    <div className="page admin-page">
-      <div className="page-head">
+    <div className="page admin-page admin-split">
+      <aside className="admin-aside">
         <div>
           <h1>{t('servers.admin.relayTitle')}</h1>
-          <p>{status.dashboardUser ? t('servers.admin.signedInAs', { user: status.dashboardUser }) : t('servers.admin.subtitle')}</p>
+          <p className="hint">{status.dashboardUser ? t('servers.admin.signedInAs', { user: status.dashboardUser }) : t('servers.admin.subtitle')}</p>
         </div>
-        <div className="row">
+        <ServiceCard />
+        <nav className="settings-nav admin-nav">
+          {SECTIONS.map((s) => (
+            <button key={s.id} className={`nav-item ${section === s.id ? 'active' : ''}`} aria-current={section === s.id ? 'page' : undefined} onClick={() => setSection(s.id)}>
+              {s.icon} <span className="ellipsis">{t(s.label)}</span>
+              {s.id === 'reports' && <ReportsCount />}
+            </button>
+          ))}
+        </nav>
+        <div className="row admin-aside-foot">
           <button className="btn sm" onClick={() => lock(false)}>
             <Lock /> {t('servers.admin.lock')}
           </button>
@@ -297,16 +320,8 @@ export default function Admin() {
             </button>
           )}
         </div>
-      </div>
-      <ServiceCard />
-      <div className="settings-grid admin-grid">
-        <nav className="settings-nav">
-          {SECTIONS.map((s) => (
-            <button key={s.id} className={`nav-item ${section === s.id ? 'active' : ''}`} onClick={() => setSection(s.id)}>
-              {s.icon} <span className="ellipsis">{t(s.label)}</span>
-            </button>
-          ))}
-        </nav>
+      </aside>
+      <div>
         <div className="admin-section">
           <h2 className="admin-section-title">{t(SECTIONS.find((s) => s.id === section)!.label)}</h2>
           {section === 'live' ? (
@@ -321,6 +336,8 @@ export default function Admin() {
             <PaymentsAdmin />
           ) : section === 'list' ? (
             <ServerListAdmin />
+          ) : section === 'reports' ? (
+            <ReportsAdmin />
           ) : section === 'users' ? (
             <UsersAdmin />
           ) : section === 'settings' ? (

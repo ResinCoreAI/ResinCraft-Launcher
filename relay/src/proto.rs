@@ -1246,6 +1246,9 @@ pub struct MySub {
     pub method: String,
     /// It can be moved to another account (bought or a gift code's, and running) while `moves` is on.
     pub movable: bool,
+    /// The relay admin's note to the player about it (e.g. why it was given); empty: none. Older relays don't send it.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub note: String,
 }
 
 /// What happens to an account's relay names and servers when an add-on ends. Protocol 11.

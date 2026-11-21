@@ -56,7 +56,7 @@ export function AnnouncementsCard() {
     <section className="announcements">
       {shown.map((a) => (
         <div key={a.id} className="announcement">
-          {a.icon ? <img src={`data:image/png;base64,${a.icon}`} alt="" /> : <Megaphone />}
+          {a.icon ? <img loading="lazy" decoding="async" src={`data:image/png;base64,${a.icon}`} alt="" /> : <Megaphone />}
           <div className="grow">
             <b>
               {a.title} <span className="hint">· {timeAgo(a.announced_at * 1000)}</span>

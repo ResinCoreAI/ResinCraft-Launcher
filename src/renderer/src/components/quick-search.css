@@ -1,0 +1,218 @@
+/* Quick search (components/QuickSearch.tsx): the title bar's Search button and the list it opens (Ctrl+K). */
+
+.qs-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  min-width: 190px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-faint);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.qs-open:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.qs-open svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.qs-open span {
+  flex: 1;
+  text-align: left;
+}
+.qs-open kbd,
+.qs-field kbd {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text-faint);
+  font: 500 11px var(--mono);
+  white-space: nowrap;
+}
+
+/* Sits in the upper third, where the eye already is after pressing the shortcut. */
+.backdrop.qs-backdrop {
+  place-items: start center;
+  padding-top: min(16vh, 130px);
+}
+.qs {
+  width: min(580px, 100%);
+  max-height: min(64vh, 520px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: modal-in 0.14s var(--ease);
+}
+.qs-field {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+.qs-field > svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--text-faint);
+}
+.qs-field input {
+  flex: 1;
+  min-width: 0;
+  height: 50px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 15px var(--font);
+  outline: none;
+  user-select: text;
+}
+.qs-field input::placeholder {
+  color: var(--text-faint);
+}
+.qs-list {
+  overflow: auto;
+  padding: 6px;
+}
+.qs-title {
+  padding: 10px 10px 4px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.qs-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.qs-item.on {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.qs-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+.qs-icon > svg {
+  width: 17px;
+  height: 17px;
+}
+.qs-icon .qs-tile {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.qs-label {
+  font-weight: 500;
+}
+.qs-hint {
+  margin-left: auto;
+  flex: none;
+  max-width: 45%;
+  font: 12px var(--mono);
+  color: var(--text-faint);
+}
+.qs-enter {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--text-faint);
+}
+.qs-hint + .qs-enter {
+  margin-left: 0;
+}
+.qs-item .qs-enter:only-of-type {
+  margin-left: auto;
+}
+.qs-empty {
+  padding: 22px 10px;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+/* In the header it takes the cover's colours, and gives up its words before the header gives up a page. */
+.sidebar .qs-open {
+  height: 34px;
+  border-color: transparent;
+  border-radius: 999px;
+  background: var(--cover-hover);
+  color: var(--cover-dim);
+}
+.sidebar .qs-open:hover {
+  background: color-mix(in srgb, var(--cover-fg) 16%, transparent);
+  color: var(--cover-fg);
+}
+.sidebar .qs-open kbd {
+  border-color: transparent;
+  background: var(--cover-hover);
+  color: inherit;
+}
+@media (max-width: 1560px) {
+  .qs-open {
+    min-width: 0;
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+  .qs-open span,
+  .qs-open kbd {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qs {
+    animation: none;
+  }
+}
+
+/* The pages follow the instances, under a rule instead of a title. */
+.qs-list [role='group'] + [role='group'] {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* A setting the search has just jumped to (pages/SettingsPage.tsx): it flashes once. */
+.setting.found {
+  animation: qs-found 1.8s var(--ease);
+}
+@keyframes qs-found {
+  0%,
+  35% {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 8px var(--accent-soft);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .setting.found {
+    animation: none;
+    outline: 2px solid var(--accent);
+    outline-offset: 6px;
+  }
+}

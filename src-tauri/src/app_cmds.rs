@@ -50,6 +50,13 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:storageImport" => json(crate::webstorage::import().await),
         "app:pendingOpen" => json(crate::openfile::take()),
         "app:pendingLink" => json(crate::openfile::take_link()),
+        // A picture the UI drew (an instance's overview card), as a PNG data URL: to the clipboard, or to a file the
+        // player picks ([suggested name, data URL] → where it was saved, or null).
+        "app:copyPng" => {
+            shell::copy_png(&png_from_data_url(&args.get::<String>(0)?)?)?;
+            done()
+        }
+        "app:savePng" => json(save_png(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "app:mcpInfo" => json(crate::mcp::info().await?),
         "app:mcpResetToken" => json(crate::mcp::reset_token().await?),
         "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
@@ -61,6 +68,23 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:saveText" => json(save_text(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         // A few textures for the holiday decorations, from the player's own Minecraft (never shipped with ResinCraft).
         "app:gameTexture" => json(game_texture(&args.get::<String>(0)?).await),
+
+        // "Report a problem" from inside the launcher (report.rs), to the same team inbox as the report website.
+        "app:sendReport" => json(crate::report::send(serde_json::from_value(args.raw(0))?).await?),
+        "app:serviceStatus" => json(crate::report::status().await),
+        // A picture from the web as a data: URL, for pictures the UI draws itself (the overview card): a page can't
+        // read pixels from sites that don't allow it, the engine can.
+        "app:imageData" => json(image_data(&args.get::<String>(0)?).await?),
+        "app:artData" => json(art_data(&args.get::<String>(0)?).await?),
+
+        // The page the player is on, for Discord's "in the launcher" presence (discord.rs `page_lines`).
+        "app:discordPage" => {
+            let page: String = args.get(0)?;
+            let kind: Option<String> = args.get(1).ok().flatten();
+            let name: Option<String> = args.get(2).ok().flatten();
+            crate::discord::page(&page, kind.as_deref(), name.as_deref()).await;
+            done()
+        }
 
         "settings:get" => json(settings::redacted(settings::get().await)),
         "settings:set" => {
@@ -76,15 +100,22 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
 
         "instances:list" => json(instances::list().await?),
-        "instances:create" => json(instances::create(args.get::<NewInstance>(0)?, |_| {}).await?),
+        "instances:create" => {
+            let inst = instances::create(args.get::<NewInstance>(0)?, |_| {}).await?;
+            // Its game files start arriving now, not at the first Play.
+            crate::game::launch::get_ready(&inst.id);
+            json(inst)
+        }
         "instances:update" => json(instances::update(&args.get::<String>(0)?, args.raw(1)).await?),
         // Files to download by hand: pick up the ones that arrived in Downloads.
         "instances:collectPending" => json(crate::content::manual::collect(&args.get::<String>(0)?).await?),
         "instances:addWatchFolder" => json(crate::content::manual::add_watch_folder().await?),
         // [id, Minecraft version, loader, loader version | null (the newest)] → Instance.
-        "instances:setVersion" => json(
-            instances::set_version(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get(2)?, args.get::<Option<String>>(3)?).await?,
-        ),
+        "instances:setVersion" => {
+            let inst = instances::set_version(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get(2)?, args.get::<Option<String>>(3)?).await?;
+            crate::game::launch::get_ready(&inst.id);
+            json(inst)
+        }
         "instances:duplicate" => json(instances::duplicate(&args.get::<String>(0)?).await?),
         "instances:copyFrom" => json(
             crate::player::carry::copy_from(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<crate::player::carry::CopyPicks>(2)?).await?,
@@ -109,6 +140,15 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             // Recycle Bin, not a permanent delete: worlds are precious.
             shell::trash(&paths::instance_dir(&id)).await?;
             done()
+        }
+        // Library → right-click → Create desktop shortcut: where the shortcut was put.
+        "instances:shortcut" => {
+            // [id, the instance's picture as a PNG data URL (optional)]
+            let icon = match args.get::<Option<String>>(1)? {
+                Some(url) => Some(png_from_data_url(&url)?),
+                None => None,
+            };
+            json(crate::core::shortcut::create(&args.get::<String>(0)?, icon).await?)
         }
         "instances:openFolder" => {
             let id: String = args.get(0)?;
@@ -244,6 +284,30 @@ fn qr_svg(text: &str) -> Result<String> {
     Ok(code.render::<qrcode::render::svg::Color>().min_dimensions(200, 200).quiet_zone(true).build())
 }
 
+/// The PNG inside a `data:image/png;base64,` URL the UI sends; anything else, or anything huge, is refused.
+fn png_from_data_url(url: &str) -> Result<Vec<u8>> {
+    use base64::Engine;
+    const MAX: usize = 12 * 1024 * 1024;
+    let b64 = url.strip_prefix("data:image/png;base64,").filter(|b| b.len() <= MAX);
+    let png = b64.and_then(|b| base64::engine::general_purpose::STANDARD.decode(b).ok());
+    match png {
+        Some(p) if p.starts_with(&[0x89, b'P', b'N', b'G']) => Ok(p),
+        _ => bail_tr!("shell.imageUnreadable", "Couldn't read the image: {error}", error = "not a PNG"),
+    }
+}
+
+/// Saves a PNG the UI drew where the player picks (Downloads by default). None if cancelled.
+async fn save_png(name: &str, data_url: &str) -> Result<Option<String>> {
+    let png = png_from_data_url(data_url)?;
+    let base: String = name.chars().filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_')).collect();
+    let base = if base.trim().is_empty() { "ResinCraft".to_string() } else { base.trim().to_string() };
+    let title = crate::tr!("app.saveImageTitle", "Save the image").text;
+    let default = shell::downloads_dir().join(format!("{base}.png"));
+    let Some(path) = shell::save_file(&title, &default, &[("PNG image", &["png"])]).await? else { return Ok(None) };
+    tokio::fs::write(&path, png).await?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 /// Saves `text` as a .txt file the player picks (Downloads by default).
 async fn save_text(name: &str, text: &str) -> Result<Option<String>> {
     let base: String = name.chars().filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.')).collect();
@@ -281,4 +345,86 @@ fn uninstall() -> Result<&'static str> {
     }
     #[cfg(not(windows))]
     crate::bail_tr!("app.uninstallElsewhere", "Remove ResinCraft the way your system removes apps.");
+}
+/** At most this big: a modpack's gallery picture, not a download. */
+const MAX_IMAGE: usize = 12 * 1024 * 1024;
+
+/// What a picture file is, from its first bytes: PNG, JPEG, GIF or WebP (never SVG, which can carry scripts).
+fn picture_kind(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
+        Some("image/png")
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("image/jpeg")
+    } else if bytes.starts_with(b"GIF8") {
+        Some("image/gif")
+    } else if bytes.len() > 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        Some("image/webp")
+    } else {
+        None
+    }
+}
+
+/// An https picture as a data: URL, at most MAX_IMAGE. Told apart by its own bytes: some servers (FTB's) send
+/// pictures as plain files.
+async fn image_data(url: &str) -> Result<String> {
+    use base64::Engine;
+    if !url.starts_with("https://") {
+        bail!("only https pictures");
+    }
+    let res = ctx::http().get(url).timeout(std::time::Duration::from_secs(20)).send().await?.error_for_status()?;
+    if res.content_length().is_some_and(|n| n as usize > MAX_IMAGE) {
+        bail!("picture too big");
+    }
+    let bytes = res.bytes().await?;
+    if bytes.len() > MAX_IMAGE {
+        bail!("picture too big");
+    }
+    let Some(kind) = picture_kind(&bytes) else { bail!("not a picture") };
+    Ok(format!("data:{kind};base64,{}", base64::engine::general_purpose::STANDARD.encode(&bytes)))
+}
+
+/// Widest a modpack's picture is kept for the backdrops behind Home, big screen mode and the launch screen. A
+/// gallery's original (often 1920–2560 wide) decodes to 8–15 MB of graphics memory; at this width it's under 4 MB,
+/// and it's shown darkened behind text anyway.
+const ART_WIDTH: u32 = 1280;
+
+/// A modpack's gallery picture, shrunk to ART_WIDTH as a JPEG data: URL and kept in the cache folder, so it's
+/// fetched and shrunk once. A WebP (which isn't decoded here) or anything that can't be read comes back as it is.
+async fn art_data(url: &str) -> Result<String> {
+    use base64::Engine;
+    use sha2::Digest;
+    let dir = paths::cache().join("art");
+    let file = dir.join(format!("{}-{ART_WIDTH}.jpg", &hex::encode(sha2::Sha256::digest(url.as_bytes()))[..24]));
+    if let Ok(bytes) = tokio::fs::read(&file).await {
+        return Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&bytes)));
+    }
+    let original = image_data(url).await?;
+    let Some(b64) = original.split_once(',').map(|(_, b)| b.to_owned()) else { return Ok(original) };
+    let shrunk = tokio::task::spawn_blocking(move || -> Option<Vec<u8>> {
+        let bytes = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
+        let img = image::load_from_memory(&bytes).ok()?;
+        let img = if img.width() > ART_WIDTH { img.resize(ART_WIDTH, u32::MAX, image::imageops::FilterType::Triangle) } else { img };
+        let mut out = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 84).encode_image(&img.to_rgb8()).ok()?;
+        Some(out)
+    })
+    .await?;
+    let Some(jpeg) = shrunk else { return Ok(original) };
+    let _ = tokio::fs::create_dir_all(&dir).await;
+    let _ = tokio::fs::write(&file, &jpeg).await;
+    Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&jpeg)))
+}
+
+#[cfg(test)]
+mod picture_tests {
+    use super::picture_kind;
+
+    #[test]
+    fn pictures_are_known_by_their_bytes() {
+        assert_eq!(picture_kind(&[0x89, b'P', b'N', b'G', 13, 10]), Some("image/png"));
+        assert_eq!(picture_kind(&[0xFF, 0xD8, 0xFF, 0xE0]), Some("image/jpeg"));
+        assert_eq!(picture_kind(b"RIFF\x00\x00\x00\x00WEBPVP8 "), Some("image/webp"));
+        assert_eq!(picture_kind(b"<svg xmlns="), None);
+        assert_eq!(picture_kind(b"<html>"), None);
+    }
 }

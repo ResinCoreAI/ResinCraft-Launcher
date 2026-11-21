@@ -42,6 +42,7 @@ import type {
 import { api } from '../api'
 import { AutoLoadMore } from '../components/AutoLoadMore'
 import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, useCopy, type ContextEntry } from '../components/ui'
+import { SourceBadge, SourceMark } from '../components/SourceMark'
 import VersionPicker from '../components/VersionPicker'
 import {
   applyChoices,
@@ -59,11 +60,9 @@ import { compact, describe, timeAgo } from '../util'
 import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
 import { PackBuilderBanner } from '../components/OwnPack'
 import { ProjectPage } from '../components/ProjectPage'
-import { ServerList } from '../components/ServerList'
 import { NativeInstallNotice } from '../components/HorizonNative'
 
 /** Which half of Discover was open last (this session). */
-const VIEW_KEY = 'resin.discoverView'
 
 const KINDS: { value: ContentKind; labelKey: Key; searchKey: Key; icon: React.ReactNode }[] = [
   { value: 'modpack', labelKey: 'discover.kind.modpack', searchKey: 'discover.search.modpack', icon: <Package size={15} /> },
@@ -158,6 +157,9 @@ export const SOURCES: { value: ContentSource; label: string; color: string; kind
   { value: 'horizon', label: 'Horizon', color: '#ff9b52', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] }
 ]
 
+/** A site's colour, for its dot and its badge. */
+const colorOf = (source: ContentSource) => SOURCES.find((s) => s.value === source)?.color
+
 /**
  * What a Horizon instance can get, by site: everything from Horizon's own registry, and Modrinth's resource packs and
  * shaders (Iris and OptiFine packs work in Horizon). Fabric and Forge mods, and the modpacks made of them, don't run.
@@ -229,7 +231,18 @@ type InstallPlan = { picks: ProjectHit[]; replace: ContentFileRef[] }
 
 const toPick = (h: ProjectHit, versionId?: string): ModPick => ({ id: h.id, kind: h.kind, title: h.title, author: h.author, slug: h.slug, versionId })
 
-export default function Discover({ initialKind, instanceId, build }: { initialKind?: ContentKind; instanceId?: string; build?: boolean }) {
+export default function Discover({
+  initialKind,
+  instanceId,
+  build,
+  initialQuery
+}: {
+  initialKind?: ContentKind
+  instanceId?: string
+  build?: boolean
+  /** What to search for straight away (handed over by the quick search). */
+  initialQuery?: string
+}) {
   const { instances, go, toast, refreshInstances, info, settings, updateSettings } = useStore()
   const target = instances.find((i) => i.id === instanceId)
   // A Horizon instance gets Horizon's registry (the default) and Modrinth's resource packs and shaders.
@@ -247,23 +260,6 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
   })
   // Discover opens on modpacks; opened for an instance (adding to it), on mods, since packs can't go into one.
   const [kind, setKind] = useState<ContentKind>(initialKind ?? (target && !modpackOnly(source) ? 'mod' : 'modpack'))
-  // Content (mods, packs…) or the server list; opened for an instance or a kind, always content.
-  const [view, setViewState] = useState<'content' | 'servers'>(() => {
-    if (target || initialKind) return 'content'
-    try {
-      return sessionStorage.getItem(VIEW_KEY) === 'servers' ? 'servers' : 'content'
-    } catch {
-      return 'content'
-    }
-  })
-  const setView = (v: 'content' | 'servers') => {
-    setViewState(v)
-    try {
-      sessionStorage.setItem(VIEW_KEY, v)
-    } catch {
-      /* private storage: just this visit */
-    }
-  }
   const sourceInfo =
     source === 'all'
       ? { value: 'all' as const, label: t('discover.allSites'), color: 'var(--accent)', kinds: kindsOf('all') }
@@ -284,8 +280,8 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
     const kinds = kindsOf(s)
     if (!kinds.includes(kind)) setKind(kinds[0])
   }
-  const [query, setQuery] = useState('')
-  const [debounced, setDebounced] = useState('')
+  const [query, setQuery] = useState(initialQuery ?? '')
+  const [debounced, setDebounced] = useState(initialQuery ?? '')
   const [sort, setSort] = useState<SortMode>('relevance')
   const [gameVersion, setGameVersion] = useState(target?.mcVersion ?? '')
   const [loader, setLoader] = useState<LoaderType | ''>(target && target.loader !== 'vanilla' ? target.loader : '')
@@ -703,36 +699,10 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         <div className="page-head">
           <div>
             <h1>{t('discover.title')}</h1>
-            <p>{t(view === 'servers' ? 'servers.list.subtitle' : 'discover.subtitle')}</p>
+            <p>{t('discover.subtitle')}</p>
           </div>
-          {!target && (
-            <Segmented<'content' | 'servers'>
-              value={view}
-              onChange={setView}
-              options={[
-                {
-                  value: 'content',
-                  label: (
-                    <>
-                      <Package /> {t('servers.list.tab.content')}
-                    </>
-                  )
-                },
-                {
-                  value: 'servers',
-                  label: (
-                    <>
-                      <Server /> {t('servers.list.tab.servers')}
-                    </>
-                  )
-                }
-              ]}
-            />
-          )}
         </div>
       )}
-
-      {!top && view === 'servers' && <ServerList />}
 
       {target?.ownPack && build ? (
         <PackBuilderBanner inst={{ ...target, ownPack: target.ownPack }} refresh={installed} />
@@ -772,7 +742,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
         />
       )}
 
-      {!top && view === 'content' && (
+      {!top && (
         <>
           <div className="toolbar">
             <Segmented<Site>
@@ -784,7 +754,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                   value: s.value as Site,
                   label: (
                     <>
-                      <span className="source-dot" style={{ background: s.color }} /> {s.label}
+                      <SourceMark source={s.value} color={s.color} /> {s.label}
                     </>
                   )
                 }))
@@ -941,7 +911,13 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                         {isSelected && <Check strokeWidth={3} />}
                       </button>
                     )}
-                    <div className="ico">{h.iconUrl ? <img src={h.iconUrl} alt="" loading="lazy" /> : <Blocks />}</div>
+                    {/* The site it comes from is on its picture too, so a list can be read at a glance. */}
+                    <div className="ico-wrap">
+                      <div className="ico">{h.iconUrl ? <img decoding="async" src={h.iconUrl} alt="" loading="lazy" /> : <Blocks />}</div>
+                      <span className="ico-source" title={siteLabel(h.source)}>
+                        <SourceMark source={h.source} color={colorOf(h.source)} />
+                      </span>
+                    </div>
                     <div className="grow">
                       <h3>
                         <button className="result-title" onClick={() => openDetails(h)}>
@@ -951,6 +927,18 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                       </h3>
                       <p>{h.description}</p>
                       <div className="stats-line">
+                        {/* Where it comes from, first and on every result; then anywhere else the same thing is. */}
+                        <SourceBadge source={h.source} label={siteLabel(h.source)} color={colorOf(h.source)} />
+                        {h.also?.map((a) => (
+                          <SourceBadge
+                            key={a.source}
+                            also
+                            source={a.source}
+                            label={siteLabel(a.source)}
+                            color={colorOf(a.source)}
+                            title={t('discover.alsoOn', { sources: siteLabel(a.source) })}
+                          />
+                        ))}
                         {h.source === 'github' ? (
                           <span title={t('discover.result.stars')}>
                             <Star /> {compact(h.follows)}
@@ -967,12 +955,6 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                             )}
                           </>
                         )}
-                        {source === 'all' && (
-                          <span>
-                            <span className="source-dot" style={{ background: SOURCES.find((s) => s.value === h.source)?.color }} /> {siteLabel(h.source)}
-                          </span>
-                        )}
-                        {h.also && <span className="faint">{t('discover.alsoOn', { sources: h.also.map((a) => siteLabel(a.source)).join(', ') })}</span>}
                         <span>
                           <Calendar /> {t('discover.result.updated', { when: timeAgo(h.updated, true) })}
                         </span>
@@ -1056,7 +1038,7 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                   <span className="select-sites" aria-hidden>
                     {bySite.map(([s, list]) => (
                       <span key={s.value}>
-                        <span className="source-dot" style={{ background: s.color }} />
+                        <SourceMark source={s.value} color={s.color} />
                         {list.length}
                       </span>
                     ))}
@@ -1088,12 +1070,12 @@ export default function Discover({ initialKind, instanceId, build }: { initialKi
                   {bySite.map(([s, list]) => (
                     <div key={s.value}>
                       <h4>
-                        <span className="source-dot" style={{ background: s.color }} /> {s.label}
+                        <SourceMark source={s.value} color={s.color} /> {s.label}
                         <b>{list.length}</b>
                       </h4>
                       {list.map((h) => (
                         <div key={h.id} className="select-item">
-                          <span className="thumb">{h.iconUrl ? <img src={h.iconUrl} alt="" /> : <Blocks />}</span>
+                          <span className="thumb">{h.iconUrl ? <img loading="lazy" decoding="async" src={h.iconUrl} alt="" /> : <Blocks />}</span>
                           <span className="ellipsis">{h.title}</span>
                           <button className="btn ghost icon sm" aria-label={t('discover.selection.remove', { title: h.title })} onClick={() => toggleSelect(h)}>
                             <X />

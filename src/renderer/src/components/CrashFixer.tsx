@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Check, FileText, Loader2, Play, Wrench } from 'lucide-react'
+import { AlertTriangle, Bug, Check, FileText, Loader2, Play, Wrench } from 'lucide-react'
 import type { CrashFix, GameCrashEvent } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -17,6 +17,8 @@ function fixLabel(f: CrashFix): string {
       return t('crash.fix.javaAuto')
     case 'memory':
       return t('crash.fix.memory', { mb: f.mb })
+    case 'updateLoader':
+      return t('crash.fix.updateLoader', { loader: f.loader })
   }
 }
 
@@ -34,6 +36,17 @@ export default function CrashFixer() {
   if (!crash) return null
 
   const inst = instances.find((i) => i.id === crash.instanceId)
+  // For "Report this crash": what crashed and what the crash fixer found, as the report's first words.
+  const crashText = () =>
+    [
+      inst ? `${inst.name}: Minecraft ${inst.mcVersion}${inst.loader !== 'vanilla' ? ` · ${inst.loader} ${inst.loaderVersion ?? ''}`.trimEnd() : ''}` : '',
+      // In English (the engine's own words): the team reads it, whatever language this launcher shows.
+      ...crash.problems.map((p) => `- ${p.title.text}${p.detail ? `: ${p.detail.text}` : ''}`),
+      crash.crashReport ? `Crash report: ${crash.crashReport.split(/[\\/]/).pop()}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 3000)
   const fixable = crash.problems.map((p, i) => (p.fix && !fixed.has(i) ? i : -1)).filter((i) => i >= 0)
   const close = () => setCrash(undefined)
 
@@ -92,6 +105,15 @@ export default function CrashFixer() {
             }}
           >
             <FileText /> {t('crash.logs')}
+          </button>
+          <button
+            className="btn ghost"
+            onClick={() => {
+              close()
+              go({ page: 'report', type: 'crash', title: t('report.crashTitle', { name: inst?.name ?? 'Minecraft' }).slice(0, 120), message: crashText() })
+            }}
+          >
+            <Bug /> {t('crash.report')}
           </button>
           <span className="grow" />
           <button className="btn" onClick={close}>

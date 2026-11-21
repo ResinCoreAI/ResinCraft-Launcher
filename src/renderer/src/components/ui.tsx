@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { LoaderArt, loaderIcon } from './LoaderArt'
 import { createPortal } from 'react-dom'
 import { AlertTriangle, Ban, Check, CheckCircle2, ChevronDown, ChevronRight, Info, Loader2, MoreHorizontal, Play, Square, X } from 'lucide-react'
 import type { AccountView, Instance } from '@shared/types'
 import { api } from '../api'
 import { isLive, useInstanceTask, useStore, type Run } from '../store'
 import { t, tx, type Key } from '../i18n'
+import TaskIsland from './TaskIsland'
 
 /** The ResinCraft mark: a resin drop holding a block, with a pixel "R" on its side. Same art as resources/logo.svg. */
 export function Logo({ className }: { className?: string }) {
@@ -69,7 +71,8 @@ export function BlockArt({ seed, color, cols = 8, rows = 8 }: { seed: string; co
   }
   return (
     <svg className="block-art" viewBox={`0 0 ${cols} ${rows}`} preserveAspectRatio="xMidYMid slice" shapeRendering="crispEdges" aria-hidden>
-      <rect width={cols} height={rows} style={{ fill: 'var(--surface-2)' }} />
+      {/* The ground is a tint of the instance's own colour, so the art stays vivid on a light page too. */}
+      <rect width={cols} height={rows} style={{ fill: `color-mix(in srgb, ${color} 38%, var(--surface-2))` }} />
       {cells.map((lvl, i) => (
         <rect key={i} x={i % cols} y={Math.floor(i / cols)} width="1" height="1" fill={color} fillOpacity={SHADES[lvl]} />
       ))}
@@ -83,16 +86,24 @@ export function InstanceTile({
   style,
   wide
 }: {
-  inst: Pick<Instance, 'name' | 'color' | 'iconUrl' | 'bannerUrl'> & { id?: string }
+  inst: Pick<Instance, 'name' | 'color' | 'iconUrl' | 'bannerUrl'> & { id?: string; loader?: string }
   className?: string
   style?: React.CSSProperties
   /** Banner-shaped tile: shows the instance's banner if it has one, else a 16×9 texture. */
   wide?: boolean
 }) {
   const src = (wide && inst.bannerUrl) || inst.iconUrl
+  // No picture of its own: what it runs on (its loader's logo and colours), else the block pattern.
+  const loader = src ? undefined : loaderIcon(inst.loader)
   return (
     <div className={`tile ${className ?? ''}`} style={style}>
-      {src ? <img src={src} alt="" draggable={false} /> : <BlockArt seed={inst.id ?? inst.name} color={inst.color} cols={wide ? 16 : 8} rows={wide ? 9 : 8} />}
+      {src ? (
+        <img loading="lazy" decoding="async" src={src} alt="" draggable={false} />
+      ) : loader ? (
+        <LoaderArt loader={loader} wide={wide} />
+      ) : (
+        <BlockArt seed={inst.id ?? inst.name} color={inst.color} cols={wide ? 16 : 8} rows={wide ? 9 : 8} />
+      )}
     </div>
   )
 }
@@ -865,14 +876,29 @@ export function Segmented<T extends string>({
   )
 }
 
-export function Empty({ icon, title, children, action }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+/** "No servers yet": two server slots, their lights blinking in turn. */
+export function RackArt() {
+  return (
+    <svg className="rack-art" viewBox="0 0 64 64" fill="none" strokeWidth="2.5" strokeLinecap="round">
+      <rect x="10" y="12" width="44" height="16" rx="5" />
+      <rect x="10" y="36" width="44" height="16" rx="5" className="dim" />
+      <circle cx="20" cy="20" r="2.6" className="light" />
+      <circle cx="20" cy="44" r="2.6" className="light late" />
+      <line x1="30" y1="20" x2="44" y2="20" className="dim" />
+      <line x1="30" y1="44" x2="44" y2="44" className="faint" />
+    </svg>
+  )
+}
+
+/**
+ * An empty list's invitation: a picture on the left, then what goes here, why, and what to do. `art` replaces the
+ * standard picture (the icon in a clean outlined tile) with one of its own, like the server rack.
+ */
+export function Empty({ icon, title, children, action, art }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode; art?: ReactNode }) {
   return (
     <div className="empty">
-      {/* A little pixel-block pile (drawn in CSS) with the icon on the top block. */}
-      <div className="empty-art" aria-hidden>
-        <i className="blk a" />
-        <i className="blk b" />
-        <span className="blk c">{icon}</span>
+      <div className={`empty-art ${art ? 'own' : ''}`} aria-hidden>
+        {art ?? <span className="empty-tile">{icon}</span>}
       </div>
       <h3>{title}</h3>
       {children && <p>{children}</p>}
@@ -932,7 +958,7 @@ export function ConfirmModal({
  * with short "working…" gaps between them. The bar keeps the last value through those gaps instead of
  * flipping to the sweeping animation, and a new stage restarts it without sliding backwards.
  */
-function TaskBar({ progress }: { progress?: number | null }) {
+export function TaskBar({ progress }: { progress?: number | null }) {
   const last = useRef<number | null>(null)
   const stage = useRef(0)
   if (progress != null) {
@@ -954,8 +980,8 @@ function TaskBar({ progress }: { progress?: number | null }) {
   )
 }
 
-/** The dock's Cancel: stops the task (once; the engine reports "cancelled" when it has). */
-function CancelTask({ id }: { id: string }) {
+/** A task's Cancel: stops the task (once; the engine reports "cancelled" when it has). */
+export function CancelTask({ id }: { id: string }) {
   const [asked, setAsked] = useState(false)
   return (
     <button
@@ -973,37 +999,33 @@ function CancelTask({ id }: { id: string }) {
   )
 }
 
+/**
+ * What is being installed or prepared for an instance right now, on its own page: the step, the file it is on, how
+ * far along it is, and a bar. Nothing while nothing runs.
+ */
+export function InstanceProgress({ id }: { id: string }) {
+  const task = useInstanceTask(id)
+  if (!task) return null
+  return (
+    <div className="iprogress" role="status">
+      <div className="iprogress-top">
+        <Loader2 className="spin" />
+        <b>{tx(task.titleText, task.title)}</b>
+        <span className="iprogress-detail ellipsis">{tx(task.detailText, task.detail) || t('common.working')}</span>
+        {task.progress != null && <span className="iprogress-pct">{Math.round(task.progress * 100)}%</span>}
+      </div>
+      <TaskBar progress={task.progress} />
+    </div>
+  )
+}
+
 export function Dock() {
-  const { tasks, toasts, dismiss } = useStore()
+  const { toasts, dismiss } = useStore()
   const icons = { success: <CheckCircle2 />, error: <AlertTriangle />, info: <Info /> }
+  // Downloads and installs as the island (TaskIsland.tsx), then the short messages; the stack grows upwards.
   return (
     <div className="dock" aria-live="polite">
-      {tasks.map((task) => (
-        <div className="task" key={task.id}>
-          <div className="top">
-            {task.state === 'error' ? (
-              <AlertTriangle style={{ color: 'var(--danger)' }} />
-            ) : task.state === 'done' ? (
-              <CheckCircle2 className="pop" style={{ color: 'var(--success)' }} />
-            ) : task.state === 'cancelled' ? (
-              <Ban className="faint" />
-            ) : (
-              <Loader2 className="spin" />
-            )}
-            <span className="grow ellipsis">{tx(task.titleText, task.title)}</span>
-            {task.progress != null && task.state === 'running' && <span className="faint">{Math.round(task.progress * 100)}%</span>}
-            {task.state === 'running' && task.cancellable && <CancelTask id={task.id} />}
-          </div>
-          <div className="detail ellipsis">
-            {task.state === 'error'
-              ? tx(task.errorText, task.error)
-              : task.state === 'cancelled'
-                ? t('app.task.cancelled')
-                : tx(task.detailText, task.detail) || t('common.working')}
-          </div>
-          {task.state === 'running' && <TaskBar progress={task.progress} />}
-        </div>
-      ))}
+      <TaskIsland />
       {toasts.map((toast) => (
         <div className={`toast ${toast.kind}`} key={toast.id}>
           {icons[toast.kind]}

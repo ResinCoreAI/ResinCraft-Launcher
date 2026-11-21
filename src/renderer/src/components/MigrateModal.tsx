@@ -350,7 +350,7 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
                   <label key={keyOf(i)} className={`mg-item ${picked.has(keyOf(i)) && importable(i) ? 'on' : ''} ${i.problem ? 'off' : ''}`}>
                     <input type="checkbox" disabled={busy || !importable(i)} checked={picked.has(keyOf(i)) && importable(i)} onChange={() => toggle(i)} />
                     <div className="mg-icon">
-                      {i.iconUrl ? <img src={i.iconUrl} alt="" /> : <BlockArt seed={i.path + (i.profile ?? '')} color={i.server ? '#22d3ee' : '#b26bff'} />}
+                      {i.iconUrl ? <img loading="lazy" decoding="async" src={i.iconUrl} alt="" /> : <BlockArt seed={i.path + (i.profile ?? '')} color={i.server ? '#22d3ee' : '#b26bff'} />}
                     </div>
                     <div className="grow" style={{ minWidth: 0 }}>
                       <div className="row" style={{ gap: 8 }}>

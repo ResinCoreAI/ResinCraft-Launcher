@@ -1,3 +1,4 @@
+import { SourceBadge } from './SourceMark'
 import { useEffect, useRef, useState } from 'react'
 import { Compass, Download, FileDown, Loader2, Package, Search } from 'lucide-react'
 import type { ContentSource, Instance, ProjectHit } from '@shared/types'
@@ -40,14 +41,23 @@ function interleave(lists: ProjectHit[][]): ProjectHit[] {
 
 /**
  * New instance → Download a modpack: searches every modpack site at once and installs a pick straight away.
- * `onInstalled` gets the new instance (the dialog then closes and opens it).
+ * Installing a pick calls `onStarted` at once (the dialog closes and the Library shows the new instance filling,
+ * with its progress in the corner), then goes on by itself and says when it is ready, with a button to open it.
+ * An imported file still waits here, then `onInstalled` gets the new instance (the dialog closes and opens it).
  */
-export function ModpackFinder({ onInstalled, onBusy }: { onInstalled: (inst: Instance) => void; onBusy: (busy: boolean) => void }) {
+export function ModpackFinder({
+  onInstalled,
+  onStarted,
+  onBusy
+}: {
+  onInstalled: (inst: Instance) => void
+  onStarted: () => void
+  onBusy: (busy: boolean) => void
+}) {
   const { info, toast, refreshInstances, go } = useStore()
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
   const [hits, setHits] = useState<ProjectHit[]>()
-  const [installing, setInstalling] = useState<string>()
   const [importing, setImporting] = useState(false)
   const run = useRef(0)
 
@@ -69,7 +79,7 @@ export function ModpackFinder({ onInstalled, onBusy }: { onInstalled: (inst: Ins
     })
   }, [debounced, info?.curseforge])
 
-  const busy = !!installing || importing
+  const busy = importing
   useEffect(() => onBusy(busy), [busy, onBusy])
 
   const done = async (inst: Instance & { duplicatesRemoved?: unknown }) => {
@@ -81,14 +91,23 @@ export function ModpackFinder({ onInstalled, onBusy }: { onInstalled: (inst: Ins
     onInstalled(inst)
   }
 
-  const install = async (hit: ProjectHit) => {
-    setInstalling(hit.id)
-    try {
-      await done(await api.content.installModpack(hit.id))
-    } catch (e) {
-      toast(t('discover.toast.installFailed', { title: hit.title, error: (e as Error).message }), 'error')
-      setInstalling(undefined)
-    }
+  // Not tied to this dialog: it closes as soon as the install starts, and the install goes on without it.
+  const install = (hit: ProjectHit) => {
+    const started = api.content.installModpack(hit.id)
+    toast(t('modpack.started', { name: hit.title }), 'info')
+    onStarted()
+    // The engine adds the instance early; the Library shows it filling.
+    setTimeout(() => void refreshInstances().catch(() => {}), 1200)
+    void started.then(
+      async (inst) => {
+        await refreshInstances().catch(() => {})
+        toast(t('discover.toast.modpackReady', { name: inst.name }), 'success', { label: t('modpack.open'), run: () => go({ page: 'instance', id: inst.id }) })
+        const dupes = packDupesNote(inst as Parameters<typeof packDupesNote>[0])
+        if (dupes) toast(dupes, 'info')
+        celebrate()
+      },
+      (e) => toast(t('discover.toast.installFailed', { title: hit.title, error: (e as Error).message }), 'error')
+    )
   }
 
   const importFile = async () => {
@@ -127,7 +146,7 @@ export function ModpackFinder({ onInstalled, onBusy }: { onInstalled: (inst: Ins
         ) : (
           hits.map((h) => (
             <div key={h.id} className="result">
-              <div className="ico">{h.iconUrl ? <img src={h.iconUrl} alt="" loading="lazy" /> : <Package />}</div>
+              <div className="ico">{h.iconUrl ? <img decoding="async" src={h.iconUrl} alt="" loading="lazy" /> : <Package />}</div>
               <div className="grow" style={{ minWidth: 0 }}>
                 <h3>
                   <span className="ellipsis">{h.title}</span>
@@ -138,14 +157,12 @@ export function ModpackFinder({ onInstalled, onBusy }: { onInstalled: (inst: Ins
                   <span>
                     <Download /> {compact(h.downloads)}
                   </span>
-                  <span>
-                    <span className="source-dot" style={{ background: site(h.source)?.color }} /> {site(h.source)?.label ?? h.source}
-                  </span>
+                  <SourceBadge source={h.source} label={site(h.source)?.label ?? h.source} color={site(h.source)?.color} />
                 </div>
               </div>
               <div className="actions">
-                <button className="btn primary sm" disabled={busy} onClick={() => void install(h)}>
-                  {installing === h.id ? <Loader2 className="spin" /> : <Download />} {t('discover.result.installPack')}
+                <button className="btn primary sm" disabled={busy} onClick={() => install(h)}>
+                  <Download /> {t('discover.result.installPack')}
                 </button>
               </div>
             </div>

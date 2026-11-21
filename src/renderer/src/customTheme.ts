@@ -218,7 +218,7 @@ export function showCustom(th: CustomTheme | undefined, draftPicture?: string) {
   const tag = styleTag()
   if (!th) {
     tag.textContent = ''
-    for (const a of ['themeStyle', 'themeEffect', 'themeImage', 'themeFit', 'themeBlur']) delete root.dataset[a]
+    for (const a of ['themeStyle', 'themeEffect', 'themeImage', 'themeFit', 'themeBlur', 'themeHeader']) delete root.dataset[a]
     return
   }
   const body = Object.entries(vars(th))
@@ -232,6 +232,9 @@ export function showCustom(th: CustomTheme | undefined, draftPicture?: string) {
   else delete root.dataset.themeEffect
   if (th.blur > 0) root.dataset.themeBlur = ''
   else delete root.dataset.themeBlur
+  // The header frosts the picture behind it unless the theme says otherwise.
+  if (th.headerBlur !== false) root.dataset.themeHeader = 'blur'
+  else delete root.dataset.themeHeader
   void pictureFor(th, draftPicture).then((url) => {
     if (token !== shownToken) return
     if (url) {
@@ -344,6 +347,7 @@ export function readThemeFile(text: string): { theme: CustomTheme; picture?: str
       imageUrl: /^https:/i.test(imageUrl) ? imageUrl : '',
       imageFit: one(t.imageFit, ['cover', 'contain', 'tile', 'center'] as const, 'cover'),
       darken: num(t.darken, 0, 90, 45),
+      ...(t.headerBlur === false ? { headerBlur: false } : {}),
       effect: one(t.effect, ['none', 'snow', 'petals', 'embers', 'fireflies', 'rain'] as const, 'none'),
       vars,
       css: str(t.css, 100_000)

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, ChevronLeft, ChevronRight, ClipboardCopy, Copy, Eye, FileText, FolderOpen, ImageOff, ImageUp, Loader2, RefreshCw, Trash2, X } from 'lucide-react'
 import type { Instance, ScreenshotInfo } from '@shared/types'
 import { api } from '../api'
+import { onTrim } from '../memory'
 import { useStore } from '../store'
 import { bytes, instancePath } from '../util'
 import { currentLanguage, rich, t } from '../i18n'
@@ -10,6 +11,8 @@ import '../instance-tabs.css'
 
 // Thumbnails survive tab switches; keyed by instance, file name and modification time.
 const thumbs = new Map<string, string>()
+// Read again from disk when next shown.
+onTrim(() => thumbs.clear())
 const thumbKey = (id: string, s: ScreenshotInfo) => `${id}/${s.name}/${s.mtime}`
 
 const when = (s: ScreenshotInfo) => new Date(s.mtime).toLocaleString(currentLanguage(), { dateStyle: 'medium', timeStyle: 'short' })
@@ -183,7 +186,7 @@ function Thumb({ instanceId, shot }: { instanceId: string; shot: ScreenshotInfo 
     }
   }, [instanceId, shot.name, key, src])
 
-  if (src) return <img src={src} alt="" draggable={false} />
+  if (src) return <img loading="lazy" decoding="async" src={src} alt="" draggable={false} />
   return (
     <span ref={ref} style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-faint)' }}>
       {failed ? <ImageOff size={20} /> : <Loader2 className="spin" size={18} />}
@@ -246,7 +249,7 @@ function Viewer({
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="it-viewer" role="dialog" aria-modal aria-label={shot.name} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
         <div className="it-viewer-stage" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-          {src ? <img src={src} alt={shot.name} onContextMenu={(e) => openContextMenu(e, menu(shot, index))} /> : <Loader2 className="spin" />}
+          {src ? <img loading="lazy" decoding="async" src={src} alt={shot.name} onContextMenu={(e) => openContextMenu(e, menu(shot, index))} /> : <Loader2 className="spin" />}
           {index > 0 && (
             <button className="btn icon it-viewer-nav prev" title={t('screenshots.viewer.previous')} onClick={() => onIndex(index - 1)}>
               <ChevronLeft />

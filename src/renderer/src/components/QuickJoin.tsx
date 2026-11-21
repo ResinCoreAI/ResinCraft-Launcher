@@ -674,7 +674,7 @@ function QuickJoinCard({ item, q }: { item: QjItem; q: QuickJoinState }) {
   const icon = itemIcon(item, ping)
   return (
     <div className="qj-card" title={item.address}>
-      <div className="ico">{icon ? <img src={icon} alt="" /> : item.edition === 'bedrock' ? <Smartphone /> : <Server />}</div>
+      <div className="ico">{icon ? <img loading="lazy" decoding="async" src={icon} alt="" /> : item.edition === 'bedrock' ? <Smartphone /> : <Server />}</div>
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="name ellipsis">
           {item.entry?.pinned && <Pin className="qj-pin" aria-label={t('quickjoin.pinned')} />}

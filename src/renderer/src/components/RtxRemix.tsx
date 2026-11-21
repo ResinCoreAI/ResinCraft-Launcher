@@ -6,6 +6,7 @@ import { useStore } from '../store'
 import { bytes } from '../util'
 import { t, type Key } from '../i18n'
 import { Segmented, Switch, celebrate } from './ui'
+import { iconPng, RTX_ICON } from './BasicIcons'
 import '../rtx-remix.css'
 import { platform } from '../platform'
 
@@ -82,14 +83,23 @@ function Row({ ok, title, detail }: { ok: boolean; title: string; detail?: strin
  * New instance → RTX Remix: NVIDIA RTX Remix for Minecraft (path tracing, beta) in a new Fabric 1.21.1 instance, or
  * added to one the player already has. The setup keeps going in the task list if the dialog closes.
  */
-export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void; onBusy: (busy: boolean) => void }) {
+export function RtxRemix({
+  onDone,
+  onBusy,
+  onStarted
+}: {
+  onDone: (inst: Instance) => void
+  onBusy: (busy: boolean) => void
+  /** The setup is under way for this instance (it now exists): the dialog can get out of the way. */
+  onStarted?: (inst: Instance) => void
+}) {
   const { instances, refreshInstances, toast } = useStore()
   const [check, setCheck] = useState<RtxRemixCheck>()
   const [target, setTarget] = useState<'new' | 'existing'>('new')
   const [name, setName] = useState('')
   const [existing, setExisting] = useState<string>()
   const [world, setWorld] = useState(true)
-  const [pack, setPack] = useState<RtxPackChoice>('auto')
+  const [pack, setPack] = useState<RtxPackChoice>('none')
   const [ownPack, setOwnPack] = useState<string>()
   const [tune, setTune] = useState(true)
   const [memoryMb, setMemoryMb] = useState<number>()
@@ -144,9 +154,16 @@ export function RtxRemix({ onDone, onBusy }: { onDone: (inst: Instance) => void;
       const inst = target === 'new' ? await api.content.rtxRemixCreate(name.trim()) : instances.find((i) => i.id === existing)!
       if (target === 'new') {
         made = inst
+        // A new RTX Remix instance wears the RTX icon (it can be changed like any other). Set before the setup
+        // starts, so the two never write the instance at once.
+        await api.instances.setImage(inst.id, 'icon', await iconPng(RTX_ICON)).catch(() => {})
         await refreshInstances()
       }
-      const done = await api.content.rtxRemixInstall(inst.id, { world, pack, ownPack, tune, memoryMb })
+      const installing = api.content.rtxRemixInstall(inst.id, { world, pack, ownPack, tune, memoryMb })
+      // The download is long and shows in the task list, the dock and on the instance's page; nothing here needs
+      // watching, so whoever opened this is told it has begun (the dialog closes) and the rest ends in a toast.
+      onStarted?.(inst)
+      const done = await installing
       await refreshInstances()
       toast(t('rtxRemix.ready', { name: done.name }))
       if (!open.current) return
@@ -365,7 +382,7 @@ export function InstanceRtxRemix({ inst }: { inst: Instance }) {
       if (on && !state.installed) {
         // Not there yet: download and set it up, sized for this PC.
         toast(t('rtxRemix.toggle.downloading', { name: inst.name }), 'info')
-        const done = await api.content.rtxRemixInstall(inst.id, { world: true, pack: 'auto', tune: true })
+        const done = await api.content.rtxRemixInstall(inst.id, { world: true, pack: 'none', tune: true })
         setState(await api.content.rtxRemixState(inst.id))
         await refreshInstances()
         toast(t('rtxRemix.ready', { name: done.name }))

@@ -11,6 +11,7 @@ import {
   History,
   Pencil,
   Pin,
+  Radar,
   PinOff,
   Plus,
   RefreshCw,
@@ -57,7 +58,7 @@ const UNGROUPED = ''
 
 export default function QuickJoin() {
   const q = useQuickJoin()
-  const { toast, route } = useStore()
+  const { toast, route, go } = useStore()
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<{ id?: string; draft: EntryDraft }>()
   // A resincraft://join link: the server, ready to add (the player picks the instance and saves).
@@ -291,30 +292,41 @@ export default function QuickJoin() {
   )
 
   const recent = q.data?.recent ?? []
+  // The server joined last, as one of the list's own items when it is one (so it has its icon and ping).
+  const last = recent[0]
+  const lastItem: QjItem | undefined =
+    last &&
+    ([...mine, ...saved, ...hosted].find((i) => i.address === last.address) ?? {
+      key: `recent:${last.address}`,
+      source: 'mine',
+      name: last.name,
+      address: last.address,
+      edition: last.edition,
+      instanceIds: last.instanceId ? [last.instanceId] : []
+    })
 
   return (
-    <div className="page qj-page">
+    <div className="page qj-page qj-feed">
       <div className="page-head">
         <div>
           <h1>{t('quickjoin.title')}</h1>
           <p>{t('quickjoin.subtitle')}</p>
         </div>
-        <div className="spacer" />
-        <button className="btn" onClick={() => setNaming({})}>
-          <FolderPlus /> {t('library.group.create')}
-        </button>
-        <button className="btn primary" onClick={() => setEditing({ draft: newDraft() })}>
-          <Plus /> {t('quickjoin.add')}
-        </button>
       </div>
 
-      <div className="toolbar">
+      {/* The server joined last, to go straight back to. */}
+      {q.loaded && lastItem && !query && <LastJoined item={lastItem} at={last.at} q={q} menu={() => rowMenu(lastItem)} />}
+
+      <div className="toolbar qj-bar">
         <div className="search">
           <Search />
           <input className="input" placeholder={t('quickjoin.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <button className="btn" disabled={!addresses.length} onClick={() => addresses.forEach((a) => pingAddress(a, true))}>
-          <RefreshCw /> {t('common.refresh')}
+        <button className="btn" onClick={() => go({ page: 'findservers' })}>
+          <Radar /> {t('servers.find.nav')}
+        </button>
+        <button className="btn primary" onClick={() => setEditing({ draft: newDraft() })}>
+          <Plus /> {t('quickjoin.add')}
         </button>
       </div>
 
@@ -326,12 +338,12 @@ export default function QuickJoin() {
         </div>
       ) : (
         <>
-          {recent.length > 0 && !query && (
+          {recent.length > 1 && !query && (
             <div className="qj-recent">
               <span className="label">
                 <History /> {t('quickjoin.recent')}
               </span>
-              {recent.slice(0, 8).map((r) => (
+              {recent.slice(1, 9).map((r) => (
                 <span key={r.address} className="chip" title={`${r.address} · ${timeAgo(r.at, true)}`}>
                   {r.name}
                 </span>
@@ -348,6 +360,20 @@ export default function QuickJoin() {
 
           <h2 className="section">
             <Zap size={18} /> {t('quickjoin.mine')}
+            <span className="qj-section-tools">
+              <button className="btn ghost sm" onClick={() => setNaming({})}>
+                <FolderPlus /> {t('library.group.create')}
+              </button>
+              <button
+                className="btn ghost icon sm"
+                disabled={!addresses.length}
+                title={t('common.refresh')}
+                aria-label={t('common.refresh')}
+                onClick={() => addresses.forEach((a) => pingAddress(a, true))}
+              >
+                <RefreshCw />
+              </button>
+            </span>
           </h2>
           {groups.length > 0 && !query && <p className="hint drag-hint">{t('quickjoin.dragHint')}</p>}
           {mine.length === 0 && groups.length === 0 ? (
@@ -558,7 +584,7 @@ function QjRow({
           <GripVertical />
         </span>
       )}
-      <div className="ico">{icon ? <img src={icon} alt="" style={{ imageRendering: 'pixelated' }} /> : <Server />}</div>
+      <div className="ico">{icon ? <img loading="lazy" decoding="async" src={icon} alt="" style={{ imageRendering: 'pixelated' }} /> : <Server />}</div>
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="title ellipsis">
           {item.entry?.pinned && <Pin className="qj-pin" aria-label={t('quickjoin.pinned')} />}
@@ -588,6 +614,37 @@ function QjRow({
         <MoreButton items={menu} className="card-more" />
       </div>
     </div>
+  )
+}
+
+/** The server joined last, big at the top: its icon, name, how it's doing, and Join to go straight back. */
+function LastJoined({ item, at, q, menu }: { item: QjItem; at: number; q: QuickJoinState; menu: () => ContextEntry[] }) {
+  const ping = usePing(item)
+  const icon = itemIcon(item, ping)
+  return (
+    <section className="qj-last" aria-label={t('quickjoin.recent')} onContextMenu={(e) => openContextMenu(e, menu(), item.name)}>
+      <div className="qj-last-ico">{icon ? <img loading="lazy" decoding="async" src={icon} alt="" style={{ imageRendering: 'pixelated' }} /> : <Server />}</div>
+      <div className="grow" style={{ minWidth: 0 }}>
+        <span className="chip compact accent">
+          <History /> {t('quickjoin.lastPlayed', { when: timeAgo(at, true) })}
+        </span>
+        <h2 className="ellipsis">{item.name}</h2>
+        <div className="it-meta">
+          {item.edition === 'java' && <PingStatus ping={ping} />}
+          <span className="mono">{item.address}</span>
+          {ping?.state === 'ok' && ping.status.version && <span>{ping.status.version}</span>}
+        </div>
+        {ping?.state === 'ok' && ping.status.motd.trim() && (
+          <div className="it-motd">
+            <Motd text={ping.status.motd} />
+          </div>
+        )}
+      </div>
+      <div className="qj-last-actions">
+        <JoinButton item={item} q={q} size="" />
+        <MoreButton items={menu} className="card-more" />
+      </div>
+    </section>
   )
 }
 

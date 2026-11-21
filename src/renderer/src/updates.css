@@ -1,10 +1,10 @@
 /* ResinCraft's own updates (components/Updates.tsx). */
 
-/* Under the title bar, clear of the task dock in the bottom corner. */
+/* In the page's bottom-left corner: clear of a page's own buttons (top right) and of the task dock (bottom right). */
 .update-banner {
   position: fixed;
-  top: calc(var(--titlebar) + 12px);
-  right: 18px;
+  left: calc(var(--sidebar-w) + 18px);
+  bottom: var(--float-bottom);
   width: 340px;
   z-index: 80;
   display: flex;
@@ -78,29 +78,40 @@
   }
 }
 
-/* The title bar's Update button, left of the window buttons. */
+/* The header's Update button, left of the window buttons: a solid pill, so it reads on any theme's cover. */
 .win-controls .title-update {
+  align-self: center;
   width: auto;
-  height: calc(100% - 8px);
-  margin: 4px 6px 4px 0;
-  padding: 0 12px;
+  height: 32px;
+  margin: 0 8px 0 0;
+  padding: 0 13px;
   gap: 6px;
   display: inline-flex;
   align-items: center;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--success, #39ff88) 16%, transparent);
-  color: var(--success, #39ff88);
+  border-radius: 999px;
+  background: var(--play);
+  color: var(--play-fg);
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
 }
 .win-controls .title-update:hover {
-  background: color-mix(in srgb, var(--success, #39ff88) 26%, transparent);
-  color: var(--success, #39ff88);
+  background: var(--play-hover);
+  color: var(--play-fg);
 }
-.win-controls .title-update.waiting {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning);
+.win-controls .title-update.waiting,
+.win-controls .title-update.waiting:hover {
+  background: var(--warning);
+  color: #201800;
+}
+/* A narrow window keeps the button and drops its word. */
+@media (max-width: 1100px) {
+  .win-controls .title-update span {
+    display: none;
+  }
+  .win-controls .title-update {
+    padding: 0 10px;
+  }
 }
 .win-controls .title-update:disabled {
   cursor: default;
@@ -116,5 +127,5 @@
   color: var(--success, var(--text));
 }
 .update-banner ~ .update-banner.join-answers {
-  top: calc(var(--titlebar) + 150px);
+  bottom: calc(var(--float-bottom) + 150px);
 }

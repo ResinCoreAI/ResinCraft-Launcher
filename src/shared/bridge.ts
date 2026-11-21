@@ -30,6 +30,13 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       saveText: fn('app:saveText'),
       pendingOpen: fn('app:pendingOpen'),
       pendingLink: fn('app:pendingLink'),
+      copyPng: fn('app:copyPng'),
+      savePng: fn('app:savePng'),
+      discordPage: fn('app:discordPage'),
+      sendReport: fn('app:sendReport'),
+      serviceStatus: fn('app:serviceStatus'),
+      imageData: fn('app:imageData'),
+      artData: fn('app:artData'),
       mcpInfo: fn('app:mcpInfo'),
       mcpResetToken: fn('app:mcpResetToken'),
       storageImport: fn('app:storageImport'),
@@ -73,8 +80,18 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       uninstall: fn('bedrock:uninstall'),
       get: fn('bedrock:get'),
       gamingServices: fn('bedrock:gamingServices'),
+      xboxAccount: fn('bedrock:xboxAccount'),
       update: fn('bedrock:update'),
-      openFolder: fn('bedrock:openFolder')
+      openFolder: fn('bedrock:openFolder'),
+      versions: fn('bedrock:versions'),
+      switchPlan: fn('bedrock:switchPlan'),
+      switchTo: fn('bedrock:switch'),
+      backToStore: fn('bedrock:backToStore'),
+      backup: fn('bedrock:backup'),
+      backups: fn('bedrock:backups'),
+      restore: fn('bedrock:restore'),
+      openBackup: fn('bedrock:openBackup'),
+      developerSettings: fn('bedrock:developerSettings')
     },
     remote: {
       status: fn('remote:status'),
@@ -121,6 +138,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       resetIcon: fn('instances:resetIcon'),
       setImage: fn('instances:setImage'),
       remove: fn('instances:remove'),
+      shortcut: fn('instances:shortcut'),
       openFolder: fn('instances:openFolder'),
       launch: fn('instances:launch'),
       kill: fn('instances:kill'),
@@ -152,7 +170,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       apply: fn('skins:apply'),
       lookupPlayer: fn('skins:lookupPlayer'),
       search: fn('skins:search'),
-      saveOnline: fn('skins:saveOnline')
+      saveOnline: fn('skins:saveOnline'),
+      fetchPng: fn('skins:fetchPng')
     },
     java: { list: fn('java:list'), browse: fn('java:browse') },
     content: {
@@ -375,6 +394,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile'), openLink: on('openLink') }
+    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), gameWindow: on('gameWindow'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile'), openLink: on('openLink') }
   } as ResinApi
 }

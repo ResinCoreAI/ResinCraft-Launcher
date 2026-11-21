@@ -144,7 +144,7 @@ export default function Accounts() {
  * account to use. The code sign-in (microsoft.com/link in the browser) is the backup, and what this build uses
  * when its app registration doesn't allow the window.
  */
-function MicrosoftLogin({ onClose }: { onClose: () => void }) {
+export function MicrosoftLogin({ onClose }: { onClose: () => void }) {
   const { refreshAccounts, toast } = useStore()
   const [mode, setMode] = useState<'starting' | 'window' | 'code'>('starting')
   const [code, setCode] = useState<DeviceCode>()
@@ -244,7 +244,7 @@ function MicrosoftLogin({ onClose }: { onClose: () => void }) {
   )
 }
 
-function OfflineModal({ onClose }: { onClose: () => void }) {
+export function OfflineModal({ onClose }: { onClose: () => void }) {
   const { refreshAccounts, toast } = useStore()
   const [name, setName] = useState('')
   const [error, setError] = useState<string>()
