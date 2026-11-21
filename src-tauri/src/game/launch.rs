@@ -277,6 +277,33 @@ static PREPARING: Mutex<Option<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = 
 /// every Play and then finds everything in place. Quiet when it can't finish (offline, no Java to be had): Play
 /// says what's wrong when it's pressed.
 pub fn get_ready(id: &str) {
+    if STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).remove(id).is_some() {
+        return;
+    }
+    start_getting_ready(id);
+}
+
+/// Instances whose `get_ready` began while their modpack was still being installed (`get_ready_early`), so the
+/// one at the end of the install isn't run a second time, and a failed or cancelled install can stop it.
+static STARTED_EARLY: Mutex<Option<HashMap<String, tokio::task::AbortHandle>>> = Mutex::new(None);
+
+/// `get_ready` at once, for a modpack instance whose Minecraft version and mod loader are already settled while its
+/// mods are still downloading: the game's own files come at the same time instead of after the last mod (the
+/// install's own call to `get_ready` then does nothing). A failed or cancelled install stops it
+/// (`stop_getting_ready`).
+pub fn get_ready_early(id: &str) {
+    let handle = start_getting_ready(id);
+    STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.to_string(), handle);
+}
+
+/// Stops a `get_ready_early` whose instance is being thrown away (its task shows as cancelled).
+pub fn stop_getting_ready(id: &str) {
+    if let Some(handle) = STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).remove(id) {
+        handle.abort();
+    }
+}
+
+fn start_getting_ready(id: &str) -> tokio::task::AbortHandle {
     let id = id.to_string();
     tokio::spawn(async move {
         let Ok(inst) = instances::get(&id).await else { return };
@@ -296,7 +323,8 @@ pub fn get_ready(id: &str) {
             let _ = tokio::fs::remove_dir_all(natives_for(&id, 1)).await;
             let _ = tokio::fs::remove_dir(paths::instance_dir(&id)).await;
         }
-    });
+    })
+    .abort_handle()
 }
 
 async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &Arc<Task>) -> Result<Prepared> {
@@ -311,6 +339,10 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         })
     };
     let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(settings.concurrency), java: Some(picker) };
+    // The game's assets come with Minecraft's own version, not the mod loader's: they start downloading now, while
+    // the loader installs (Forge and NeoForge patch the game for a while) and the libraries download, instead of
+    // after both. The assets step below finds them in place, or waits for the ones still on their way.
+    let early_assets = early_assets(&inst.mc_version, asset_downloads(settings.concurrency));
     let mut version = super::versionpatch::resolve_instance(inst, &ctx).await?;
 
     let libraries = resolve_libraries(&version);
@@ -335,7 +367,8 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         items.push(l.item.clone());
     }
     download_checked(items, settings.concurrency, task.counter(tr!("launch.downloadingLibraries", "Downloading libraries"))).await?;
-    download_all(assets.items, settings.concurrency * 2, task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
+    download_all(assets.items, asset_downloads(settings.concurrency), task.counter(tr!("launch.downloadingAssets", "Downloading assets"))).await?;
+    drop(early_assets);
     let game_assets = materialize_legacy_assets(&assets.index, &assets.id, &paths::game_dir(&inst.id)).await?;
 
     task.update(tr!("launch.unpackingNatives", "Unpacking natives…"), None);
@@ -366,6 +399,38 @@ async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &
         version,
         natives,
     })
+}
+
+/// How many of a game's assets download at once, for a Parallel downloads setting of `parallel`: four times as many
+/// (at most 64, at least twice as many as before). Assets are thousands of small files, and each one waits mostly on
+/// its own request: 3,913 assets (829 MB) took 12.3-13.7 s 32 at a time and 9.6-9.8 s 64 at a time, for about 6 MB
+/// more memory; 96 at a time was no faster.
+pub fn asset_downloads(parallel: usize) -> usize {
+    (parallel * 4).min(64).max(parallel * 2)
+}
+
+/// Minecraft `mc`'s assets downloading on the side (see `prepare`). Best effort and silent: the assets step after
+/// it reports progress and gets whatever this didn't. Nothing when this version's asset index is saved already (its
+/// assets came before: every Play after the first), so Play doesn't check thousands of files twice. Stops when
+/// dropped.
+fn early_assets(mc: &str, concurrency: usize) -> crate::core::net::BackgroundDownload {
+    let mc = mc.to_string();
+    let listing = async move {
+        if assets_listed_before(&mc).await {
+            return Ok(Vec::new());
+        }
+        let vanilla = super::mojang::get_vanilla_version(&mc).await?;
+        asset_items(&vanilla).await.map(|a| a.items)
+    };
+    // Listing needs the version JSON and asset index (a request each the first time), so it goes on the side too.
+    crate::core::net::download_in_background_after(listing, concurrency)
+}
+
+/// Whether Minecraft `mc`'s saved version JSON names an asset index that is saved too.
+async fn assets_listed_before(mc: &str) -> bool {
+    let Ok(text) = tokio::fs::read_to_string(paths::versions().join(mc).join(format!("{mc}.json"))).await else { return false };
+    let Some(id) = serde_json::from_str::<VersionJson>(&text).ok().and_then(|v| v.asset_index).map(|a| a.id) else { return false };
+    crate::core::fsutil::safe_join(&paths::assets().join("indexes"), &format!("{id}.json")).is_ok_and(|f| f.is_file())
 }
 
 /// What a natives folder holds and which jars it was unpacked from, kept in the folder itself, so the next start can
@@ -818,7 +883,18 @@ impl LogParser {
 #[derive(Default)]
 pub struct LaunchHooks {
     pub on_started: Option<Box<dyn FnOnce() + Send>>,
+    /// The game said it's stopping (the player quit it): its window closes now, while Java takes about 5 s more to
+    /// end. Not called when the game ends without saying so (a crash, Stop in the launcher).
+    pub on_closing: Option<Box<dyn FnOnce() + Send>>,
     pub on_exit: Option<Box<dyn FnOnce(Option<i32>) + Send>>,
+}
+
+/// The line Minecraft logs when the player quits, right before it closes its window: "[12:00:00] [Render
+/// thread/INFO]: Stopping!" (older versions: "[Client thread/INFO]"). Java then runs for about 5 s more (Minecraft
+/// waits for its background workers), and the launcher used to come back only then.
+pub fn says_stopping(line: &str) -> bool {
+    let line = line.trim_end();
+    line.ends_with("]: Stopping!") && (line.contains("[Render thread/") || line.contains("[Client thread/"))
 }
 
 fn loader_label(inst: &Instance) -> String {
@@ -899,10 +975,17 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
     // Set once the "Minecraft crashed" window was shown for this run (Fabric's own error window keeps the game open,
     // so it's shown as soon as the loader says it gave up, not only when the game exits).
     let crash_shown = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let on_closing = Arc::new(Mutex::new(hooks.on_closing));
     let push = {
-        let (pending, console, crash_shown) = (pending.clone(), console.clone(), crash_shown.clone());
+        let (pending, console, crash_shown, on_closing) = (pending.clone(), console.clone(), crash_shown.clone(), on_closing.clone());
         let (instance_id, run_id) = (id.to_string(), run.run_id.clone());
         move |l: LogLine| {
+            if says_stopping(&l.text) {
+                let hook = on_closing.lock().unwrap().take();
+                if let Some(f) = hook {
+                    f();
+                }
+            }
             {
                 let mut c = console.lock().unwrap();
                 c.push_back(l.text.clone());
@@ -1297,6 +1380,17 @@ mod tests {
         std::fs::remove_file(&other).unwrap();
         assert!(unpack_natives(&natives, &extract[1..]).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn knows_when_the_game_says_it_stops() {
+        assert!(says_stopping("[10:49:28] [Render thread/INFO]: Stopping!"));
+        assert!(says_stopping("[10:49:28] [Client thread/INFO]: Stopping!\r"));
+        // A server or a mod saying something like it isn't the game closing.
+        assert!(!says_stopping("[10:49:28] [Server thread/INFO]: Stopping!"));
+        assert!(!says_stopping("[10:49:28] [Server thread/INFO]: Stopping server"));
+        assert!(!says_stopping("[10:49:28] [Render thread/INFO]: Stopping! (not yet)"));
+        assert!(!says_stopping("Stopping!"));
     }
 
     #[test]

@@ -826,6 +826,8 @@ pub async fn install_mrpack(file: &Path, meta: PackMeta) -> Result<Instance> {
         // On the Library at once, with this task's progress on its card.
         task.set_instance(&inst.id);
         crate::core::events::list_changed("instances");
+        // Minecraft and the loader come while the pack's files do.
+        crate::game::launch::get_ready_early(&inst.id);
         let filled = fill_pack(&inst, &pack, &file, &task).await;
         guard.keep();
         match filled {

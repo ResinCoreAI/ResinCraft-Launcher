@@ -228,19 +228,20 @@ pub async fn remote_meta(file: &RemoteFile) -> Option<JarMeta> {
 }
 
 async fn get_range(url: &str, start: u64, end: u64) -> Result<Option<Chunk>> {
-    let res = http().get(url).header(reqwest::header::RANGE, format!("bytes={start}-{end}")).send().await?;
+    let res = crate::core::net::unless_stalled(url, http().get(url).header(reqwest::header::RANGE, format!("bytes={start}-{end}")).send()).await?;
     let status = res.status();
     if !status.is_success() {
         return Err(HttpError { status: status.as_u16(), url: url.to_string(), body: String::new() }.into());
     }
     if status == reqwest::StatusCode::PARTIAL_CONTENT {
-        return Ok(Some(Chunk::Part(res.bytes().await?.to_vec())));
+        let url = url.to_string();
+        return Ok(Some(Chunk::Part(crate::core::net::unless_stalled(&url, res.bytes()).await?.to_vec())));
     }
     Ok(read_capped(res).await?.map(Chunk::Whole))
 }
 
 async fn get_whole(url: &str) -> Result<Option<Vec<u8>>> {
-    let res = http().get(url).send().await?;
+    let res = crate::core::net::unless_stalled(url, http().get(url).send()).await?;
     if !res.status().is_success() {
         return Err(HttpError { status: res.status().as_u16(), url: url.to_string(), body: String::new() }.into());
     }
@@ -252,8 +253,9 @@ async fn read_capped(mut res: reqwest::Response) -> Result<Option<Vec<u8>>> {
     if res.content_length().is_some_and(|n| n > MAX_WHOLE) {
         return Ok(None);
     }
+    let url = res.url().to_string();
     let mut all = Vec::new();
-    while let Some(chunk) = res.chunk().await? {
+    while let Some(chunk) = crate::core::net::unless_stalled(&url, res.chunk()).await? {
         all.extend_from_slice(&chunk);
         if all.len() as u64 > MAX_WHOLE {
             return Ok(None);
@@ -389,7 +391,7 @@ where
 pub async fn remote_zip_texts(url: &str, size: u64, wanted: &[&'static str]) -> Option<BTreeMap<&'static str, String>> {
     // Some download hosts only redirect plain requests and answer 404 to ranged ones (CurseForge's edge server),
     // so follow the redirects once and read the ranges from where they end.
-    let url = match http().head(url).send().await {
+    let url = match crate::core::net::unless_stalled(url, http().head(url).send()).await {
         Ok(res) if res.status().is_success() => res.url().to_string(),
         _ => url.to_string(),
     };

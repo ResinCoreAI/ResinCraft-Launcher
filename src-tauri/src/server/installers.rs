@@ -1306,6 +1306,7 @@ async fn forge_like(loader: LoaderType, mc: &str, ver: &str, dir: &Path, java: &
             return Ok(launch);
         }
     }
+    prefetch_forge_server(&installer, mc, dir, task, &name).await;
     let args = vec!["-jar".to_string(), plain(&installer), "--installServer".into(), plain(dir)];
     run_installer(java, &args, dir, task, &name).await?;
 
@@ -1339,6 +1340,89 @@ async fn forge_like(loader: LoaderType, mc: &str, ver: &str, dir: &Path, java: &
         Some(j) => Ok(jar(&j)),
         None => bail!("The {name} installer finished, but ResinCraft couldn't find how to start the server"),
     }
+}
+
+/// The files a modern Forge / NeoForge installer's `--installServer` would download, put in the server folder
+/// first: its libraries (its own tools' and the server's), from the launcher's libraries folder when a game there
+/// already has them, else downloaded several at a time, and the vanilla server jar. The installer fetches them one
+/// after another and keeps whatever is already in place with the right checksum, so all it has left to do is
+/// patch. Best effort: whatever isn't here yet, the installer still gets itself.
+async fn prefetch_forge_server(installer: &Path, mc: &str, dir: &Path, task: &Arc<Task>, name: &str) {
+    let libs_dir = dir.join("libraries");
+    let found = {
+        let (installer, libs_dir, mc, dir) = (installer.to_path_buf(), libs_dir.clone(), mc.to_string(), dir.to_path_buf());
+        tokio::task::spawn_blocking(move || -> Result<(Vec<DownloadItem>, Option<PathBuf>)> {
+            let mut zip = crate::content::index::open_zip(&installer)?;
+            let profile: Value = serde_json::from_str(&crate::content::index::read_zip_text(&mut zip, "install_profile.json")?.unwrap_or_default())?;
+            let mut libs: Vec<Value> = profile.get("libraries").and_then(Value::as_array).cloned().unwrap_or_default();
+            if let Some(json) = profile.get("json").and_then(Value::as_str) {
+                if let Some(text) = crate::content::index::read_zip_text(&mut zip, json.trim_start_matches('/'))? {
+                    let version: Value = serde_json::from_str(&text)?;
+                    libs.extend(version.get("libraries").and_then(Value::as_array).cloned().unwrap_or_default());
+                }
+            }
+            Ok((forge_server_libs(&libs, &libs_dir), forge_server_jar(&profile, &mc, &dir)))
+        })
+        .await
+    };
+    let Ok(Ok((mut items, server_jar))) = found else { return };
+    if items.is_empty() {
+        return;
+    }
+    // The launcher's own copies (a game with this loader has them already): copied, checked like a download.
+    let shared = paths::libraries();
+    for item in &items {
+        if item.dest.is_file() {
+            continue;
+        }
+        let Ok(rel) = item.dest.strip_prefix(&libs_dir) else { continue };
+        let from = shared.join(rel);
+        if from.is_file() {
+            if let Some(parent) = item.dest.parent() {
+                let _ = tokio::fs::create_dir_all(parent).await;
+            }
+            let _ = tokio::fs::copy(&from, &item.dest).await;
+        }
+    }
+    if let Some(dest) = server_jar {
+        if let Ok(v) = get_vanilla_version(mc).await {
+            if let Some(f) = v.downloads.as_ref().and_then(|d| d.get("server")) {
+                items.push(DownloadItem::new(&f.url, dest).hash(f.sha1.clone().map(Hash::sha1)).size(f.size));
+            }
+        }
+    }
+    let parallel = settings::parallel_downloads().await;
+    // A file that can't be had now is left to the installer, which says what's wrong if it can't either.
+    let _ = download_all(items, parallel, task.counter(tr!("forge.downloadingLibraries", "Downloading {name} libraries", name = name))).await;
+}
+
+/// Each library with a download address (`downloads.artifact`), as a download into the server's `libraries`.
+/// Installer-made jars have no address and are left out.
+fn forge_server_libs(libs: &[Value], libs_dir: &Path) -> Vec<DownloadItem> {
+    libs.iter()
+        .filter_map(|l| {
+            let art = l.pointer("/downloads/artifact")?;
+            let url = art.get("url").and_then(Value::as_str).filter(|u| !u.is_empty())?;
+            let path = art.get("path").and_then(Value::as_str).filter(|p| !p.is_empty())?;
+            let dest = crate::core::fsutil::safe_join(libs_dir, path).ok()?;
+            Some(DownloadItem::new(url, dest).hash(art.get("sha1").and_then(Value::as_str).map(Hash::sha1)).size(art.get("size").and_then(Value::as_u64)))
+        })
+        .collect()
+}
+
+/// Where the installer looks for the vanilla server jar: the profile's `serverJarPath` (1.17+), else
+/// `minecraft_server.<mc>.jar` in the server folder.
+fn forge_server_jar(profile: &Value, mc: &str, dir: &Path) -> Option<PathBuf> {
+    let Some(pattern) = profile.get("serverJarPath").and_then(Value::as_str) else {
+        return Some(dir.join(format!("minecraft_server.{mc}.jar")));
+    };
+    let rel = pattern.replace("{MINECRAFT_VERSION}", mc);
+    let rel = rel.strip_prefix("{LIBRARY_DIR}/")?;
+    // Anything else in the pattern isn't known here: the installer gets the jar itself.
+    if rel.contains('{') {
+        return None;
+    }
+    crate::core::fsutil::safe_join(&dir.join("libraries"), rel).ok()
 }
 
 /// Forge for Minecraft 1.7.10–1.12.2. Its installer's `--installServer` downloads from hosts that are gone (or
@@ -1535,6 +1619,26 @@ pub fn describe(meta: &ServerMeta) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn forge_server_files_go_where_the_installer_looks() {
+        let dir = Path::new("/srv/s1");
+        let modern = serde_json::json!({ "serverJarPath": "{LIBRARY_DIR}/net/minecraft/server/{MINECRAFT_VERSION}/server-{MINECRAFT_VERSION}-bundled.jar" });
+        assert_eq!(forge_server_jar(&modern, "26.3", dir), Some(dir.join("libraries").join("net/minecraft/server/26.3/server-26.3-bundled.jar")));
+        assert_eq!(forge_server_jar(&serde_json::json!({}), "1.16.5", dir), Some(dir.join("minecraft_server.1.16.5.jar")));
+        assert_eq!(forge_server_jar(&serde_json::json!({ "serverJarPath": "{ROOT}/x.jar" }), "26.3", dir), None);
+
+        let libs = vec![
+            serde_json::json!({ "name": "a:b:1", "downloads": { "artifact": { "path": "a/b/1/b-1.jar", "url": "https://maven.minecraftforge.net/a/b/1/b-1.jar", "sha1": "s", "size": 5 } } }),
+            // Made by the installer: no address.
+            serde_json::json!({ "name": "net.minecraftforge:forge:26.3-66.1.9:server", "downloads": { "artifact": { "path": "f.jar", "url": "" } } }),
+            serde_json::json!({ "name": "bad", "downloads": { "artifact": { "path": "../../escape.jar", "url": "https://x/e.jar" } } }),
+        ];
+        let items = forge_server_libs(&libs, &dir.join("libraries"));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].dest, dir.join("libraries").join("a/b/1/b-1.jar"));
+        assert_eq!(items[0].size, Some(5));
+    }
 
     #[test]
     fn catserver_files_name_their_version() {

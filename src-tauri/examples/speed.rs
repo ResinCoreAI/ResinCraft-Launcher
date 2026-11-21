@@ -26,8 +26,14 @@
 //!   cargo run --release --example speed -- ready <instance id> [<instance id>…] [play]
 //!       gets the instances' files ready in the background, as making an instance does, and waits for it; with
 //!       `play`, presses Play on the first one two seconds in and says how long that Play took
+//!   cargo run --release --example speed -- close <instance id> [times]
+//!       starts the game, waits for its title screen, closes its window as a player does and says when the
+//!       launcher noticed: the game saying it stops, its process ending, the "stopped" event and the window hook
 //!   cargo run --release --example speed -- prep <instance id> [times]
 //!       what Play does before Java starts, one step at a time
+//!   cargo run --release --example speed -- loader <mcVersion> <forge|neoforge> [loader version] [times]
+//!       installs the mod loader from scratch (its libraries stay once downloaded), each step timed; prints a
+//!       fingerprint of the version JSON and the files the install made, to compare before and after a change
 //!   cargo run --release --example speed -- cdn <Modrinth pack version id> [times] [at once]
 //!       the pack's files through the launcher's downloader into a throwaway folder, with the slowest files each time
 //!       (RESIN_SPEED_SPLIT=1 fetches each file by hand instead and says how long the network and the disk took)
@@ -92,9 +98,11 @@ async fn run() -> Result<()> {
         Some("steps") => steps(&need(1, "an instance id")?).await,
         Some("make") => make(&need(1, "a Minecraft version")?, &need(2, "a loader")?, arg(3)).await,
         Some("launch") => launch_times(&need(1, "an instance id")?, num(2, 1), arg(3)).await,
+        Some("close") => close_times(&need(1, "an instance id")?, num(2, 1)).await,
         Some("prep") => prep(&need(1, "an instance id")?, num(2, 1)).await,
         Some("ready") => ready(&argv[1..]).await,
         Some("faults") => faults().await,
+        Some("loader") => loader(&need(1, "a Minecraft version")?, &need(2, "forge or neoforge")?, arg(3), num(4, 1)).await,
         Some("cdn") => cdn(&need(1, "a Modrinth version id")?, num(2, 3), num(3, 16)).await,
         _ => bail!("say what to time: local, game, pack, switch, unknown, picks, dupes, steps, make, launch or tree (see the top of examples/speed.rs)"),
     }
@@ -104,6 +112,13 @@ async fn run() -> Result<()> {
 static COMMAND: Mutex<Option<String>> = Mutex::new(None);
 /// Rung when a game stops.
 static STOPPED: tokio::sync::Notify = tokio::sync::Notify::const_new();
+/// (what, when) for `close`: game events, the game's own milestones and the launch hooks.
+static MARKS: Mutex<Vec<(String, Instant)>> = Mutex::new(Vec::new());
+
+fn mark(what: impl Into<String>) {
+    MARKS.lock().unwrap().push((what.into(), Instant::now()));
+}
+
 /// How many tasks have ended.
 static TASKS_ENDED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
@@ -129,6 +144,7 @@ fn watch_tasks() {
             }
         }
         "game" => {
+            mark(format!("event {}", payload["state"].as_str().unwrap_or_default()));
             if matches!(payload["state"].as_str(), Some("stopped" | "crashed")) {
                 STOPPED.notify_one();
             }
@@ -137,6 +153,14 @@ fn watch_tasks() {
             for l in payload["lines"].as_array().into_iter().flatten() {
                 if let Some(c) = l["text"].as_str().and_then(|t| t.strip_prefix("Command: ")) {
                     *COMMAND.lock().unwrap() = Some(c.to_string());
+                }
+                let text = l["text"].as_str().unwrap_or_default();
+                if text.contains("Created:") && text.contains("atlas") {
+                    mark("log atlas");
+                } else if text.contains("Stopping!") {
+                    mark("log Stopping!");
+                } else if text.starts_with("Game exited with code") {
+                    mark("log exited");
                 }
             }
         }
@@ -279,6 +303,71 @@ async fn serve_in_pieces(listener: tokio::net::TcpListener, body: Arc<Vec<u8>>, 
     }
 }
 
+/// A server that goes quiet instead of closing: each connection gets at most `piece` more bytes of the file (from
+/// where `Range` says) and then nothing more, with the connection left open, as Forge's Maven did to installer
+/// downloads. With `mute_first`, the first connection doesn't even get an answer.
+async fn serve_and_stall(listener: tokio::net::TcpListener, body: Arc<Vec<u8>>, piece: usize, mute_first: bool, requests: Arc<Mutex<Vec<String>>>) {
+    let mut first = true;
+    loop {
+        let Ok((mut sock, _)) = listener.accept().await else { return };
+        let (body, requests, mute) = (body.clone(), requests.clone(), mute_first && first);
+        first = false;
+        tokio::spawn(async move {
+            let mut buf: Vec<u8> = Vec::new();
+            let mut tmp = [0u8; 4096];
+            while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                match sock.read(&mut tmp).await {
+                    Ok(n) if n > 0 => buf.extend_from_slice(&tmp[..n]),
+                    _ => return,
+                }
+            }
+            let head = String::from_utf8_lossy(&buf).to_lowercase();
+            let from: usize = head.lines().find_map(|l| l.strip_prefix("range: bytes=")).and_then(|r| r.trim().trim_end_matches('-').parse().ok()).unwrap_or(0);
+            requests.lock().unwrap().push(format!("from {from}"));
+            if !mute {
+                let rest = &body[from.min(body.len())..];
+                let h = match from {
+                    0 => format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", rest.len()),
+                    _ => format!("HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {from}-{}/{}\r\n\r\n", rest.len(), body.len() - 1, body.len()),
+                };
+                let _ = sock.write_all(h.as_bytes()).await;
+                let _ = sock.write_all(&rest[..rest.len().min(piece)]).await;
+                let _ = sock.flush().await;
+                if rest.len() <= piece {
+                    return;
+                }
+            }
+            // Open and silent until the client gives up on it.
+            let _ = sock.read(&mut tmp).await;
+        });
+    }
+}
+
+async fn stall_faults(dir: &Path, check: &mut impl FnMut(&str, bool, String)) -> Result<()> {
+    use resincraft_lib::core::net::download_file;
+    // Small (received whole in memory) and big (written as it arrives), each going quiet partway twice; and a file
+    // whose first request is never answered.
+    for (label, len, piece, mute_first) in [("small", 200_000usize, 90_000usize, false), ("big", 3_000_000, 1_200_000, false), ("unanswered", 500_000, 500_000, true)] {
+        let body = Arc::new(noise(len as u64 + 7, len));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let port = listener.local_addr()?.port();
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let server = tokio::spawn(serve_and_stall(listener, body.clone(), piece, mute_first, requests.clone()));
+        let dest = dir.join(format!("stall-{label}.bin"));
+        let item = DownloadItem::new(format!("http://127.0.0.1:{port}/f"), &dest).hash(Some(Hash::sha1(hash_bytes(&body, HashAlgo::Sha1)))).size(Some(len as u64));
+        let t = Instant::now();
+        // Before the fix this never returned; the outer limit turns that into a failure instead of a hang.
+        let res = tokio::time::timeout(Duration::from_secs(300), download_file(&item)).await;
+        let took = t.elapsed();
+        let asked = requests.lock().unwrap().clone();
+        let whole = std::fs::read(&dest).map(|b| b == *body).unwrap_or(false);
+        let ok = matches!(res, Ok(Ok(()))) && whole;
+        check(&format!("{label} file from a host that goes quiet arrives whole"), ok, format!("{} in {:.0} s, requests {asked:?}", if ok { "done" } else { "not done" }, took.as_secs_f64()));
+        server.abort();
+    }
+    Ok(())
+}
+
 async fn faults() -> Result<()> {
     use resincraft_lib::core::net::download_file;
     let dir = paths::cache().join("speed-faults");
@@ -358,6 +447,11 @@ async fn faults() -> Result<()> {
     let res = download_all(items, 4, |done, total| seen.lock().unwrap().push((done, total))).await;
     let seen = seen.into_inner().unwrap();
     check("files already there are counted without downloading", res.is_ok() && seen.first() == Some(&(0, 2)) && seen.last() == Some(&(2, 2)), format!("{seen:?}"));
+
+    // Hosts that go quiet (about a minute and a half: each stall waits out the timeout). RESIN_SPEED_NO_STALLS=1 skips it.
+    if std::env::var("RESIN_SPEED_NO_STALLS").is_err() {
+        stall_faults(&dir, &mut check).await?;
+    }
 
     let _ = tokio::fs::remove_dir_all(&dir).await;
     if failed > 0 {
@@ -498,20 +592,68 @@ async fn game(mc: &str, at_once: Option<usize>) -> Result<()> {
     items.extend(mojang::logging_config(&version).into_iter().map(|l| l.item));
     let items: Vec<DownloadItem> = items.into_iter().filter(|i| !i.url.is_empty()).collect();
     let assets = mojang::asset_items(&version).await?;
-    println!("game {mc}: {} libraries and jars, {} assets, {at_once} at once ({} for assets)", items.len(), assets.items.len(), at_once * 2);
+    let for_assets = launch::asset_downloads(at_once);
+    println!("game {mc}: {} libraries and jars, {} assets, {at_once} at once ({for_assets} for assets)", items.len(), assets.items.len());
 
     let size = |list: &[DownloadItem]| -> u64 { list.iter().filter_map(|i| std::fs::metadata(&i.dest).ok()).map(|m| m.len()).sum() };
     let t = Instant::now();
     download_all(items.clone(), at_once, |_, _| {}).await?;
     println!("RESULT game libraries      {}  ({})", secs(t.elapsed()), mb(size(&items)));
     let t = Instant::now();
-    download_all(assets.items.clone(), at_once * 2, |_, _| {}).await?;
+    download_all(assets.items.clone(), for_assets, |_, _| {}).await?;
     println!("RESULT game assets         {}  ({})", secs(t.elapsed()), mb(size(&assets.items)));
     println!("RESULT game total          {}", secs(total.elapsed()));
     let t = Instant::now();
     download_all(items, at_once, |_, _| {}).await?;
-    download_all(assets.items, at_once * 2, |_, _| {}).await?;
+    download_all(assets.items, for_assets, |_, _| {}).await?;
     println!("RESULT game check again    {}  (everything already there)", secs(t.elapsed()));
+    Ok(())
+}
+
+// ---------- A mod loader's install ----------
+
+async fn loader(mc: &str, which: &str, version: Option<String>, times: usize) -> Result<()> {
+    let kind = match which {
+        "forge" => LoaderType::Forge,
+        "neoforge" => LoaderType::Neoforge,
+        _ => bail!("forge or neoforge"),
+    };
+    let ver = match version.filter(|v| v != "latest") {
+        Some(v) => v,
+        None => resincraft_lib::game::loaders::latest_loader(kind, mc).await?,
+    };
+    // Modern versions only (1.13+): old Forge's Maven names carry a branch suffix this doesn't look up.
+    let full = ver.clone();
+    let dir = paths::versions().join(format!("{}-{mc}-{full}", kind.as_str()));
+    let concurrency = settings::get().await.concurrency;
+    for run in 1..=times.max(1) {
+        // The loader's own folder goes, so the installer and its steps run again; libraries already downloaded stay.
+        let _ = tokio::fs::remove_dir_all(&dir).await;
+        let task = events::Task::new(format!("{which} {mc}-{ver} run {run}"), None);
+        let ctx = ResolveContext { task: Some(task.clone()), concurrency: Some(concurrency), java: None };
+        let t = Instant::now();
+        let version = resolve_version(mc, kind, Some(&ver), &ctx).await?;
+        let took = t.elapsed();
+        task.done();
+        // What the install made: the version JSON (paths made relative) and each file it lists, by SHA-1.
+        let installed: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("installed.json"))?)?;
+        let slash = |s: &str| s.replace('\\', "/");
+        let games = slash(&paths::games().to_string_lossy());
+        let mut made: Vec<String> = Vec::new();
+        for f in installed["files"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            let bytes = std::fs::read(f).unwrap_or_default();
+            made.push(format!("{} {}", slash(f).replace(&games, ""), hash_bytes(&bytes, HashAlgo::Sha1)));
+        }
+        made.sort();
+        let json = slash(&serde_json::to_string(&version)?).replace("//", "/").replace(&games, "");
+        let print = hash_bytes(format!("{json}\n{}", made.join("\n")).as_bytes(), HashAlgo::Sha1);
+        println!("RESULT loader {which} {mc}-{ver} run {run}  {}  ({} files made, fingerprint {})", secs(took), made.len(), &print[..12]);
+        if run == 1 {
+            for m in &made {
+                println!("  made {m}");
+            }
+        }
+    }
     Ok(())
 }
 
@@ -756,6 +898,66 @@ async fn ready(args: &[String]) -> Result<()> {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     println!("RESULT {} instance(s) ready in the background {}", ids.len(), secs(t.elapsed()));
+    Ok(())
+}
+
+async fn close_times(id: &str, times: usize) -> Result<()> {
+    let mut s = settings::get().await;
+    s.memory_mb = 2048;
+    for n in 0..times.max(1) {
+        MARKS.lock().unwrap().clear();
+        let auth = LaunchAuth { account_id: "offline-test".into(), username: "ResinTester".into(), uuid: "00000000-0000-0000-0000-000000000000".into(), access_token: "0".into(), user_type: "legacy", xuid: None };
+        let hooks = launch::LaunchHooks {
+            on_started: Some(Box::new(|| mark("hook started"))),
+            on_closing: Some(Box::new(|| mark("hook closing"))),
+            on_exit: Some(Box::new(|_| mark("hook exit"))),
+        };
+        let play = Instant::now();
+        launch::launch_instance(id, &s, auth, hooks).await?;
+        // Up: the last texture atlas, then quiet for 5 s.
+        let deadline = Instant::now() + Duration::from_secs(180);
+        loop {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            let last_atlas = MARKS.lock().unwrap().iter().rev().find(|m| m.0 == "log atlas").map(|m| m.1);
+            if last_atlas.is_some_and(|t| t.elapsed() > Duration::from_secs(5)) || Instant::now() > deadline {
+                break;
+            }
+        }
+        let pid = launch::game_processes().into_iter().find(|g| g.instance_id == id).map(|g| g.pid).ok_or_else(|| anyhow!("the game isn't running"))?;
+        // When Windows says the process is gone, watched apart from the launcher.
+        #[cfg(windows)]
+        std::thread::spawn(move || unsafe {
+            use windows::Win32::System::Threading::{OpenProcess, WaitForSingleObject, INFINITE, PROCESS_SYNCHRONIZE};
+            if let Ok(h) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) {
+                WaitForSingleObject(h, INFINITE);
+                mark("os exited");
+                let _ = windows::Win32::Foundation::CloseHandle(h);
+            }
+        });
+        // What a click on the window's X does.
+        let close = Instant::now();
+        std::process::Command::new("taskkill").args(["/PID", &pid.to_string()]).output()?;
+        let _ = tokio::time::timeout(Duration::from_secs(60), STOPPED.notified()).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let marks = MARKS.lock().unwrap().clone();
+        let at = |what: &str, after: Instant| marks.iter().find(|m| m.0 == what && m.1 >= after).map(|m| m.1);
+        let since = |t: Option<Instant>, from: Instant| t.map(|t| format!("{:.2}s", t.duration_since(from).as_secs_f64())).unwrap_or_else(|| "never".into());
+        let exited = at("log exited", close);
+        println!(
+            "RESULT close #{}  open: Play → running event {}, → started hook {}  |  close: X → Stopping! {}, → launcher told (closing hook) {}, → Windows says gone {}, → exit logged {}, → stopped event {}, → exit hook {}  |  gone → exit hook {}",
+            n + 1,
+            since(at("event running", play), play),
+            since(at("hook started", play), play),
+            since(at("log Stopping!", close), close),
+            since(at("hook closing", close), close),
+            since(at("os exited", close), close),
+            since(exited, close),
+            since(at("event stopped", close), close),
+            since(at("hook exit", close), close),
+            at("os exited", close).map(|e| since(at("hook exit", e), e)).unwrap_or_else(|| "?".into()),
+        );
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
     Ok(())
 }
 

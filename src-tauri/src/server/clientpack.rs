@@ -194,6 +194,8 @@ pub async fn install(req: InstallReq) -> Result<String> {
     let inst = sources::import_modpack_file(&file).await;
     let _ = tokio::fs::remove_file(&file).await;
     let inst = inst?;
+    // Its game files (started while the pack installed) are on their way.
+    crate::game::launch::get_ready(&inst.id);
     known.packs.insert(req.id, (inst.id.clone(), sha));
     write_json(&installed_file(), &known).await?;
     Ok(inst.id)
