@@ -4265,7 +4265,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "새 토큰을 만들었습니다. 예전 토큰으로 설정한 어시스턴트는 새 토큰이 필요합니다.",
   "settings.mcp.copied": "복사됨",
   "settings.freeMemory": "숨겨져 있을 때 메모리 비우기",
-  "settings.freeMemory.hint": "창이 트레이에 숨겨져 있거나 게임 중일 때 ResinCraft는 30초 후 창을 닫고 약 240MB 대신 약 30MB만 사용합니다. 다시 여는 데는 1초 정도 걸립니다. 다른 프로그램이 앞에 있거나 1분 동안 PC를 사용하지 않으면 돌아올 때까지 메모리 대부분도 돌려줍니다.",
+  "settings.freeMemory.hint": "창이 트레이에 숨겨져 있거나 게임 중일 때 ResinCraft는 30초 후 창을 닫고 약 240MB 대신 약 30MB만 사용합니다. 다시 여는 데는 1초 정도 걸립니다. 다른 프로그램이 앞에 있으면 돌아올 때까지 메모리 대부분도 돌려주고, 사용하는 동안에도 메모리를 적게 유지합니다.",
   "instance.content.local": "로컬 파일",
   "instance.content.localHint": "Modrinth나 CurseForge가 아니라 PC에서 추가해서 ResinCraft가 업데이트를 확인할 수 없습니다.",
   // welcome

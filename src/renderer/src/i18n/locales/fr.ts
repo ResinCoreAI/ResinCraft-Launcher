@@ -4333,7 +4333,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "Nouveau jeton créé. Les assistants configurés avec l'ancien ont besoin du nouveau.",
   "settings.mcp.copied": "Copié",
   "settings.freeMemory": "Libérer la mémoire une fois masqué",
-  "settings.freeMemory.hint": "Quand la fenêtre est cachée dans la zone de notification ou pendant que vous jouez, ResinCraft la ferme au bout de 30 secondes et utilise environ 30 Mo au lieu d'environ 240 Mo ; la rouvrir prend une seconde. Quand un autre programme est au premier plan, ou que personne n'utilise le PC pendant une minute, il libère aussi la plus grande partie de sa mémoire jusqu'à votre retour.",
+  "settings.freeMemory.hint": "Quand la fenêtre est cachée dans la zone de notification ou pendant que vous jouez, ResinCraft la ferme au bout de 30 secondes et utilise environ 30 Mo au lieu d'environ 240 Mo ; la rouvrir prend une seconde. Quand un autre programme est au premier plan, il libère aussi la plus grande partie de sa mémoire jusqu'à votre retour, et pendant que vous l'utilisez, il garde sa mémoire basse.",
   "instance.content.local": "Fichier local",
   "instance.content.localHint": "Ajouté depuis votre PC, pas depuis Modrinth ou CurseForge : ResinCraft ne peut pas chercher de mises à jour.",
   // welcome

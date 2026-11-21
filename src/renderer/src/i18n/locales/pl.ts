@@ -4364,7 +4364,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "Utworzono nowy token. Asystenci ustawieni ze starym potrzebują nowego.",
   "settings.mcp.copied": "Skopiowano",
   "settings.freeMemory": "Zwalniaj pamięć, gdy ukryty",
-  "settings.freeMemory.hint": "Gdy okno jest ukryte w zasobniku lub podczas gry, ResinCraft zamyka je po 30 sekundach i używa około 30 MB zamiast około 240 MB; ponowne otwarcie trwa sekundę. Gdy inny program jest na wierzchu albo nikt nie używa komputera przez minutę, oddaje też większość swojej pamięci, dopóki nie wrócisz.",
+  "settings.freeMemory.hint": "Gdy okno jest ukryte w zasobniku lub podczas gry, ResinCraft zamyka je po 30 sekundach i używa około 30 MB zamiast około 240 MB; ponowne otwarcie trwa sekundę. Gdy inny program jest na wierzchu, oddaje też większość swojej pamięci, dopóki nie wrócisz, a gdy z niego korzystasz, utrzymuje niskie zużycie pamięci.",
   "instance.content.local": "Plik lokalny",
   "instance.content.localHint": "Dodany z Twojego PC, nie z Modrinth ani CurseForge, więc ResinCraft nie sprawdzi aktualizacji.",
   // welcome

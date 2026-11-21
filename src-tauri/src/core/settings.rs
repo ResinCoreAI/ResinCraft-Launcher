@@ -73,6 +73,7 @@ pub struct Settings {
     pub tray: bool,
     /// Out of sight for a while (in the tray, or hidden while a game runs), the window closes completely and
     /// WebView2's ~200 MB go back to Windows; it opens again in a second when it's wanted (Settings → Appearance).
+    /// While it's used, its page runs at WebView2's low memory level too (`webview::lean_in_use`).
     pub free_memory_hidden: bool,
     /// When the same mod is on Modrinth and CurseForge: "ask" | "modrinth" | "curseforge" (Settings → Downloads,
     /// or "Don't ask again" in the duplicate dialog).
@@ -250,7 +251,12 @@ pub async fn set(patch: Value) -> Result<Settings> {
     let s: Settings = serde_json::from_value(current)?;
     crate::game::commands::check_env(&s.env)?;
     write_json(&paths::settings_file(), &s).await?;
+    let lean_changed = CACHE.lock().unwrap().as_ref().is_some_and(|old| old.free_memory_hidden != s.free_memory_hidden);
     *CACHE.lock().unwrap() = Some(s.clone());
+    if lean_changed {
+        // Turned on or off from Settings, so the window is in use: its level for that changes at once.
+        crate::webview::set_low_memory(false);
+    }
     crate::tray::sync(s.tray);
     crate::remote::sync(s.remote_control);
     crate::mcp::sync(s.mcp, s.mcp_port);

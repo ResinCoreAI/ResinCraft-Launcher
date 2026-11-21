@@ -94,6 +94,7 @@ pub fn run() {
                 }
             }
             tauri::async_runtime::spawn(discord::init());
+            webview::started();
             tauri::async_runtime::spawn(server::discordbot::init());
             tauri::async_runtime::spawn(remote::init());
             tauri::async_runtime::spawn(mcp::init());
@@ -113,8 +114,8 @@ pub fn run() {
         .expect("error while running ResinCraft")
         .run(|app, event| {
             // Tray mode: the close button hides the window; ResinCraft goes on in the background.
-            // Looked at again (from the tray, the taskbar, or after another program): back to normal memory; left for
-            // another program: little memory (see `webview::focus_changed`).
+            // Looked at again (from the tray, the taskbar, or after another program): the memory level for using it;
+            // left for another program: little memory (see `webview::focus_changed`).
             if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(focused), .. } = &event {
                 if label == "main" {
                     webview::focus_changed(*focused);

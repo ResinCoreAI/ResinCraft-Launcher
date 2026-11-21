@@ -17,7 +17,7 @@ import {
 import { OpenLinks } from './components/OpenLinks'
 import { useGamepad } from './gamepad'
 import { bigScreenPrefs, setBigScreen, toggleBigScreen, useBigScreen } from './bigScreen'
-import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'react'
 import type { AccountView } from '@shared/types'
 import { ACCOUNT_KIND_SHORT, Avatar, ContextMenuHost, Dock, Logo, openMenuBelow, type ContextEntry } from './components/ui'
 import DropImport from './components/DropImport'
@@ -49,23 +49,52 @@ import { useAdminStatus } from './adminStatus'
 import { useStoreOpen } from './storeStatus'
 import { decideWelcome, useWelcome } from './welcomeState'
 
+/**
+ * A page whose code loads apart from the launcher's start: on its first visit, or before that with `preload`. Once
+ * its code is in, the page shows at once; a page still loading would show only after React's 300 ms wait.
+ */
+function page<P extends object>(load: () => Promise<{ default: ComponentType<P> }>) {
+  let loaded: ComponentType<P> | undefined
+  const get = () => load().then((m) => ((loaded = m.default), m))
+  const Lazy = lazy(get)
+  const Page = (props: P) => {
+    const Shown = loaded ?? Lazy
+    return <Shown {...props} />
+  }
+  Page.preload = () => void get().catch(() => {})
+  return Page
+}
+
 // Home and the Library are where the launcher opens; every other page (and what only it uses, like the theme
-// editor in Settings) loads on its first visit, so starting up parses less.
-const Servers = lazy(() => import('./pages/Servers'))
-const BigScreen = lazy(() => import('./components/BigScreen'))
-const InstancePage = lazy(() => import('./pages/InstancePage'))
-const Discover = lazy(() => import('./pages/Discover'))
-const QuickJoin = lazy(() => import('./pages/QuickJoin'))
-const Accounts = lazy(() => import('./pages/Accounts'))
-const Bedrock = lazy(() => import('./pages/Bedrock'))
+// editor in Settings) is read a moment after the start (`preloadPages`), so starting up parses less and a page
+// still opens at once.
+const Servers = page(() => import('./pages/Servers'))
+const BigScreen = page(() => import('./components/BigScreen'))
+const InstancePage = page(() => import('./pages/InstancePage'))
+const Discover = page(() => import('./pages/Discover'))
+const QuickJoin = page(() => import('./pages/QuickJoin'))
+const Accounts = page(() => import('./pages/Accounts'))
+const Bedrock = page(() => import('./pages/Bedrock'))
 const Horizon = lazy(() => import('./pages/Horizon'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const SettingsPage = page(() => import('./pages/SettingsPage'))
 const StorePage = lazy(() => import('./pages/Store'))
-const FindServers = lazy(() => import('./pages/FindServers'))
+const FindServers = page(() => import('./pages/FindServers'))
 const Report = lazy(() => import('./pages/Report'))
 const Admin = lazy(() => import('./pages/Admin'))
 // Only a brand-new launcher (or Settings → About) ever shows it.
 const Welcome = lazy(() => import('./components/Welcome'))
+
+/** The pages the header and an instance open, read one by one while the launcher has nothing else to do. */
+function preloadPages() {
+  const pages = [InstancePage, Discover, SettingsPage, Servers, QuickJoin, FindServers, Accounts, Bedrock, BigScreen]
+  const next = () => {
+    const p = pages.shift()
+    if (!p) return
+    p.preload()
+    requestIdleCallback(next, { timeout: 2000 })
+  }
+  window.setTimeout(() => requestIdleCallback(next, { timeout: 2000 }), 1500)
+}
 
 /**
  * The header's pages, in three groups: `play` (what you already have) and `get` (where more comes from) are its
@@ -109,6 +138,7 @@ export default function App() {
   const welcome = useWelcome()
   useEffect(() => {
     if (ready) decideWelcome(!accounts.length && !instances.length)
+    if (ready) preloadPages()
   }, [ready])
   useRemoteActions()
   // Discord's presence while no game runs says what the player is doing here (discord.rs `page_lines`). Sent once

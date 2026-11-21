@@ -4260,7 +4260,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "已生成新令牌。用旧令牌配置的助手需要换成新的。",
   "settings.mcp.copied": "已复制",
   "settings.freeMemory": "隐藏时释放内存",
-  "settings.freeMemory.hint": "当窗口隐藏在托盘中或你在玩游戏时，ResinCraft 会在 30 秒后关闭窗口，内存从约 240 MB 降到约 30 MB；再次打开大约需要一秒。当其他程序在前台，或电脑一分钟没人使用时，它也会释放大部分内存，直到你回来。",
+  "settings.freeMemory.hint": "当窗口隐藏在托盘中或你在玩游戏时，ResinCraft 会在 30 秒后关闭窗口，内存从约 240 MB 降到约 30 MB；再次打开大约需要一秒。当其他程序在前台时，它也会释放大部分内存，直到你回来；你使用它时，也会保持较低的内存占用。",
   "instance.content.local": "本地文件",
   "instance.content.localHint": "从你的电脑添加，不是来自 Modrinth 或 CurseForge，所以 ResinCraft 无法检查更新。",
   // welcome

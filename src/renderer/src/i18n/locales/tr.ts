@@ -4283,7 +4283,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "Yeni belirteç oluşturuldu. Eskisiyle kurulan asistanların yenisine ihtiyacı var.",
   "settings.mcp.copied": "Kopyalandı",
   "settings.freeMemory": "Gizliyken belleği boşalt",
-  "settings.freeMemory.hint": "Pencere sistem tepsisinde gizliyken ya da oynarken ResinCraft onu 30 saniye sonra kapatır ve yaklaşık 240 MB yerine yaklaşık 30 MB kullanır; yeniden açmak bir saniye sürer. Önde başka bir program varken ya da bilgisayar bir dakika kullanılmazsa, sen dönene kadar belleğinin çoğunu da geri verir.",
+  "settings.freeMemory.hint": "Pencere sistem tepsisinde gizliyken ya da oynarken ResinCraft onu 30 saniye sonra kapatır ve yaklaşık 240 MB yerine yaklaşık 30 MB kullanır; yeniden açmak bir saniye sürer. Önde başka bir program varken, sen dönene kadar belleğinin çoğunu da geri verir; sen kullanırken de belleğini düşük tutar.",
   "instance.content.local": "Yerel dosya",
   "instance.content.localHint": "Modrinth veya CurseForge'dan değil, bilgisayarından eklendi; bu yüzden ResinCraft güncellemelerini denetleyemez.",
   // welcome
