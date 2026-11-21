@@ -39,16 +39,62 @@ pub fn body_of(err: &anyhow::Error) -> Option<&str> {
     err.downcast_ref::<HttpError>().map(|e| e.body.as_str())
 }
 
+/// How long a request or download may go without a single byte arriving before it's given up on. The HTTP client
+/// only has a connect timeout, so a connection that went quiet midway used to be waited on forever: Forge's Maven
+/// did that to installer downloads (a 26.3 server's installer stopped at 2.2 of its 8 MB, and the server was
+/// "being made" until the launcher closed; a Forge modpack's preparation stopped the same way). A file download
+/// that stalls is tried again from where it stopped.
+const STALL: Duration = Duration::from_secs(30);
+
+/// A connection that went quiet for `STALL` (see there).
+#[derive(Debug)]
+pub struct Stalled {
+    pub url: String,
+}
+
+impl fmt::Display for Stalled {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Nothing arrived for {} seconds from {}", STALL.as_secs(), self.url)
+    }
+}
+impl std::error::Error for Stalled {}
+
+/// `step` (sending a request, or reading the next piece of an answer), or a `Stalled` error once nothing has come
+/// for `STALL`.
+pub(crate) async fn unless_stalled<T, E: Into<anyhow::Error>>(url: &str, step: impl std::future::Future<Output = std::result::Result<T, E>>) -> Result<T> {
+    match tokio::time::timeout(STALL, step).await {
+        Ok(r) => r.map_err(Into::into),
+        Err(_) => Err(Stalled { url: url.to_string() }.into()),
+    }
+}
+
+/// The whole body of `res`, giving up when it stalls (`res.bytes()` would wait forever).
+async fn body_bytes(mut res: reqwest::Response) -> Result<Vec<u8>> {
+    let url = res.url().to_string();
+    let mut out = Vec::with_capacity(res.content_length().unwrap_or(0).min(16 << 20) as usize);
+    while let Some(piece) = unless_stalled(&url, res.chunk()).await? {
+        out.extend_from_slice(&piece);
+    }
+    Ok(out)
+}
+
+/// The body of an answer that failed, as text, for the error; empty if it doesn't come.
+async fn error_body(res: reqwest::Response) -> String {
+    body_bytes(res).await.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default()
+}
+
 /// Sends a request and parses the JSON response; non-2xx becomes an `HttpError`.
 pub async fn send_json<T: DeserializeOwned>(req: reqwest::RequestBuilder) -> Result<T> {
-    let res = req.header("Accept", "application/json").send().await?;
+    let req = req.header("Accept", "application/json");
+    let label = req.try_clone().and_then(|r| r.build().ok()).map(|r| r.url().to_string()).unwrap_or_default();
+    let res = unless_stalled(&label, req.send()).await?;
     let status = res.status();
     let url = res.url().to_string();
     if !status.is_success() {
-        let body = res.text().await.unwrap_or_default();
+        let body = error_body(res).await;
         return Err(HttpError { status: status.as_u16(), url, body }.into());
     }
-    let bytes = res.bytes().await?;
+    let bytes = body_bytes(res).await?;
     serde_json::from_slice(&bytes).map_err(|_| err_tr!("download.unexpectedResponse", "Unexpected response from {url}", url = url))
 }
 
@@ -62,13 +108,14 @@ pub async fn post_json<T: DeserializeOwned, B: Serialize + ?Sized>(url: &str, bo
 
 /// GETs a URL as text (XML metadata, plain-text endpoints); non-2xx becomes an `HttpError`.
 pub async fn fetch_text(url: &str) -> Result<String> {
-    let res = http().get(url).send().await?;
+    let res = unless_stalled(url, http().get(url).send()).await?;
     let status = res.status();
     if !status.is_success() {
-        let body = res.text().await.unwrap_or_default();
+        let body = error_body(res).await;
         return Err(HttpError { status: status.as_u16(), url: url.to_string(), body }.into());
     }
-    Ok(res.text().await?)
+    let bytes = body_bytes(res).await?;
+    Ok(String::from_utf8(bytes).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -533,7 +580,7 @@ async fn try_download(item: &DownloadItem, tmp: &Path, have: u64) -> Result<()> 
     if have > 0 {
         request = request.header(reqwest::header::RANGE, format!("bytes={have}-")).header(reqwest::header::ACCEPT_ENCODING, "identity");
     }
-    let mut res = request.send().await?;
+    let mut res = unless_stalled(&item.url, request.send()).await?;
     if !res.status().is_success() {
         return Err(HttpError { status: res.status().as_u16(), url: item.url.clone(), body: String::new() }.into());
     }
@@ -551,7 +598,7 @@ async fn try_download(item: &DownloadItem, tmp: &Path, have: u64) -> Result<()> 
     if !resumed && res.content_length().is_some_and(|n| n <= WHOLE_IN_MEMORY) {
         let mut pieces = Vec::new();
         loop {
-            match res.chunk().await {
+            match unless_stalled(&item.url, res.chunk()).await {
                 Ok(Some(piece)) => pieces.push(piece),
                 Ok(None) => break,
                 Err(e) => {
@@ -559,7 +606,7 @@ async fn try_download(item: &DownloadItem, tmp: &Path, have: u64) -> Result<()> 
                     if pieces.iter().any(|p| !p.is_empty()) {
                         let _ = tokio::fs::write(tmp, pieces.concat()).await;
                     }
-                    return Err(e.into());
+                    return Err(e);
                 }
             }
         }
@@ -606,7 +653,7 @@ async fn try_download(item: &DownloadItem, tmp: &Path, have: u64) -> Result<()> 
     let mut idle = Some((file, hashing));
     let mut busy: Option<tokio::task::JoinHandle<std::io::Result<(std::fs::File, Option<RunningHash>)>>> = None;
     loop {
-        match res.chunk().await {
+        match unless_stalled(&item.url, res.chunk()).await {
             Ok(Some(piece)) => {
                 let (mut file, mut hashing) = match busy.take() {
                     Some(write) => write.await??,
@@ -630,7 +677,7 @@ async fn try_download(item: &DownloadItem, tmp: &Path, have: u64) -> Result<()> 
                 if !can_resume {
                     let _ = tokio::fs::remove_file(tmp).await;
                 }
-                return Err(e.into());
+                return Err(e);
             }
         }
     }

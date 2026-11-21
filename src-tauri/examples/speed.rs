@@ -279,6 +279,71 @@ async fn serve_in_pieces(listener: tokio::net::TcpListener, body: Arc<Vec<u8>>, 
     }
 }
 
+/// A server that goes quiet instead of closing: each connection gets at most `piece` more bytes of the file (from
+/// where `Range` says) and then nothing more, with the connection left open, as Forge's Maven did to installer
+/// downloads. With `mute_first`, the first connection doesn't even get an answer.
+async fn serve_and_stall(listener: tokio::net::TcpListener, body: Arc<Vec<u8>>, piece: usize, mute_first: bool, requests: Arc<Mutex<Vec<String>>>) {
+    let mut first = true;
+    loop {
+        let Ok((mut sock, _)) = listener.accept().await else { return };
+        let (body, requests, mute) = (body.clone(), requests.clone(), mute_first && first);
+        first = false;
+        tokio::spawn(async move {
+            let mut buf: Vec<u8> = Vec::new();
+            let mut tmp = [0u8; 4096];
+            while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                match sock.read(&mut tmp).await {
+                    Ok(n) if n > 0 => buf.extend_from_slice(&tmp[..n]),
+                    _ => return,
+                }
+            }
+            let head = String::from_utf8_lossy(&buf).to_lowercase();
+            let from: usize = head.lines().find_map(|l| l.strip_prefix("range: bytes=")).and_then(|r| r.trim().trim_end_matches('-').parse().ok()).unwrap_or(0);
+            requests.lock().unwrap().push(format!("from {from}"));
+            if !mute {
+                let rest = &body[from.min(body.len())..];
+                let h = match from {
+                    0 => format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", rest.len()),
+                    _ => format!("HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {from}-{}/{}\r\n\r\n", rest.len(), body.len() - 1, body.len()),
+                };
+                let _ = sock.write_all(h.as_bytes()).await;
+                let _ = sock.write_all(&rest[..rest.len().min(piece)]).await;
+                let _ = sock.flush().await;
+                if rest.len() <= piece {
+                    return;
+                }
+            }
+            // Open and silent until the client gives up on it.
+            let _ = sock.read(&mut tmp).await;
+        });
+    }
+}
+
+async fn stall_faults(dir: &Path, check: &mut impl FnMut(&str, bool, String)) -> Result<()> {
+    use resincraft_lib::core::net::download_file;
+    // Small (received whole in memory) and big (written as it arrives), each going quiet partway twice; and a file
+    // whose first request is never answered.
+    for (label, len, piece, mute_first) in [("small", 200_000usize, 90_000usize, false), ("big", 3_000_000, 1_200_000, false), ("unanswered", 500_000, 500_000, true)] {
+        let body = Arc::new(noise(len as u64 + 7, len));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let port = listener.local_addr()?.port();
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let server = tokio::spawn(serve_and_stall(listener, body.clone(), piece, mute_first, requests.clone()));
+        let dest = dir.join(format!("stall-{label}.bin"));
+        let item = DownloadItem::new(format!("http://127.0.0.1:{port}/f"), &dest).hash(Some(Hash::sha1(hash_bytes(&body, HashAlgo::Sha1)))).size(Some(len as u64));
+        let t = Instant::now();
+        // Before the fix this never returned; the outer limit turns that into a failure instead of a hang.
+        let res = tokio::time::timeout(Duration::from_secs(300), download_file(&item)).await;
+        let took = t.elapsed();
+        let asked = requests.lock().unwrap().clone();
+        let whole = std::fs::read(&dest).map(|b| b == *body).unwrap_or(false);
+        let ok = matches!(res, Ok(Ok(()))) && whole;
+        check(&format!("{label} file from a host that goes quiet arrives whole"), ok, format!("{} in {:.0} s, requests {asked:?}", if ok { "done" } else { "not done" }, took.as_secs_f64()));
+        server.abort();
+    }
+    Ok(())
+}
+
 async fn faults() -> Result<()> {
     use resincraft_lib::core::net::download_file;
     let dir = paths::cache().join("speed-faults");
@@ -358,6 +423,11 @@ async fn faults() -> Result<()> {
     let res = download_all(items, 4, |done, total| seen.lock().unwrap().push((done, total))).await;
     let seen = seen.into_inner().unwrap();
     check("files already there are counted without downloading", res.is_ok() && seen.first() == Some(&(0, 2)) && seen.last() == Some(&(2, 2)), format!("{seen:?}"));
+
+    // Hosts that go quiet (about a minute and a half: each stall waits out the timeout). RESIN_SPEED_NO_STALLS=1 skips it.
+    if std::env::var("RESIN_SPEED_NO_STALLS").is_err() {
+        stall_faults(&dir, &mut check).await?;
+    }
 
     let _ = tokio::fs::remove_dir_all(&dir).await;
     if failed > 0 {

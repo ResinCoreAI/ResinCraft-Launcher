@@ -277,6 +277,33 @@ static PREPARING: Mutex<Option<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = 
 /// every Play and then finds everything in place. Quiet when it can't finish (offline, no Java to be had): Play
 /// says what's wrong when it's pressed.
 pub fn get_ready(id: &str) {
+    if STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).remove(id).is_some() {
+        return;
+    }
+    start_getting_ready(id);
+}
+
+/// Instances whose `get_ready` began while their modpack was still being installed (`get_ready_early`), so the
+/// one at the end of the install isn't run a second time, and a failed or cancelled install can stop it.
+static STARTED_EARLY: Mutex<Option<HashMap<String, tokio::task::AbortHandle>>> = Mutex::new(None);
+
+/// `get_ready` at once, for a modpack instance whose Minecraft version and mod loader are already settled while its
+/// mods are still downloading: the game's own files come at the same time instead of after the last mod (the
+/// install's own call to `get_ready` then does nothing). A failed or cancelled install stops it
+/// (`stop_getting_ready`).
+pub fn get_ready_early(id: &str) {
+    let handle = start_getting_ready(id);
+    STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.to_string(), handle);
+}
+
+/// Stops a `get_ready_early` whose instance is being thrown away (its task shows as cancelled).
+pub fn stop_getting_ready(id: &str) {
+    if let Some(handle) = STARTED_EARLY.lock().unwrap().get_or_insert_with(HashMap::new).remove(id) {
+        handle.abort();
+    }
+}
+
+fn start_getting_ready(id: &str) -> tokio::task::AbortHandle {
     let id = id.to_string();
     tokio::spawn(async move {
         let Ok(inst) = instances::get(&id).await else { return };
@@ -296,7 +323,8 @@ pub fn get_ready(id: &str) {
             let _ = tokio::fs::remove_dir_all(natives_for(&id, 1)).await;
             let _ = tokio::fs::remove_dir(paths::instance_dir(&id)).await;
         }
-    });
+    })
+    .abort_handle()
 }
 
 async fn prepare(inst: &Instance, settings: &Settings, natives: PathBuf, task: &Arc<Task>) -> Result<Prepared> {

@@ -306,6 +306,8 @@ pub async fn install(listing_id: &str, plan_url: &str) -> Result<String> {
             instances::create(new, |_| {}).await?
         }
     };
+    // Minecraft and the loader come while the owner's files download (a modpack's started already).
+    crate::game::launch::get_ready(&inst.id);
     let game = paths::game_dir(&inst.id);
 
     // What the owner took out of the modpack.

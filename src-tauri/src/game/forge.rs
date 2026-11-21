@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::core::fsutil::{read_json, safe_join, write_json};
-use crate::core::net::{download_all, download_file, hash_file, status_of, DownloadItem, HashAlgo};
+use crate::core::net::{download_all, download_file, hash_file, status_of, DownloadItem, Hash, HashAlgo};
 use crate::core::paths;
 use crate::core::text::Text;
 use crate::core::types::LoaderType;
@@ -305,6 +305,10 @@ async fn install_from(mc: &str, name: &str, installer: &Path, work: &Path, ctx: 
             }
         }
         let args = p.args.iter().flatten().map(|a| sub(a)).collect::<Result<Vec<_>>>()?;
+        if let Some(item) = mojmaps_download(&p.jar, &args, &vanilla) {
+            download_all(vec![item], 1, |_, _| {}).await?;
+            continue;
+        }
         let main = main_class_of(&jar).await?;
         run_processor(&java, &classpath, &main, &args, name).await?;
         if !outputs.is_empty() && !outputs_valid(&outputs).await {
@@ -471,6 +475,27 @@ async fn fetch_legacy_lib(mut lib: Library, forge_lib: &str) -> Result<Option<Li
     Err(last.unwrap_or_else(|| anyhow!("{} couldn't be downloaded", lib.name)))
 }
 
+/// The installer tools' `DOWNLOAD_MOJMAPS` step (Forge 1.17–1.21) only downloads Mojang's mappings for the version:
+/// done here instead, with the launcher's downloader, saving a Java start (and a download with no timeout). None for
+/// any other step, or when the version has no mappings to point at; the step then runs as it is.
+fn mojmaps_download(jar: &str, args: &[String], vanilla: &VersionJson) -> Option<DownloadItem> {
+    if !jar.starts_with("net.minecraftforge:installertools:") {
+        return None;
+    }
+    let value = |flag: &str| args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1));
+    if value("--task").map(String::as_str) != Some("DOWNLOAD_MOJMAPS") {
+        return None;
+    }
+    // Only the version being installed: another would need its own version JSON.
+    if value("--version").is_some_and(|v| *v != vanilla.id) {
+        return None;
+    }
+    let side = value("--side").map(String::as_str).unwrap_or("client");
+    let out = value("--output")?;
+    let f = vanilla.downloads.as_ref()?.get(&format!("{side}_mappings"))?;
+    (!f.url.is_empty()).then(|| DownloadItem::new(&f.url, PathBuf::from(out)).hash(f.sha1.clone().map(Hash::sha1)).size(f.size))
+}
+
 async fn pick_java(major: u32, ctx: &ResolveContext) -> Result<String> {
     if let Some(java) = &ctx.java {
         return java(major).await;
@@ -520,4 +545,43 @@ async fn run_processor(java: &str, classpath: &[PathBuf], main_class: &str, args
     let tail = lines[lines.len().saturating_sub(15)..].join("\n");
     let code = out.status.code().map(|c| c.to_string()).unwrap_or_else(|| "null".into());
     bail_tr!("forge.processorFailed", "Installing {name} failed ({main_class} exited with code {code}):\n{tail}", name = name, main_class = main_class, code = code, tail = tail)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn vanilla() -> VersionJson {
+        serde_json::from_value(serde_json::json!({
+            "id": "1.20.1",
+            "downloads": { "client_mappings": { "url": "https://piston-data.mojang.com/m.txt", "sha1": "abc", "size": 42 } }
+        }))
+        .unwrap()
+    }
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn mojmaps_step_becomes_a_download() {
+        let a = args(&["--task", "DOWNLOAD_MOJMAPS", "--version", "1.20.1", "--side", "client", "--output", "/libs/maps.txt"]);
+        let item = mojmaps_download("net.minecraftforge:installertools:1.4.1", &a, &vanilla()).expect("a download");
+        assert_eq!(item.url, "https://piston-data.mojang.com/m.txt");
+        assert_eq!(item.dest, PathBuf::from("/libs/maps.txt"));
+        assert_eq!(item.hash.map(|h| h.value).as_deref(), Some("abc"));
+        assert_eq!(item.size, Some(42));
+    }
+
+    #[test]
+    fn other_steps_still_run() {
+        let v = vanilla();
+        let tools = "net.minecraftforge:installertools:1.4.1";
+        // Another task, another tool, another version, a side with no mappings, no output.
+        assert!(mojmaps_download(tools, &args(&["--task", "MCP_DATA", "--output", "/x"]), &v).is_none());
+        assert!(mojmaps_download("net.minecraftforge:jarsplitter:1.1.4", &args(&["--task", "DOWNLOAD_MOJMAPS", "--output", "/x"]), &v).is_none());
+        assert!(mojmaps_download(tools, &args(&["--task", "DOWNLOAD_MOJMAPS", "--version", "1.19.2", "--output", "/x"]), &v).is_none());
+        assert!(mojmaps_download(tools, &args(&["--task", "DOWNLOAD_MOJMAPS", "--side", "server", "--output", "/x"]), &v).is_none());
+        assert!(mojmaps_download(tools, &args(&["--task", "DOWNLOAD_MOJMAPS"]), &v).is_none());
+    }
 }
