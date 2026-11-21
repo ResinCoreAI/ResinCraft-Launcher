@@ -35,6 +35,30 @@ use tauri::{AppHandle, Manager};
 /// that crashes at start doesn't pay for a reload.
 const UNLOAD_AFTER: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// How long the launcher may be out of focus (the player is in another program) before its page is asked to use
+/// little memory.
+const TRIM_AFTER_BLUR: std::time::Duration = std::time::Duration::from_secs(5);
+/// Bumped whenever the main window gains or loses focus, so a trim planned before that is called off.
+static FOCUS: AtomicU64 = AtomicU64::new(0);
+
+/// The main window gained or lost focus. Focused: normal memory at once. Unfocused for `TRIM_AFTER_BLUR` (another
+/// program in front, the launcher still open behind it): WebView2's low memory level, which gives back most of the
+/// page's memory (Task Manager went from about 105 MB to 13-32 MB for the whole launcher) and takes it back as soon as
+/// the window is used again. Part of Settings → Appearance → Free memory while hidden.
+pub fn focus_changed(focused: bool) {
+    let generation = FOCUS.fetch_add(1, Ordering::SeqCst) + 1;
+    if focused {
+        set_low_memory(false);
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(TRIM_AFTER_BLUR).await;
+        if FOCUS.load(Ordering::SeqCst) == generation && crate::core::settings::free_memory_hidden() {
+            set_low_memory(true);
+        }
+    });
+}
+
 /// The main window is closed to save memory (not quit): the app keeps running and `show` opens it again.
 static UNLOADED: AtomicBool = AtomicBool::new(false);
 /// Bumped whenever the window is shown, so an unload planned before that is called off.
