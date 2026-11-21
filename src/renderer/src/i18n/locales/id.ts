@@ -4273,7 +4273,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "Token baru dibuat. Asisten yang memakai token lama butuh yang baru.",
   "settings.mcp.copied": "Disalin",
   "settings.freeMemory": "Bebaskan memori saat disembunyikan",
-  "settings.freeMemory.hint": "Saat jendela disembunyikan di tray atau selagi kamu bermain, ResinCraft menutupnya setelah 30 detik dan memakai sekitar 30 MB, bukan sekitar 240 MB. Membukanya lagi butuh satu detik.",
+  "settings.freeMemory.hint": "Saat jendela disembunyikan di tray atau saat kamu bermain, ResinCraft menutupnya setelah 30 detik dan memakai sekitar 30 MB, bukan sekitar 240 MB; membukanya lagi butuh sedetik. Saat program lain ada di depan, atau PC tidak dipakai selama satu menit, ResinCraft juga melepas sebagian besar memorinya sampai kamu kembali.",
   "instance.content.local": "File lokal",
   "instance.content.localHint": "Ditambahkan dari PC kamu, bukan dari Modrinth atau CurseForge, jadi ResinCraft tidak bisa mengecek pembaruannya.",
   // welcome

@@ -4260,7 +4260,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "已產生新權杖。用舊權杖設定的助理需要換成新的。",
   "settings.mcp.copied": "已複製",
   "settings.freeMemory": "隱藏時釋放記憶體",
-  "settings.freeMemory.hint": "視窗隱藏到系統匣或你在玩遊戲時，ResinCraft 會在 30 秒後關閉視窗，占用約 30 MB 而不是約 240 MB。重新開啟需要一秒左右。",
+  "settings.freeMemory.hint": "當視窗隱藏在系統匣中或你在玩遊戲時，ResinCraft 會在 30 秒後關閉視窗，記憶體從約 240 MB 降到約 30 MB；再次開啟大約需要一秒。當其他程式在前景，或電腦一分鐘沒人使用時，它也會釋出大部分記憶體，直到你回來。",
   "instance.content.local": "本機檔案",
   "instance.content.localHint": "從你的電腦加入，不是來自 Modrinth 或 CurseForge，所以 ResinCraft 無法檢查更新。",
   // welcome

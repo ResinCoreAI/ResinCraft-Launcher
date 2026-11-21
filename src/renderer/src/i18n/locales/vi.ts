@@ -4270,7 +4270,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "Đã tạo mã mới. Trợ lý đã cài bằng mã cũ cần mã mới.",
   "settings.mcp.copied": "Đã sao chép",
   "settings.freeMemory": "Giải phóng bộ nhớ khi ẩn",
-  "settings.freeMemory.hint": "Khi cửa sổ bị ẩn xuống khay hệ thống hoặc trong lúc bạn chơi, ResinCraft đóng nó sau 30 giây và chỉ dùng khoảng 30 MB thay vì khoảng 240 MB. Mở lại mất khoảng một giây.",
+  "settings.freeMemory.hint": "Khi cửa sổ bị ẩn trong khay hệ thống hoặc lúc bạn chơi, ResinCraft đóng nó sau 30 giây và chỉ dùng khoảng 30 MB thay vì khoảng 240 MB; mở lại mất khoảng một giây. Khi một chương trình khác đang ở phía trước, hoặc không ai dùng máy trong một phút, nó cũng trả lại phần lớn bộ nhớ cho tới khi bạn quay lại.",
   "instance.content.local": "Tệp trên máy",
   "instance.content.localHint": "Được thêm từ máy của bạn, không phải từ Modrinth hay CurseForge, nên ResinCraft không kiểm tra cập nhật được.",
   // welcome

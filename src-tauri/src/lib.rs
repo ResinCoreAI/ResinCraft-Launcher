@@ -113,10 +113,11 @@ pub fn run() {
         .expect("error while running ResinCraft")
         .run(|app, event| {
             // Tray mode: the close button hides the window; ResinCraft goes on in the background.
-            // Looked at again (from the tray, or the taskbar while a game runs): back to normal memory.
-            if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } = &event {
+            // Looked at again (from the tray, the taskbar, or after another program): back to normal memory; left for
+            // another program: little memory (see `webview::focus_changed`).
+            if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(focused), .. } = &event {
                 if label == "main" {
-                    webview::set_low_memory(false);
+                    webview::focus_changed(*focused);
                 }
             }
             if let tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::CloseRequested { api, .. }, .. } = &event {

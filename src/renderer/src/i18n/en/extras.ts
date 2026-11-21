@@ -393,12 +393,8 @@ export default {
   "bigscreen.tab.settings": "Settings",
   "bigscreen.title": "Big screen mode",
   "bigscreen.yourInstances": "Your instances",
-  // The crash fixer's "update the mod loader" (engine: crash fixer on faster-prepare). The engine.* lines come back in
-  // en/engine.ts once that engine is merged and `npx tsx tools/engine-strings.ts` runs; then they can go from here.
+  // The crash fixer's "update the mod loader" (its reasons come from the engine, in en/engine.ts).
   "crash.fix.updateLoader": "Updates {loader} to the newest version",
-  "engine.crash.loaderTooOld": "{who} needs {loader} {want}, and this instance has {have}",
-  "engine.crash.modTooOld": "{who} needs {dep} {want}, and this instance has {have}",
-  "engine.crash.modTooOldHint": "Update {dep} in the Content tab.",
   "island.tuck": "Hide (keeps downloading)",
   "island.untuck": "Show downloads",
   "bedrock.xboxNote": "Bedrock plays as the Xbox account signed in on this PC (in the Xbox app), not the account picked in ResinCraft. Windows decides this; no launcher can change it.",

@@ -4270,7 +4270,7 @@ const dict: Dict = {
   "settings.mcp.tokenReset": "新しいトークンを作りました。古いトークンで設定したアシスタントには新しいものが必要です。",
   "settings.mcp.copied": "コピーしました",
   "settings.freeMemory": "非表示中はメモリを解放",
-  "settings.freeMemory.hint": "ウィンドウがトレイに隠れているときやプレイ中は、30 秒後に ResinCraft がウィンドウを閉じ、約 240 MB の代わりに約 30 MB で動きます。開き直すのに 1 秒ほどかかります。",
+  "settings.freeMemory.hint": "ウィンドウがトレイに隠れているときやプレイ中は、30 秒後に ResinCraft がウィンドウを閉じ、約 240 MB の代わりに約 30 MB で動きます。もう一度開くのは 1 秒ほどです。ほかのアプリが前面にあるときや、PC が 1 分間使われていないときも、戻ってくるまでメモリの大半を解放します。",
   "instance.content.local": "ローカルファイル",
   "instance.content.localHint": "Modrinth や CurseForge ではなく PC から追加されたため、ResinCraft は更新を確認できません。",
   // welcome
