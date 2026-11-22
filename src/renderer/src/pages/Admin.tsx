@@ -2,6 +2,7 @@
 // Unlocked with the relay dashboard's password; the relay checks every request, this page is only its UI.
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
+  Activity,
   Ban,
   Check,
   CreditCard,
@@ -47,6 +48,7 @@ import { RelaySettingsAdmin } from '../components/admin/RelaySettings'
 import { EventsAdmin } from '../components/admin/Events'
 import { PaymentsAdmin } from '../components/admin/Payments'
 import { DevAdmin } from '../components/admin/Dev'
+import { StatusAdmin } from '../components/admin/Status'
 import '../serverlist.css'
 
 type Promo = { kind: 'recommended' | 'sponsored'; until?: number | null; order?: number; since?: number; active?: boolean }
@@ -112,8 +114,9 @@ type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
 /** The relay's screens, in the dashboard's order. */
-type Section = 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
+type Section = 'status' | 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
 const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
+  { id: 'status', label: 'servers.admin.nav.status', icon: <Activity size={16} /> },
   { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
   { id: 'names', label: 'servers.admin.nav.names', icon: <Tag size={16} /> },
   { id: 'bans', label: 'servers.admin.nav.bans', icon: <Ban size={16} /> },
@@ -343,7 +346,9 @@ export default function Admin() {
       <div>
         <div className="admin-section">
           <h2 className="admin-section-title">{t(SECTIONS.find((s) => s.id === section)!.label)}</h2>
-          {section === 'live' ? (
+          {section === 'status' ? (
+            <StatusAdmin />
+          ) : section === 'live' ? (
             <LiveTunnels />
           ) : section === 'names' ? (
             <NamesAdmin />
