@@ -732,4 +732,10 @@ export default {
   "guide.status.refresh.body": "Checks run only when you open this page or press Refresh, and each gives up after 8 seconds.",
   "guide.status.row": "What stops working",
   "guide.status.row.body": "Each service says what won't work while it's down, how fast it answered and when it was checked.",
+  // Backups as PRAR files (Settings → Move to another PC).
+  "backup.format": "Backup file",
+  "backup.formatPrar": "PRAR (smaller)",
+  "backup.formatZip": "Zip",
+  "backup.formatPrarHint": "A .prar file: mods and libraries that instances share are stored only once, so it's much smaller. ResinCraft and PuirkleRAR can open it.",
+  "backup.formatZipHint": "A .resincraft file (a zip): bigger, but any zip program can open it.",
 } as const

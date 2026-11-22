@@ -57,6 +57,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
     },
     backup: {
       export: fn('backup:export'),
+      formats: fn('backup:formats'),
       pick: fn('backup:pick'),
       inspect: fn('backup:inspect'),
       import: fn('backup:import')

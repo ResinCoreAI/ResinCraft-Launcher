@@ -49,9 +49,13 @@ export interface MemoryUsage {
 /** A world in one of the instances (worlds.recent). */
 export type RecentWorld = WorldInfo & { instanceId: string }
 
-/** What a .resincraft backup holds. */
+/** A backup file's kind: PRAR (PuirkleRAR's archive, .prar) or a zip (.resincraft). */
+export type BackupFormat = 'prar' | 'zip'
+
+/** What a backup file holds. */
 export interface BackupInfo {
   path: string
+  kind: BackupFormat
   format: string
   version: number
   appVersion: string
@@ -68,6 +72,7 @@ export interface BackupInfo {
 
 export interface BackupExport {
   path: string
+  /** Size of the backup file. */
   bytes: number
   instances: number
   servers: number
@@ -2563,10 +2568,12 @@ export interface ResinApi {
     /** Switches to `folder`. `move` (default true): bring the current instances along as a cancellable task. */
     change(folder: string, move?: boolean): Promise<StorageChange>
   }
-  /** Moving to another PC: everything in one .resincraft file, and back (Settings → Move to another PC). */
+  /** Moving to another PC: everything in one backup file, and back (Settings → Move to another PC). */
   backup: {
-    /** Makes a backup; `dest` null asks where. Null if the save dialog was cancelled. */
-    export(dest: string | null, gameFiles: boolean): Promise<BackupExport | null>
+    /** Makes a backup; `dest` null asks where. Null if the save dialog was cancelled. `format` defaults to the first of `formats()`. */
+    export(dest: string | null, gameFiles: boolean, format?: BackupFormat): Promise<BackupExport | null>
+    /** The kinds this build can make, the one to offer first at the front (source builds without PuirkleRAR: zip only). */
+    formats(): Promise<BackupFormat[]>
     /** The open-file dialog for a backup; null if cancelled. */
     pick(): Promise<string | null>
     inspect(path: string): Promise<BackupInfo>

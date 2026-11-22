@@ -168,6 +168,8 @@ npm install
 npm run dev
 ```
 
+PRAR backups (Settings → Move to another PC) use PuirkleRAR, whose repository is private. Without access to it, run `node tools/use-prar-stub.mjs` once before building: the engine then uses the stand-in in `src-tauri/prar-stub/` and makes zip backups only.
+
 - `npm run dev` starts the UI on Vite (port 1420) and the Rust engine in `src-tauri/`, with hot reload for the UI. Dev builds keep all game data in `.dev-data/` inside the project, so testing never touches a real install.
 - `npm run build` builds this system's release files into `src-tauri/target/release/bundle/`: the NSIS installer on Windows, the `.app` and `.dmg` on macOS (`npm run build -- --target universal-apple-darwin` for one that runs on both CPUs), the `.AppImage` and `.deb` on Linux. Release CI builds all of them (`.github/workflows/release.yml`).
 - `npm run dev:web` serves the UI alone at http://localhost:1420 with a mock engine and sample data, which is handy for design work.

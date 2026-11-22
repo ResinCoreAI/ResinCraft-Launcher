@@ -60,6 +60,9 @@ idna = "1"
 tauri-plugin-updater = "2"
 # ResinCraft Relay (../relay): the launcher's side of <name>.rscraft.resincore.tech tunnels.
 resincraft-relay = { path = "../relay", default-features = false, features = ["agent"] }
+# PRAR backups (core/backup_prar.rs): PuirkleRAR's archive format, from its private repository (fetched with the git
+# program, see ../.cargo/config.toml). Without access to it: `node tools/use-prar-stub.mjs` (zip backups only).
+puirklerar = { git = "https://github.com/Puirkle/PuirkleRAR.git", rev = "608c36b3fe26da38962eb22e9fd08da8d1dddf1c", default-features = false }
 # Mod and modpack descriptions and changelogs (Markdown) for Discover's details page; the UI sanitizes the HTML.
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 # The host's own Discord bot for whitelist requests (server/discordbot.rs): Discord's gateway is a websocket.

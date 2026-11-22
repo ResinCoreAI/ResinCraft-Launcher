@@ -1,5 +1,5 @@
 // A fake backend so the UI can be designed and previewed in a normal browser (npm run dev, then open the Vite URL).
-import type { AccountView, ContentItem, Instance, McVersion, ProjectHit, RemoteGrant, ResinApi, Settings } from '@shared/types'
+import type { AccountView, BackupFormat, ContentItem,Instance, McVersion, ProjectHit, RemoteGrant, ResinApi, Settings } from '@shared/types'
 import { mockInstanceTabs } from './mock-instance-tabs'
 import { mockEngine } from './mock-engine'
 import { mockProfile } from './mock-profile'
@@ -344,13 +344,16 @@ export function mockApi(): ResinApi {
     storage: mockStorage(),
     // The preview can't open file dialogs: it pretends a backup was saved, and that one was picked.
     backup: {
-      export: async (_dest, gameFiles) => {
+      export: async (_dest, gameFiles, format = 'prar') => {
         await mockEngine.download({ key: 'backup.exporting', text: 'Making a backup', params: {} })
-        return { path: 'C:\\Users\\you\\Downloads\\ResinCraft backup.resincraft', bytes: gameFiles ? 3.4e9 : 1.2e9, instances: instances.length, servers: 5 }
+        const zip = format === 'zip'
+        return { path: `C:\\Users\\you\\Downloads\\ResinCraft backup.${zip ? 'resincraft' : 'prar'}`, bytes: (gameFiles ? 3.4e9 : 1.2e9) * (zip ? 1 : 0.35), instances: instances.length, servers: 5 }
       },
-      pick: () => wait('C:\\Users\\you\\Downloads\\ResinCraft backup.resincraft', 200),
+      formats: () => wait<BackupFormat[]>(['prar', 'zip']),
+      pick: () => wait('C:\\Users\\you\\Downloads\\ResinCraft backup.prar', 200),
       inspect: async (path) => ({
         path,
+        kind: path.endsWith('.prar') ? 'prar' : 'zip',
         format: 'resincraft-backup',
         version: 1,
         appVersion: '1.1.0',

@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Download, FolderOpen, Loader2, Upload } from 'lucide-react'
-import type { BackupInfo } from '@shared/types'
+import type { BackupFormat, BackupInfo } from '@shared/types'
 import { api } from '../api'
 import { onBackupOpen } from '../openRequests'
 import { useStore } from '../store'
 import { t } from '../i18n'
 import { size as bytes } from './Storage'
-import { Modal, Switch } from './ui'
+import { Modal, Segmented, Switch } from './ui'
 
 /**
- * Settings → Move to another PC: everything in one .resincraft file (Export), and that file opened on the other PC
- * (Import adds to what's there; nothing is replaced). Signed-in accounts never go into it.
+ * Settings → Move to another PC: everything in one backup file (Export: PRAR, much smaller, or a .resincraft zip), and
+ * that file opened on the other PC (Import adds to what's there; nothing is replaced). Signed-in accounts never go into it.
  */
 export function BackupSection() {
   const { toast, refreshInstances } = useStore()
   const [gameFiles, setGameFiles] = useState(false)
+  // What this build can make (a source build without PuirkleRAR: zip only), PRAR first.
+  const [formats, setFormats] = useState<BackupFormat[]>(['zip'])
+  const [format, setFormat] = useState<BackupFormat>('zip')
   const [busy, setBusy] = useState<'export' | 'import'>()
   const [saved, setSaved] = useState<string>()
   const [opening, setOpening] = useState<BackupInfo>()
@@ -27,7 +30,7 @@ export function BackupSection() {
   const doExport = async () => {
     setBusy('export')
     try {
-      const r = await api.backup.export(null, gameFiles)
+      const r = await api.backup.export(null, gameFiles, format)
       if (r) {
         setSaved(r.path)
         toast(t('backup.exported', { file: r.path.split(/[\\/]/).pop() ?? r.path, size: bytes(r.bytes) }), 'success')
@@ -47,6 +50,13 @@ export function BackupSection() {
       failed(e)
     }
   }
+
+  useEffect(() => {
+    void api.backup.formats().then((f) => {
+      setFormats(f)
+      setFormat(f[0] ?? 'zip')
+    }, failed)
+  }, [])
 
   // A .resincraft file double-clicked in Windows: straight to its restore window, which asks before anything.
   useEffect(
@@ -79,6 +89,19 @@ export function BackupSection() {
           </div>
           <Switch on={gameFiles} onChange={setGameFiles} label={t('backup.gameFiles')} />
         </div>
+        {formats.length > 1 && (
+          <div className="setting">
+            <div className="text">
+              <b>{t('backup.format')}</b>
+              <span>{t(format === 'prar' ? 'backup.formatPrarHint' : 'backup.formatZipHint')}</span>
+            </div>
+            <Segmented<BackupFormat>
+              value={format}
+              onChange={setFormat}
+              options={formats.map((f) => ({ value: f, label: t(f === 'prar' ? 'backup.formatPrar' : 'backup.formatZip') }))}
+            />
+          </div>
+        )}
         {saved && (
           <div className="setting">
             <span className="hint mono ellipsis grow">{saved}</span>

@@ -31,6 +31,15 @@ jobs:
           workspaces: |
             src-tauri -> target
             relay -> target
+      # PRAR backups need PuirkleRAR, a private repository, read with a deploy key. Without the key (a pull request
+      # from a fork) the engine is checked with its stand-in instead, which makes zip backups only.
+      - name: PuirkleRAR access
+        shell: bash
+        env:
+          KEY: ${{ secrets.PUIRKLERAR_DEPLOY_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then node tools/use-prar-stub.mjs; exit 0; fi
+          bash tools/puirklerar-access.sh
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build:web

@@ -1,4 +1,6 @@
-//! Moving to another PC: everything the player made, in one `.resincraft` file (a zip), and back.
+//! Moving to another PC: everything the player made, in one backup file, and back. The file is PRAR (PuirkleRAR's
+//! archive, `.prar`, see `backup_prar.rs`: mods and libraries that instances share are stored once) or a zip
+//! (`.resincraft`, which anything can open). Both hold the same names.
 //!
 //! In the file: `resincraft-backup.json` (what's inside), `games/instances/<id>/…` and `games/servers/<id>/…`,
 //! optionally the shared game files (`games/libraries|assets|versions|java/…`, which can also re-download), and
@@ -23,10 +25,10 @@ use serde_json::Value;
 use zip::write::SimpleFileOptions;
 
 use super::events::Task;
-use super::{paths, settings, shell, storage};
+use super::{backup_prar, paths, settings, shell, storage};
 use crate::{bail_tr, err_tr, tr};
 
-const MANIFEST: &str = "resincraft-backup.json";
+pub(super) const MANIFEST: &str = "resincraft-backup.json";
 const FORMAT: &str = "resincraft-backup";
 const VERSION: u32 = 1;
 /// Shared game files that can come along (they also re-download by themselves).
@@ -57,11 +59,55 @@ pub struct Manifest {
     pub bytes: u64,
 }
 
+/// The kind of backup file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Format {
+    /// PuirkleRAR's archive (`.prar`): much smaller, each piece of data stored once.
+    Prar,
+    /// A zip (`.resincraft`).
+    Zip,
+}
+
+impl Format {
+    fn ext(self) -> &'static str {
+        match self {
+            Format::Prar => "prar",
+            Format::Zip => "resincraft",
+        }
+    }
+
+    /// From the file's first bytes (so a renamed file still opens).
+    fn of(path: &Path) -> Result<Format> {
+        let mut head = [0u8; 4];
+        std::fs::File::open(path)
+            .and_then(|mut f| f.read_exact(&mut head))
+            .map_err(|e| err_tr!("backup.unreadable", "Couldn't read {file}: {error}", file = path.display().to_string(), error = e.to_string()))?;
+        match &head {
+            b"PRAR" if backup_prar::available() => Ok(Format::Prar),
+            b"PRAR" => bail_tr!("backup.noPrar", "This build of ResinCraft can't make or open PRAR backups. Use a zip backup instead."),
+            b"PK\x03\x04" => Ok(Format::Zip),
+            _ => bail_tr!("backup.notBackup", "That isn't a ResinCraft backup."),
+        }
+    }
+}
+
+/// The kinds of backup this build can make, the one to offer first at the front.
+pub fn formats() -> Vec<Format> {
+    if backup_prar::available() {
+        vec![Format::Prar, Format::Zip]
+    } else {
+        vec![Format::Zip]
+    }
+}
+
 /// What a backup file holds, for the import dialog.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupInfo {
     pub path: String,
+    /// PRAR or zip. (The manifest's own `format` is its format name.)
+    pub kind: Format,
     #[serde(flatten)]
     pub manifest: Manifest,
     /// Instance and server ids that already exist here (they come in as copies).
@@ -74,6 +120,7 @@ pub struct BackupInfo {
 #[serde(rename_all = "camelCase")]
 pub struct ExportResult {
     pub path: String,
+    /// Size of the backup file.
     pub bytes: u64,
     pub instances: usize,
     pub servers: usize,
@@ -91,8 +138,8 @@ pub struct ImportResult {
     pub settings: bool,
 }
 
-/// One file to put in the backup: where it is, its name in the zip, its size.
-type Entry = (PathBuf, String, u64);
+/// One file to put in the backup: where it is, its name in the backup, its size.
+pub(super) type Entry = (PathBuf, String, u64);
 
 /// The name of an instance or server, from its own meta file.
 fn name_of(meta: &Path) -> String {
@@ -202,6 +249,20 @@ fn write_backup(dest: &Path, files: &[Entry], manifest: &Manifest, stop: &Atomic
     Ok(())
 }
 
+/// Writes the zip to a `.part` file next to `dest` and puts it in place when complete. A failed or cancelled backup
+/// leaves nothing behind (this runs to the end on its own thread, even after Cancel drops the task).
+fn write_zip(dest: &Path, files: &[Entry], manifest: &Manifest, stop: &AtomicBool, done: &AtomicU64) -> Result<()> {
+    let tmp = dest.with_extension("resincraft.part");
+    let written = write_backup(&tmp, files, manifest, stop, done).and_then(|_| {
+        let _ = std::fs::remove_file(dest);
+        Ok(std::fs::rename(&tmp, dest)?)
+    });
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    written
+}
+
 /// Sets the flag when the task's work is dropped (Cancel in the task list).
 struct StopOnDrop(Arc<AtomicBool>);
 impl Drop for StopOnDrop {
@@ -234,17 +295,24 @@ async fn run_blocking<T: Send + 'static>(
 }
 
 /// Makes a backup. `dest` None: asks where (Downloads by default). None back when the player cancelled the dialog.
-pub async fn export(dest: Option<String>, game_files: bool) -> Result<Option<ExportResult>> {
+pub async fn export(dest: Option<String>, game_files: bool, format: Format) -> Result<Option<ExportResult>> {
     if let Some(why) = storage::blocker().await {
         bail!(why);
+    }
+    if format == Format::Prar && !backup_prar::available() {
+        bail_tr!("backup.noPrar", "This build of ResinCraft can't make or open PRAR backups. Use a zip backup instead.");
     }
     let dest = match dest {
         Some(d) => PathBuf::from(d),
         None => {
             let day = chrono_day();
-            let default = shell::downloads_dir().join(format!("ResinCraft backup {day}.resincraft"));
+            let default = shell::downloads_dir().join(format!("ResinCraft backup {day}.{}", format.ext()));
             let title = tr!("backup.saveTitle", "Save the backup").to_string();
-            match shell::save_file(&title, &default, &[("ResinCraft backup", &["resincraft"])]).await? {
+            let filter: shell::Filter = match format {
+                Format::Prar => ("ResinCraft backup (PRAR)", &["prar"]),
+                Format::Zip => ("ResinCraft backup", &["resincraft"]),
+            };
+            match shell::save_file(&title, &default, &[filter]).await? {
                 Some(p) => p,
                 None => return Ok(None),
             }
@@ -252,17 +320,14 @@ pub async fn export(dest: Option<String>, game_files: bool) -> Result<Option<Exp
     };
     Task::run(tr!("backup.exporting", "Making a backup"), None, move |task| async move {
         let (files, manifest) = tokio::task::spawn_blocking(move || collect(game_files)).await?;
-        let total = manifest.bytes;
-        let tmp = dest.with_extension("resincraft.part");
-        let (t2, files2, m2) = (tmp.clone(), files, manifest.clone());
-        let written = run_blocking(&task, || tr!("backup.exportingDetail", "Making a backup"), total, move |stop, done| write_backup(&t2, &files2, &m2, &stop, &done)).await;
-        if let Err(e) = written {
-            let _ = tokio::fs::remove_file(&tmp).await;
-            return Err(e);
+        let (d2, m2) = (dest.clone(), manifest.clone());
+        let label = || tr!("backup.exportingDetail", "Making a backup");
+        match format {
+            Format::Zip => run_blocking(&task, label, manifest.bytes, move |stop, done| write_zip(&d2, &files, &m2, &stop, &done)).await?,
+            Format::Prar => run_blocking(&task, label, backup_prar::SCALE, move |stop, done| backup_prar::write(&d2, files, &m2, &stop, &done)).await?,
         }
-        let _ = tokio::fs::remove_file(&dest).await;
-        tokio::fs::rename(&tmp, &dest).await?;
-        Ok(Some(ExportResult { path: dest.to_string_lossy().to_string(), bytes: total, instances: manifest.instances.len(), servers: manifest.servers.len() }))
+        let bytes = tokio::fs::metadata(&dest).await.map(|m| m.len()).unwrap_or(manifest.bytes);
+        Ok(Some(ExportResult { path: dest.to_string_lossy().to_string(), bytes, instances: manifest.instances.len(), servers: manifest.servers.len() }))
     })
     .await
 }
@@ -282,10 +347,16 @@ fn chrono_day() -> String {
 }
 
 fn read_manifest(path: &Path) -> Result<Manifest> {
-    let file = std::fs::File::open(path).map_err(|e| err_tr!("backup.unreadable", "Couldn't read {file}: {error}", file = path.display().to_string(), error = e.to_string()))?;
-    let mut zip = zip::ZipArchive::new(file).map_err(|_| err_tr!("backup.notBackup", "That isn't a ResinCraft backup."))?;
-    let mut text = String::new();
-    zip.by_name(MANIFEST).map_err(|_| err_tr!("backup.notBackup", "That isn't a ResinCraft backup."))?.read_to_string(&mut text)?;
+    let text = match Format::of(path)? {
+        Format::Zip => {
+            let file = std::fs::File::open(path).map_err(|e| err_tr!("backup.unreadable", "Couldn't read {file}: {error}", file = path.display().to_string(), error = e.to_string()))?;
+            let mut zip = zip::ZipArchive::new(file).map_err(|_| err_tr!("backup.notBackup", "That isn't a ResinCraft backup."))?;
+            let mut text = String::new();
+            zip.by_name(MANIFEST).map_err(|_| err_tr!("backup.notBackup", "That isn't a ResinCraft backup."))?.read_to_string(&mut text)?;
+            text
+        }
+        Format::Prar => backup_prar::manifest_text(path).map_err(|_| err_tr!("backup.notBackup", "That isn't a ResinCraft backup."))?,
+    };
     let m: Manifest = serde_json::from_str(&text).map_err(|_| err_tr!("backup.notBackup", "That isn't a ResinCraft backup."))?;
     if m.format != FORMAT {
         bail_tr!("backup.notBackup", "That isn't a ResinCraft backup.");
@@ -299,13 +370,14 @@ fn read_manifest(path: &Path) -> Result<Manifest> {
 /// Asks for a backup file to import. None if cancelled.
 pub async fn pick() -> Result<Option<String>> {
     let title = tr!("backup.openTitle", "Choose a ResinCraft backup").to_string();
-    Ok(shell::pick_file(&title, &[("ResinCraft backup", &["resincraft"])]).await?.map(|p| p.to_string_lossy().to_string()))
+    let exts: &[&str] = if backup_prar::available() { &["prar", "resincraft"] } else { &["resincraft"] };
+    Ok(shell::pick_file(&title, &[("ResinCraft backup", exts)]).await?.map(|p| p.to_string_lossy().to_string()))
 }
 
 /// What's in a backup file, without importing it.
 pub async fn inspect(path: &str) -> Result<BackupInfo> {
     let p = PathBuf::from(path);
-    let manifest = tokio::task::spawn_blocking(move || read_manifest(&p)).await??;
+    let (format, manifest) = tokio::task::spawn_blocking(move || anyhow::Ok((Format::of(&p)?, read_manifest(&p)?))).await??;
     let existing = manifest
         .instances
         .iter()
@@ -313,7 +385,7 @@ pub async fn inspect(path: &str) -> Result<BackupInfo> {
         .chain(manifest.servers.iter().filter(|s| paths::servers().join(&s.id).exists()))
         .map(|i| i.id.clone())
         .collect();
-    Ok(BackupInfo { path: path.to_string(), manifest, existing, free_bytes: storage::free_bytes(&paths::games()) })
+    Ok(BackupInfo { path: path.to_string(), kind: format, manifest, existing, free_bytes: storage::free_bytes(&paths::games()) })
 }
 
 /// A free id like `id`, given the ids already taken.
@@ -340,6 +412,64 @@ fn target(name: &str, map: &HashMap<(String, String), String>, games: &Path, sta
     }
 }
 
+/// Whether a file going to `dest` is written: game files that exist already are kept. Notes the instance or server
+/// folder it goes into, so a failed import can take it away again.
+fn should_place(dest: &Path, games: &Path, staging: &Path, made: &std::sync::Mutex<Vec<PathBuf>>) -> bool {
+    let is_item = dest.starts_with(games.join("instances")) || dest.starts_with(games.join("servers"));
+    if !is_item && dest.exists() && !dest.starts_with(staging) {
+        return false;
+    }
+    if is_item {
+        let rel = dest.strip_prefix(games).map(Path::to_path_buf).unwrap_or_default();
+        let top: PathBuf = rel.components().take(2).collect();
+        let item = games.join(top);
+        let mut m = made.lock().unwrap();
+        if !m.contains(&item) {
+            m.push(item);
+        }
+    }
+    true
+}
+
+/// Unpacks a PRAR backup into a work folder next to the instances (same drive), then moves each file to where
+/// `target` puts it. The work folder is always removed.
+fn extract_prar(path: &Path, games: &Path, map: &HashMap<(String, String), String>, staging: &Path, stop: &AtomicBool, done: &AtomicU64, made: &std::sync::Mutex<Vec<PathBuf>>) -> Result<()> {
+    let work = games.join(format!(".backup-import-{}", super::fsutil::now_ms()));
+    let result = (|| {
+        backup_prar::unpack(path, &work, stop, done)?;
+        for (name, from) in backup_prar::files_in(&work) {
+            if stop.load(Ordering::Relaxed) {
+                bail!(super::events::cancelled_error());
+            }
+            if name == MANIFEST {
+                continue;
+            }
+            let Some(dest) = target(&name, map, games, staging) else { continue };
+            if !should_place(&dest, games, staging, made) {
+                continue;
+            }
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            move_file(&from, &dest)?;
+        }
+        done.store(backup_prar::SCALE, Ordering::Relaxed);
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&work);
+    result
+}
+
+/// A rename, or a copy when `to` is on another drive (the staging folder can be).
+fn move_file(from: &Path, to: &Path) -> Result<()> {
+    if std::fs::rename(from, to).is_ok() {
+        return Ok(());
+    }
+    std::fs::copy(from, to)?;
+    let _ = std::fs::remove_file(from);
+    Ok(())
+}
+
 /// Extracts the backup (on a blocking thread). Game files that exist already are kept. Returns the instance and
 /// server folders it made, so a failure can remove them.
 fn extract(path: &Path, map: &HashMap<(String, String), String>, staging: &Path, stop: &AtomicBool, done: &AtomicU64, made: &std::sync::Mutex<Vec<PathBuf>>) -> Result<()> {
@@ -355,20 +485,9 @@ fn extract(path: &Path, map: &HashMap<(String, String), String>, staging: &Path,
             continue;
         }
         let Some(dest) = target(entry.name(), map, &games, staging) else { continue };
-        let is_item = dest.starts_with(games.join("instances")) || dest.starts_with(games.join("servers"));
-        if !is_item && dest.exists() && !dest.starts_with(staging) {
+        if !should_place(&dest, &games, staging, made) {
             done.fetch_add(entry.size(), Ordering::Relaxed);
             continue;
-        }
-        if is_item {
-            // The instance/server folder itself, so a failed import can take it away again.
-            let rel = dest.strip_prefix(&games).map(Path::to_path_buf).unwrap_or_default();
-            let top: PathBuf = rel.components().take(2).collect();
-            let item = games.join(top);
-            let mut m = made.lock().unwrap();
-            if !m.contains(&item) {
-                m.push(item);
-            }
         }
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent)?;
@@ -405,6 +524,7 @@ pub async fn import(path: String, use_settings: bool) -> Result<ImportResult> {
         bail!(why);
     }
     let info = inspect(&path).await?;
+    let format = info.kind;
     if let Some(free) = info.free_bytes {
         if free < info.manifest.bytes + 200 * 1024 * 1024 {
             bail_tr!(
@@ -433,17 +553,25 @@ pub async fn import(path: String, use_settings: bool) -> Result<ImportResult> {
     let staging = paths::cache().join(format!("backup-import-{}", super::fsutil::now_ms()));
     let total = m.bytes;
     Task::run(tr!("backup.importing", "Importing a backup"), None, move |task| async move {
-        let made = Arc::new(std::sync::Mutex::new(Vec::<PathBuf>::new()));
-        let (p, map2, st, made2) = (PathBuf::from(&path), map.clone(), staging.clone(), made.clone());
-        let extracted = run_blocking(&task, || tr!("backup.importingDetail", "Importing a backup"), total, move |stop, done| extract(&p, &map2, &st, &stop, &done, &made2)).await;
-        if let Err(e) = extracted {
-            // Take back what this import added (game files that came in are only caches).
-            for dir in made.lock().unwrap().iter() {
-                let _ = std::fs::remove_dir_all(dir);
+        let (p, map2, st) = (PathBuf::from(&path), map.clone(), staging.clone());
+        // On its own thread, which runs to the end even after Cancel drops this task: so it cleans up there too.
+        let work = move |stop: Arc<AtomicBool>, done: Arc<AtomicU64>| {
+            let made = std::sync::Mutex::new(Vec::<PathBuf>::new());
+            let r = match format {
+                Format::Zip => extract(&p, &map2, &st, &stop, &done, &made),
+                Format::Prar => extract_prar(&p, &paths::games(), &map2, &st, &stop, &done, &made),
+            };
+            if r.is_err() {
+                // Take back what this import added (game files that came in are only caches).
+                for dir in made.lock().unwrap().iter() {
+                    let _ = std::fs::remove_dir_all(dir);
+                }
+                let _ = std::fs::remove_dir_all(&st);
             }
-            let _ = std::fs::remove_dir_all(&staging);
-            return Err(e);
-        }
+            r
+        };
+        let total = if format == Format::Prar { backup_prar::SCALE } else { total };
+        run_blocking(&task, || tr!("backup.importingDetail", "Importing a backup"), total, work).await?;
         // New ids: fix each moved item's own meta, and links to renamed instances (a server's sync source).
         let instance_ids: Vec<(String, String)> = map.iter().filter(|((k, _), _)| k == "instances").map(|((_, old), new)| (old.clone(), new.clone())).collect();
         for ((kind, old), new) in &map {
@@ -536,7 +664,11 @@ async fn apply_settings(from: &Path) -> bool {
 pub async fn handle(channel: &str, args: super::Args) -> Result<Value> {
     use super::router::json;
     match channel {
-        "backup:export" => json(export(args.get::<Option<String>>(0)?, args.get::<Option<bool>>(1)?.unwrap_or(false)).await?),
+        "backup:export" => {
+            let format = args.get::<Option<Format>>(2)?.unwrap_or(formats()[0]);
+            json(export(args.get::<Option<String>>(0)?, args.get::<Option<bool>>(1)?.unwrap_or(false), format).await?)
+        }
+        "backup:formats" => json(formats()),
         "backup:pick" => json(pick().await?),
         "backup:inspect" => json(inspect(&args.get::<String>(0)?).await?),
         "backup:import" => json(import(args.get::<String>(0)?, args.get::<Option<bool>>(1)?.unwrap_or(true)).await?),
@@ -621,6 +753,65 @@ mod tests {
         let inst = games.join("instances").join("cozy-2");
         assert_eq!(std::fs::read(inst.join("minecraft/saves/W/level.dat")).unwrap(), vec![1, 2, 3]);
         assert_eq!(std::fs::read_to_string(inst.join("minecraft/options.txt")).unwrap(), "fov:90");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn round_trip_through_prar() {
+        if !backup_prar::available() {
+            return;
+        }
+        // backup_prar::write + extract_prar against fixture folders; two instances share a mod.
+        let dir = std::env::temp_dir().join(format!("resin-backup-prar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mod_jar: Vec<u8> = (0..200_000u32).map(|i| (i.wrapping_mul(2_654_435_761) >> 13) as u8).collect();
+        let mut files = Vec::new();
+        for id in ["cozy", "smp"] {
+            let src = dir.join("src").join(id);
+            std::fs::create_dir_all(src.join("minecraft/mods")).unwrap();
+            std::fs::write(src.join("instance.json"), format!(r#"{{"id":"{id}","name":"{id}"}}"#)).unwrap();
+            std::fs::write(src.join("minecraft/mods/shared.jar"), &mod_jar).unwrap();
+            walk(&src, &format!("games/instances/{id}"), &["natives"], &mut files);
+        }
+        let lib = dir.join("src/libraries/a.jar");
+        std::fs::create_dir_all(lib.parent().unwrap()).unwrap();
+        std::fs::write(&lib, b"lib").unwrap();
+        files.push((lib, "games/libraries/a.jar".into(), 3));
+        let manifest = Manifest {
+            format: FORMAT.into(),
+            version: VERSION,
+            instances: vec![Item { id: "cozy".into(), name: "cozy".into() }, Item { id: "smp".into(), name: "smp".into() }],
+            ..Default::default()
+        };
+        let arc = dir.join("b.prar");
+        backup_prar::write(&arc, files, &manifest, &AtomicBool::new(false), &AtomicU64::new(0)).unwrap();
+        assert_eq!(Format::of(&arc).unwrap(), Format::Prar);
+        assert_eq!(read_manifest(&arc).unwrap().instances.len(), 2);
+        // The shared mod is stored once.
+        let size = std::fs::metadata(&arc).unwrap().len();
+        assert!(size < mod_jar.len() as u64 * 3 / 2, "{size}");
+        // Import with cozy taken: it comes in as cozy-2; a library that's already there is kept.
+        let games = dir.join("games");
+        std::fs::create_dir_all(games.join("libraries")).unwrap();
+        std::fs::write(games.join("libraries/a.jar"), b"mine").unwrap();
+        let mut map = HashMap::new();
+        map.insert(("instances".to_string(), "cozy".to_string()), "cozy-2".to_string());
+        let made = std::sync::Mutex::new(Vec::new());
+        let done = AtomicU64::new(0);
+        extract_prar(&arc, &games, &map, &dir.join("staging"), &AtomicBool::new(false), &done, &made).unwrap();
+        assert_eq!(std::fs::read(games.join("instances/cozy-2/minecraft/mods/shared.jar")).unwrap(), mod_jar);
+        assert_eq!(std::fs::read(games.join("instances/smp/minecraft/mods/shared.jar")).unwrap(), mod_jar);
+        assert_eq!(std::fs::read(games.join("libraries/a.jar")).unwrap(), b"mine");
+        assert_eq!(made.lock().unwrap().len(), 2);
+        assert_eq!(done.load(Ordering::Relaxed), backup_prar::SCALE);
+        // No work folder left next to the instances.
+        assert!(std::fs::read_dir(&games).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().starts_with(".backup-import")));
+        // Cancelled: stops before anything is placed, and leaves no work folder.
+        let games2 = dir.join("games2");
+        let cancelled = extract_prar(&arc, &games2, &HashMap::new(), &dir.join("staging2"), &AtomicBool::new(true), &AtomicU64::new(0), &std::sync::Mutex::new(Vec::new()));
+        assert!(cancelled.is_err_and(|e| super::super::events::is_cancelled(&e)));
+        assert!(!games2.join("instances").exists());
+        assert!(std::fs::read_dir(&games2).map(|rd| rd.count() == 0).unwrap_or(true));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

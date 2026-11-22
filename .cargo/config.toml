@@ -1,0 +1,4 @@
+# Git dependencies are fetched with the git program, so its sign-in reaches the private PuirkleRAR repository
+# (Git Credential Manager on a developer's PC, a deploy key in CI). See src-tauri/Cargo.toml.
+[net]
+git-fetch-with-cli = true

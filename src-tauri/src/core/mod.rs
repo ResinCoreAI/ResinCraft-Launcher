@@ -4,6 +4,7 @@
 pub mod art;
 pub mod autobackup;
 pub mod backup;
+pub mod backup_prar;
 pub mod backupfiles;
 pub mod memory;
 pub mod ctx;

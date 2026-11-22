@@ -77,6 +77,14 @@ jobs:
         with:
           workspaces: src-tauri -> target
           key: ${{ matrix.platform }}
+      # PRAR backups need PuirkleRAR, a private repository, read with a deploy key. A release never ships without it.
+      - name: PuirkleRAR access
+        shell: bash
+        env:
+          KEY: ${{ secrets.PUIRKLERAR_DEPLOY_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then echo "::error::PUIRKLERAR_DEPLOY_KEY is not set (a read-only deploy key of Puirkle/PuirkleRAR)."; exit 1; fi
+          bash tools/puirklerar-access.sh
       - run: npm ci
       - name: Build
         shell: bash

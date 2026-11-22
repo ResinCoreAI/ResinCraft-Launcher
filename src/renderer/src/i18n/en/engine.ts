@@ -46,6 +46,7 @@ export default {
   'engine.backup.exportingDetail': 'Making a backup',
   'engine.backup.importing': 'Importing a backup',
   'engine.backup.importingDetail': 'Importing a backup',
+  'engine.backup.noPrar': "This build of ResinCraft can't make or open PRAR backups. Use a zip backup instead.",
   'engine.backup.noSpace': 'Not enough free space: the backup needs {need} and the drive has {free}. Choose another place for your instances in Settings → Storage, or free some space.',
   'engine.backup.notBackup': "That isn't a ResinCraft backup.",
   'engine.backup.openTitle': 'Choose a ResinCraft backup',

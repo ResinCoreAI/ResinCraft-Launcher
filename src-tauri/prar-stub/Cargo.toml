@@ -1,0 +1,10 @@
+[package]
+name = "puirklerar"
+version = "1.0.0-beta"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-only"
+description = "Stand-in for PuirkleRAR (a private repository) in source builds without access to it: PRAR backups are off."
+
+[dependencies]
+anyhow = "1"
