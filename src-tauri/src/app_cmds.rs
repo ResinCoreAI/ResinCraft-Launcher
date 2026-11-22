@@ -78,6 +78,18 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:serviceStatus" => json(crate::report::status().await),
         "app:checkServices" => json(crate::status::check_all().await),
         "app:statusNotices" => json(crate::status::notices().await),
+        // ResinCraft Status (status.<relay domain>): its page's data, email updates, and its posting page (statussite.rs).
+        "app:statusSite" => json(crate::statussite::public().await?),
+        "app:statusSubscribe" => {
+            crate::statussite::subscribe(&args.get::<String>(0)?).await?;
+            done()
+        }
+        "app:statusAdminLogin" => json(crate::statussite::admin_login(&args.get::<String>(0)?).await?),
+        "app:statusAdminCall" => json(crate::statussite::admin_call(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<Value>>(2)?).await?),
+        "app:statusAdminLogout" => {
+            crate::statussite::admin_logout().await;
+            done()
+        }
         // A picture from the web as a data: URL, for pictures the UI draws itself (the overview card): a page can't
         // read pixels from sites that don't allow it, the engine can.
         "app:imageData" => json(image_data(&args.get::<String>(0)?).await?),

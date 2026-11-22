@@ -1,7 +1,7 @@
 // Admin → Reports: what players sent from report.<domain> and the launcher's "Report a problem" page, newest first.
 // The same screen as the relay dashboard's Reports page; the relay keeps them, this is only its UI.
 import { useEffect, useState } from 'react'
-import { Check, Copy, Inbox, Trash2, Undo2 } from 'lucide-react'
+import { Check, Copy, Inbox, Mail, Trash2, Undo2 } from 'lucide-react'
 import { t, type Key } from '../../i18n'
 import { Empty } from '../ui'
 import { useCopy } from '../ui'
@@ -23,6 +23,8 @@ interface Report {
   email?: string
   at: number
   seen: boolean
+  /** Emails the team sent back (relay reports.rs `ReportMail`): when, and the subject. */
+  mails?: { at: number; subject: string }[]
 }
 interface Reports {
   reports: Report[]
@@ -108,6 +110,7 @@ export function ReportsAdmin() {
   const copy = useCopy()
   const [filter, setFilter] = useState('')
   const [deleting, setDeleting] = useState<Report>()
+  const [emailing, setEmailing] = useState<Report>()
   if (!data) return <Loading error={error} />
 
   const count = (f: (r: Report) => boolean) => data.reports.filter(f).length
@@ -176,6 +179,16 @@ export function ReportsAdmin() {
               />
               <Block label="servers.admin.reports.block.steps" text={r.steps} />
               <Block label="servers.admin.reports.block.expected" text={r.expected} />
+              {!!r.mails?.length && (
+                <div className="admin-report-block">
+                  <span className="report-label">{t('servers.admin.reports.mails')}</span>
+                  {r.mails.map((m, i) => (
+                    <p key={i} className="hint">
+                      <Mail className="inline" size={13} /> {m.subject} · <span title={when(m.at)}>{ago(m.at)}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
               <div className="row admin-report-actions">
                 {r.seen ? (
                   <button className="btn sm" onClick={() => void act('/api/reports/new', { id: r.id })}>
@@ -184,6 +197,11 @@ export function ReportsAdmin() {
                 ) : (
                   <button className="btn sm primary" onClick={() => void act('/api/reports/seen', { id: r.id })}>
                     <Check /> {t('servers.admin.reports.markSeen')}
+                  </button>
+                )}
+                {r.email && (
+                  <button className="btn sm" onClick={() => setEmailing(r)}>
+                    <Mail /> {t('servers.admin.reports.emailPlayer')}
                   </button>
                 )}
                 <button className="btn sm" onClick={() => void copy(issue(r), t('servers.admin.reports.copied'))}>
@@ -197,6 +215,19 @@ export function ReportsAdmin() {
             </article>
           ))}
         </div>
+      )}
+      {emailing && (
+        <AskModal
+          title={t('servers.admin.reports.emailTitle', { id: emailing.id })}
+          body={<p className="muted">{t('servers.admin.reports.emailBody', { email: emailing.email ?? '' })}</p>}
+          fields={[
+            { key: 'subject', label: t('servers.admin.reports.emailSubject'), value: `Re: ${emailing.title}`.slice(0, 150) },
+            { key: 'message', label: t('servers.admin.reports.emailMessage'), type: 'textarea' }
+          ]}
+          confirm={t('servers.admin.reports.emailSend')}
+          onSubmit={(v) => act('/api/reports/email', { id: emailing.id, subject: v.subject, message: v.message }, 'servers.admin.reports.emailSent')}
+          onClose={() => setEmailing(undefined)}
+        />
       )}
       {deleting && (
         <AskModal

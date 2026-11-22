@@ -4,7 +4,8 @@
 import { useState } from 'react'
 import { AlertTriangle, Megaphone, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { t, type Key } from '../../i18n'
-import { ConfirmModal } from '../ui'
+import { ConfirmModal, Segmented } from '../ui'
+import { StatusSiteAdmin } from './StatusSite'
 import { duration, Loading, size, Stat, useAct, useAdmin, when } from './common'
 
 type Level = 'info' | 'degraded' | 'outage' | 'maintenance'
@@ -61,7 +62,28 @@ const fromInput = (v: string) => (v ? Math.floor(new Date(v).getTime() / 1000) :
 
 const EMPTY = { id: '', level: 'maintenance' as Level, title: '', body: '', starts: '', ends: '' }
 
+/** Two places players read about outages: the relay's notices (in every launcher's Status page) and ResinCraft Status
+ * (status.<relay domain>, with incidents, maintenance and email updates). */
 export function StatusAdmin() {
+  const [tab, setTab] = useState<'relay' | 'site'>('relay')
+  return (
+    <>
+      <div className="ss-admin-tabs">
+        <Segmented
+          value={tab}
+          options={[
+            { value: 'relay', label: t('servers.admin.statusSite.tabRelay') },
+            { value: 'site', label: t('servers.admin.statusSite.tabSite') }
+          ]}
+          onChange={setTab}
+        />
+      </div>
+      {tab === 'relay' ? <RelayStatus /> : <StatusSiteAdmin />}
+    </>
+  )
+}
+
+function RelayStatus() {
   const { data, error, reload } = useAdmin<StatusData>('/api/status', 30_000)
   const act = useAct(reload)
   const [form, setForm] = useState(EMPTY)

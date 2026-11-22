@@ -244,3 +244,240 @@
   color: var(--text-faint);
   font-size: 12px;
 }
+
+/* ResinCraft Status (components/StatusSite.tsx): the team's incidents and maintenance, the relay's 90 days, and email
+   updates. Colours by impact: minor amber, major orange, critical red, maintenance cyan. */
+.ss-now {
+  margin-bottom: 14px;
+}
+.ss-now .st-group-title {
+  margin-top: 4px;
+}
+.ss-inc {
+  --s: var(--text-faint);
+  margin-bottom: 8px;
+  padding: 13px 16px;
+  border: 1px solid color-mix(in srgb, var(--s) 40%, var(--border));
+  border-left: 3px solid var(--s);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--s) 7%, var(--surface));
+}
+.ss-inc.past {
+  --s: var(--border-strong);
+  background: var(--surface);
+}
+.ss-minor {
+  --s: var(--warning);
+}
+.ss-major {
+  --s: #ff8a3d;
+}
+.ss-critical {
+  --s: var(--danger);
+}
+.ss-maint {
+  --s: var(--data);
+}
+.ss-inc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ss-inc-head b {
+  font-size: 14px;
+  color: var(--text);
+}
+.ss-chip {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--s);
+}
+.ss-inc.past .ss-chip {
+  color: var(--text-faint);
+}
+.ss-impact {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+}
+.ss-inc p {
+  margin: 5px 0 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.ss-inc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.ss-inc-meta .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+}
+.ss-timeline {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--border-strong);
+}
+.ss-timeline li {
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+.ss-timeline li b {
+  color: var(--text);
+}
+
+.ss-history {
+  margin-top: 26px;
+}
+.ss-history-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.ss-history-head > div {
+  flex: 1;
+}
+.ss-history-head .hint {
+  margin: 0;
+}
+.ss-parts {
+  padding: 6px 18px 12px;
+}
+.ss-part {
+  padding: 10px 0 4px;
+}
+.ss-part + .ss-part {
+  border-top: 1px solid var(--border);
+}
+.ss-part-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 7px;
+  font-size: 13px;
+}
+.ss-part-head b {
+  flex: 1;
+  color: var(--text);
+}
+.ss-level {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--play);
+}
+.ss-l-maintenance {
+  color: var(--data);
+}
+.ss-l-degraded {
+  color: var(--warning);
+}
+.ss-l-partial {
+  color: #ff8a3d;
+}
+.ss-l-major {
+  color: var(--danger);
+}
+.ss-l-unknown {
+  color: var(--text-faint);
+}
+.ss-bars {
+  display: flex;
+  gap: 2px;
+  height: 26px;
+}
+.ss-bar {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--play);
+  opacity: 0.85;
+}
+.ss-bar:hover {
+  opacity: 1;
+  outline: 1px solid var(--text-dim);
+}
+.ss-b-none {
+  background: var(--surface-3);
+}
+.ss-b-degraded {
+  background: var(--warning);
+}
+.ss-b-partial {
+  background: #ff8a3d;
+}
+.ss-b-major {
+  background: var(--danger);
+}
+.ss-b-maintenance {
+  background: var(--data);
+}
+.ss-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.ss-past-title {
+  margin-top: 22px;
+}
+.ss-subscribe {
+  display: flex;
+  gap: 14px;
+  margin-top: 22px;
+  padding: 16px 18px;
+}
+.ss-sub-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  margin-top: 2px;
+}
+.ss-subscribe b {
+  color: var(--text);
+}
+.ss-subscribe .hint {
+  margin: 3px 0 10px;
+}
+.ss-sub-form {
+  display: flex;
+  gap: 8px;
+  max-width: 460px;
+}
+.ss-sub-form .input {
+  flex: 1;
+  min-width: 0;
+}
+.ss-sub-done {
+  margin: 0;
+  color: var(--play);
+  font-size: 13px;
+}
+.ss-updated,
+.ss-unreachable {
+  margin-top: 14px;
+}
+@media (max-width: 640px) {
+  .ss-bars {
+    gap: 1px;
+  }
+  .ss-sub-form {
+    flex-direction: column;
+  }
+}

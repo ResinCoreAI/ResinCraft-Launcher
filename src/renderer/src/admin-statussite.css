@@ -1,0 +1,59 @@
+/* Admin → Status → Status page (components/admin/StatusSite.tsx): posting to ResinCraft Status. */
+.ss-admin-tabs {
+  margin-bottom: 14px;
+}
+.ss-admin-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 520px;
+}
+.ss-admin-signin .hint {
+  margin: 0 0 6px;
+}
+.ss-admin-bar {
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.ss-admin-bar .hint {
+  margin: 0;
+}
+.ss-admin-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 6px;
+}
+.ss-admin-part {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.ss-admin-part.on {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.ss-admin-part label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.ss-admin-part select {
+  width: auto;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.ss-admin-notify {
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+}
+.ss-admin-notify em {
+  font-style: normal;
+}

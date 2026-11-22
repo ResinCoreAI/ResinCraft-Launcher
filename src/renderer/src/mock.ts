@@ -18,6 +18,7 @@ import { mockDetails, mockVersionInfo } from './mock-details'
 import { MOCK_PACK, mockPackUpdates, mockPackVersions, mockSwitchPack } from './mock-packswitch'
 import { mockVersions } from './mock-versions'
 import { mockCheckServices, mockStatusNotices } from './mock-status'
+import { mockStatusSite } from './mock-statussite'
 import { mockMailCall } from './mock-mail'
 
 export function mockApi(): ResinApi {
@@ -313,6 +314,7 @@ export function mockApi(): ResinApi {
       artData: async (url) => url,
       checkServices: mockCheckServices,
       statusNotices: mockStatusNotices,
+      ...mockStatusSite(),
       serviceStatus: async () => ({ website: 'operational', tools: 'operational', java: 'degraded', agents: 'operational', list: 'operational', console: 'major', payments: 'operational' }),
       mcpInfo: async () => ({ state: 'on' as const, port: 47615, url: 'http://127.0.0.1:47615/mcp', token: 'mock0123456789abcdef0123456789abcdef0123' }),
       mcpResetToken: async () => ({ state: 'on' as const, port: 47615, url: 'http://127.0.0.1:47615/mcp', token: 'mock0123456789abcdef0123456789abcdef0123' }),

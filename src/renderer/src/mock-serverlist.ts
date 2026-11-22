@@ -161,9 +161,20 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
   if (method === 'POST' && p === '/api/service') return (service = { ...service, state: b.state, message: b.message || null, since: now() })
   if (p.startsWith('/api/payments/wallet')) return mockWalletAdmin(method, path, b, pay.subs, pay.products)
   if (p === '/api/payments' || p.startsWith('/api/payments/')) return { ...(paymentsMock(method, p, b) as object), walletOn: walletAdminOn() }
+  // Admin → Status → Relay: the relay's health and its status notices (relay status.rs).
+  if (p === '/api/status' || p.startsWith('/api/status/')) return relayStatusMock(method, p, b)
   if (p === '/api/devs' || p.startsWith('/api/devs/')) return devMock(method, p, b)
   if (method === 'POST' && p.startsWith('/api/reports/')) {
     const r = relayReports.find((x) => x.id === b.id)
+    if (p === '/api/reports/email') {
+      // Written back through the status checker's mailbox (relay reports.rs email_reporter).
+      if (!r) throw new Error('no such report')
+      if (!r.email) throw new Error('this report has no email to write to')
+      if (!String(b.subject ?? '').trim() || !String(b.message ?? '').trim()) throw new Error('a subject and a message are needed')
+      ;(r as { mails?: { at: number; subject: string }[] }).mails = [...((r as { mails?: { at: number; subject: string }[] }).mails ?? []), { at: Math.floor(Date.now() / 1000), subject: String(b.subject) }]
+      r.seen = true
+      return { ok: true }
+    }
     if (p === '/api/reports/seen-all') relayReports.forEach((x) => (x.seen = true))
     else if (p === '/api/reports/delete' && r) relayReports.splice(relayReports.indexOf(r), 1)
     else if (r) r.seen = p === '/api/reports/seen'
@@ -480,3 +491,22 @@ const statesListeners = new Set<(e: Record<string, JoinState>) => void>()
 const answeredListeners = new Set<(e: JoinAnsweredEvent) => void>()
 export const onJoinStates = (cb: (e: Record<string, JoinState>) => void) => (statesListeners.add(cb), () => void statesListeners.delete(cb))
 export const onJoinAnswered = (cb: (e: JoinAnsweredEvent) => void) => (answeredListeners.add(cb), () => void answeredListeners.delete(cb))
+
+// The relay's /api/status for the preview: its health, and the notices players see (saved and removed here).
+type MockNotice = { id: string; level: string; title: string; body: string; startsAt: number; endsAt: number; createdAt: number; updatedAt: number; by: string; state: string }
+let relayNotices: MockNotice[] = [
+  { id: 'n1', level: 'maintenance', title: 'Relay maintenance tonight', body: 'Hosting pauses for about 20 minutes.', startsAt: Math.floor(Date.now() / 1000) + 3600, endsAt: Math.floor(Date.now() / 1000) + 4800, createdAt: Math.floor(Date.now() / 1000) - 600, updatedAt: Math.floor(Date.now() / 1000) - 600, by: 'Puirkle_Gamer', state: 'scheduled' }
+]
+function relayStatusMock(method: string, p: string, b: Record<string, unknown>) {
+  const sec = () => Math.floor(Date.now() / 1000)
+  if (method === 'POST' && p === '/api/status/notices/save') {
+    const old = relayNotices.find((n) => n.id === b.id)
+    const n: MockNotice = { id: old?.id ?? `n${sec()}`, level: String(b.level ?? 'info'), title: String(b.title ?? ''), body: String(b.body ?? ''), startsAt: Number(b.startsAt) || 0, endsAt: Number(b.endsAt) || 0, createdAt: old?.createdAt ?? sec(), updatedAt: sec(), by: 'Puirkle_Gamer', state: 'active' }
+    if (n.startsAt > sec()) n.state = 'scheduled'
+    relayNotices = [n, ...relayNotices.filter((x) => x.id !== n.id)]
+  } else if (method === 'POST' && p === '/api/status/notices/remove') relayNotices = relayNotices.filter((x) => x.id !== b.id)
+  return {
+    health: { version: '2.1.0', startedAt: sec() - 86400 * 3, uptimeSecs: 86400 * 3 + 4200, ports: [{ name: 'agents', port: 7000 }, { name: 'java', port: 25565 }, { name: 'dashboard', port: 443 }], players: 41, servers: 17, sessions: 230, memoryMb: 182, dataFileBytes: 4_200_000, recentErrors: [] },
+    notices: relayNotices
+  }
+}

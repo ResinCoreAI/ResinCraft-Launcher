@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { AlertTriangle, Info, OctagonX, RefreshCw, Wrench } from 'lucide-react'
-import type { ServiceCheck, StatusNotice } from '@shared/types'
+import type { ServiceCheck, StatusNotice, StatusSite } from '@shared/types'
 import { api } from '../api'
 import { currentLanguage, t, type Key } from '../i18n'
 import { timeAgo } from '../util'
+import { StatusSiteHistory, StatusSiteNow } from '../components/StatusSite'
 import '../status.css'
 
 /** The page's groups, in order (status.rs `services` gives each service one). */
@@ -52,6 +53,9 @@ function problem(c: ServiceCheck): string {
 export default function Status() {
   const [checks, setChecks] = useState<ServiceCheck[]>()
   const [notices, setNotices] = useState<StatusNotice[]>([])
+  // ResinCraft Status's own page (incidents, maintenance, 90 days): kept when a refresh can't reach it.
+  const [site, setSite] = useState<StatusSite>()
+  const [siteError, setSiteError] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // Re-draws "Checked 2 minutes ago" now and then; nothing is checked again.
@@ -66,9 +70,13 @@ export default function Status() {
     setError('')
     // The team's notices come along with the checks; none (an older relay, or it's down) is not an error.
     const posted = api.app.statusNotices().then(setNotices, () => setNotices([]))
+    const statusSite = api.app.statusSite().then(
+      (v) => (setSite(v), setSiteError('')),
+      (e) => setSiteError((e as Error).message)
+    )
     try {
       setChecks(await api.app.checkServices())
-      await posted
+      await Promise.all([posted, statusSite])
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -130,6 +138,8 @@ export default function Status() {
         </div>
       )}
 
+      <StatusSiteNow site={site} />
+
       <div className={`card st-summary st-${level}`} role="status" aria-live="polite">
         <span className={`st-lamp st-${level}`} aria-hidden />
         <b className="grow">{summary}</b>
@@ -176,6 +186,7 @@ export default function Status() {
           </section>
         )
       })}
+      <StatusSiteHistory site={site} error={siteError} />
       <p className="hint st-foot">{t('status.foot')}</p>
     </div>
   )

@@ -29,6 +29,7 @@ pub mod remote;
 pub mod remoteview;
 pub mod report;
 pub mod status;
+pub mod statussite;
 pub mod tray;
 pub mod webview;
 pub mod webstorage;

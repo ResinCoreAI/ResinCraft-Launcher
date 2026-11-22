@@ -1980,6 +1980,78 @@ export interface InboxData {
   status?: InboxStatusSub
 }
 
+/** A part's day on ResinCraft Status: [uptime %, outage minutes, average ms, slow checks, posted level?, posted titles?]. */
+export type StatusSiteDay = [number | null, number, number, number, string?, string[]?]
+/** One part ResinCraft Status checks (its monitor.js `COMPONENTS`). */
+export interface StatusSitePart {
+  id: string
+  group: string
+  name: string
+  about: string
+  state: 'operational' | 'maintenance' | 'degraded' | 'partial' | 'major' | 'unknown'
+  ms: number | null
+  /** Over its 90 days, in %. */
+  uptime: number | null
+  /** One per `StatusSite.days`; null: nothing known that day. */
+  daily: (StatusSiteDay | null)[]
+}
+export interface StatusSiteUpdate {
+  /** ms since 1970 */
+  at: number
+  status: string
+  message: string
+}
+/** A posted incident or maintenance (lib-incidents.js), as the public page gets it. Times in ms. */
+export interface StatusSiteIncident {
+  id: number
+  title: string
+  impact: 'none' | 'minor' | 'major' | 'critical' | 'maintenance'
+  /** investigating | identified | monitoring | resolved; maintenance: scheduled | in_progress | verifying | completed */
+  status: string
+  on: boolean
+  upcoming: boolean
+  start: number
+  end: number | null
+  window: { from: number; until: number } | null
+  components: { name: string; level: string }[]
+  /** Newest first. */
+  updates: StatusSiteUpdate[]
+}
+/** status.json, as ResinCraft Status's own page reads it (written by its monitor.js every minute). */
+export interface StatusSite {
+  updated: number
+  /** UTC days, oldest first (90). */
+  days: string[]
+  components: StatusSitePart[]
+  outages: { name: string; start: number; end: number | null; note: string }[]
+  incidents: StatusSiteIncident[]
+  features?: { subscribe?: boolean; reportEmail?: boolean }
+}
+/** An incident on the posting page (admin.js `state`): as stored, with where it stands now. */
+export interface StatusSiteAdminIncident {
+  id: number
+  title: string
+  impact: StatusSiteIncident['impact']
+  /** part id → level */
+  components: Record<string, string>
+  created: number
+  window?: { from: number; until: number }
+  /** Oldest first. */
+  updates: StatusSiteUpdate[]
+  phase: { status: string; on: boolean; upcoming: boolean; start: number; end: number | null }
+}
+/** The posting page's state (admin.js `state`); `notified`: how many subscribers the last change emailed. */
+export interface StatusSiteAdmin {
+  signedIn: boolean
+  hasPassword?: boolean
+  parts?: Record<string, string>
+  levels?: Record<string, string>
+  incidents?: StatusSiteAdminIncident[]
+  mail?: { configured: boolean; from: string | null; queued: number }
+  subscribers?: { count: number; waiting: number; list: { id: number; email: string; since: number }[] }
+  notified?: number
+}
+
 /** A notice the ResinCraft team posts on the relay, shown on the Status page (status.rs `StatusNotice`). */
 export interface StatusNotice {
   id: string
@@ -2653,6 +2725,14 @@ export interface ResinApi {
     checkServices(): Promise<ServiceCheck[]>
     /** The ResinCraft team's notices for the Status page (from the relay), most severe first; none when unreachable. */
     statusNotices(): Promise<StatusNotice[]>
+    /** ResinCraft Status (status.<relay domain>): its page's data, as its own page reads it (statussite.rs). */
+    statusSite(): Promise<StatusSite>
+    /** Its "Get email updates": the service emails a link to confirm. */
+    statusSubscribe(email: string): Promise<void>
+    /** Admin → Status → Status page: sign in to its posting page (the password isn't kept), its API, sign out. */
+    statusAdminLogin(password: string): Promise<StatusSiteAdmin>
+    statusAdminCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<StatusSiteAdmin>
+    statusAdminLogout(): Promise<void>
     /** An https picture as a data: URL (for pictures the UI draws on a canvas, like the overview card). */
     imageData(url: string): Promise<string>
     /** A modpack's gallery picture shrunk for a backdrop (at most 1280 wide), as a data: URL; fetched once, then cached. */
