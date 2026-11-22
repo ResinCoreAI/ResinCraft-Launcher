@@ -390,6 +390,13 @@ export function mockServerList(find: (id: string) => ServerInfo) {
     },
     adminLock: async () => void (adminUnlocked = false),
     adminCall: (method: 'GET' | 'POST', path: string, body?: unknown) => mockAdminCall(method, path, body),
+    devPickBuild: () =>
+      wait({ path: 'C:/builds/ResinCraft Launcher_1.6.2-dev.202611231200_x64-setup.exe', name: 'ResinCraft Launcher_1.6.2-dev.202611231200_x64-setup.exe', size: 14_300_000, version: '1.6.2-dev.202611231200', signature: true, target: 'windows-x86_64' }),
+    devUpload: async (req: { version: string; target: string; notes?: string }) => {
+      await wait(null, 900)
+      devBuild = { version: req.version, notes: req.notes ?? '', uploadedAt: now(), platforms: [{ target: req.target, size: 14_300_000, uploadedAt: now() }] }
+      return { ok: true, version: req.version, target: req.target }
+    },
     clientPack: (id: string) =>
       wait({
         modded: find(id).type !== 'vanilla' && find(id).type !== 'paper' && find(id).type !== 'bedrock',

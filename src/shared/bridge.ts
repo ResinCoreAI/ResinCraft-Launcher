@@ -328,6 +328,8 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       adminUnlock: fn('server:adminUnlock'),
       adminLock: fn('server:adminLock'),
       adminCall: fn('server:adminCall'),
+      devPickBuild: fn('server:devPickBuild'),
+      devUpload: fn('server:devUpload'),
       submitListing: fn('server:submitListing'),
       myListings: fn('server:myListings'),
       removeListing: fn('server:removeListing'),

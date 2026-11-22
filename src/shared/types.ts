@@ -494,6 +494,19 @@ export interface UpdateAvailable {
   dev?: boolean
 }
 
+/** A Dev build's update file picked on this PC (Admin → Dev). */
+export interface DevBuildFile {
+  path: string
+  name: string
+  size: number
+  /** From the bundle's name; empty when it has none. */
+  version: string
+  /** The .sig the build made next to it is there. */
+  signature: boolean
+  /** The updater platform, guessed from the name ("windows-x86_64"). */
+  target: string
+}
+
 /** Games and hosted servers (their names) that installing an update would cut off. */
 export interface UpdateBlockers {
   games: string[]
@@ -2980,6 +2993,10 @@ export interface ResinApi {
     adminLock(forget?: boolean): Promise<void>
     /** One admin request (the relay dashboard's JSON API: GET /api/listings, POST /api/listings/…). */
     adminCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
+    /** Admin → Dev: picks a Dev build's update file on this PC (null if cancelled). */
+    devPickBuild(): Promise<DevBuildFile | null>
+    /** Admin → Dev: uploads it to the relay's Dev channel, with the .sig next to it. */
+    devUpload(req: { path: string; version: string; target: string; notes?: string }): Promise<unknown>
     submitListing(req: { address: string; info: ListingInfo }): Promise<ListingStatus>
     myListings(): Promise<MyListing[]>
     removeListing(id: string): Promise<ListingStatus>

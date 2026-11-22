@@ -1,10 +1,15 @@
-// Admin → Dev: who may use the launcher's Dev update channel, and the Dev build release-dev.bat uploaded (the relay's
-// Dev page; relay-server's devbuilds.rs).
+// Admin → Dev: who may use the launcher's Dev update channel, and the Dev build (uploaded here, on the relay's Dev
+// page or by release-dev.bat; relay-server's devbuilds.rs).
 import { useState } from 'react'
-import { FlaskConical, Trash2, UserPlus } from 'lucide-react'
+import { FileUp, FlaskConical, Loader2, Trash2, Upload, UserPlus } from 'lucide-react'
+import type { DevBuildFile } from '@shared/types'
+import { api } from '../../api'
+import { useStore } from '../../store'
 import { t } from '../../i18n'
 import { ConfirmModal } from '../ui'
 import { ago, Loading, size, useAct, useAdmin } from './common'
+
+const TARGETS = ['windows-x86_64', 'windows-aarch64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64', 'linux-aarch64']
 
 interface DevInvite {
   uuid: string
@@ -24,6 +29,35 @@ export function DevAdmin() {
   const act = useAct(reload)
   const [who, setWho] = useState('')
   const [removing, setRemoving] = useState(false)
+  const { toast } = useStore()
+  const [file, setFile] = useState<DevBuildFile | null>(null)
+  const [version, setVersion] = useState('')
+  const [target, setTarget] = useState('windows-x86_64')
+  const [notes, setNotes] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const pick = async () => {
+    const f = await api.server.devPickBuild().catch((e) => void toast((e as Error).message, 'error'))
+    if (!f) return
+    setFile(f)
+    setVersion(f.version)
+    setTarget(f.target)
+  }
+  const preRelease = /^\d+\.\d+\.\d+-[0-9A-Za-z.-]+$/.test(version.trim())
+  const upload = async () => {
+    if (!file) return
+    setUploading(true)
+    try {
+      await api.server.devUpload({ path: file.path, version: version.trim(), target, notes: notes.trim() })
+      toast(t('servers.admin.dev.uploadDone', { version: version.trim() }), 'success')
+      setFile(null)
+      setNotes('')
+      await reload()
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
   const invite = async () => {
     const name = who.trim()
     if (await act('/api/devs/add', { who: name }, 'servers.admin.dev.invited', { name })) setWho('')
@@ -47,7 +81,7 @@ export function DevAdmin() {
                 {b.notes && <div className="hint">{b.notes}</div>}
               </>
             ) : (
-              <span>{data.uploads ? t('servers.admin.dev.noBuild') : t('servers.admin.dev.uploadsOff')}</span>
+              <span>{t('servers.admin.dev.noBuild')}</span>
             )}
           </div>
           {b && (
@@ -56,6 +90,56 @@ export function DevAdmin() {
             </button>
           )}
         </div>
+      </div>
+
+      <div className="settings-section">
+        <h3>{t('servers.admin.dev.upload')}</h3>
+        <p className="hint">{t('servers.admin.dev.uploadHint')}</p>
+        <div className="card">
+          <div className="setting">
+            <div className="text">
+              <b>{file ? file.name : t('servers.admin.dev.noFile')}</b>
+              {file && <span>{size(file.size)}</span>}
+              {file && !file.signature && <div className="hint bad">{t('servers.admin.dev.noSig', { name: file.name })}</div>}
+            </div>
+            <button className="btn sm" disabled={uploading} onClick={() => void pick()}>
+              <FileUp /> {t('servers.admin.dev.choose')}
+            </button>
+          </div>
+          {file && (
+            <div className="setting stack">
+              <div className="listing-fields">
+                <div className="field-row">
+                  <label className="field">
+                    <span>{t('servers.admin.dev.version')}</span>
+                    <input className="input" value={version} maxLength={64} spellCheck={false} placeholder="1.7.0-dev.1" onChange={(e) => setVersion(e.target.value)} />
+                    {!preRelease && <span className="hint">{t('servers.admin.dev.versionHint')}</span>}
+                  </label>
+                  <label className="field">
+                    <span>{t('servers.admin.dev.target')}</span>
+                    <select className="input" value={target} onChange={(e) => setTarget(e.target.value)}>
+                      {TARGETS.map((x) => (
+                        <option key={x} value={x}>
+                          {x}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="field">
+                  <span>{t('servers.admin.dev.notes')}</span>
+                  <input className="input" value={notes} maxLength={4000} onChange={(e) => setNotes(e.target.value)} />
+                </label>
+                <div className="row end">
+                  <button className="btn sm primary" disabled={uploading || !file.signature || !preRelease} onClick={() => void upload()}>
+                    {uploading ? <Loader2 className="spin" /> : <Upload />} {t(uploading ? 'servers.admin.dev.uploading' : 'servers.admin.dev.uploadButton')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        {!data.uploads && <p className="hint">{t('servers.admin.dev.uploadsOff')}</p>}
       </div>
 
       <div className="settings-section">

@@ -236,6 +236,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             done()
         }
 "server:adminCall" => json(admin::call(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<Value>>(2)?).await?),
+        // Admin → Dev: pick a Dev build's update file on this PC, and upload it (with the .sig next to it).
+        "server:devPickBuild" => json(admin::dev_pick_build().await?),
+        "server:devUpload" => json(admin::dev_upload(args.get(0)?).await?),
         "server:antiCheat" => json(plugins::anticheat_status(&args.get::<String>(0)?).await?),
         "server:setAntiCheat" => {
             let id: String = args.get(0)?;

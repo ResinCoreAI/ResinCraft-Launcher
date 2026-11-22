@@ -228,3 +228,97 @@ pub async fn call(method: &str, path: &str, body: Option<Value>) -> Result<Value
     };
     answer.map_err(|why| tr!("admin.refused", "The relay refused: {error}", error = why).into())
 }
+
+// ---------- Admin → Dev: uploading a Dev build from this PC ----------
+
+/// A Dev build's update file picked on this PC: what the upload form shows and needs.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DevBuildFile {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    /// From the bundle's name ("ResinCraft Launcher_1.7.0-dev.1_x64-setup.exe"); empty when it has none.
+    pub version: String,
+    /// The `.sig` the build made next to it (the update signature) is there.
+    pub signature: bool,
+    /// The updater platform it's for, guessed from the name ("windows-x86_64").
+    pub target: String,
+}
+
+/// What's in a bundle's file name.
+fn dev_build_file(path: &std::path::Path, size: u64) -> DevBuildFile {
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let version = name.split('_').find(|p| semver::Version::parse(p).is_ok()).unwrap_or_default().to_string();
+    let lower = name.to_ascii_lowercase();
+    let arm = lower.contains("arm64") || lower.contains("aarch64");
+    let target = if lower.ends_with(".app.tar.gz") {
+        "darwin-aarch64"
+    } else if lower.ends_with(".appimage") || lower.ends_with(".deb") {
+        if arm { "linux-aarch64" } else { "linux-x86_64" }
+    } else if arm {
+        "windows-aarch64"
+    } else {
+        "windows-x86_64"
+    };
+    let signature = std::path::PathBuf::from(format!("{}.sig", path.display())).is_file();
+    DevBuildFile { path: path.display().to_string(), name, size, version, signature, target: target.into() }
+}
+
+/// Picks a Dev build's update file (None: cancelled).
+pub async fn dev_pick_build() -> Result<Option<DevBuildFile>> {
+    let picked = crate::core::shell::pick_file("Choose a Dev build", &[("Update file", &["exe", "gz", "AppImage", "deb"])]).await?;
+    let Some(path) = picked else { return Ok(None) };
+    let size = tokio::fs::metadata(&path).await?.len();
+    Ok(Some(dev_build_file(&path, size)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DevUploadReq {
+    pub path: String,
+    pub version: String,
+    pub target: String,
+    #[serde(default)]
+    pub notes: String,
+}
+
+/// Uploads a Dev build to the relay with a one-time ticket from the admin connection (`/api/devs/upload-ticket`).
+/// The update signature comes from the `.sig` next to the file.
+pub async fn dev_upload(req: DevUploadReq) -> Result<Value> {
+    let signature = tokio::fs::read_to_string(format!("{}.sig", req.path)).await.map_err(|e| anyhow::anyhow!("{}.sig: {e}", req.path))?;
+    let ticket = call("POST", "/api/devs/upload-ticket", None).await?;
+    let (Some(url), Some(t)) = (ticket["url"].as_str(), ticket["ticket"].as_str()) else { anyhow::bail!("the relay didn't give an upload ticket") };
+    let body = tokio::fs::read(&req.path).await?;
+    let res = crate::core::ctx::http()
+        .put(format!("{url}/{}", urlencoding::encode(&req.target)))
+        .bearer_auth(t)
+        .header("X-Version", req.version.trim())
+        .header("X-Signature", signature.trim())
+        .header("X-Notes", urlencoding::encode(req.notes.trim()).into_owned())
+        .header("Content-Type", "application/octet-stream")
+        .timeout(std::time::Duration::from_secs(900))
+        .body(body)
+        .send()
+        .await?;
+    let status = res.status();
+    let answer: Value = res.json().await.unwrap_or(Value::Null);
+    if !status.is_success() {
+        let why = answer.get("error").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+        return Err(tr!("admin.refused", "The relay refused: {error}", error = why).into());
+    }
+    Ok(answer)
+}
+
+#[cfg(test)]
+mod dev_build_tests {
+    use super::*;
+
+    #[test]
+    fn reads_bundle_names() {
+        let f = dev_build_file(std::path::Path::new("C:/b/ResinCraft Launcher_1.6.2-dev.202611221530_x64-setup.exe"), 5);
+        assert_eq!((f.version.as_str(), f.target.as_str(), f.signature), ("1.6.2-dev.202611221530", "windows-x86_64", false));
+        let f = dev_build_file(std::path::Path::new("/b/ResinCraft.Launcher_1.7.0_arm64_linux.AppImage"), 5);
+        assert_eq!((f.version.as_str(), f.target.as_str()), ("1.7.0", "linux-aarch64"));
+        assert_eq!(dev_build_file(std::path::Path::new("setup.exe"), 5).version, "");
+    }
+}
