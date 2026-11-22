@@ -3,7 +3,7 @@
 //   Stable 2.0.0              → "Version 2.0.0"
 //   Beta   2.0.1-beta.1       → "B2.0.1 Build2026.11.23.1"   (the day it was built, and which beta that is)
 //   Dev    2.0.1-dev.2        → "DV2.0.1.2"                  (developers' Dev build, and its build number)
-//   Test   2.0.1-test.1       → "DT2.0.1"                    (the Test build invited testers get)
+//   Test   2.0.1-test.1       → "DT2.0.1.1"                  (the Test build invited testers get, and its build number)
 // Anything else (an -rc, a local build) shows as it is.
 import { t } from './i18n'
 
@@ -32,7 +32,7 @@ export function versionName(version?: string): string {
     case 'dev':
       return `DV${core}${num ? `.${num}` : ''}`
     case 'test':
-      return `DT${core}`
+      return `DT${core}${num ? `.${num}` : ''}`
     default:
       return v
   }
