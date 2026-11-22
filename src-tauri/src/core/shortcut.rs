@@ -111,7 +111,7 @@ async fn write(dir: &Path, stem: &str, exe: &Path, id: &str, name: &str, icon: O
     // The picture the UI sent is kept next to the instance, for the entry to point at.
     let sent = paths::instance_dir(id).join("shortcut.png");
     let icon_png = match icon {
-        Some(png) if tokio::fs::write(&sent, png).await.is_ok() => sent,
+        Some(png) if tokio::fs::write(&sent, &png).await.is_ok() => sent,
         _ => instances::icon_file(id),
     };
     let icon = if icon_png.is_file() { icon_png.display().to_string() } else { "resincraft".to_string() };
