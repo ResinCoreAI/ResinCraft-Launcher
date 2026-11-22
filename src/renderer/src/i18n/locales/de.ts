@@ -5043,6 +5043,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "Nicht für Minecraft {version}: Auswählen wechselt zu einer Version, die {loader} unterstützt",
   "newInstance.switched": "{loader} unterstützt Minecraft {from} nicht, deshalb ist Minecraft {to} gewählt.",
   "common.moreBelow": "Weiter unten mehr",
+  "settings.classicLayout": "Klassisches Layout",
+  "settings.classicLayout.hint": "Der Look von 1.6: Seiten in einer Leiste links, darunter deine letzten Instanzen und dein Konto. Alle Seiten und Funktionen bleiben gleich.",
 }
 
 export default dict

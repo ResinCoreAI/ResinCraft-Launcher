@@ -1,0 +1,269 @@
+/* ---------- Classic layout (components/ClassicShell.tsx, Settings → Appearance) ----------
+   The 1.6.1 shell: a bar down the left, a thin title bar over the page, flat panels. Everything is scoped to
+   .app.classic / html.classic-ui, so the new header's rules (styles.css "Shell") are untouched when it's off.
+   The cover's colours are re-pointed at the page's on the parts that sit on a panel now, not on the cover. */
+
+html.classic-ui {
+  --titlebar: 44px;
+  --sidebar-w: 236px;
+}
+
+.app.classic {
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+}
+
+.app.classic aside.sidebar,
+.app.classic .classic-top,
+html.classic-ui .win-controls {
+  --cover-fg: var(--text);
+  --cover-dim: var(--text-dim);
+  --cover-hover: var(--surface);
+}
+
+/* The bar down the left. */
+.app.classic aside.sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  min-height: 0;
+  padding: 0 12px 12px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  color: var(--text);
+}
+.app.classic .brand {
+  height: calc(var(--titlebar) + 18px);
+  gap: 10px;
+  padding: 8px 6px 0;
+}
+.app.classic .brand svg {
+  width: 28px;
+  height: 28px;
+}
+.app.classic .brand-name {
+  font: 700 17px/1.05 var(--font-display);
+}
+.app.classic .brand-name small {
+  display: block;
+  font: 400 11px/1.5 var(--font);
+  color: var(--text-faint);
+  letter-spacing: 0;
+}
+/* Window buttons on the left: they sit over the bar's top, so the name moves below them. */
+:root[data-winside='left'] .app.classic .brand {
+  height: auto;
+  padding-top: calc(var(--titlebar) + 4px);
+}
+
+.app.classic aside.sidebar .nav {
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  height: auto;
+  margin-top: 16px;
+  overflow: visible;
+}
+.app.classic aside.sidebar .nav-item {
+  gap: 11px;
+  height: auto;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: inherit;
+  font-weight: 500;
+}
+.app.classic aside.sidebar .nav-item:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.app.classic aside.sidebar .nav-item.active,
+.app.classic aside.sidebar .nav-item.active:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 500;
+}
+/* The page you are on: a mark at the bar's edge. */
+.app.classic aside.sidebar .nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  background: var(--accent);
+}
+.app.classic aside.sidebar .nav-item svg {
+  width: 17px;
+  height: 17px;
+}
+.app.classic aside.sidebar .nav-item.active svg {
+  color: var(--accent);
+}
+.app.classic aside.sidebar .nav-item .count {
+  margin-left: auto;
+  font: 500 11px/18px var(--mono);
+  color: var(--text-faint);
+  opacity: 1;
+}
+.app.classic aside.sidebar .nav-item .live {
+  margin-left: auto;
+}
+
+.classic-label {
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 18px 10px 6px;
+}
+.app.classic aside.sidebar .nav-recent {
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
+  overflow: auto;
+}
+.app.classic aside.sidebar .nav-recent .nav-item {
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.app.classic .nav-recent .nav-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+.classic-empty {
+  padding: 0 10px;
+}
+
+.app.classic aside.sidebar .account-chip {
+  margin: 10px 0 0;
+  width: 100%;
+  height: auto;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: border-color 0.12s var(--ease);
+}
+.app.classic aside.sidebar .account-chip:hover,
+.app.classic aside.sidebar .account-chip.active {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.app.classic .account-chip .avatar {
+  border-radius: var(--radius-sm);
+}
+.app.classic .account-chip .who {
+  flex: 1;
+}
+.app.classic .account-chip .who b {
+  max-width: none;
+  font-size: inherit;
+}
+.app.classic .account-chip .who span {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.app.classic .account-chip .chip-caret {
+  width: 15px;
+  height: 15px;
+  color: var(--text-faint);
+}
+
+/* The page: flat, edge to edge beside the bar. */
+.app.classic .main {
+  margin: 0;
+  border-radius: 0;
+  background: var(--bg);
+}
+.classic-top {
+  height: var(--titlebar);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 calc(var(--win-w, 0px) + 12px) 0 32px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 13px;
+  -webkit-app-region: drag;
+}
+:root[data-winside='left'] .classic-top {
+  padding-right: 16px;
+}
+.classic-top button,
+.classic-top input {
+  -webkit-app-region: no-drag;
+}
+.classic-top .crumb {
+  flex: 1;
+  margin: 0;
+}
+.classic-top .crumb button {
+  margin-left: 0;
+}
+.classic-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.classic-tools .head-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+}
+
+/* The holiday piece stands in the bar here, not the window's corner. */
+html.classic-ui .shell-decor {
+  display: none;
+}
+
+/* A narrow window: the bar keeps only its icons. */
+@media (max-width: 860px) {
+  html.classic-ui {
+    --sidebar-w: 64px;
+  }
+  .app.classic aside.sidebar {
+    padding: 0 8px 8px;
+  }
+  .app.classic .brand {
+    justify-content: center;
+    padding: 8px 0 0;
+  }
+  .app.classic .brand-name,
+  .app.classic .classic-label,
+  .app.classic .classic-empty,
+  .app.classic aside.sidebar .nav-item .ellipsis,
+  .app.classic aside.sidebar .nav-item .count,
+  .app.classic .account-chip .who,
+  .app.classic .account-chip .chip-caret {
+    display: none;
+  }
+  .app.classic aside.sidebar .nav-item {
+    justify-content: center;
+    padding: 9px 0;
+  }
+  .app.classic aside.sidebar .nav-item.active::before {
+    left: -8px;
+  }
+  .app.classic aside.sidebar .nav-recent {
+    border-top: 1px solid var(--border);
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  .app.classic aside.sidebar .account-chip {
+    justify-content: center;
+    padding: 6px 0;
+  }
+  .app.classic aside.sidebar .account-chip .avatar {
+    width: 30px;
+    height: 30px;
+  }
+  .classic-top {
+    padding-left: 16px;
+  }
+}

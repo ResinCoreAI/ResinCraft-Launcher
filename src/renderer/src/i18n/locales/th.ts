@@ -5003,6 +5003,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "ใช้กับ Minecraft {version} ไม่ได้: กดเลือกแล้วจะเปลี่ยนไปเวอร์ชันที่ {loader} รองรับ",
   "newInstance.switched": "{loader} ไม่รองรับ Minecraft {from} เลยเปลี่ยนเป็น Minecraft {to} ให้",
   "common.moreBelow": "เลื่อนลงดูเพิ่ม",
+  "settings.classicLayout": "หน้าตาแบบเก่า",
+  "settings.classicLayout.hint": "หน้าตาแบบ 1.6: หน้าต่างๆ อยู่ในแถบด้านซ้าย มีอินสแตนซ์ล่าสุดและบัญชีอยู่ด้านล่าง ทุกหน้าและทุกฟีเจอร์ยังเหมือนเดิม",
 }
 
 export default dict

@@ -637,4 +637,6 @@ export default {
   "newInstance.loaderOtherVersion": "Not for Minecraft {version}: picking it moves to a version {loader} supports",
   "newInstance.switched": "{loader} doesn't support Minecraft {from}, so Minecraft {to} is picked.",
   "common.moreBelow": "More below",
+  "settings.classicLayout": "Classic layout",
+  "settings.classicLayout.hint": "The 1.6 look: pages in a bar down the left, with your recent instances and account under them. Every page and feature stays the same.",
 } as const

@@ -5014,6 +5014,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "Bukan untuk Minecraft {version}: memilihnya pindah ke versi yang didukung {loader}",
   "newInstance.switched": "{loader} tidak mendukung Minecraft {from}, jadi Minecraft {to} yang dipilih.",
   "common.moreBelow": "Masih ada di bawah",
+  "settings.classicLayout": "Tata letak klasik",
+  "settings.classicLayout.hint": "Tampilan 1.6: halaman di bilah kiri, dengan instance terakhir dan akunmu di bawahnya. Semua halaman dan fitur tetap sama.",
 }
 
 export default dict

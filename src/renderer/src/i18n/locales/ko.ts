@@ -5006,6 +5006,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "Minecraft {version}에서는 안 돼요: 고르면 {loader}가 지원하는 버전으로 바뀌어요",
   "newInstance.switched": "{loader}는 Minecraft {from}을 지원하지 않아서 Minecraft {to}를 골랐어요.",
   "common.moreBelow": "아래에 더 있어요",
+  "settings.classicLayout": "클래식 레이아웃",
+  "settings.classicLayout.hint": "1.6의 모습: 왼쪽 바에 페이지가 있고 그 아래에 최근 인스턴스와 계정이 있어요. 페이지와 기능은 모두 그대로예요.",
 }
 
 export default dict

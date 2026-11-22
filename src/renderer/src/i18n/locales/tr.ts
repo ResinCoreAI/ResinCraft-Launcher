@@ -5024,6 +5024,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "Minecraft {version} için değil: seçince {loader} destekleyen bir sürüme geçer",
   "newInstance.switched": "{loader}, Minecraft {from} sürümünü desteklemiyor; bu yüzden Minecraft {to} seçildi.",
   "common.moreBelow": "Aşağıda devamı var",
+  "settings.classicLayout": "Klasik düzen",
+  "settings.classicLayout.hint": "1.6 görünümü: sayfalar soldaki çubukta, altında son örneklerin ve hesabın. Tüm sayfalar ve özellikler aynı kalır.",
 }
 
 export default dict

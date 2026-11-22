@@ -46,6 +46,9 @@ import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
 import { useAdminStatus } from './adminStatus'
+import { useClassicLayout } from './classicLayoutState'
+import { ClassicSidebar, ClassicTopBar } from './components/ClassicShell'
+import './classic.css'
 import { useStoreOpen } from './storeStatus'
 import { decideWelcome, useWelcome } from './welcomeState'
 
@@ -170,6 +173,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', key)
   }, [])
   const isAdmin = useAdminStatus()
+  const classic = useClassicLayout()
   const storeOpen = useStoreOpen()
   const current = route.page === 'instance' ? 'library' : route.page
   const instance = route.page === 'instance' ? instances.find((i) => i.id === route.id) : undefined
@@ -189,9 +193,12 @@ export default function App() {
   }, [])
 
   return (
-    <div className="app">
+    <div className={`app ${classic ? 'classic' : ''}`}>
       {/* The site header, which is also the window's title bar. It keeps the class it had as a left bar, so themes
           and custom CSS written for .sidebar still colour it. Its empty parts drag the window. */}
+      {classic ? (
+        <ClassicSidebar nav={nav} current={current} accountMenu={accountMenu} />
+      ) : (
       <header className="sidebar" data-tauri-drag-region>
         <div className="brand" data-tauri-drag-region>
           <Logo />
@@ -255,11 +262,18 @@ export default function App() {
           </button>
         </div>
       </header>
+      )}
 
       <main className="main">
+        {classic && (
+          <ClassicTopBar
+            title={t(nav.find((n) => n.page === current)?.label ?? 'nav.home')}
+            searchPages={nav.map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))}
+          />
+        )}
         <div className="content">
-          {/* The way back from an instance; it scrolls away with the page. */}
-          {instance && (
+          {/* The way back from an instance; it scrolls away with the page. (Classic: it's in the title bar.) */}
+          {instance && !classic && (
             <div className="topbar">
               <div className="crumb">
                 <button onClick={() => go({ page: 'library' })}>{t('nav.library')}</button>

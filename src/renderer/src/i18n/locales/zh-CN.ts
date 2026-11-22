@@ -5001,6 +5001,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "不适用于 Minecraft {version}：选择后会切换到 {loader} 支持的版本",
   "newInstance.switched": "{loader} 不支持 Minecraft {from}，因此改选 Minecraft {to}。",
   "common.moreBelow": "下方还有内容",
+  "settings.classicLayout": "经典布局",
+  "settings.classicLayout.hint": "1.6 的样子：页面在左侧栏中，下方是最近的实例和你的账号。所有页面和功能保持不变。",
 }
 
 export default dict

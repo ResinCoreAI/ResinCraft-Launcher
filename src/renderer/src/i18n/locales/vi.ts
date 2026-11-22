@@ -5011,6 +5011,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "Không dành cho Minecraft {version}: chọn sẽ chuyển sang phiên bản {loader} hỗ trợ",
   "newInstance.switched": "{loader} không hỗ trợ Minecraft {from}, nên đã chọn Minecraft {to}.",
   "common.moreBelow": "Còn nữa bên dưới",
+  "settings.classicLayout": "Bố cục cổ điển",
+  "settings.classicLayout.hint": "Giao diện 1.6: các trang nằm trong thanh bên trái, bên dưới là instance gần đây và tài khoản của bạn. Mọi trang và tính năng vẫn giữ nguyên.",
 }
 
 export default dict

@@ -5011,6 +5011,8 @@ const dict: Dict = {
   "newInstance.loaderOtherVersion": "Minecraft {version} には非対応：選ぶと {loader} が対応するバージョンに切り替わります",
   "newInstance.switched": "{loader} は Minecraft {from} に対応していないため、Minecraft {to} を選びました。",
   "common.moreBelow": "下にまだあります",
+  "settings.classicLayout": "クラシックレイアウト",
+  "settings.classicLayout.hint": "1.6 の見た目：左のバーにページ、その下に最近のインスタンスとアカウント。ページと機能はすべて同じです。",
 }
 
 export default dict

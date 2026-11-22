@@ -20,6 +20,7 @@ import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { DISCLAIMER, fixed } from '../util'
 import { SETTING_SECTIONS } from '../settingsIndex'
 import { setLaunchScreen, useLaunchScreen } from '../launchScreenState'
+import { setClassicLayout, useClassicLayout } from '../classicLayoutState'
 import { setGuideOn, startGuide, useGuide } from '../guideState'
 import { setWindowButtons, useWindowButtons, WINDOW_BUTTON_STYLES, type WindowButtonStyle } from '../windowButtonsState'
 
@@ -201,6 +202,7 @@ const SECTIONS = SETTING_SECTIONS.map((x) => ({ ...x, icon: SECTION_ICONS[x.id] 
 export default function SettingsPage() {
   const { settings: s, updateSettings, info, toast, route, go } = useStore()
   const launchScreen = useLaunchScreen()
+  const classicLayout = useClassicLayout()
   const guide = useGuide()
   const [javas, setJavas] = useState<JavaInstall[]>()
   const [scanning, setScanning] = useState(false)
@@ -322,6 +324,13 @@ export default function SettingsPage() {
             <div className="card">
               <ThemePicker s={s} set={set} />
               <WindowButtonsPicker />
+              <div className="setting">
+                <div className="text">
+                  <b>{t('settings.classicLayout')}</b>
+                  <span>{t('settings.classicLayout.hint')}</span>
+                </div>
+                <Switch on={classicLayout} onChange={setClassicLayout} label={t('settings.classicLayout')} />
+              </div>
               <div className="setting">
                 <div className="text">
                   <b>{t('settings.language')}</b>
