@@ -37,6 +37,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       sendReport: fn('app:sendReport'),
       serviceStatus: fn('app:serviceStatus'),
       checkServices: fn('app:checkServices'),
+      statusNotices: fn('app:statusNotices'),
       imageData: fn('app:imageData'),
       artData: fn('app:artData'),
       mcpInfo: fn('app:mcpInfo'),

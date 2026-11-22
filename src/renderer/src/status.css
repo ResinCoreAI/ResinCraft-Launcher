@@ -171,3 +171,76 @@
     padding-left: 23px;
   }
 }
+
+/* The ResinCraft team's notices (from the relay), above the summary, most severe first. */
+.st-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.st-notice {
+  --n: var(--text-faint);
+  display: flex;
+  gap: 12px;
+  padding: 13px 16px;
+  border: 1px solid color-mix(in srgb, var(--n) 40%, var(--border));
+  border-left: 3px solid var(--n);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--n) 8%, var(--surface));
+}
+.st-n-outage {
+  --n: var(--danger);
+}
+.st-n-degraded {
+  --n: var(--warning);
+}
+.st-n-maintenance {
+  --n: var(--data);
+}
+.st-notice-icon {
+  flex: none;
+  color: var(--n);
+  margin-top: 1px;
+}
+.st-n-info .st-notice-icon {
+  color: var(--text-dim);
+}
+.st-notice-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.st-notice-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.st-notice-level {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--n);
+}
+.st-n-info .st-notice-level {
+  color: var(--text-faint);
+}
+.st-notice-text b {
+  font-size: 14px;
+  color: var(--text);
+}
+.st-notice-text p {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.st-notice-when {
+  margin-top: 4px;
+  color: var(--text-faint);
+  font-size: 12px;
+}

@@ -234,6 +234,74 @@ pub async fn probe(client: &reqwest::Client, target: &Target, key: Option<&str>)
     }
 }
 
+/// A notice the ResinCraft team posts on the relay (its Admin → Status): planned maintenance, a known outage.
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusNotice {
+    #[serde(default)]
+    pub id: String,
+    /// "outage" | "degraded" | "maintenance" | "info" (anything else reads as "info").
+    #[serde(default)]
+    pub level: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub body: String,
+    /// Unix seconds; `ends_at` 0 = until further notice.
+    #[serde(default)]
+    pub starts_at: i64,
+    #[serde(default)]
+    pub ends_at: i64,
+    #[serde(default)]
+    pub updated_at: i64,
+}
+
+#[derive(serde::Deserialize)]
+struct NoticeList {
+    #[serde(default)]
+    notices: Vec<StatusNotice>,
+}
+
+const LEVELS: [&str; 4] = ["outage", "degraded", "maintenance", "info"];
+
+/// The notices worth showing at `now` (unix seconds), most severe first: known levels only (others become "info"),
+/// none that has ended or not started, none without a title. The relay already sends only active ones, sorted; this
+/// keeps a cached or older answer honest.
+pub fn active_notices(list: Vec<StatusNotice>, now: i64) -> Vec<StatusNotice> {
+    let mut out: Vec<StatusNotice> = list
+        .into_iter()
+        .filter(|n| !n.title.trim().is_empty() && (n.ends_at == 0 || n.ends_at > now) && n.starts_at <= now)
+        .map(|mut n| {
+            if !LEVELS.contains(&n.level.as_str()) {
+                n.level = "info".into();
+            }
+            n
+        })
+        .collect();
+    out.sort_by_key(|n| LEVELS.iter().position(|l| *l == n.level));
+    out
+}
+
+/// The relay's notices from `url`. Anything but a readable 200 (an older relay answers 404, or it's down) is no
+/// notices: the relay's own rows on the page already say when it can't be reached.
+pub async fn fetch_notices(client: &reqwest::Client, url: &str, now: i64) -> Vec<StatusNotice> {
+    let Ok(res) = client.get(url).timeout(TIMEOUT).send().await else { return Vec::new() };
+    if !res.status().is_success() {
+        return Vec::new();
+    }
+    match res.json::<NoticeList>().await {
+        Ok(list) => active_notices(list.notices, now),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// The ResinCraft team's notices for the Status page (`app:statusNotices`); none when this build has no relay.
+pub async fn notices() -> Vec<StatusNotice> {
+    let Some(relay) = crate::server::relay::settings() else { return Vec::new() };
+    let url = format!("https://{}/api/status/notices", relay.domain);
+    fetch_notices(crate::core::ctx::http(), &url, crate::core::fsutil::now_ms() / 1000).await
+}
+
 /// Check every service at once (`app:checkServices`).
 pub async fn check_all() -> Vec<ServiceCheck> {
     let client = crate::core::ctx::http();
@@ -319,15 +387,59 @@ mod tests {
 
     /// A one-request server that answers with `status`.
     async fn answer_once(status: &'static str) -> u16 {
+        answer_body(status, "").await
+    }
+
+    /// A one-request server that answers with `status` and `body`.
+    async fn answer_body(status: &'static str, body: &'static str) -> u16 {
         let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = l.local_addr().unwrap().port();
         tokio::spawn(async move {
             let (mut s, _) = l.accept().await.unwrap();
             let mut buf = [0u8; 1024];
             let _ = s.read(&mut buf).await;
-            let _ = s.write_all(format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").as_bytes()).await;
+            let head = format!("HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+            let _ = s.write_all(format!("{head}{body}").as_bytes()).await;
         });
         port
+    }
+
+    fn notice(id: &str, level: &str, starts_at: i64, ends_at: i64) -> StatusNotice {
+        StatusNotice { id: id.into(), level: level.into(), title: format!("t{id}"), body: String::new(), starts_at, ends_at, updated_at: 0 }
+    }
+
+    #[test]
+    fn notices_keep_only_active_ones_most_severe_first() {
+        let list = vec![
+            notice("a", "info", 0, 0),
+            notice("b", "maintenance", 50, 200),
+            notice("c", "outage", 0, 0),
+            notice("ended", "outage", 0, 90),
+            notice("later", "degraded", 150, 0),
+            notice("d", "weird", 0, 0),
+            StatusNotice { title: "  ".into(), ..notice("blank", "outage", 0, 0) },
+        ];
+        let got: Vec<(String, String)> = active_notices(list, 100).into_iter().map(|n| (n.id, n.level)).collect();
+        let want = [("c", "outage"), ("b", "maintenance"), ("a", "info"), ("d", "info")];
+        assert_eq!(got, want.map(|(a, b)| (a.to_string(), b.to_string())));
+    }
+
+    #[tokio::test]
+    async fn notices_from_the_relay_or_none() {
+        let client = reqwest::Client::new();
+        let body = r#"{"notices":[{"id":"n1","level":"degraded","title":"Slow joins","body":"Working on it","startsAt":10,"endsAt":0,"updatedAt":12}]}"#;
+        let port = answer_body("200 OK", body).await;
+        let got = fetch_notices(&client, &format!("http://127.0.0.1:{port}/api/status/notices"), 100).await;
+        assert_eq!(got, vec![StatusNotice { id: "n1".into(), level: "degraded".into(), title: "Slow joins".into(), body: "Working on it".into(), starts_at: 10, ends_at: 0, updated_at: 12 }]);
+        // An older relay without the page, a broken answer, or no relay at all: no notices, no error.
+        let port = answer_body("404 Not Found", "not found").await;
+        assert!(fetch_notices(&client, &format!("http://127.0.0.1:{port}/api/status/notices"), 100).await.is_empty());
+        let port = answer_body("200 OK", "<html>").await;
+        assert!(fetch_notices(&client, &format!("http://127.0.0.1:{port}/api/status/notices"), 100).await.is_empty());
+        let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let closed = l.local_addr().unwrap().port();
+        drop(l);
+        assert!(fetch_notices(&client, &format!("http://127.0.0.1:{closed}/"), 100).await.is_empty());
     }
 
     #[tokio::test]
