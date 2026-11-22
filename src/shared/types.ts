@@ -1878,6 +1878,36 @@ export interface ServiceCheck {
   checkedAt: number
 }
 
+/** A mail from ResinCraft on the Inbox page (the relay's `/api/inbox`, mail.rs). `body` is plain text with **bold**,
+ * *italic*, [links](https://…), "- " lists and "# " headings; `snippet` is it on one line without the marks. */
+export interface InboxMessage {
+  id: string
+  from: string
+  subject: string
+  body: string
+  snippet: string
+  category: '' | 'news' | 'update' | 'event' | 'account' | 'support'
+  sentAt: number
+  read: boolean
+}
+
+/** The account's email address for mail by email: confirmed with a code the relay emails. */
+export interface InboxEmail {
+  /** The relay can send email at all. */
+  on: boolean
+  address: string | null
+  verifiedAt: number | null
+  /** A code is waiting for this address. */
+  pending: { address: string; expiresAt: number; resendAt: number } | null
+}
+
+export interface InboxData {
+  messages: InboxMessage[]
+  unread: number
+  total: number
+  email: InboxEmail
+}
+
 /** A notice the ResinCraft team posts on the relay, shown on the Status page (status.rs `StatusNotice`). */
 export interface StatusNotice {
   id: string
@@ -2945,6 +2975,10 @@ export interface ResinApi {
     /** Starts the game into the open tunnel. */
     join(req: { instanceId: string; accountId?: string }): Promise<void>
     leave(): Promise<void>
+  }
+  /** The Inbox page: one of the relay's `/api/inbox…` requests with the active account's relay session (mail.rs). */
+  mail: {
+    call(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
   }
   screenshots: {
     list(instanceId: string): Promise<ScreenshotInfo[]>

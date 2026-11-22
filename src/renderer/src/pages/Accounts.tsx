@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, ExternalLink, Fingerprint, Info, Loader2, LogIn, Shirt, ShieldCheck, Trash2, UserCheck, UserPlus, Users } from 'lucide-react'
+import { Check, Copy, ExternalLink, Fingerprint, Info, Loader2, LogIn, Mail, Shirt, ShieldCheck, Trash2, UserCheck, UserPlus, Users } from 'lucide-react'
 import type { AccountView, DeviceCode } from '@shared/types'
 import { api } from '../api'
 import { Avatar, ConfirmModal, Empty, Modal, openContextMenu, useCopy } from '../components/ui'
 import { useStore } from '../store'
 import ProfileManager from '../components/ProfileManager'
+import EmailAddress from '../components/EmailAddress'
+import { useInboxBadge } from '../inboxState'
+import '../inbox.css'
 import { rich, t, tx } from '../i18n'
 
 export default function Accounts() {
@@ -14,6 +17,8 @@ export default function Accounts() {
   const [removing, setRemoving] = useState<string>()
   const [managing, setManaging] = useState<AccountView>()
   const copy = useCopy()
+  const mail = useInboxBadge()
+  const activeMicrosoft = accounts.find((a) => a.active && a.type === 'msa')
   return (
     <div className="page" style={{ maxWidth: 860 }}>
       <div className="page-head">
@@ -111,6 +116,17 @@ export default function Accounts() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Where ResinCraft's mail reaches the active Microsoft account by email (the Inbox page has the rest). */}
+      {activeMicrosoft && mail.available && (
+        <div className="card email-section" style={{ marginTop: 16, padding: '16px 18px' }}>
+          <h2>
+            <Mail className="inline" /> {t('inbox.email.title')}
+          </h2>
+          <p className="hint">{t('inbox.email.subtitle', { name: activeMicrosoft.username })}</p>
+          <EmailAddress />
         </div>
       )}
 

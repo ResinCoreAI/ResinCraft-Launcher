@@ -14,6 +14,7 @@ import type {
   ServerListPage,
   ServerListQuery
 } from '@shared/types'
+import { mockMailAdmin } from './mock-mail'
 
 const CATEGORIES = ['smp', 'survival', 'pvp', 'minigames', 'creative', 'modded', 'skyblock', 'anarchy', 'roleplay', 'economy', 'factions', 'prison', 'parkour', 'hardcore', 'vanilla', 'towny', 'lifesteal', 'bedwars']
 
@@ -148,6 +149,7 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
   const limits = { tunnels_per_account: 3, names_per_account: 5, connections_per_tunnel: 50, connections_per_ip: 0, agents_per_ip: 0, monthly_gb_per_account: 100, handshake_timeout_secs: 10, idle_timeout_secs: 300, logins_per_ip_per_hour: 30, name_expiry_days: 180, session_days: 30, max_pending_handshakes: 200, session_minutes: 120, session_warn_minutes: [15, 5, 1], session_continue_minutes: 15, topup_gb: 30, topups_per_month: 3, topup_low_gb: 1, max_domains: 3, join_requests_per_ip: 5, join_requests_per_server: 30 }
   // ?require2fa=1: the relay wants 2FA before anything else (until it's set up here).
   if (new URLSearchParams(location.search).get('require2fa') === '1' && !twoFactorDone && !p.startsWith('/api/users/2fa')) throw new Error('The relay refused: set up two-factor sign-in first')
+  if (p === '/api/mail' || p.startsWith('/api/mail/')) return mockMailAdmin(method, p, b)
   if (method === 'POST' && p === '/api/users/2fa/setup')
     return { secret: 'JBSWY3DPEHPK3PXPJBSWY3DP', uri: 'otpauth://totp/ResinCraft%20Relay:Puirkle_Gamer?secret=JBSWY3DPEHPK3PXPJBSWY3DP&issuer=ResinCraft%20Relay&algorithm=SHA1&digits=6&period=30' }
   if (method === 'POST' && p === '/api/users/2fa/confirm') {

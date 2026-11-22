@@ -249,6 +249,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       join: fn('friends:join'),
       leave: fn('friends:leave')
     },
+    mail: { call: fn('mail:call') },
     quickjoin: {
       get: fn('quickjoin:get'),
       save: fn('quickjoin:save'),

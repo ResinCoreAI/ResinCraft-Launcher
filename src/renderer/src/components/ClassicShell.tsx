@@ -10,6 +10,7 @@ import { t, type Key } from '../i18n'
 import { setBigScreen } from '../bigScreen'
 import { Avatar, InstanceTile, Logo, openContextMenu, type ContextEntry } from './ui'
 import QuickSearch from './QuickSearch'
+import { useInboxBadge } from '../inboxState'
 import { SidebarPumpkin } from './ThemeDecor'
 
 export type ClassicNavItem = { page: Route['page']; label: Key; icon: ReactNode }
@@ -44,6 +45,7 @@ export function ClassicSidebar({
 }) {
   const { route, go, instances, games, accounts, activeAccount, switchAccount, toast } = useStore()
   const recent = instances.filter((i) => i.lastPlayed || games[i.id]).slice(0, 6)
+  const mail = useInboxBadge()
   return (
     <aside className="sidebar classic-side">
       <div className="brand" data-tauri-drag-region>
@@ -66,6 +68,7 @@ export function ClassicSidebar({
             {n.icon}
             <span className="ellipsis">{t(n.label)}</span>
             {n.page === 'library' && instances.length > 0 && <span className="count">{instances.length}</span>}
+            {n.page === 'inbox' && mail.unread > 0 && <span className="ib-badge">{mail.unread > 99 ? '99+' : mail.unread}</span>}
           </button>
         ))}
       </nav>

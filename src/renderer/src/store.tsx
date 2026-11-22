@@ -27,6 +27,8 @@ export type Route =
   | { page: 'report'; type?: 'bug' | 'crash' | 'idea' | 'question' | 'down'; title?: string; message?: string }
   /** Whether the services the launcher depends on answer right now (pages/Status.tsx). */
   | { page: 'status' }
+  /** Mail from ResinCraft to the active account (pages/Inbox.tsx). */
+  | { page: 'inbox' }
 
 export type GameState = GameEvent['state']
 

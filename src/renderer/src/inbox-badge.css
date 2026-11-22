@@ -1,0 +1,27 @@
+/* The header's unread count on the Inbox button (inboxState.ts loads it with the header). */
+.head-btn .ib-badge,
+.nav-item .ib-badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.head-btn {
+  position: relative;
+}
+.head-btn .ib-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  pointer-events: none;
+}
+.nav-item .ib-badge {
+  margin-left: auto;
+}

@@ -19,6 +19,7 @@ pub mod discord;
 pub mod files;
 pub mod friends;
 pub mod game;
+pub mod mail;
 pub mod mcp;
 pub mod migrate;
 pub mod openfile;

@@ -5,6 +5,7 @@ import {
   Compass,
   Home as HomeIcon,
   Layers,
+  Mail,
   Radar,
   Server,
   Settings as SettingsIcon,
@@ -47,6 +48,7 @@ import { useStore, type Route } from './store'
 import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
 import { useAdminStatus } from './adminStatus'
+import { useInboxBadge, useInboxWatch } from './inboxState'
 import { useClassicLayout } from './classicLayoutState'
 import { ClassicSidebar, ClassicTopBar } from './components/ClassicShell'
 import './classic.css'
@@ -86,6 +88,7 @@ const FindServers = page(() => import('./pages/FindServers'))
 const Report = lazy(() => import('./pages/Report'))
 const Status = lazy(() => import('./pages/Status'))
 const Admin = lazy(() => import('./pages/Admin'))
+const Inbox = page(() => import('./pages/Inbox'))
 // Only a brand-new launcher (or Settings → About) ever shows it.
 const Welcome = lazy(() => import('./components/Welcome'))
 
@@ -118,6 +121,8 @@ const NAV: { page: Route['page']; label: Key; icon: ReactNode; group: 'play' | '
   // While ResinCraft Relay sells add-ons and packs (useStoreOpen).
   { page: 'store', label: 'servers.store.nav', icon: <ShoppingBag />, group: 'get' },
   { page: 'accounts', label: 'nav.accounts', icon: <Users />, group: 'you' },
+  // Mail from ResinCraft: shown once the relay answers for the active account (useInboxWatch).
+  { page: 'inbox', label: 'inbox.nav', icon: <Mail />, group: 'you' },
   { page: 'settings', label: 'nav.settings', icon: <SettingsIcon />, group: 'you' },
   // Only for ResinCraft Relay's admin accounts (useAdminStatus).
   { page: 'admin', label: 'servers.admin.nav', icon: <Shield />, group: 'you' }
@@ -177,9 +182,14 @@ export default function App() {
   const isAdmin = useAdminStatus()
   const classic = useClassicLayout()
   const storeOpen = useStoreOpen()
+  // The Inbox's unread count, asked now and then; new mail says so unless the Inbox is open.
+  useInboxWatch(activeAccount?.type === 'msa' ? activeAccount.id : undefined, (count) => {
+    if (route.page !== 'inbox') toast(t('inbox.newMail', { count }), 'info')
+  })
+  const mail = useInboxBadge()
   const current = route.page === 'instance' ? 'library' : route.page
   const instance = route.page === 'instance' ? instances.find((i) => i.id === route.id) : undefined
-  const nav = NAV.filter((n) => (n.page !== 'bedrock' || hasBedrockApp) && (n.page !== 'admin' || isAdmin) && (n.page !== 'store' || storeOpen))
+  const nav = NAV.filter((n) => (n.page !== 'bedrock' || hasBedrockApp) && (n.page !== 'admin' || isAdmin) && (n.page !== 'store' || storeOpen) && (n.page !== 'inbox' || mail.available || route.page === 'inbox'))
   const playing = Object.values(games).some((g) => g === 'running')
   // The quick search finds every header page, and the Status page (not in the header: it's for when something's
   // wrong, so it waits in Settings → About, Report a problem and here).
@@ -247,6 +257,11 @@ export default function App() {
                 onClick={() => go({ page: n.page } as Route)}
               >
                 {n.icon}
+                {n.page === 'inbox' && mail.unread > 0 && (
+                  <span className="ib-badge" aria-label={t('inbox.unreadCount', { count: mail.unread })}>
+                    {mail.unread > 99 ? '99+' : mail.unread}
+                  </span>
+                )}
               </button>
             ))}
           <button
@@ -310,6 +325,7 @@ export default function App() {
             {route.page === 'findservers' && <FindServers />}
             {route.page === 'report' && <Report type={route.type} title={route.title} message={route.message} />}
             {route.page === 'status' && <Status />}
+            {route.page === 'inbox' && <Inbox />}
             {route.page === 'servers' && <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />}
           </Suspense>
         </div>
