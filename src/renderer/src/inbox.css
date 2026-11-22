@@ -487,3 +487,115 @@
 .ib-admin-reward .input[type='number'] {
   width: 110px;
 }
+
+/* Admin → Mail → Welcome mail: the master switch, then one card per mail (a header row; the editor when open). */
+.welcome-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.welcome-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.welcome-entry-head .text {
+  cursor: pointer;
+  min-width: 0;
+}
+.welcome-entry-head .text b {
+  display: block;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.welcome-entry-chips {
+  gap: 6px;
+  margin-top: 4px;
+}
+.welcome-entry-num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font: 600 11.5px var(--mono);
+}
+.welcome-entry-actions {
+  gap: 2px;
+  flex: none;
+}
+.welcome-entry-actions .switch {
+  margin-left: 8px;
+}
+.welcome-entry.off .welcome-entry-head .text,
+.welcome-entry.off .welcome-entry-num {
+  opacity: 0.55;
+}
+.welcome-entry-body {
+  border-top: 1px solid var(--border);
+}
+.welcome-delay select.input {
+  width: 140px;
+  flex: none;
+}
+
+/* Admin → Mail → Schedule: the timing fields in the compose form and the schedules under it. */
+.mail-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.mail-schedule .input[type='number'].mail-schedule-count {
+  width: 110px;
+}
+.mail-schedule .mail-schedule-date {
+  width: 160px;
+}
+.mail-schedule .mail-schedule-time {
+  width: 120px;
+}
+.mail-weekdays {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.mail-weekdays button {
+  min-width: 46px;
+}
+.mail-next-runs {
+  margin: 0;
+  padding-left: 20px;
+  font: 400 12.5px var(--mono);
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mail-schedule-line {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.mail-schedule-actions {
+  flex: none;
+  gap: 4px;
+  align-self: flex-start;
+}
+.admin-item.mail-editing {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+@media (max-width: 760px) {
+  .welcome-entry-head,
+  .admin-items .admin-item:has(.mail-schedule-actions) {
+    flex-wrap: wrap;
+  }
+}

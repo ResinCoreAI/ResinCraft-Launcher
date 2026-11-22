@@ -1,17 +1,17 @@
 // Admin → Mail: write to players, into their launcher's Inbox, by email to addresses they confirmed, or both; check
-// the mail server with a test email; see what was sent and take a mail back out of the inboxes (relay-server's
-// `/api/mail`, `/api/mail/send|remove|test`; the relay dashboard's Mail page has the same).
+// the mail server with a test email; schedule a send for later or to repeat (Schedules.tsx); see what was sent and
+// take a mail back out of the inboxes (relay-server's `/api/mail`, `/api/mail/send|remove|test`,
+// `/api/mail/schedules…`; the relay dashboard's Mail page has the same).
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Eye, Gift, Mail, MailCheck, Plus, Send, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Eye, Gift, Mail, MailCheck, Send, Trash2, X } from 'lucide-react'
 import { t, type Key } from '../../i18n'
 import { ConfirmModal, Segmented } from '../ui'
 import MailText from '../MailText'
 import { ago, Loading, Stat, useAct, useAdmin, when } from './common'
 import '../../inbox.css'
-import { WelcomeAdmin } from './Welcome'
+import { CATEGORY, RewardsEditor, WelcomeAdmin, type Category, type Reward } from './Welcome'
+import { fromSchedule, newTiming, ScheduleTiming, SchedulesList, timingOk, toEnds, toRepeat, type Schedule, type SchedulesData, type ScheduleSend } from './Schedules'
 
-type Category = '' | 'news' | 'update' | 'event' | 'account' | 'support' | 'status'
-type Reward = { kind: 'credit'; amount: number } | { kind: 'item'; product: string; days: number; name?: string }
 type Delivery = 'inbox' | 'email' | 'both'
 
 interface Segment {
@@ -55,14 +55,6 @@ interface MailData {
   sent: Sent[]
 }
 
-const CATEGORY: Record<Exclude<Category, ''>, Key> = {
-  news: 'inbox.category.news',
-  update: 'inbox.category.update',
-  event: 'inbox.category.event',
-  account: 'inbox.category.account',
-  support: 'inbox.category.support',
-  status: 'inbox.category.status'
-}
 /** The relay's groups by id (its English labels are for the dashboard). */
 const SEGMENT: Record<string, Key> = {
   developers: 'servers.admin.mail.seg.developers',
@@ -75,7 +67,20 @@ const SEGMENT: Record<string, Key> = {
 }
 const segName = (s: { id: string; label: string }) => (SEGMENT[s.id] ? t(SEGMENT[s.id]) : s.label)
 
-const EMPTY = { audience: 'players', players: '', delivery: 'inbox' as Delivery, from: 'ResinCraft', category: '' as Category, subject: '', body: '', attachments: [] as Reward[] }
+const EMPTY = {
+  audience: 'players',
+  players: '',
+  delivery: 'inbox' as Delivery,
+  from: 'ResinCraft',
+  category: '' as Category,
+  subject: '',
+  body: '',
+  attachments: [] as Reward[],
+  /** Send now, or save as a schedule (`timing`); `editing` is the schedule being changed. */
+  mode: 'now' as 'now' | 'schedule',
+  timing: newTiming(),
+  editing: ''
+}
 /** "50.00 THB" for the smallest unit. */
 const money = (n: number, cur?: string) => `${(n / 100).toFixed(2)} ${(cur ?? '').toUpperCase()}`.trim()
 /** The draft survives switching sections (not the launcher closing). */
@@ -85,7 +90,11 @@ export function MailAdmin() {
   // While emails are going out, look every 3 s; otherwise every 30 s.
   const [fast, setFast] = useState(false)
   const { data, error, reload } = useAdmin<MailData>('/api/mail', fast ? 3_000 : 30_000)
-  const act = useAct(reload)
+  const { data: sched, error: schedError, reload: reloadSched } = useAdmin<SchedulesData>('/api/mail/schedules', 30_000)
+  // A schedule's run adds to the sent list, so its changes reload both.
+  const act = useAct(async () => {
+    await Promise.all([reload(), reloadSched()])
+  })
   const [form, setFormState] = useState(draft)
   const setForm = (f: typeof draft) => setFormState((draft = f))
   const [confirming, setConfirming] = useState(false)
@@ -102,8 +111,14 @@ export function MailAdmin() {
   const count = form.audience === 'players' ? named : (group?.count ?? 0)
   const emails = form.audience === 'players' ? null : (group?.emails ?? 0)
   const rewardsNeedInbox = form.attachments.length > 0 && delivery === 'email'
-  const ready = !!form.subject.trim() && !!form.body.trim() && count > 0 && !rewardsNeedInbox && form.attachments.every((a) => (a.kind === 'credit' ? a.amount > 0 : !!a.product))
-  const setReward = (i: number, r: Reward | null) => setForm({ ...form, attachments: r ? form.attachments.map((x, n) => (n === i ? r : x)) : form.attachments.filter((_, n) => n !== i) })
+  const scheduling = form.mode === 'schedule'
+  const ready =
+    !!form.subject.trim() &&
+    !!form.body.trim() &&
+    count > 0 &&
+    !rewardsNeedInbox &&
+    form.attachments.every((a) => (a.kind === 'credit' ? a.amount > 0 : !!a.product)) &&
+    (!scheduling || (timingOk(form.timing) && !!sched))
   const products = data.products ?? []
   const maxRewards = data.limits.attachments ?? 5
   const who =
@@ -119,13 +134,45 @@ export function MailAdmin() {
     .filter(Boolean)
     .join(' · ')
   const send = async () => {
-    const ok = await act(
-      '/api/mail/send',
-      { audience: form.audience, players: form.players, delivery, from: form.from, category: form.category, subject: form.subject, body: form.body, attachments: form.attachments },
-      'servers.admin.mail.sent'
-    )
+    const ok = await act('/api/mail/send', sendBody(), 'servers.admin.mail.sent')
     if (ok) setForm({ ...EMPTY })
   }
+  function sendBody() {
+    return { audience: form.audience, players: form.players, delivery, from: form.from, category: form.category, subject: form.subject, body: form.body, attachments: form.attachments }
+  }
+  const saveSchedule = async () => {
+    const tz = form.timing.tz.trim() || sched?.defaultTz
+    const ok = await act(
+      '/api/mail/schedules/save',
+      { ...(form.editing ? { id: form.editing } : {}), send: sendBody(), repeat: toRepeat(form.timing), ends: toEnds(form.timing), tz },
+      form.editing ? 'servers.admin.mail.schedule.updated' : 'servers.admin.mail.schedule.saved'
+    )
+    if (ok) setForm({ ...EMPTY, mode: 'schedule', timing: newTiming() })
+  }
+  /** Loads a schedule into the form in "Schedule" mode. */
+  const edit = (s: Schedule) => {
+    const names = s.send.players.map((uuid, i) => s.send.playerNames[i] || uuid)
+    setForm({
+      audience: s.send.audience,
+      players: names.join(', '),
+      delivery: s.send.delivery,
+      from: s.send.from,
+      category: s.send.category ?? '',
+      subject: s.send.subject,
+      body: s.send.body,
+      attachments: (s.send.attachments ?? []).map((a): Reward => (a.kind === 'item' ? { kind: 'item', product: a.product, days: a.days } : a)),
+      mode: 'schedule',
+      timing: fromSchedule(s),
+      editing: s.id
+    })
+    document.querySelector('.mail-compose')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  const scheduleAudience = (s: ScheduleSend) =>
+    s.audience === 'everyone'
+      ? t('servers.admin.mail.schedule.toEveryone')
+      : s.audience === 'players'
+        ? s.players.map((uuid, i) => s.playerNames[i] || uuid.slice(0, 8)).join(', ') || t('servers.admin.mail.named')
+        : segName(data.segments.find((g) => g.id === s.audience) ?? { id: s.audience, label: s.audience })
   const audienceText = (m: Sent) =>
     m.audience === 'everyone'
       ? t('servers.admin.mail.toEveryone', { count: m.toCount })
@@ -181,19 +228,39 @@ export function MailAdmin() {
 
       <WelcomeAdmin />
 
-      <div className="settings-section">
+      <div className="settings-section mail-compose">
         <h3>
-          <Mail className="inline" /> {t('servers.admin.mail.write')}
+          <Mail className="inline" /> {form.editing ? t('servers.admin.mail.schedule.editTitle') : t('servers.admin.mail.write')}
         </h3>
         <form
           className="card"
           onSubmit={(e) => {
             e.preventDefault()
-            if (ready) setConfirming(true)
+            if (!ready) return
+            if (scheduling) void saveSchedule()
+            else setConfirming(true)
           }}
         >
           <div className="setting stack">
             <div className="listing-fields">
+              <div className="row wrap">
+                <Segmented
+                  value={form.mode}
+                  onChange={(mode) => setForm({ ...form, mode, ...(mode === 'now' ? { editing: '' } : {}) })}
+                  options={[
+                    { value: 'now', label: t('servers.admin.mail.schedule.modeNow') },
+                    { value: 'schedule', label: t('servers.admin.mail.schedule.modeSchedule') }
+                  ]}
+                />
+                {form.editing && (
+                  <>
+                    <span className="hint grow">{t('servers.admin.mail.schedule.editingHint', { id: form.editing })}</span>
+                    <button type="button" className="btn sm ghost" onClick={() => setForm({ ...EMPTY, mode: 'schedule', timing: newTiming() })}>
+                      <X /> {t('servers.admin.mail.schedule.cancelEdit')}
+                    </button>
+                  </>
+                )}
+              </div>
               <div className="field-row">
                 <label className="field">
                   <span>{t('servers.admin.mail.to')}</span>
@@ -260,64 +327,24 @@ export function MailAdmin() {
               </label>
               <div className="field">
                 <span>{t('servers.admin.mail.rewards')}</span>
-                {form.attachments.map((r, i) => (
-                  <div key={i} className="row ib-admin-reward">
-                    {r.kind === 'credit' ? (
-                      <>
-                        <span className="chip compact success">{t('inbox.reward.credit')}</span>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0.01}
-                          step={0.01}
-                          value={(r.amount / 100).toFixed(2)}
-                          onChange={(e) => setReward(i, { kind: 'credit', amount: Math.round(Number(e.target.value) * 100) })}
-                          aria-label={t('servers.admin.mail.amount')}
-                        />
-                        <span className="hint">{(data.currency ?? '').toUpperCase()}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="chip compact accent">{t('servers.admin.mail.item')}</span>
-                        <select className="input" value={r.product} onChange={(e) => setReward(i, { ...r, product: e.target.value })} aria-label={t('servers.admin.mail.item')}>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0}
-                          max={data.limits.days ?? 3650}
-                          value={r.days}
-                          onChange={(e) => setReward(i, { ...r, days: Math.max(0, Math.round(Number(e.target.value))) })}
-                          aria-label={t('servers.admin.mail.days')}
-                        />
-                        <span className="hint">{t('servers.admin.mail.daysHint')}</span>
-                      </>
-                    )}
-                    <button type="button" className="btn sm ghost" onClick={() => setReward(i, null)} aria-label={t('common.remove')}>
-                      <Trash2 />
-                    </button>
-                  </div>
-                ))}
-                <div className="row">
-                  <button type="button" className="btn sm" disabled={form.attachments.length >= maxRewards} onClick={() => setForm({ ...form, attachments: [...form.attachments, { kind: 'credit', amount: 5000 }] })}>
-                    <Plus /> {t('inbox.reward.credit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn sm"
-                    disabled={form.attachments.length >= maxRewards || !products.length}
-                    onClick={() => setForm({ ...form, attachments: [...form.attachments, { kind: 'item', product: products[0]?.id ?? '', days: 30 }] })}
-                  >
-                    <Gift /> {t('servers.admin.mail.item')}
-                  </button>
-                </div>
+                <RewardsEditor
+                  value={form.attachments}
+                  onChange={(attachments) => setForm({ ...form, attachments })}
+                  products={products}
+                  currency={data.currency ?? ''}
+                  max={maxRewards}
+                  maxDays={data.limits.days ?? 3650}
+                />
                 <span className={`hint ${rewardsNeedInbox ? 'bad' : ''}`}>{rewardsNeedInbox ? t('servers.admin.mail.rewardsNeedInbox') : t('servers.admin.mail.rewardsHint')}</span>
               </div>
+              {scheduling && (
+                <div className="field">
+                  <span>
+                    <CalendarClock className="inline" /> {t('servers.admin.mail.schedule.when')}
+                  </span>
+                  {sched ? <ScheduleTiming value={form.timing} onChange={(timing) => setForm({ ...form, timing })} data={sched} /> : <Loading error={schedError} />}
+                </div>
+              )}
               {preview && (
                 <div className="card ib-admin-preview">
                   <div className="hint">
@@ -333,14 +360,26 @@ export function MailAdmin() {
                 <button type="button" className="btn sm ghost" onClick={() => setPreview(!preview)} aria-pressed={preview}>
                   <Eye /> {t('servers.admin.mail.preview')}
                 </button>
-                <button className="btn sm primary" type="submit" disabled={!ready}>
-                  <Send /> {t('servers.admin.mail.send')}
-                </button>
+                {scheduling ? (
+                  <button className="btn sm primary" type="submit" disabled={!ready}>
+                    <CalendarClock /> {form.editing ? t('servers.admin.mail.schedule.update') : t('servers.admin.mail.schedule.save')}
+                  </button>
+                ) : (
+                  <button className="btn sm primary" type="submit" disabled={!ready}>
+                    <Send /> {t('servers.admin.mail.send')}
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </form>
       </div>
+
+      {sched ? (
+        <SchedulesList data={sched} act={act} audienceText={scheduleAudience} currency={data.currency ?? ''} products={products} editing={form.editing} onEdit={edit} />
+      ) : (
+        schedError && <p className="hint bad">{schedError}</p>
+      )}
 
       <div className="settings-section">
         <h3>{t('servers.admin.mail.history', { count: data.sent.length })}</h3>
