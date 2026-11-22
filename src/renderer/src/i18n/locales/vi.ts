@@ -5572,6 +5572,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "Lớn nhất ({currency})",
   "servers.admin.wallet.cardMin": "Thẻ từ ({currency})",
   "servers.admin.wallet.expireMinutes": "Lần nạp chưa thanh toán hết hạn sau (phút)",
+  "servers.admin.statusSite.inbox": "Hộp thư của người chơi",
+  "servers.admin.statusSite.inboxHint": "(trong launcher, gửi qua relay)",
+  "servers.admin.statusSite.inboxOff": "Không gửi",
+  "servers.admin.statusSite.inboxStatus": "Người chơi theo dõi cập nhật trạng thái",
+  "servers.admin.statusSite.inboxEveryone": "Mọi người chơi",
+  "servers.admin.statusSite.inboxWindow": "Từ {from} đến {until}.",
+  "servers.admin.statusSite.inboxParts": "Bị ảnh hưởng: {parts}.",
+  "servers.admin.statusSite.inboxSent": "Đã gửi cả vào Hộp thư của người chơi.",
+  "servers.admin.statusSite.inboxFailed": "Đã đăng, nhưng không gửi được vào Hộp thư của người chơi: {error}",
 }
 
 export default dict

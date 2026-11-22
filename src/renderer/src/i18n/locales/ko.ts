@@ -5567,6 +5567,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "최대({currency})",
   "servers.admin.wallet.cardMin": "카드 최소 금액({currency})",
   "servers.admin.wallet.expireMinutes": "미결제 충전 만료 시간(분)",
+  "servers.admin.statusSite.inbox": "플레이어 받은편지함",
+  "servers.admin.statusSite.inboxHint": "(런처 안에서, relay를 통해 보내요)",
+  "servers.admin.statusSite.inboxOff": "보내지 않음",
+  "servers.admin.statusSite.inboxStatus": "상태 업데이트를 팔로우하는 플레이어",
+  "servers.admin.statusSite.inboxEveryone": "모든 플레이어",
+  "servers.admin.statusSite.inboxWindow": "{from}부터 {until}까지.",
+  "servers.admin.statusSite.inboxParts": "영향받는 부분: {parts}.",
+  "servers.admin.statusSite.inboxSent": "플레이어 받은편지함에도 보냈어요.",
+  "servers.admin.statusSite.inboxFailed": "게시했지만 플레이어 받은편지함에는 보내지 못했어요: {error}",
 }
 
 export default dict

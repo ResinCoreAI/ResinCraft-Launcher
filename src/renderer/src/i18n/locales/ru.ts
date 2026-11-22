@@ -5634,6 +5634,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "Максимум ({currency})",
   "servers.admin.wallet.cardMin": "Карта от ({currency})",
   "servers.admin.wallet.expireMinutes": "Срок оплаты пополнения (минуты)",
+  "servers.admin.statusSite.inbox": "Входящие игроков",
+  "servers.admin.statusSite.inboxHint": "(в лаунчере, отправляется через relay)",
+  "servers.admin.statusSite.inboxOff": "Не отправлять",
+  "servers.admin.statusSite.inboxStatus": "Игроки, которые следят за статусом",
+  "servers.admin.statusSite.inboxEveryone": "Все игроки",
+  "servers.admin.statusSite.inboxWindow": "С {from} до {until}.",
+  "servers.admin.statusSite.inboxParts": "Затронуто: {parts}.",
+  "servers.admin.statusSite.inboxSent": "Также отправлено во «Входящие» игроков.",
+  "servers.admin.statusSite.inboxFailed": "Опубликовано, но не удалось отправить во «Входящие» игроков: {error}",
 }
 
 export default dict

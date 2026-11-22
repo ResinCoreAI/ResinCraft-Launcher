@@ -5575,6 +5575,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "Terbesar ({currency})",
   "servers.admin.wallet.cardMin": "Kartu mulai dari ({currency})",
   "servers.admin.wallet.expireMinutes": "Isi saldo yang belum dibayar berakhir setelah (menit)",
+  "servers.admin.statusSite.inbox": "Kotak Masuk pemain",
+  "servers.admin.statusSite.inboxHint": "(di launcher, dikirim lewat relay)",
+  "servers.admin.statusSite.inboxOff": "Jangan kirim",
+  "servers.admin.statusSite.inboxStatus": "Pemain yang mengikuti kabar status",
+  "servers.admin.statusSite.inboxEveryone": "Semua pemain",
+  "servers.admin.statusSite.inboxWindow": "Dari {from} sampai {until}.",
+  "servers.admin.statusSite.inboxParts": "Terdampak: {parts}.",
+  "servers.admin.statusSite.inboxSent": "Juga dikirim ke Kotak Masuk pemain.",
+  "servers.admin.statusSite.inboxFailed": "Dipasang, tetapi tidak bisa dikirim ke Kotak Masuk pemain: {error}",
 }
 
 export default dict

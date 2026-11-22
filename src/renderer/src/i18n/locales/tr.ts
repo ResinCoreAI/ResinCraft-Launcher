@@ -5585,6 +5585,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "En büyük ({currency})",
   "servers.admin.wallet.cardMin": "Kartla en az ({currency})",
   "servers.admin.wallet.expireMinutes": "Ödenmemiş yükleme süresi (dakika)",
+  "servers.admin.statusSite.inbox": "Oyuncuların Gelen kutusu",
+  "servers.admin.statusSite.inboxHint": "(başlatıcıda, relay üzerinden gönderilir)",
+  "servers.admin.statusSite.inboxOff": "Gönderme",
+  "servers.admin.statusSite.inboxStatus": "Durum güncellemelerini takip eden oyuncular",
+  "servers.admin.statusSite.inboxEveryone": "Tüm oyuncular",
+  "servers.admin.statusSite.inboxWindow": "{from} ile {until} arası.",
+  "servers.admin.statusSite.inboxParts": "Etkilenen: {parts}.",
+  "servers.admin.statusSite.inboxSent": "Oyuncuların Gelen kutusuna da gönderildi.",
+  "servers.admin.statusSite.inboxFailed": "Yayınlandı, ancak oyuncuların Gelen kutusuna gönderilemedi: {error}",
 }
 
 export default dict

@@ -5562,6 +5562,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "最大（{currency}）",
   "servers.admin.wallet.cardMin": "卡片最低（{currency}）",
   "servers.admin.wallet.expireMinutes": "未付款儲值的失效時間（分鐘）",
+  "servers.admin.statusSite.inbox": "玩家收件匣",
+  "servers.admin.statusSite.inboxHint": "（在啟動器中，透過 relay 傳送）",
+  "servers.admin.statusSite.inboxOff": "不傳送",
+  "servers.admin.statusSite.inboxStatus": "關注狀態更新的玩家",
+  "servers.admin.statusSite.inboxEveryone": "所有玩家",
+  "servers.admin.statusSite.inboxWindow": "從 {from} 到 {until}。",
+  "servers.admin.statusSite.inboxParts": "受影響：{parts}。",
+  "servers.admin.statusSite.inboxSent": "也已傳送到玩家收件匣。",
+  "servers.admin.statusSite.inboxFailed": "已發布，但無法傳送到玩家收件匣：{error}",
 }
 
 export default dict

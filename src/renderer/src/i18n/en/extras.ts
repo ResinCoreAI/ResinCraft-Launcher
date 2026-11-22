@@ -1198,4 +1198,13 @@ export default {
   "servers.admin.wallet.customMax": "Largest ({currency})",
   "servers.admin.wallet.cardMin": "Card starts at ({currency})",
   "servers.admin.wallet.expireMinutes": "Unpaid top-up ends after (minutes)",
+  "servers.admin.statusSite.inbox": "Players' Inbox",
+  "servers.admin.statusSite.inboxHint": "(in the launcher, sent through the relay)",
+  "servers.admin.statusSite.inboxOff": "Don't send",
+  "servers.admin.statusSite.inboxStatus": "Players who follow status updates",
+  "servers.admin.statusSite.inboxEveryone": "Every player",
+  "servers.admin.statusSite.inboxWindow": "From {from} to {until}.",
+  "servers.admin.statusSite.inboxParts": "Affected: {parts}.",
+  "servers.admin.statusSite.inboxSent": "Sent to players' Inbox too.",
+  "servers.admin.statusSite.inboxFailed": "Posted, but it couldn't go to players' Inbox: {error}",
 } as const

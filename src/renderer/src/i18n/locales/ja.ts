@@ -5572,6 +5572,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "最大（{currency}）",
   "servers.admin.wallet.cardMin": "カードの最低額（{currency}）",
   "servers.admin.wallet.expireMinutes": "未払いのチャージの期限（分）",
+  "servers.admin.statusSite.inbox": "プレイヤーの受信箱",
+  "servers.admin.statusSite.inboxHint": "（ランチャー内、relay 経由で送信）",
+  "servers.admin.statusSite.inboxOff": "送信しない",
+  "servers.admin.statusSite.inboxStatus": "状態の更新をフォローしているプレイヤー",
+  "servers.admin.statusSite.inboxEveryone": "すべてのプレイヤー",
+  "servers.admin.statusSite.inboxWindow": "{from} から {until} まで。",
+  "servers.admin.statusSite.inboxParts": "影響：{parts}。",
+  "servers.admin.statusSite.inboxSent": "プレイヤーの受信箱にも送信しました。",
+  "servers.admin.statusSite.inboxFailed": "掲載しましたが、プレイヤーの受信箱には送信できませんでした：{error}",
 }
 
 export default dict

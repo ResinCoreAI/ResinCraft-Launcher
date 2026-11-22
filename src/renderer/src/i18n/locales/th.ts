@@ -5564,6 +5564,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "สูงสุด ({currency})",
   "servers.admin.wallet.cardMin": "บัตรขั้นต่ำ ({currency})",
   "servers.admin.wallet.expireMinutes": "ยกเลิกการเติมเงินที่ยังไม่จ่ายหลัง (นาที)",
+  "servers.admin.statusSite.inbox": "กล่องจดหมายของผู้เล่น",
+  "servers.admin.statusSite.inboxHint": "(ในลันเชอร์ ส่งผ่าน relay)",
+  "servers.admin.statusSite.inboxOff": "ไม่ส่ง",
+  "servers.admin.statusSite.inboxStatus": "ผู้เล่นที่ติดตามการอัปเดตสถานะ",
+  "servers.admin.statusSite.inboxEveryone": "ผู้เล่นทุกคน",
+  "servers.admin.statusSite.inboxWindow": "ตั้งแต่ {from} ถึง {until}",
+  "servers.admin.statusSite.inboxParts": "ส่วนที่ได้รับผลกระทบ: {parts}",
+  "servers.admin.statusSite.inboxSent": "ส่งเข้ากล่องจดหมายของผู้เล่นด้วยแล้ว",
+  "servers.admin.statusSite.inboxFailed": "ลงประกาศแล้ว แต่ส่งเข้ากล่องจดหมายของผู้เล่นไม่ได้: {error}",
 }
 
 export default dict

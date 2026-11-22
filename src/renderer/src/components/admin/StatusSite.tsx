@@ -9,7 +9,7 @@ import { api } from '../../api'
 import { useStore } from '../../store'
 import { currentLanguage, t, type Key } from '../../i18n'
 import { ConfirmModal, Modal, Segmented } from '../ui'
-import { Loading } from './common'
+import { Loading, post as relayPost } from './common'
 import '../../admin-statussite.css'
 
 const IMPACTS = ['none', 'minor', 'major', 'critical'] as const
@@ -38,6 +38,38 @@ const fromInput = (v: string) => (v ? new Date(v).getTime() : undefined)
 const at = (ms: number) => new Date(ms).toLocaleString(currentLanguage(), { dateStyle: 'medium', timeStyle: 'short' })
 
 type Parts = Record<string, string>
+
+/** Who on the relay gets a post in their launcher Inbox too: nobody, players who follow status updates (their Inbox's
+ *  "Status updates", the relay's `status` group), or every player. */
+type InboxTo = 'off' | 'status' | 'everyone'
+
+/** Sends a post to players' Inboxes through the relay (`/api/mail/send`). Resolves to an error message, or undefined. */
+async function toInbox(to: InboxTo, subject: string, body: string): Promise<string | undefined> {
+  if (to === 'off') return undefined
+  try {
+    await relayPost('/api/mail/send', { audience: to, delivery: 'inbox', from: 'ResinCraft Status', category: 'status', subject: subject.slice(0, 150), body: body.slice(0, 5000) })
+    return undefined
+  } catch (e) {
+    return (e as Error).message
+  }
+}
+
+/** The Inbox choice under a post (and under an update). */
+function InboxChoice({ value, onChange, disabled }: { value: InboxTo; onChange: (v: InboxTo) => void; disabled?: boolean }) {
+  return (
+    <label className="row ss-admin-notify">
+      <span className="grow">
+        {t('servers.admin.statusSite.inbox')}
+        <em className="hint"> {t('servers.admin.statusSite.inboxHint')}</em>
+      </span>
+      <select className="input" style={{ width: 'auto' }} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as InboxTo)}>
+        <option value="off">{t('servers.admin.statusSite.inboxOff')}</option>
+        <option value="status">{t('servers.admin.statusSite.inboxStatus')}</option>
+        <option value="everyone">{t('servers.admin.statusSite.inboxEveryone')}</option>
+      </select>
+    </label>
+  )
+}
 const EMPTY = { kind: 'incident' as 'incident' | 'maintenance', title: '', impact: 'minor', status: 'investigating', parts: {} as Parts, message: '', started: '', resolved: '', from: '', until: '', notify: true }
 
 export function StatusSiteAdmin() {
@@ -50,6 +82,8 @@ export function StatusSiteAdmin() {
   const [editing, setEditing] = useState<{ inc: StatusSiteAdminIncident; resolve: boolean } | null>(null)
   const [deleting, setDeleting] = useState<StatusSiteAdminIncident | null>(null)
   const [removing, setRemoving] = useState<{ id: number; email: string } | null>(null)
+  // Who gets a new post in their launcher Inbox too (InboxChoice).
+  const [inbox, setInbox] = useState<InboxTo>('status')
 
   const load = useCallback(async () => {
     try {
@@ -143,7 +177,21 @@ export function StatusSiteAdmin() {
     const body = maint
       ? { kind: 'maintenance', title: form.title.trim(), from, until, parts: form.parts, message: form.message.trim(), notify: form.notify }
       : { title: form.title.trim(), impact: form.impact, status: form.status, parts: form.parts, message: form.message.trim(), at: started, resolvedAt: resolved, notify: form.notify }
-    if (await act('/admin/api/incidents', body, maint ? 'servers.admin.statusSite.scheduled' : 'servers.admin.statusSite.posted')) setForm({ ...EMPTY, kind: form.kind })
+    if (!(await act('/admin/api/incidents', body, maint ? 'servers.admin.statusSite.scheduled' : 'servers.admin.statusSite.posted'))) return
+    // Already over (written down after the fact): like email, nobody's Inbox gets it.
+    if (!resolved) {
+      const parts = Object.keys(form.parts).map(partName).join(', ')
+      const subject = maint ? `${impactWord('maintenance')}: ${form.title.trim()}` : `${impactWord(form.impact)}: ${form.title.trim()}`
+      const lines = [
+        form.message.trim(),
+        maint && from && until ? t('servers.admin.statusSite.inboxWindow', { from: at(from), until: at(until) }) : maint ? '' : `${t('servers.admin.statusSite.status')}: ${statusWord(form.status)}`,
+        parts ? t('servers.admin.statusSite.inboxParts', { parts }) : ''
+      ]
+      const problem = await toInbox(inbox, subject, lines.filter(Boolean).join('\n\n'))
+      if (problem) toast(t('servers.admin.statusSite.inboxFailed', { error: problem }), 'error')
+      else if (inbox !== 'off') toast(t('servers.admin.statusSite.inboxSent'), 'success')
+    }
+    setForm({ ...EMPTY, kind: form.kind })
   }
 
   const row = (inc: StatusSiteAdminIncident) => {
@@ -303,6 +351,7 @@ export function StatusSiteAdmin() {
                 </div>
               )}
               {timeProblem && <span className="hint bad">{t(timeProblem)}</span>}
+              <InboxChoice value={resolved ? 'off' : inbox} disabled={!!resolved} onChange={setInbox} />
               <label className="row ss-admin-notify">
                 <input type="checkbox" checked={form.notify} onChange={(e) => setForm({ ...form, notify: e.target.checked })} disabled={!state.mail?.configured} />
                 <span>
@@ -394,6 +443,8 @@ function UpdateModal({
   const [message, setMessage] = useState('')
   const [when, setWhen] = useState('')
   const [notify, setNotify] = useState(true)
+  const [inbox, setInbox] = useState<InboxTo>('status')
+  const { toast } = useStore()
   const [busy, setBusy] = useState(false)
   const atMs = fromInput(when)
   const bad = !!atMs && (atMs > Date.now() + 60_000 || atMs < (inc.updates[0]?.at ?? 0))
@@ -401,6 +452,11 @@ function UpdateModal({
     setBusy(true)
     const body = { status: resolve ? undefined : status, message: message.trim(), at: atMs, notify }
     const ok = await act(`/admin/api/incidents/${inc.id}/${resolve ? 'resolve' : 'update'}`, body, resolve ? (isMaint ? 'servers.admin.statusSite.finished' : 'servers.admin.statusSite.resolved') : 'servers.admin.statusSite.updated')
+    if (ok && !atMs) {
+      const word = resolve ? t(isMaint ? 'servers.admin.statusSite.finish' : 'servers.admin.statusSite.resolve') : statusWord(status)
+      const problem = await toInbox(inbox, `${word}: ${inc.title}`, message.trim() || word)
+      if (problem) toast(t('servers.admin.statusSite.inboxFailed', { error: problem }), 'error')
+    }
     setBusy(false)
     if (ok) onClose()
   }
@@ -442,6 +498,7 @@ function UpdateModal({
           <input className="input" type="datetime-local" max={toInput(Date.now())} value={when} onChange={(e) => setWhen(e.target.value)} />
           <em>{bad ? <span className="bad">{t('servers.admin.statusSite.whenBad')}</span> : t('servers.admin.statusSite.whenHint')}</em>
         </label>
+        <InboxChoice value={atMs ? 'off' : inbox} disabled={!!atMs} onChange={setInbox} />
         <label className="row ss-admin-notify">
           <input type="checkbox" checked={notify && mailOn} disabled={!mailOn} onChange={(e) => setNotify(e.target.checked)} />
           <span>{t('servers.admin.statusSite.notify')}</span>

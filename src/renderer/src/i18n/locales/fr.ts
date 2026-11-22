@@ -5635,6 +5635,15 @@ const dict: Dict = {
   "servers.admin.wallet.customMax": "Maximum ({currency})",
   "servers.admin.wallet.cardMin": "Carte à partir de ({currency})",
   "servers.admin.wallet.expireMinutes": "Une recharge impayée prend fin après (minutes)",
+  "servers.admin.statusSite.inbox": "Boîte de réception des joueurs",
+  "servers.admin.statusSite.inboxHint": "(dans le launcher, envoyé via le relay)",
+  "servers.admin.statusSite.inboxOff": "Ne pas envoyer",
+  "servers.admin.statusSite.inboxStatus": "Joueurs qui suivent les mises à jour d’état",
+  "servers.admin.statusSite.inboxEveryone": "Tous les joueurs",
+  "servers.admin.statusSite.inboxWindow": "De {from} à {until}.",
+  "servers.admin.statusSite.inboxParts": "Éléments touchés : {parts}.",
+  "servers.admin.statusSite.inboxSent": "Aussi envoyé dans la boîte de réception des joueurs.",
+  "servers.admin.statusSite.inboxFailed": "Publié, mais l’envoi dans la boîte de réception des joueurs a échoué : {error}",
 }
 
 export default dict
