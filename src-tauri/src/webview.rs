@@ -40,8 +40,10 @@ use tauri::{AppHandle, Manager};
 /// and timers ran on time. Part of Settings → Appearance → Free memory while hidden.
 static LEAN_FROM_NOW: AtomicBool = AtomicBool::new(false);
 const LEAN_AFTER_START: std::time::Duration = std::time::Duration::from_secs(3);
-/// After the low level, the first page has settled by then: its memory goes back to Windows (`rest`).
+/// After the low level, the first page has settled by then: its memory goes back to Windows (`rest`). A launcher with
+/// many instances, a signed-in account and pictures keeps loading for a while after, so it's done once more later.
 const REST_AFTER_START: std::time::Duration = std::time::Duration::from_secs(3);
+const REST_AGAIN_AFTER: std::time::Duration = std::time::Duration::from_secs(6);
 
 fn lean_in_use() -> bool {
     LEAN_FROM_NOW.load(Ordering::SeqCst) && crate::core::settings::free_memory_hidden()
@@ -58,6 +60,8 @@ pub fn started() {
         }
         tauri::async_runtime::spawn(async {
             tokio::time::sleep(REST_AFTER_START).await;
+            rest().await;
+            tokio::time::sleep(REST_AGAIN_AFTER).await;
             rest().await;
         });
         watch_budget().await;
