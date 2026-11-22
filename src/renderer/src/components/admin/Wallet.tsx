@@ -50,6 +50,14 @@ interface WalletData {
   /** Cancelling a running purchase gives its unused time back as credit (refundable products only). */
   refundOnCancel?: boolean
   refundOnCancelFromFile?: boolean
+  /** Players may type their own top-up, from `customMin` to `customMax`; card top-ups start at `cardMin`; an unpaid
+   *  top-up is cancelled after `topupExpireMinutes`. Missing on relays from before these. */
+  customTopup?: boolean
+  customMin?: number
+  customMax?: number
+  cardMin?: number
+  topupExpireMinutes?: number
+  customFromFile?: boolean
   methods: string[]
   outstanding: number
   accounts: number
@@ -73,7 +81,8 @@ const KINDS: Record<string, Key> = {
   purchase: 'servers.wallet.kind.purchase',
   refund: 'servers.wallet.kind.refund',
   grant: 'servers.wallet.kind.grant',
-  deduct: 'servers.wallet.kind.deduct'
+  deduct: 'servers.wallet.kind.deduct',
+  gift: 'servers.wallet.kind.gift'
 }
 
 function money(amount: number, currency: string) {
@@ -88,6 +97,63 @@ const signed = (n: number, cur: string) => `${n > 0 ? '+' : n < 0 ? '−' : ''}$
 function toMinor(v: string): number | null {
   const n = Number(v.replace(/,/g, '').trim())
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null
+}
+
+/** Players' own top-up amounts, the card minimum and how long an unpaid top-up waits (`/api/payments/wallet/custom`). */
+function TopupRules({ d, act }: { d: WalletData; act: ReturnType<typeof useAct> }) {
+  const cur = d.currency
+  const baht = (n?: number) => (n ? String(n / 100) : '')
+  const [f, setF] = useState({ min: baht(d.customMin), max: baht(d.customMax), card: baht(d.cardMin), expire: String(d.topupExpireMinutes ?? 10) })
+  useEffect(
+    () => setF({ min: baht(d.customMin), max: baht(d.customMax), card: baht(d.cardMin), expire: String(d.topupExpireMinutes ?? 10) }),
+    [d.customMin, d.customMax, d.cardMin, d.topupExpireMinutes]
+  )
+  const num = (k: keyof typeof f, label: Key) => (
+    <label className="field">
+      <span>{t(label, { currency: cur.toUpperCase() })}</span>
+      <input className="input" inputMode="numeric" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value.replace(/[^\d]/g, '') })} />
+    </label>
+  )
+  const save = () => {
+    const min = toMinor(f.min)
+    const max = toMinor(f.max)
+    const card = toMinor(f.card)
+    const expire = Number(f.expire)
+    if (!min || !max || !card || min > max || !(expire >= 1 && expire <= 60)) return void act('/api/payments/wallet/custom', { min: min ?? 0, max: max ?? 0, cardMin: card ?? 0, topupExpireMinutes: expire })
+    void act('/api/payments/wallet/custom', { min, max, cardMin: card, topupExpireMinutes: expire }, 'servers.admin.pay.saved')
+  }
+  return (
+    <div className="setting stack">
+      <div className="row">
+        <div className="text grow">
+          <b>{t('servers.admin.wallet.customTopup')}</b>
+          <span>
+            {d.customTopup
+              ? t('servers.admin.wallet.customTopupOn', { min: money(d.customMin ?? 0, cur), max: money(d.customMax ?? 0, cur) })
+              : t('servers.admin.wallet.customTopupOff')}
+          </span>
+          {d.customFromFile && <span className="hint">{t('servers.admin.wallet.customFromFile')}</span>}
+        </div>
+        {!d.customFromFile && (
+          <button className="btn sm" onClick={() => void act('/api/payments/wallet/custom', { reset: true }, 'servers.admin.pay.saved')}>
+            {t('servers.admin.set.reset')}
+          </button>
+        )}
+        <Switch on={!!d.customTopup} label={t('servers.admin.wallet.customTopup')} onChange={(on) => void act('/api/payments/wallet/custom', { on }, 'servers.admin.pay.saved')} />
+      </div>
+      <div className="field-row">
+        {num('min', 'servers.admin.wallet.customMin')}
+        {num('max', 'servers.admin.wallet.customMax')}
+        {num('card', 'servers.admin.wallet.cardMin')}
+        {num('expire', 'servers.admin.wallet.expireMinutes')}
+      </div>
+      <div className="row end">
+        <button className="btn sm primary" onClick={save}>
+          {t('common.save')}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /** Admin → Payments → Resin Credit. `open`: an account to open first (Refund as credit on Purchases), and the
@@ -155,6 +221,7 @@ export function WalletAdmin({ open }: { open?: { uuid: string; refund?: string }
               <span className="hint">{methods ? t('servers.admin.wallet.methods', { methods }) : t('servers.admin.wallet.noMethods')}</span>
             </div>
           )}
+          {data.customTopup !== undefined && <TopupRules d={data} act={act} />}
           {data.refundOnCancel !== undefined && (
             <div className="setting">
               <div className="text">

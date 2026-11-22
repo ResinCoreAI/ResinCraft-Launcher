@@ -1405,6 +1405,12 @@ pub struct WalletInfo {
     pub history: Vec<WalletEntry>,
     /// There are older entries: ask `wallet` with `before` = the last one's id.
     pub more: bool,
+    /// Players may type their own top-up amount, from `custom_min` to `custom_max` (whole units of the currency).
+    pub custom_topup: bool,
+    pub custom_min: u64,
+    pub custom_max: u64,
+    /// A top-up paid by card is at least this much (PromptPay and TrueMoney can be less). 0: no extra minimum.
+    pub card_min: u64,
 }
 
 /// One change to a Resin Credit balance.
@@ -1490,6 +1496,8 @@ pub struct PayStep {
     pub once: bool,
     /// The ways it can be paid ("card", "promptpay").
     pub methods: Vec<String>,
+    /// A Resin Credit top-up left unpaid is cancelled at this time (unix seconds); 0: not a top-up.
+    pub expires_at: u64,
 }
 
 #[cfg(test)]

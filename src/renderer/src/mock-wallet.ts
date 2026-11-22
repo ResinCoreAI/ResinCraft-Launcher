@@ -91,7 +91,8 @@ export function mockWallet(uuid: string, name: string, before?: number | null): 
     topups: admin.topups,
     methods: methods(),
     history: older.slice(0, PAGE),
-    more: older.length > PAGE
+    more: older.length > PAGE,
+    ...(admin.enabled ? { custom_topup: true, custom_min: 2000, custom_max: 500000, card_min: 15000 } : {})
   }
 }
 

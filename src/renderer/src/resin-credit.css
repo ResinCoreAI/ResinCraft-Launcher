@@ -201,3 +201,32 @@
 .rc-admin-account {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
+
+/* The player's own amount, under the presets: picked once something is typed in. */
+.rc-own {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.rc-own.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.rc-own label {
+  flex: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rc-own .input {
+  flex: 1;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.rc-own .input.bad {
+  border-color: var(--danger, #e5484d);
+}

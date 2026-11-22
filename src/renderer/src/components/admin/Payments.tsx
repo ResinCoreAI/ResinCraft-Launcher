@@ -67,6 +67,8 @@ interface Promo {
 interface GiftCode {
   code: string
   product: string
+  /** A Resin Credit code: what it adds to the balance (smallest unit), instead of a product. */
+  credit?: number
   days: number
   max_uses: number
   expires_at?: number
@@ -736,7 +738,8 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
           <span className={`chip compact ${g.usable ? 'success' : 'danger'}`}>{t(g.usable ? 'servers.admin.pay.usable' : 'servers.admin.pay.ended')}</span>
         </b>
         <span>
-          {name(g.product)} · {g.days ? t('servers.admin.pay.forDays', { n: g.days }) : t('servers.admin.pay.forGood')} ·{' '}
+          {g.credit ? t('servers.admin.pay.giftCredit', { amount: money(g.credit, d.currency) }) : name(g.product)}
+          {g.credit ? '' : ` · ${g.days ? t('servers.admin.pay.forDays', { n: g.days }) : t('servers.admin.pay.forGood')}`} ·{' '}
           {t('servers.admin.pay.redeemed', { n: g.max_uses ? `${g.redeemed.length} / ${g.max_uses}` : g.redeemed.length })}
           {g.expires_at ? ` · ${t('servers.admin.pay.endsAt', { when: when(g.expires_at) })}` : ''}
         </span>
@@ -775,7 +778,7 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
       <div className="settings-section">
         <div className="toolbar">
           <h3 className="grow">{t('servers.admin.pay.gifts')}</h3>
-          <button className="btn sm primary" disabled={d.products.length === 0} onClick={() => setGift(true)}>
+          <button className="btn sm primary" disabled={d.products.length === 0 && !d.walletOn} onClick={() => setGift(true)}>
             <Plus /> {t('servers.admin.pay.makeGifts')}
           </button>
         </div>
@@ -994,8 +997,14 @@ function PromoModal({ d, onAdd, onClose }: { d: Payments; onAdd: (body: Record<s
   )
 }
 
+/** The gift form's "product" when the code gives Resin Credit. */
+const CREDIT = '__credit'
+
 function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<string, unknown>) => Promise<boolean>; onClose: () => void }) {
-  const [f, setF] = useState({ product: d.products[0]?.id ?? '', days: '30', code: '', count: '1', uses: '1', expires: '', note: '' })
+  const [f, setF] = useState({ product: d.products[0]?.id ?? (d.walletOn ? CREDIT : ''), days: '30', code: '', count: '1', uses: '1', expires: '', note: '', credit: '100' })
+  // Resin Credit instead of a product: the code adds that much to the balance.
+  const credit = f.product === CREDIT
+  const creditAmount = Math.round(Number(f.credit) * 100)
   // How long a code gives the product: a month (30 days), a year (365), for good (0) or any number of days.
   const [len, setLen] = useState<'30' | '365' | '0' | 'custom'>('30')
   const field = (k: Exclude<keyof typeof f, 'product'>, label: string, placeholder?: string) => (
@@ -1005,17 +1014,26 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
     </label>
   )
   const submit = () => {
-    const body: Record<string, unknown> = { product: f.product, days: len === 'custom' ? Math.max(1, Math.floor(Number(f.days) || 1)) : Number(len), max_uses: Number(f.uses) || 0, note: f.note.trim() }
+    const body: Record<string, unknown> = credit
+      ? { credit: creditAmount, max_uses: Number(f.uses) || 0, note: f.note.trim() }
+      : { product: f.product, days: len === 'custom' ? Math.max(1, Math.floor(Number(f.days) || 1)) : Number(len), max_uses: Number(f.uses) || 0, note: f.note.trim() }
     if (f.code.trim()) body.code = f.code.trim()
     else body.count = Math.max(1, Number(f.count) || 1)
     if (Number(f.expires) > 0) body.expires_days = Number(f.expires)
     return onMake(body)
   }
   return (
-    <FormModal title={t('servers.admin.pay.makeGifts')} confirm={t('servers.admin.pay.makeGifts')} ok={!!f.product} onSubmit={submit} onClose={onClose}>
+    <FormModal
+      title={t('servers.admin.pay.makeGifts')}
+      confirm={t('servers.admin.pay.makeGifts')}
+      ok={!!f.product && (!credit || (Number.isInteger(Number(f.credit)) && creditAmount >= 1000 && creditAmount <= 10_000_000))}
+      onSubmit={submit}
+      onClose={onClose}
+    >
       <label className="field">
         <span>{t('servers.admin.pay.f.gives')}</span>
         <select className="input" value={f.product} onChange={(e) => setF({ ...f, product: e.target.value })}>
+          {d.walletOn && <option value={CREDIT}>{t('servers.admin.pay.giftCreditOption')}</option>}
           {d.products.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -1023,6 +1041,13 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
           ))}
         </select>
       </label>
+      {credit ? (
+        <label className="field">
+          <span>{t('servers.admin.pay.f.creditAmount')}</span>
+          <input className="input" inputMode="numeric" value={f.credit} onChange={(e) => setF({ ...f, credit: e.target.value.replace(/[^\d]/g, '') })} />
+          <span className="hint">{t('servers.admin.pay.giftCreditHint', { amount: money(creditAmount || 0, d.currency) })}</span>
+        </label>
+      ) : (
       <label className="field">
         <span>{t('servers.admin.pay.f.lasts')}</span>
         <Segmented<'30' | '365' | '0' | 'custom'>
@@ -1036,8 +1061,9 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
           ]}
         />
       </label>
+      )}
       <div className="field-row">
-        {len === 'custom' && field('days', t('servers.admin.pay.f.days'))}
+        {!credit && len === 'custom' && field('days', t('servers.admin.pay.f.days'))}
         {field('uses', t('servers.admin.pay.f.perCode'))}
         {field('expires', t('servers.admin.pay.f.endsIn'), t('servers.admin.pay.never'))}
       </div>

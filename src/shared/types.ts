@@ -1556,6 +1556,12 @@ export interface WalletInfo {
   history: WalletEntry[]
   /** Older entries: ask again with `before` = the last one's id. */
   more: boolean
+  /** Players may type their own amount, from `custom_min` to `custom_max` (whole baht). */
+  custom_topup?: boolean
+  custom_min?: number
+  custom_max?: number
+  /** A top-up paid by card is at least this much (PromptPay and TrueMoney can be less). */
+  card_min?: number
 }
 
 /** What a Resin Credit top-up asked for next: the payment form (card, PromptPay; then `relayWalletRefresh` with
@@ -1652,6 +1658,8 @@ export interface PayStep {
   once?: boolean
   /** "card", "promptpay". */
   methods?: string[]
+  /** A Resin Credit top-up left unpaid is cancelled at this time (unix seconds). */
+  expires_at?: number
 }
 
 export interface AccountPlan {

@@ -239,6 +239,15 @@ function PayModal({
 
   const price = money(step.amount, step.currency)
   const carried = step.carried ?? 0
+  // A top-up runs out after a while unpaid (the relay cancels it): count down, and stop at 0.
+  const [now, setNow] = useState(() => Date.now() / 1000)
+  useEffect(() => {
+    if (!step.expires_at) return
+    const timer = window.setInterval(() => setNow(Date.now() / 1000), 1000)
+    return () => window.clearInterval(timer)
+  }, [step.expires_at])
+  const left = step.expires_at ? Math.max(0, Math.ceil(step.expires_at - now)) : undefined
+  const expired = left === 0
   return (
     <Modal
       title={title}
@@ -252,13 +261,19 @@ function PayModal({
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={!ready || busy} onClick={() => void pay()}>
+          <button className="btn primary" disabled={!ready || busy || expired} onClick={() => void pay()}>
             {busy ? <Loader2 className="spin" /> : <CreditCard />}{' '}
             {busy ? t('servers.relayPlan.paying') : step.intent === 'setup' ? t('servers.relayPlan.saveCard') : t('servers.relayPlan.payFor', { price })}
           </button>
         </>
       }
     >
+      {left !== undefined &&
+        (expired ? (
+          <p className="callout pending rp-notice">{t('servers.wallet.topupExpired')}</p>
+        ) : (
+          <p className="hint">{t('servers.wallet.topupExpiresIn', { time: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` })}</p>
+        ))}
       {!ready && !error && (
         <p className="hint">
           <Loader2 className="spin" /> {t('servers.relayPlan.loadingForm')}
@@ -302,8 +317,9 @@ function PayModal({
 
 // ---------- Resin Credit: the Store's wallet (only while the plan says `wallet`) ----------
 
-/** The account's Resin Credit: loaded while `on`, with older ledger pages on request. */
-function useWallet(account: string, on: boolean) {
+/** The account's Resin Credit: loaded while `on`, with older ledger pages on request. Read again whenever the plan's
+ *  balance changes (a gift code redeemed, a refund, the admin's grant). */
+function useWallet(account: string, on: boolean, balance?: number) {
   const [wallet, setWallet] = useState<WalletInfo>()
   const [error, setError] = useState<string>()
   const [loadingMore, setLoadingMore] = useState(false)
@@ -320,6 +336,12 @@ function useWallet(account: string, on: boolean) {
     setWallet(undefined)
     void reload()
   }, [reload])
+  const seen = useRef(balance)
+  useEffect(() => {
+    if (balance === seen.current) return
+    seen.current = balance
+    void reload()
+  }, [balance])
   const more = async () => {
     const last = wallet?.history[wallet.history.length - 1]
     if (!wallet || !last) return
@@ -341,7 +363,8 @@ const WALLET_KINDS: Record<string, Key> = {
   purchase: 'servers.wallet.kind.purchase',
   refund: 'servers.wallet.kind.refund',
   grant: 'servers.wallet.kind.grant',
-  deduct: 'servers.wallet.kind.deduct'
+  deduct: 'servers.wallet.kind.deduct',
+  gift: 'servers.wallet.kind.gift'
 }
 const signed = (n: number, currency: string) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${money(Math.abs(n), currency)}`
 const stamp = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
@@ -407,8 +430,24 @@ function TopupModal({
   onDone: (w: WalletInfo, added: number) => void
 }) {
   const cur = wallet.currency
-  const [amount, setAmount] = useState(() => wallet.topups.find((n) => n >= (need ?? 0)) ?? wallet.topups[0] ?? 0)
-  const [method, setMethod] = useState(wallet.methods[0] ?? '')
+  // The player's own amount (whole baht, as typed), when the relay takes one; `own` empty: a preset is picked.
+  const custom = !!wallet.custom_topup && !!wallet.custom_max
+  const cMin = wallet.custom_min ?? 0
+  const cMax = wallet.custom_max ?? 0
+  const preset = wallet.topups.find((n) => n >= (need ?? 0))
+  const [picked, setPicked] = useState(() => preset ?? wallet.topups[0] ?? 0)
+  // Checkout short by more than any preset: start with that much typed in.
+  const [own, setOwn] = useState(() => (!preset && need && custom ? String(Math.ceil(Math.max(need, cMin) / 100)) : ''))
+  const ownAmount = own.trim() ? Math.round(Number(own.trim()) * 100) : 0
+  const ownBad = !!own.trim() && (!Number.isInteger(Number(own.trim())) || ownAmount < cMin || ownAmount > cMax)
+  const amount = own.trim() ? (ownBad ? 0 : ownAmount) : picked
+  // Card has its own minimum (฿150): below it, PromptPay or TrueMoney.
+  const cardMin = wallet.card_min ?? 0
+  const cardTooSmall = (n: number) => cardMin > 0 && n > 0 && n < cardMin
+  const [method, setMethod] = useState(() => wallet.methods.find((m) => !(m === 'card' && cardTooSmall(preset ?? wallet.topups[0] ?? 0))) ?? wallet.methods[0] ?? '')
+  useEffect(() => {
+    if (method === 'card' && cardTooSmall(amount)) setMethod(wallet.methods.find((m) => m !== 'card') ?? method)
+  }, [amount])
   const [link, setLink] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -445,7 +484,7 @@ function TopupModal({
       setBusy(false)
     }
   }
-  const ready = !busy && amount > 0 && !!method && (method !== 'truemoney' || link.trim().length > 8)
+  const ready = !busy && amount > 0 && !!method && !(method === 'card' && cardTooSmall(amount)) && (method !== 'truemoney' || link.trim().length > 8)
   return (
     <Modal
       title={t('servers.wallet.topupTitle')}
@@ -463,30 +502,71 @@ function TopupModal({
         </>
       }
     >
-      {wallet.methods.length === 0 || wallet.topups.length === 0 ? (
+      {wallet.methods.length === 0 || (wallet.topups.length === 0 && !custom) ? (
         <p className="hint it-warn">{t('servers.wallet.topupClosed')}</p>
       ) : (
         <>
           <div className="field">
             <label>{t('servers.wallet.amount')}</label>
             <div className="rc-amounts" role="radiogroup" aria-label={t('servers.wallet.amount')}>
-              {wallet.topups.map((n) => (
-                <button key={n} role="radio" aria-checked={n === amount} className={`rc-amount${n === amount ? ' on' : ''}`} onClick={() => setAmount(n)}>
-                  {money(n, cur)}
-                </button>
-              ))}
+              {wallet.topups.map((n) => {
+                const on = !own.trim() && n === picked
+                return (
+                  <button
+                    key={n}
+                    role="radio"
+                    aria-checked={on}
+                    className={`rc-amount${on ? ' on' : ''}`}
+                    onClick={() => {
+                      setPicked(n)
+                      setOwn('')
+                    }}
+                  >
+                    {money(n, cur)}
+                  </button>
+                )
+              })}
             </div>
-            <span className="hint">{t('servers.wallet.afterTopup', { balance: money(before + amount, cur) })}</span>
+            {custom && (
+              <div className={`rc-own${own.trim() ? ' on' : ''}`}>
+                <label htmlFor="rc-own">{t('servers.wallet.ownAmount')}</label>
+                <input
+                  id="rc-own"
+                  className={`input${ownBad ? ' bad' : ''}`}
+                  inputMode="numeric"
+                  value={own}
+                  maxLength={9}
+                  placeholder={t('servers.wallet.ownAmountRange', { min: money(cMin, cur), max: money(cMax, cur) })}
+                  onChange={(e) => setOwn(e.target.value.replace(/[^\d]/g, ''))}
+                  onKeyDown={(e) => e.key === 'Enter' && ready && void go()}
+                />
+              </div>
+            )}
+            {ownBad ? (
+              <span className="hint bad">{t('servers.wallet.ownAmountBad', { min: money(cMin, cur), max: money(cMax, cur) })}</span>
+            ) : (
+              <span className="hint">{t('servers.wallet.afterTopup', { balance: money(before + amount, cur) })}</span>
+            )}
           </div>
           <div className="field">
             <label>{t('servers.relayPlan.payWith')}</label>
             <div className="segmented rp-ways">
-              {wallet.methods.map((m) => (
-                <button key={m} className={method === m ? 'on' : undefined} onClick={() => setMethod(m)}>
-                  {WALLET_METHODS[m] ? t(WALLET_METHODS[m]) : m}
-                </button>
-              ))}
+              {wallet.methods.map((m) => {
+                const off = m === 'card' && cardTooSmall(amount)
+                return (
+                  <button
+                    key={m}
+                    className={method === m ? 'on' : undefined}
+                    disabled={off}
+                    title={off ? t('servers.wallet.cardMin', { amount: money(cardMin, cur) }) : undefined}
+                    onClick={() => setMethod(m)}
+                  >
+                    {WALLET_METHODS[m] ? t(WALLET_METHODS[m]) : m}
+                  </button>
+                )
+              })}
             </div>
+            {cardTooSmall(amount) && wallet.methods.includes('card') && <span className="hint">{t('servers.wallet.cardMin', { amount: money(cardMin, cur) })}</span>}
           </div>
           {method === 'truemoney' && (
             <div className="field">
@@ -522,7 +602,7 @@ const WALLET_METHODS: Record<string, Key> = {
 function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: number) => void }) {
   const { toast } = useStore()
   const plan = a.plan!
-  const w = useWallet(a.account, !!plan.wallet)
+  const w = useWallet(a.account, !!plan.wallet, plan.wallet_balance)
   const [topup, setTopup] = useState(false)
   const [history, setHistory] = useState(false)
   const wallet = w.wallet
