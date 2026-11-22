@@ -9,6 +9,7 @@ import { api } from '../api'
 import { useStore } from '../store'
 import { t, tx } from '../i18n'
 import { timeAgo } from '../util'
+import { versionName } from '../versionName'
 import { Modal, Switch } from './ui'
 import '../updates.css'
 
@@ -214,7 +215,7 @@ export function UpdatesSection() {
         <div className="card">
           <div className="setting">
             <div className="text">
-              <b>{t('updates.version', { version: status.current })}</b>
+              <b>{versionName(status.current)}</b>
               <span>{t('updates.store')}</span>
             </div>
           </div>
@@ -252,7 +253,7 @@ export function UpdatesSection() {
         <div className="setting">
           <div className="text">
             <b>
-              {t('updates.version', { version: status.current })}
+              {versionName(status.current)}
               {available && !busy && <span className="update-new">{available.version}</span>}
               {available?.dev && !busy && <span className="chip warn">{t(channel === 'test' ? 'updates.testBuild' : 'updates.devBuild')}</span>}
             </b>

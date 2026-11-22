@@ -21,6 +21,7 @@ import { DISCLAIMER, fixed } from '../util'
 import { SETTING_SECTIONS } from '../settingsIndex'
 import { setLaunchScreen, useLaunchScreen } from '../launchScreenState'
 import { setClassicLayout, useClassicLayout } from '../classicLayoutState'
+import { versionName } from '../versionName'
 import { setGuideOn, startGuide, useGuide } from '../guideState'
 import { setWindowButtons, useWindowButtons, WINDOW_BUTTON_STYLES, type WindowButtonStyle } from '../windowButtonsState'
 
@@ -722,7 +723,7 @@ export default function SettingsPage() {
             <div className="card pad row" style={{ gap: 16 }}>
               <Logo className="about-logo" />
               <div className="grow">
-                <b style={{ fontSize: 16 }}>ResinCraft Launcher</b> <span className="faint">v{info?.version}</span>
+                <b style={{ fontSize: 16 }}>ResinCraft Launcher</b> <span className="faint">{versionName(info?.version)}</span>
                 <div className="muted">{t('settings.about.credit')}</div>
                 <div className="hint mono ellipsis" style={{ marginTop: 6 }}>
                   {t('settings.about.dataFolder', { path: info?.dataDir ?? '' })}

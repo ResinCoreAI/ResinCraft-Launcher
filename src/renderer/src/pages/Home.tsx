@@ -16,6 +16,7 @@ import { usePackArt } from '../components/packArt'
 import { BasicIcon, iconPng, RTX_ICON } from '../components/BasicIcons'
 import { useWelcome } from '../welcomeState'
 import { makeStarterInstance } from '../starterInstance'
+import { versionName } from '../versionName'
 
 export default function Home() {
   const { instances, activeAccount, go, setNewInstanceOpen, settings, ready, refreshInstances } = useStore()
@@ -156,7 +157,7 @@ function SiteFooter() {
         </nav>
         <p className="site-foot-note">
           {t('settings.about.credit')}
-          {info?.version && <span className="mono">v{info.version}</span>}
+          {info?.version && <span className="mono">{versionName(info.version)}</span>}
           <span className="legal">{DISCLAIMER}</span>
         </p>
       </div>

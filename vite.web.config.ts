@@ -7,6 +7,9 @@ export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
   base: './',
   plugins: [react()],
+  // The day this copy was built, for a Beta's version name ("B2.0.1 Build2026.11.23.1", versionName.ts).
+  // This PC's own date (not UTC), so a build made just after midnight in Thailand says that day.
+  define: { __BUILD_DATE__: JSON.stringify(new Date().toLocaleDateString('sv').replace(/-/g, '.')) },
   resolve: {
     alias: { '@shared': resolve(__dirname, 'src/shared'), '@': resolve(__dirname, 'src/renderer/src') }
   },
