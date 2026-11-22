@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react'
-import { AlertTriangle, BookmarkPlus, Check, CircleSlash, Download, Loader2, RotateCcw, Search, Upload, X } from 'lucide-react'
+import { AlertTriangle, BookmarkPlus, Check, CircleSlash, Download, Loader2, Pencil, RotateCcw, Search, Upload, X } from 'lucide-react'
 import type { AccountView, NameStatus, OnlineSkin, PlayerProfile, SavedSkin, SkinVariant } from '@shared/types'
 import { api } from '../api'
 import { currentLanguage, t } from '../i18n'
@@ -14,7 +14,7 @@ const SkinEditor = lazy(() => import('./SkinEditor'))
 import { Modal } from './ui'
 import '../profile.css'
 
-type Tab = 'skin' | 'find' | 'cape' | 'name'
+type Tab = 'skin' | 'edit' | 'find' | 'cape' | 'name'
 /** The skin open in the editor: where it came from, and its picture as it was loaded (`source`). */
 interface Work {
   /** Changes when another skin is opened (the editor then loads `source` and clears undo). */
@@ -157,7 +157,7 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
   const cape = profile?.capes.find((c) => c.active)
   const skinUrl = peek ? peek.url : (edited ?? profile?.skin?.url)
   const showVariant = peek ? peek.variant : variant
-  const editing = tab === 'skin' && !!profile
+  const editing = tab === 'edit' && !!profile
 
   return (
     <Modal title={t('profile.title', { name: profile?.name ?? account.username })} subtitle={t('profile.subtitle')} onClose={onClose} wide>
@@ -195,7 +195,7 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
 
           <div className="pm-panel">
             <div className="tabs pm-tabs">
-              {(['skin', 'find', 'cape', 'name'] as const).map((id) => (
+              {(['skin', 'edit', 'find', 'cape', 'name'] as const).map((id) => (
                 <button
                   key={id}
                   className={tab === id ? 'on' : ''}
@@ -210,6 +210,42 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
             </div>
 
             {tab === 'skin' && (
+              <div className="pm-skin-home">
+                <SkinShelf
+                  library={library}
+                  error={libraryError}
+                  reload={reloadLibrary}
+                  busy={busy}
+                  wearing={wearing}
+                  opened={work?.libraryId}
+                  open={(sk) => {
+                    open({ source: sk.preview, label: sk.name, from: 'library', name: sk.name, libraryId: sk.id }, sk.variant)
+                    setTab('edit')
+                  }}
+                  use={useSaved}
+                  toast={toast}
+                />
+                <div className="pm-actions">
+                  <button
+                    className="btn ghost"
+                    onClick={() =>
+                      void run('reset', () => api.accounts.resetSkin(account.id), () => t('profile.skin.wasReset')).then(
+                        (ok) => ok && profile && void openWearing({ ...profile, skin: undefined })
+                      )
+                    }
+                    disabled={!!busy || !profile.skin}
+                  >
+                    {busy === 'reset' ? <Loader2 className="spin" /> : <RotateCcw />} {t('profile.skin.reset')}
+                  </button>
+                  <div className="grow" />
+                  <button className="btn primary" onClick={() => setTab('edit')}>
+                    <Pencil /> {t('profile.tab.edit')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {tab === 'edit' && (
               <SkinTab
                 profile={profile}
                 work={work}
@@ -221,19 +257,6 @@ export default function ProfileManager({ account, onClose }: { account: AccountV
                 setVariant={setVariant}
                 open={open}
                 busy={busy}
-                shelf={
-                  <SkinShelf
-                    library={library}
-                    error={libraryError}
-                    reload={reloadLibrary}
-                    busy={busy}
-                    wearing={wearing}
-                    opened={work?.libraryId}
-                    open={(s) => open({ source: s.preview, label: s.name, from: 'library', name: s.name, libraryId: s.id }, s.variant)}
-                    use={useSaved}
-                    toast={toast}
-                  />
-                }
                 save={async () => {
                   const png = editor.current?.png()
                   if (!png || !work) return
@@ -352,7 +375,6 @@ function SkinTab({
   setVariant,
   open,
   busy,
-  shelf,
   save,
   download,
   apply,
@@ -368,7 +390,6 @@ function SkinTab({
   setVariant: (v: SkinVariant) => void
   open: (w: Omit<Work, 'key'>, v?: SkinVariant) => void
   busy?: string
-  shelf: ReactNode
   save: () => Promise<void>
   download: () => void
   apply: () => Promise<void>
@@ -491,7 +512,6 @@ function SkinTab({
             <Loader2 className="spin" />
           </div>
         )}
-        {shelf}
       </div>
       {dragging && <div className="se-drop">{t('skinTab.drop')}</div>}
 

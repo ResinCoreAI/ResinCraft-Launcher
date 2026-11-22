@@ -125,5 +125,42 @@ export default {
   'bedrock.openBackup': 'Show this backup in Explorer',
   'bedrock.showAllBackups': 'Show all {count}',
   'bedrock.unsupported.title': 'Bedrock Edition is a Windows app',
-  'bedrock.unsupported.body': 'On this system, play Bedrock on a phone, console or Windows PC. You can still host Bedrock servers here.'
+  'bedrock.unsupported.body': 'On this system, play Bedrock on a phone, console or Windows PC. You can still host Bedrock servers here.',
+  // Play: which account Bedrock signs in with (the Xbox app's; switched there).
+  'bedrock.account.title': 'Play Bedrock as',
+  'bedrock.account.subtitle': 'Minecraft for Windows signs in with the account the Xbox app is signed in with.',
+  'bedrock.account.checking': 'Checking which account the Xbox app is signed in with…',
+  'bedrock.account.xboxIs': 'The Xbox app is signed in as {name}.',
+  'bedrock.account.xboxUnknown': "Windows doesn't say which account the Xbox app is signed in with.",
+  'bedrock.account.unnamed': 'an Xbox account',
+  'bedrock.account.inXbox': 'In the Xbox app',
+  'bedrock.account.xboxOnly': "The Xbox app's account (not in ResinCraft)",
+  'bedrock.account.unknown': "Can't be checked",
+  'bedrock.account.unknownHint': "ResinCraft doesn't know this account's Xbox account yet. Sign it in again in Accounts so it can be checked.",
+  'bedrock.account.continue': 'Switch and play',
+  'bedrock.account.switchTitle': 'Switch the Xbox app to {name}',
+  'bedrock.account.switchSubtitle': 'Only the Xbox app can change the account Minecraft for Windows uses.',
+  'bedrock.account.openXbox': 'Open the Xbox app',
+  'bedrock.account.step1': 'In the Xbox app, select your profile picture, then Sign out.',
+  'bedrock.account.step2': 'Select Sign in.',
+  'bedrock.account.step3': 'Sign in with the Microsoft account of {name}.',
+  'bedrock.account.waiting': 'The Xbox app is signed in as {now}. Minecraft starts when it is signed in as {name}.',
+  'bedrock.account.waitingUnknown': 'Minecraft starts when the Xbox app is signed in as {name}.',
+  'bedrock.account.cantCheck': "ResinCraft can't tell whether the Xbox app is signed in as {name}. Play when you have switched.",
+  'bedrock.account.playNow': 'Play',
+  'bedrock.account.owns': 'Owns Bedrock',
+  'bedrock.account.trialOnly': 'Trial only',
+  'bedrock.account.trialWarn': "{name} doesn't own Minecraft for Windows, so the game runs as the trial.",
+  // Under Play, when the game would run as the trial.
+  'bedrock.trial.notOwned': "The Xbox app is signed in as {name}, which doesn't own Minecraft for Windows, so the game runs as the trial.",
+  'bedrock.trial.unknownXbox':
+    'If Minecraft says Unlock Full Game: the Xbox app is signed in as {name}, which isn\'t in ResinCraft, so ResinCraft can\'t check what it owns.',
+  'bedrock.trial.owner': '{owner} owns Minecraft for Windows. To play the full game:',
+  'bedrock.trial.noOwner':
+    "None of your accounts in ResinCraft owns Minecraft for Windows. Owning Minecraft: Java Edition includes it: add that Microsoft account in Accounts.",
+  'bedrock.trial.step1': 'Sign the Xbox app in with {owner}.',
+  'bedrock.trial.step2': 'Sign the Microsoft Store in with the same account.',
+  'bedrock.trial.step3': 'Close Minecraft and start it again.',
+  'bedrock.account.whole':
+    'This changes the account for the Microsoft Store and other Xbox games on this Windows user too. If Minecraft is open, close it first: it picks the account when it starts.'
 }

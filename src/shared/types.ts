@@ -447,8 +447,8 @@ export interface Settings {
   autoUpdate: boolean
   /** Install found updates in the background without asking, once no game or hosted server runs. */
   silentUpdate?: boolean
-  /** 'stable' or 'beta' (pre-releases too). */
-  updateChannel?: 'stable' | 'beta'
+  /** 'stable', 'beta' (pre-releases too) or 'dev' (the relay's Dev builds, for invited accounts). */
+  updateChannel?: 'stable' | 'beta' | 'dev'
   /** Closing the window keeps ResinCraft running in the system tray. */
   tray?: boolean
   /** Hidden for 30 s (in the tray, or while a game runs), the window closes completely to free WebView2's memory and
@@ -490,6 +490,21 @@ export interface UpdateAvailable {
   notesUrl: string
   /** The version already installed, offered again by Reinstall (not shown as an update). */
   reinstall?: boolean
+  /** A Dev build from the relay: no release page (`notesUrl` is empty). */
+  dev?: boolean
+}
+
+/** A Dev build's update file picked on this PC (Admin → Dev). */
+export interface DevBuildFile {
+  path: string
+  name: string
+  size: number
+  /** From the bundle's name; empty when it has none. */
+  version: string
+  /** The .sig the build made next to it is there. */
+  signature: boolean
+  /** The updater platform, guessed from the name ("windows-x86_64"). */
+  target: string
 }
 
 /** Games and hosted servers (their names) that installing an update would cut off. */
@@ -512,6 +527,8 @@ export interface UpdateStatus {
   waitingFor?: UpdateBlockers
   /** Installed from the Microsoft Store: the Store updates it, so ResinCraft never looks. */
   store?: boolean
+  /** Whether the signed-in account may use the Dev channel (the relay's admin invited it); missing until the relay said. */
+  dev?: boolean
 }
 
 export interface AppInfo {
@@ -1100,6 +1117,28 @@ export interface BedrockEdition {
   switched?: boolean
 }
 
+/** The Xbox account the Xbox app is signed in with: Bedrock plays as it. */
+export interface XboxUser {
+  xuid: string
+  gamertag: string
+}
+
+/** The Xbox app's account next to ResinCraft's accounts. */
+export interface XboxSignIn {
+  /** Missing when Windows doesn't say who is signed in. */
+  user?: XboxUser
+  /** The ResinCraft account that is that Xbox account. */
+  accountId?: string
+  /** ResinCraft's Microsoft accounts whose Xbox account isn't known, so they can't be matched. */
+  unknown: string[]
+  /**
+   * ResinCraft's accounts that own Minecraft for Windows, and those that don't, as Minecraft's entitlement service
+   * says (unknown ones are in neither). An account that doesn't own it plays the trial.
+   */
+  owners: string[]
+  notOwners: string[]
+}
+
 export interface BedrockStatus {
   /** Bedrock Edition only exists as an app on Windows. */
   supported: boolean
@@ -1676,6 +1715,8 @@ export interface AdminStatus {
   needCode?: boolean
   /** This PC unlocks by itself. */
   remembered?: boolean
+  /** Not an admin but one of the relay's developers: the Admin page shows only Dev (server.devCall). */
+  developer?: boolean
 }
 
 /** One world backup zip (a server's or an instance's). */
@@ -2421,6 +2462,8 @@ export interface ResinApi {
     info(): Promise<AppInfo>
     /** RAM used by the launcher, running games and servers, and the PC. */
     memory(): Promise<MemoryUsage>
+    /** Nobody has used the window for a while (memory.ts): the engine has WebView2 give memory back. */
+    rest(): Promise<void>
     openExternal(url: string): Promise<void>
     showItem(path: string): Promise<void>
     /** Absolute path of a file dropped onto the window (synchronous, preload-side). */
@@ -2551,6 +2594,11 @@ export interface ResinApi {
     gamingServices(): Promise<void>
     /** Opens the Xbox app, where the Windows account Bedrock signs in with is switched (its Store page if missing). */
     xboxAccount(): Promise<void>
+    /**
+     * Who the Xbox app is signed in as (Bedrock plays as that account; no launcher can choose it), matched to
+     * ResinCraft's accounts. Read from where Windows keeps it, which Microsoft doesn't document: missing means unknown.
+     */
+    xboxUser(): Promise<XboxSignIn>
     /** Opens the Microsoft Store's Downloads and updates page. */
     update(): Promise<void>
     /** Opens a world's folder, or the edition's worlds folder. */
@@ -2609,6 +2657,8 @@ export interface ResinApi {
     /** Reinstall: the newest release even when it's the one installed; then `install()` as for an update. */
     checkReinstall(): Promise<UpdateStatus>
     blockers(): Promise<UpdateBlockers>
+    /** Asks the relay whether this account may use the Dev channel (`dev` in the status; at most every 10 minutes). */
+    devAccess(): Promise<UpdateStatus>
     /** Downloads and installs the found update (the app restarts). `waitForStop`: install once games and servers stop. */
     /** true: once every game and server has stopped; 'close': stop servers and close games first. */
     install(mode?: boolean | 'close'): Promise<void>
@@ -2974,6 +3024,12 @@ export interface ResinApi {
     adminLock(forget?: boolean): Promise<void>
     /** One admin request (the relay dashboard's JSON API: GET /api/listings, POST /api/listings/…). */
     adminCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
+    /** Admin → Dev: picks a Dev build's update file on this PC (null if cancelled). */
+    devPickBuild(): Promise<DevBuildFile | null>
+    /** Admin → Dev: uploads it to the relay's Dev channel, with the .sig next to it. */
+    devUpload(req: { path: string; version: string; target: string; notes?: string; developer?: boolean }): Promise<unknown>
+    /** Admin → Dev for the relay's developers: the same /api/devs routes with the relay session, no unlock. */
+    devCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
     submitListing(req: { address: string; info: ListingInfo }): Promise<ListingStatus>
     myListings(): Promise<MyListing[]>
     removeListing(id: string): Promise<ListingStatus>

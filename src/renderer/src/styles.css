@@ -7516,3 +7516,326 @@ button.island-toggle:focus-visible {
   height: 44%;
   margin-bottom: 9%;
 }
+
+/* ---------- New instance (NewInstanceModal.tsx): the card being made first, then short rows ---------- */
+.ni {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ni-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .ni-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.ni-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  overflow: hidden;
+}
+.ni-art {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.ni-art .tile {
+  width: 100%;
+  height: 100%;
+}
+.ni-art-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+  transition: opacity 0.15s var(--ease);
+}
+.ni-art-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.ni-art:hover .ni-art-btn,
+.ni-art:focus-visible .ni-art-btn {
+  opacity: 1;
+}
+.ni-art-remove {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  border-color: transparent;
+}
+.ni-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+.ni-card-meta .pic-icon small {
+  display: none;
+}
+.ni-card-meta b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ni-card-meta .grow > span {
+  display: block;
+  color: var(--text-faint);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ni-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ni-fields .swatches {
+  margin-top: 8px;
+}
+.ni-loaders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ni-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s var(--ease),
+    background 0.15s var(--ease);
+}
+.ni-loader:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.ni-loader.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.ni-loader:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ni-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex: none;
+  overflow: hidden;
+}
+.ni-mark.drawn svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ni-mark.letter {
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--text);
+  font: 700 12px var(--font-display);
+}
+.ni-rows {
+  border-top: 1px solid var(--border);
+}
+.ni-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ni-row-label {
+  padding-top: 9px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.ni-row-value {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ni-row-value .select {
+  width: 100%;
+}
+.ni-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ni-pick b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.ni-pick .ni-chev {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  color: var(--text-faint);
+  transition: transform 0.15s var(--ease);
+}
+.ni-pick[aria-expanded='true'] .ni-chev {
+  transform: rotate(180deg);
+}
+.ni-pick:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ni-versions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ni-extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-top: 8px;
+}
+.ni-extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.ni-sum {
+  margin-right: auto;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+/* A window's own tips (New instance): over the window, under menus. */
+.guide-layer.over-dialog {
+  z-index: 140;
+}
+
+/* A loader without a build for the version shown: dimmer, but picking it moves to a version it has. */
+.ni-loader.other {
+  opacity: 0.6;
+}
+.ni-loader.other:hover {
+  opacity: 1;
+}
+.ni-switched {
+  color: var(--accent-text, var(--accent));
+}
+
+/* A window with more below what shows: its bottom fades out and a "More below" button sits over it (ui.tsx
+   ModalBody). */
+.modal-scroll {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.modal-scroll > .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.modal-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 56px;
+  pointer-events: none;
+  background: linear-gradient(transparent, var(--surface));
+}
+.modal-more {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  animation: modal-more-in 0.2s var(--ease);
+}
+.modal-more svg {
+  width: 15px;
+  height: 15px;
+}
+.modal-more:hover {
+  border-color: var(--accent);
+}
+@keyframes modal-more-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .modal-more svg {
+    animation: modal-more-nudge 1.6s ease-in-out 3;
+  }
+}
+@keyframes modal-more-nudge {
+  50% {
+    transform: translateY(2px);
+  }
+}

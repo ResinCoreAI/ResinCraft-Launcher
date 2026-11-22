@@ -238,7 +238,7 @@ export function VersionSection({ inst }: { inst: Instance }) {
   }
 
   return (
-    <div className="settings-section">
+    <div className="settings-section" data-guide="inst-version">
       <h3>{t('version.title')}</h3>
       <div className="card">
         <GameVersion inst={inst} />

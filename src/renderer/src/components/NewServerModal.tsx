@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Blocks, Check, ChevronLeft, ChevronRight, Combine, Cpu, Fish, FileArchive, FlaskConical, Hammer, Layers, Leaf, Loader2, Network, Package, Search, Server, Smartphone, Sparkles, Sunrise } from 'lucide-react'
+import { Blocks, Combine, Cpu, Fish, FileArchive, FlaskConical, Hammer, Layers, Leaf, Loader2, Network, Package, Pickaxe, Plug, Puzzle, Search, Server, Smartphone, Sparkles, Star, Sunrise } from 'lucide-react'
 import type {
   ContentSource,
   Instance,
@@ -151,6 +151,25 @@ const GROUPS: { title: Key; types: Pick[] }[] = [
   { title: 'servers.create.groupBedrock', types: ['bedrock', 'pocketmine', 'nukkit', 'powernukkitx', 'nukkitpm1'] }
 ]
 
+/** The one most people want in each group, marked on its card and offered first. */
+const BEST: Partial<Record<Key, Pick>> = {
+  'servers.create.groupVanilla': 'vanilla',
+  'servers.create.groupPlugins': 'paper',
+  'servers.create.groupMods': 'neoforge',
+  'servers.create.groupHybrid': 'arclight',
+  'servers.create.groupProxy': 'velocity',
+  'servers.create.groupBedrock': 'bedrock'
+}
+const isBest = (k: Pick) => Object.values(BEST).includes(k)
+
+/** "Start here": what the server is for, each with its best pick. */
+const INTENTS: { id: string; title: Key; body: Key; pick: Pick; icon: ReactNode }[] = [
+  { id: 'vanilla', title: 'servers.create.intent.vanilla', body: 'servers.create.intent.vanilla.body', pick: 'vanilla', icon: <Pickaxe /> },
+  { id: 'plugins', title: 'servers.create.intent.plugins', body: 'servers.create.intent.plugins.body', pick: 'paper', icon: <Plug /> },
+  { id: 'mods', title: 'servers.create.intent.mods', body: 'servers.create.intent.mods.body', pick: 'neoforge', icon: <Puzzle /> },
+  { id: 'bedrock', title: 'servers.create.intent.bedrock', body: 'servers.create.intent.bedrock.body', pick: 'bedrock', icon: <Smartphone /> }
+]
+
 /** Server types whose version list comes from their own download site. */
 const OWN_VERSIONS: ServerKind[] = ['paper', 'purpur', 'folia', 'spigot', 'leaf', 'pufferfish', 'craftbukkit', 'sponge', 'arclight', 'mohist', 'magma', 'catserver', 'crucible', 'spongeforge', 'cardboard', 'velocity', 'bungeecord', 'waterfall', 'travertine', 'waterdogpe', 'geyser', 'glowstone', 'cuberite', 'pumpkin', 'horizon', 'bedrock', 'pocketmine', 'nukkit', 'powernukkitx', 'nukkitpm1']
 /** Types that come in builds to choose from (Arclight: one per mod loader). */
@@ -187,13 +206,13 @@ export default function NewServerModal({
   const [name, setName] = useState('')
   const [error, setError] = useState<string>()
 
-  // Server software: first the software (tiles), then its versions.
-  const [step, setStep] = useState<'pick' | 'details'>('pick')
+  // Server software, all on one page: what the middle shows ("Start here", one group, or a search) and the pick.
+  const [browse, setBrowse] = useState<'start' | number>('start')
+  const [find, setFind] = useState('')
   const icons = useSoftwareIcons()
   const [kind, setKind] = useState<Pick>('paper')
   const serverKind: ServerKind = kind === 'snapshot' ? 'vanilla' : kind
   const [versions, setVersions] = useState<string[]>()
-  const [filter, setFilter] = useState('')
   const [mc, setMc] = useState<string>()
   const [loaderVersions, setLoaderVersions] = useState<LoaderVersion[]>()
   const [loaderVersion, setLoaderVersion] = useState<string>()
@@ -312,7 +331,17 @@ export default function NewServerModal({
     }
   }, [pack])
 
-  const shown = useMemo(() => (versions ?? []).filter((v) => v.includes(filter.trim())), [versions, filter])
+  // The groups this PC can host, and what a search finds across all of them (by name or description).
+  const groups = useMemo(() => GROUPS.map((g) => ({ ...g, types: g.types.filter((k) => canHostBedrock || k !== 'bedrock') })), [])
+  const all = groups.flatMap((g) => g.types.map((k) => ({ k, group: g.title })))
+  const needle = find.trim().toLowerCase()
+  const found = needle ? all.filter(({ k }) => `${pickLabel(k)} ${t(`servers.type.${k}` as Key)}`.toLowerCase().includes(needle)) : []
+  const groupOf = (k: Pick) => all.find((x) => x.k === k)?.group
+  const intents = INTENTS.map((i) => (i.pick === 'bedrock' && !canHostBedrock ? { ...i, pick: 'pocketmine' as Pick } : i))
+  const choose = (k: Pick) => {
+    setKind(k)
+    setError(undefined)
+  }
   const placeholder =
     mode === 'software'
       ? t('servers.create.defaultName', { type: pickLabel(kind), version: mc ?? '' })
@@ -356,187 +385,226 @@ export default function NewServerModal({
       wide
       footer={
         <>
-          {mode === 'software' && step === 'pick' ? (
-            <>
-              <span className="hint grow">{t('servers.create.pickHint')}</span>
-              <button className="btn ghost" onClick={onClose}>
-                {t('common.cancel')}
-              </button>
-              <button className="btn primary" onClick={() => setStep('details')}>
-                {t('common.next')} <ChevronRight />
-              </button>
-            </>
-          ) : (
-            <>
-              {mode === 'software' ? (
-                <button className="btn ghost" onClick={() => setStep('pick')}>
-                  <ChevronLeft /> {t('common.back')}
-                </button>
-              ) : (
-                <button className="btn ghost" onClick={onClose}>
-                  {t('common.cancel')}
-                </button>
-              )}
-              <button className="btn primary" disabled={!ready} onClick={create}>
-                {mode === 'file' ? t('servers.create.chooseAndCreate') : t('servers.create.create')}
-              </button>
-            </>
+          {mode === 'software' && mc && (
+            <span className="sv-sum">
+              <b>
+                {pickLabel(kind)} {mc}
+              </b>
+              {loader && loaderVersion ? ` · ${loaderVersion}` : build ? ` · ${builds?.find((b) => b.id === build)?.label ?? build}` : ''}
+            </span>
           )}
+          <button className="btn ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary" disabled={!ready} onClick={create}>
+            {mode === 'file' ? t('servers.create.chooseAndCreate') : t('servers.create.create')}
+          </button>
         </>
       }
     >
-      {!(mode === 'software' && step === 'details') && (
-        <Segmented<Mode>
-          value={mode}
-          onChange={(m) => {
-            setMode(m)
-            setError(undefined)
-          }}
-          options={[
-            { value: 'software', label: t('servers.create.mode.software') },
-            { value: 'modpack', label: t('servers.create.mode.modpack') },
-            { value: 'instance', label: t('servers.create.mode.instance') },
-            ...(pc ? [] : [{ value: 'file' as Mode, label: t('servers.create.mode.file') }])
-          ]}
-        />
-      )}
+      <div className="sv-modes">
+          <Segmented<Mode>
+            value={mode}
+            onChange={(m) => {
+              setMode(m)
+              setError(undefined)
+            }}
+            options={[
+              { value: 'software', label: t('servers.create.mode.software') },
+              { value: 'modpack', label: t('servers.create.mode.modpack') },
+              { value: 'instance', label: t('servers.create.mode.instance') },
+              ...(pc ? [] : [{ value: 'file' as Mode, label: t('servers.create.mode.file') }])
+            ]}
+          />
+      </div>
 
-      {mode === 'software' && step === 'pick' && (
-        <div className="sv-pick-page">
-          {GROUPS.map((g) => ({ ...g, types: g.types.filter((k) => canHostBedrock || k !== 'bedrock') })).map((g) => (
-            <div className="field" key={g.title}>
-              <label>{t(g.title)}</label>
-              <div className="sv-types">
-                {g.types.map((k) => (
-                  <button
-                    key={k}
-                    className={`sv-type ${k === kind ? 'on' : ''}`}
-                    aria-pressed={k === kind}
-                    // A click only selects (Next goes on); a double-click goes on at once.
-                    onClick={() => {
-                      if (k !== kind) setFilter('')
-                      setKind(k)
-                      setError(undefined)
-                    }}
-                    onDoubleClick={() => setStep('details')}
-                  >
-                    <SoftwareLogo kind={k} icons={icons} />
-                    <span className="sv-type-text">
-                      <b>{pickLabel(k)}</b>
-                      <span>{t(`servers.type.${k}` as Key)}</span>
-                    </span>
-                    {k === kind && <Check className="sv-type-check" aria-hidden />}
-                  </button>
-                ))}
-              </div>
+      {mode === 'software' && (
+        <div className="sv-one" data-guide-tour="newServer">
+          {/* A: search and the groups down the side. */}
+          <nav className="sv-rail" aria-label={t('servers.create.mode.software')}>
+            <div className="search">
+              <Search />
+              <input className="input" placeholder={t('servers.create.searchAll', { count: all.length })} value={find} onChange={(e) => setFind(e.target.value)} />
             </div>
-          ))}
-        </div>
-      )}
+            <button className={`sv-rail-item ${!needle && browse === 'start' ? 'on' : ''}`} onClick={() => (setFind(''), setBrowse('start'))}>
+              <Star /> {t('servers.create.start')}
+            </button>
+            <span className="sv-rail-sep" />
+            {groups.map((g, i) => (
+              <button key={g.title} className={`sv-rail-item ${!needle && browse === i ? 'on' : ''}`} onClick={() => (setFind(''), setBrowse(i))}>
+                {t(g.title)}
+                <em>{g.types.length}</em>
+              </button>
+            ))}
+          </nav>
 
-      {mode === 'software' && step === 'details' && (
-        <div className="sv-picked">
-          <div className="sv-type on static">
-            <SoftwareLogo kind={kind} icons={icons} />
-            <span className="sv-type-text">
-              <b>{pickLabel(kind)}</b>
-              <span>{t(`servers.type.${kind}` as Key)}</span>
-            </span>
+          <div className="sv-middle">
+            {needle ? (
+              // C: one list across every group.
+              <>
+                <div className="sv-mid-head">
+                  <b>“{find.trim()}”</b>
+                  <span className="hint">{t('servers.create.found', { count: found.length })}</span>
+                </div>
+                {found.length ? (
+                  <div className="sv-results">
+                    {found.map(({ k, group }) => (
+                      <button key={k} className={`sv-result ${k === kind ? 'on' : ''}`} aria-pressed={k === kind} onClick={() => choose(k)}>
+                        <SoftwareLogo kind={k} icons={icons} />
+                        <span className="sv-type-text grow">
+                          <b>{pickLabel(k)}</b>
+                          <span>{t(`servers.type.${k}` as Key)}</span>
+                        </span>
+                        <span className={`chip ${isBest(k) ? 'accent' : ''}`}>{isBest(k) ? t('servers.create.best') : t(group)}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="hint">{t('servers.create.noMatch')}</p>
+                )}
+              </>
+            ) : browse === 'start' ? (
+              // B: what it's for, each with its best pick.
+              <>
+                <div className="sv-mid-head">
+                  <b>{t('servers.create.intentTitle')}</b>
+                  <span className="hint">{t('servers.create.intentHint')}</span>
+                </div>
+                <div className="sv-intents">
+                  {intents.map((i) => (
+                    <button key={i.id} className={`sv-intent ${i.pick === kind ? 'on' : ''}`} aria-pressed={i.pick === kind} onClick={() => choose(i.pick)}>
+                      <span className="sv-intent-ico">{i.icon}</span>
+                      <b>{t(i.title)}</b>
+                      <span className="sv-intent-body">{t(i.body)}</span>
+                      <span className="sv-intent-pick">
+                        <SoftwareLogo kind={i.pick} icons={icons} />
+                        {pickLabel(i.pick)}
+                        {i.pick !== 'pocketmine' && <span className="chip accent">{t('servers.create.best')}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="hint">{t('servers.create.browseHint')}</p>
+              </>
+            ) : (
+              // A: one group at a time.
+              <>
+                <div className="sv-mid-head">
+                  <b>{t(groups[browse].title)}</b>
+                  <span className="hint">{groups[browse].types.length}</span>
+                </div>
+                <div className="sv-types">
+                  {groups[browse].types.map((k) => (
+                    <button
+                      key={k}
+                      className={`sv-type ${k === kind ? 'on' : ''}`}
+                      aria-pressed={k === kind}
+                      onClick={() => choose(k)}
+                    >
+                      <SoftwareLogo kind={k} icons={icons} />
+                      <span className="sv-type-text">
+                        <b>{pickLabel(k)}</b>
+                        <span>{t(`servers.type.${k}` as Key)}</span>
+                        {isBest(k) && <span className="chip accent sv-best">{t('servers.create.best')}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
-          <button className="btn sm" onClick={() => setStep('pick')}>
-            {t('servers.create.change')}
-          </button>
+
+          {/* What's picked: what it is, its version and build, its name. Create is in the footer. */}
+          <div className="sv-detail">
+            <div className="sv-detail-head">
+              <SoftwareLogo kind={kind} icons={icons} />
+              <b className="grow">{pickLabel(kind)}</b>
+              {isBest(kind) && <span className="chip accent">{t('servers.create.best')}</span>}
+            </div>
+            <p className="hint">{t(`servers.type.${kind}` as Key)}</p>
+            {groupOf(kind) && <span className="chip sv-detail-group">{t(groupOf(kind)!)}</span>}
+              {kind === 'spigot' && <div className="callout">{t('servers.create.spigotSlow')}</div>}
+              {(kind === 'forge' || kind === 'neoforge') && <div className="callout">{t('servers.create.forgeSlow')}</div>}
+              {kind === 'snapshot' && <div className="callout">{t('servers.create.snapshotHint')}</div>}
+              {kind === 'arclight' && <div className="callout">{t('servers.create.arclightHint')}</div>}
+              {kind === 'bedrock' && <div className="callout">{t('servers.create.bedrockHint')}</div>}
+
+              <div className="field">
+                <label htmlFor="srv-version">{t(kind === 'bedrock' ? 'servers.create.bedrockVersion' : 'servers.create.mcVersion')}</label>
+                {versions?.length === 0 ? (
+                  <div className="hint">{t('servers.create.noVersions')}</div>
+                ) : (
+                  <select id="srv-version" className="select" value={mc ?? ''} disabled={!versions} onChange={(e) => setMc(e.target.value)}>
+                    {!versions && <option>{t('common.loading')}</option>}
+                    {versions?.map((v, i) => (
+                      <option key={v} value={v}>
+                        {i === 0 ? t('servers.create.latestOption', { version: v }) : v}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {WITH_BUILDS.includes(serverKind) && mc && (
+                <div className="field">
+                  <label htmlFor="srv-build">{t('servers.create.build', { type: SERVER_LABEL[serverKind] })}</label>
+                  {builds?.length === 0 ? (
+                    <div className="callout danger">{t('servers.create.loaderUnavailable', { loader: SERVER_LABEL[serverKind], version: mc })}</div>
+                  ) : (
+                    <select id="srv-build" className="select" value={build ?? ''} disabled={!builds} onChange={(e) => setBuild(e.target.value)}>
+                      {!builds && <option>{t('common.loading')}</option>}
+                      {builds?.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.label}
+                          {b.stable ? '' : ` (${t('servers.create.unstable')})`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {loader && (
+                <div className="field">
+                  <label htmlFor="srv-loader">{t('servers.create.loaderVersion', { loader: SERVER_LABEL[serverKind] })}</label>
+                  {loaderVersions?.length === 0 ? (
+                    <div className="callout danger">
+                      {serverKind === 'forge' && ancientForge
+                        ? t('servers.create.ancientForge')
+                        : t('servers.create.loaderUnavailable', { loader: SERVER_LABEL[serverKind], version: mc ?? '' })}
+                    </div>
+                  ) : (
+                    <select
+                      id="srv-loader"
+                      className="select"
+                      value={loaderVersion ?? ''}
+                      disabled={!loaderVersions}
+                      onChange={(e) => setLoaderVersion(e.target.value)}
+                    >
+                      {!loaderVersions && <option>{t('common.loading')}</option>}
+                      {loaderVersions?.map((l) => (
+                        <option key={l.version} value={l.version}>
+                          {l.version}
+                          {l.stable ? '' : ` (${t('servers.create.unstable')})`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+            <div className="field">
+              <label htmlFor="srv-name">{t('servers.create.name')}</label>
+              <input id="srv-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          </div>
         </div>
       )}
 
-      {!(mode === 'software' && step === 'pick') && (
+      {mode !== 'software' && (
         <div className="field">
           <label htmlFor="srv-name">{t('servers.create.name')}</label>
           <input id="srv-name" className="input" placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-      )}
-
-      {mode === 'software' && step === 'details' && (
-        <>
-          {kind === 'spigot' && <div className="callout">{t('servers.create.spigotSlow')}</div>}
-          {(kind === 'forge' || kind === 'neoforge') && <div className="callout">{t('servers.create.forgeSlow')}</div>}
-          {kind === 'snapshot' && <div className="callout">{t('servers.create.snapshotHint')}</div>}
-          {kind === 'arclight' && <div className="callout">{t('servers.create.arclightHint')}</div>}
-          {kind === 'bedrock' && <div className="callout">{t('servers.create.bedrockHint')}</div>}
-
-          <div className="field">
-            <label className="label">{t(kind === 'bedrock' ? 'servers.create.bedrockVersion' : 'servers.create.mcVersion')}</label>
-            <div className="search">
-              <Search />
-              <input className="input" placeholder={t('servers.create.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
-            </div>
-            <div className="version-list" style={{ maxHeight: 180 }}>
-              {!versions && (
-                <div className="empty" style={{ padding: 24 }}>
-                  <Loader2 className="spin" />
-                </div>
-              )}
-              {versions?.length === 0 && (
-                <div className="hint" style={{ padding: 12 }}>
-                  {t('servers.create.noVersions')}
-                </div>
-              )}
-              {shown.map((v) => (
-                <button key={v} className={v === mc ? 'on' : ''} onClick={() => setMc(v)}>
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {WITH_BUILDS.includes(serverKind) && mc && (
-            <div className="field">
-              <label htmlFor="srv-build">{t('servers.create.build', { type: SERVER_LABEL[serverKind] })}</label>
-              {builds?.length === 0 ? (
-                <div className="callout danger">{t('servers.create.loaderUnavailable', { loader: SERVER_LABEL[serverKind], version: mc })}</div>
-              ) : (
-                <select id="srv-build" className="select" value={build ?? ''} disabled={!builds} onChange={(e) => setBuild(e.target.value)}>
-                  {!builds && <option>{t('common.loading')}</option>}
-                  {builds?.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.label}
-                      {b.stable ? '' : ` (${t('servers.create.unstable')})`}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          {loader && (
-            <div className="field">
-              <label htmlFor="srv-loader">{t('servers.create.loaderVersion', { loader: SERVER_LABEL[serverKind] })}</label>
-              {loaderVersions?.length === 0 ? (
-                <div className="callout danger">
-                  {serverKind === 'forge' && ancientForge
-                    ? t('servers.create.ancientForge')
-                    : t('servers.create.loaderUnavailable', { loader: SERVER_LABEL[serverKind], version: mc ?? '' })}
-                </div>
-              ) : (
-                <select
-                  id="srv-loader"
-                  className="select"
-                  value={loaderVersion ?? ''}
-                  disabled={!loaderVersions}
-                  onChange={(e) => setLoaderVersion(e.target.value)}
-                >
-                  {!loaderVersions && <option>{t('common.loading')}</option>}
-                  {loaderVersions?.map((l) => (
-                    <option key={l.version} value={l.version}>
-                      {l.version}
-                      {l.stable ? '' : ` (${t('servers.create.unstable')})`}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-        </>
       )}
 
       {mode === 'modpack' && (

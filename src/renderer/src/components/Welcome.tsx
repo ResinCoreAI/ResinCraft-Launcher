@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, ArrowRightLeft, Check, Compass, LogIn, Monitor, Plus, UserPlus } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowRightLeft, Check, ChevronDown, Compass, Languages, LogIn, Monitor, Plus, UserPlus } from 'lucide-react'
 import type { Settings } from '@shared/types'
-import { Avatar, Logo } from './ui'
+import { Avatar, Logo, openContextMenu } from './ui'
 import MigrateModal from './MigrateModal'
 import { MicrosoftLogin, OfflineModal } from '../pages/Accounts'
 import { useStore } from '../store'
@@ -119,6 +119,8 @@ export default function Welcome() {
 /** Step one: the greeting, with the two choices that change what the rest of the welcome looks and reads like. */
 function Hello({ s, set }: { s: Settings; set: (p: Partial<Settings>) => void }) {
   const systemLanguage = matchLanguage(navigator.languages ?? [navigator.language])
+  const systemName = t('settings.language.system', { name: LANGUAGES.find((l) => l.code === systemLanguage)?.name ?? 'English' })
+  const following = !s.language || s.language === 'system'
   const season = activeSeason()
   const seasonOn = !!season && s.seasonalThemes !== false && s.seasonOff !== season.key
   const shown = effectiveTheme(s, window.matchMedia('(prefers-color-scheme: light)').matches)
@@ -132,17 +134,28 @@ function Hello({ s, set }: { s: Settings; set: (p: Partial<Settings>) => void })
       <h1 id="welcome-title">{t('home.welcome.title')}</h1>
       <p className="welcome-lead">{t('home.welcome.body')}</p>
 
-      <label className="welcome-field">
-        <span>{t('settings.language')}</span>
-        <select className="select" value={s.language || 'system'} onChange={(e) => set({ language: e.target.value })}>
-          <option value="system">{t('settings.language.system', { name: LANGUAGES.find((l) => l.code === systemLanguage)?.name ?? 'English' })}</option>
-          {LANGUAGES.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {/* A dropdown of every language, each in its own name, so a player who can't read the current one still finds theirs. */}
+      <div className="welcome-field">
+        <span id="welcome-language">{t('settings.language')}</span>
+        <button
+          type="button"
+          className="welcome-lang-pick"
+          aria-labelledby="welcome-language"
+          aria-haspopup="menu"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            openContextMenu({ x: r.left, y: r.bottom + 4, keyboard: e.detail === 0, origin: e.currentTarget }, [
+              { label: systemName, icon: <Monitor />, checked: following, onSelect: () => set({ language: 'system' }) },
+              '-',
+              ...LANGUAGES.map((l) => ({ label: l.name, checked: s.language === l.code, onSelect: () => set({ language: l.code }) }))
+            ])
+          }}
+        >
+          {following ? <Monitor size={15} /> : <Languages size={15} />}
+          <span className="grow">{following ? systemName : (LANGUAGES.find((l) => l.code === s.language)?.name ?? systemName)}</span>
+          <ChevronDown size={15} />
+        </button>
+      </div>
 
       <div className="welcome-field">
         <span id="welcome-theme">{t('settings.theme')}</span>

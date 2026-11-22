@@ -669,6 +669,7 @@ function ServerDetail({
         />
       )}
 
+      <span hidden data-guide-tour={tab === 'console' ? 'server' : `server:${tab}`} />
       <div className="tabs" role="tablist">
         {tabs
           .filter((x) => !x.hidden)

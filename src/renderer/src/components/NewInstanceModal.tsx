@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Blocks, Download, Hammer, Loader2, Search, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Blocks, ChevronDown, Download, Hammer, ImagePlus, Loader2, Search, Sparkles, Trash2 } from 'lucide-react'
 import type { LoaderType, LoaderVersion, McVersion, OptifineJar } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { COLORS, LOADER_LABEL } from '../util'
 import { currentLanguage, t } from '../i18n'
-import { Modal, Segmented, Switch } from './ui'
-import { BannerPicker, IconPicker } from './ImagePicker'
+import { InstanceTile, Modal, Segmented, Switch } from './ui'
+import { IconPicker, usePicturePicker } from './ImagePicker'
+import { BasicIcon } from './BasicIcons'
+import { loaderIcon } from './LoaderArt'
 import { useGroupNames } from '../pages/Library'
 import { OptifineSteps, optifineFits } from './Optifine'
 import { PackFields, type PackDraft } from './OwnPack'
@@ -17,6 +19,23 @@ import { RtxRemix } from './RtxRemix'
 
 /** The loaders whose builds depend on the Minecraft version (Vanilla always has one; Horizon brings its own). */
 const CHECKED_LOADERS: LoaderType[] = ['fabric', 'quilt', 'forge', 'neoforge', 'liteloader']
+const LOADERS: LoaderType[] = ['vanilla', 'fabric', 'quilt', 'neoforge', 'forge', 'liteloader', 'horizon']
+/** Where to start looking for a loader's newest Minecraft version, when it isn't the newest release. */
+const NEWEST_FOR: Partial<Record<LoaderType, string>> = { liteloader: '1.12.2' }
+
+/** A loader's mark on its button: its project's logo, its pixel drawing offline, or its first letter. */
+function LoaderMark({ loader }: { loader: LoaderType }) {
+  const icon = loaderIcon(loader)
+  const [failed, setFailed] = useState(false)
+  if (icon?.logo && !failed) return <img className="ni-mark" src={icon.logo} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+  if (icon)
+    return (
+      <span className="ni-mark drawn">
+        <BasicIcon icon={icon} />
+      </span>
+    )
+  return <span className="ni-mark letter">{(LOADER_LABEL[loader] ?? loader)[0]}</span>
+}
 
 export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const { settings, activeAccount, refreshInstances, go, toast, instances } = useStore()
@@ -42,10 +61,33 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('')
   const [group, setGroup] = useState('')
   const groups = useGroupNames()
-  const [color, setColor] = useState(COLORS[Math.floor(Math.random() * COLORS.length)])
+  // Not picked any more (the picture is the loader's logo): a random one, for the tints that use it.
+  const [color] = useState(COLORS[Math.floor(Math.random() * COLORS.length)])
   const [icon, setIcon] = useState<string | null>(null)
   const [banner, setBanner] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [versionsOpen, setVersionsOpen] = useState(false)
+  // A loader picked that had no build for the version shown: Minecraft moved to one it has (from → to).
+  const [switched, setSwitched] = useState<{ loader: LoaderType; from: string; to: string }>()
+  const picking = useRef(0)
+  const pickLoader = async (l: LoaderType) => {
+    const n = ++picking.current
+    setLoader(l)
+    setSwitched(undefined)
+    if (l === 'vanilla' || l === 'horizon' || !mc || hasBuild[l] !== false) return
+    const releases = (versions ?? []).filter((v) => v.type === 'release').map((v) => v.id)
+    const from = mc
+    for (const v of releases.slice(Math.max(0, releases.indexOf(NEWEST_FOR[l] ?? releases[0])))) {
+      const builds = await api.versions.loaders(l, v).catch(() => [])
+      if (n !== picking.current) return
+      if (builds.length) {
+        setMc(v)
+        setSwitched({ loader: l, from, to: v })
+        return
+      }
+    }
+  }
+  const pickBanner = usePicturePicker('banner', setBanner, (m) => setError(m))
   const [error, setError] = useState<string>()
   // OptiFine: the jar the player downloaded from optifine.net, checked against the chosen Minecraft version.
   const [optifine, setOptifine] = useState(false)
@@ -144,6 +186,11 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
   )
 
   const unavailable = loader !== 'vanilla' && loaderVersions?.length === 0
+  // The newest full release, marked "Latest" on the version button and in its list.
+  const latest = versions?.find((v) => v.type === 'release')?.id
+  const mcType = versions?.find((v) => v.id === mc)?.type
+  // What it makes: "Minecraft 26.3 · Fabric 0.17.2", on the card and beside Create.
+  const summary = [mc && `Minecraft ${mc}`, loader !== 'vanilla' && `${LOADER_LABEL[loader]}${loaderVersion ? ` ${loaderVersion}` : ''}`].filter(Boolean).join(' · ')
   // Forge before 1.2.5 also needs ModLoader.
   const legacyForge = !!mc && /^1\.([01](\.|$)|2(\.[0-4])?$)/.test(mc)
   const placeholder = makingPack
@@ -221,6 +268,7 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
           </button>
         ) : (
           <>
+            {!from && <span className="ni-sum">{summary}</span>}
             <button className="btn ghost" onClick={onClose}>
               {t('common.cancel')}
             </button>
@@ -302,47 +350,44 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
           }}
         />
       ) : (
-        <>
-          <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
-            <IconPicker inst={{ name: name || placeholder, color, iconUrl: icon ?? undefined }} onChange={setIcon} onError={setError} />
-            <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="ni" data-guide-tour="newInstance">
+          {/* The card being made, as the Library will show it: its picture is the banner, else the icon, else the
+              loader's own art. Name, group and colour sit beside it. */}
+          <div className="ni-hero">
+            <div className="ni-card" data-guide="ni-card">
+              <button type="button" className="ni-art" onClick={pickBanner.open} title={t(banner ? 'art.changeBanner' : 'art.addBanner')}>
+                <InstanceTile inst={{ name: name || placeholder, color, iconUrl: icon ?? undefined, bannerUrl: banner ?? undefined, loader }} wide />
+                <span className="ni-art-btn">
+                  <ImagePlus /> {t(banner ? 'art.changeBanner' : 'art.addBanner')}
+                </span>
+              </button>
+              {banner && (
+                <button type="button" className="ni-art-remove btn icon sm" onClick={() => setBanner(null)} aria-label={t('art.removeBanner')} title={t('art.removeBanner')}>
+                  <Trash2 />
+                </button>
+              )}
+              <div className="ni-card-meta">
+                <IconPicker inst={{ name: name || placeholder, color, iconUrl: icon ?? undefined, loader }} onChange={setIcon} onError={setError} size={40} />
+                <span className="grow">
+                  <b>{name.trim() || (from ? from.name : placeholder)}</b>
+                  <span>{summary}</span>
+                </span>
+              </div>
+              {pickBanner.modal}
+            </div>
+            <div className="ni-fields">
               <div className="field">
                 <label htmlFor="inst-name">{t(makingPack ? 'ownPack.packName' : 'newInstance.name')}</label>
-                <input
-                  id="inst-name"
-                  className="input"
-                  placeholder={from ? from.name : placeholder}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoFocus
-                />
+                <input id="inst-name" className="input" placeholder={from ? from.name : placeholder} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
               </div>
-              <div className="field">
+              <div className="field" data-guide="ni-group">
                 <label htmlFor="inst-group">{t('library.group.label')}</label>
-                <input
-                  id="inst-group"
-                  className="input"
-                  list="inst-groups"
-                  placeholder={t('library.group.none')}
-                  value={group}
-                  onChange={(e) => setGroup(e.target.value)}
-                />
+                <input id="inst-group" className="input" list="inst-groups" placeholder={t('library.group.none')} value={group} onChange={(e) => setGroup(e.target.value)} />
                 <datalist id="inst-groups">
                   {groups.map((g) => (
                     <option key={g} value={g} />
                   ))}
                 </datalist>
-              </div>
-              <div className="swatches">
-                {COLORS.map((c) => (
-                  <button
-                    key={c}
-                    className={`swatch ${c === color ? 'on' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => setColor(c)}
-                    aria-label={t('newInstance.colorOption', { color: c })}
-                  />
-                ))}
               </div>
             </div>
           </div>
@@ -366,126 +411,153 @@ export default function NewInstanceModal({ onClose }: { onClose: () => void }) {
 
           {makingPack && <PackFields value={pack} onChange={setPack} />}
 
-          <BannerPicker value={banner ?? undefined} onChange={setBanner} onError={setError} />
-
           {!from && (
             <>
-              <div className="field">
-                <label>{t('newInstance.modLoader')}</label>
-                <Segmented<LoaderType>
-                  value={loader}
-                  onChange={setLoader}
-                  options={(
-                    [
-                      { value: 'vanilla', label: 'Vanilla' },
-                      { value: 'fabric', label: 'Fabric' },
-                      { value: 'quilt', label: 'Quilt' },
-                      { value: 'forge', label: 'Forge' },
-                      { value: 'neoforge', label: 'NeoForge' },
-                      { value: 'liteloader', label: 'LiteLoader' },
-                      { value: 'horizon', label: 'Horizon' }
-                    ] as { value: LoaderType; label: string }[]
-                  ).map((o) => ({ ...o, disabled: o.value !== loader && hasBuild[o.value] === false }))}
-                />
+              <div className="field" data-guide="ni-loader">
+                <label id="ni-loader">{t('newInstance.modLoader')}</label>
+                <div className="ni-loaders" role="radiogroup" aria-labelledby="ni-loader">
+                  {LOADERS.map((l) => {
+                    // No build for this version: still pickable, it moves Minecraft to a version it has.
+                    const off = l !== loader && hasBuild[l] === false
+                    return (
+                      <button
+                        key={l}
+                        type="button"
+                        role="radio"
+                        aria-checked={l === loader}
+                        className={`ni-loader ${l === loader ? 'on' : ''} ${off ? 'other' : ''}`}
+                        title={off && mc ? t('newInstance.loaderOtherVersion', { loader: LOADER_LABEL[l], version: mc }) : undefined}
+                        onClick={() => void pickLoader(l)}
+                      >
+                        <LoaderMark loader={l} />
+                        {l === 'vanilla' ? 'Vanilla' : LOADER_LABEL[l]}
+                      </button>
+                    )
+                  })}
+                </div>
+                {switched && switched.loader === loader && (
+                  <span className="hint ni-switched">{t('newInstance.switched', { loader: LOADER_LABEL[loader], from: switched.from, to: switched.to })}</span>
+                )}
                 <span className="hint">
                   {loader === 'horizon'
                     ? t('servers.horizon.instanceHint')
                     : loader === 'vanilla'
-                    ? t('newInstance.vanillaHint')
-                    : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', {
-                        loader: LOADER_LABEL[loader]
-                      })}
+                      ? t('newInstance.vanillaHint')
+                      : t(loader === 'forge' || loader === 'neoforge' ? 'newInstance.loaderHintSlow' : 'newInstance.loaderHint', { loader: LOADER_LABEL[loader] })}
                 </span>
               </div>
 
-              <div className="field">
-                <div className="row">
-                  <label className="label grow">{t('newInstance.mcVersion')}</label>
-                  <span className="hint">{t('newInstance.snapshots')}</span>
-                  <Switch on={snapshots} onChange={setSnapshots} label={t('newInstance.showSnapshots')} />
-                </div>
-                <div className="search">
-                  <Search />
-                  <input className="input" placeholder={t('newInstance.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
-                </div>
-                <div className="version-list">
-                  {!versions && !error && (
-                    <div className="empty" style={{ padding: 30 }}>
-                      <Loader2 className="spin" />
+              <div className="ni-rows">
+                {/* Minecraft: what's picked, as a dropdown that opens the version list in place. */}
+                <div className="ni-row" data-guide="ni-version">
+                  <span className="ni-row-label">{t('newInstance.mcVersion')}</span>
+                  <div className="ni-row-value">
+                    <div className="row">
+                      <button type="button" className="ni-pick grow" aria-expanded={versionsOpen} disabled={loader === 'horizon'} onClick={() => setVersionsOpen((o) => !o)}>
+                        <b>{mc ?? t('common.loading')}</b>
+                        {mc && mc === latest && <span className="chip accent">{t('newInstance.latest')}</span>}
+                        {mcType && mcType !== 'release' && <span className="chip">{t(`newInstance.type.${mcType}`)}</span>}
+                        <ChevronDown className="ni-chev" />
+                      </button>
+                      <span className="hint">{t('newInstance.snapshots')}</span>
+                      <Switch on={snapshots} onChange={setSnapshots} label={t('newInstance.showSnapshots')} />
                     </div>
-                  )}
-                  {shown.map((v) => (
-                    <button key={v.id} className={v.id === mc ? 'on' : ''} disabled={loader === 'horizon'} onClick={() => setMc(v.id)}>
-                      {v.id}
-                      {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
-                      <span className="date">
-                        {new Date(v.releaseTime).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </span>
-                    </button>
-                  ))}
+                    {versionsOpen && loader !== 'horizon' && (
+                      <div className="ni-versions">
+                        <div className="search">
+                          <Search />
+                          <input className="input" placeholder={t('newInstance.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} autoFocus />
+                        </div>
+                        <div className="version-list">
+                          {!versions && !error && (
+                            <div className="empty" style={{ padding: 30 }}>
+                              <Loader2 className="spin" />
+                            </div>
+                          )}
+                          {shown.map((v) => (
+                            <button
+                              key={v.id}
+                              className={v.id === mc ? 'on' : ''}
+                              onClick={() => {
+                                setMc(v.id)
+                                setVersionsOpen(false)
+                              }}
+                            >
+                              {v.id}
+                              {v.id === latest && <span className="chip accent">{t('newInstance.latest')}</span>}
+                              {v.type !== 'release' && <span className="chip">{t(`newInstance.type.${v.type}`)}</span>}
+                              <span className="date">
+                                {new Date(v.releaseTime).toLocaleDateString(currentLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {loader !== 'vanilla' && (
-                <div className="field">
-                  <label htmlFor="loader-ver">{t('newInstance.loaderVersion', { loader: LOADER_LABEL[loader] })}</label>
-                  {unavailable ? (
-                    <div className="callout danger">
-                      {loader === 'forge' && legacyForge
-                        ? t('newInstance.legacyForge')
-                        : t('newInstance.unsupported', { loader: LOADER_LABEL[loader], version: mc })}
+                {loader !== 'vanilla' && (
+                  <div className="ni-row" data-guide="ni-loader-version">
+                    <label className="ni-row-label" htmlFor="loader-ver">
+                      {t('newInstance.loaderVersion', { loader: LOADER_LABEL[loader] })}
+                    </label>
+                    <div className="ni-row-value">
+                      {unavailable ? (
+                        <div className="callout danger">
+                          {loader === 'forge' && legacyForge ? t('newInstance.legacyForge') : t('newInstance.unsupported', { loader: LOADER_LABEL[loader], version: mc })}
+                        </div>
+                      ) : (
+                        <select id="loader-ver" className="select" value={loaderVersion ?? ''} onChange={(e) => setLoaderVersion(e.target.value)} disabled={!loaderVersions}>
+                          {!loaderVersions && <option>{t('common.loading')}</option>}
+                          {loaderVersions?.map((l, i) => (
+                            <option key={l.version} value={l.version}>
+                              {i === loaderVersions.findIndex((x) => x.stable)
+                                ? t('newInstance.optionRecommended', { version: l.version })
+                                : l.stable
+                                  ? l.version
+                                  : t('newInstance.optionBeta', { version: l.version })}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
-                  ) : (
-                    <select
-                      id="loader-ver"
-                      className="select"
-                      value={loaderVersion ?? ''}
-                      onChange={(e) => setLoaderVersion(e.target.value)}
-                      disabled={!loaderVersions}
-                    >
-                      {!loaderVersions && <option>{t('common.loading')}</option>}
-                      {loaderVersions?.map((l, i) => (
-                        <option key={l.version} value={l.version}>
-                          {i === loaderVersions.findIndex((x) => x.stable)
-                            ? t('newInstance.optionRecommended', { version: l.version })
-                            : l.stable
-                              ? l.version
-                              : t('newInstance.optionBeta', { version: l.version })}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+
+                {!makingPack && (optifineFits(loader) || liteFits) && (
+                  <div className="ni-row" data-guide="ni-extras">
+                    <span className="ni-row-label">{t('newInstance.extras')}</span>
+                    <div className="ni-row-value">
+                      <div className="ni-extras">
+                        {optifineFits(loader) && (
+                          <label className="ni-extra">
+                            <Switch on={optifine} onChange={setOptifine} label={t('optifine.add')} />
+                            OptiFine
+                          </label>
+                        )}
+                        {liteFits && (
+                          <label className="ni-extra">
+                            <Switch on={lite} onChange={setLite} label={t('newInstance.withLiteloader')} />
+                            LiteLoader
+                          </label>
+                        )}
+                      </div>
+                      {optifine && optifineFits(loader) && <span className="hint">{t('optifine.newHint')}</span>}
+                      {lite && liteFits && (
+                        <span className="hint">{liteVersion === null ? t('newInstance.unsupported', { loader: 'LiteLoader', version: mc }) : t('version.liteloaderHint')}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {optifine && optifineFits(loader) && !makingPack && mc && <OptifineSteps mc={mc} loader={loader} jar={ofJar} onPick={pickOptifine} />}
+              {optifine && ofError && <div className="callout danger">{ofError}</div>}
             </>
           )}
 
-          {liteFits && !makingPack && (
-            <div className="field">
-              <div className="row">
-                <label className="label grow">LiteLoader</label>
-                <Switch on={lite} onChange={setLite} label={t('newInstance.withLiteloader')} />
-              </div>
-              <span className="hint">
-                {lite && liteVersion === null ? t('newInstance.unsupported', { loader: 'LiteLoader', version: mc }) : t('version.liteloaderHint')}
-              </span>
-            </div>
-          )}
-
-          {optifineFits(loader) && !makingPack && (
-            <div className="field">
-              <div className="row">
-                <label className="label grow">OptiFine</label>
-                <Switch on={optifine} onChange={setOptifine} label={t('optifine.add')} />
-              </div>
-              <span className="hint">{t('optifine.newHint')}</span>
-              {optifine && mc && <OptifineSteps mc={mc} loader={loader} jar={ofJar} onPick={pickOptifine} />}
-              {optifine && ofError && <div className="callout danger">{ofError}</div>}
-            </div>
-          )}
-
           {error && <div className="callout danger">{error}</div>}
-        </>
+        </div>
       )}
     </Modal>
   )

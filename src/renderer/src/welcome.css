@@ -219,3 +219,37 @@
     transition: none;
   }
 }
+
+/* The language dropdown: looks like the launcher's other fields, opens the launcher's own menu. */
+.welcome-lang-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(320px, 100%);
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease);
+}
+.welcome-lang-pick:hover,
+.welcome-lang-pick[aria-expanded='true'] {
+  border-color: var(--border-strong);
+}
+.welcome-lang-pick svg {
+  flex: none;
+  color: var(--text-dim);
+}
+.welcome-lang-pick .grow {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

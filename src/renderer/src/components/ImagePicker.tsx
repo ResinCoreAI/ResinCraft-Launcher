@@ -261,7 +261,7 @@ export function IconPicker({
   onError,
   size = 72,
 }: {
-  inst: Pick<Instance, 'name' | 'color' | 'iconUrl'> & { id?: string }
+  inst: Pick<Instance, 'name' | 'color' | 'iconUrl'> & { id?: string; loader?: string }
   onChange: (dataUrl: string | null) => void
   onError: (message: string) => void
   size?: number

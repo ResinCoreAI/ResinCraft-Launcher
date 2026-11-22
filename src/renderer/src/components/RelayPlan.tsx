@@ -581,7 +581,7 @@ export function ServerPriority() {
   const put = (account: string) => (p: PlanInfo) =>
     setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === account ? { ...x, plan: p } : x)) })
   return (
-    <div className="card rp-page" style={{ marginTop: 12 }}>
+    <div className="card pad rp-page" style={{ marginTop: 12 }}>
       {rows.map((a) => (
         <div key={a.account}>
           {rows.length > 1 && <p className="hint">{a.accountName}</p>}

@@ -4,6 +4,7 @@ import App from './App'
 import { restoreLanguage, setLanguage, useLanguage } from './i18n'
 import { StoreProvider, useStore } from './store'
 import { installDesktopBehaviour } from './desktop'
+import { watchMemory } from './memory'
 import { api } from './api'
 import './fonts'
 import './styles.css'
@@ -35,6 +36,7 @@ async function carryStorage() {
 const holder = window as unknown as { __resinRoot?: Root }
 
 installDesktopBehaviour()
+watchMemory()
 void carryStorage()
   .then(() => restoreLanguage())
   .finally(() =>

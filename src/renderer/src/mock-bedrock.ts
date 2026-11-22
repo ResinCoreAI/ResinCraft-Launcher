@@ -58,6 +58,9 @@ const compareVersions = (a: string, b: string) => {
 
 export function mockBedrock(now: number): ResinApi['bedrock'] {
   const mode = new URLSearchParams(location.search).get('bedrock') ?? ''
+  const xboxMode = new URLSearchParams(location.search).get('xbox') ?? ''
+  /** Which of ResinCraft's accounts the Xbox app is signed in with. */
+  let xbox = 'a2'
   let status: BedrockStatus = {
     supported: true,
     gamingServices: mode !== 'noGamingServices',
@@ -343,7 +346,22 @@ export function mockBedrock(now: number): ResinApi['bedrock'] {
     },
     get: () => sleep(300),
     gamingServices: () => sleep(300),
-    xboxAccount: () => sleep(300),
+    // The Xbox app starts on the Bedrock account (a2). Opening it plays the player switching: 4 s later it is on the
+    // next of ResinCraft's Microsoft accounts, so the picker's wait can be seen to end. ?xbox=other: an Xbox account
+    // ResinCraft doesn't have; ?xbox=none: Windows doesn't say.
+    xboxAccount: async () => {
+      await sleep(300)
+      const order = ['a2', 'a1']
+      setTimeout(() => (xbox = order[(order.indexOf(xbox) + 1) % order.length]), 4000)
+    },
+    xboxUser: async () => {
+      await sleep(350)
+      // Puirkle (a1) owns Java Edition, and with it Minecraft for Windows; the Bedrock-only PuirkleBE (a2) doesn't.
+      const own = { owners: ['a1'], notOwners: ['a2'] }
+      if (xboxMode === 'none') return { unknown: [], ...own }
+      if (xboxMode === 'other' && xbox === 'a2') return { user: { xuid: '2535499999999999', gamertag: 'FamilyPC' }, unknown: [], ...own }
+      return { user: { xuid: xbox === 'a1' ? '2535400000000001' : '2535412345678901', gamertag: xbox === 'a1' ? 'PuirkleXbox' : 'PuirkleBE' }, accountId: xbox, unknown: [], ...own }
+    },
     update: () => sleep(300),
     openFolder: () => sleep(100),
     versions: async () => {

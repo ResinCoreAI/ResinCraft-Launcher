@@ -220,6 +220,61 @@ export function PlayButton({ inst, size = '' }: { inst: Instance; size?: 'lg' | 
   )
 }
 
+/**
+ * A window's scrolling body. While there's more below what shows, the bottom fades out and a "More below" button
+ * sits over it (it scrolls down most of a screenful), so a long window doesn't look finished halfway down.
+ */
+function ModalBody({ children }: { children: ReactNode }) {
+  const body = useRef<HTMLDivElement>(null)
+  const [more, setMore] = useState(false)
+  useEffect(() => {
+    const el = body.current
+    if (!el) return
+    let frame = 0
+    const check = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 24))
+    }
+    check()
+    el.addEventListener('scroll', check, { passive: true })
+    // What's inside changes size as it loads or opens (a version list, a picture).
+    const sizes = new ResizeObserver(check)
+    sizes.observe(el)
+    for (const child of el.children) sizes.observe(child)
+    const added = new MutationObserver(() => {
+      for (const child of el.children) sizes.observe(child)
+      check()
+    })
+    added.observe(el, { childList: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      el.removeEventListener('scroll', check)
+      sizes.disconnect()
+      added.disconnect()
+    }
+  }, [])
+  return (
+    <div className="modal-scroll">
+      <div ref={body} className="modal-body">
+        {children}
+      </div>
+      {more && (
+        <>
+          <div className="modal-fade" aria-hidden />
+          <button
+            type="button"
+            className="modal-more"
+            tabIndex={-1}
+            onClick={() => body.current?.scrollBy({ top: body.current.clientHeight * 0.7, behavior: 'smooth' })}
+          >
+            <ChevronDown /> {t('common.moreBelow')}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function Modal({
   title,
   subtitle,
@@ -260,7 +315,7 @@ export function Modal({
             <X />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        <ModalBody>{children}</ModalBody>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
     </div>,

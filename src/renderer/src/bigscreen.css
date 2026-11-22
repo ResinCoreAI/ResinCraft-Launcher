@@ -655,8 +655,15 @@ html.bs-framed .main {
     display: inline;
   }
 }
-.bs-tabs {
+/* Only an edge with more tabs beyond it fades out (BigScreen.tsx sets these as the bar scrolls). */
+.bs-tabs.more-right {
   mask-image: linear-gradient(90deg, #000 calc(100% - 1.5em), transparent);
+}
+.bs-tabs.more-left {
+  mask-image: linear-gradient(90deg, transparent, #000 1.5em);
+}
+.bs-tabs.more-left.more-right {
+  mask-image: linear-gradient(90deg, transparent, #000 1.5em, #000 calc(100% - 1.5em), transparent);
 }
 .bs-top {
   gap: 1.1em;
@@ -1235,4 +1242,19 @@ html.bigscreen-on .backdrop > .modal {
 .bsd-card {
   content-visibility: auto;
   contain-intrinsic-size: auto 4em;
+}
+/* The hints are buttons for the mouse too. */
+.bs-hint[role='button'] {
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.2em 0.55em 0.2em 0.2em;
+  margin: -0.2em -0.55em -0.2em -0.2em;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.bs-hint[role='button']:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+.bs-hint[role='button']:active {
+  background: rgba(255, 255, 255, 0.18);
 }

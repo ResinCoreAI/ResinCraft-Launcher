@@ -54,7 +54,7 @@ import {
   type ContextItem
 } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
-import { COLOR_NAMES, COLORS, describe, hasCustomIcon, instancePath, playtime } from '../util'
+import { describe, hasCustomIcon, instancePath, playtime } from '../util'
 import { t } from '../i18n'
 import { OwnPackChip } from '../components/OwnPack'
 import { PackUpdateBadge } from '../components/PackUpdates'
@@ -388,10 +388,10 @@ export default function Library() {
           <p>{t('library.subtitle')}</p>
         </div>
         <div className="spacer" />
-        <button className="btn" onClick={() => setMigrating(true)}>
+        <button className="btn" data-guide="migrate" onClick={() => setMigrating(true)}>
           <ArrowLeftRight /> {t('migrate.button')}
         </button>
-        <button className="btn" onClick={(e) => void importPack(e.currentTarget)} disabled={importing}>
+        <button className="btn" data-guide="import" onClick={(e) => void importPack(e.currentTarget)} disabled={importing}>
           {importing ? <Loader2 className="spin" /> : <FileDown />} {t('library.importModpack')}
         </button>
         <button className="btn primary" onClick={() => setNewInstanceOpen(true)}>
@@ -411,7 +411,7 @@ export default function Library() {
               <button className="btn" onClick={() => go({ page: 'discover', kind: 'modpack' })}>
                 {t('library.empty.browse')}
               </button>
-              <button className="btn" onClick={() => setMigrating(true)}>
+              <button className="btn" data-guide="migrate" onClick={() => setMigrating(true)}>
                 <ArrowLeftRight /> {t('migrate.button')}
               </button>
             </div>
@@ -798,16 +798,6 @@ export function useInstanceMenu(inst: Instance) {
         hint: t('menu.hint.look'),
         icon: <Palette />,
         items: [
-          {
-            label: t('menu.instance.color'),
-            icon: <Palette />,
-            items: COLORS.map((c, i) => ({
-              label: t(COLOR_NAMES[i]),
-              icon: <span className="ctx-swatch" style={{ background: c }} />,
-              checked: inst.color === c,
-              onSelect: () => void update({ color: c })
-            }))
-          },
           { label: t('art.menu'), icon: <ImagePlus />, onSelect: () => go({ page: 'instance', id: inst.id, tab: 'settings' }) },
           hasCustomIcon(inst) && { label: t('menu.instance.resetIcon'), icon: <RotateCcw />, onSelect: () => void resetIcon() }
         ]

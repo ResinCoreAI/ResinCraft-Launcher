@@ -11,14 +11,17 @@ import { Modal } from '../ui'
 export const get = <T,>(path: string) => api.server.adminCall('GET', path) as Promise<T>
 export const post = <T = unknown,>(path: string, body: unknown = {}) => api.server.adminCall('POST', path, body) as Promise<T>
 
+/** How a screen reaches the relay: the admin connection (default), or a developer's Dev calls (server.devCall). */
+export type Caller = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<unknown>
+
 /** A route's answer, loaded now and again every `pollMs` (while the screen is open). */
-export function useAdmin<T>(path: string, pollMs?: number) {
+export function useAdmin<T>(path: string, pollMs?: number, caller?: Caller) {
   const [data, setData] = useState<T>()
   const [error, setError] = useState<string>()
   const live = useRef(true)
   const reload = useCallback(async () => {
     try {
-      const v = await get<T>(path)
+      const v = caller ? ((await caller('GET', path)) as T) : await get<T>(path)
       if (live.current) {
         setData(v)
         setError(undefined)
@@ -26,7 +29,7 @@ export function useAdmin<T>(path: string, pollMs?: number) {
     } catch (e) {
       if (live.current) setError((e as Error).message)
     }
-  }, [path])
+  }, [path, caller])
   useEffect(() => {
     live.current = true
     void reload()
@@ -40,12 +43,12 @@ export function useAdmin<T>(path: string, pollMs?: number) {
 }
 
 /** A change: posts, toasts `done` (or the relay's error), reloads. Resolves true when it worked. */
-export function useAct(reload: () => unknown) {
+export function useAct(reload: () => unknown, caller?: Caller) {
   const { toast } = useStore()
   return useCallback(
     async (path: string, body: unknown = {}, done?: Key, params?: Record<string, string | number>) => {
       try {
-        await post(path, body)
+        await (caller ? caller('POST', path, body) : post(path, body))
         if (done) toast(t(done, params), 'success')
         await reload()
         return true
@@ -54,7 +57,7 @@ export function useAct(reload: () => unknown) {
         return false
       }
     },
-    [reload, toast]
+    [reload, toast, caller]
   )
 }
 

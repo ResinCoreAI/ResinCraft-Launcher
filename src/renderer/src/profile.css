@@ -367,7 +367,7 @@
 }
 .pm-edit-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: start;
 }
@@ -616,4 +616,25 @@
   .se-shelf {
     max-height: 260px;
   }
+}
+
+/* The Skin tab: your saved skins, full width, with Reset and a button into the editor (its own tab). */
+.pm-skin-home {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.pm-skin-home .se-shelf {
+  max-height: 380px;
+}
+.pm-skin-home .se-shelf-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.pm-skin-home .se-shelf-row + .se-shelf-row {
+  border-top: 0;
+}
+.pm-skin-home .se-shelf-row {
+  border-bottom: 1px solid var(--border);
 }

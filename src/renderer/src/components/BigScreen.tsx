@@ -12,6 +12,7 @@ import { useStore } from '../store'
 import { t, type Key } from '../i18n'
 import { describe, playtime, timeAgo } from '../util'
 import { onPad, padStyle, setBigScreen, useBigScreenPrefs, type PadStyle } from '../bigScreen'
+import { back, bigScreenOwns, button, press } from '../padNav'
 import { Avatar, Logo } from './ui'
 import { Art, byPlayed } from './bigscreen/parts'
 import BsInstance from './bigscreen/BsInstance'
@@ -280,6 +281,49 @@ export default function BigScreen({ pages }: { /** The launcher's other pages, i
 
   const filtered = shown.filter((i) => filter === 'all' || (filter === 'modded' ? modded(i) : filter === 'vanilla' ? !modded(i) : running(i)))
 
+  // The hints along the bottom work with the mouse too: each does what its controller button does. (Pressed on
+  // mouse down, kept out of the controller's focus, so the selected card stays selected.)
+  const hintPress = (b: 'a' | 'b' | 'x' | 'y' | 'view') => (e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    if (b === 'a') return press()
+    if (b === 'b') return back()
+    if (bigScreenOwns(b)) window.dispatchEvent(new CustomEvent('resin-pad', { detail: b }))
+    else button(b)
+  }
+
+  // The tab bar scrolls to keep the open tab in full view (clear of the fade on its right edge), so moving along
+  // with LB/RB never leaves the selected one hidden.
+  const tabBar = useRef<HTMLElement>(null)
+  const openTab = framed ? `page:${route.page}` : tab
+  useEffect(() => {
+    const nav = tabBar.current
+    const el = nav?.querySelector<HTMLElement>('.bs-tab.active')
+    if (!nav || !el) return
+    const n = nav.getBoundingClientRect()
+    const r = el.getBoundingClientRect()
+    const fade = parseFloat(getComputedStyle(nav).fontSize) * 2.5
+    if (r.right > n.right - fade) nav.scrollBy({ left: r.right - (n.right - fade), behavior: 'smooth' })
+    else if (r.left < n.left + fade) nav.scrollBy({ left: r.left - (n.left + fade), behavior: 'smooth' })
+  }, [openTab])
+  // Which ends of the tab bar have more beyond them: only those edges fade out.
+  useEffect(() => {
+    const nav = tabBar.current
+    if (!nav) return
+    const edges = () => {
+      nav.classList.toggle('more-left', nav.scrollLeft > 2)
+      nav.classList.toggle('more-right', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2)
+    }
+    edges()
+    nav.addEventListener('scroll', edges, { passive: true })
+    const sizes = new ResizeObserver(edges)
+    sizes.observe(nav)
+    return () => {
+      nav.removeEventListener('scroll', edges)
+      sizes.disconnect()
+    }
+  }, [])
+
   const hints: { b: 'a' | 'b' | 'x' | 'y'; label: string }[] =
     sheet
       ? [
@@ -429,7 +473,7 @@ export default function BigScreen({ pages }: { /** The launcher's other pages, i
         <span className="bs-logo">
           <Logo className="bs-logo-mark" /> ResinCraft
         </span>
-        <nav className="bs-tabs" aria-label={t('bigscreen.title')}>
+        <nav ref={tabBar} className="bs-tabs" aria-label={t('bigscreen.title')}>
           <span className="bs-bumper" aria-hidden>
             {pad === 'playstation' ? 'L1' : 'LB'}
           </span>
@@ -475,7 +519,7 @@ export default function BigScreen({ pages }: { /** The launcher's other pages, i
       <main className="bs-main">{framed ? null : page}</main>
 
       <footer ref={foot} className="bs-hints">
-        <span className="bs-hint">
+        <span className="bs-hint" role="button" onMouseDown={hintPress('view')}>
           <span className="bs-glyph bs-glyph-wide" aria-hidden>
             {pad === 'playstation' ? 'Create' : 'View'}
           </span>
@@ -483,7 +527,7 @@ export default function BigScreen({ pages }: { /** The launcher's other pages, i
         </span>
         <span className="grow" />
         {hints.map((h) => (
-          <span key={h.b} className="bs-hint">
+          <span key={h.b} className="bs-hint" role="button" onMouseDown={hintPress(h.b)}>
             <Glyph b={h.b} pad={pad} /> {h.label}
           </span>
         ))}

@@ -470,6 +470,84 @@ async fn restore(id: &str) -> Result<super::bedrock_backup::Restored> {
     crate::core::events::Task::run(title, task_owner(edition), move |task| async move { super::bedrock_backup::run_restore(&folder, target, &task).await }).await
 }
 
+// ---------- Which Xbox account Bedrock signs in with ----------
+//
+// Minecraft for Windows signs in as the Xbox account the Xbox app has for this Windows user; Microsoft offers no way
+// for another program to choose it (the game asks Gaming Services for the "default user"). ResinCraft can only see
+// which account that is and compare it with its own accounts. Windows keeps it, written by the Xbox app when it
+// signs in, under HKCU\Software\Microsoft\XboxLive (Xuid, Gamertag). Microsoft doesn't document that key, so a
+// missing or odd one reads as "unknown", never as an error.
+
+/// The Xbox account the Xbox app is signed in with.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct XboxUser {
+    pub xuid: String,
+    pub gamertag: String,
+}
+
+/// Reads `reg query HKCU\Software\Microsoft\XboxLive`: lines like `    Xuid    REG_SZ    2535466269577823`.
+fn parse_xbox_live_key(text: &str) -> Option<XboxUser> {
+    let value = |name: &str| -> Option<String> {
+        text.lines().find_map(|line| {
+            let mut parts = line.trim().splitn(3, |c: char| c.is_whitespace());
+            let (key, _) = (parts.next()?, parts.next()?);
+            if !key.eq_ignore_ascii_case(name) {
+                return None;
+            }
+            // `Name    REG_SZ    value`: the value is what follows the type, spaces inside it kept.
+            let rest = line.trim()[key.len()..].trim_start();
+            let rest = rest.strip_prefix("REG_SZ")?.trim();
+            (!rest.is_empty()).then(|| rest.to_string())
+        })
+    };
+    let xuid = value("Xuid").filter(|x| x.len() >= 10 && x.chars().all(|c| c.is_ascii_digit()))?;
+    let gamertag = value("UniqueModernGamertag").or_else(|| value("ModernGamertag")).or_else(|| value("Gamertag")).unwrap_or_default();
+    Some(XboxUser { xuid, gamertag })
+}
+
+async fn xbox_user() -> Option<XboxUser> {
+    if !cfg!(windows) {
+        return None;
+    }
+    let out = crate::game::java::hidden_command("reg").args(["query", r"HKCU\Software\Microsoft\XboxLive"]).output().await.ok()?;
+    parse_xbox_live_key(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// The Xbox app's account next to ResinCraft's accounts, for Bedrock's Play.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct XboxSignIn {
+    /// Who the Xbox app is signed in as; none when Windows doesn't say.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<XboxUser>,
+    /// The ResinCraft account that is that Xbox account, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
+    /// ResinCraft's Microsoft accounts whose Xbox account isn't known (signed in before it was stored): they can't
+    /// be matched.
+    pub unknown: Vec<String>,
+    /// ResinCraft's accounts that own Minecraft for Windows, and those that don't (unknown ones are in neither).
+    pub owners: Vec<String>,
+    pub not_owners: Vec<String>,
+}
+
+/// Matches the Xbox app's account to ResinCraft's: by Xbox user ID, or for a Bedrock account without one, by its
+/// gamertag (it is named after it).
+fn match_xbox(user: Option<XboxUser>, accounts: &[super::accounts::XboxIdentity]) -> XboxSignIn {
+    let account_id = user.as_ref().and_then(|u| {
+        accounts
+            .iter()
+            .find(|a| a.xuid.as_deref() == Some(u.xuid.as_str()))
+            .or_else(|| accounts.iter().find(|a| a.xuid.is_none() && a.kind == "bedrock" && !u.gamertag.is_empty() && a.username.eq_ignore_ascii_case(&u.gamertag)))
+            .map(|a| a.id.clone())
+    });
+    let unknown = accounts.iter().filter(|a| a.xuid.is_none() && a.kind != "bedrock").map(|a| a.id.clone()).collect();
+    let owners = accounts.iter().filter(|a| a.owns_bedrock == Some(true)).map(|a| a.id.clone()).collect();
+    let not_owners = accounts.iter().filter(|a| a.owns_bedrock == Some(false)).map(|a| a.id.clone()).collect();
+    XboxSignIn { user, account_id, unknown, owners, not_owners }
+}
+
 pub async fn handle(channel: &str, args: Args) -> Result<Value> {
     match channel {
         "bedrock:status" => json(status().await?),
@@ -494,6 +572,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             }
             done()
         }
+        // Who the Xbox app is signed in as (Bedrock plays as that account), matched to ResinCraft's accounts.
+        "bedrock:xboxUser" => json(match_xbox(xbox_user().await, &super::accounts::xbox_identities().await)),
         "bedrock:gamingServices" => {
             shell::open_app_link(&store_page(GAMING_SERVICES_ID))?;
             done()
@@ -546,6 +626,54 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_the_xbox_apps_account() {
+        // As on a real PC (2026-11-22), with the e-mail line left out of the test.
+        let key = "\r\nHKEY_CURRENT_USER\\Software\\Microsoft\\XboxLive\r\n    HasFiredSignInEvent    REG_DWORD    0x1\r\n    AccountId    REG_SZ    00037FFE41F1DBC0\r\n    Xuid    REG_SZ    2535466269577823\r\n    Gamertag    REG_SZ    Old Tag\r\n    UniqueModernGamertag    REG_SZ    Puirkle Gamer#123\r\n\r\nHKEY_CURRENT_USER\\Software\\Microsoft\\XboxLive\\TokenBroker\r\n";
+        assert_eq!(parse_xbox_live_key(key), Some(XboxUser { xuid: "2535466269577823".into(), gamertag: "Puirkle Gamer#123".into() }));
+        let plain = "    Xuid    REG_SZ    2535466269577823\n    Gamertag    REG_SZ    PuirkleGamer\n";
+        assert_eq!(parse_xbox_live_key(plain).unwrap().gamertag, "PuirkleGamer");
+        // Signed out, the key missing, or something odd: unknown.
+        assert_eq!(parse_xbox_live_key("ERROR: The system was unable to find the specified registry key or value."), None);
+        assert_eq!(parse_xbox_live_key("    Xuid    REG_SZ    \n"), None);
+        assert_eq!(parse_xbox_live_key("    Xuid    REG_SZ    not-a-number\n"), None);
+        assert_eq!(parse_xbox_live_key("    XuidOld    REG_SZ    2535466269577823\n"), None);
+        assert_eq!(parse_xbox_live_key(""), None);
+    }
+
+    /// This PC's Xbox app: `cargo test --lib real_xbox_user -- --ignored --nocapture`.
+    #[tokio::test]
+    #[ignore = "reads this PC's Xbox sign-in"]
+    async fn real_xbox_user() {
+        let user = xbox_user().await;
+        println!("gamertag: {:?}, xuid known: {}", user.as_ref().map(|u| &u.gamertag), user.is_some());
+    }
+
+    #[test]
+    fn matches_the_xbox_account_to_ours() {
+        use super::super::accounts::XboxIdentity;
+        let acc = |id: &str, kind: &str, name: &str, xuid: Option<&str>| XboxIdentity {
+            id: id.into(),
+            kind: kind.into(),
+            username: name.into(),
+            xuid: xuid.map(str::to_string),
+            owns_bedrock: match id {
+                "a" => Some(true),
+                "b" => Some(false),
+                _ => None,
+            },
+        };
+        let ours = vec![acc("a", "msa", "Steve", Some("111")), acc("b", "bedrock", "PuirkleGamer", None), acc("c", "msa", "Alex", None)];
+        let user = |xuid: &str, tag: &str| Some(XboxUser { xuid: xuid.into(), gamertag: tag.into() });
+        assert_eq!(match_xbox(user("111", "Whoever"), &ours).account_id.as_deref(), Some("a"));
+        assert_eq!(match_xbox(user("222", "puirklegamer"), &ours).account_id.as_deref(), Some("b"), "a Bedrock account is named after its gamertag");
+        assert_eq!(match_xbox(user("333", "Alex"), &ours).account_id, None, "a Java name is not a gamertag");
+        let none = match_xbox(None, &ours);
+        assert_eq!((none.account_id, none.unknown), (None, vec!["c".to_string()]));
+        let v = serde_json::to_value(match_xbox(user("111", "T"), &ours)).unwrap();
+        assert_eq!(v, serde_json::json!({"user": {"xuid": "111", "gamertag": "T"}, "accountId": "a", "unknown": ["c"], "owners": ["a"], "notOwners": ["b"]}));
+    }
 
     #[test]
     fn reads_uninstall_results() {

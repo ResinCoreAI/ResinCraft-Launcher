@@ -192,7 +192,19 @@ export function UpdatesSection() {
         (s) => publish({ status: s }),
         () => {}
       )
+    // Whether the relay's admin invited this account to the Dev channel (Dev is offered only then).
+    void api.update.devAccess().then(
+      (s) => publish({ status: s }),
+      () => {}
+    )
   }, [])
+
+  // No longer invited while on Dev: back to Beta (the engine already checks Beta's feed for it).
+  const channel = settings?.updateChannel ?? 'stable'
+  const devTaken = channel === 'dev' && status?.dev === false
+  useEffect(() => {
+    if (devTaken) void updateSettings({ updateChannel: 'beta' })
+  }, [devTaken, updateSettings])
 
   if (!settings || !status) return null
   if (status.store)
@@ -227,7 +239,9 @@ export function UpdatesSection() {
               : status.lastChecked
                 ? t('updates.upToDate')
                 : ''
-  const notesUrl = available?.notesUrl ?? `${RELEASES}/tag/v${status.current}`
+  // A Dev build has no release page.
+  const notesUrl = available ? available.notesUrl : `${RELEASES}/tag/v${status.current}`
+  const showDev = !!status.dev || channel === 'dev'
 
   return (
     <section className="settings-section" id="updates">
@@ -239,6 +253,7 @@ export function UpdatesSection() {
             <b>
               {t('updates.version', { version: status.current })}
               {available && !busy && <span className="update-new">{available.version}</span>}
+              {available?.dev && !busy && <span className="chip warn">{t('updates.devBuild')}</span>}
             </b>
             <span className="update-line">
               {status.error && !busy && <Info size={13} className="note" />}
@@ -274,24 +289,27 @@ export function UpdatesSection() {
         <div className="setting">
           <div className="text">
             <b>{t('updates.channel')}</b>
-            <span>{t('updates.channel.hint')}</span>
+            <span>{t(channel === 'dev' ? 'updates.channel.devHint' : 'updates.channel.hint')}</span>
           </div>
           <select
             className="input"
             style={{ width: 'auto' }}
-            value={settings.updateChannel ?? 'stable'}
-            onChange={(e) => void updateSettings({ updateChannel: e.target.value as 'stable' | 'beta' }).then(() => check())}
+            value={channel}
+            onChange={(e) => void updateSettings({ updateChannel: e.target.value as 'stable' | 'beta' | 'dev' }).then(() => check())}
           >
             <option value="stable">{t('updates.channel.stable')}</option>
             <option value="beta">{t('updates.channel.beta')}</option>
+            {showDev && <option value="dev">{t('updates.channel.dev')}</option>}
           </select>
         </div>
         <ReinstallLauncherSetting start={() => void start()} busy={busy} />
         <div className="setting">
           <div className="row" style={{ gap: 18 }}>
-            <button className="link" onClick={() => void api.app.openExternal(notesUrl)}>
-              {t('updates.releaseNotes')}
-            </button>
+            {notesUrl && (
+              <button className="link" onClick={() => void api.app.openExternal(notesUrl)}>
+                {t('updates.releaseNotes')}
+              </button>
+            )}
             <button className="link" onClick={() => void api.app.openExternal(RELEASES)}>
               {t('updates.allReleases')}
             </button>

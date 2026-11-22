@@ -52,7 +52,7 @@ import {
 } from '../components/ui'
 import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../components/LaunchCommands'
 import { isLive, useStore } from '../store'
-import { bytes, COLORS, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
+import { bytes, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
 import { engineError, t } from '../i18n'
 import ExportModal from '../components/ExportModal'
 import { ReinstallInstanceModal, type InstanceReinstall } from '../components/Reinstall'
@@ -154,7 +154,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
             <Hammer />
           </button>
         )}
-        <button className="btn lg" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
+        <button className="btn lg" data-guide="export" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
           <PackageOpen /> {t('instance.export')}
         </button>
         <button className="btn lg icon" title={t('copyFrom.title')} aria-label={t('copyFrom.title')} onClick={() => setCopyingFrom(true)}>
@@ -182,6 +182,7 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
       )}
 
       <div className="tabs" role="tablist">
+        <span hidden data-guide-tour={tab === 'content' ? undefined : `instance:${tab}`} />
         <button className={tab === 'content' ? 'on' : ''} onClick={() => setTab('content')}>
           <Blocks /> {t('instance.tab.content')}
         </button>
@@ -524,7 +525,7 @@ function ContentTab({ inst }: { inst: Instance }) {
                 <ArrowUpCircle /> {t('instance.content.updateAll', { count: updates.length })}
               </button>
             ) : (
-              <button className="btn" disabled={checking} onClick={checkUpdates}>
+              <button className="btn" data-guide="updates" disabled={checking} onClick={checkUpdates}>
                 {checking ? <Loader2 className="spin" /> : <RefreshCw />} {t('instance.content.checkUpdates')}
               </button>
             )}
@@ -1015,23 +1016,6 @@ function SettingsTab({ inst }: { inst: Instance }) {
               />
             </div>
           </div>
-          <div className="setting">
-            <div className="text">
-              <b>{t('instance.settings.color')}</b>
-              <span>{t('instance.settings.colorHint')}</span>
-            </div>
-            <div className="control swatches">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  className={`swatch ${c === inst.color ? 'on' : ''}`}
-                  style={{ background: c }}
-                  onClick={() => void save({ color: c })}
-                  aria-label={t('instance.settings.colorOption', { color: c })}
-                />
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1057,7 +1041,7 @@ function SettingsTab({ inst }: { inst: Instance }) {
         </div>
       </div>
 
-      <div className="settings-section">
+      <div className="settings-section" data-guide="inst-performance">
         <h3>{t('instance.settings.performance')}</h3>
         <div className="card">
           <div className="setting">

@@ -1,11 +1,10 @@
 import { createContext, useContext, useRef, useState } from 'react'
-import { ArrowUpCircle, Blocks, Check, ChevronDown, Copy, FolderInput, FolderPlus, Loader2, Minus, PackageOpen, Palette, RefreshCw, Square, Trash2, X } from 'lucide-react'
+import { ArrowUpCircle, Blocks, Check, ChevronDown, Copy, FolderInput, FolderPlus, Loader2, Minus, PackageOpen, RefreshCw, Square, Trash2, X } from 'lucide-react'
 import type { Instance, InstancePatch, PackFormat } from '@shared/types'
 import { api } from '../api'
 import { ConfirmModal, Modal, openContextMenu, openMenuBelow, Segmented, type ContextEntry, type ContextItem } from '../components/ui'
 import { nextExportVersion } from '../components/OwnPack'
 import { useStore } from '../store'
-import { COLOR_NAMES, COLORS } from '../util'
 import { t } from '../i18n'
 import { addSavedGroup, NameModal, useGroupNames } from './Library'
 import '../library-select.css'
@@ -150,7 +149,6 @@ export function useBulkActions(picked: Instance[], clear: () => void) {
   const moveTo = (group: string | null) =>
     patchAll({ group }, t('library.sel.moving'), (count) => t('library.sel.moved', { count, group: group || t('library.group.ungrouped') }))
 
-  const setColor = (color: string) => patchAll({ color }, t('library.sel.coloring'), (count) => t('library.sel.colored', { count }))
 
   const duplicate = async () => {
     const r = await each(t('library.sel.duplicating'), picked, (i) => api.instances.duplicate(i.id))
@@ -229,14 +227,6 @@ export function useBulkActions(picked: Instance[], clear: () => void) {
     ]
   }
 
-  const colorItems = (): ContextEntry[] =>
-    COLORS.map((c, i) => ({
-      label: t(COLOR_NAMES[i]),
-      icon: <span className="ctx-swatch" style={{ background: c }} />,
-      checked: picked.every((p) => p.color === c),
-      onSelect: () => void setColor(c)
-    }))
-
   /** Why an action skips some of the selection (or can't run for any of it). */
   const skips = (left: number, reason: 'running' | 'vanilla'): string | undefined =>
     left ? t(reason === 'running' ? 'library.sel.skipRunning' : 'library.sel.skipVanilla', { count: left }) : undefined
@@ -262,7 +252,6 @@ export function useBulkActions(picked: Instance[], clear: () => void) {
     running.length > 0 && { label: t('library.sel.stop', { count: running.length }), icon: <Square />, onSelect: () => void stopAll() },
     running.length > 0 && '-',
     { label: t('library.sel.moveTo'), icon: <FolderInput />, disabled: busy, items: groupItems() },
-    { label: t('menu.instance.color'), icon: <Palette />, disabled: busy, items: colorItems() },
     { label: t('library.sel.duplicate', { count: picked.length }), icon: <Copy />, disabled: busy, onSelect: () => void duplicate() },
     { label: t('library.sel.export', { count: picked.length }), icon: <PackageOpen />, disabled: busy, onSelect: ask('export') },
     '-',
@@ -291,9 +280,6 @@ export function useBulkActions(picked: Instance[], clear: () => void) {
       )}
       <button className="btn sm" disabled={busy} aria-haspopup="menu" onClick={dropdown(groupItems)}>
         <FolderInput /> {t('library.sel.moveTo')} <ChevronDown />
-      </button>
-      <button className="btn sm" disabled={busy} aria-haspopup="menu" onClick={dropdown(colorItems)}>
-        <Palette /> {t('library.sel.color')} <ChevronDown />
       </button>
       <button className="btn sm" disabled={busy} onClick={() => void duplicate()}>
         <Copy /> {t('library.card.duplicate')}

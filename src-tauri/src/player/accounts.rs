@@ -63,6 +63,10 @@ struct StoredAccount {
     mc_token_expires: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     xuid: Option<String>,
+    /// Owns Minecraft for Windows (Bedrock), as Minecraft's entitlement service said at the last sign-in. None:
+    /// not asked yet (accounts added before ResinCraft asked), or the service didn't answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    owns_bedrock: Option<bool>,
     /// Anything else in the file is kept as is.
     #[serde(flatten)]
     extra: Map<String, Value>,
@@ -178,6 +182,45 @@ async fn save(list: &[StoredAccount]) -> Result<()> {
 
 fn view(a: &StoredAccount) -> AccountView {
     AccountView { id: a.id.clone(), kind: a.kind.clone(), username: a.username.clone(), uuid: a.uuid.clone(), skin_url: a.skin_url.clone(), active: a.active }
+}
+
+/// A Microsoft account in ResinCraft as Bedrock's account check sees it: its Xbox user ID when known.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XboxIdentity {
+    pub id: String,
+    /// "msa" or "bedrock".
+    pub kind: String,
+    /// The Minecraft name (msa) or the gamertag (bedrock).
+    pub username: String,
+    pub xuid: Option<String>,
+    /// Owns Minecraft for Windows; None when not known.
+    pub owns_bedrock: Option<bool>,
+}
+
+fn identity(a: &StoredAccount) -> XboxIdentity {
+    XboxIdentity {
+        id: a.id.clone(),
+        kind: a.kind.clone(),
+        username: a.username.clone(),
+        xuid: a.xuid.clone().filter(|x| !x.trim().is_empty()),
+        owns_bedrock: a.owns_bedrock,
+    }
+}
+
+/// The Microsoft and Bedrock accounts, with their Xbox user IDs and whether they own Bedrock (offline profiles
+/// have neither). An account that doesn't know them yet (added before ResinCraft kept them) signs in again
+/// quietly, the way starting Java does, to learn them; if that fails it stays unknown.
+pub async fn xbox_identities() -> Vec<XboxIdentity> {
+    let mut out = Vec::new();
+    for a in load().await.into_iter().filter(|a| a.kind == "msa" || a.kind == "bedrock") {
+        let a = if (a.xuid.is_none() || a.owns_bedrock.is_none()) && !is_unreadable(a.refresh_token.as_deref()) {
+            refresh(&a).await.unwrap_or(a)
+        } else {
+            a
+        };
+        out.push(identity(&a));
+    }
+    out
 }
 
 pub async fn list_accounts() -> Result<Vec<AccountView>> {
@@ -302,6 +345,30 @@ struct McLoginResult {
     mc_token: String,
     mc_token_expires: i64,
     xuid: Option<String>,
+    owns_bedrock: Option<bool>,
+}
+
+#[derive(Deserialize)]
+struct Entitlements {
+    #[serde(default)]
+    items: Vec<Entitlement>,
+}
+#[derive(Deserialize)]
+struct Entitlement {
+    #[serde(default)]
+    name: String,
+}
+
+/// Whether Minecraft's entitlement list includes Bedrock for Windows (bought alone, with Java Edition since June
+/// 2022, or in a bundle).
+fn owns_bedrock(list: &Entitlements) -> bool {
+    list.items.iter().any(|e| e.name == "product_minecraft_bedrock" || e.name == "game_minecraft_bedrock")
+}
+
+/// Asks Minecraft's entitlement service what the account owns. None when it doesn't answer.
+async fn bedrock_entitlement(mc_token: &str) -> Option<bool> {
+    let list: Entitlements = send_json(http().get("https://api.minecraftservices.com/entitlements/mcstore").bearer_auth(mc_token)).await.ok()?;
+    Some(owns_bedrock(&list))
 }
 
 async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
@@ -352,6 +419,7 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
         // No Java Edition: a Bedrock profile, named after the Xbox gamertag.
         Err(e) if status_of(&e) == Some(404) => {
             let (gamertag, xuid) = xbox_identity(&xbl.token).await?;
+            let owns_bedrock = bedrock_entitlement(&mc.access_token).await;
             return Ok(McLoginResult {
                 java: false,
                 username: gamertag,
@@ -360,10 +428,18 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
                 mc_token: mc.access_token,
                 mc_token_expires: now_ms() + mc.expires_in * 1000,
                 xuid: Some(xuid),
+                owns_bedrock,
             });
         }
         Err(e) => return Err(e),
     };
+    // The Minecraft token's claims carry no Xbox user ID: Xbox Live's own token does. Both are best effort here, so
+    // a hiccup doesn't stop a Java sign-in.
+    let xuid = match claim.xid.clone() {
+        Some(x) => Some(x),
+        None => xbox_identity(&xbl.token).await.ok().map(|(_, xuid)| xuid),
+    };
+    let owns_bedrock = bedrock_entitlement(&mc.access_token).await;
 
     Ok(McLoginResult {
         java: true,
@@ -372,7 +448,8 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
         skin_url: profile.skins.into_iter().find(|s| s.state == "ACTIVE").map(|s| https_texture(&s.url)),
         mc_token: mc.access_token,
         mc_token_expires: now_ms() + mc.expires_in * 1000,
-        xuid: claim.xid.clone(),
+        xuid,
+        owns_bedrock,
     })
 }
 
@@ -485,6 +562,7 @@ async fn finish_login(tok: &Value, abort: &AtomicBool) -> Result<Option<StoredAc
         mc_token: Some(seal(&mc.mc_token)),
         mc_token_expires: Some(mc.mc_token_expires),
         xuid: mc.xuid,
+        owns_bedrock: mc.owns_bedrock,
         extra: Map::new(),
     })
     .await?;
@@ -677,7 +755,9 @@ async fn refresh(acc: &StoredAccount) -> Result<StoredAccount> {
         skin_url: mc.skin_url,
         mc_token: Some(seal(&mc.mc_token)),
         mc_token_expires: Some(mc.mc_token_expires),
-        xuid: mc.xuid,
+        // A hiccup at this sign-in doesn't forget what an earlier one learnt.
+        xuid: mc.xuid.or_else(|| acc.xuid.clone()),
+        owns_bedrock: mc.owns_bedrock.or(acc.owns_bedrock),
         refresh_token: match s(&tok, "refresh_token").filter(|t| !t.is_empty()) {
             Some(t) => Some(seal(t)),
             None => acc.refresh_token.clone(),
@@ -841,6 +921,23 @@ pub(super) fn https_texture(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_bedrock_ownership() {
+        let read = |json: &str| owns_bedrock(&serde_json::from_str::<Entitlements>(json).unwrap());
+        // Java owners since June 2022 (the shape Minecraft's service answers with; signatures left out).
+        assert!(read(r#"{"items":[{"name":"product_minecraft","signature":"x"},{"name":"game_minecraft","signature":"x"},{"name":"product_minecraft_bedrock","signature":"x"},{"name":"game_minecraft_bedrock","signature":"x"}],"signature":"x","keyId":"1"}"#));
+        assert!(read(r#"{"items":[{"name":"game_minecraft_bedrock"}]}"#));
+        // Java Edition only, nothing, and an answer without items.
+        assert!(!read(r#"{"items":[{"name":"product_minecraft"},{"name":"game_minecraft"}]}"#));
+        assert!(!read(r#"{"items":[]}"#));
+        assert!(!read(r#"{}"#));
+        assert!(!read(r#"{"items":[{"name":"product_minecraft_bedrock_trial"}]}"#));
+        // Accounts saved before this field existed read as "not known yet".
+        let old: StoredAccount = serde_json::from_str(r#"{"id":"1","type":"msa","username":"Steve","uuid":"u"}"#).unwrap();
+        assert_eq!((old.owns_bedrock, old.xuid.as_deref()), (None, None));
+        assert!(!serde_json::to_string(&old).unwrap().contains("ownsBedrock"));
+    }
 
     #[test]
     fn pkce_pair_is_well_formed() {

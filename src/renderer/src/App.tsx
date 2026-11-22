@@ -219,7 +219,7 @@ export default function App() {
 
         <div className="head-tools" data-tauri-drag-region>
           <QuickSearch pages={nav.map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))} />
-          <button className="head-btn" title={`${t('bigscreen.enter')} (F11)`} aria-label={t('bigscreen.enter')} onClick={() => void setBigScreen(true)}>
+          <button className="head-btn" data-guide="bigscreen" title={`${t('bigscreen.enter')} (F11)`} aria-label={t('bigscreen.enter')} onClick={() => void setBigScreen(true)}>
             <Tv />
           </button>
           {nav
@@ -227,6 +227,7 @@ export default function App() {
             .map((n) => (
               <button
                 key={n.page}
+                data-guide={n.page}
                 className={`head-btn ${current === n.page ? 'active' : ''}`}
                 title={t(n.label)}
                 aria-label={t(n.label)}

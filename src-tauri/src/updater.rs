@@ -11,6 +11,10 @@
 //! branch, which .github/workflows/publish-update.yml writes when a release is published, so publishing a release's
 //! draft is what offers it to players. (Launcher 0.3.0 read the newest release's own latest.json instead.) Test
 //! builds point elsewhere with `tauri build --config` (see README, "Updates").
+//!
+//! The Dev channel is for accounts the relay's admin invited (and launcher admins): the relay serves its feed and
+//! update files to those accounts only, with their relay session (`/api/dev/feed`, `/dev/<target>`), and the developer
+//! uploads builds to it with `release-dev.bat`. Dev users also get Beta's releases when they're newer.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -32,6 +36,9 @@ const RELEASES: &str = "https://github.com/ResinCoreAI/ResinCraft-Launcher/relea
 /// The Beta channel's feed (Settings → Updates): pre-releases and stable releases, written by publish-update.yml.
 const STABLE_FEED: &str = "https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/updates/latest.json";
 const BETA_FEED: &str = "https://raw.githubusercontent.com/ResinCoreAI/ResinCraft-Launcher/updates/beta.json";
+
+/// How long the relay's word on the Dev channel is kept before Settings asks again.
+const DEV_ACCESS_TTL_MS: u64 = 10 * 60_000;
 
 /// What the UI shows in Settings → Updates and in the update banner (also sent as the `update` event).
 #[derive(Debug, Clone, Serialize, Default)]
@@ -56,6 +63,10 @@ pub struct UpdateStatus {
     /// Installed from the Microsoft Store (an MSIX package): the Store updates it, so ResinCraft never looks.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub store: bool,
+    /// Whether the signed-in account may use the Dev channel (the relay's admin invited it), once the relay said:
+    /// Settings offers it, and moves a launcher on Dev that isn't invited any more back to Beta.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dev: Option<bool>,
 }
 
 /// Whether this copy runs from an MSIX package (the Microsoft Store), which Windows updates itself.
@@ -88,6 +99,9 @@ pub struct Available {
     /// The version already installed, offered again by Reinstall.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub reinstall: bool,
+    /// A Dev build from the relay (it has no release page: `notes_url` is empty).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub dev: bool,
 }
 
 /// Games and hosted servers that would be cut off by the restart (their names, for the warning).
@@ -111,6 +125,8 @@ struct State {
     update: Option<Update>,
     /// A check or an install is running.
     busy: bool,
+    /// When the relay last answered about the Dev channel (ms since 1970).
+    dev_asked: u64,
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
@@ -179,6 +195,13 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // UI installs it like an update (signature checked, same installer type).
         "update:checkReinstall" => json(check_with(true).await?),
         "update:blockers" => json(blockers().await),
+        // Settings → Updates: asks the relay whether this account may use the Dev channel (at most every 10 minutes).
+        "update:devAccess" => {
+            if with(|st| now_ms().saturating_sub(st.dev_asked) > DEV_ACCESS_TTL_MS) {
+                ask_dev_access().await;
+            }
+            json(status().await)
+        }
         // `true`: download now and install once every game and hosted server has stopped. "close": download, then
         // stop the hosted servers (saving their worlds) and close the games, and install.
         "update:install" => {
@@ -220,8 +243,11 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     status().await;
     publish(|s| s.state = "checking");
 
+    let channel = crate::core::settings::get().await.update_channel;
+    // Dev: the relay's Dev build next to Beta's feed; an account that isn't invited (any more) gets Beta.
+    let dev = if channel == "dev" { ask_dev_access().await } else { DevAccess::No };
     let mut builder = app.updater_builder().timeout(Duration::from_secs(30));
-    if crate::core::settings::get().await.update_channel == "beta" {
+    if channel == "beta" || channel == "dev" {
         // The stable feed second: the updater tries the next address when one fails (no beta.json yet).
         builder = builder.endpoints(vec![BETA_FEED.parse().expect("beta feed address"), STABLE_FEED.parse().expect("stable feed address")])?;
     }
@@ -231,6 +257,15 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     let result = match builder.build() {
         Ok(updater) => updater.check().await,
         Err(e) => Err(e),
+    };
+    let mut from_dev = None;
+    let result = match dev {
+        DevAccess::Yes { feed, session, .. } => {
+            let found = check_dev(&app, &feed, &session, reinstall).await;
+            from_dev = found.as_ref().ok().and_then(|u| u.as_ref()).map(|u| u.version.clone());
+            newest(result, found)
+        }
+        _ => result,
     };
     let checked = now_ms();
     let _ = write_json(&state_file(), &Saved { last_checked: Some(checked) }).await;
@@ -242,12 +277,16 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
             (None, Some(calm(&e)))
         }
     };
-    let available = update.as_ref().map(|u| Available {
-        version: u.version.clone(),
-        notes: u.body.clone().filter(|b| !b.trim().is_empty()),
-        date: u.raw_json.get("pub_date").and_then(Value::as_str).map(str::to_string),
-        notes_url: format!("{RELEASES}/tag/v{}", u.version.trim_start_matches('v')),
-        reinstall: u.version.trim_start_matches('v') == current_version(),
+    let available = update.as_ref().map(|u| {
+        let dev = from_dev.as_deref() == Some(u.version.as_str());
+        Available {
+            version: u.version.clone(),
+            notes: u.body.clone().filter(|b| !b.trim().is_empty()),
+            date: u.raw_json.get("pub_date").and_then(Value::as_str).map(str::to_string),
+            notes_url: if dev { String::new() } else { format!("{RELEASES}/tag/v{}", u.version.trim_start_matches('v')) },
+            reinstall: u.version.trim_start_matches('v') == current_version(),
+            dev,
+        }
     });
     with(|st| {
         st.busy = false;
@@ -264,6 +303,103 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
         }
         s.error = error;
     }))
+}
+
+/// What the relay says about this launcher's account and the Dev channel.
+enum DevAccess {
+    /// Invited (or a launcher admin): the feed's address and the relay session that opens it (and its downloads);
+    /// `developer`: the account may also manage the Dev channel from the Admin page.
+    Yes { feed: String, session: String, developer: bool },
+    /// Not invited, no Microsoft account, a relay without the Dev channel, or a build without the relay.
+    No,
+    /// The relay couldn't be asked (offline…): Settings keeps what it last heard.
+    Unknown,
+}
+
+/// Asks the relay (signing the active Microsoft account in when it has no relay session yet) and tells Settings.
+async fn ask_dev_access() -> DevAccess {
+    let access = dev_access().await;
+    if !matches!(access, DevAccess::Unknown) {
+        let dev = matches!(access, DevAccess::Yes { .. });
+        let changed = with(|st| {
+            st.dev_asked = now_ms();
+            st.status.dev != Some(dev)
+        });
+        if changed {
+            publish(|s| s.dev = Some(dev));
+        }
+    }
+    access
+}
+
+/// Whether the active account is one of the relay's developers (the Admin page shows them its Dev section).
+pub(crate) async fn is_developer() -> bool {
+    matches!(ask_dev_access().await, DevAccess::Yes { developer: true, .. })
+}
+
+async fn dev_access() -> DevAccess {
+    use crate::server::relay;
+    if relay::settings().is_none() {
+        return DevAccess::No;
+    }
+    let Some(account) = crate::player::accounts::microsoft_account(None).await else { return DevAccess::No };
+    for retry in [false, true] {
+        let (session, domain) = match relay::session_token(&account).await {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("[update] no relay session for the Dev channel: {e:#}");
+                return DevAccess::Unknown;
+            }
+        };
+        let res = ctx::http().get(format!("https://{domain}/api/dev/access")).bearer_auth(&session).timeout(Duration::from_secs(15)).send().await;
+        match res.map(|r| (r.status().as_u16(), r)) {
+            // The saved session ran out: sign in again, once.
+            Ok((401, _)) if !retry => relay::forget_session(&account).await,
+            Ok((200, r)) => {
+                let v = r.json::<Value>().await.unwrap_or(Value::Null);
+                let flag = |k: &str| v.get(k).and_then(Value::as_bool).unwrap_or(false);
+                return if flag("dev") { DevAccess::Yes { feed: format!("https://{domain}/api/dev/feed"), session, developer: flag("developer") } } else { DevAccess::No };
+            }
+            // A relay without the Dev channel (older), or a banned account.
+            Ok((403 | 404, _)) => return DevAccess::No,
+            Ok((code, _)) => {
+                eprintln!("[update] the relay answered HTTP {code} about the Dev channel");
+                return DevAccess::Unknown;
+            }
+            Err(e) => {
+                eprintln!("[update] couldn't ask the relay about the Dev channel: {}", e.without_url());
+                return DevAccess::Unknown;
+            }
+        }
+    }
+    DevAccess::Unknown
+}
+
+/// The relay's Dev build, when it's newer than the running version (or, `reinstall`, the same).
+async fn check_dev(app: &tauri::AppHandle, feed: &str, session: &str, reinstall: bool) -> Result<Option<Update>, UpdaterError> {
+    let Ok(url) = feed.parse() else { return Ok(None) };
+    let mut builder = app.updater_builder().timeout(Duration::from_secs(30)).endpoints(vec![url])?.header("Authorization", format!("Bearer {session}"))?;
+    if reinstall {
+        builder = builder.version_comparator(|current, remote| remote.version >= current);
+    }
+    builder.build()?.check().await
+}
+
+/// The newer of Beta's update and the Dev build. A Dev problem (no build for this platform, the relay offline) never
+/// hides Beta's update; Beta's problem only shows when there's no Dev build either.
+fn newest(beta: Result<Option<Update>, UpdaterError>, dev: Result<Option<Update>, UpdaterError>) -> Result<Option<Update>, UpdaterError> {
+    let version = |u: &Update| semver::Version::parse(u.version.trim_start_matches('v')).ok();
+    match (beta, dev) {
+        (Ok(Some(b)), Ok(Some(d))) => Ok(Some(if version(&d) > version(&b) { d } else { b })),
+        (Ok(b), Ok(None)) => Ok(b),
+        (Ok(None), Ok(d)) => Ok(d),
+        (Ok(b), Err(e)) => {
+            eprintln!("[update] Dev check failed: {e}");
+            Ok(b)
+        }
+        (Err(_), Ok(Some(d))) => Ok(Some(d)),
+        (Err(e), _) => Err(e),
+    }
 }
 
 /// Names of the games and hosted servers that are running.

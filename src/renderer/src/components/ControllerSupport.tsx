@@ -112,7 +112,7 @@ export function InstanceController({ inst }: { inst: Instance }) {
           : t('controller.hint')
 
   return (
-    <div className="settings-section">
+    <div className="settings-section" data-guide="inst-controller">
       <h3>{t('controller.title')}</h3>
       <div className="card">
         <div className="setting">

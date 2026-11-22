@@ -61,9 +61,12 @@ export default function Skin3D({
       clearTimeout(timer)
       v.controls.removeEventListener('start', hold)
       v.controls.removeEventListener('end', release)
+      const el = v.renderer.domElement
       v.dispose()
-      // Give the WebGL context back now rather than whenever it's garbage collected.
-      v.renderer.forceContextLoss()
+      // Gone for good (not just re-made on the same canvas, as on a resize or React's second run): give the WebGL
+      // context back now rather than whenever it's garbage collected. A context lost on a canvas that's reused
+      // would leave the next figure with nothing to draw on.
+      setTimeout(() => !el.isConnected && v.renderer.forceContextLoss(), 0)
       viewer.current = undefined
     }
   }, [width, height])

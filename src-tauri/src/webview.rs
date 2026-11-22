@@ -40,6 +40,10 @@ use tauri::{AppHandle, Manager};
 /// and timers ran on time. Part of Settings → Appearance → Free memory while hidden.
 static LEAN_FROM_NOW: AtomicBool = AtomicBool::new(false);
 const LEAN_AFTER_START: std::time::Duration = std::time::Duration::from_secs(3);
+/// After the low level, the first page has settled by then: its memory goes back to Windows (`rest`). A launcher with
+/// many instances, a signed-in account and pictures keeps loading for a while after, so it's done once more later.
+const REST_AFTER_START: std::time::Duration = std::time::Duration::from_secs(3);
+const REST_AGAIN_AFTER: std::time::Duration = std::time::Duration::from_secs(6);
 
 fn lean_in_use() -> bool {
     LEAN_FROM_NOW.load(Ordering::SeqCst) && crate::core::settings::free_memory_hidden()
@@ -54,6 +58,12 @@ pub fn started() {
         if crate::game::running_ids().is_empty() {
             set_low_memory(false);
         }
+        tauri::async_runtime::spawn(async {
+            tokio::time::sleep(REST_AFTER_START).await;
+            rest().await;
+            tokio::time::sleep(REST_AGAIN_AFTER).await;
+            rest().await;
+        });
         watch_budget().await;
     });
 }
@@ -67,6 +77,13 @@ const CHECK_EVERY: std::time::Duration = std::time::Duration::from_millis(500);
 /// big page isn't redrawn over and over.
 const SETTLE_AFTER_TRIM: std::time::Duration = std::time::Duration::from_millis(1500);
 const MOST_SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
+/// While it's used, over this the pages WebView2 holds but isn't using go back to Windows, at most every
+/// `RELEASE_GAP`. Measured on the UI rework (each page 10 s in use, twice each, Task Manager's memory for the whole
+/// launcher): Home 65-70 → 53-56 MB, Library 63-69 → 49-50, an instance with 224 mods 80-81 → 49-70, big screen
+/// 85-92 → 54-55, Home after the other pages 83-102 → 54-70; over a tour of every page 79 → 66 MB on average and over
+/// 120 MB 1.3 → 0.2 % of the time. No more slow frames than without it, and pages opened as fast.
+const SOFT_BUDGET: u64 = 80 * 1024 * 1024;
+const RELEASE_GAP: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Keeps the launcher under `BUDGET` while it's used (part of Settings → Appearance → Free memory while hidden).
 /// The low memory level alone keeps it at about 110-140 MB while pages are opened; over the budget, the level is
@@ -81,14 +98,22 @@ const MOST_SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
 async fn watch_budget() {
     let mut settle = SETTLE_AFTER_TRIM;
     let mut just_trimmed = false;
+    let mut released = std::time::Instant::now();
     loop {
         tokio::time::sleep(CHECK_EVERY).await;
         if !lean_in_use() || unloaded() || !crate::game::running_ids().is_empty() {
             continue;
         }
-        if crate::core::memory::launcher_bytes().await <= BUDGET {
+        let bytes = crate::core::memory::launcher_bytes().await;
+        if bytes <= BUDGET {
             settle = SETTLE_AFTER_TRIM;
             just_trimmed = false;
+            // Under the budget but over the soft one: WebView2's unused pages go back to Windows (as at rest), which
+            // redraws nothing; what's in use comes back as it's touched.
+            if bytes > SOFT_BUDGET && released.elapsed() >= RELEASE_GAP {
+                crate::core::memory::release_webview_pages().await;
+                released = std::time::Instant::now();
+            }
             continue;
         }
         if just_trimmed {
@@ -98,6 +123,27 @@ async fn watch_budget() {
         crate::core::events::emit("memoryTrim", ());
         just_trimmed = true;
         tokio::time::sleep(settle).await;
+    }
+}
+
+/// Under this, a launcher left alone isn't asked to give memory back: there's little left to give.
+const REST_FLOOR: u64 = 60 * 1024 * 1024;
+
+/// Nobody has used the window for a while (the page says so, memory.ts), or the first page has just loaded: WebView2's
+/// processes hand the memory they hold but aren't using back to Windows (their working sets are emptied), for other
+/// programs to use; what's needed again comes back as it's used. WebView2 does the same on its own about 30 s after
+/// the start; this does it then, and again whenever the launcher is left alone. What's on screen stays as it is.
+///
+/// Measured on the UI rework (Task Manager's memory for the whole launcher, twice each): left alone after it opens,
+/// 89-99 MB until WebView2's own drop at about 30 s, against 43-58 MB from about 5 s on; 41-44 MB after that either
+/// way. After going through every page, 55 MB resting against 59. Pages opened again after resting as fast (11-44
+/// ms), and pictures of the window don't change.
+pub async fn rest() {
+    if !lean_in_use() || unloaded() || !crate::game::running_ids().is_empty() {
+        return;
+    }
+    if crate::core::memory::launcher_bytes().await > REST_FLOOR {
+        crate::core::memory::release_webview_pages().await;
     }
 }
 
