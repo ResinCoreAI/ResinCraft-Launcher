@@ -1100,6 +1100,22 @@ export interface BedrockEdition {
   switched?: boolean
 }
 
+/** The Xbox account the Xbox app is signed in with: Bedrock plays as it. */
+export interface XboxUser {
+  xuid: string
+  gamertag: string
+}
+
+/** The Xbox app's account next to ResinCraft's accounts. */
+export interface XboxSignIn {
+  /** Missing when Windows doesn't say who is signed in. */
+  user?: XboxUser
+  /** The ResinCraft account that is that Xbox account. */
+  accountId?: string
+  /** ResinCraft's Microsoft accounts whose Xbox account isn't known, so they can't be matched. */
+  unknown: string[]
+}
+
 export interface BedrockStatus {
   /** Bedrock Edition only exists as an app on Windows. */
   supported: boolean
@@ -2551,6 +2567,11 @@ export interface ResinApi {
     gamingServices(): Promise<void>
     /** Opens the Xbox app, where the Windows account Bedrock signs in with is switched (its Store page if missing). */
     xboxAccount(): Promise<void>
+    /**
+     * Who the Xbox app is signed in as (Bedrock plays as that account; no launcher can choose it), matched to
+     * ResinCraft's accounts. Read from where Windows keeps it, which Microsoft doesn't document: missing means unknown.
+     */
+    xboxUser(): Promise<XboxSignIn>
     /** Opens the Microsoft Store's Downloads and updates page. */
     update(): Promise<void>
     /** Opens a world's folder, or the edition's worlds folder. */

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { AlertTriangle, Archive, Download, ExternalLink, FolderOpen, Gamepad2, Globe, Loader2, Play, Plus, RefreshCw, Server, Smartphone, Trash2, UserRound, Wrench, X } from 'lucide-react'
 import type { BedrockEdition, BedrockEditionKind, BedrockInstallMode, BedrockStatus, ServerInfo } from '@shared/types'
 import { api } from '../api'
+import { BedrockAccountPicker, playBedrock } from '../components/BedrockAccountPicker'
 import { BackupsCard, BackupsList, useBedrockVersions, VersionPlate, type BedrockFailure, type BedrockVersionsState } from '../components/BedrockVersions'
 import { ConfirmModal, Empty, MoreButton, type ContextEntry } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
@@ -146,6 +147,7 @@ export default function Bedrock() {
 
   return (
     <div className="page bd-page">
+      <BedrockAccountPicker />
       {!status ? (
         <div className="results">
           <div className="skeleton" style={{ height: 300, borderRadius: 20 }} />
@@ -384,7 +386,7 @@ function Hero(p: EditionProps & { versions: BedrockVersionsState }) {
         ) : e.installed ? (
           <>
             <div className="bd-acts">
-              <button className="btn primary play-btn lg" onClick={() => void run(e.edition, () => api.bedrock.play(e.edition))}>
+              <button className="btn primary play-btn lg" onClick={() => void run(e.edition, () => playBedrock(e.edition))}>
                 {opening === e.edition ? <Loader2 className="spin" /> : <Play />} {t('bedrock.play')}
               </button>
               <button className="btn lg" onClick={() => void run(`f:${e.edition}`, () => api.bedrock.openFolder(e.edition))}>
@@ -437,7 +439,7 @@ function PreviewCard(p: EditionProps) {
         !installing &&
         (e.installed ? (
           <>
-            <button className="btn primary play-btn" onClick={() => void run(e.edition, () => api.bedrock.play(e.edition))}>
+            <button className="btn primary play-btn" onClick={() => void run(e.edition, () => playBedrock(e.edition))}>
               {opening === e.edition ? <Loader2 className="spin" /> : <Play />} {t('bedrock.play')}
             </button>
             <MoreButton className="ghost" items={() => menu(p, true)} />

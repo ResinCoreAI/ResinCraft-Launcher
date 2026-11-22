@@ -81,6 +81,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       get: fn('bedrock:get'),
       gamingServices: fn('bedrock:gamingServices'),
       xboxAccount: fn('bedrock:xboxAccount'),
+      xboxUser: fn('bedrock:xboxUser'),
       update: fn('bedrock:update'),
       openFolder: fn('bedrock:openFolder'),
       versions: fn('bedrock:versions'),

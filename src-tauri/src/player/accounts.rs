@@ -180,6 +180,27 @@ fn view(a: &StoredAccount) -> AccountView {
     AccountView { id: a.id.clone(), kind: a.kind.clone(), username: a.username.clone(), uuid: a.uuid.clone(), skin_url: a.skin_url.clone(), active: a.active }
 }
 
+/// A Microsoft account in ResinCraft as Bedrock's account check sees it: its Xbox user ID when known.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XboxIdentity {
+    pub id: String,
+    /// "msa" or "bedrock".
+    pub kind: String,
+    /// The Minecraft name (msa) or the gamertag (bedrock).
+    pub username: String,
+    pub xuid: Option<String>,
+}
+
+/// The Microsoft and Bedrock accounts, with their Xbox user IDs (offline profiles have none).
+pub async fn xbox_identities() -> Vec<XboxIdentity> {
+    load()
+        .await
+        .iter()
+        .filter(|a| a.kind == "msa" || a.kind == "bedrock")
+        .map(|a| XboxIdentity { id: a.id.clone(), kind: a.kind.clone(), username: a.username.clone(), xuid: a.xuid.clone().filter(|x| !x.trim().is_empty()) })
+        .collect()
+}
+
 pub async fn list_accounts() -> Result<Vec<AccountView>> {
     Ok(load().await.iter().map(view).collect())
 }
