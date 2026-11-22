@@ -15,6 +15,7 @@ import type {
   ServerListQuery
 } from '@shared/types'
 import { mockMailAdmin } from './mock-mail'
+import { mockWalletAdmin, walletAdminOn } from './mock-wallet'
 
 const CATEGORIES = ['smp', 'survival', 'pvp', 'minigames', 'creative', 'modded', 'skyblock', 'anarchy', 'roleplay', 'economy', 'factions', 'prison', 'parkour', 'hardcore', 'vanilla', 'towny', 'lifesteal', 'bedwars']
 
@@ -158,7 +159,8 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
     return { ...(relayMock('GET', '/api/users', {}) as object), recoveryCodes: ['k7qm-2xpa', 'p3nd-8wqe', 'a9vz-4tkr', 'm2cx-7yhb', 'q8fe-1nsd', 'w4lg-6uop', 'z1rt-5mkc', 'h6bn-3ejv', 'c5ys-9adw', 'v2qp-0gtx'] }
   }
   if (method === 'POST' && p === '/api/service') return (service = { ...service, state: b.state, message: b.message || null, since: now() })
-  if (p === '/api/payments' || p.startsWith('/api/payments/')) return paymentsMock(method, p, b)
+  if (p.startsWith('/api/payments/wallet')) return mockWalletAdmin(method, path, b, pay.subs, pay.products)
+  if (p === '/api/payments' || p.startsWith('/api/payments/')) return { ...(paymentsMock(method, p, b) as object), walletOn: walletAdminOn() }
   if (p === '/api/devs' || p.startsWith('/api/devs/')) return devMock(method, p, b)
   if (method === 'POST' && p.startsWith('/api/reports/')) {
     const r = relayReports.find((x) => x.id === b.id)

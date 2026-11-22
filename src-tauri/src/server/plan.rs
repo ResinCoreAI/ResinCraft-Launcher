@@ -6,8 +6,8 @@
 //! While the relay's admin has payments off, nothing is for sale and the launcher shows nothing to buy.
 
 use anyhow::Result;
-use resincraft_relay::agent::Connection;
-use resincraft_relay::proto::{PayStep, PlanInfo, Quote};
+use resincraft_relay::agent::{Connection, TopupStep};
+use resincraft_relay::proto::{PayStep, PlanInfo, Quote, WalletInfo};
 use serde::Serialize;
 
 use crate::core::text::Text;
@@ -129,5 +129,66 @@ pub async fn move_to(account: &str, sub: &str, to: &str) -> Result<PlanInfo> {
             conn.plan_move(sub, &token).await.map_err(|e| relay::describe(&e, ""))
         }
         r => r.map_err(|e| relay::describe(&e, "")),
+    }
+}
+
+// ---------- Resin Credit (only while the plan says `wallet`) ----------
+
+/// What a Resin Credit top-up asked for next: the payment form's step (card, PromptPay; then `wallet_refresh` with
+/// its `sub`), or the wallet already credited (a TrueMoney angpao).
+#[derive(Debug, Clone, Serialize)]
+pub struct Topup {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pay: Option<PayStep>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet: Option<WalletInfo>,
+}
+
+/// The account's Resin Credit: balance, top-up amounts and the newest ledger entries (`before`: older than that id).
+pub async fn wallet(account: &str, before: Option<u64>) -> Result<WalletInfo> {
+    connect(account).await?.wallet(before).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// Buys Resin Credit: `amount` is one of the wallet's `topups`; `link` is the TrueMoney angpao.
+pub async fn wallet_topup(account: &str, amount: u64, method: &str, link: Option<&str>) -> Result<Topup> {
+    match connect(account).await?.wallet_topup(amount, method, link).await.map_err(|e| relay::describe(&e, ""))? {
+        TopupStep::Pay(pay) => Ok(Topup { pay: Some(pay), wallet: None }),
+        TopupStep::Done(wallet) => Ok(Topup { pay: None, wallet: Some(wallet) }),
+    }
+}
+
+/// Reads a card or PromptPay top-up from Stripe again after paying (it's credited once).
+pub async fn wallet_refresh(account: &str, id: &str) -> Result<WalletInfo> {
+    connect(account).await?.wallet_refresh(id).await.map_err(|e| relay::describe(&e, ""))
+}
+
+/// Pays for a cart (one month or year) or a one-time purchase's renewal with Resin Credit.
+pub async fn wallet_pay(account: &str, items: &[String], yearly: bool, promo: Option<&str>, renew_of: Option<&str>) -> Result<PlanInfo> {
+    connect(account).await?.wallet_pay(items, yearly, promo, renew_of).await.map_err(|e| relay::describe(&e, ""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wallet_fields_are_read_and_absent_from_older_relays() {
+        let old: PlanInfo = serde_json::from_str(r#"{"enabled":true,"currency":"thb"}"#).unwrap();
+        assert!(!old.wallet);
+        assert_eq!(old.wallet_balance, 0);
+        let new: PlanInfo = serde_json::from_str(r#"{"enabled":true,"wallet":true,"wallet_balance":12500}"#).unwrap();
+        assert!(new.wallet);
+        assert_eq!(new.wallet_balance, 12500);
+        let q: Quote = serde_json::from_str(r#"{"total":6900,"wallet":true,"wallet_balance":5000,"wallet_note":"Missing 19 baht"}"#).unwrap();
+        assert!(q.wallet && !q.wallet_covers);
+        assert_eq!(q.wallet_note.as_deref(), Some("Missing 19 baht"));
+        let w: WalletInfo = serde_json::from_str(
+            r#"{"enabled":true,"balance":100,"history":[{"id":3,"at":1,"kind":"refund","amount":-5,"balance_after":95,"ref":"sub_1","note":"","by":"Admin a"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(w.history[0].reference, "sub_1");
+        assert_eq!(w.history[0].amount, -5);
+        let t = serde_json::to_value(Topup { pay: None, wallet: Some(w) }).unwrap();
+        assert!(t.get("pay").is_none() && t.get("wallet").is_some());
     }
 }

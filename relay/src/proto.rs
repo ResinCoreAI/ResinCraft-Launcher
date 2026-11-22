@@ -62,6 +62,12 @@
 //! `pay`, whose client secret the launcher's own payment form confirms with Stripe); `plan_cancel` cancels or resumes
 //! one at the end of its period, and `plan_refresh` re-reads one from Stripe after a payment. Older launchers never
 //! hear about any of it.
+//!
+//! Resin Credit (a store wallet) needs no protocol of its own: `plan` says `wallet` when the relay takes it (relays
+//! without it never set it). `wallet` (answered with `wallet`) gives the balance, the top-up amounts and the ledger;
+//! `wallet_topup` buys credit (answered with `pay` for a card or PromptPay, then `wallet_refresh`; with `wallet` for a
+//! TrueMoney angpao); `wallet_pay` pays for a cart or a renewal with it (answered with `plan`). `plan_quote` says
+//! whether the balance covers the cart.
 
 use serde::{Deserialize, Serialize};
 
@@ -301,6 +307,36 @@ pub enum AgentMsg {
     /// account's Minecraft services token (the relay asks Mojang whose it is and forgets it). Only while `plan` says
     /// `moves` (relays without it never set it); answered with this account's `plan`.
     PlanMove { sub: String, to_token: String },
+    /// The account's Resin Credit: its balance, the top-up amounts and the newest ledger entries ([`WALLET_PAGE`] of
+    /// them; `before`: the ones older than that entry id). Answered with `wallet`. Only while `plan` says `wallet`.
+    Wallet {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        before: Option<u64>,
+    },
+    /// Buy Resin Credit: `amount` is one of `wallet.topups` (smallest unit). `method` "card" or "promptpay": answered
+    /// with `pay` (a one-time PaymentIntent for the payment form; its `sub` is the top-up's id for `wallet_refresh`).
+    /// "truemoney" with `link`, an angpao worth at least `amount`: answered with `wallet` (everything the envelope
+    /// gave is credited). Only while `plan` says `wallet`.
+    WalletTopup {
+        amount: u64,
+        method: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        link: Option<String>,
+    },
+    /// Read a card or PromptPay top-up from Stripe again (after the payment form says it went through): answered with
+    /// `wallet` (the credit is there once Stripe says it succeeded).
+    WalletRefresh { id: String },
+    /// Pay for a cart (one month or year, like `plan_cart` without `renew`) or, with `renew_of`, a one-time purchase's
+    /// renewal with Resin Credit, after the promo code and unused days. Answered with `plan`; `not_enough_credit`
+    /// when the balance doesn't cover it. A subscription that renews by itself can't be paid this way.
+    WalletPay {
+        items: Vec<String>,
+        yearly: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        promo: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        renew_of: Option<String>,
+    },
     Ping { seq: u64 },
 }
 
@@ -609,6 +645,8 @@ pub enum RelayMsg {
     Pay { pay: PayStep },
     /// The answer to `plan_quote`. Protocol 11.
     Quote { quote: Quote },
+    /// The answer to `wallet`, `wallet_refresh` and a TrueMoney `wallet_topup`: the account's Resin Credit.
+    Wallet { wallet: WalletInfo },
     Pong { seq: u64 },
     /// The answer to `remote {enabled: true}`: this launcher is listed for its account's console. Protocol 6.
     RemoteReady {
@@ -806,6 +844,8 @@ pub enum ErrorCode {
     /// This name lost ResinCraft Relay: its account has fewer names or servers than it uses (renew, or change the
     /// priority). Protocol 11.
     NamePaused,
+    /// The account's Resin Credit doesn't cover the price (the message says how much is missing).
+    NotEnoughCredit,
     ShuttingDown,
     Internal,
     #[serde(other)]
@@ -1174,6 +1214,12 @@ pub struct PlanInfo {
     pub admin: bool,
     /// The relay's admin lets players move purchases to another of their accounts (`plan_move`).
     pub moves: bool,
+    /// Resin Credit is on: `wallet`, `wallet_topup` and `wallet_pay` work. Relays without it never set it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub wallet: bool,
+    /// The account's Resin Credit (smallest unit).
+    #[serde(skip_serializing_if = "is_zero")]
+    pub wallet_balance: u64,
     /// Selling is on but the Store is closed: nothing can be bought, renewed or changed (`products` is empty), while
     /// the free plan's limits and gift codes (`plan_redeem`) still work.
     pub store_closed: bool,
@@ -1242,13 +1288,21 @@ pub struct MySub {
     pub items: Vec<MySubItem>,
     /// Paid once for one month or year (it doesn't renew by itself: `plan_cart` with `renew_of` renews it).
     pub once: bool,
-    /// How it was paid: "card", "promptpay", "truemoney", "free"; empty for subscriptions and grants.
+    /// How it was paid: "card", "promptpay", "truemoney", "wallet" (Resin Credit), "free"; empty for subscriptions and
+    /// grants.
     pub method: String,
     /// It can be moved to another account (bought or a gift code's, and running) while `moves` is on.
     pub movable: bool,
     /// The relay admin's note to the player about it (e.g. why it was given); empty: none. Older relays don't send it.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub note: String,
+    /// The relay's admin ended it and gave this much back as Resin Credit (0: not refunded).
+    #[serde(skip_serializing_if = "is_zero")]
+    pub refunded: u64,
+    /// What cancelling it now would give back as Resin Credit (its unused time, while the admin refunds cancels and
+    /// the product is refundable); 0: nothing. A cancel that credits ends it now instead of at the period's end.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub cancel_credit: u64,
 }
 
 /// What happens to an account's relay names and servers when an add-on ends. Protocol 11.
@@ -1311,6 +1365,65 @@ pub struct Quote {
     pub promo_error: Option<String>,
     /// Why the cart can't be bought as it is (an item it has, a duplicate, not for sale).
     pub error: Option<String>,
+    /// Resin Credit is on (relays without it leave all four out).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub wallet: bool,
+    /// The account's Resin Credit.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub wallet_balance: u64,
+    /// `wallet_pay` can pay `total` now: the balance covers it and the cart (and its promo code) are fine.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub wallet_covers: bool,
+    /// What the player should know about paying with Resin Credit (it pays one month or year at a time, never a
+    /// subscription that renews by itself; how much is missing).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet_note: Option<String>,
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
+}
+
+/// The newest ledger entries `wallet` sends at once.
+pub const WALLET_PAGE: usize = 20;
+
+/// An account's Resin Credit (`wallet`): a store balance a top-up, a refund or the admin adds to and a purchase spends.
+/// Amounts are in the currency's smallest unit (satang: 10000 is 100 baht).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct WalletInfo {
+    /// Resin Credit is on and the relay sells (off: nothing can be topped up or paid with it; the balance stays).
+    pub enabled: bool,
+    pub balance: u64,
+    /// ISO currency, lowercase ("thb").
+    pub currency: String,
+    /// The amounts a top-up can be, smallest first.
+    pub topups: Vec<u64>,
+    /// How a top-up can be paid now: "card", "promptpay", "truemoney" (empty: not now, e.g. the Store is closed).
+    pub methods: Vec<String>,
+    /// Ledger entries, newest first ([`WALLET_PAGE`] at most, fewer when their notes are long).
+    pub history: Vec<WalletEntry>,
+    /// There are older entries: ask `wallet` with `before` = the last one's id.
+    pub more: bool,
+}
+
+/// One change to a Resin Credit balance.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct WalletEntry {
+    pub id: u64,
+    pub at: u64,
+    /// "topup", "purchase", "refund", "grant" (from the admin) or "deduct" (by the admin).
+    pub kind: String,
+    /// Signed: what came in (+) or went out (-).
+    pub amount: i64,
+    pub balance_after: u64,
+    /// What it's about: the top-up's payment, the purchase, the refunded purchase (empty for the admin's).
+    #[serde(rename = "ref")]
+    pub reference: String,
+    pub note: String,
+    /// Who made it: the player's name, or "Admin <user>".
+    pub by: String,
 }
 
 /// One purchase the cart covers, and what its unused days are worth. Protocol 11.

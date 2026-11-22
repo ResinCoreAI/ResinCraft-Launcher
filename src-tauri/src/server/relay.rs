@@ -191,6 +191,7 @@ pub fn describe(e: &AgentError, name: &str) -> anyhow::Error {
         ),
         ErrorCode::CodeInvalid => err_tr!("hostRelay.codeInvalid", "That code doesn't work: {error}", error = admin_message(e)),
         ErrorCode::PaymentFailed => err_tr!("hostRelay.paymentFailed", "The payment didn't go through: {error}", error = admin_message(e)),
+        ErrorCode::NotEnoughCredit => err_tr!("hostRelay.notEnoughCredit", "Your Resin Credit doesn't cover this: {error}", error = admin_message(e)),
         ErrorCode::BedrockUnavailable => err_tr!(
             "hostRelay.noBedrock",
             "ResinCraft Relay can't carry Bedrock servers right now (it has no free Bedrock ports, or hasn't been updated for them yet)."

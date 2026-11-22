@@ -8,6 +8,7 @@ import { useStore } from '../../store'
 import { ConfirmModal, Empty, Modal, MoreButton, Segmented, Switch, type ContextEntry } from '../ui'
 import { account, Loading, post, shortId, useAct, useAdmin, when } from './common'
 import { UNLIMITED_COUNT } from '../../relayCount'
+import { WalletAdmin } from './Wallet'
 
 type Grants = { servers?: number; names?: number; traffic_gb?: number; unlimited_traffic?: boolean; no_session_limit?: boolean; whitelist_page?: boolean }
 interface Product {
@@ -24,6 +25,8 @@ interface Product {
   stripe_price_monthly?: string
   stripe_price_yearly?: string
   active: number
+  /** Cancelling it can give its unused time back as Resin Credit (relays with Resin Credit; absent: true). */
+  refundable?: boolean
 }
 interface Sub {
   id: string
@@ -44,6 +47,8 @@ interface Sub {
   moved_at?: number
   /** The admin's note to the player. */
   note?: string
+  /** Given back as Resin Credit (Refund as credit). */
+  refunded?: number
 }
 interface Promo {
   code: string
@@ -110,9 +115,11 @@ interface Payments {
   truemoney?: { on: boolean; phone: string; enabled?: boolean; fromFile?: boolean }
   warning?: string
   made?: string[]
+  /** Resin Credit's switch (relays without Resin Credit leave it out). */
+  walletOn?: boolean
 }
 
-type View = 'selling' | 'products' | 'codes' | 'purchases' | 'truemoney'
+type View = 'selling' | 'products' | 'codes' | 'purchases' | 'truemoney' | 'wallet'
 const COUNTS = ['servers', 'names', 'traffic_gb'] as const
 const SWITCHES = ['unlimited_traffic', 'no_session_limit', 'whitelist_page'] as const
 /** Counts that can be ∞ (no limit), like Unlimited in an account's own settings. */
@@ -146,19 +153,27 @@ export function PaymentsAdmin() {
   const { data, error, reload } = useAdmin<Payments>('/api/payments')
   const act = useAct(reload)
   const [view, setView] = useState<View>('selling')
+  // Refund as credit on a purchase: Resin Credit with its account open, asking about that purchase.
+  const [walletOpen, setWalletOpen] = useState<{ uuid: string; refund?: string }>()
   if (!data) return <Loading error={error} />
+  const hasWallet = data.walletOn !== undefined
+  const show = (v: View) => {
+    if (v !== 'wallet') setWalletOpen(undefined)
+    setView(v)
+  }
   return (
     <div className="pay-admin">
       <div className="toolbar">
         <Segmented<View>
           value={view}
-          onChange={setView}
+          onChange={show}
           options={[
             { value: 'selling', label: t('servers.admin.pay.view.selling') },
             { value: 'products', label: t('servers.admin.pay.view.products') },
             { value: 'codes', label: t('servers.admin.pay.view.codes') },
             { value: 'purchases', label: t('servers.admin.pay.view.purchases') },
-            { value: 'truemoney', label: t('servers.admin.pay.view.truemoney') }
+            { value: 'truemoney', label: t('servers.admin.pay.view.truemoney') },
+            ...(hasWallet ? [{ value: 'wallet' as const, label: t('servers.wallet.title') }] : [])
           ]}
         />
         <span className="grow" />
@@ -173,7 +188,16 @@ export function PaymentsAdmin() {
       ) : view === 'codes' ? (
         <Codes d={data} act={act} reload={reload} />
       ) : view === 'purchases' ? (
-        <Purchases d={data} act={act} />
+        <Purchases
+          d={data}
+          act={act}
+          onRefund={(s) => {
+            setWalletOpen({ uuid: s.uuid, refund: s.id })
+            setView('wallet')
+          }}
+        />
+      ) : view === 'wallet' && hasWallet ? (
+        <WalletAdmin key={walletOpen ? `${walletOpen.uuid}:${walletOpen.refund}` : ''} open={walletOpen} />
       ) : (
         <TrueMoney d={data} act={act} />
       )}
@@ -498,6 +522,7 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
     yearly: p ? s(p.yearly / 100) : '',
     order: s(p?.order ?? 0),
     on_sale: p?.on_sale ?? false,
+    refundable: p?.refundable ?? true,
     stripe_product: s(p?.stripe_product),
     stripe_price_monthly: s(p?.stripe_price_monthly),
     stripe_price_yearly: s(p?.stripe_price_yearly)
@@ -543,6 +568,8 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
         yearly: Number(f.yearly) || 0,
         order: Math.floor(Number(f.order) || 0),
         on_sale: f.on_sale,
+        // Only relays with Resin Credit know it.
+        ...(d.walletOn !== undefined ? { refundable: f.refundable } : {}),
         stripe_product: f.stripe_product.trim(),
         stripe_price_monthly: f.stripe_price_monthly.trim(),
         stripe_price_yearly: f.stripe_price_yearly.trim()
@@ -630,6 +657,14 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
           <Switch on={f.on_sale} label={t('servers.admin.pay.onSale')} onChange={(on_sale) => setF({ ...f, on_sale })} />
           <span>{t('servers.admin.pay.onSale')}</span>
         </label>
+        {d.walletOn !== undefined && (
+          <label className="row">
+            <Switch on={f.refundable} label={t('servers.admin.wallet.refundable')} onChange={(refundable) => setF({ ...f, refundable })} />
+            <span>
+              {t('servers.admin.wallet.refundable')} <span className="hint">{t('servers.admin.wallet.refundableHint')}</span>
+            </span>
+          </label>
+        )}
         {text('stripe_product', t('servers.admin.pay.f.stripeProduct'), 'prod_…')}
         <div className="field-row">
           {text('stripe_price_monthly', t('servers.admin.pay.f.stripeMonthly'), 'price_…')}
@@ -1015,7 +1050,7 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
   )
 }
 
-function Purchases({ d, act }: { d: Payments; act: Act }) {
+function Purchases({ d, act, onRefund }: { d: Payments; act: Act; onRefund: (s: Sub) => void }) {
   const [giving, setGiving] = useState(false)
   const [ending, setEnding] = useState<Sub>()
   const [noting, setNoting] = useState<Sub>()
@@ -1055,6 +1090,7 @@ function Purchases({ d, act }: { d: Payments; act: Act }) {
                   {s.name || shortId(s.uuid)} · {name(s.product)}
                   <span className={`chip compact ${s.active ? 'success' : 'danger'}`}>{s.status}</span>
                   {s.cancel_at_period_end && <span className="chip compact warn">{t('servers.admin.pay.endsAtEnd')}</span>}
+                  {(s.refunded ?? 0) > 0 && <span className="chip compact">{t('servers.admin.wallet.refundedChip', { amount: money(s.refunded!, cur) })}</span>}
                 </b>
                 <span>{how(s)}</span>
                 <span className="hint">
@@ -1067,6 +1103,10 @@ function Purchases({ d, act }: { d: Payments; act: Act }) {
               <MoreButton
                 items={(): ContextEntry[] => [
                   { label: t(s.note ? 'servers.admin.pay.editNote' : 'servers.admin.pay.addNote'), icon: <Pencil />, onSelect: () => setNoting(s) },
+                  // Resin Credit on: end it now and give credit back (never money), in Resin Credit with its account open.
+                  ...(d.walletOn && s.uuid && !s.refunded && !s.status.startsWith('pending') && s.status !== 'incomplete'
+                    ? ([{ label: t('servers.admin.wallet.refund'), icon: <Wallet />, onSelect: () => onRefund(s) }] as ContextEntry[])
+                    : []),
                   '-',
                   ...(s.source === 'admin'
                     ? ([{ label: t('servers.admin.pay.takeAway'), icon: <Trash2 />, danger: true, onSelect: () => setEnding(s) }] as ContextEntry[])

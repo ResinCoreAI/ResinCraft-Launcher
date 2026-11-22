@@ -1513,12 +1513,56 @@ export interface PlanSub {
   items?: { product: string; name: string; amount: number }[]
   /** Paid once for a month or a year: it doesn't renew by itself (Renew extends it). */
   once?: boolean
-  /** How a one-time purchase was paid: "card", "promptpay", "truemoney", "free". */
+  /** How a one-time purchase was paid: "card", "promptpay", "truemoney", "wallet" (Resin Credit), "free". */
   method?: string
   /** It can be moved to another account (bought or a gift code's, and running) while the plan says `moves`. */
   movable?: boolean
   /** The relay admin's note to the player about it (shown instead of "Given by the relay admin" on a grant). */
   note?: string
+  /** The relay's admin ended it and gave this much back as Resin Credit (absent: not refunded). */
+  refunded?: number
+  /** Cancelling it now gives this back as Resin Credit and ends it now (absent or 0: it runs to its end, no credit). */
+  cancel_credit?: number
+}
+
+/** One change to a Resin Credit balance. */
+export interface WalletEntry {
+  id: number
+  /** Unix seconds. */
+  at: number
+  /** "topup", "purchase", "refund", "grant" (from the admin) or "deduct" (by the admin). */
+  kind: 'topup' | 'purchase' | 'refund' | 'grant' | 'deduct' | string
+  /** Signed, smallest unit: what came in (+) or went out (−). */
+  amount: number
+  balance_after: number
+  /** The top-up's payment, the purchase, the refunded purchase (empty for the admin's). */
+  ref: string
+  note: string
+  /** The player's name, or "Admin <user>". */
+  by: string
+}
+
+/** An account's Resin Credit (only while the plan says `wallet`): a Store balance in the currency's smallest unit. */
+export interface WalletInfo {
+  /** On and selling: off, nothing can be topped up or paid with it (the balance stays). */
+  enabled: boolean
+  balance: number
+  currency: string
+  /** The amounts a top-up can be, smallest first. */
+  topups: number[]
+  /** How a top-up can be paid now: "card", "promptpay", "truemoney" (empty: not now). */
+  methods: string[]
+  /** Newest first, up to 20. */
+  history: WalletEntry[]
+  /** Older entries: ask again with `before` = the last one's id. */
+  more: boolean
+}
+
+/** What a Resin Credit top-up asked for next: the payment form (card, PromptPay; then `relayWalletRefresh` with
+ * `pay.sub`), or the wallet credited already (a TrueMoney angpao). */
+export interface WalletTopup {
+  pay?: PayStep
+  wallet?: WalletInfo
 }
 
 /** What happens to the account's relay names and servers when an add-on ends. */
@@ -1552,6 +1596,13 @@ export interface PlanQuote {
   promo_error?: string | null
   /** Why the cart can't be bought as it is. */
   error?: string | null
+  /** Resin Credit is on (older relays leave the four wallet fields out). */
+  wallet?: boolean
+  wallet_balance?: number
+  /** Resin Credit can pay `total` now (`relayWalletPay`). */
+  wallet_covers?: boolean
+  /** What to know about paying with Resin Credit (one month or year at a time; how much is missing). */
+  wallet_note?: string | null
 }
 
 export interface PlanInfo {
@@ -1572,6 +1623,10 @@ export interface PlanInfo {
   admin?: boolean
   /** The relay's admin lets players move purchases to another of their accounts. */
   moves?: boolean
+  /** Resin Credit (the Store's wallet) is on: older relays never set it. */
+  wallet?: boolean
+  /** The account's Resin Credit, smallest unit (absent: 0). */
+  wallet_balance?: number
   /** Selling is on but the Store is closed: nothing to buy, renew or change; limits and gift codes still work. */
   store_closed?: boolean
   totals: { servers: number; names: number; monthly_bytes: number; unlimited_traffic: boolean; no_session_limit: boolean; whitelist_page: boolean; session_secs: number }
@@ -3194,6 +3249,14 @@ export interface ResinApi {
     relayPlanRefresh(account: string, sub: string): Promise<PlanInfo>
     /** Moves one of `account`'s purchases to `to`, another Microsoft account signed in here (only while `moves`). */
     relayPlanMove(account: string, sub: string, to: string): Promise<PlanInfo>
+    /** The account's Resin Credit (only while its plan says `wallet`); `before`: older ledger entries than that id. */
+    relayWallet(account: string, before?: number | null): Promise<WalletInfo>
+    /** Buys Resin Credit: card or PromptPay answer with the payment form's step, a TrueMoney angpao with the wallet. */
+    relayWalletTopup(account: string, amount: number, method: string, link?: string | null): Promise<WalletTopup>
+    /** Reads a card or PromptPay top-up again after paying (credited once). */
+    relayWalletRefresh(account: string, id: string): Promise<WalletInfo>
+    /** Pays for a cart (one month or year) or a one-time purchase's renewal with Resin Credit. */
+    relayWalletPay(account: string, items: string[], yearly: boolean, promo?: string | null, renewOf?: string | null): Promise<PlanInfo>
     /** Frees a reserved name. */
     relayRevoke(account: string, name: string): Promise<void>
     /** Changes a reserved name, for the servers here that use it too. */

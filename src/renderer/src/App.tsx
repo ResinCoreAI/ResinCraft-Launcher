@@ -14,6 +14,7 @@ import {
   Smartphone,
   Tv,
   Users,
+  Wallet,
   Zap
 } from 'lucide-react'
 import { OpenLinks } from './components/OpenLinks'
@@ -52,7 +53,8 @@ import { useInboxBadge, useInboxWatch } from './inboxState'
 import { useClassicLayout } from './classicLayoutState'
 import { ClassicSidebar, ClassicTopBar } from './components/ClassicShell'
 import './classic.css'
-import { useStoreOpen } from './storeStatus'
+import { money, useStoreOpen, useWalletOf } from './storeStatus'
+import './resin-credit.css'
 import { decideWelcome, useWelcome } from './welcomeState'
 
 /**
@@ -182,6 +184,8 @@ export default function App() {
   const isAdmin = useAdminStatus()
   const classic = useClassicLayout()
   const storeOpen = useStoreOpen()
+  // Resin Credit of the active account, under its name in the header (while its relay has it on).
+  const credit = useWalletOf(activeAccount?.type === 'msa' ? activeAccount.uuid : undefined)
   // The Inbox's unread count, asked now and then; new mail says so unless the Inbox is open.
   useInboxWatch(activeAccount?.type === 'msa' ? activeAccount.id : undefined, (count) => {
     if (route.page !== 'inbox') toast(t('inbox.newMail', { count }), 'info')
@@ -277,6 +281,11 @@ export default function App() {
             <Avatar account={activeAccount} size={26} />
             <div className="who">
               <b>{activeAccount?.username ?? t('app.notSignedIn')}</b>
+              {credit && storeOpen && (
+                <span className="rc-menu-balance" title={t('servers.wallet.title')}>
+                  <Wallet /> {money(credit.balance, credit.currency)}
+                </span>
+              )}
             </div>
             {accounts.length > 0 && <ChevronDown className="chip-caret" />}
           </button>

@@ -21,26 +21,21 @@ import {
   ShoppingBag,
   ShoppingCart,
   Trash2,
+  History,
+  Wallet,
   X
 } from 'lucide-react'
-import type { AccountPlan, PayStep, PlanInfo, PlanProduct, PlanQuote, PlanSub, RelayPlans } from '@shared/types'
+import type { AccountPlan, PayStep, PlanInfo, PlanProduct, PlanQuote, PlanSub, RelayPlans, WalletEntry, WalletInfo } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
 import { t, tx, type Key } from '../i18n'
 import { ConfirmModal, Modal } from './ui'
 import { loadStripe, stripeAppearance, type StripeJs } from '../stripe'
 import '../relay-plan.css'
+import '../resin-credit.css'
 import { countText, UNLIMITED_COUNT } from '../relayCount'
+import { money, setWalletBalance } from '../storeStatus'
 
-function money(amount: number, currency: string) {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency.toUpperCase(), maximumFractionDigits: amount % 100 ? 2 : 0 }).format(
-      amount / 100
-    )
-  } catch {
-    return `${(amount / 100).toLocaleString()} ${currency.toUpperCase()}`
-  }
-}
 
 const gb = (bytes: number) => `${Math.round((bytes / 1e9) * 10) / 10} GB`
 const day = (unix: number) => new Date(unix * 1000).toLocaleDateString()
@@ -89,7 +84,9 @@ function PayModal({
   step,
   testMode,
   onClose,
-  onPaid
+  onPaid,
+  paid,
+  onDone
 }: {
   account: string
   accountName: string
@@ -97,7 +94,10 @@ function PayModal({
   step: PayStep
   testMode?: boolean
   onClose: () => void
-  onPaid: (plan: PlanInfo) => void
+  onPaid?: (plan: PlanInfo) => void
+  /** Not a purchase (a Resin Credit top-up): reads the payment again and says whether it went through; then `onDone`. */
+  paid?: () => Promise<boolean>
+  onDone?: () => void
 }) {
   const box = useRef<HTMLDivElement>(null)
   const stripe = useRef<{ stripe: StripeJs; elements: StripeJs }>(undefined)
@@ -120,6 +120,16 @@ function PayModal({
 
   /** Paid: the purchase as the relay has it now (a renewal folds into the purchase it renews). */
   const finish = async () => {
+    if (paid) {
+      for (let i = 0; i < 7; i++) {
+        if (i) await new Promise((r) => setTimeout(r, 1500))
+        if (await paid()) {
+          onDone?.()
+          return true
+        }
+      }
+      return false
+    }
     let plan = await api.server.relayPlanRefresh(account, step.sub)
     const done = (p: PlanInfo) => {
       const m = p.mine.find((x) => x.id === step.sub)
@@ -130,7 +140,7 @@ function PayModal({
       plan = await api.server.relayPlanRefresh(account, step.sub)
     }
     if (!done(plan)) return false
-    onPaid(plan)
+    onPaid?.(plan)
     return true
   }
 
@@ -140,11 +150,18 @@ function PayModal({
     let gone = false
     const timer = setInterval(async () => {
       if (gone) return
+      if (paid) {
+        if ((await paid().catch(() => false)) && !gone) {
+          gone = true
+          onDone?.()
+        }
+        return
+      }
       const plan = await api.server.relayPlanRefresh(account, step.sub).catch(() => undefined)
       const m = plan?.mine.find((x) => x.id === step.sub)
       if (plan && (m ? m.active : step.once && !plan.mine.some((x) => x.id === step.sub && !x.active)) && !gone) {
         gone = true
-        onPaid(plan)
+        onPaid?.(plan)
       }
     }, 4000)
     return () => {
@@ -283,7 +300,277 @@ function PayModal({
   )
 }
 
-type PayWay = 'once' | 'renew' | 'angpao'
+// ---------- Resin Credit: the Store's wallet (only while the plan says `wallet`) ----------
+
+/** The account's Resin Credit: loaded while `on`, with older ledger pages on request. */
+function useWallet(account: string, on: boolean) {
+  const [wallet, setWallet] = useState<WalletInfo>()
+  const [error, setError] = useState<string>()
+  const [loadingMore, setLoadingMore] = useState(false)
+  const reload = useCallback(async () => {
+    if (!on) return setWallet(undefined)
+    try {
+      setWallet(await api.server.relayWallet(account))
+      setError(undefined)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }, [account, on])
+  useEffect(() => {
+    setWallet(undefined)
+    void reload()
+  }, [reload])
+  const more = async () => {
+    const last = wallet?.history[wallet.history.length - 1]
+    if (!wallet || !last) return
+    setLoadingMore(true)
+    try {
+      const next = await api.server.relayWallet(account, last.id)
+      setWallet({ ...next, history: [...wallet.history, ...next.history.filter((e) => !wallet.history.some((x) => x.id === e.id))] })
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+  return { wallet, setWallet, error, reload, more, loadingMore }
+}
+
+const WALLET_KINDS: Record<string, Key> = {
+  topup: 'servers.wallet.kind.topup',
+  purchase: 'servers.wallet.kind.purchase',
+  refund: 'servers.wallet.kind.refund',
+  grant: 'servers.wallet.kind.grant',
+  deduct: 'servers.wallet.kind.deduct'
+}
+const signed = (n: number, currency: string) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${money(Math.abs(n), currency)}`
+const stamp = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+/** Ledger entries, newest first: what, when, the amount (+ in, − out), the balance after and the note. */
+function WalletEntries({ entries, currency }: { entries: WalletEntry[]; currency: string }) {
+  return (
+    <div className="rc-ledger">
+      {entries.map((e) => (
+        <div key={e.id} className="rc-entry">
+          <div className="rc-entry-text">
+            <b>{WALLET_KINDS[e.kind] ? t(WALLET_KINDS[e.kind]) : e.kind}</b>
+            <span className="hint">{stamp(e.at)}</span>
+            {e.note && <span className="hint rc-entry-note">{e.note}</span>}
+          </div>
+          <div className="rc-entry-amount">
+            <b className={e.amount < 0 ? 'rc-out' : 'rc-in'}>{signed(e.amount, currency)}</b>
+            <span className="hint">{t('servers.wallet.after', { balance: money(e.balance_after, currency) })}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Every ledger entry, a page at a time ("Show more" asks for the ones before the last). */
+function WalletHistoryModal({ w, accountName, onClose }: { w: ReturnType<typeof useWallet>; accountName: string; onClose: () => void }) {
+  const wallet = w.wallet!
+  return (
+    <Modal
+      title={t('servers.wallet.historyTitle')}
+      subtitle={t('servers.wallet.balanceOf', { account: accountName, balance: money(wallet.balance, wallet.currency) })}
+      onClose={onClose}
+      footer={
+        <button className="btn" onClick={onClose}>
+          {t('common.close')}
+        </button>
+      }
+    >
+      {wallet.history.length === 0 ? <p className="hint">{t('servers.wallet.noHistory')}</p> : <WalletEntries entries={wallet.history} currency={wallet.currency} />}
+      {wallet.more && (
+        <button className="btn sm rc-more" disabled={w.loadingMore} onClick={() => void w.more()}>
+          {w.loadingMore ? <Loader2 className="spin" /> : <ChevronDown />} {t('servers.wallet.showMore')}
+        </button>
+      )}
+    </Modal>
+  )
+}
+
+/** Buys Resin Credit: one of the admin's amounts, then card or PromptPay (the payment form) or a TrueMoney angpao. */
+function TopupModal({
+  a,
+  wallet,
+  need,
+  onClose,
+  onDone
+}: {
+  a: AccountPlan
+  wallet: WalletInfo
+  /** At least this much is missing (from checkout): the first amount that covers it is picked. */
+  need?: number
+  onClose: () => void
+  onDone: (w: WalletInfo, added: number) => void
+}) {
+  const cur = wallet.currency
+  const [amount, setAmount] = useState(() => wallet.topups.find((n) => n >= (need ?? 0)) ?? wallet.topups[0] ?? 0)
+  const [method, setMethod] = useState(wallet.methods[0] ?? '')
+  const [link, setLink] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const [step, setStep] = useState<PayStep>()
+  const before = wallet.balance
+
+  if (step)
+    return (
+      <PayModal
+        account={a.account}
+        accountName={a.accountName}
+        title={t('servers.wallet.topupTitleAmount', { amount: money(step.amount, cur) })}
+        step={step}
+        testMode={a.plan!.test_mode}
+        onClose={onClose}
+        paid={async () => {
+          const w = await api.server.relayWalletRefresh(a.account, step.sub)
+          if (!w.history.some((e) => e.kind === 'topup' && e.ref === step.sub)) return false
+          onDone(w, w.balance - before)
+          return true
+        }}
+      />
+    )
+
+  const go = async () => {
+    setBusy(true)
+    setError(undefined)
+    try {
+      const r = await api.server.relayWalletTopup(a.account, amount, method, method === 'truemoney' ? link.trim() : null)
+      if (r.wallet) onDone(r.wallet, r.wallet.balance - before)
+      else if (r.pay) setStep(r.pay)
+    } catch (e) {
+      setError((e as Error).message)
+      setBusy(false)
+    }
+  }
+  const ready = !busy && amount > 0 && !!method && (method !== 'truemoney' || link.trim().length > 8)
+  return (
+    <Modal
+      title={t('servers.wallet.topupTitle')}
+      subtitle={t('servers.wallet.balanceOf', { account: a.accountName, balance: money(before, cur) })}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary" disabled={!ready} onClick={() => void go()}>
+            {busy ? <Loader2 className="spin" /> : method === 'truemoney' ? <Gift /> : <CreditCard />}{' '}
+            {method === 'truemoney' ? t('servers.wallet.topupAngpao') : t('servers.wallet.topupFor', { amount: money(amount, cur) })}
+          </button>
+        </>
+      }
+    >
+      {wallet.methods.length === 0 || wallet.topups.length === 0 ? (
+        <p className="hint it-warn">{t('servers.wallet.topupClosed')}</p>
+      ) : (
+        <>
+          <div className="field">
+            <label>{t('servers.wallet.amount')}</label>
+            <div className="rc-amounts" role="radiogroup" aria-label={t('servers.wallet.amount')}>
+              {wallet.topups.map((n) => (
+                <button key={n} role="radio" aria-checked={n === amount} className={`rc-amount${n === amount ? ' on' : ''}`} onClick={() => setAmount(n)}>
+                  {money(n, cur)}
+                </button>
+              ))}
+            </div>
+            <span className="hint">{t('servers.wallet.afterTopup', { balance: money(before + amount, cur) })}</span>
+          </div>
+          <div className="field">
+            <label>{t('servers.relayPlan.payWith')}</label>
+            <div className="segmented rp-ways">
+              {wallet.methods.map((m) => (
+                <button key={m} className={method === m ? 'on' : undefined} onClick={() => setMethod(m)}>
+                  {WALLET_METHODS[m] ? t(WALLET_METHODS[m]) : m}
+                </button>
+              ))}
+            </div>
+          </div>
+          {method === 'truemoney' && (
+            <div className="field">
+              <label htmlFor="rc-angpao">{t('servers.relayPlan.angpaoLink')}</label>
+              <input
+                id="rc-angpao"
+                className="input mono"
+                value={link}
+                maxLength={200}
+                spellCheck={false}
+                placeholder="https://gift.truemoney.com/campaign/?v=…"
+                onChange={(e) => setLink(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && ready && void go()}
+              />
+              <span className="hint">{t('servers.wallet.angpaoHint', { amount: money(amount, cur) })}</span>
+            </div>
+          )}
+          <p className="hint">{t('servers.wallet.topupHint')}</p>
+        </>
+      )}
+      {error && <p className="hint it-warn">{error}</p>}
+    </Modal>
+  )
+}
+
+const WALLET_METHODS: Record<string, Key> = {
+  card: 'servers.wallet.method.card',
+  promptpay: 'servers.wallet.method.promptpay',
+  truemoney: 'servers.wallet.method.truemoney'
+}
+
+/** The Store's Resin Credit card: the balance, Top up, the newest changes and the whole history. */
+function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: number) => void }) {
+  const { toast } = useStore()
+  const plan = a.plan!
+  const w = useWallet(a.account, !!plan.wallet)
+  const [topup, setTopup] = useState(false)
+  const [history, setHistory] = useState(false)
+  const wallet = w.wallet
+  const cur = wallet?.currency || plan.currency
+  const balance = wallet?.balance ?? plan.wallet_balance ?? 0
+  // The plan's balance moved (a purchase paid with credit, a top-up from checkout, the plan read again): the ledger too.
+  const planBalance = plan.wallet_balance ?? 0
+  useEffect(() => {
+    if (w.wallet && w.wallet.balance !== planBalance) void w.reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planBalance])
+  return (
+    <div className="rc-wallet">
+      <div className="row rc-wallet-head">
+        <Wallet />
+        <span className="grow">{t('servers.wallet.title')}</span>
+        {wallet && !wallet.enabled && <span className="chip compact">{t('servers.wallet.off')}</span>}
+      </div>
+      <div className="rc-balance">{money(balance, cur)}</div>
+      <div className="row rc-wallet-buttons">
+        <button className="btn sm primary" disabled={!wallet?.enabled || wallet.methods.length === 0} onClick={() => setTopup(true)}>
+          <Plus /> {t('servers.wallet.topup')}
+        </button>
+        <button className="btn sm" disabled={!wallet} onClick={() => setHistory(true)}>
+          <History /> {t('servers.wallet.history')}
+        </button>
+      </div>
+      {wallet && wallet.history.length > 0 && <WalletEntries entries={wallet.history.slice(0, 3)} currency={cur} />}
+      {w.error && <p className="hint bad">{w.error}</p>}
+      {topup && wallet && (
+        <TopupModal
+          a={a}
+          wallet={wallet}
+          onClose={() => setTopup(false)}
+          onDone={(next, added) => {
+            w.setWallet(next)
+            onBalance(next.balance)
+            setTopup(false)
+            toast(t('servers.wallet.added', { amount: money(Math.max(added, 0), next.currency), account: a.accountName }), 'success')
+          }}
+        />
+      )}
+      {history && wallet && <WalletHistoryModal w={w} accountName={a.accountName} onClose={() => setHistory(false)} />}
+    </div>
+  )
+}
+
+type PayWay = 'once' | 'renew' | 'angpao' | 'wallet'
 
 /** Checkout, for one product, the cart or a renewal: the price and promo discount of each item (from the relay), how
  * to pay (once by card or PromptPay, the default; a card subscription that renews; a TrueMoney angpao), then the
@@ -312,6 +599,13 @@ function CheckoutModal({
   const [error, setError] = useState<string>()
   const [step, setStep] = useState<PayStep>()
   const [quote, setQuote] = useState<PlanQuote>()
+  // Resin Credit: the player picked a way already (else credit is picked once it covers the cart), the top-up dialog
+  // (with the wallet it needs), the "Pay … from Resin Credit?" question, and a new quote after a top-up.
+  const touched = useRef(false)
+  const [topupWallet, setTopupWallet] = useState<WalletInfo>()
+  const [confirming, setConfirming] = useState(false)
+  const [requote, setRequote] = useState(0)
+  const { toast } = useStore()
   const ids = items.map((p) => p.id)
   const key = ids.join(',')
   const currency = plan.currency
@@ -327,7 +621,11 @@ function CheckoutModal({
     const timer = setTimeout(() => {
       api.server
         .relayPlanQuote(a.account, ids, yearly, promo.trim() || null, renewOf ?? null)
-        .then((q) => !gone && setQuote(q))
+        .then((q) => {
+          if (gone) return
+          setQuote(q)
+          if (q.wallet_covers && !touched.current) setWay('wallet')
+        })
         .catch(() => {})
     }, 300)
     return () => {
@@ -335,12 +633,32 @@ function CheckoutModal({
       clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.account, key, yearly, promo])
+  }, [a.account, key, yearly, promo, requote])
 
   if (step)
     return <PayModal account={a.account} accountName={a.accountName} title={title} step={step} testMode={plan.test_mode} onClose={onClose} onPaid={onPaid} />
 
+  const payWithCredit = async () => {
+    setError(undefined)
+    try {
+      onPaid(await api.server.relayWalletPay(a.account, renewOf ? [] : ids, yearly, promo.trim() || null, renewOf ?? null))
+    } catch (e) {
+      setError((e as Error).message)
+      // A balance that changed meanwhile: the quote says what it is now.
+      setRequote((n) => n + 1)
+    }
+  }
+
+  const openTopup = async () => {
+    try {
+      setTopupWallet(await api.server.relayWallet(a.account))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   const go = async () => {
+    if (way === 'wallet') return setConfirming(true)
     setBusy(true)
     setError(undefined)
     try {
@@ -374,6 +692,10 @@ function CheckoutModal({
   // TrueMoney: offered when the relay takes it; greyed out (with how to switch it on) for the relay's admin.
   if (plan.truemoney) ways.push({ value: 'angpao', label: t('servers.relayPlan.wayAngpao') })
   else if (plan.admin) ways.push({ value: 'angpao', label: t('servers.relayPlan.wayAngpao'), off: true })
+  // Resin Credit: only from relays that have it switched on.
+  const walletBalance = quote?.wallet ? (quote.wallet_balance ?? 0) : (plan.wallet_balance ?? 0)
+  if (plan.wallet) ways.push({ value: 'wallet', label: t('servers.wallet.way', { balance: money(walletBalance, currency) }) })
+  const missing = Math.max(0, total - walletBalance)
   const credit = quote?.credit ?? 0
   // A subscription takes the unused days off its first payment only.
   const totalText =
@@ -382,7 +704,12 @@ function CheckoutModal({
         ? t('servers.relayPlan.firstThen', { first: money(total, currency), then: per(total + credit) })
         : per(total)
       : `${money(total, currency)} · ${period}`
-  const ready = !busy && !cartError && (way !== 'angpao' || link.trim().length > 8) && !(below && way === 'once')
+  const ready =
+    !busy &&
+    !cartError &&
+    (way !== 'angpao' || link.trim().length > 8) &&
+    !(below && way === 'once') &&
+    (way !== 'wallet' || !!quote?.wallet_covers)
 
   return (
     <Modal
@@ -395,8 +722,8 @@ function CheckoutModal({
             {t('common.cancel')}
           </button>
           <button className="btn primary" disabled={!ready} onClick={() => void go()}>
-            {busy ? <Loader2 className="spin" /> : way === 'angpao' ? <Gift /> : <CreditCard />}{' '}
-            {way === 'angpao' ? t('servers.relayPlan.angpaoPay') : t('servers.relayPlan.continue')}
+            {busy ? <Loader2 className="spin" /> : way === 'angpao' ? <Gift /> : way === 'wallet' ? <Wallet /> : <CreditCard />}{' '}
+            {way === 'angpao' ? t('servers.relayPlan.angpaoPay') : way === 'wallet' ? t('servers.wallet.payWith') : t('servers.relayPlan.continue')}
           </button>
         </>
       }
@@ -436,7 +763,10 @@ function CheckoutModal({
               className={way === w.value ? 'on' : undefined}
               disabled={w.off}
               title={w.off ? t('servers.relayPlan.angpaoOffAdmin') : undefined}
-              onClick={() => setWay(w.value)}
+              onClick={() => {
+                touched.current = true
+                setWay(w.value)
+              }}
             >
               {w.label}
             </button>
@@ -448,9 +778,36 @@ function CheckoutModal({
             ? t('servers.relayPlan.wayOnceHint', { period })
             : way === 'renew'
               ? t('servers.relayPlan.wayRenewHint')
-              : t('servers.relayPlan.angpaoHint', { price: money(total, currency) })}
+              : way === 'wallet'
+                ? t('servers.wallet.wayHint', { period })
+                : t('servers.relayPlan.angpaoHint', { price: money(total, currency) })}
         </span>
       </div>
+      {way === 'wallet' && (
+        <div className="rc-checkout">
+          <div className="rp-line">
+            <span className="grow">{t('servers.wallet.balance')}</span>
+            <b>{money(walletBalance, currency)}</b>
+          </div>
+          {quote?.wallet_covers ? (
+            <div className="rp-line">
+              <span className="grow">{t('servers.wallet.balanceAfter')}</span>
+              <b>{money(walletBalance - total, currency)}</b>
+            </div>
+          ) : (
+            quote &&
+            missing > 0 && (
+              <div className="rp-line rc-missing">
+                <span className="grow">{t('servers.wallet.missing', { amount: money(missing, currency) })}</span>
+                <button className="btn sm" onClick={() => void openTopup()}>
+                  <Plus /> {t('servers.wallet.topup')}
+                </button>
+              </div>
+            )
+          )}
+          {quote?.wallet_note && <p className="hint">{quote.wallet_note}</p>}
+        </div>
+      )}
       {way === 'angpao' && (
         <div className="field">
           <label htmlFor="rp-angpao">{t('servers.relayPlan.angpaoLink')}</label>
@@ -490,6 +847,48 @@ function CheckoutModal({
         {quote?.promo_error && <span className="hint it-warn">{quote.promo_error}</span>}
         {error && <span className="hint it-warn">{error}</span>}
       </div>
+      {topupWallet && (
+        <TopupModal
+          a={a}
+          wallet={topupWallet}
+          need={missing}
+          onClose={() => setTopupWallet(undefined)}
+          onDone={(w, added) => {
+            setTopupWallet(undefined)
+            toast(t('servers.wallet.added', { amount: money(Math.max(added, 0), w.currency), account: a.accountName }), 'success')
+            touched.current = false
+            setRequote((n) => n + 1)
+          }}
+        />
+      )}
+      {confirming && (
+        <Modal
+          title={t('servers.wallet.confirmTitle', { amount: money(total, currency) })}
+          onClose={() => setConfirming(false)}
+          footer={
+            <>
+              <button className="btn ghost" onClick={() => setConfirming(false)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn primary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  await payWithCredit()
+                  setBusy(false)
+                  setConfirming(false)
+                }}
+              >
+                {busy ? <Loader2 className="spin" /> : <Wallet />} {t('servers.wallet.payAmount', { amount: money(total, currency) })}
+              </button>
+            </>
+          }
+        >
+          <p>{t('servers.wallet.confirmBody', { items: items.map((p) => p.name).join(' + '), period, account: a.accountName })}</p>
+          <p className="hint">{t('servers.wallet.confirmAfter', { balance: money(Math.max(0, walletBalance - total), currency) })}</p>
+        </Modal>
+      )}
     </Modal>
   )
 }
@@ -857,8 +1256,13 @@ function SubRow({
         </div>
         {/* The admin's note on something bought (on a grant it stands in for "Given by the relay admin" above). */}
         {s.note && s.paid !== false && (s.paid || s.once) && <div className="hint rp-note">{s.note}</div>}
+        {(s.refunded ?? 0) > 0 && (
+          <div className="hint rc-refunded">
+            <Wallet /> {t('servers.wallet.refunded', { amount: money(s.refunded!, plan.currency) })}
+          </div>
+        )}
       </div>
-      {s.once && !s.cancel_at_period_end && plan.enabled && !plan.store_closed && s.status !== 'credited' && (
+      {s.once && !s.cancel_at_period_end && plan.enabled && !plan.store_closed && s.status !== 'credited' && !s.refunded && (
         <button className="btn sm primary" onClick={onRenew}>
           <RefreshCw /> {t('servers.relayPlan.renew')}
         </button>
@@ -882,6 +1286,7 @@ function SubRow({
       {(s.paid || s.once) &&
         s.active &&
         s.status !== 'credited' &&
+        !s.refunded &&
         (s.cancel_at_period_end ? (
           <button className="btn sm" onClick={onResume}>
             <Check /> {t('servers.relayPlan.resume')}
@@ -923,7 +1328,11 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
   if (!plans.available || selling.length === 0) return <>{empty ?? null}</>
   const a = selling.find((x) => x.account === picked) ?? selling[0]
   const plan = a.plan!
-  const put = (p: PlanInfo) => setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })
+  const put = (p: PlanInfo) => {
+    setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })
+    // The header's balance follows (a purchase paid with credit, a top-up).
+    if (p.wallet) setWalletBalance(a.account, p.wallet_balance ?? 0, p.currency)
+  }
   // Where a purchase can move: the other Microsoft accounts signed in here that the relay answered for.
   const moveTargets = plan.moves ? plans.accounts.filter((x) => x.account !== a.account && x.plan && !x.error) : []
 
@@ -1257,13 +1666,24 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
     {cancelling && (
       <ConfirmModal
         title={t('servers.relayPlan.cancelTitle', { name: cancelling.name })}
-        body={t('servers.relayPlan.cancelBody', { date: cancelling.period_end ? day(cancelling.period_end) : '–' })}
-        confirm={t('servers.relayPlan.cancel')}
+        body={
+          (cancelling.cancel_credit ?? 0) > 0
+            ? t('servers.wallet.cancelCreditBody', { amount: money(cancelling.cancel_credit!, plan.currency) })
+            : t('servers.relayPlan.cancelBody', { date: cancelling.period_end ? day(cancelling.period_end) : '–' })
+        }
+        confirm={
+          (cancelling.cancel_credit ?? 0) > 0
+            ? t('servers.wallet.cancelCredit', { amount: money(cancelling.cancel_credit!, plan.currency) })
+            : t('servers.relayPlan.cancel')
+        }
         onClose={() => setCancelling(undefined)}
         onConfirm={async () => {
           try {
             put(await api.server.relayPlanCancel(a.account, cancelling.id, false))
-            toast(t('servers.relayPlan.cancelled', { name: cancelling.name }))
+            // A cancel that credits ended it now: the balance (and the wallet card's ledger) follow from the plan.
+            if ((cancelling.cancel_credit ?? 0) > 0)
+              toast(t('servers.wallet.cancelCredited', { name: cancelling.name, amount: money(cancelling.cancel_credit!, plan.currency) }), 'success')
+            else toast(t('servers.relayPlan.cancelled', { name: cancelling.name }))
           } catch (e) {
             toast((e as Error).message, 'error')
           }
@@ -1281,6 +1701,7 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
           {heading}
           {accountTabs}
           {errors}
+          {plan.wallet && <WalletCard key={a.account} a={a} onBalance={(b) => put({ ...plan, wallet_balance: b })} />}
           <div className="rp-have">
             <div className="row">
               <span className="hint grow">{t('servers.relayPlan.youHave', { account: a.accountName })}</span>

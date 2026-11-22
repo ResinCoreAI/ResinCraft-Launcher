@@ -365,6 +365,12 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "server:relayPlanPay" => json(plan::pay(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:relayPlanRefresh" => json(plan::refresh(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "server:relayPlanMove" => json(plan::move_to(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?),
+        "server:relayWallet" => json(plan::wallet(&args.get::<String>(0)?, args.get::<Option<u64>>(1)?).await?),
+        "server:relayWalletTopup" => json(plan::wallet_topup(&args.get::<String>(0)?, args.get::<u64>(1)?, &args.get::<String>(2)?, args.get::<Option<String>>(3)?.as_deref()).await?),
+        "server:relayWalletRefresh" => json(plan::wallet_refresh(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "server:relayWalletPay" => json(
+            plan::wallet_pay(&args.get::<String>(0)?, &args.get::<Vec<String>>(1)?, args.get::<bool>(2)?, args.get::<Option<String>>(3)?.as_deref(), args.get::<Option<String>>(4)?.as_deref()).await?,
+        ),
         "server:relayRevoke" => {
             relay::revoke_name(&args.get::<String>(0)?, &args.get::<String>(1)?).await?;
             done()

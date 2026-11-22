@@ -289,6 +289,15 @@ impl Drop for Connection {
     }
 }
 
+/// What a Resin Credit top-up asked for next.
+#[derive(Debug, Clone)]
+pub enum TopupStep {
+    /// Confirm this payment in the payment form, then `wallet_refresh` with its `sub`.
+    Pay(crate::proto::PayStep),
+    /// Credited already (a TrueMoney angpao).
+    Done(crate::proto::WalletInfo),
+}
+
 /// The account's reserved names as the relay lists them.
 #[derive(Debug, Clone)]
 pub struct MyNames {
@@ -582,6 +591,37 @@ impl Connection {
     /// Minecraft services token). Only while the plan says `moves`; answers with this account's plan.
     pub async fn plan_move(&mut self, sub: &str, to_token: &str) -> Result<crate::proto::PlanInfo, AgentError> {
         self.plan_info(AgentMsg::PlanMove { sub: sub.into(), to_token: to_token.into() }).await
+    }
+
+    /// The account's Resin Credit (`before`: the ledger entries older than that id). Only while the plan says `wallet`.
+    pub async fn wallet(&mut self, before: Option<u64>) -> Result<crate::proto::WalletInfo, AgentError> {
+        match self.plan_call(AgentMsg::Wallet { before }).await? {
+            RelayMsg::Wallet { wallet } => Ok(wallet),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Buys Resin Credit: a card or PromptPay top-up gives the payment form's step (then `wallet_refresh` with its
+    /// `sub`); a TrueMoney angpao (`link`) is credited at once.
+    pub async fn wallet_topup(&mut self, amount: u64, method: &str, link: Option<&str>) -> Result<TopupStep, AgentError> {
+        match self.plan_call(AgentMsg::WalletTopup { amount, method: method.into(), link: link.map(str::to_string) }).await? {
+            RelayMsg::Pay { pay } => Ok(TopupStep::Pay(pay)),
+            RelayMsg::Wallet { wallet } => Ok(TopupStep::Done(wallet)),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Reads a card or PromptPay top-up from Stripe again (after paying).
+    pub async fn wallet_refresh(&mut self, id: &str) -> Result<crate::proto::WalletInfo, AgentError> {
+        match self.plan_call(AgentMsg::WalletRefresh { id: id.into() }).await? {
+            RelayMsg::Wallet { wallet } => Ok(wallet),
+            other => Err(unexpected(&other)),
+        }
+    }
+
+    /// Pays for a cart (one month or year) or a one-time purchase's renewal with Resin Credit.
+    pub async fn wallet_pay(&mut self, items: &[String], yearly: bool, promo: Option<&str>, renew_of: Option<&str>) -> Result<crate::proto::PlanInfo, AgentError> {
+        self.plan_info(AgentMsg::WalletPay { items: items.to_vec(), yearly, promo: promo.map(str::to_string), renew_of: renew_of.map(str::to_string) }).await
     }
 
     /// Whether this relay can list the account's names (protocol 10).

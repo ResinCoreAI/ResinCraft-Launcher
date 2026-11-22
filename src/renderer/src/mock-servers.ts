@@ -30,6 +30,7 @@ import type {
 import { MOCK_PACK, mockServerPacks } from './mock-packswitch'
 import { mockRequests } from './mock-requests'
 import { mockBackups, mockServerList } from './mock-serverlist'
+import { mockCancelCredit, mockQuoteWallet, mockWallet, mockWalletBalance, mockWalletRefresh, mockWalletRefund, mockWalletSpend, mockWalletTopup, walletOn } from './mock-wallet'
 
 type Listener<T> = (e: T) => void
 
@@ -409,7 +410,42 @@ export function mockServers(): {
   ].map((p) => ({ ...p, yearly: p.monthly * 10, owned: false }))
   type MockSub = import('@shared/types').PlanSub
   const planAccounts: { account: string; accountName: string; subs: MockSub[] }[] = [
-    { account: PUIRKLE, accountName: 'Puirkle', subs: [] },
+    {
+      account: PUIRKLE,
+      accountName: 'Puirkle',
+      // Paid with Resin Credit; the second one the relay's admin refunded as credit.
+      subs: [
+        {
+          id: 'wallet-mock-b',
+          product: 'addon-name',
+          name: '+1 name',
+          yearly: false,
+          status: 'canceled',
+          active: false,
+          period_end: Math.floor(Date.now() / 1000) - 5 * 86400,
+          cancel_at_period_end: false,
+          amount: 4900,
+          paid: false,
+          once: true,
+          method: 'wallet',
+          refunded: 3200
+        },
+        {
+          id: 'wallet-mock-a',
+          product: 'addon-server',
+          name: '+1 server online',
+          yearly: false,
+          status: 'paid',
+          active: true,
+          period_end: Math.floor(Date.now() / 1000) + 22 * 86400,
+          cancel_at_period_end: false,
+          amount: 6900,
+          paid: false,
+          once: true,
+          method: 'wallet'
+        }
+      ]
+    },
     {
       account: '2b7c1a56-0d1e-4f7a-9a51-6f2f5d1d0b77',
       accountName: 'Puirkle_Gamer',
@@ -491,10 +527,13 @@ export function mockServers(): {
       products: on && new URLSearchParams(location.search).get('plans') !== 'closed' ? PLAN_PRODUCTS.map((p) => ({ ...p, owned: owned(p) })) : [],
       mine: a.subs
         .filter((x) => x.status !== 'pending')
-        .map((x) => ({ ...x, movable: x.active && x.status !== 'granted' && x.status !== 'credited' }))
+        .map((x) => ({ ...x, movable: x.active && x.status !== 'granted' && x.status !== 'credited', cancel_credit: mockCancelCredit(x) }))
         .reverse(),
       // ?plans=nomove: the relay's admin hasn't switched moving purchases on.
       moves: on && new URLSearchParams(location.search).get('plans') !== 'nomove',
+      // Resin Credit (?wallet=off: a relay without it).
+      wallet: on && walletOn(),
+      wallet_balance: on && walletOn() ? mockWalletBalance(a.account, a.accountName) : 0,
       // ?plans=notm: the relay doesn't take TrueMoney and this account is its admin (greyed out, with how).
       truemoney: new URLSearchParams(location.search).get('plans') !== 'notm',
       admin: new URLSearchParams(location.search).get('plans') === 'notm',
@@ -1109,7 +1148,7 @@ export function mockServers(): {
       await wait(null, 300)
       return { available: true, accounts: planAccounts.map((a) => ({ account: a.account, accountName: a.accountName, unsupported: false, plan: mockPlan(a) })) }
     },
-    relayPlanQuote: async (_account, items, yearly, promo) => {
+    relayPlanQuote: async (account, items, yearly, promo, renewOf) => {
       await wait(null, 150)
       const code = (promo ?? '').trim().toUpperCase()
       const lines = items.map((id) => {
@@ -1126,7 +1165,14 @@ export function mockServers(): {
       const dupe = items.find((x, i) => items.indexOf(x) !== i)
       const subtotal = lines.reduce((n, l) => n + l.price, 0)
       const discount = lines.reduce((n, l) => n + l.discount, 0)
+      const credit =
+        new URLSearchParams(location.search).get('plans') === 'credit' && items.some((id) => PLAN_PRODUCTS.find((x) => x.id === id)?.grants.unlimited_traffic)
+          ? Math.min(11267, subtotal - discount)
+          : 0
+      const name = planAccounts.find((x) => x.account === account)?.accountName ?? ''
+      const walletFields = mockQuoteWallet(account, name, subtotal - discount - credit, !dupe && !promoError && (items.length > 0 || !!renewOf))
       return {
+        ...walletFields,
         lines,
         subtotal,
         discount,
@@ -1302,7 +1348,62 @@ export function mockServers(): {
     relayPlanCancel: async (account, sub, resume) => {
       await wait(null, 400)
       const a = planAccounts.find((x) => x.account === account)!
-      a.subs.find((x) => x.id === sub)!.cancel_at_period_end = !resume
+      const s = a.subs.find((x) => x.id === sub)!
+      // Resin Credit refunds cancels: the unused time comes back as credit and it ends now.
+      const credit = resume ? 0 : mockCancelCredit(s)
+      if (credit) {
+        mockWalletRefund(account, a.accountName, credit, s.id, `Cancelled ${s.name}`)
+        Object.assign(s, { status: 'canceled', active: false, period_end: Math.floor(Date.now() / 1000), refunded: credit })
+        return mockPlan(a)
+      }
+      s.cancel_at_period_end = !resume
+      return mockPlan(a)
+    },
+    relayWallet: async (account, before) => {
+      await wait(null, 250)
+      const a = planAccounts.find((x) => x.account === account)!
+      return mockWallet(account, a.accountName, before)
+    },
+    relayWalletTopup: async (account, amount, method, link) => {
+      await wait(null, 500)
+      return mockWalletTopup(account, planAccounts.find((x) => x.account === account)!.accountName, amount, method, link)
+    },
+    relayWalletRefresh: async (account, id) => {
+      await wait(null, 400)
+      return mockWalletRefresh(account, planAccounts.find((x) => x.account === account)!.accountName, id)
+    },
+    relayWalletPay: async (account, items, yearly, promo, renewOf) => {
+      await wait(null, 600)
+      const a = planAccounts.find((x) => x.account === account)!
+      const end = (from: number) => from + (yearly ? 365 : 30) * 86400
+      const now = Math.floor(Date.now() / 1000)
+      const renewed = renewOf ? a.subs.find((x) => x.id === renewOf) : undefined
+      const ids = renewed ? (renewed.items?.length ? renewed.items.map((i) => i.product) : [renewed.product]) : items
+      const ps = ids.map((id) => PLAN_PRODUCTS.find((x) => x.id === id)!)
+      const subtotal = ps.reduce((n, p) => n + (yearly ? p.yearly : p.monthly), 0)
+      const off = !renewed && (promo ?? '').toUpperCase() === 'TEST50' && ids.includes('addon-whitelist-page') ? Math.round((yearly ? 19000 : 1900) / 2) : 0
+      const id = `wallet-mock-${++planSeq}`
+      const what = `${ps.map((p) => p.name).join(' + ')} (${yearly ? '1 year' : '1 month'})`
+      mockWalletSpend(account, a.accountName, subtotal - off, renewed ? renewed.id : id, renewed ? `Renewal of ${what}` : what)
+      if (renewed) {
+        renewed.period_end = end(Math.max(renewed.period_end, now))
+        return mockPlan(a)
+      }
+      a.subs.push({
+        id,
+        product: ids[0],
+        name: ps.map((p) => p.name).join(' + '),
+        yearly,
+        status: 'paid',
+        active: true,
+        period_end: end(now),
+        cancel_at_period_end: false,
+        amount: subtotal - off,
+        paid: false,
+        once: true,
+        method: 'wallet',
+        items: ids.length > 1 ? ps.map((p) => ({ product: p.id, name: p.name, amount: yearly ? p.yearly : p.monthly })) : []
+      })
       return mockPlan(a)
     },
     relayPlanMove: async (account, sub, to) => {
