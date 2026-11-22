@@ -2,14 +2,15 @@
 // the mail server with a test email; see what was sent and take a mail back out of the inboxes (relay-server's
 // `/api/mail`, `/api/mail/send|remove|test`; the relay dashboard's Mail page has the same).
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Eye, Mail, MailCheck, Send, Trash2 } from 'lucide-react'
+import { AlertTriangle, Eye, Gift, Mail, MailCheck, Plus, Send, Trash2 } from 'lucide-react'
 import { t, type Key } from '../../i18n'
 import { ConfirmModal, Segmented } from '../ui'
 import MailText from '../MailText'
 import { ago, Loading, Stat, useAct, useAdmin, when } from './common'
 import '../../inbox.css'
 
-type Category = '' | 'news' | 'update' | 'event' | 'account' | 'support'
+type Category = '' | 'news' | 'update' | 'event' | 'account' | 'support' | 'status'
+type Reward = { kind: 'credit'; amount: number } | { kind: 'item'; product: string; days: number; name?: string }
 type Delivery = 'inbox' | 'email' | 'both'
 
 interface Segment {
@@ -39,13 +40,17 @@ interface Sent {
   emailSkipped: number
   emailDone: boolean
   emailError: string
+  attachments?: Reward[]
+  claimedCount?: number
 }
 interface MailData {
-  smtp: { on: boolean; host: string; port: number; tls: string; from: string }
+  email: { on: boolean; checker: string }
   everyone: { count: number; emails: number }
   segments: Segment[]
   categories: Exclude<Category, ''>[]
-  limits: { subject: number; body: number; from: number; players: number }
+  limits: { subject: number; body: number; from: number; players: number; attachments?: number; credit?: number; days?: number }
+  products?: { id: string; name: string; kind: string }[]
+  currency?: string
   sent: Sent[]
 }
 
@@ -54,7 +59,8 @@ const CATEGORY: Record<Exclude<Category, ''>, Key> = {
   update: 'inbox.category.update',
   event: 'inbox.category.event',
   account: 'inbox.category.account',
-  support: 'inbox.category.support'
+  support: 'inbox.category.support',
+  status: 'inbox.category.status'
 }
 /** The relay's groups by id (its English labels are for the dashboard). */
 const SEGMENT: Record<string, Key> = {
@@ -63,11 +69,14 @@ const SEGMENT: Record<string, Key> = {
   buyers: 'servers.admin.mail.seg.buyers',
   hosts: 'servers.admin.mail.seg.hosts',
   admins: 'servers.admin.mail.seg.admins',
-  verified: 'servers.admin.mail.seg.verified'
+  verified: 'servers.admin.mail.seg.verified',
+  status: 'servers.admin.mail.seg.status'
 }
 const segName = (s: { id: string; label: string }) => (SEGMENT[s.id] ? t(SEGMENT[s.id]) : s.label)
 
-const EMPTY = { audience: 'players', players: '', delivery: 'inbox' as Delivery, from: 'ResinCraft', category: '' as Category, subject: '', body: '' }
+const EMPTY = { audience: 'players', players: '', delivery: 'inbox' as Delivery, from: 'ResinCraft', category: '' as Category, subject: '', body: '', attachments: [] as Reward[] }
+/** "50.00 THB" for the smallest unit. */
+const money = (n: number, cur?: string) => `${(n / 100).toFixed(2)} ${(cur ?? '').toUpperCase()}`.trim()
 /** The draft survives switching sections (not the launcher closing). */
 let draft = { ...EMPTY }
 
@@ -85,13 +94,17 @@ export function MailAdmin() {
   useEffect(() => setFast(!!data?.sent.some((m) => m.email && !m.emailDone)), [data])
   if (!data) return <Loading error={error} />
 
-  const emailOn = data.smtp.on
+  const emailOn = data.email.on
   const delivery: Delivery = emailOn ? form.delivery : 'inbox'
   const named = form.players.split(/[\s,;]+/).filter(Boolean).length
   const group = form.audience === 'everyone' ? data.everyone : data.segments.find((s) => s.id === form.audience)
   const count = form.audience === 'players' ? named : (group?.count ?? 0)
   const emails = form.audience === 'players' ? null : (group?.emails ?? 0)
-  const ready = !!form.subject.trim() && !!form.body.trim() && count > 0
+  const rewardsNeedInbox = form.attachments.length > 0 && delivery === 'email'
+  const ready = !!form.subject.trim() && !!form.body.trim() && count > 0 && !rewardsNeedInbox && form.attachments.every((a) => (a.kind === 'credit' ? a.amount > 0 : !!a.product))
+  const setReward = (i: number, r: Reward | null) => setForm({ ...form, attachments: r ? form.attachments.map((x, n) => (n === i ? r : x)) : form.attachments.filter((_, n) => n !== i) })
+  const products = data.products ?? []
+  const maxRewards = data.limits.attachments ?? 5
   const who =
     form.audience === 'everyone'
       ? t('servers.admin.mail.toEveryone', { count })
@@ -107,7 +120,7 @@ export function MailAdmin() {
   const send = async () => {
     const ok = await act(
       '/api/mail/send',
-      { audience: form.audience, players: form.players, delivery, from: form.from, category: form.category, subject: form.subject, body: form.body },
+      { audience: form.audience, players: form.players, delivery, from: form.from, category: form.category, subject: form.subject, body: form.body, attachments: form.attachments },
       'servers.admin.mail.sent'
     )
     if (ok) setForm({ ...EMPTY })
@@ -137,8 +150,7 @@ export function MailAdmin() {
           {emailOn ? (
             <div className="setting">
               <div className="text">
-                <b>{t('servers.admin.mail.serverOn', { host: `${data.smtp.host}:${data.smtp.port}`, tls: data.smtp.tls === 'tls' ? 'TLS' : data.smtp.tls === 'starttls' ? 'STARTTLS' : '—' })}</b>
-                <span>{t('servers.admin.mail.serverFrom', { from: data.smtp.from })}</span>
+                <b>{t('servers.admin.mail.viaChecker', { url: data.email.checker })}</b>
               </div>
               <form
                 className="row"
@@ -159,7 +171,7 @@ export function MailAdmin() {
                 <b>
                   <AlertTriangle className="inline" /> {t('servers.admin.mail.serverOff')}
                 </b>
-                <span>{t('servers.admin.mail.serverOffHint')}</span>
+                <span>{t('servers.admin.mail.serverOffChecker')}</span>
               </div>
             </div>
           )}
@@ -243,6 +255,66 @@ export function MailAdmin() {
                 <textarea className="input" rows={8} value={form.body} maxLength={data.limits.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
                 <span className="hint">{t('servers.admin.mail.formatting')}</span>
               </label>
+              <div className="field">
+                <span>{t('servers.admin.mail.rewards')}</span>
+                {form.attachments.map((r, i) => (
+                  <div key={i} className="row ib-admin-reward">
+                    {r.kind === 'credit' ? (
+                      <>
+                        <span className="chip compact success">{t('inbox.reward.credit')}</span>
+                        <input
+                          className="input"
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={(r.amount / 100).toFixed(2)}
+                          onChange={(e) => setReward(i, { kind: 'credit', amount: Math.round(Number(e.target.value) * 100) })}
+                          aria-label={t('servers.admin.mail.amount')}
+                        />
+                        <span className="hint">{(data.currency ?? '').toUpperCase()}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="chip compact accent">{t('servers.admin.mail.item')}</span>
+                        <select className="input" value={r.product} onChange={(e) => setReward(i, { ...r, product: e.target.value })} aria-label={t('servers.admin.mail.item')}>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="input"
+                          type="number"
+                          min={0}
+                          max={data.limits.days ?? 3650}
+                          value={r.days}
+                          onChange={(e) => setReward(i, { ...r, days: Math.max(0, Math.round(Number(e.target.value))) })}
+                          aria-label={t('servers.admin.mail.days')}
+                        />
+                        <span className="hint">{t('servers.admin.mail.daysHint')}</span>
+                      </>
+                    )}
+                    <button type="button" className="btn sm ghost" onClick={() => setReward(i, null)} aria-label={t('common.remove')}>
+                      <Trash2 />
+                    </button>
+                  </div>
+                ))}
+                <div className="row">
+                  <button type="button" className="btn sm" disabled={form.attachments.length >= maxRewards} onClick={() => setForm({ ...form, attachments: [...form.attachments, { kind: 'credit', amount: 5000 }] })}>
+                    <Plus /> {t('inbox.reward.credit')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    disabled={form.attachments.length >= maxRewards || !products.length}
+                    onClick={() => setForm({ ...form, attachments: [...form.attachments, { kind: 'item', product: products[0]?.id ?? '', days: 30 }] })}
+                  >
+                    <Gift /> {t('servers.admin.mail.item')}
+                  </button>
+                </div>
+                <span className={`hint ${rewardsNeedInbox ? 'bad' : ''}`}>{rewardsNeedInbox ? t('servers.admin.mail.rewardsNeedInbox') : t('servers.admin.mail.rewardsHint')}</span>
+              </div>
               {preview && (
                 <div className="card ib-admin-preview">
                   <div className="hint">
@@ -297,6 +369,12 @@ export function MailAdmin() {
                       </span>
                     )}
                     {m.emailSkipped > 0 && <span className="chip compact">{t('servers.admin.mail.skippedChip', { count: m.emailSkipped })}</span>}
+                    {m.attachments?.map((r, i) => (
+                      <span key={i} className="chip compact accent">
+                        <Gift className="inline" /> {r.kind === 'credit' ? money(r.amount, data.currency) : `${r.name ?? r.product} · ${r.days ? t('inbox.reward.days', { days: r.days }) : t('inbox.reward.forGood')}`}
+                      </span>
+                    ))}
+                    {!!m.attachments?.length && <span className="chip compact">{t('servers.admin.mail.claimedChip', { count: m.claimedCount ?? 0 })}</span>}
                   </div>
                   <details className="ib-admin-body">
                     <summary className="hint">{t('servers.admin.mail.show')}</summary>

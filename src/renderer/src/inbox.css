@@ -396,3 +396,94 @@
   cursor: pointer;
   margin-top: 4px;
 }
+
+/* Mail rewards: the cards under a mail, Claim, and the row's gift line. */
+.ib-rewards {
+  margin-top: 22px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.ib-rewards h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+}
+.ib-rewards h3 svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+.ib-rewards.claimed {
+  opacity: 0.7;
+}
+.ib-reward-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ib-reward {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+  padding: 10px 14px 10px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.ib-reward img {
+  width: 44px;
+  height: 44px;
+}
+.ib-reward > div {
+  display: flex;
+  flex-direction: column;
+}
+.ib-reward b {
+  font-size: 15px;
+}
+.ib-reward span {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.ib-reward-gift {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ib-claimed {
+  font-size: 13px;
+  color: var(--success);
+  font-weight: 600;
+}
+.ib-row-gift {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.ib-row-gift svg {
+  width: 13px;
+  height: 13px;
+}
+.ib-list-head {
+  gap: 6px;
+}
+.ib-admin-reward .input[type='number'] {
+  width: 110px;
+}

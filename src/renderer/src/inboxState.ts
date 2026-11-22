@@ -1,7 +1,7 @@
 // The Inbox's unread count for the header badge, and the calls the Inbox page and the email section make
 // (src-tauri mail.rs → the relay's /api/inbox…). Kept apart from pages/Inbox.tsx so the header doesn't load the page.
 import { useEffect, useSyncExternalStore } from 'react'
-import type { InboxData, InboxEmail, InboxMessage } from '@shared/types'
+import type { InboxData, InboxEmail, InboxMessage, InboxReward, InboxStatusSub } from '@shared/types'
 import { api } from './api'
 import './inbox-badge.css'
 
@@ -15,8 +15,16 @@ export const inbox = {
   email: () => call<InboxEmail>('GET', '/api/inbox/email'),
   startEmail: (address: string) => call<InboxEmail>('POST', '/api/inbox/email', { address }),
   confirmEmail: (code: string) => call<InboxEmail>('POST', '/api/inbox/email/confirm', { code }),
-  removeEmail: () => call<InboxEmail>('POST', '/api/inbox/email/remove', {})
+  removeEmail: () => call<InboxEmail>('POST', '/api/inbox/email/remove', {}),
+  /** A mail's rewards (or every mail's, `all`): what it gave and the new Resin Credit balance. */
+  claim: (id: string | 'all') =>
+    call<{ claimed: string[]; given: InboxReward[]; credit: number; unread: number; unclaimed: number; error?: string | null }>('POST', '/api/inbox/claim', id === 'all' ? { all: true } : { id }),
+  status: () => call<InboxStatusSub>('GET', '/api/inbox/status'),
+  setStatus: (on: boolean, email: boolean) => call<InboxStatusSub>('POST', '/api/inbox/status', { on, email })
 }
+
+/** "50.00 THB" for an amount in the currency's smallest unit. */
+export const creditText = (amount: number, currency?: string) => `${(amount / 100).toFixed(2)} ${(currency ?? '').toUpperCase()}`.trim()
 
 /** `available`: the relay answered for this account (a Microsoft account, a relay with mail). */
 interface State {

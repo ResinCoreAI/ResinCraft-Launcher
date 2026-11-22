@@ -1,7 +1,7 @@
 // The browser preview's mail: a player's inbox and email address (mail:call, relay `/api/inbox…`) and the admins'
 // Mail screen (`/api/mail…` over adminCall). `?inbox=empty` starts with no mail, `?inbox=off` as a relay without
 // email, `?inbox=none` as a build with no relay (the page says so). The confirmation code is always 123456.
-import type { InboxMessage } from '@shared/types'
+import type { InboxMessage, InboxReward } from '@shared/types'
 
 const now = () => Math.floor(Date.now() / 1000)
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms))
@@ -28,10 +28,39 @@ interface Sent {
   emailSkipped: number
   emailDone: boolean
   emailError: string
+  attachments?: InboxReward[]
+  claimedCount?: number
 }
 
 const T = now()
 const sent: Sent[] = [
+  {
+    id: 'm7',
+    from: 'ResinCraft',
+    subject: 'Thanks for testing 2.0!',
+    body: 'Here is a little something for helping us test **ResinCraft 2.0**. Claim it below.',
+    category: 'event',
+    sentAt: T - 60 * 8,
+    by: 'Admin puirkle',
+    audience: 'testers',
+    toNames: [],
+    toCount: 12,
+    inbox: true,
+    email: false,
+    inboxCount: 12,
+    readCount: 3,
+    emailTotal: 0,
+    emailSent: 0,
+    emailFailed: 0,
+    emailSkipped: 0,
+    emailDone: true,
+    emailError: '',
+    attachments: [
+      { kind: 'credit', amount: 5000 },
+      { kind: 'item', product: 'addon-unlimited-traffic', name: 'Unlimited traffic', days: 30 }
+    ],
+    claimedCount: 2
+  },
   {
     id: 'm6',
     from: 'ResinCraft',
@@ -148,6 +177,9 @@ const deleted = new Set<string>(mode() === 'empty' ? sent.map((m) => m.id) : [])
 let address: string | null = null
 let verifiedAt: number | null = null
 let pending: { address: string; expiresAt: number; resendAt: number } | null = null
+let credit = 12000
+const claimed = new Set<string>()
+let statusSub = { on: false, email: false, since: 0 }
 
 const snippet = (body: string) =>
   body
@@ -159,8 +191,9 @@ const snippet = (body: string) =>
     .replace(/\*/g, '')
     .slice(0, 160)
 
-const mine = () => sent.filter((m) => m.inbox && (m.audience === 'everyone' || m.toNames.includes('Puirkle_Gamer')) && !deleted.has(m.id))
-const asMessage = (m: Sent): InboxMessage => ({ id: m.id, from: m.from, subject: m.subject, body: m.body, snippet: snippet(m.body), category: m.category, sentAt: m.sentAt, read: read.has(m.id) })
+const mine = () => sent.filter((m) => m.inbox && (m.audience === 'everyone' || m.audience === 'testers' || m.toNames.includes('Puirkle_Gamer')) && !deleted.has(m.id))
+const asMessage = (m: Sent): InboxMessage => ({ id: m.id, from: m.from, subject: m.subject, body: m.body, snippet: snippet(m.body), category: m.category, sentAt: m.sentAt, read: read.has(m.id), ...(m.attachments?.length ? { attachments: m.attachments, claimed: claimed.has(m.id) } : {}) })
+const unclaimed = () => mine().filter((m) => m.attachments?.length && !claimed.has(m.id)).map((m) => m.id)
 const unread = () => mine().filter((m) => !read.has(m.id)).length
 const emailState = () => ({ on: mode() !== 'off', address, verifiedAt, pending: pending && pending.expiresAt > now() ? pending : null })
 
@@ -173,7 +206,7 @@ export async function mockMailCall(method: string, path: string, body?: unknown)
   const route = `${method} ${path}`
   switch (route) {
     case 'GET /api/inbox':
-      return { messages: mine().map(asMessage), unread: unread(), total: mine().length, email: emailState() }
+      return { messages: mine().map(asMessage), unread: unread(), total: mine().length, email: emailState(), unclaimed: unclaimed().length, credit, currency: 'thb', status: statusSub }
     case 'GET /api/inbox/unread':
       return { unread: unread() }
     case 'POST /api/inbox/read': {
@@ -185,7 +218,33 @@ export async function mockMailCall(method: string, path: string, body?: unknown)
     case 'POST /api/inbox/mark':
       for (const id of ids) b.read ? read.add(id) : read.delete(id)
       return { changed: ids.length, unread: unread() }
+    case 'POST /api/inbox/claim': {
+      const list = (b as { all?: boolean }).all ? unclaimed() : ids
+      const given: InboxReward[] = []
+      const done: string[] = []
+      for (const id of list) {
+        const m = mine().find((x) => x.id === id)
+        if (!m?.attachments?.length || claimed.has(id)) continue
+        claimed.add(id)
+        read.add(id)
+        done.push(id)
+        for (const a of m.attachments) {
+          if (a.kind === 'credit') credit += a.amount
+          given.push(a)
+        }
+      }
+      if (!done.length) throw new Error('ResinCraft Relay: you’ve claimed this already')
+      return { claimed: done, given, credit, unread: unread(), unclaimed: unclaimed().length }
+    }
+    case 'GET /api/inbox/status':
+      return statusSub
+    case 'POST /api/inbox/status': {
+      const q = b as { on?: boolean; email?: boolean }
+      statusSub = q.on ? { on: true, email: !!q.email, since: statusSub.since || now() } : { on: false, email: false, since: 0 }
+      return statusSub
+    }
     case 'POST /api/inbox/delete':
+      if (ids.some((id) => sent.find((m) => m.id === id)?.attachments?.length && !claimed.has(id))) throw new Error('ResinCraft Relay: claim its rewards first')
       for (const id of ids) deleted.add(id)
       return { deleted: ids.length, unread: unread() }
     case 'GET /api/inbox/email':
@@ -220,15 +279,22 @@ const SEGMENTS = [
   { id: 'buyers', label: 'Buyers with an active purchase', count: 41, emails: 18 },
   { id: 'hosts', label: 'Hosts (own a relay name)', count: 96, emails: 22 },
   { id: 'admins', label: 'Launcher admins', count: 2, emails: 1 },
-  { id: 'verified', label: 'Players with a confirmed email', count: 57, emails: 57 }
+  { id: 'verified', label: 'Players with a confirmed email', count: 57, emails: 57 },
+  { id: 'status', label: 'Subscribed to relay status', count: 31, emails: 9 }
 ]
 
 const adminData = () => ({
-  smtp: mode() === 'off' ? { on: false, host: '', port: 587, tls: 'starttls', from: '' } : { on: true, host: 'mail.resincore.ai', port: 587, tls: 'starttls', from: 'ResinCraft <no-reply@rscraft.resincore.tech>' },
+  email: mode() === 'off' ? { on: false, checker: '' } : { on: true, checker: 'http://127.0.0.1:7102/internal/mail' },
   everyone: { count: 412, emails: 57 },
   segments: SEGMENTS,
-  categories: ['news', 'update', 'event', 'account', 'support'],
-  limits: { subject: 150, body: 5000, from: 40, players: 200 },
+  categories: ['news', 'update', 'event', 'account', 'support', 'status'],
+  limits: { subject: 150, body: 5000, from: 40, players: 200, attachments: 5, credit: 10000000, days: 3650 },
+  products: [
+    { id: 'addon-server', name: '+1 server online', kind: 'addon' },
+    { id: 'addon-unlimited-traffic', name: 'Unlimited traffic', kind: 'addon' },
+    { id: 'pack-219', name: 'Starter pack', kind: 'pack' }
+  ],
+  currency: 'thb',
   sent: sent.slice()
 })
 
@@ -267,7 +333,9 @@ export function mockMailAdmin(method: string, path: string, b: Record<string, un
       emailFailed: 0,
       emailSkipped: email ? count - emails : 0,
       emailDone: !email || emails === 0,
-      emailError: ''
+      emailError: '',
+      attachments: ((b.attachments as InboxReward[] | undefined) ?? []).map((a) => (a.kind === 'item' ? { ...a, name: (adminData().products.find((p) => p.id === a.product)?.name ?? a.product) } : a)),
+      claimedCount: 0
     }
     sent.unshift(m)
     // The emails "go out" over a few seconds.

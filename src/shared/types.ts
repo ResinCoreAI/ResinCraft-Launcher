@@ -1941,9 +1941,21 @@ export interface InboxMessage {
   subject: string
   body: string
   snippet: string
-  category: '' | 'news' | 'update' | 'event' | 'account' | 'support'
+  category: '' | 'news' | 'update' | 'event' | 'account' | 'support' | 'status'
   sentAt: number
   read: boolean
+  /** What claiming it gives (Resin Credit in the currency's smallest unit, or a Store item for some days; 0: for good). */
+  attachments?: InboxReward[]
+  claimed?: boolean
+}
+
+export type InboxReward = { kind: 'credit'; amount: number } | { kind: 'item'; product: string; name: string; days: number }
+
+/** Whether the account gets the relay's status notices as mail (and by email). */
+export interface InboxStatusSub {
+  on: boolean
+  email: boolean
+  since: number
 }
 
 /** The account's email address for mail by email: confirmed with a code the relay emails. */
@@ -1961,6 +1973,11 @@ export interface InboxData {
   unread: number
   total: number
   email: InboxEmail
+  /** Mails with rewards still to claim, the Resin Credit balance (smallest unit) and its currency. */
+  unclaimed?: number
+  credit?: number
+  currency?: string
+  status?: InboxStatusSub
 }
 
 /** A notice the ResinCraft team posts on the relay, shown on the Status page (status.rs `StatusNotice`). */
