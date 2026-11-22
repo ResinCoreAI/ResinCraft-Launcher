@@ -77,6 +77,13 @@ const CHECK_EVERY: std::time::Duration = std::time::Duration::from_millis(500);
 /// big page isn't redrawn over and over.
 const SETTLE_AFTER_TRIM: std::time::Duration = std::time::Duration::from_millis(1500);
 const MOST_SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
+/// While it's used, over this the pages WebView2 holds but isn't using go back to Windows, at most every
+/// `RELEASE_GAP`. Measured on the UI rework (each page 10 s in use, twice each, Task Manager's memory for the whole
+/// launcher): Home 65-70 → 53-56 MB, Library 63-69 → 49-50, an instance with 224 mods 80-81 → 49-70, big screen
+/// 85-92 → 54-55, Home after the other pages 83-102 → 54-70; over a tour of every page 79 → 66 MB on average and over
+/// 120 MB 1.3 → 0.2 % of the time. No more slow frames than without it, and pages opened as fast.
+const SOFT_BUDGET: u64 = 80 * 1024 * 1024;
+const RELEASE_GAP: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Keeps the launcher under `BUDGET` while it's used (part of Settings → Appearance → Free memory while hidden).
 /// The low memory level alone keeps it at about 110-140 MB while pages are opened; over the budget, the level is
@@ -91,14 +98,22 @@ const MOST_SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
 async fn watch_budget() {
     let mut settle = SETTLE_AFTER_TRIM;
     let mut just_trimmed = false;
+    let mut released = std::time::Instant::now();
     loop {
         tokio::time::sleep(CHECK_EVERY).await;
         if !lean_in_use() || unloaded() || !crate::game::running_ids().is_empty() {
             continue;
         }
-        if crate::core::memory::launcher_bytes().await <= BUDGET {
+        let bytes = crate::core::memory::launcher_bytes().await;
+        if bytes <= BUDGET {
             settle = SETTLE_AFTER_TRIM;
             just_trimmed = false;
+            // Under the budget but over the soft one: WebView2's unused pages go back to Windows (as at rest), which
+            // redraws nothing; what's in use comes back as it's touched.
+            if bytes > SOFT_BUDGET && released.elapsed() >= RELEASE_GAP {
+                crate::core::memory::release_webview_pages().await;
+                released = std::time::Instant::now();
+            }
             continue;
         }
         if just_trimmed {
