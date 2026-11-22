@@ -1873,6 +1873,18 @@ export interface ServiceCheck {
   checkedAt: number
 }
 
+/** A notice the ResinCraft team posts on the relay, shown on the Status page (status.rs `StatusNotice`). */
+export interface StatusNotice {
+  id: string
+  level: 'outage' | 'degraded' | 'maintenance' | 'info'
+  title: string
+  body: string
+  /** Unix seconds; `endsAt` 0 = until further notice. */
+  startsAt: number
+  endsAt: number
+  updatedAt: number
+}
+
 /** The MCP server for AI assistants (mcp.rs). */
 export interface McpInfo {
   state: 'off' | 'on' | 'error'
@@ -2532,6 +2544,8 @@ export interface ResinApi {
     serviceStatus(): Promise<Record<string, string>>
     /** The Status page: every service the launcher depends on, checked from this PC just now (status.rs). */
     checkServices(): Promise<ServiceCheck[]>
+    /** The ResinCraft team's notices for the Status page (from the relay), most severe first; none when unreachable. */
+    statusNotices(): Promise<StatusNotice[]>
     /** An https picture as a data: URL (for pictures the UI draws on a canvas, like the overview card). */
     imageData(url: string): Promise<string>
     /** A modpack's gallery picture shrunk for a backdrop (at most 1280 wide), as a data: URL; fetched once, then cached. */

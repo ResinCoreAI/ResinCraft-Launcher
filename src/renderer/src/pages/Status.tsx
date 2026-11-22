@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
-import type { ServiceCheck } from '@shared/types'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { AlertTriangle, Info, OctagonX, RefreshCw, Wrench } from 'lucide-react'
+import type { ServiceCheck, StatusNotice } from '@shared/types'
 import { api } from '../api'
 import { currentLanguage, t, type Key } from '../i18n'
 import { timeAgo } from '../util'
@@ -15,6 +15,14 @@ const GROUPS: { id: string; label: Key }[] = [
   { id: 'resincraft', label: 'status.group.resincraft' }
 ]
 const STATE: Record<ServiceCheck['state'], Key> = { up: 'status.state.up', slow: 'status.state.slow', down: 'status.state.down', off: 'status.state.off' }
+
+/** The team's notices (status.rs `StatusNotice`): each level's word and mark. */
+const NOTICE: Record<StatusNotice['level'], { label: Key; icon: ReactNode }> = {
+  outage: { label: 'status.notice.outage', icon: <OctagonX /> },
+  degraded: { label: 'status.notice.degraded', icon: <AlertTriangle /> },
+  maintenance: { label: 'status.notice.maintenance', icon: <Wrench /> },
+  info: { label: 'status.notice.info', icon: <Info /> }
+}
 
 const name = (id: string) => t(`status.${id}` as Key)
 const impact = (id: string) => t(`status.${id}.impact` as Key)
@@ -43,6 +51,7 @@ function problem(c: ServiceCheck): string {
  */
 export default function Status() {
   const [checks, setChecks] = useState<ServiceCheck[]>()
+  const [notices, setNotices] = useState<StatusNotice[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // Re-draws "Checked 2 minutes ago" now and then; nothing is checked again.
@@ -55,8 +64,11 @@ export default function Status() {
   const check = useCallback(async () => {
     setBusy(true)
     setError('')
+    // The team's notices come along with the checks; none (an older relay, or it's down) is not an error.
+    const posted = api.app.statusNotices().then(setNotices, () => setNotices([]))
     try {
       setChecks(await api.app.checkServices())
+      await posted
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -81,6 +93,7 @@ export default function Status() {
           ? t('status.summary.slow', { list: slow.map((c) => name(c.id)).join(', ') })
           : t('status.summary.up')
   const checkedAt = checks?.reduce((m, c) => Math.max(m, c.checkedAt), 0)
+  const when = (secs: number) => new Date(secs * 1000).toLocaleString(currentLanguage(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const clock = (ms: number) => new Date(ms).toLocaleTimeString(currentLanguage(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   return (
@@ -95,6 +108,27 @@ export default function Status() {
           <RefreshCw className={busy ? 'spin' : undefined} /> {busy ? t('status.checking') : t('status.refresh')}
         </button>
       </div>
+
+      {notices.length > 0 && (
+        <div className="st-notices" aria-label={t('status.notices.label')}>
+          {notices.map((n) => (
+            <div key={n.id} className={`st-notice st-n-${n.level}`} role={n.level === 'outage' ? 'alert' : undefined}>
+              <span className="st-notice-icon" aria-hidden>
+                {NOTICE[n.level]?.icon ?? <Info />}
+              </span>
+              <div className="st-notice-text">
+                <span className="st-notice-level">{t(NOTICE[n.level]?.label ?? 'status.notice.info')}</span>
+                <b>{n.title}</b>
+                {n.body && <p>{n.body}</p>}
+                <span className="st-notice-when">
+                  {n.endsAt > 0 && <>{t('status.notice.until', { time: when(n.endsAt) })} · </>}
+                  {t('status.notice.updated', { time: timeAgo((n.updatedAt || n.startsAt) * 1000, true) })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className={`card st-summary st-${level}`} role="status" aria-live="polite">
         <span className={`st-lamp st-${level}`} aria-hidden />

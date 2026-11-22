@@ -1,7 +1,8 @@
 // The Status page in the browser preview: every service the engine checks (status.rs), with the relay's site up
 // while its API answers 502, as it did the week the page was made. ?status=up: everything up; ?status=offline:
-// nothing answers (no internet).
-import type { ServiceCheck } from '@shared/types'
+// nothing answers (no internet). The team's notices: ?notices=none (none, as from an older relay's 404) or
+// ?notices=all (one of each level).
+import type { ServiceCheck, StatusNotice } from '@shared/types'
 
 const SERVICES: [id: string, group: string, hosts: string[]][] = [
   ['microsoft', 'signin', ['login.microsoftonline.com', 'user.auth.xboxlive.com', 'xsts.auth.xboxlive.com']],
@@ -36,4 +37,36 @@ export async function mockCheckServices(): Promise<ServiceCheck[]> {
     if (id === 'playit') return { ...base, state: 'down', ms: null, problem: 'timeout', failedHost: hosts[0] }
     return base
   })
+}
+
+export async function mockStatusNotices(): Promise<StatusNotice[]> {
+  const mode = new URLSearchParams(location.search).get('notices') ?? ''
+  await new Promise((r) => setTimeout(r, 300))
+  if (mode === 'none') return []
+  const now = Math.floor(Date.now() / 1000)
+  const outage: StatusNotice = {
+    id: 'n1',
+    level: 'outage',
+    title: 'ResinCraft Relay API is down',
+    body: "The server list, relay names and the store can't load right now. Servers that are already open keep running. We're on it.",
+    startsAt: now - 1800,
+    endsAt: 0,
+    updatedAt: now - 600
+  }
+  const maintenance: StatusNotice = {
+    id: 'n2',
+    level: 'maintenance',
+    title: 'Relay maintenance tonight',
+    body: 'Hosting through ResinCraft Relay pauses for about 20 minutes while the relay moves to a faster server.',
+    startsAt: now - 60,
+    endsAt: now + 3 * 3600,
+    updatedAt: now - 3600
+  }
+  if (mode !== 'all') return [outage, maintenance]
+  return [
+    outage,
+    { ...outage, id: 'n3', level: 'degraded', title: 'Joining friends is slow', body: 'Some joins take up to a minute.' },
+    maintenance,
+    { ...maintenance, id: 'n4', level: 'info', title: 'New relay region', body: 'Players in Asia now join through Singapore.', endsAt: 0 }
+  ]
 }
