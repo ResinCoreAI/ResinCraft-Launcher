@@ -199,9 +199,9 @@ export function UpdatesSection() {
     )
   }, [])
 
-  // No longer invited while on Dev: back to Beta (the engine already checks Beta's feed for it).
+  // No longer on the list while on Dev or Test: back to Beta (the engine already checks Beta's feed for it).
   const channel = settings?.updateChannel ?? 'stable'
-  const devTaken = channel === 'dev' && status?.dev === false
+  const devTaken = (channel === 'dev' && status?.dev === false) || (channel === 'test' && status?.test === false)
   useEffect(() => {
     if (devTaken) void updateSettings({ updateChannel: 'beta' })
   }, [devTaken, updateSettings])
@@ -242,6 +242,7 @@ export function UpdatesSection() {
   // A Dev build has no release page.
   const notesUrl = available ? available.notesUrl : `${RELEASES}/tag/v${status.current}`
   const showDev = !!status.dev || channel === 'dev'
+  const showTest = !!status.test || channel === 'test'
 
   return (
     <section className="settings-section" id="updates">
@@ -253,7 +254,7 @@ export function UpdatesSection() {
             <b>
               {t('updates.version', { version: status.current })}
               {available && !busy && <span className="update-new">{available.version}</span>}
-              {available?.dev && !busy && <span className="chip warn">{t('updates.devBuild')}</span>}
+              {available?.dev && !busy && <span className="chip warn">{t(channel === 'test' ? 'updates.testBuild' : 'updates.devBuild')}</span>}
             </b>
             <span className="update-line">
               {status.error && !busy && <Info size={13} className="note" />}
@@ -289,16 +290,17 @@ export function UpdatesSection() {
         <div className="setting">
           <div className="text">
             <b>{t('updates.channel')}</b>
-            <span>{t(channel === 'dev' ? 'updates.channel.devHint' : 'updates.channel.hint')}</span>
+            <span>{t(channel === 'dev' ? 'updates.channel.devHint' : channel === 'test' ? 'updates.channel.testHint' : 'updates.channel.hint')}</span>
           </div>
           <select
             className="input"
             style={{ width: 'auto' }}
             value={channel}
-            onChange={(e) => void updateSettings({ updateChannel: e.target.value as 'stable' | 'beta' | 'dev' }).then(() => check())}
+            onChange={(e) => void updateSettings({ updateChannel: e.target.value as 'stable' | 'beta' | 'dev' | 'test' }).then(() => check())}
           >
             <option value="stable">{t('updates.channel.stable')}</option>
             <option value="beta">{t('updates.channel.beta')}</option>
+            {showTest && <option value="test">{t('updates.channel.test')}</option>}
             {showDev && <option value="dev">{t('updates.channel.dev')}</option>}
           </select>
         </div>

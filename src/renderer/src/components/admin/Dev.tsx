@@ -1,16 +1,22 @@
-// Admin → Dev: who may use the launcher's Dev update channel, and the Dev build (uploaded here, on the relay's Dev
-// page or by release-dev.bat; relay-server's devbuilds.rs). Admins use it over the admin connection; the relay's
-// developers (`developer`) get only this screen, over their relay session, and may not make or remove developers.
+// Admin → Dev: the relay's two invite-only update channels, each with its own list and its own build (relay-server's
+// devbuilds.rs). Neither gives the other:
+// - Developers (only an admin adds them) get the Dev build, what they install in their own launcher.
+// - Testers (a developer or an admin invites them) get the Test build.
+// Builds are uploaded here, on the relay's Dev page, or by release-dev.bat. Admins use it over the admin connection;
+// developers get only this screen, over their relay session, and may not add or remove developers.
 import { useState } from 'react'
-import { FileUp, FlaskConical, Loader2, Trash2, Upload, UserPlus } from 'lucide-react'
+import { Code2, FileUp, FlaskConical, Loader2, TestTube2, Trash2, Upload, UserPlus } from 'lucide-react'
 import type { DevBuildFile } from '@shared/types'
 import { api } from '../../api'
 import { useStore } from '../../store'
-import { t } from '../../i18n'
-import { ConfirmModal } from '../ui'
+import { t, type Key } from '../../i18n'
+import { ConfirmModal, Segmented } from '../ui'
 import { ago, Loading, size, useAct, useAdmin, type Caller } from './common'
 
 const TARGETS = ['windows-x86_64', 'windows-aarch64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64', 'linux-aarch64']
+
+type Lane = 'dev' | 'test'
+type List = 'developers' | 'testers'
 
 interface DevInvite {
   uuid: string
@@ -19,9 +25,19 @@ interface DevInvite {
   addedBy: string
   developer?: boolean
 }
+interface Build {
+  version: string
+  notes: string
+  uploadedAt: number
+  platforms: { target: string; size: number; uploadedAt: number }[]
+}
 interface DevData {
-  invites: DevInvite[]
-  build: { version: string; notes: string; uploadedAt: number; platforms: { target: string; size: number; uploadedAt: number }[] } | null
+  developers?: DevInvite[]
+  testers?: DevInvite[]
+  /** A relay from before the two lists: everyone in one list, developers flagged. */
+  invites?: DevInvite[]
+  build: Build | null
+  testBuild?: Build | null
   /** `[dev_builds] upload_tokens` is set, so release-dev.bat can upload. */
   uploads: boolean
   /** A developer's own account (their calls only). */
@@ -30,15 +46,16 @@ interface DevData {
 
 const devCall: Caller = (method, path, body) => api.server.devCall(method, path, body)
 
+const LANE_ICON = { dev: <Code2 className="inline" />, test: <TestTube2 className="inline" /> }
+
 export function DevAdmin({ developer = false }: { developer?: boolean }) {
   const caller = developer ? devCall : undefined
   const { data, error, reload } = useAdmin<DevData>('/api/devs', undefined, caller)
   const act = useAct(reload, caller)
-  const [promoting, setPromoting] = useState<DevInvite | null>(null)
-  const [who, setWho] = useState('')
-  const [removing, setRemoving] = useState(false)
+  const [removing, setRemoving] = useState<Lane | null>(null)
   const { toast } = useStore()
   const [file, setFile] = useState<DevBuildFile | null>(null)
+  const [lane, setLane] = useState<Lane>('dev')
   const [version, setVersion] = useState('')
   const [target, setTarget] = useState('windows-x86_64')
   const [notes, setNotes] = useState('')
@@ -55,8 +72,8 @@ export function DevAdmin({ developer = false }: { developer?: boolean }) {
     if (!file) return
     setUploading(true)
     try {
-      await api.server.devUpload({ path: file.path, version: version.trim(), target, notes: notes.trim(), developer })
-      toast(t('servers.admin.dev.uploadDone', { version: version.trim() }), 'success')
+      await api.server.devUpload({ path: file.path, version: version.trim(), target, notes: notes.trim(), developer, lane })
+      toast(t(lane === 'test' ? 'servers.admin.dev.uploadDoneTest' : 'servers.admin.dev.uploadDone', { version: version.trim() }), 'success')
       setFile(null)
       setNotes('')
       await reload()
@@ -66,39 +83,53 @@ export function DevAdmin({ developer = false }: { developer?: boolean }) {
       setUploading(false)
     }
   }
-  const invite = async () => {
-    const name = who.trim()
-    if (await act('/api/devs/add', { who: name }, 'servers.admin.dev.invited', { name })) setWho('')
-  }
   if (!data) return <Loading error={error} />
-  const b = data.build
+  // A relay from before the split sends only `invites`.
+  const developers = data.developers ?? (data.invites ?? []).filter((i) => i.developer)
+  const testers = data.testers ?? (data.invites ?? []).filter((i) => !i.developer)
+  const split = !!data.testers
+  const builds: { lane: Lane; build: Build | null | undefined }[] = [
+    { lane: 'dev', build: data.build },
+    { lane: 'test', build: split ? (data.testBuild ?? null) : undefined }
+  ]
+  const removingBuild = removing && (removing === 'dev' ? data.build : data.testBuild)
   return (
     <>
-      <p className="hint">{t('servers.admin.dev.lead')}</p>
+      <p className="hint">{t('servers.admin.dev.leadLanes')}</p>
       <p className="hint">{t(developer ? 'servers.admin.dev.leadDeveloper' : 'servers.admin.dev.roles')}</p>
+      {!split && <p className="hint bad">{t('servers.admin.dev.oldRelay')}</p>}
+
       <div className="card" style={{ marginBottom: 18 }}>
-        <div className="setting">
-          <div className="text">
-            <b>
-              <FlaskConical className="inline" /> {b ? t('servers.admin.dev.build', { version: b.version }) : t('servers.admin.dev.noBuildTitle')}
-            </b>
-            {b ? (
-              <>
-                <span>
-                  {t('servers.admin.dev.uploaded', { when: ago(b.uploadedAt) })} · {b.platforms.map((p) => `${p.target} (${size(p.size)})`).join(', ')}
-                </span>
-                {b.notes && <div className="hint">{b.notes}</div>}
-              </>
-            ) : (
-              <span>{t('servers.admin.dev.noBuild')}</span>
-            )}
-          </div>
-          {b && (
-            <button className="btn sm danger" onClick={() => setRemoving(true)}>
-              <Trash2 /> {t('servers.admin.dev.removeBuild')}
-            </button>
-          )}
-        </div>
+        {builds
+          .filter((x) => x.build !== undefined)
+          .map(({ lane: l, build: b }) => (
+            <div key={l} className="setting">
+              <div className="text">
+                <b>
+                  {LANE_ICON[l]}{' '}
+                  {b
+                    ? t(l === 'test' ? 'servers.admin.dev.testBuild' : 'servers.admin.dev.build', { version: b.version })
+                    : t(l === 'test' ? 'servers.admin.dev.noTestBuildTitle' : 'servers.admin.dev.noBuildTitle')}
+                </b>
+                <span>{t(l === 'test' ? 'servers.admin.dev.testBuildFor' : 'servers.admin.dev.devBuildFor')}</span>
+                {b ? (
+                  <>
+                    <div className="hint">
+                      {t('servers.admin.dev.uploaded', { when: ago(b.uploadedAt) })} · {b.platforms.map((p) => `${p.target} (${size(p.size)})`).join(', ')}
+                    </div>
+                    {b.notes && <div className="hint">{b.notes}</div>}
+                  </>
+                ) : (
+                  <div className="hint">{t('servers.admin.dev.noBuild')}</div>
+                )}
+              </div>
+              {b && (
+                <button className="btn sm danger" onClick={() => setRemoving(l)}>
+                  <Trash2 /> {t('servers.admin.dev.removeBuild')}
+                </button>
+              )}
+            </div>
+          ))}
       </div>
 
       <div className="settings-section">
@@ -118,10 +149,30 @@ export function DevAdmin({ developer = false }: { developer?: boolean }) {
           {file && (
             <div className="setting stack">
               <div className="listing-fields">
+                {split && (
+                  <div className="field">
+                    <span>{t('servers.admin.dev.uploadAs')}</span>
+                    <Segmented
+                      value={lane}
+                      onChange={setLane}
+                      options={[
+                        { value: 'dev', label: t('servers.admin.dev.laneDev') },
+                        { value: 'test', label: t('servers.admin.dev.laneTest') }
+                      ]}
+                    />
+                  </div>
+                )}
                 <div className="field-row">
                   <label className="field">
                     <span>{t('servers.admin.dev.version')}</span>
-                    <input className="input" value={version} maxLength={64} spellCheck={false} placeholder="1.7.0-dev.1" onChange={(e) => setVersion(e.target.value)} />
+                    <input
+                      className="input"
+                      value={version}
+                      maxLength={64}
+                      spellCheck={false}
+                      placeholder={lane === 'test' ? '2.0.1-test.1' : '2.0.1-dev.1'}
+                      onChange={(e) => setVersion(e.target.value)}
+                    />
                     {!preRelease && <span className="hint">{t('servers.admin.dev.versionHint')}</span>}
                   </label>
                   <label className="field">
@@ -136,12 +187,13 @@ export function DevAdmin({ developer = false }: { developer?: boolean }) {
                   </label>
                 </div>
                 <label className="field">
-                  <span>{t('servers.admin.dev.notes')}</span>
+                  <span>{t(lane === 'test' ? 'servers.admin.dev.notesTest' : 'servers.admin.dev.notes')}</span>
                   <input className="input" value={notes} maxLength={4000} onChange={(e) => setNotes(e.target.value)} />
                 </label>
                 <div className="row end">
                   <button className="btn sm primary" disabled={uploading || !file.signature || !preRelease} onClick={() => void upload()}>
-                    {uploading ? <Loader2 className="spin" /> : <Upload />} {t(uploading ? 'servers.admin.dev.uploading' : 'servers.admin.dev.uploadButton')}
+                    {uploading ? <Loader2 className="spin" /> : <Upload />}{' '}
+                    {t(uploading ? 'servers.admin.dev.uploading' : lane === 'test' ? 'servers.admin.dev.uploadTestButton' : 'servers.admin.dev.uploadButton')}
                   </button>
                 </div>
               </div>
@@ -151,13 +203,82 @@ export function DevAdmin({ developer = false }: { developer?: boolean }) {
         {!data.uploads && !developer && <p className="hint">{t('servers.admin.dev.uploadsOff')}</p>}
       </div>
 
-      <div className="settings-section">
-        <h3>{t('servers.admin.dev.invite')}</h3>
+      <InviteList
+        list="developers"
+        people={developers}
+        canEdit={!developer}
+        act={act}
+        title="servers.admin.dev.developersList"
+        lead="servers.admin.dev.developersLead"
+        none="servers.admin.dev.noDevelopers"
+        split={split}
+      />
+      <InviteList
+        list="testers"
+        people={testers}
+        canEdit
+        act={act}
+        title="servers.admin.dev.testersList"
+        lead="servers.admin.dev.testersLead"
+        none="servers.admin.dev.none"
+        split={split}
+      />
+
+      {removing && removingBuild && (
+        <ConfirmModal
+          title={t('servers.admin.dev.removeBuild')}
+          body={t(removing === 'test' ? 'servers.admin.dev.removeTestBuildConfirm' : 'servers.admin.dev.removeBuildConfirm', { version: removingBuild.version })}
+          confirm={t('servers.admin.dev.removeBuild')}
+          onConfirm={async () =>
+            void (await act('/api/devs/build/remove', { lane: removing }, removing === 'test' ? 'servers.admin.dev.testBuildRemoved' : 'servers.admin.dev.buildRemoved'))
+          }
+          onClose={() => setRemoving(null)}
+        />
+      )}
+    </>
+  )
+}
+
+/** One of the two lists: who's on it, and (when `canEdit`) a form to add someone and a button to take them off. */
+function InviteList({
+  list,
+  people,
+  canEdit,
+  act,
+  title,
+  lead,
+  none,
+  split
+}: {
+  list: List
+  people: DevInvite[]
+  canEdit: boolean
+  act: ReturnType<typeof useAct>
+  title: Key
+  lead: Key
+  none: Key
+  split: boolean
+}) {
+  const [who, setWho] = useState('')
+  const add = async () => {
+    const name = who.trim()
+    // An older relay knows only one list, with developers flagged.
+    const body = split ? { who: name, list } : { who: name, developer: list === 'developers' }
+    if (await act('/api/devs/add', body, list === 'developers' ? 'servers.admin.dev.addedDeveloper' : 'servers.admin.dev.invited', { name })) setWho('')
+  }
+  return (
+    <div className="settings-section">
+      <h3>
+        {list === 'developers' ? <Code2 className="inline" /> : <FlaskConical className="inline" />} {t(title, { count: people.length })}
+      </h3>
+      <p className="hint">{t(lead)}</p>
+      {canEdit && (
         <form
           className="card"
+          style={{ marginBottom: 10 }}
           onSubmit={(e) => {
             e.preventDefault()
-            if (who.trim()) void invite()
+            if (who.trim()) void add()
           }}
         >
           <div className="setting">
@@ -166,66 +287,31 @@ export function DevAdmin({ developer = false }: { developer?: boolean }) {
               <input className="input" value={who} maxLength={36} spellCheck={false} placeholder="Notch / 069a79f4-44e9-…" onChange={(e) => setWho(e.target.value)} />
             </label>
             <button className="btn sm primary" type="submit" disabled={!who.trim()}>
-              <UserPlus /> {t('servers.admin.dev.inviteButton')}
+              <UserPlus /> {t(list === 'developers' ? 'servers.admin.dev.addDeveloper' : 'servers.admin.dev.inviteButton')}
             </button>
           </div>
         </form>
-      </div>
-
-      <div className="settings-section">
-        <h3>{t('servers.admin.dev.list', { count: data.invites.length })}</h3>
-        {data.invites.length === 0 ? (
-          <p className="hint">{t('servers.admin.dev.none')}</p>
-        ) : (
-          <div className="card admin-items">
-            {data.invites.map((a) => (
-              <div key={a.uuid} className="setting">
-                <div className="text">
-                  <b>
-                    {a.name || a.uuid} {a.developer && <span className="chip compact success">{t('servers.admin.dev.developer')}</span>}
-                  </b>
-                  <span>{t('servers.admin.dev.invitedBy', { when: ago(a.addedAt), by: a.addedBy || '—' })}</span>
-                  <div className="hint mono">{a.uuid}</div>
-                </div>
-                {!developer &&
-                  (a.developer ? (
-                    <button className="btn sm" onClick={() => void act('/api/devs/developer', { uuid: a.uuid, on: false }, 'servers.admin.dev.madeTester', { name: a.name || a.uuid })}>
-                      {t('servers.admin.dev.makeTester')}
-                    </button>
-                  ) : (
-                    <button className="btn sm" onClick={() => setPromoting(a)}>
-                      {t('servers.admin.dev.makeDeveloper')}
-                    </button>
-                  ))}
-                {(!developer || !a.developer) && (
-                  <button className="btn sm" onClick={() => void act('/api/devs/remove', { uuid: a.uuid }, 'servers.admin.dev.uninvited')}>
-                    {t('servers.admin.dev.uninvite')}
-                  </button>
-                )}
+      )}
+      {people.length === 0 ? (
+        <p className="hint">{t(none)}</p>
+      ) : (
+        <div className="card admin-items">
+          {people.map((a) => (
+            <div key={a.uuid} className="setting">
+              <div className="text">
+                <b>{a.name || a.uuid}</b>
+                <span>{t('servers.admin.dev.invitedBy', { when: ago(a.addedAt), by: a.addedBy || '—' })}</span>
+                <div className="hint mono">{a.uuid}</div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {promoting && (
-        <ConfirmModal
-          title={t('servers.admin.dev.makeDeveloper')}
-          body={t('servers.admin.dev.makeDeveloperConfirm', { name: promoting.name || promoting.uuid })}
-          confirm={t('servers.admin.dev.makeDeveloper')}
-          onConfirm={async () => void (await act('/api/devs/developer', { uuid: promoting.uuid, on: true }, 'servers.admin.dev.madeDeveloper', { name: promoting.name || promoting.uuid }))}
-          onClose={() => setPromoting(null)}
-        />
+              {canEdit && (
+                <button className="btn sm" onClick={() => void act('/api/devs/remove', split ? { uuid: a.uuid, list } : { uuid: a.uuid }, 'servers.admin.dev.uninvited')}>
+                  {t(list === 'developers' ? 'servers.admin.dev.removeDeveloper' : 'servers.admin.dev.uninvite')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
       )}
-      {removing && b && (
-        <ConfirmModal
-          title={t('servers.admin.dev.removeBuild')}
-          body={t('servers.admin.dev.removeBuildConfirm', { version: b.version })}
-          confirm={t('servers.admin.dev.removeBuild')}
-          onConfirm={async () => void (await act('/api/devs/build/remove', {}, 'servers.admin.dev.buildRemoved'))}
-          onClose={() => setRemoving(false)}
-        />
-      )}
-    </>
+    </div>
   )
 }

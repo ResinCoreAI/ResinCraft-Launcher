@@ -297,6 +297,9 @@ pub struct DevUploadReq {
     /// A developer's upload: the ticket comes from [`dev_call`], not the admin connection.
     #[serde(default)]
     pub developer: bool,
+    /// Which build: "dev" (developers' Dev build, the default) or "test" (testers' Test build).
+    #[serde(default)]
+    pub lane: Option<String>,
 }
 
 /// A developer's Dev API: `path` is the admin route (`/api/devs`, `/api/devs/add`...), sent to the relay as
@@ -332,7 +335,10 @@ pub async fn dev_call(method: &str, path: &str, body: Option<Value>) -> Result<V
 /// developer's [`dev_call`]). The update signature comes from the `.sig` next to the file.
 pub async fn dev_upload(req: DevUploadReq) -> Result<Value> {
     let signature = tokio::fs::read_to_string(format!("{}.sig", req.path)).await.map_err(|e| anyhow::anyhow!("{}.sig: {e}", req.path))?;
-    let ticket = if req.developer { dev_call("POST", "/api/devs/upload-ticket", None).await? } else { call("POST", "/api/devs/upload-ticket", None).await? };
+    // The ticket is for one lane: the relay only takes it for that build.
+    let lane = if req.lane.as_deref() == Some("test") { "test" } else { "dev" };
+    let body = Some(serde_json::json!({ "lane": lane }));
+    let ticket = if req.developer { dev_call("POST", "/api/devs/upload-ticket", body).await? } else { call("POST", "/api/devs/upload-ticket", body).await? };
     let (Some(url), Some(t)) = (ticket["url"].as_str(), ticket["ticket"].as_str()) else { anyhow::bail!("the relay didn't give an upload ticket") };
     let body = tokio::fs::read(&req.path).await?;
     let res = crate::core::ctx::http()

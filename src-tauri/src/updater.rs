@@ -12,9 +12,12 @@
 //! draft is what offers it to players. (Launcher 0.3.0 read the newest release's own latest.json instead.) Test
 //! builds point elsewhere with `tauri build --config` (see README, "Updates").
 //!
-//! The Dev channel is for accounts the relay's admin invited (and launcher admins): the relay serves its feed and
-//! update files to those accounts only, with their relay session (`/api/dev/feed`, `/dev/<target>`), and the developer
-//! uploads builds to it with `release-dev.bat`. Dev users also get Beta's releases when they're newer.
+//! Two invite-only channels live on the relay, each with its own list and its own build, and neither gives the other:
+//! - Dev, for developers (an admin adds them): the Dev build (`/api/dev/feed`, `/dev/<target>`), what they install in
+//!   their own launcher. `release-dev.bat` uploads it.
+//! - Test, for testers a developer invites: the Test build (`/api/dev/test/feed`, `/dev/test/<target>`).
+//! Launcher admins have both. The relay serves the feeds and update files only with the account's relay session.
+//! Dev and Test users also get Beta's releases when they're newer.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -67,6 +70,9 @@ pub struct UpdateStatus {
     /// Settings offers it, and moves a launcher on Dev that isn't invited any more back to Beta.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dev: Option<bool>,
+    /// The same for the Test channel: a tester's invitation (separate from Dev, which is for developers).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test: Option<bool>,
 }
 
 /// Whether this copy runs from an MSIX package (the Microsoft Store), which Windows updates itself.
@@ -244,10 +250,11 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     publish(|s| s.state = "checking");
 
     let channel = crate::core::settings::get().await.update_channel;
-    // Dev: the relay's Dev build next to Beta's feed; an account that isn't invited (any more) gets Beta.
-    let dev = if channel == "dev" { ask_dev_access().await } else { DevAccess::No };
+    // Dev and Test: that relay build next to Beta's feed; an account that isn't on its list (any more) gets Beta.
+    let relay_channel = channel == "dev" || channel == "test";
+    let dev = if relay_channel { ask_dev_access().await } else { DevAccess::No };
     let mut builder = app.updater_builder().timeout(Duration::from_secs(30));
-    if channel == "beta" || channel == "dev" {
+    if channel == "beta" || relay_channel {
         // The stable feed second: the updater tries the next address when one fails (no beta.json yet).
         builder = builder.endpoints(vec![BETA_FEED.parse().expect("beta feed address"), STABLE_FEED.parse().expect("stable feed address")])?;
     }
@@ -259,13 +266,17 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
         Err(e) => Err(e),
     };
     let mut from_dev = None;
-    let result = match dev {
-        DevAccess::Yes { feed, session, .. } => {
+    let feed = match dev {
+        DevAccess::Yes { dev_feed, test_feed, session, .. } => if channel == "test" { test_feed } else { dev_feed }.map(|f| (f, session)),
+        _ => None,
+    };
+    let result = match feed {
+        Some((feed, session)) => {
             let found = check_dev(&app, &feed, &session, reinstall).await;
             from_dev = found.as_ref().ok().and_then(|u| u.as_ref()).map(|u| u.version.clone());
             newest(result, found)
         }
-        _ => result,
+        None => result,
     };
     let checked = now_ms();
     let _ = write_json(&state_file(), &Saved { last_checked: Some(checked) }).await;
@@ -305,11 +316,12 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     }))
 }
 
-/// What the relay says about this launcher's account and the Dev channel.
+/// What the relay says about this launcher's account and its two invite-only channels.
 enum DevAccess {
-    /// Invited (or a launcher admin): the feed's address and the relay session that opens it (and its downloads);
-    /// `developer`: the account may also manage the Dev channel from the Admin page.
-    Yes { feed: String, session: String, developer: bool },
+    /// On at least one of the relay's lists (or a launcher admin), with the relay session that opens the feeds (and
+    /// their downloads). `dev_feed`: a developer's Dev build. `test_feed`: a tester's Test build (a separate
+    /// invitation; neither gives the other). `developer`: the account may also manage both from the Admin page.
+    Yes { dev_feed: Option<String>, test_feed: Option<String>, session: String, developer: bool },
     /// Not invited, no Microsoft account, a relay without the Dev channel, or a build without the relay.
     No,
     /// The relay couldn't be asked (offline…): Settings keeps what it last heard.
@@ -320,13 +332,19 @@ enum DevAccess {
 async fn ask_dev_access() -> DevAccess {
     let access = dev_access().await;
     if !matches!(access, DevAccess::Unknown) {
-        let dev = matches!(access, DevAccess::Yes { .. });
+        let (dev, test) = match &access {
+            DevAccess::Yes { dev_feed, test_feed, .. } => (dev_feed.is_some(), test_feed.is_some()),
+            _ => (false, false),
+        };
         let changed = with(|st| {
             st.dev_asked = now_ms();
-            st.status.dev != Some(dev)
+            st.status.dev != Some(dev) || st.status.test != Some(test)
         });
         if changed {
-            publish(|s| s.dev = Some(dev));
+            publish(|s| {
+                s.dev = Some(dev);
+                s.test = Some(test);
+            });
         }
     }
     access
@@ -358,7 +376,14 @@ async fn dev_access() -> DevAccess {
             Ok((200, r)) => {
                 let v = r.json::<Value>().await.unwrap_or(Value::Null);
                 let flag = |k: &str| v.get(k).and_then(Value::as_bool).unwrap_or(false);
-                return if flag("dev") { DevAccess::Yes { feed: format!("https://{domain}/api/dev/feed"), session, developer: flag("developer") } } else { DevAccess::No };
+                // A relay from before the Test channel doesn't send `test`.
+                let dev_feed = flag("dev").then(|| format!("https://{domain}/api/dev/feed"));
+                let test_feed = flag("test").then(|| format!("https://{domain}/api/dev/test/feed"));
+                return if dev_feed.is_some() || test_feed.is_some() || flag("developer") {
+                    DevAccess::Yes { dev_feed, test_feed, session, developer: flag("developer") }
+                } else {
+                    DevAccess::No
+                };
             }
             // A relay without the Dev channel (older), or a banned account.
             Ok((403 | 404, _)) => return DevAccess::No,

@@ -447,8 +447,9 @@ export interface Settings {
   autoUpdate: boolean
   /** Install found updates in the background without asking, once no game or hosted server runs. */
   silentUpdate?: boolean
-  /** 'stable', 'beta' (pre-releases too) or 'dev' (the relay's Dev builds, for invited accounts). */
-  updateChannel?: 'stable' | 'beta' | 'dev'
+  /** 'stable', 'beta' (pre-releases too), 'dev' (the relay's Dev build, for developers) or 'test' (the relay's Test
+   *  build, for invited testers). */
+  updateChannel?: 'stable' | 'beta' | 'dev' | 'test'
   /** Closing the window keeps ResinCraft running in the system tray. */
   tray?: boolean
   /** Hidden for 30 s (in the tray, or while a game runs), the window closes completely to free WebView2's memory and
@@ -490,7 +491,7 @@ export interface UpdateAvailable {
   notesUrl: string
   /** The version already installed, offered again by Reinstall (not shown as an update). */
   reinstall?: boolean
-  /** A Dev build from the relay: no release page (`notesUrl` is empty). */
+  /** A Dev or Test build from the relay: no release page (`notesUrl` is empty). */
   dev?: boolean
 }
 
@@ -527,8 +528,10 @@ export interface UpdateStatus {
   waitingFor?: UpdateBlockers
   /** Installed from the Microsoft Store: the Store updates it, so ResinCraft never looks. */
   store?: boolean
-  /** Whether the signed-in account may use the Dev channel (the relay's admin invited it); missing until the relay said. */
+  /** Whether the signed-in account may use the Dev channel (a developer); missing until the relay said. */
   dev?: boolean
+  /** Whether it may use the Test channel (a tester a developer invited; separate from Dev); missing until the relay said. */
+  test?: boolean
 }
 
 export interface AppInfo {
@@ -3027,7 +3030,7 @@ export interface ResinApi {
     /** Admin → Dev: picks a Dev build's update file on this PC (null if cancelled). */
     devPickBuild(): Promise<DevBuildFile | null>
     /** Admin → Dev: uploads it to the relay's Dev channel, with the .sig next to it. */
-    devUpload(req: { path: string; version: string; target: string; notes?: string; developer?: boolean }): Promise<unknown>
+    devUpload(req: { path: string; version: string; target: string; notes?: string; developer?: boolean; lane?: 'dev' | 'test' }): Promise<unknown>
     /** Admin → Dev for the relay's developers: the same /api/devs routes with the relay session, no unlock. */
     devCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
     submitListing(req: { address: string; info: ListingInfo }): Promise<ListingStatus>
