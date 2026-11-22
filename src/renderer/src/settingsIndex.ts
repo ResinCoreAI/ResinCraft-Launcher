@@ -20,6 +20,7 @@ export const SETTING_SECTIONS: { id: string; label: Key }[] = [
   { id: 'remote', label: 'settings.remote' },
   { id: 'mcp', label: 'settings.mcp' },
   { id: 'updates', label: 'updates.nav' },
+  { id: 'store-history', label: 'storeHistory.title' },
   { id: 'about', label: 'settings.nav.about' }
 ]
 

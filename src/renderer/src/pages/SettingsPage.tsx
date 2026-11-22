@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Activity, Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sparkles, Sun, Terminal, Trash2, Tv } from 'lucide-react'
+  Activity, Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, Receipt, RefreshCw, RotateCcw, Sparkles, Sun, Terminal, Trash2, Tv } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { showWelcome } from '../welcomeState'
@@ -22,6 +22,7 @@ import { SETTING_SECTIONS } from '../settingsIndex'
 import { setLaunchScreen, useLaunchScreen } from '../launchScreenState'
 import { setClassicLayout, useClassicLayout } from '../classicLayoutState'
 import { versionName } from '../versionName'
+import { StoreHistorySection } from '../components/StoreHistory'
 import { setGuideOn, startGuide, useGuide } from '../guideState'
 import { setWindowButtons, useWindowButtons, WINDOW_BUTTON_STYLES, type WindowButtonStyle } from '../windowButtonsState'
 
@@ -196,6 +197,7 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   remote: <Globe size={16} />,
   mcp: <Bot size={16} />,
   updates: <RefreshCw size={16} />,
+  'store-history': <Receipt size={16} />,
   about: <Info size={16} />
 }
 const SECTIONS = SETTING_SECTIONS.map((x) => ({ ...x, icon: SECTION_ICONS[x.id] }))
@@ -715,6 +717,8 @@ export default function SettingsPage() {
               <PackUpdatesSetting />
             </div>
           </section>
+
+          <StoreHistorySection />
 
           <ResetSettings />
 

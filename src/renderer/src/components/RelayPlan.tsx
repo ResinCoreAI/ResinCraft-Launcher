@@ -35,6 +35,7 @@ import '../relay-plan.css'
 import '../resin-credit.css'
 import { countText, UNLIMITED_COUNT } from '../relayCount'
 import { money, setWalletBalance } from '../storeStatus'
+import { openStoreHistory } from './StoreHistory'
 
 
 const gb = (bytes: number) => `${Math.round((bytes / 1e9) * 10) / 10} GB`
@@ -370,7 +371,7 @@ const signed = (n: number, currency: string) => `${n > 0 ? '+' : n < 0 ? '−' :
 const stamp = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 /** Ledger entries, newest first: what, when, the amount (+ in, − out), the balance after and the note. */
-function WalletEntries({ entries, currency }: { entries: WalletEntry[]; currency: string }) {
+export function WalletEntries({ entries, currency }: { entries: WalletEntry[]; currency: string }) {
   return (
     <div className="rc-ledger">
       {entries.map((e) => (
@@ -387,30 +388,6 @@ function WalletEntries({ entries, currency }: { entries: WalletEntry[]; currency
         </div>
       ))}
     </div>
-  )
-}
-
-/** Every ledger entry, a page at a time ("Show more" asks for the ones before the last). */
-function WalletHistoryModal({ w, accountName, onClose }: { w: ReturnType<typeof useWallet>; accountName: string; onClose: () => void }) {
-  const wallet = w.wallet!
-  return (
-    <Modal
-      title={t('servers.wallet.historyTitle')}
-      subtitle={t('servers.wallet.balanceOf', { account: accountName, balance: money(wallet.balance, wallet.currency) })}
-      onClose={onClose}
-      footer={
-        <button className="btn" onClick={onClose}>
-          {t('common.close')}
-        </button>
-      }
-    >
-      {wallet.history.length === 0 ? <p className="hint">{t('servers.wallet.noHistory')}</p> : <WalletEntries entries={wallet.history} currency={wallet.currency} />}
-      {wallet.more && (
-        <button className="btn sm rc-more" disabled={w.loadingMore} onClick={() => void w.more()}>
-          {w.loadingMore ? <Loader2 className="spin" /> : <ChevronDown />} {t('servers.wallet.showMore')}
-        </button>
-      )}
-    </Modal>
   )
 }
 
@@ -600,11 +577,10 @@ const WALLET_METHODS: Record<string, Key> = {
 
 /** The Store's Resin Credit card: the balance, Top up, the newest changes and the whole history. */
 function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: number) => void }) {
-  const { toast } = useStore()
+  const { toast, go } = useStore()
   const plan = a.plan!
   const w = useWallet(a.account, !!plan.wallet, plan.wallet_balance)
   const [topup, setTopup] = useState(false)
-  const [history, setHistory] = useState(false)
   const wallet = w.wallet
   const cur = wallet?.currency || plan.currency
   const balance = wallet?.balance ?? plan.wallet_balance ?? 0
@@ -626,7 +602,7 @@ function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: num
         <button className="btn sm primary" disabled={!wallet?.enabled || wallet.methods.length === 0} onClick={() => setTopup(true)}>
           <Plus /> {t('servers.wallet.topup')}
         </button>
-        <button className="btn sm" disabled={!wallet} onClick={() => setHistory(true)}>
+        <button className="btn sm" disabled={!wallet} onClick={() => openStoreHistory(go)}>
           <History /> {t('servers.wallet.history')}
         </button>
       </div>
@@ -645,7 +621,6 @@ function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: num
           }}
         />
       )}
-      {history && wallet && <WalletHistoryModal w={w} accountName={a.accountName} onClose={() => setHistory(false)} />}
     </div>
   )
 }

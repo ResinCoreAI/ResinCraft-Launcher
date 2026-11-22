@@ -230,3 +230,40 @@
 .rc-own .input.bad {
   border-color: var(--danger, #e5484d);
 }
+
+/* Settings → Store history (components/StoreHistory.tsx). */
+.sh-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sh-bar {
+  gap: 8px;
+}
+.sh-list {
+  display: flex;
+  flex-direction: column;
+}
+.sh-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.sh-row:first-child {
+  border-top: 0;
+}
+.sh-row > svg {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: none;
+  color: var(--text-faint);
+}
+.sh-row .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
