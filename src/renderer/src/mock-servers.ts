@@ -344,22 +344,27 @@ export function mockServers(): {
   let spareNames = ['old-smp']
   // ResinCraft Relay plans (?plans=off: the relay sells nothing).
   const plansOn = new URLSearchParams(location.search).get('plans') !== 'off'
-  const g = (servers: number, names: number, traffic_gb: number, unlimited_traffic = false, no_session_limit = false, whitelist_page = false) => ({
+  const g = (servers: number, names: number, traffic_gb: number, unlimited_traffic = false, no_session_limit = false, whitelist_page = false, session_minutes = 0) => ({
     servers,
     names,
     traffic_gb,
     unlimited_traffic,
     no_session_limit,
-    whitelist_page
+    whitelist_page,
+    session_minutes
   })
-  const PLAN_PRODUCTS = [
+  // The card's look the relay's admin picks (badge, highlight, icon); left out like the relay does when unset.
+  type Look = { badge?: string; highlight?: boolean; icon?: string }
+  type MockProduct = { id: string; kind: string; name: string; description: string; grants: ReturnType<typeof g>; monthly: number } & Look
+  const PLAN_PRODUCTS = (<MockProduct[]>[
     {
       id: 'addon-server',
       kind: 'addon',
       name: '+1 server online',
       description: 'One more server online through the relay at once',
       grants: g(1, 0, 0),
-      monthly: 6900
+      monthly: 6900,
+      icon: 'server'
     },
     { id: 'addon-name', kind: 'addon', name: '+1 name', description: 'One more reserved name', grants: g(0, 1, 0), monthly: 4900 },
     { id: 'addon-traffic-20', kind: 'addon', name: '+20 GB traffic', description: '20 GB more traffic every month', grants: g(0, 0, 20), monthly: 1900 },
@@ -372,7 +377,28 @@ export function mockServers(): {
       name: 'No session limit',
       description: 'Servers stay online without pressing Continue',
       grants: g(0, 0, 0, false, true),
-      monthly: 9900
+      monthly: 9900,
+      icon: 'infinity'
+    },
+    {
+      id: 'addon-session-120',
+      kind: 'addon',
+      name: 'Longer sessions +120 min',
+      description: '120 more minutes in every session before Continue',
+      grants: g(0, 0, 0, false, false, false, 120),
+      monthly: 1900,
+      icon: 'clock'
+    },
+    {
+      id: 'addon-session-240',
+      kind: 'addon',
+      name: 'Longer sessions +240 min',
+      description: '240 more minutes in every session before Continue',
+      grants: g(0, 0, 0, false, false, false, 240),
+      monthly: 3500,
+      icon: 'clock',
+      badge: 'Best value',
+      highlight: true
     },
     {
       id: 'addon-whitelist-page',
@@ -389,7 +415,10 @@ export function mockServers(): {
       name: '+1 server, +1 name, unlimited traffic',
       description: 'One more server online, one more name and no data cap',
       grants: g(1, 1, 0, true),
-      monthly: 19900
+      monthly: 19900,
+      badge: 'Popular',
+      highlight: true,
+      icon: 'star'
     },
     {
       id: 'pack-219',
@@ -407,14 +436,26 @@ export function mockServers(): {
       grants: g(1, 1, 0, true, true),
       monthly: 25900
     }
-  ].map((p) => ({ ...p, yearly: p.monthly * 10, owned: false }))
+  ]).map((p) => ({ ...p, yearly: p.monthly * 10, owned: false }))
   type MockSub = import('@shared/types').PlanSub
   const planAccounts: { account: string; accountName: string; subs: MockSub[] }[] = [
     {
       account: PUIRKLE,
       accountName: 'Puirkle',
-      // Paid with Resin Credit; the second one the relay's admin refunded as credit.
+      // Paid with Resin Credit; the second one the relay's admin refunded as credit. The admin also gave longer sessions.
       subs: [
+        {
+          id: 'grant_mock_session',
+          product: 'addon-session-120',
+          name: 'Longer sessions +120 min',
+          yearly: false,
+          status: 'granted',
+          active: true,
+          period_end: 0,
+          cancel_at_period_end: false,
+          amount: 0,
+          paid: false
+        },
         {
           id: 'wallet-mock-b',
           product: 'addon-name',
@@ -502,6 +543,7 @@ export function mockServers(): {
         have.servers += p.servers
         have.names += p.names
         have.traffic_gb += p.traffic_gb
+        have.session_minutes += p.session_minutes
         have.unlimited_traffic ||= p.unlimited_traffic
         have.no_session_limit ||= p.no_session_limit
         have.whitelist_page ||= p.whitelist_page
@@ -509,7 +551,7 @@ export function mockServers(): {
     }
     const owned = (p: (typeof PLAN_PRODUCTS)[number]) => {
       const x = p.grants
-      const counts = x.servers > 0 || x.names > 0 || x.traffic_gb > 0
+      const counts = x.servers > 0 || x.names > 0 || x.traffic_gb > 0 || (x.session_minutes > 0 && !have.no_session_limit)
       return (
         !counts &&
         !((x.unlimited_traffic && !have.unlimited_traffic) || (x.no_session_limit && !have.no_session_limit) || (x.whitelist_page && !have.whitelist_page))
@@ -561,9 +603,11 @@ export function mockServers(): {
             unlimited_traffic: have.unlimited_traffic,
             no_session_limit: have.no_session_limit,
             whitelist_page: have.whitelist_page,
-            session_secs: have.no_session_limit ? 0 : 7200
+            session_secs: have.no_session_limit ? 0 : 7200 + have.session_minutes * 60,
+            session_minutes: have.no_session_limit ? 0 : 120 + have.session_minutes,
+            session_minutes_added: have.no_session_limit ? 0 : have.session_minutes
           }
-        : { servers: 3, names: 5, monthly_bytes: 0, unlimited_traffic: true, no_session_limit: true, whitelist_page: true, session_secs: 0 }
+        : { servers: 3, names: 5, monthly_bytes: 0, unlimited_traffic: true, no_session_limit: true, whitelist_page: true, session_secs: 0, session_minutes: 0, session_minutes_added: 0 }
     }
   }
   let nameRequest: RelayNameAccount['request']
@@ -1154,7 +1198,13 @@ export function mockServers(): {
       const lines = items.map((id) => {
         const p = PLAN_PRODUCTS.find((x) => x.id === id)!
         const price = yearly ? p.yearly : p.monthly
-        return { product: id, name: p.name, price, discount: code === 'TEST50' && id === 'addon-whitelist-page' ? Math.round(price / 2) : 0 }
+        return {
+          product: id,
+          name: p.name,
+          price,
+          discount: code === 'TEST50' && id === 'addon-whitelist-page' ? Math.round(price / 2) : 0,
+          ...(p.grants.session_minutes ? { session_minutes: p.grants.session_minutes } : {})
+        }
       })
       const promoError =
         code && code !== 'TEST50'

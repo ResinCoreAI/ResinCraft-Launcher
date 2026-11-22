@@ -259,10 +259,14 @@ const pay = {
   currency: 'thb',
   stripe: { secretKey: true, publishableKey: true, webhookSecret: true, testMode: true, ready: true, webhookUrl: 'https://rscraft.resincore.tech/stripe/webhook' },
   products: [
-    { id: 'addon-server', name: '+1 server', description: '', kind: 'addon', grants: { servers: 1 }, monthly: 6900, yearly: 69000, on_sale: true, order: 1, stripe_product: 'prod_Mock1', stripe_price_monthly: 'price_M1', stripe_price_yearly: 'price_Y1', active: 4 },
+    { id: 'addon-server', name: '+1 server', description: '', kind: 'addon', grants: { servers: 1 }, monthly: 6900, yearly: 69000, on_sale: true, order: 1, stripe_product: 'prod_Mock1', stripe_price_monthly: 'price_M1', stripe_price_yearly: 'price_Y1', active: 4, icon: 'server' },
     { id: 'addon-unlimited-traffic', name: 'Unlimited traffic', description: '', kind: 'addon', grants: { unlimited_traffic: true }, monthly: 16900, yearly: 169000, on_sale: true, order: 3, stripe_product: '', active: 2 },
-    { id: 'pack-219', name: 'Creator pack', description: 'Two servers, unlimited traffic', kind: 'pack', grants: { servers: 1, names: 1, unlimited_traffic: true, no_session_limit: true }, monthly: 21900, yearly: 219000, on_sale: false, order: 10, stripe_product: 'prod_Mock3', active: 0 }
+    { id: 'pack-219', name: 'Creator pack', description: 'Two servers, unlimited traffic', kind: 'pack', grants: { servers: 1, names: 1, unlimited_traffic: true, no_session_limit: true }, monthly: 21900, yearly: 219000, on_sale: false, order: 10, stripe_product: 'prod_Mock3', active: 0, badge: 'Popular', highlight: true, icon: 'star' },
+    // The relay's two default add-ons (seeded off sale).
+    { id: 'addon-session-120', name: 'Longer sessions +120 min', description: '', kind: 'addon', grants: { servers: 0, names: 0, traffic_gb: 0, session_minutes: 120, unlimited_traffic: false, no_session_limit: false, whitelist_page: false }, monthly: 1900, yearly: 19000, on_sale: false, order: 20, stripe_product: '', active: 1, refundable: true, icon: 'clock' },
+    { id: 'addon-session-240', name: 'Longer sessions +240 min', description: '', kind: 'addon', grants: { servers: 0, names: 0, traffic_gb: 0, session_minutes: 240, unlimited_traffic: false, no_session_limit: false, whitelist_page: false }, monthly: 3500, yearly: 35000, on_sale: false, order: 21, stripe_product: '', active: 0, refundable: true, icon: 'clock' }
   ] as Row[],
+  productIcons: ['clock', 'database', 'server', 'tag', 'infinity', 'globe', 'star', 'gift', 'shield', 'bolt'],
   subs: [
     { id: 'pi_mock1', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Alex', product: 'addon-server', yearly: false, status: 'paid', period_end: now() + 86400 * 12, cancel_at_period_end: false, amount: 6900, source: 'once', method: 'promptpay', active: true },
     { id: 'sub_mock2', uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle_Gamer', product: 'addon-unlimited-traffic', yearly: true, status: 'active', period_end: now() + 86400 * 200, cancel_at_period_end: false, amount: 169000, source: 'stripe', active: true },
@@ -291,10 +295,22 @@ function paymentsMock(method: string, p: string, b: Row): unknown {
   else if (p.endsWith('/store')) pay.storeOpen = b.reset ? { on: true, fromFile: true } : { on: !!b.on, fromFile: false }
   else if (p.endsWith('/moves')) pay.moves = b.reset ? { on: false, fromFile: true } : { on: !!b.on, fromFile: false }
   else if (p.endsWith('/free')) pay.free = b.reset ? { ...pay.fileFree } : { ...pay.free, ...b }
-  else if (p.endsWith('/product/sale') && product) product.on_sale = !!b.on
+  else if (p.endsWith('/product/sale') && product) {
+    if (b.on && !product.monthly && !product.yearly) throw new Error('The relay refused: on_sale: it needs a monthly or a yearly price first')
+    product.on_sale = !!b.on
+  } else if (p.endsWith('/product/duplicate') && product) {
+    let made = b.new_id || `${product.id}-copy`
+    for (let n = 2; pay.products.some((x) => x.id === made); n++) made = `${product.id}-copy-${n}`
+    pay.products.push({ ...product, id: made, name: `${product.name} (copy)`, on_sale: false, stripe_product: '', stripe_price_monthly: '', stripe_price_yearly: '', active: 0 })
+    return { ...pay, made }
+  }
   else if (p.endsWith('/product/remove')) pay.products = pay.products.filter((x) => x.id !== b.id)
   else if (p.endsWith('/product/stripe') && product) product.stripe_product = 'prod_Made'
   else if (p.endsWith('/product')) {
+    if (!product && !/^[a-z0-9][a-z0-9-]{1,39}$/.test(String(b.id ?? ''))) throw new Error('The relay refused: id: 2-40 lowercase letters, digits and dashes')
+    if (String(b.badge ?? '').length > 20) throw new Error('The relay refused: badge: at most 20 characters')
+    if ((b.grants?.session_minutes ?? 0) > 43200) throw new Error('The relay refused: grants.session_minutes: at most 43200 (use no_session_limit for no limit)')
+    if (b.on_sale && !b.monthly && !b.yearly) throw new Error('The relay refused: on_sale: it needs a monthly or a yearly price')
     const cents = { monthly: Math.round(b.monthly * 100), yearly: Math.round(b.yearly * 100) }
     if (product) Object.assign(product, b, cents)
     else pay.products.push({ ...b, ...cents, active: 0 })

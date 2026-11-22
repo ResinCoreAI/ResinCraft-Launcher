@@ -1480,7 +1480,13 @@ export interface PlanGrants {
   unlimited_traffic: boolean
   no_session_limit: boolean
   whitelist_page: boolean
+  /** Minutes added to every session before Continue (older relays leave it out: 0). */
+  session_minutes?: number
 }
+
+/** The icons a Store card can have (the relay's PRODUCT_ICONS). */
+export const PRODUCT_ICONS = ['clock', 'database', 'server', 'tag', 'infinity', 'globe', 'star', 'gift', 'shield', 'bolt'] as const
+export type ProductIcon = (typeof PRODUCT_ICONS)[number]
 
 /** A product for sale; prices in the currency's smallest unit (satang: 6900 = 69 THB). */
 export interface PlanProduct {
@@ -1493,6 +1499,12 @@ export interface PlanProduct {
   yearly: number
   /** Everything it gives, the account has already. */
   owned: boolean
+  /** The admin's short label on the card ("Popular", at most 20 characters; absent: none). */
+  badge?: string
+  /** The admin wants the card to stand out. */
+  highlight?: boolean
+  /** One of PRODUCT_ICONS (absent: the launcher's own for the product). */
+  icon?: ProductIcon | string
 }
 
 export interface PlanSub {
@@ -1588,7 +1600,8 @@ export interface PlanAccess {
 
 /** What a cart costs before buying it: each item's price and the promo code's discount on it. */
 export interface PlanQuote {
-  lines: { product: string; name: string; price: number; discount: number }[]
+  /** session_minutes: what the item adds to every session (absent: none). */
+  lines: { product: string; name: string; price: number; discount: number; session_minutes?: number }[]
   subtotal: number
   discount: number
   /** Unused days of purchases the cart covers, taken off after the discount (only when the relay's admin counts
@@ -1635,7 +1648,19 @@ export interface PlanInfo {
   wallet_balance?: number
   /** Selling is on but the Store is closed: nothing to buy, renew or change; limits and gift codes still work. */
   store_closed?: boolean
-  totals: { servers: number; names: number; monthly_bytes: number; unlimited_traffic: boolean; no_session_limit: boolean; whitelist_page: boolean; session_secs: number }
+  totals: {
+    servers: number
+    names: number
+    monthly_bytes: number
+    unlimited_traffic: boolean
+    no_session_limit: boolean
+    whitelist_page: boolean
+    session_secs: number
+    /** One session's length in minutes (0: no limit; older relays leave it out). */
+    session_minutes?: number
+    /** The part of session_minutes that purchases and grants add (0 with no limit). */
+    session_minutes_added?: number
+  }
 }
 
 /** What the payment form needs: a PaymentIntent (or SetupIntent) to confirm with Stripe.js, or nothing to pay. */

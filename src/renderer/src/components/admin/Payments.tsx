@@ -2,15 +2,27 @@
 // unused-days credit, ended add-ons (grace and cut-off) and TrueMoney angpao. Same routes as the relay dashboard's
 // Payments page (GET /api/payments, POST /api/payments/…); amounts are in the currency's smallest unit.
 import { useEffect, useState, type ReactNode } from 'react'
-import { Ban, Check, CloudUpload, Gift, Pencil, Plus, RefreshCw, Search, ShoppingBag, Ticket, Trash2, Wallet, X } from 'lucide-react'
+import { Ban, Check, CloudUpload, Copy, CreditCard, Gift, Pencil, Plus, RefreshCw, Search, ShoppingBag, Ticket, Trash2, Wallet, X } from 'lucide-react'
 import { currentLanguage, t, type Key } from '../../i18n'
 import { useStore } from '../../store'
 import { ConfirmModal, Empty, Modal, MoreButton, Segmented, Switch, type ContextEntry } from '../ui'
 import { account, Loading, post, shortId, useAct, useAdmin, when } from './common'
 import { UNLIMITED_COUNT } from '../../relayCount'
 import { WalletAdmin } from './Wallet'
+import { isProductIcon, ProductIcon, StoreProductRow } from '../StoreProduct'
+import '../../relay-plan.css'
+import '../../pay-product.css'
 
-type Grants = { servers?: number; names?: number; traffic_gb?: number; unlimited_traffic?: boolean; no_session_limit?: boolean; whitelist_page?: boolean }
+type Grants = {
+  servers?: number
+  names?: number
+  traffic_gb?: number
+  /** Minutes added to every session (relays that send productIcons). */
+  session_minutes?: number
+  unlimited_traffic?: boolean
+  no_session_limit?: boolean
+  whitelist_page?: boolean
+}
 interface Product {
   id: string
   name: string
@@ -27,6 +39,10 @@ interface Product {
   active: number
   /** Cancelling it can give its unused time back as Resin Credit (relays with Resin Credit; absent: true). */
   refundable?: boolean
+  /** The Store card's look (relays that send productIcons): a short label, standing out, and one of productIcons. */
+  badge?: string
+  highlight?: boolean
+  icon?: string
 }
 interface Sub {
   id: string
@@ -119,10 +135,15 @@ interface Payments {
   made?: string[]
   /** Resin Credit's switch (relays without Resin Credit leave it out). */
   walletOn?: boolean
+  /** The icons a product card can have; relays from before session minutes, badges and icons leave it out. */
+  productIcons?: string[]
 }
 
 type View = 'selling' | 'products' | 'codes' | 'purchases' | 'truemoney' | 'wallet'
-const COUNTS = ['servers', 'names', 'traffic_gb'] as const
+const COUNTS = ['servers', 'names', 'traffic_gb', 'session_minutes'] as const
+/** The relay's limits for a product (its payments.rs). */
+const MAX_BADGE = 20
+const MAX_SESSION_MINUTES = 43200
 const SWITCHES = ['unlimited_traffic', 'no_session_limit', 'whitelist_page'] as const
 /** Counts that can be ∞ (no limit), like Unlimited in an account's own settings. */
 const INF = ['servers', 'names'] as const
@@ -147,6 +168,7 @@ function gives(g: Grants) {
   if ((g.names ?? 0) >= UNLIMITED_COUNT) parts.push(t('servers.admin.pay.giveNamesInf'))
   else if (g.names) parts.push(t('servers.admin.pay.giveNames', { count: g.names }))
   if (g.traffic_gb) parts.push(t('servers.admin.pay.giveTraffic', { count: g.traffic_gb }))
+  if (g.session_minutes && !g.no_session_limit) parts.push(t('servers.admin.pay.giveSessionMinutes', { minutes: g.session_minutes }))
   for (const k of SWITCHES) if (g[k]) parts.push(t(`servers.admin.pay.grant.${k}` as Key))
   return parts.join(', ') || t('servers.admin.pay.giveNothing')
 }
@@ -186,7 +208,7 @@ export function PaymentsAdmin() {
       {view === 'selling' ? (
         <Selling d={data} act={act} />
       ) : view === 'products' ? (
-        <Products d={data} act={act} />
+        <Products d={data} act={act} reload={reload} />
       ) : view === 'codes' ? (
         <Codes d={data} act={act} reload={reload} />
       ) : view === 'purchases' ? (
@@ -428,10 +450,25 @@ function Selling({ d, act }: { d: Payments; act: Act }) {
   )
 }
 
-function Products({ d, act }: { d: Payments; act: Act }) {
-  const [editing, setEditing] = useState<Product | 'new'>()
+function Products({ d, act, reload }: { d: Payments; act: Act; reload: () => unknown }) {
+  const { toast } = useStore()
+  // A product's id (its editor), or a new one.
+  const [editing, setEditing] = useState<{ id: string } | 'new'>()
   const [removing, setRemoving] = useState<Product>()
   const cur = d.currency
+  const rich = !!d.productIcons
+  const editingProduct = editing && editing !== 'new' ? d.products.find((p) => p.id === editing.id) : undefined
+  // A copy off sale (the relay leaves out its Stripe links), then its editor, like the relay dashboard.
+  const duplicate = async (p: Product) => {
+    try {
+      const r = await post<{ made?: string }>('/api/payments/product/duplicate', { id: p.id })
+      toast(t('servers.admin.pay.duplicated', { name: p.name }), 'success')
+      await reload()
+      setEditing(r.made ? { id: r.made } : undefined)
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
   return (
     <>
       <div className="toolbar">
@@ -448,10 +485,20 @@ function Products({ d, act }: { d: Payments; act: Act }) {
       ) : (
         <div className="card admin-items">
           {d.products.map((p) => (
-            <div key={p.id} className="setting admin-item">
+            <div key={p.id} className="setting admin-item pe-item">
+              {rich && (
+                <span
+                  className={`pe-item-ic${p.highlight ? ' on' : ''}`}
+                  title={isProductIcon(p.icon) ? t(`servers.admin.pay.icon.${p.icon}` as Key) : t('servers.admin.pay.iconAuto')}
+                >
+                  <ProductIcon icon={p.icon} kind={p.kind} />
+                </span>
+              )}
               <div className="text">
                 <b>
                   {p.name}
+                  {p.badge && <span className="rp-badge pe-badge">{p.badge}</span>}
+                  {p.highlight && <span className="chip compact">{t('servers.admin.pay.highlighted')}</span>}
                   <span className="chip compact">{t(p.kind === 'pack' ? 'servers.admin.pay.pack' : 'servers.admin.pay.addon')}</span>
                   {p.on_sale ? (
                     <span className="chip compact success">{t('servers.admin.pay.onSale')}</span>
@@ -483,9 +530,15 @@ function Products({ d, act }: { d: Payments; act: Act }) {
                 label={t('servers.admin.pay.onSale')}
                 onChange={(on) => void act('/api/payments/product/sale', { id: p.id, on }, 'servers.admin.pay.saved')}
               />
+              {rich && (
+                <button className="btn sm ghost icon" title={t('servers.admin.pay.duplicateHint')} aria-label={t('servers.admin.pay.duplicate')} onClick={() => void duplicate(p)}>
+                  <Copy />
+                </button>
+              )}
               <MoreButton
                 items={() => [
-                  { label: t('servers.admin.pay.edit'), icon: <Pencil />, onSelect: () => setEditing(p) },
+                  { label: t('servers.admin.pay.edit'), icon: <Pencil />, onSelect: () => setEditing({ id: p.id }) },
+                  rich && { label: t('servers.admin.pay.duplicate'), icon: <Copy />, onSelect: () => void duplicate(p) },
                   d.stripe.ready && {
                     label: t('servers.admin.pay.createInStripe'),
                     icon: <CloudUpload />,
@@ -499,7 +552,19 @@ function Products({ d, act }: { d: Payments; act: Act }) {
           ))}
         </div>
       )}
-      {editing && <ProductModal d={d} p={editing === 'new' ? undefined : editing} act={act} onClose={() => setEditing(undefined)} />}
+      {(editing === 'new' || editingProduct) && (
+        <ProductModal
+          key={editingProduct?.id ?? 'new'}
+          d={d}
+          p={editingProduct}
+          act={act}
+          onDuplicate={(p) => {
+            setEditing(undefined)
+            void duplicate(p)
+          }}
+          onClose={() => setEditing(undefined)}
+        />
+      )}
       {removing && (
         <ConfirmModal
           title={t('servers.admin.pay.removeTitle', { name: removing.name })}
@@ -513,8 +578,23 @@ function Products({ d, act }: { d: Payments; act: Act }) {
   )
 }
 
-function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: Act; onClose: () => void }) {
+/** One group of the product editor, under its own heading. */
+function Group({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="pe-group">
+      <h4>{title}</h4>
+      {hint && <p className="hint">{hint}</p>}
+      {children}
+    </section>
+  )
+}
+
+/** The product editor: every field the relay takes, grouped as on the relay dashboard, and the Store's card as it'll look. */
+function ProductModal({ d, p, act, onDuplicate, onClose }: { d: Payments; p?: Product; act: Act; onDuplicate: (p: Product) => void; onClose: () => void }) {
   const s = (v?: string | number | null) => (v == null ? '' : String(v))
+  // Relays from before session minutes and the card's look don't send productIcons (nor take those fields).
+  const rich = !!d.productIcons
+  const icons = (d.productIcons ?? []).filter(isProductIcon)
   const [f, setF] = useState({
     id: s(p?.id),
     name: s(p?.name),
@@ -525,12 +605,16 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
     order: s(p?.order ?? 0),
     on_sale: p?.on_sale ?? false,
     refundable: p?.refundable ?? true,
+    badge: s(p?.badge),
+    highlight: p?.highlight ?? false,
+    icon: isProductIcon(p?.icon) ? (p?.icon as string) : '',
     stripe_product: s(p?.stripe_product),
     stripe_price_monthly: s(p?.stripe_price_monthly),
     stripe_price_yearly: s(p?.stripe_price_yearly)
   })
   const [g, setG] = useState<Grants>(p?.grants ?? {})
   const [busy, setBusy] = useState(false)
+  const [previewYearly, setPreviewYearly] = useState(false)
   const isInf = (k: (typeof INF)[number]) => (g[k] ?? 0) >= UNLIMITED_COUNT
   const allInf = INF.every(isInf) && SWITCHES.every((k) => !!g[k])
   const setAllInf = (on: boolean) => {
@@ -540,7 +624,7 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
     setG(next)
   }
   const cur = d.currency.toUpperCase()
-  const text = (k: keyof typeof f, label: string, placeholder?: string) => (
+  const text = (k: keyof typeof f, label: string, placeholder?: string, hint?: string, maxLength?: number) => (
     <label className="field">
       <span>{label}</span>
       <input
@@ -548,16 +632,47 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
         spellCheck={false}
         value={f[k] as string}
         placeholder={placeholder}
+        maxLength={maxLength}
         disabled={k === 'id' && !!p}
         onChange={(e) => setF({ ...f, [k]: e.target.value })}
       />
+      {hint && <em className="hint">{hint}</em>}
     </label>
   )
+  const toggle = (on: boolean, label: string, onChange: (v: boolean) => void, hint?: string) => (
+    <label className="row">
+      <Switch on={on} label={label} onChange={onChange} />
+      <span>
+        {label}
+        {hint && <span className="hint"> {hint}</span>}
+      </span>
+    </label>
+  )
+  const counts = COUNTS.filter((k) => rich || k !== 'session_minutes')
+  const grants = (): Grants => {
+    const out: Grants = {}
+    for (const k of counts) out[k] = Math.max(0, Math.floor(Number(g[k]) || 0))
+    for (const k of SWITCHES) out[k] = !!g[k]
+    return out
+  }
+  const monthly = Number(f.monthly) || 0
+  const yearly = Number(f.yearly) || 0
+  // What the relay would refuse, said before sending (its own 400s name the field too).
+  const problem = !f.name.trim()
+    ? t('servers.admin.pay.err.name')
+    : !p && !/^[a-z0-9][a-z0-9-]{1,39}$/.test(f.id.trim())
+      ? t('servers.admin.pay.err.id')
+      : f.badge.trim().length > MAX_BADGE
+        ? t('servers.admin.pay.err.badge', { n: MAX_BADGE })
+        : (Number(g.session_minutes) || 0) > MAX_SESSION_MINUTES
+          ? t('servers.admin.pay.err.minutes', { n: MAX_SESSION_MINUTES })
+          : monthly < 0 || yearly < 0
+            ? t('servers.admin.pay.err.negative')
+            : f.on_sale && !monthly && !yearly && !f.stripe_price_monthly.trim() && !f.stripe_price_yearly.trim()
+              ? t('servers.admin.pay.err.onSale')
+              : ''
   const save = async () => {
     setBusy(true)
-    const grants: Grants = {}
-    for (const k of COUNTS) grants[k] = Math.max(0, Math.floor(Number(g[k]) || 0))
-    for (const k of SWITCHES) grants[k] = !!g[k]
     const ok = await act(
       '/api/payments/product',
       {
@@ -565,13 +680,14 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
         name: f.name.trim(),
         description: f.description.trim(),
         kind: f.kind,
-        grants,
-        monthly: Number(f.monthly) || 0,
-        yearly: Number(f.yearly) || 0,
+        grants: grants(),
+        monthly,
+        yearly,
         order: Math.floor(Number(f.order) || 0),
         on_sale: f.on_sale,
         // Only relays with Resin Credit know it.
         ...(d.walletOn !== undefined ? { refundable: f.refundable } : {}),
+        ...(rich ? { badge: f.badge.trim(), highlight: f.highlight, icon: f.icon } : {}),
         stripe_product: f.stripe_product.trim(),
         stripe_price_monthly: f.stripe_price_monthly.trim(),
         stripe_price_yearly: f.stripe_price_yearly.trim()
@@ -581,6 +697,48 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
     setBusy(false)
     if (ok) onClose()
   }
+  // The Store page's own row, from what's typed so far.
+  const previewPrice = Math.round((previewYearly ? yearly : monthly) * 100)
+  const preview = (
+    <aside className="pe-preview">
+      <div className="row">
+        <b className="grow">{t('servers.admin.pay.preview')}</b>
+        <Segmented<'m' | 'y'>
+          value={previewYearly ? 'y' : 'm'}
+          onChange={(v) => setPreviewYearly(v === 'y')}
+          options={[
+            { value: 'm', label: t('servers.relayPlan.monthly') },
+            { value: 'y', label: t('servers.relayPlan.yearly') }
+          ]}
+        />
+      </div>
+      <div className={`relay-plan rp-page${f.on_sale && previewPrice ? '' : ' pe-off'}`}>
+        <StoreProductRow
+          p={{ name: f.name.trim() || t('servers.admin.pay.untitled'), kind: f.kind, grants: grants(), badge: f.badge.trim(), highlight: f.highlight, icon: f.icon }}
+          price={previewPrice}
+          currency={d.currency}
+          yearly={previewYearly}
+          buttons={
+            <>
+              <button type="button" className="btn sm primary" tabIndex={-1}>
+                <CreditCard /> {t('servers.relayPlan.buy')}
+              </button>
+              <button type="button" className="btn sm icon" tabIndex={-1} aria-label={t('servers.relayPlan.addToCart')}>
+                <Plus />
+              </button>
+            </>
+          }
+        />
+      </div>
+      <p className="hint">
+        {!previewPrice
+          ? t(previewYearly ? 'servers.admin.pay.previewNoYearly' : 'servers.admin.pay.previewNoMonthly')
+          : f.on_sale
+            ? t('servers.admin.pay.previewOnSale')
+            : t('servers.admin.pay.previewOffSale')}
+      </p>
+    </aside>
+  )
   return (
     <Modal
       wide
@@ -588,91 +746,124 @@ function ProductModal({ d, p, act, onClose }: { d: Payments; p?: Product; act: A
       onClose={onClose}
       footer={
         <>
+          {problem && <span className="hint bad grow pe-problem">{problem}</span>}
+          {p && rich && (
+            <button className="btn" title={t('servers.admin.pay.duplicateHint')} onClick={() => onDuplicate(p)}>
+              <Copy /> {t('servers.admin.pay.duplicate')}
+            </button>
+          )}
           <button className="btn" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={busy || !f.name.trim() || (!p && !f.id.trim())} onClick={() => void save()}>
+          <button className="btn primary" disabled={busy || !!problem} onClick={() => void save()}>
             <Check /> {t('servers.admin.set.save')}
           </button>
         </>
       }
     >
-      <div className="listing-fields">
-        <div className="field-row">
-          {text('id', t('servers.admin.pay.f.id'), 'addon-server')}
-          <label className="field">
-            <span>{t('servers.admin.pay.f.kind')}</span>
-            <Segmented<'addon' | 'pack'>
-              value={f.kind}
-              onChange={(kind) => setF({ ...f, kind })}
-              options={[
-                { value: 'addon', label: t('servers.admin.pay.addon') },
-                { value: 'pack', label: t('servers.admin.pay.pack') }
-              ]}
-            />
-          </label>
-        </div>
-        {text('name', t('servers.admin.pay.f.name'))}
-        {text('description', t('servers.admin.pay.f.description'))}
-        <div className="field-row">
-          {text('monthly', t('servers.admin.pay.f.monthly', { currency: cur }))}
-          {text('yearly', t('servers.admin.pay.f.yearly', { currency: cur }))}
-          {text('order', t('servers.admin.pay.f.order'))}
-        </div>
-        <label className="row">
-          <Switch on={allInf} label={t('servers.admin.pay.infinite')} onChange={setAllInf} />
-          <span>
-            {t('servers.admin.pay.infinite')} <span className="hint">{t('servers.admin.pay.infiniteHint')}</span>
-          </span>
-        </label>
-        <div className="field-row">
-          {COUNTS.map((k) => {
-            const inf = k !== 'traffic_gb' && isInf(k)
-            return (
-              <label key={k} className="field">
-                <span>{t(`servers.admin.pay.grant.${k}` as Key)}</span>
-                <input
-                  className="input"
-                  inputMode="numeric"
-                  value={inf ? '' : s(g[k] ?? 0)}
-                  placeholder={inf ? '∞' : undefined}
-                  disabled={inf}
-                  onChange={(e) => setG({ ...g, [k]: e.target.value === '' ? 0 : Number(e.target.value) })}
+      <div className={rich ? 'pe' : undefined}>
+        <div className="listing-fields">
+          <Group title={t('servers.admin.pay.sec.basics')}>
+            <div className="field-row">
+              {text('id', t('servers.admin.pay.f.id'), 'addon-longer-sessions', p ? t('servers.admin.pay.f.idFixed') : t('servers.admin.pay.f.idHint'), 40)}
+              <label className="field">
+                <span>{t('servers.admin.pay.f.kind')}</span>
+                <Segmented<'addon' | 'pack'>
+                  value={f.kind}
+                  onChange={(kind) => setF({ ...f, kind })}
+                  options={[
+                    { value: 'addon', label: t('servers.admin.pay.addon') },
+                    { value: 'pack', label: t('servers.admin.pay.pack') }
+                  ]}
                 />
-                {k !== 'traffic_gb' && (
-                  <span className="row" style={{ gap: 6, fontWeight: 'normal' }}>
-                    <input type="checkbox" checked={inf} onChange={(e) => setG({ ...g, [k]: e.target.checked ? UNLIMITED_COUNT : 0 })} />
-                    {t('servers.admin.pay.noLimit')}
-                  </span>
-                )}
               </label>
-            )
-          })}
+            </div>
+            {text('name', t('servers.admin.pay.f.name'), undefined, undefined, 80)}
+            {text('description', t('servers.admin.pay.f.description'), undefined, undefined, 300)}
+          </Group>
+          <Group title={t('servers.admin.pay.sec.items')} hint={rich ? t('servers.admin.pay.itemsHint') : undefined}>
+            {toggle(allInf, t('servers.admin.pay.infinite'), setAllInf, t('servers.admin.pay.infiniteHint'))}
+            <div className="field-row">
+              {counts.map((k) => {
+                const inf = (k === 'servers' || k === 'names') && isInf(k)
+                // Longer sessions mean nothing next to no session limit.
+                const off = inf || (k === 'session_minutes' && !!g.no_session_limit)
+                return (
+                  <label key={k} className="field">
+                    <span>{t(`servers.admin.pay.grant.${k}` as Key)}</span>
+                    <input
+                      className="input"
+                      inputMode="numeric"
+                      value={inf ? '' : s(g[k] ?? 0)}
+                      placeholder={inf ? '∞' : undefined}
+                      disabled={off}
+                      onChange={(e) => setG({ ...g, [k]: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    />
+                    {(k === 'servers' || k === 'names') && (
+                      <span className="row" style={{ gap: 6, fontWeight: 'normal' }}>
+                        <input type="checkbox" checked={inf} onChange={(e) => setG({ ...g, [k]: e.target.checked ? UNLIMITED_COUNT : 0 })} />
+                        {t('servers.admin.pay.noLimit')}
+                      </span>
+                    )}
+                    {k === 'session_minutes' && <em className="hint">{t('servers.admin.pay.f.minutesHint', { n: MAX_SESSION_MINUTES })}</em>}
+                  </label>
+                )
+              })}
+            </div>
+            {SWITCHES.map((k) => (
+              <div key={k}>{toggle(!!g[k], t(`servers.admin.pay.grant.${k}` as Key), (v) => setG({ ...g, [k]: v }))}</div>
+            ))}
+          </Group>
+          <Group title={t('servers.admin.pay.sec.prices')} hint={t('servers.admin.pay.pricesHint', { currency: cur })}>
+            <div className="field-row">
+              {text('monthly', t('servers.admin.pay.f.monthly', { currency: cur }))}
+              {text('yearly', t('servers.admin.pay.f.yearly', { currency: cur }))}
+            </div>
+          </Group>
+          <Group title={t('servers.admin.pay.sec.sale')}>
+            {toggle(f.on_sale, t('servers.admin.pay.onSale'), (on_sale) => setF({ ...f, on_sale }))}
+            <div className="field-row">{text('order', t('servers.admin.pay.f.order'))}</div>
+            {d.walletOn !== undefined &&
+              toggle(f.refundable, t('servers.admin.wallet.refundable'), (refundable) => setF({ ...f, refundable }), t('servers.admin.wallet.refundableHint'))}
+          </Group>
+          {rich && (
+            <Group title={t('servers.admin.pay.sec.display')}>
+              {text('badge', t('servers.admin.pay.f.badge'), t('servers.admin.pay.f.badgePlaceholder'), t('servers.admin.pay.f.badgeHint', { n: MAX_BADGE }), MAX_BADGE)}
+              {toggle(f.highlight, t('servers.admin.pay.f.highlight'), (highlight) => setF({ ...f, highlight }), t('servers.admin.pay.f.highlightHint'))}
+              <div className="field">
+                <span>{t('servers.admin.pay.f.icon')}</span>
+                <div className="pe-icons" role="radiogroup" aria-label={t('servers.admin.pay.f.icon')}>
+                  {['', ...icons].map((name) => {
+                    const label = name ? t(`servers.admin.pay.icon.${name}` as Key) : t('servers.admin.pay.iconAuto')
+                    return (
+                      <button
+                        key={name || 'auto'}
+                        type="button"
+                        role="radio"
+                        aria-checked={f.icon === name}
+                        className={`pe-icon${f.icon === name ? ' on' : ''}${name ? '' : ' auto'}`}
+                        title={name ? label : t('servers.admin.pay.iconAutoHint')}
+                        aria-label={label}
+                        onClick={() => setF({ ...f, icon: name })}
+                      >
+                        <ProductIcon icon={name} kind={f.kind} />
+                        {!name && <span>{label}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </Group>
+          )}
+          <Group title={t('servers.admin.pay.sec.stripe')} hint={t('servers.admin.pay.stripeHint')}>
+            {text('stripe_product', t('servers.admin.pay.f.stripeProduct'), 'prod_…')}
+            <div className="field-row">
+              {text('stripe_price_monthly', t('servers.admin.pay.f.stripeMonthly'), 'price_…')}
+              {text('stripe_price_yearly', t('servers.admin.pay.f.stripeYearly'), 'price_…')}
+            </div>
+          </Group>
         </div>
-        {SWITCHES.map((k) => (
-          <label key={k} className="row">
-            <Switch on={!!g[k]} label={t(`servers.admin.pay.grant.${k}` as Key)} onChange={(v) => setG({ ...g, [k]: v })} />
-            <span>{t(`servers.admin.pay.grant.${k}` as Key)}</span>
-          </label>
-        ))}
-        <label className="row">
-          <Switch on={f.on_sale} label={t('servers.admin.pay.onSale')} onChange={(on_sale) => setF({ ...f, on_sale })} />
-          <span>{t('servers.admin.pay.onSale')}</span>
-        </label>
-        {d.walletOn !== undefined && (
-          <label className="row">
-            <Switch on={f.refundable} label={t('servers.admin.wallet.refundable')} onChange={(refundable) => setF({ ...f, refundable })} />
-            <span>
-              {t('servers.admin.wallet.refundable')} <span className="hint">{t('servers.admin.wallet.refundableHint')}</span>
-            </span>
-          </label>
-        )}
-        {text('stripe_product', t('servers.admin.pay.f.stripeProduct'), 'prod_…')}
-        <div className="field-row">
-          {text('stripe_price_monthly', t('servers.admin.pay.f.stripeMonthly'), 'price_…')}
-          {text('stripe_price_yearly', t('servers.admin.pay.f.stripeYearly'), 'price_…')}
-        </div>
-        <span className="hint">{t('servers.admin.pay.stripeHint')}</span>
+        {rich && preview}
       </div>
     </Modal>
   )

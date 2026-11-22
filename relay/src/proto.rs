@@ -1169,6 +1169,9 @@ pub struct Grants {
     pub no_session_limit: bool,
     /// Whitelist pages for every name of the account.
     pub whitelist_page: bool,
+    /// More minutes in every session before it needs a `continue` (on top of the free plan's session length; nothing
+    /// while the account has no session limit). Relays before it leave it out: 0.
+    pub session_minutes: u32,
 }
 
 impl Grants {
@@ -1177,14 +1180,19 @@ impl Grants {
         self.servers = self.servers.saturating_add(other.servers.saturating_mul(times));
         self.names = self.names.saturating_add(other.names.saturating_mul(times));
         self.traffic_gb = self.traffic_gb.saturating_add(other.traffic_gb.saturating_mul(times));
+        self.session_minutes = self.session_minutes.saturating_add(other.session_minutes.saturating_mul(times));
         self.unlimited_traffic |= other.unlimited_traffic;
         self.no_session_limit |= other.no_session_limit;
         self.whitelist_page |= other.whitelist_page;
     }
 
-    /// Only switches `have` already has: buying this again would add nothing.
+    /// Only switches `have` already has: buying this again would add nothing. Longer sessions add nothing to an
+    /// account with no session limit.
     pub fn adds_nothing_to(&self, have: &Grants) -> bool {
-        let counts = (self.servers > 0 && have.servers < UNLIMITED_COUNT) || (self.names > 0 && have.names < UNLIMITED_COUNT) || self.traffic_gb > 0;
+        let counts = (self.servers > 0 && have.servers < UNLIMITED_COUNT)
+            || (self.names > 0 && have.names < UNLIMITED_COUNT)
+            || self.traffic_gb > 0
+            || (self.session_minutes > 0 && !have.no_session_limit);
         let new_switch = (self.unlimited_traffic && !have.unlimited_traffic) || (self.no_session_limit && !have.no_session_limit) || (self.whitelist_page && !have.whitelist_page);
         !counts && !new_switch
     }
@@ -1261,7 +1269,22 @@ pub struct ProductInfo {
     pub yearly: u64,
     /// The account has everything it gives already (switches only): it can't be bought again.
     pub owned: bool,
+    /// The admin's short label for the card ("Popular", at most [`MAX_BADGE`] characters); empty: none.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub badge: String,
+    /// The admin wants this card to stand out.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub highlight: bool,
+    /// The card's icon, one of [`PRODUCT_ICONS`]; empty: the launcher's own for the product.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub icon: String,
 }
+
+/// The icons a product card can have.
+pub const PRODUCT_ICONS: &[&str] = &["clock", "database", "server", "tag", "infinity", "globe", "star", "gift", "shield", "bolt"];
+
+/// The longest badge on a product card (characters).
+pub const MAX_BADGE: usize = 20;
 
 /// One of the account's subscriptions, or a product the admin gave it. Protocol 11.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -1384,6 +1407,10 @@ fn is_zero(n: &u64) -> bool {
     *n == 0
 }
 
+fn is_zero_u32(n: &u32) -> bool {
+    *n == 0
+}
+
 /// The newest ledger entries `wallet` sends at once.
 pub const WALLET_PAGE: usize = 20;
 
@@ -1452,6 +1479,9 @@ pub struct QuoteLine {
     pub price: u64,
     /// Taken off this item by the promo code.
     pub discount: u64,
+    /// Minutes the item adds to every session (0: none, left out).
+    #[serde(skip_serializing_if = "is_zero_u32")]
+    pub session_minutes: u32,
 }
 
 /// What an account has, everything counted. Protocol 11.
@@ -1467,6 +1497,11 @@ pub struct PlanTotals {
     pub whitelist_page: bool,
     /// One session's length (0: no limit).
     pub session_secs: u64,
+    /// One session's length in minutes, rounded up: the free plan's plus everything the account's purchases and the
+    /// admin's grants add (0: no limit, like `session_secs`). Relays before it leave it out: 0.
+    pub session_minutes: u32,
+    /// The part of `session_minutes` the account's purchases and grants add (0 while it has no limit).
+    pub session_minutes_added: u32,
 }
 
 /// What the launcher's payment form needs (`pay`). Protocol 11.

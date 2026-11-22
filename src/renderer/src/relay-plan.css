@@ -371,3 +371,64 @@
   margin-top: 2px;
   font-style: italic;
 }
+
+/* A product's look the relay's admin picks: its badge, and a card that stands out. */
+.rp-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 600 11.5px var(--font);
+  letter-spacing: 0.01em;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.rp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-card-head .rp-badge {
+  margin-left: 0;
+}
+.rp-card-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.rp-card-ic svg {
+  width: 16px;
+  height: 16px;
+}
+.rp-row.highlight,
+.rp-card.highlight {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.rp-row.highlight:hover,
+.rp-card.highlight:hover {
+  border-color: var(--accent);
+}
+.rp-row.highlight .rp-row-ic {
+  background: var(--accent-soft);
+}
+/* "+120 min per session" under a cart or checkout line. */
+.rp-line-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.rp-line-note svg {
+  width: 12px;
+  height: 12px;
+}

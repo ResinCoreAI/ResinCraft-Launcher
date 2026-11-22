@@ -191,4 +191,35 @@ mod tests {
         let t = serde_json::to_value(Topup { pay: None, wallet: Some(w) }).unwrap();
         assert!(t.get("pay").is_none() && t.get("wallet").is_some());
     }
+
+    #[test]
+    fn session_minutes_and_card_looks_are_read_and_default_on_older_relays() {
+        use resincraft_relay::proto::{Grants, ProductInfo};
+        // An older relay: no session minutes, badge, highlight or icon anywhere.
+        let old: PlanInfo = serde_json::from_str(
+            r#"{"enabled":true,"products":[{"id":"addon-server","grants":{"servers":1}}],"totals":{"session_secs":7200},"currency":"thb"}"#,
+        )
+        .unwrap();
+        let p = &old.products[0];
+        assert_eq!((p.grants.session_minutes, p.badge.as_str(), p.highlight, p.icon.as_str()), (0, "", false, ""));
+        assert_eq!((old.totals.session_minutes, old.totals.session_minutes_added), (0, 0));
+        let new: PlanInfo = serde_json::from_str(
+            r#"{"enabled":true,"products":[{"id":"addon-session-120","grants":{"session_minutes":120},"badge":"Popular","highlight":true,"icon":"clock"}],"totals":{"session_secs":14400,"session_minutes":240,"session_minutes_added":120}}"#,
+        )
+        .unwrap();
+        let p = &new.products[0];
+        assert_eq!((p.grants.session_minutes, p.badge.as_str(), p.highlight, p.icon.as_str()), (120, "Popular", true, "clock"));
+        assert_eq!((new.totals.session_minutes, new.totals.session_minutes_added), (240, 120));
+        // Sent on to the Store as the relay sends them: empty looks left out, minutes always there.
+        let plain = serde_json::to_value(ProductInfo { id: "x".into(), ..Default::default() }).unwrap();
+        assert!(plain.get("badge").is_none() && plain.get("highlight").is_none() && plain.get("icon").is_none());
+        assert_eq!(plain["grants"]["session_minutes"], 0);
+        let q: Quote = serde_json::from_str(r#"{"lines":[{"product":"a","price":1900,"session_minutes":120},{"product":"b","price":6900}]}"#).unwrap();
+        assert_eq!((q.lines[0].session_minutes, q.lines[1].session_minutes), (120, 0));
+        let mut have = Grants { no_session_limit: true, ..Default::default() };
+        assert!(Grants { session_minutes: 120, ..Default::default() }.adds_nothing_to(&have));
+        have.no_session_limit = false;
+        have.add(&Grants { session_minutes: 120, ..Default::default() }, 2);
+        assert_eq!(have.session_minutes, 240);
+    }
 }

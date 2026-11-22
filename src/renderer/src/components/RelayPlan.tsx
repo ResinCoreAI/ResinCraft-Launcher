@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Clock,
   CreditCard,
   ExternalLink,
   Gift,
@@ -33,7 +34,8 @@ import { ConfirmModal, Modal } from './ui'
 import { loadStripe, stripeAppearance, type StripeJs } from '../stripe'
 import '../relay-plan.css'
 import '../resin-credit.css'
-import { countText, UNLIMITED_COUNT } from '../relayCount'
+import { countText } from '../relayCount'
+import { givesParts, ProductIcon, StoreProductRow } from './StoreProduct'
 import { money, setWalletBalance } from '../storeStatus'
 import { openStoreHistory } from './StoreHistory'
 
@@ -42,18 +44,26 @@ const gb = (bytes: number) => `${Math.round((bytes / 1e9) * 10) / 10} GB`
 const day = (unix: number) => new Date(unix * 1000).toLocaleDateString()
 
 /** What a product gives, in a few words. */
-function gives(p: PlanProduct) {
-  const g = p.grants
-  const parts: string[] = []
-  if (g.servers >= UNLIMITED_COUNT) parts.push(t('servers.relayPlan.giveServersInf'))
-  else if (g.servers) parts.push(t('servers.relayPlan.giveServers', { count: g.servers }))
-  if (g.names >= UNLIMITED_COUNT) parts.push(t('servers.relayPlan.giveNamesInf'))
-  else if (g.names) parts.push(t('servers.relayPlan.giveNames', { count: g.names }))
-  if (g.traffic_gb) parts.push(t('servers.relayPlan.giveTraffic', { amount: `${g.traffic_gb} GB` }))
-  if (g.unlimited_traffic) parts.push(t('servers.relayPlan.trafficUnlimited'))
-  if (g.no_session_limit) parts.push(t('servers.relayPlan.sessionUnlimited'))
-  if (g.whitelist_page) parts.push(t('servers.relayPlan.whitelistOn'))
-  return parts.join(' · ')
+const gives = (p: PlanProduct) => givesParts(p.grants).join(' · ')
+
+/** "+120 min per session" under a cart or checkout line whose item lengthens sessions (nothing otherwise). */
+function MinutesNote({ minutes }: { minutes?: number }) {
+  if (!minutes) return null
+  return (
+    <span className="rp-line-note">
+      <Clock /> {t('servers.relayPlan.giveSessionMinutes', { minutes })}
+    </span>
+  )
+}
+
+/** The account's session length: the relay's own minutes when it sends them, else the old seconds. */
+function sessionText(tot: PlanInfo['totals']) {
+  if (tot.session_minutes === undefined)
+    return tot.no_session_limit ? t('servers.relayPlan.sessionUnlimited') : t('servers.relayPlan.session', { minutes: Math.round(tot.session_secs / 60) })
+  if (tot.no_session_limit || tot.session_minutes === 0) return t('servers.relayPlan.sessionUnlimited')
+  return tot.session_minutes_added
+    ? t('servers.relayPlan.sessionLengthAdded', { minutes: tot.session_minutes, added: tot.session_minutes_added })
+    : t('servers.relayPlan.sessionLength', { minutes: tot.session_minutes })
 }
 
 function usePlans() {
@@ -784,9 +794,15 @@ function CheckoutModal({
       }
     >
       <div className="rp-lines">
-        {(quote?.lines ?? items.map((p) => ({ product: p.id, name: p.name, price: yearly ? p.yearly : p.monthly, discount: 0 }))).map((l) => (
+        {(
+          quote?.lines ??
+          items.map((p) => ({ product: p.id, name: p.name, price: yearly ? p.yearly : p.monthly, discount: 0, session_minutes: p.grants.no_session_limit ? 0 : p.grants.session_minutes }))
+        ).map((l) => (
           <div key={l.product} className="rp-line">
-            <span className="grow">{l.name}</span>
+            <span className="grow">
+              {l.name}
+              <MinutesNote minutes={l.session_minutes} />
+            </span>
             {l.discount > 0 && <span className="rp-was">{money(l.price, currency)}</span>}
             <b>{money(l.price - l.discount, currency)}</b>
           </div>
@@ -1448,8 +1464,14 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
     if (!price) return null
     const others = othersWith(plans.accounts, a.account, p)
     return (
-      <div key={p.id} className={`rp-card${p.owned ? ' owned' : ''}`}>
-        <div className="rp-card-name">{p.name}</div>
+      <div key={p.id} className={`rp-card${p.owned ? ' owned' : ''}${p.highlight ? ' highlight' : ''}`}>
+        <div className="rp-card-head">
+          <span className="rp-card-ic">
+            <ProductIcon icon={p.icon} kind={p.kind} />
+          </span>
+          <div className="rp-card-name grow">{p.name}</div>
+          {p.badge && <span className="rp-badge">{p.badge}</span>}
+        </div>
         <div className="hint">{gives(p)}</div>
         <div className="rp-price">
           {money(price, plan.currency)}
@@ -1500,9 +1522,7 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
       <span className="chip">{t('servers.relayPlan.servers', { count: countText(tot.servers) })}</span>
       <span className="chip">{t('servers.relayPlan.names', { count: countText(tot.names) })}</span>
       <span className="chip">{tot.unlimited_traffic ? t('servers.relayPlan.trafficUnlimited') : t('servers.relayPlan.traffic', { amount: gb(tot.monthly_bytes) })}</span>
-      <span className="chip">
-        {tot.no_session_limit ? t('servers.relayPlan.sessionUnlimited') : t('servers.relayPlan.session', { minutes: Math.round(tot.session_secs / 60) })}
-      </span>
+      <span className="chip">{sessionText(tot)}</span>
       <span className={`chip${tot.whitelist_page ? ' success' : ''}`}>
         {tot.whitelist_page ? t('servers.relayPlan.whitelistOn') : t('servers.relayPlan.whitelistOff')}
       </span>
@@ -1577,7 +1597,10 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
       {inCart.length === 0 && <p className="hint">{t('servers.relayPlan.cartEmpty')}</p>}
       {inCart.map((p) => (
         <div key={p.id} className="rp-line">
-          <span className="grow">{p.name}</span>
+          <span className="grow">
+            {p.name}
+            <MinutesNote minutes={p.grants.no_session_limit ? 0 : p.grants.session_minutes} />
+          </span>
           <b>{(yearly ? p.yearly : p.monthly) ? money(yearly ? p.yearly : p.monthly, plan.currency) : t('servers.relayPlan.notThisPeriod')}</b>
           <button className="btn ghost icon sm" title={t('servers.relayPlan.removeFromCart')} aria-label={t('servers.relayPlan.removeFromCart')} onClick={() => cart.remove(p.id)}>
             <X />
@@ -1616,34 +1639,32 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
     if (!price) return null
     const others = othersWith(plans.accounts, a.account, p)
     return (
-      <div key={p.id} className={`rp-row${p.owned ? ' owned' : ''}`}>
-        <span className="rp-row-ic">{p.kind === 'pack' ? <Package /> : <Puzzle />}</span>
-        <div className="rp-row-text">
-          <b>{p.name}</b>
-          <span className="hint">{gives(p)}</span>
-          {others.length > 0 && <span className="hint it-warn">{t('servers.relayPlan.otherHas', { account: others.join(', ') })}</span>}
-        </div>
-        <div className="rp-row-price">
-          {money(price, plan.currency)}
-          <span className="hint"> / {yearly ? t('servers.relayPlan.year') : t('servers.relayPlan.month')}</span>
-        </div>
-        <div className="rp-row-buttons">
-          <button className="btn sm primary" disabled={p.owned || busy != null} onClick={() => void buy(p)}>
-            {busy === p.id ? <Loader2 className="spin" /> : p.owned ? <Check /> : <CreditCard />} {p.owned ? t('servers.relayPlan.owned') : t('servers.relayPlan.buy')}
-          </button>
-          {!p.owned && (
-            <button
-              className="btn sm icon"
-              disabled={cart.items.includes(p.id)}
-              title={cart.items.includes(p.id) ? t('servers.relayPlan.inCart') : t('servers.relayPlan.addToCart')}
-              aria-label={cart.items.includes(p.id) ? t('servers.relayPlan.inCart') : t('servers.relayPlan.addToCart')}
-              onClick={() => cart.add(p.id)}
-            >
-              {cart.items.includes(p.id) ? <Check /> : <Plus />}
+      <StoreProductRow
+        key={p.id}
+        p={p}
+        price={price}
+        currency={plan.currency}
+        yearly={yearly}
+        notes={others.length > 0 && <span className="hint it-warn">{t('servers.relayPlan.otherHas', { account: others.join(', ') })}</span>}
+        buttons={
+          <>
+            <button className="btn sm primary" disabled={p.owned || busy != null} onClick={() => void buy(p)}>
+              {busy === p.id ? <Loader2 className="spin" /> : p.owned ? <Check /> : <CreditCard />} {p.owned ? t('servers.relayPlan.owned') : t('servers.relayPlan.buy')}
             </button>
-          )}
-        </div>
-      </div>
+            {!p.owned && (
+              <button
+                className="btn sm icon"
+                disabled={cart.items.includes(p.id)}
+                title={cart.items.includes(p.id) ? t('servers.relayPlan.inCart') : t('servers.relayPlan.addToCart')}
+                aria-label={cart.items.includes(p.id) ? t('servers.relayPlan.inCart') : t('servers.relayPlan.addToCart')}
+                onClick={() => cart.add(p.id)}
+              >
+                {cart.items.includes(p.id) ? <Check /> : <Plus />}
+              </button>
+            )}
+          </>
+        }
+      />
     )
   }
 
