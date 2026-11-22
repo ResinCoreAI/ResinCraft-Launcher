@@ -5584,6 +5584,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Reclamados: {count}",
   "servers.admin.mail.viaChecker": "El correo sale por el comprobador de estado ({url}), desde su buzón.",
   "servers.admin.mail.serverOffChecker": "Configura [report_mail] url en relay.toml (el comprobador de estado, como la página de Informes) y reinicia el relay. La Bandeja de entrada funciona sin él.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Regalo de bienvenida",
+  "servers.admin.mail.welcome.lead": "La primera vez que una cuenta de Microsoft inicia sesión, recibe este mensaje en su buzón con Resin Credit para reclamar. Una sola vez por cuenta: las cuentas que el relay ya conocía antes de esto no reciben nada. El crédito solo se mueve cuando se reclama.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit está desactivado: las cuentas nuevas reciben el mensaje sin regalo.",
+  "servers.admin.mail.welcome.enabled": "Enviar el mensaje de bienvenida a las cuentas nuevas",
+  "servers.admin.mail.welcome.gift": "Regalo ({currency}, 0: ninguno)",
+  "servers.admin.mail.welcome.placeholders": "{name}: el nombre de Minecraft del jugador. {credit}: el regalo; las líneas que lo llevan se omiten cuando no hay regalo.",
+  "servers.admin.mail.welcome.mailed": "Mensajes de bienvenida",
+  "servers.admin.mail.welcome.gifts": "Regalos",
+  "servers.admin.mail.welcome.claimed": "Reclamados",
+  "servers.admin.mail.welcome.known": "Conocidas antes",
+  "servers.admin.mail.welcome.saved": "Mensaje de bienvenida guardado.",
+  "servers.admin.mail.welcome.reset": "Restablecer a relay.toml",
+  "servers.admin.mail.welcome.resetDone": "El mensaje de bienvenida vuelve a seguir relay.toml.",
+  "servers.admin.mail.welcome.fromFile": "De relay.toml [welcome]",
 }
 
 export default dict

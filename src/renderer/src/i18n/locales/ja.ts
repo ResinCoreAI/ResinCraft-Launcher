@@ -5538,6 +5538,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "受け取り済み：{count}",
   "servers.admin.mail.viaChecker": "メールはステータスチェッカー ({url}) を通り、そのメールボックスから送信されます。",
   "servers.admin.mail.serverOffChecker": "relay.toml の [report_mail] url を設定し（レポートページと同じステータスチェッカー）、リレーを再起動してください。受信トレイはなくても使えます。",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "ウェルカムギフト",
+  "servers.admin.mail.welcome.lead": "Microsoft アカウントが初めてサインインすると、受け取れる Resin Credit を添えたこのメールが受信箱に届きます。各アカウントに一度きりです。この機能ができる前からリレーが知っているアカウントには届きません。Resin Credit は受け取ったときに初めて移動します。",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit はオフです。新しいアカウントにはギフトなしでメールが届きます。",
+  "servers.admin.mail.welcome.enabled": "新しいアカウントにウェルカムメールを送る",
+  "servers.admin.mail.welcome.gift": "ギフト（{currency}、0：なし）",
+  "servers.admin.mail.welcome.placeholders": "{name}：プレイヤーの Minecraft の名前。{credit}：ギフト。ギフトがないときは、これを含む行が省かれます。",
+  "servers.admin.mail.welcome.mailed": "ウェルカムメール",
+  "servers.admin.mail.welcome.gifts": "ギフト",
+  "servers.admin.mail.welcome.claimed": "受け取り済み",
+  "servers.admin.mail.welcome.known": "既存アカウント",
+  "servers.admin.mail.welcome.saved": "ウェルカムメールを保存しました。",
+  "servers.admin.mail.welcome.reset": "relay.toml に戻す",
+  "servers.admin.mail.welcome.resetDone": "ウェルカムメールは再び relay.toml に従います。",
+  "servers.admin.mail.welcome.fromFile": "relay.toml [welcome] から",
 }
 
 export default dict

@@ -5528,6 +5528,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "已領取：{count}",
   "servers.admin.mail.viaChecker": "郵件透過狀態檢查器（{url}）從它的信箱寄出。",
   "servers.admin.mail.serverOffChecker": "在 relay.toml 中設定 [report_mail] url（狀態檢查器，與回報頁面相同）並重新啟動中繼。收件匣沒有它也能使用。",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "歡迎禮物",
+  "servers.admin.mail.welcome.lead": "Microsoft 帳號第一次登入時，會在收件匣收到這封郵件，附上可領取的 Resin Credit。每個帳號只有一次：此功能推出前中繼就已認識的帳號不會收到。Resin Credit 要領取時才會轉入。",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit 已關閉：新帳號收到的郵件不含禮物。",
+  "servers.admin.mail.welcome.enabled": "寄送歡迎郵件給新帳號",
+  "servers.admin.mail.welcome.gift": "禮物（{currency}，0：無）",
+  "servers.admin.mail.welcome.placeholders": "{name}：玩家的 Minecraft 名稱。{credit}：禮物；沒有禮物時，含有它的行會省略。",
+  "servers.admin.mail.welcome.mailed": "歡迎郵件",
+  "servers.admin.mail.welcome.gifts": "禮物",
+  "servers.admin.mail.welcome.claimed": "已領取",
+  "servers.admin.mail.welcome.known": "先前已有",
+  "servers.admin.mail.welcome.saved": "歡迎郵件已儲存。",
+  "servers.admin.mail.welcome.reset": "重設為 relay.toml",
+  "servers.admin.mail.welcome.resetDone": "歡迎郵件已重新依照 relay.toml 設定。",
+  "servers.admin.mail.welcome.fromFile": "來自 relay.toml [welcome]",
 }
 
 export default dict

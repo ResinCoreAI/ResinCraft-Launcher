@@ -5533,6 +5533,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "받음: {count}",
   "servers.admin.mail.viaChecker": "이메일은 상태 확인기({url})를 거쳐 그 메일함에서 발송됩니다.",
   "servers.admin.mail.serverOffChecker": "relay.toml에 [report_mail] url을 설정하고(신고 페이지와 같은 상태 확인기) 릴레이를 다시 시작하세요. 받은편지함은 없어도 작동합니다.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "환영 선물",
+  "servers.admin.mail.welcome.lead": "Microsoft 계정이 처음 로그인하면 받을 수 있는 Resin Credit과 함께 이 메일이 받은편지함으로 와요. 계정마다 딱 한 번이에요. 이 기능이 생기기 전부터 릴레이가 알던 계정은 받지 않아요. Resin Credit은 받을 때만 옮겨져요.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit이 꺼져 있어요. 새 계정은 선물 없이 메일을 받아요.",
+  "servers.admin.mail.welcome.enabled": "새 계정에 환영 메일 보내기",
+  "servers.admin.mail.welcome.gift": "선물 ({currency}, 0: 없음)",
+  "servers.admin.mail.welcome.placeholders": "{name}: 플레이어의 Minecraft 이름. {credit}: 선물. 선물이 없으면 이것이 들어간 줄은 빠져요.",
+  "servers.admin.mail.welcome.mailed": "환영 메일",
+  "servers.admin.mail.welcome.gifts": "선물",
+  "servers.admin.mail.welcome.claimed": "받음",
+  "servers.admin.mail.welcome.known": "기존 계정",
+  "servers.admin.mail.welcome.saved": "환영 메일을 저장했어요.",
+  "servers.admin.mail.welcome.reset": "relay.toml로 되돌리기",
+  "servers.admin.mail.welcome.resetDone": "환영 메일이 다시 relay.toml을 따라요.",
+  "servers.admin.mail.welcome.fromFile": "relay.toml [welcome]에서",
 }
 
 export default dict

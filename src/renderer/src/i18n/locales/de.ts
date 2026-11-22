@@ -5570,6 +5570,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Abgeholt: {count}",
   "servers.admin.mail.viaChecker": "E-Mails gehen über den Status-Checker ({url}) und dessen Postfach raus.",
   "servers.admin.mail.serverOffChecker": "Setze [report_mail] url in relay.toml (der Status-Checker, wie bei der Berichte-Seite) und starte den Relay neu. Der Posteingang funktioniert auch ohne.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Willkommensgeschenk",
+  "servers.admin.mail.welcome.lead": "Wenn sich ein Microsoft-Konto zum ersten Mal anmeldet, bekommt es diese Post in seinen Posteingang, mit Resin Credit zum Abholen. Nur ein einziges Mal pro Konto: Konten, die das Relay schon vorher kannte, bekommen keine. Resin Credit wird erst beim Abholen gutgeschrieben.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit ist aus: Neue Konten bekommen die Post ohne Geschenk.",
+  "servers.admin.mail.welcome.enabled": "Willkommenspost an neue Konten senden",
+  "servers.admin.mail.welcome.gift": "Geschenk ({currency}, 0: keins)",
+  "servers.admin.mail.welcome.placeholders": "{name}: der Minecraft-Name des Spielers. {credit}: das Geschenk; Zeilen damit fallen weg, wenn es kein Geschenk gibt.",
+  "servers.admin.mail.welcome.mailed": "Willkommensnachrichten",
+  "servers.admin.mail.welcome.gifts": "Geschenke",
+  "servers.admin.mail.welcome.claimed": "Abgeholt",
+  "servers.admin.mail.welcome.known": "Schon bekannt",
+  "servers.admin.mail.welcome.saved": "Willkommenspost gespeichert.",
+  "servers.admin.mail.welcome.reset": "Auf relay.toml zurücksetzen",
+  "servers.admin.mail.welcome.resetDone": "Die Willkommenspost folgt wieder relay.toml.",
+  "servers.admin.mail.welcome.fromFile": "Aus relay.toml [welcome]",
 }
 
 export default dict

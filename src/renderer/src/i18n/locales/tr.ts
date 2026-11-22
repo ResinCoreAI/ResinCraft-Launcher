@@ -5551,6 +5551,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Alındı: {count}",
   "servers.admin.mail.viaChecker": "E-postalar durum denetleyicisi ({url}) üzerinden, onun posta kutusundan gider.",
   "servers.admin.mail.serverOffChecker": "relay.toml içinde [report_mail] url ayarlayın (Raporlar sayfasındaki gibi durum denetleyicisi) ve aktarıcıyı yeniden başlatın. Gelen Kutusu onsuz da çalışır.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Hoş geldin hediyesi",
+  "servers.admin.mail.welcome.lead": "Bir Microsoft hesabı ilk kez giriş yaptığında, Gelen kutusuna alınacak Resin Credit ile birlikte bu posta gelir. Her hesaba yalnızca bir kez: aktarıcının bu özellikten önce tanıdığı hesaplar almaz. Kredi yalnızca alındığında aktarılır.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit kapalı: yeni hesaplar postayı hediyesiz alır.",
+  "servers.admin.mail.welcome.enabled": "Yeni hesaplara hoş geldin postası gönder",
+  "servers.admin.mail.welcome.gift": "Hediye ({currency}, 0: yok)",
+  "servers.admin.mail.welcome.placeholders": "{name}: oyuncunun Minecraft adı. {credit}: hediye; hediye yoksa bunu içeren satırlar çıkarılır.",
+  "servers.admin.mail.welcome.mailed": "Hoş geldin postaları",
+  "servers.admin.mail.welcome.gifts": "Hediyeler",
+  "servers.admin.mail.welcome.claimed": "Alındı",
+  "servers.admin.mail.welcome.known": "Önceden bilinen",
+  "servers.admin.mail.welcome.saved": "Hoş geldin postası kaydedildi.",
+  "servers.admin.mail.welcome.reset": "relay.toml'a sıfırla",
+  "servers.admin.mail.welcome.resetDone": "Hoş geldin postası yeniden relay.toml'u izliyor.",
+  "servers.admin.mail.welcome.fromFile": "relay.toml [welcome] bölümünden",
 }
 
 export default dict

@@ -35,6 +35,29 @@ interface Sent {
 const T = now()
 const sent: Sent[] = [
   {
+    id: 'welcome',
+    from: 'ResinCraft',
+    subject: 'Welcome to ResinCraft Relay!',
+    body: "Hi Puirkle_Gamer, welcome to ResinCraft!\n\nResinCraft Relay puts the Minecraft servers you host in ResinCraft Launcher online for your friends, with no port forwarding: each server gets its own address, like **yourworld.rscraft.resincore.tech**.\n\n- Start a server in the launcher and press **Go online**\n- Find servers to join in **Find servers**\n- News from the ResinCraft team arrives here in your Inbox\n\nHere's **40.00 THB** of Resin Credit to start: claim it below and spend it in the Store.\n\nHave fun!",
+    category: 'account',
+    sentAt: T - 60 * 3,
+    by: 'Welcome',
+    audience: 'players',
+    toNames: ['Puirkle_Gamer'],
+    toCount: 1,
+    inbox: true,
+    email: false,
+    inboxCount: 1,
+    readCount: 0,
+    emailTotal: 0,
+    emailSent: 0,
+    emailFailed: 0,
+    emailSkipped: 0,
+    emailDone: true,
+    emailError: '',
+    attachments: [{ kind: 'credit', amount: 4000 }]
+  },
+  {
     id: 'm7',
     from: 'ResinCraft',
     subject: 'Thanks for testing 2.0!',
@@ -295,7 +318,8 @@ const adminData = () => ({
     { id: 'pack-219', name: 'Starter pack', kind: 'pack' }
   ],
   currency: 'thb',
-  sent: sent.slice()
+  // The welcome mail is each account's own, not in the sent list.
+  sent: sent.filter((m) => m.id !== 'welcome')
 })
 
 /** The admins' `/api/mail…` routes in the preview (relayMock in mock-serverlist.ts). */
@@ -361,4 +385,27 @@ export function mockMailAdmin(method: string, path: string, b: Record<string, un
     return { ok: true }
   }
   return undefined
+}
+
+/** The welcome gift's settings (`/api/welcome…`) in the preview. */
+const WELCOME_BODY = sent[0].body.replace('Puirkle_Gamer', '{name}').replace('40.00 THB', '{credit}')
+let welcome = { enabled: true, credit: 4000, from: 'ResinCraft', subject: 'Welcome to ResinCraft Relay!', body: WELCOME_BODY }
+let welcomeOverride = false
+export function mockWelcomeAdmin(method: string, path: string, b: Record<string, unknown>): unknown {
+  if (method === 'POST' && path === '/api/welcome/save') {
+    if (typeof b.subject === 'string' && !b.subject.trim()) throw new Error('The relay refused: [welcome] subject: one line, 1 to 150 characters')
+    welcome = { ...welcome, ...(b as Partial<typeof welcome>) }
+    welcomeOverride = true
+  } else if (method === 'POST' && path === '/api/welcome/reset') {
+    welcome = { enabled: false, credit: 4000, from: 'ResinCraft', subject: 'Welcome to ResinCraft Relay!', body: WELCOME_BODY }
+    welcomeOverride = false
+  } else if (!(method === 'GET' && path === '/api/welcome')) return undefined
+  return {
+    settings: welcome,
+    fromFile: !welcomeOverride,
+    walletOn: mode() !== 'nowallet',
+    currency: 'thb',
+    counts: { accounts: 431, known: 398, mailed: 33, gifts: 33, claimed: 21, giftCredit: 132000, claimedCredit: 84000 },
+    limits: { subject: 150, body: 5000, from: 40, credit: 10000000 }
+  }
 }

@@ -5530,6 +5530,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "รับแล้ว: {count}",
   "servers.admin.mail.viaChecker": "อีเมลส่งผ่านตัวตรวจสถานะ ({url}) จากกล่องจดหมายของมัน",
   "servers.admin.mail.serverOffChecker": "ตั้งค่า [report_mail] url ใน relay.toml (ตัวตรวจสถานะ แบบเดียวกับหน้ารายงาน) แล้วรีสตาร์ทรีเลย์ กล่องจดหมายยังใช้ได้แม้ไม่มีอีเมล",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "ของขวัญต้อนรับ",
+  "servers.admin.mail.welcome.lead": "ครั้งแรกที่บัญชี Microsoft ลงชื่อเข้าใช้ บัญชีนั้นจะได้รับจดหมายนี้ในกล่องจดหมาย พร้อม Resin Credit ให้กดรับ ได้ครั้งเดียวต่อบัญชีเท่านั้น บัญชีที่รีเลย์รู้จักอยู่แล้วก่อนมีฟีเจอร์นี้จะไม่ได้รับ เครดิตจะย้ายก็ต่อเมื่อกดรับแล้ว",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit ปิดอยู่ บัญชีใหม่จะได้รับจดหมายโดยไม่มีของขวัญ",
+  "servers.admin.mail.welcome.enabled": "ส่งจดหมายต้อนรับให้บัญชีใหม่",
+  "servers.admin.mail.welcome.gift": "ของขวัญ ({currency}, 0: ไม่มี)",
+  "servers.admin.mail.welcome.placeholders": "{name}: ชื่อ Minecraft ของผู้เล่น {credit}: ของขวัญ บรรทัดที่มีตัวนี้จะถูกตัดออกเมื่อไม่มีของขวัญ",
+  "servers.admin.mail.welcome.mailed": "จดหมายต้อนรับ",
+  "servers.admin.mail.welcome.gifts": "ของขวัญ",
+  "servers.admin.mail.welcome.claimed": "รับแล้ว",
+  "servers.admin.mail.welcome.known": "รู้จักอยู่แล้ว",
+  "servers.admin.mail.welcome.saved": "บันทึกจดหมายต้อนรับแล้ว",
+  "servers.admin.mail.welcome.reset": "กลับไปใช้ relay.toml",
+  "servers.admin.mail.welcome.resetDone": "จดหมายต้อนรับกลับไปใช้ค่าจาก relay.toml แล้ว",
+  "servers.admin.mail.welcome.fromFile": "จาก relay.toml [welcome]",
 }
 
 export default dict

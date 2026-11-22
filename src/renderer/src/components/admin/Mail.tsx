@@ -8,6 +8,7 @@ import { ConfirmModal, Segmented } from '../ui'
 import MailText from '../MailText'
 import { ago, Loading, Stat, useAct, useAdmin, when } from './common'
 import '../../inbox.css'
+import { WelcomeAdmin } from './Welcome'
 
 type Category = '' | 'news' | 'update' | 'event' | 'account' | 'support' | 'status'
 type Reward = { kind: 'credit'; amount: number } | { kind: 'item'; product: string; days: number; name?: string }
@@ -177,6 +178,8 @@ export function MailAdmin() {
           )}
         </div>
       </div>
+
+      <WelcomeAdmin />
 
       <div className="settings-section">
         <h3>

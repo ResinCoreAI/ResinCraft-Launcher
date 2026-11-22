@@ -14,7 +14,7 @@ import type {
   ServerListPage,
   ServerListQuery
 } from '@shared/types'
-import { mockMailAdmin } from './mock-mail'
+import { mockMailAdmin, mockWelcomeAdmin } from './mock-mail'
 import { mockWalletAdmin, walletAdminOn } from './mock-wallet'
 
 const CATEGORIES = ['smp', 'survival', 'pvp', 'minigames', 'creative', 'modded', 'skyblock', 'anarchy', 'roleplay', 'economy', 'factions', 'prison', 'parkour', 'hardcore', 'vanilla', 'towny', 'lifesteal', 'bedwars']
@@ -151,6 +151,7 @@ function relayMock(method: string, path: string, b: Record<string, any>): unknow
   // ?require2fa=1: the relay wants 2FA before anything else (until it's set up here).
   if (new URLSearchParams(location.search).get('require2fa') === '1' && !twoFactorDone && !p.startsWith('/api/users/2fa')) throw new Error('The relay refused: set up two-factor sign-in first')
   if (p === '/api/mail' || p.startsWith('/api/mail/')) return mockMailAdmin(method, p, b)
+  if (p === '/api/welcome' || p.startsWith('/api/welcome/')) return mockWelcomeAdmin(method, p, b)
   if (method === 'POST' && p === '/api/users/2fa/setup')
     return { secret: 'JBSWY3DPEHPK3PXPJBSWY3DP', uri: 'otpauth://totp/ResinCraft%20Relay:Puirkle_Gamer?secret=JBSWY3DPEHPK3PXPJBSWY3DP&issuer=ResinCraft%20Relay&algorithm=SHA1&digits=6&period=30' }
   if (method === 'POST' && p === '/api/users/2fa/confirm') {

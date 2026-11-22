@@ -5632,6 +5632,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Odebrano: {count}",
   "servers.admin.mail.viaChecker": "E-maile wychodzą przez sprawdzacz statusu ({url}), z jego skrzynki.",
   "servers.admin.mail.serverOffChecker": "Ustaw [report_mail] url w relay.toml (sprawdzacz statusu, jak przy stronie Zgłoszeń) i uruchom przekaźnik ponownie. Skrzynka odbiorcza działa i bez tego.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Prezent powitalny",
+  "servers.admin.mail.welcome.lead": "Gdy konto Microsoft loguje się po raz pierwszy, dostaje tę wiadomość w Skrzynce odbiorczej z Resin Credit do odebrania. Tylko raz na konto: konta, które przekaźnik znał wcześniej, nie dostają nic. Środki przechodzą dopiero po odebraniu.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit jest wyłączony: nowe konta dostają wiadomość bez prezentu.",
+  "servers.admin.mail.welcome.enabled": "Wysyłaj wiadomość powitalną do nowych kont",
+  "servers.admin.mail.welcome.gift": "Prezent ({currency}, 0: brak)",
+  "servers.admin.mail.welcome.placeholders": "{name}: nazwa gracza w Minecraft. {credit}: prezent; wiersze z nim są pomijane, gdy nie ma prezentu.",
+  "servers.admin.mail.welcome.mailed": "Wiadomości powitalne",
+  "servers.admin.mail.welcome.gifts": "Prezenty",
+  "servers.admin.mail.welcome.claimed": "Odebrano",
+  "servers.admin.mail.welcome.known": "Znane wcześniej",
+  "servers.admin.mail.welcome.saved": "Zapisano wiadomość powitalną.",
+  "servers.admin.mail.welcome.reset": "Przywróć z relay.toml",
+  "servers.admin.mail.welcome.resetDone": "Wiadomość powitalna znów korzysta z relay.toml.",
+  "servers.admin.mail.welcome.fromFile": "Z relay.toml [welcome]",
 }
 
 export default dict

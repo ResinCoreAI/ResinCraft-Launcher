@@ -5589,6 +5589,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Riscattati: {count}",
   "servers.admin.mail.viaChecker": "Le email passano dal controllo di stato ({url}), dalla sua casella.",
   "servers.admin.mail.serverOffChecker": "Imposta [report_mail] url in relay.toml (il controllo di stato, come per la pagina Segnalazioni) e riavvia il relay. La Posta in arrivo funziona anche senza.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Regalo di benvenuto",
+  "servers.admin.mail.welcome.lead": "La prima volta che un account Microsoft accede, riceve questo messaggio nella posta in arrivo con del Resin Credit da riscattare. Una sola volta per account: gli account che il relay conosceva prima di questa funzione non ricevono nulla. Il credito passa solo quando viene riscattato.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit è disattivato: i nuovi account ricevono il messaggio senza regalo.",
+  "servers.admin.mail.welcome.enabled": "Invia il messaggio di benvenuto ai nuovi account",
+  "servers.admin.mail.welcome.gift": "Regalo ({currency}, 0: nessuno)",
+  "servers.admin.mail.welcome.placeholders": "{name}: il nome Minecraft del giocatore. {credit}: il regalo; le righe che lo contengono vengono omesse quando non c'è un regalo.",
+  "servers.admin.mail.welcome.mailed": "Messaggi di benvenuto",
+  "servers.admin.mail.welcome.gifts": "Regali",
+  "servers.admin.mail.welcome.claimed": "Riscattati",
+  "servers.admin.mail.welcome.known": "Già noti",
+  "servers.admin.mail.welcome.saved": "Messaggio di benvenuto salvato.",
+  "servers.admin.mail.welcome.reset": "Ripristina da relay.toml",
+  "servers.admin.mail.welcome.resetDone": "Il messaggio di benvenuto segue di nuovo relay.toml.",
+  "servers.admin.mail.welcome.fromFile": "Da relay.toml [welcome]",
 }
 
 export default dict

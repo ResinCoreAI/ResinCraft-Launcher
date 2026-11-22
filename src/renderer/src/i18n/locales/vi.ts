@@ -5538,6 +5538,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Đã nhận: {count}",
   "servers.admin.mail.viaChecker": "Email được gửi qua trình kiểm tra trạng thái ({url}), từ hộp thư của nó.",
   "servers.admin.mail.serverOffChecker": "Đặt [report_mail] url trong relay.toml (trình kiểm tra trạng thái, như trang Báo cáo) rồi khởi động lại relay. Hộp thư đến vẫn hoạt động khi không có email.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Quà chào mừng",
+  "servers.admin.mail.welcome.lead": "Lần đầu một tài khoản Microsoft đăng nhập, tài khoản đó nhận thư này trong Hộp thư kèm Resin Credit để nhận. Chỉ một lần cho mỗi tài khoản: những tài khoản relay đã biết từ trước khi có tính năng này sẽ không nhận được. Resin Credit chỉ được chuyển khi được nhận.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit đang tắt: tài khoản mới nhận thư mà không có quà.",
+  "servers.admin.mail.welcome.enabled": "Gửi thư chào mừng cho tài khoản mới",
+  "servers.admin.mail.welcome.gift": "Quà ({currency}, 0: không có)",
+  "servers.admin.mail.welcome.placeholders": "{name}: tên Minecraft của người chơi. {credit}: phần quà; các dòng có nó sẽ bị bỏ đi khi không có quà.",
+  "servers.admin.mail.welcome.mailed": "Thư chào mừng",
+  "servers.admin.mail.welcome.gifts": "Quà",
+  "servers.admin.mail.welcome.claimed": "Đã nhận",
+  "servers.admin.mail.welcome.known": "Đã biết từ trước",
+  "servers.admin.mail.welcome.saved": "Đã lưu thư chào mừng.",
+  "servers.admin.mail.welcome.reset": "Đặt lại theo relay.toml",
+  "servers.admin.mail.welcome.resetDone": "Thư chào mừng lại theo relay.toml.",
+  "servers.admin.mail.welcome.fromFile": "Từ relay.toml [welcome]",
 }
 
 export default dict

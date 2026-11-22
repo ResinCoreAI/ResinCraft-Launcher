@@ -5600,6 +5600,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Получено: {count}",
   "servers.admin.mail.viaChecker": "Письма уходят через проверку статуса ({url}), с её почтового ящика.",
   "servers.admin.mail.serverOffChecker": "Укажите [report_mail] url в relay.toml (проверка статуса, как для страницы жалоб) и перезапустите ретранслятор. «Входящие» работают и без этого.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Приветственный подарок",
+  "servers.admin.mail.welcome.lead": "Когда аккаунт Microsoft входит впервые, он получает это письмо во «Входящие» с Resin Credit, который можно забрать. Только один раз на аккаунт: аккаунты, которые ретранслятор знал до появления этой функции, ничего не получают. Кредит переводится, только когда его забирают.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit выключен: новые аккаунты получают письмо без подарка.",
+  "servers.admin.mail.welcome.enabled": "Отправлять приветственное письмо новым аккаунтам",
+  "servers.admin.mail.welcome.gift": "Подарок ({currency}, 0: нет)",
+  "servers.admin.mail.welcome.placeholders": "{name}: имя игрока в Minecraft. {credit}: подарок; строки с ним убираются, если подарка нет.",
+  "servers.admin.mail.welcome.mailed": "Приветственные письма",
+  "servers.admin.mail.welcome.gifts": "Подарки",
+  "servers.admin.mail.welcome.claimed": "Получено",
+  "servers.admin.mail.welcome.known": "Известны раньше",
+  "servers.admin.mail.welcome.saved": "Приветственное письмо сохранено.",
+  "servers.admin.mail.welcome.reset": "Вернуть из relay.toml",
+  "servers.admin.mail.welcome.resetDone": "Приветственное письмо снова берётся из relay.toml.",
+  "servers.admin.mail.welcome.fromFile": "Из relay.toml [welcome]",
 }
 
 export default dict

@@ -5541,6 +5541,21 @@ const dict: Dict = {
   "servers.admin.mail.claimedChip": "Diklaim: {count}",
   "servers.admin.mail.viaChecker": "Email dikirim lewat pemeriksa status ({url}), dari kotak suratnya.",
   "servers.admin.mail.serverOffChecker": "Atur [report_mail] url di relay.toml (pemeriksa status, seperti halaman Laporan) lalu mulai ulang relay. Kotak masuk tetap berfungsi tanpanya.",
+  // The welcome gift for first sign-ins, in Admin → Mail (components/admin/Welcome.tsx).
+  "servers.admin.mail.welcome.title": "Hadiah sambutan",
+  "servers.admin.mail.welcome.lead": "Saat akun Microsoft masuk untuk pertama kalinya, akun itu menerima surat ini di Kotak Masuk dengan Resin Credit untuk diklaim. Hanya sekali per akun: akun yang sudah dikenal relay sebelum fitur ini ada tidak mendapatkannya. Kredit baru berpindah saat diklaim.",
+  "servers.admin.mail.welcome.walletOff": "Resin Credit nonaktif: akun baru menerima surat tanpa hadiah.",
+  "servers.admin.mail.welcome.enabled": "Kirim surat sambutan ke akun baru",
+  "servers.admin.mail.welcome.gift": "Hadiah ({currency}, 0: tidak ada)",
+  "servers.admin.mail.welcome.placeholders": "{name}: nama Minecraft pemain. {credit}: hadiahnya; baris yang memuatnya dihilangkan jika tidak ada hadiah.",
+  "servers.admin.mail.welcome.mailed": "Surat sambutan",
+  "servers.admin.mail.welcome.gifts": "Hadiah",
+  "servers.admin.mail.welcome.claimed": "Diklaim",
+  "servers.admin.mail.welcome.known": "Dikenal sebelumnya",
+  "servers.admin.mail.welcome.saved": "Surat sambutan disimpan.",
+  "servers.admin.mail.welcome.reset": "Atur ulang ke relay.toml",
+  "servers.admin.mail.welcome.resetDone": "Surat sambutan kembali mengikuti relay.toml.",
+  "servers.admin.mail.welcome.fromFile": "Dari relay.toml [welcome]",
 }
 
 export default dict
