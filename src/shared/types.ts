@@ -2421,6 +2421,8 @@ export interface ResinApi {
     info(): Promise<AppInfo>
     /** RAM used by the launcher, running games and servers, and the PC. */
     memory(): Promise<MemoryUsage>
+    /** Nobody has used the window for a while (memory.ts): the engine has WebView2 give memory back. */
+    rest(): Promise<void>
     openExternal(url: string): Promise<void>
     showItem(path: string): Promise<void>
     /** Absolute path of a file dropped onto the window (synchronous, preload-side). */

@@ -40,6 +40,8 @@ use tauri::{AppHandle, Manager};
 /// and timers ran on time. Part of Settings → Appearance → Free memory while hidden.
 static LEAN_FROM_NOW: AtomicBool = AtomicBool::new(false);
 const LEAN_AFTER_START: std::time::Duration = std::time::Duration::from_secs(3);
+/// After the low level, the first page has settled by then: its memory goes back to Windows (`rest`).
+const REST_AFTER_START: std::time::Duration = std::time::Duration::from_secs(3);
 
 fn lean_in_use() -> bool {
     LEAN_FROM_NOW.load(Ordering::SeqCst) && crate::core::settings::free_memory_hidden()
@@ -54,6 +56,10 @@ pub fn started() {
         if crate::game::running_ids().is_empty() {
             set_low_memory(false);
         }
+        tauri::async_runtime::spawn(async {
+            tokio::time::sleep(REST_AFTER_START).await;
+            rest().await;
+        });
         watch_budget().await;
     });
 }
@@ -98,6 +104,27 @@ async fn watch_budget() {
         crate::core::events::emit("memoryTrim", ());
         just_trimmed = true;
         tokio::time::sleep(settle).await;
+    }
+}
+
+/// Under this, a launcher left alone isn't asked to give memory back: there's little left to give.
+const REST_FLOOR: u64 = 60 * 1024 * 1024;
+
+/// Nobody has used the window for a while (the page says so, memory.ts), or the first page has just loaded: WebView2's
+/// processes hand the memory they hold but aren't using back to Windows (their working sets are emptied), for other
+/// programs to use; what's needed again comes back as it's used. WebView2 does the same on its own about 30 s after
+/// the start; this does it then, and again whenever the launcher is left alone. What's on screen stays as it is.
+///
+/// Measured on the UI rework (Task Manager's memory for the whole launcher, twice each): left alone after it opens,
+/// 89-99 MB until WebView2's own drop at about 30 s, against 43-58 MB from about 5 s on; 41-44 MB after that either
+/// way. After going through every page, 55 MB resting against 59. Pages opened again after resting as fast (11-44
+/// ms), and pictures of the window don't change.
+pub async fn rest() {
+    if !lean_in_use() || unloaded() || !crate::game::running_ids().is_empty() {
+        return;
+    }
+    if crate::core::memory::launcher_bytes().await > REST_FLOOR {
+        crate::core::memory::release_webview_pages().await;
     }
 }
 

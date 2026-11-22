@@ -260,6 +260,7 @@ export function mockApi(): ResinApi {
 
   return {
     app: {
+      rest: async () => {},
       // Plausible, slowly moving numbers for the RAM chips and the Home card.
       memory: async () => {
         const wobble = (base: number) => Math.round(base * (0.92 + Math.random() * 0.12))

@@ -35,6 +35,10 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // Kept for older front ends: the window controls are drawn in the UI, so there's nothing to recolour.
         "app:setTitleBar" => done(),
         "app:memory" => json(crate::core::memory::usage().await),
+        "app:rest" => {
+            crate::webview::rest().await;
+            done()
+        }
         "app:cancelTask" => json(crate::core::events::cancel(&args.get::<String>(0)?)),
         // A custom theme's background picture: [theme id, data URL | null (remove)], and reading it back.
         "app:saveThemeImage" => {

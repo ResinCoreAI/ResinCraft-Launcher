@@ -21,6 +21,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       openExternal: fn('app:openExternal'),
       setTitleBar: fn('app:setTitleBar'),
       memory: fn('app:memory'),
+      rest: fn('app:rest'),
       cancelTask: fn('app:cancelTask'),
       saveThemeImage: fn('app:saveThemeImage'),
       themeImage: fn('app:themeImage'),

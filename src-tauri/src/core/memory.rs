@@ -215,6 +215,34 @@ pub async fn launcher_bytes() -> u64 {
     .unwrap_or(0)
 }
 
+/// Empties the working sets of the launcher's WebView2 processes (`webview::rest`): Windows gets back the pages they
+/// hold, and those they use again come back from its standby list as they're touched. The launcher's own process is
+/// left as it is.
+#[cfg(windows)]
+pub async fn release_webview_pages() {
+    let _ = launcher_bytes().await;
+    let pids = LAUNCHER_TREE.lock().unwrap().as_ref().map(|(_, p)| p.clone()).unwrap_or_default();
+    let me = std::process::id();
+    tokio::task::spawn_blocking(move || {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::ProcessStatus::K32EmptyWorkingSet;
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA};
+        for pid in pids.into_iter().filter(|p| *p != me) {
+            unsafe {
+                if let Ok(h) = OpenProcess(PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                    let _ = K32EmptyWorkingSet(h);
+                    let _ = CloseHandle(h);
+                }
+            }
+        }
+    })
+    .await
+    .ok();
+}
+
+#[cfg(not(windows))]
+pub async fn release_webview_pages() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
