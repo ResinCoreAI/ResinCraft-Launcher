@@ -157,8 +157,16 @@ pub async fn status() -> AdminStatus {
                 *guard = Some(u);
                 return st;
             }
-            // Revoked on the dashboard (or expired): forget it and ask again.
-            _ => save_token(&account.uuid, None).await,
+            // Revoked on the dashboard (or expired): forget it and ask again. Only when the relay answered: a relay
+            // that's down or unreachable says nothing about the token, so it stays for when the relay is back.
+            _ => {
+                if relay::connect_for_list(&account).await.is_err() {
+                    let mut st = status_of(&account, false, None, false, true);
+                    st.developer = crate::updater::is_developer().await;
+                    return st;
+                }
+                save_token(&account.uuid, None).await
+            }
         }
     }
     let admin = match relay::connect_for_list(&account).await {
