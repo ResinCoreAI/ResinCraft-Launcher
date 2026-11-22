@@ -188,6 +188,22 @@ export default function Admin() {
   }
 
   if (!status) return null
+  // One of the relay's developers (not an admin): only Dev, over their relay session, with no unlock.
+  if (!status.admin && status.developer) {
+    return (
+      <div className="page admin-page">
+        <div className="page-head">
+          <div>
+            <h1>{t('servers.admin.dev.pageTitle')}</h1>
+            <p>{t('servers.admin.dev.signedInDeveloper', { name: status.username ?? '' })}</p>
+          </div>
+        </div>
+        <div className="admin-section">
+          <DevAdmin developer />
+        </div>
+      </div>
+    )
+  }
   if (!status.admin) {
     return (
       <div className="page">

@@ -330,6 +330,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       adminCall: fn('server:adminCall'),
       devPickBuild: fn('server:devPickBuild'),
       devUpload: fn('server:devUpload'),
+      devCall: fn('server:devCall'),
       submitListing: fn('server:submitListing'),
       myListings: fn('server:myListings'),
       removeListing: fn('server:removeListing'),

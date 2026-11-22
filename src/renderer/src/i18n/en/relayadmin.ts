@@ -44,6 +44,16 @@ export default {
   'servers.admin.dev.uploadButton': 'Upload',
   'servers.admin.dev.uploading': 'Uploading…',
   'servers.admin.dev.uploadDone': 'Uploaded Dev build {version}.',
+  'servers.admin.dev.pageTitle': 'Dev channel',
+  'servers.admin.dev.signedInDeveloper': 'Signed in as {name}, a developer.',
+  'servers.admin.dev.roles': 'Developers can also invite and uninvite testers and upload or remove the Dev build, from the Admin page in their own launcher. They get no other admin powers.',
+  'servers.admin.dev.leadDeveloper': 'As a developer you can invite and uninvite testers and upload or remove the Dev build. Only an admin can make or remove developers.',
+  'servers.admin.dev.developer': 'Developer',
+  'servers.admin.dev.makeDeveloper': 'Make developer',
+  'servers.admin.dev.makeTester': 'Make tester',
+  'servers.admin.dev.makeDeveloperConfirm': '{name} will be able to invite and uninvite testers and upload or remove the Dev build from their launcher. They get no other admin powers.',
+  'servers.admin.dev.madeDeveloper': '{name} is a developer now.',
+  'servers.admin.dev.madeTester': '{name} is a tester again.',
 
   // Service switch
   'servers.admin.relay.service': 'Relay',

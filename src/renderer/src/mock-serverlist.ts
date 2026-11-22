@@ -115,21 +115,32 @@ const relayReports = [
 ]
 
 // Admin → Dev: invites and the Dev build.
-let devInvites = [{ uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Alex', addedAt: now() - 86400 * 3, addedBy: 'Admin Puirkle_Gamer' }]
+let devInvites = [
+  { uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Alex', addedAt: now() - 86400 * 3, addedBy: 'Admin Puirkle_Gamer', developer: false },
+  { uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle', addedAt: now() - 86400 * 9, addedBy: 'Admin Puirkle_Gamer', developer: true }
+]
+// ?developer=1 previews a developer (not an admin): the Admin page shows only Dev.
+const isDeveloper = () => new URLSearchParams(location.search).get('developer') === '1'
 let devBuild: { version: string; notes: string; uploadedAt: number; platforms: { target: string; size: number; uploadedAt: number }[] } | null = {
   version: '1.6.2-dev.202611221530',
   notes: 'New skins page',
   uploadedAt: now() - 5400,
   platforms: [{ target: 'windows-x86_64', size: 14_200_000, uploadedAt: now() - 5400 }]
 }
-function devMock(method: string, p: string, b: Record<string, any>): unknown { // eslint-disable-line @typescript-eslint/no-explicit-any
+function devMock(method: string, p: string, b: Record<string, any>, admin = true): unknown { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const by = admin ? 'Admin Puirkle_Gamer' : 'Developer Puirkle'
   if (method === 'POST' && p === '/api/devs/add') {
     const who = String(b.who ?? '').trim()
     if (devInvites.some((a) => a.name.toLowerCase() === who.toLowerCase())) throw new Error('The relay refused: that account is invited already')
-    devInvites = [...devInvites, { uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: who, addedAt: now(), addedBy: 'Admin Puirkle_Gamer' }]
-  } else if (method === 'POST' && p === '/api/devs/remove') devInvites = devInvites.filter((a) => a.uuid !== b.uuid)
-  else if (method === 'POST' && p === '/api/devs/build/remove') devBuild = null
-  return { invites: devInvites, build: devBuild, uploads: true }
+    devInvites = [...devInvites, { uuid: crypto.randomUUID(), name: who, addedAt: now(), addedBy: by, developer: false }]
+  } else if (method === 'POST' && p === '/api/devs/remove') {
+    if (!admin && devInvites.some((a) => a.uuid === b.uuid && a.developer)) throw new Error("The relay refused: only an admin can take back a developer's invite")
+    devInvites = devInvites.filter((a) => a.uuid !== b.uuid)
+  } else if (method === 'POST' && p === '/api/devs/developer') {
+    if (!admin) throw new Error('The relay refused: only an admin can make a developer')
+    devInvites = devInvites.map((a) => (a.uuid === b.uuid ? { ...a, developer: !!b.on } : a))
+  } else if (method === 'POST' && p === '/api/devs/build/remove') devBuild = null
+  return { invites: devInvites, build: devBuild, uploads: true, ...(admin ? {} : { you: { uuid: '8667ba71-b85a-4004-af54-457a9734eed7', name: 'Puirkle' } }) }
 }
 
 function relayMock(method: string, path: string, b: Record<string, any>): unknown { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -375,7 +386,7 @@ export function mockServerList(find: (id: string) => ServerInfo) {
       return status
     },
     // The Admin page: ?admin=1 previews an admin account (password "admin").
-    adminStatus: () => wait({ admin: isAdmin(), unlocked: adminUnlocked, username: 'Puirkle', dashboardUser: adminUnlocked ? 'Puirkle_Gamer' : undefined }),
+    adminStatus: () => wait({ admin: isAdmin(), unlocked: adminUnlocked, username: 'Puirkle', dashboardUser: adminUnlocked ? 'Puirkle_Gamer' : undefined, developer: !isAdmin() && isDeveloper() }),
     adminUnlock: async (req: { password?: string; code?: string; remember: boolean }) => {
       await wait(null, 500)
       // ?admin=1&twofa=1 previews a user with 2FA on (code 123456).
@@ -392,6 +403,11 @@ export function mockServerList(find: (id: string) => ServerInfo) {
     adminCall: (method: 'GET' | 'POST', path: string, body?: unknown) => mockAdminCall(method, path, body),
     devPickBuild: () =>
       wait({ path: 'C:/builds/ResinCraft Launcher_1.6.2-dev.202611231200_x64-setup.exe', name: 'ResinCraft Launcher_1.6.2-dev.202611231200_x64-setup.exe', size: 14_300_000, version: '1.6.2-dev.202611231200', signature: true, target: 'windows-x86_64' }),
+    devCall: async (method: 'GET' | 'POST', path: string, body?: unknown) => {
+      await wait(null, 200)
+      if (!isDeveloper()) throw new Error("The relay refused: this account isn't a developer")
+      return devMock(method, path, (body ?? {}) as Record<string, unknown>, false)
+    },
     devUpload: async (req: { version: string; target: string; notes?: string }) => {
       await wait(null, 900)
       devBuild = { version: req.version, notes: req.notes ?? '', uploadedAt: now(), platforms: [{ target: req.target, size: 14_300_000, uploadedAt: now() }] }

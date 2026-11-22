@@ -260,7 +260,7 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     };
     let mut from_dev = None;
     let result = match dev {
-        DevAccess::Yes { feed, session } => {
+        DevAccess::Yes { feed, session, .. } => {
             let found = check_dev(&app, &feed, &session, reinstall).await;
             from_dev = found.as_ref().ok().and_then(|u| u.as_ref()).map(|u| u.version.clone());
             newest(result, found)
@@ -307,8 +307,9 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
 
 /// What the relay says about this launcher's account and the Dev channel.
 enum DevAccess {
-    /// Invited (or a launcher admin): the feed's address and the relay session that opens it (and its downloads).
-    Yes { feed: String, session: String },
+    /// Invited (or a launcher admin): the feed's address and the relay session that opens it (and its downloads);
+    /// `developer`: the account may also manage the Dev channel from the Admin page.
+    Yes { feed: String, session: String, developer: bool },
     /// Not invited, no Microsoft account, a relay without the Dev channel, or a build without the relay.
     No,
     /// The relay couldn't be asked (offline…): Settings keeps what it last heard.
@@ -331,6 +332,11 @@ async fn ask_dev_access() -> DevAccess {
     access
 }
 
+/// Whether the active account is one of the relay's developers (the Admin page shows them its Dev section).
+pub(crate) async fn is_developer() -> bool {
+    matches!(ask_dev_access().await, DevAccess::Yes { developer: true, .. })
+}
+
 async fn dev_access() -> DevAccess {
     use crate::server::relay;
     if relay::settings().is_none() {
@@ -350,8 +356,9 @@ async fn dev_access() -> DevAccess {
             // The saved session ran out: sign in again, once.
             Ok((401, _)) if !retry => relay::forget_session(&account).await,
             Ok((200, r)) => {
-                let dev = r.json::<Value>().await.ok().and_then(|v| v.get("dev").and_then(Value::as_bool)).unwrap_or(false);
-                return if dev { DevAccess::Yes { feed: format!("https://{domain}/api/dev/feed"), session } } else { DevAccess::No };
+                let v = r.json::<Value>().await.unwrap_or(Value::Null);
+                let flag = |k: &str| v.get(k).and_then(Value::as_bool).unwrap_or(false);
+                return if flag("dev") { DevAccess::Yes { feed: format!("https://{domain}/api/dev/feed"), session, developer: flag("developer") } } else { DevAccess::No };
             }
             // A relay without the Dev channel (older), or a banned account.
             Ok((403 | 404, _)) => return DevAccess::No,

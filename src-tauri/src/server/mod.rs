@@ -239,6 +239,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // Admin → Dev: pick a Dev build's update file on this PC, and upload it (with the .sig next to it).
         "server:devPickBuild" => json(admin::dev_pick_build().await?),
         "server:devUpload" => json(admin::dev_upload(args.get(0)?).await?),
+        // Admin -> Dev for the relay's developers (not admins): the same routes with the relay session.
+        "server:devCall" => json(admin::dev_call(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<Option<Value>>(2)?).await?),
         "server:antiCheat" => json(plugins::anticheat_status(&args.get::<String>(0)?).await?),
         "server:setAntiCheat" => {
             let id: String = args.get(0)?;

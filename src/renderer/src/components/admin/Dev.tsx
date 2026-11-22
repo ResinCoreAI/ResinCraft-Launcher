@@ -1,5 +1,6 @@
 // Admin → Dev: who may use the launcher's Dev update channel, and the Dev build (uploaded here, on the relay's Dev
-// page or by release-dev.bat; relay-server's devbuilds.rs).
+// page or by release-dev.bat; relay-server's devbuilds.rs). Admins use it over the admin connection; the relay's
+// developers (`developer`) get only this screen, over their relay session, and may not make or remove developers.
 import { useState } from 'react'
 import { FileUp, FlaskConical, Loader2, Trash2, Upload, UserPlus } from 'lucide-react'
 import type { DevBuildFile } from '@shared/types'
@@ -7,7 +8,7 @@ import { api } from '../../api'
 import { useStore } from '../../store'
 import { t } from '../../i18n'
 import { ConfirmModal } from '../ui'
-import { ago, Loading, size, useAct, useAdmin } from './common'
+import { ago, Loading, size, useAct, useAdmin, type Caller } from './common'
 
 const TARGETS = ['windows-x86_64', 'windows-aarch64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64', 'linux-aarch64']
 
@@ -16,17 +17,24 @@ interface DevInvite {
   name: string
   addedAt: number
   addedBy: string
+  developer?: boolean
 }
 interface DevData {
   invites: DevInvite[]
   build: { version: string; notes: string; uploadedAt: number; platforms: { target: string; size: number; uploadedAt: number }[] } | null
   /** `[dev_builds] upload_tokens` is set, so release-dev.bat can upload. */
   uploads: boolean
+  /** A developer's own account (their calls only). */
+  you?: { uuid: string; name: string }
 }
 
-export function DevAdmin() {
-  const { data, error, reload } = useAdmin<DevData>('/api/devs')
-  const act = useAct(reload)
+const devCall: Caller = (method, path, body) => api.server.devCall(method, path, body)
+
+export function DevAdmin({ developer = false }: { developer?: boolean }) {
+  const caller = developer ? devCall : undefined
+  const { data, error, reload } = useAdmin<DevData>('/api/devs', undefined, caller)
+  const act = useAct(reload, caller)
+  const [promoting, setPromoting] = useState<DevInvite | null>(null)
   const [who, setWho] = useState('')
   const [removing, setRemoving] = useState(false)
   const { toast } = useStore()
@@ -47,7 +55,7 @@ export function DevAdmin() {
     if (!file) return
     setUploading(true)
     try {
-      await api.server.devUpload({ path: file.path, version: version.trim(), target, notes: notes.trim() })
+      await api.server.devUpload({ path: file.path, version: version.trim(), target, notes: notes.trim(), developer })
       toast(t('servers.admin.dev.uploadDone', { version: version.trim() }), 'success')
       setFile(null)
       setNotes('')
@@ -67,6 +75,7 @@ export function DevAdmin() {
   return (
     <>
       <p className="hint">{t('servers.admin.dev.lead')}</p>
+      <p className="hint">{t(developer ? 'servers.admin.dev.leadDeveloper' : 'servers.admin.dev.roles')}</p>
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="setting">
           <div className="text">
@@ -139,7 +148,7 @@ export function DevAdmin() {
             </div>
           )}
         </div>
-        {!data.uploads && <p className="hint">{t('servers.admin.dev.uploadsOff')}</p>}
+        {!data.uploads && !developer && <p className="hint">{t('servers.admin.dev.uploadsOff')}</p>}
       </div>
 
       <div className="settings-section">
@@ -172,19 +181,42 @@ export function DevAdmin() {
             {data.invites.map((a) => (
               <div key={a.uuid} className="setting">
                 <div className="text">
-                  <b>{a.name || a.uuid}</b>
+                  <b>
+                    {a.name || a.uuid} {a.developer && <span className="chip compact success">{t('servers.admin.dev.developer')}</span>}
+                  </b>
                   <span>{t('servers.admin.dev.invitedBy', { when: ago(a.addedAt), by: a.addedBy || '—' })}</span>
                   <div className="hint mono">{a.uuid}</div>
                 </div>
-                <button className="btn sm" onClick={() => void act('/api/devs/remove', { uuid: a.uuid }, 'servers.admin.dev.uninvited')}>
-                  {t('servers.admin.dev.uninvite')}
-                </button>
+                {!developer &&
+                  (a.developer ? (
+                    <button className="btn sm" onClick={() => void act('/api/devs/developer', { uuid: a.uuid, on: false }, 'servers.admin.dev.madeTester', { name: a.name || a.uuid })}>
+                      {t('servers.admin.dev.makeTester')}
+                    </button>
+                  ) : (
+                    <button className="btn sm" onClick={() => setPromoting(a)}>
+                      {t('servers.admin.dev.makeDeveloper')}
+                    </button>
+                  ))}
+                {(!developer || !a.developer) && (
+                  <button className="btn sm" onClick={() => void act('/api/devs/remove', { uuid: a.uuid }, 'servers.admin.dev.uninvited')}>
+                    {t('servers.admin.dev.uninvite')}
+                  </button>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
 
+      {promoting && (
+        <ConfirmModal
+          title={t('servers.admin.dev.makeDeveloper')}
+          body={t('servers.admin.dev.makeDeveloperConfirm', { name: promoting.name || promoting.uuid })}
+          confirm={t('servers.admin.dev.makeDeveloper')}
+          onConfirm={async () => void (await act('/api/devs/developer', { uuid: promoting.uuid, on: true }, 'servers.admin.dev.madeDeveloper', { name: promoting.name || promoting.uuid }))}
+          onClose={() => setPromoting(null)}
+        />
+      )}
       {removing && b && (
         <ConfirmModal
           title={t('servers.admin.dev.removeBuild')}

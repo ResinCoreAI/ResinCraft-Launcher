@@ -50,6 +50,9 @@ pub struct AdminStatus {
     pub need_code: bool,
     /// This PC unlocks by itself (a remembered device token).
     pub remembered: bool,
+    /// Not an admin but one of the relay's developers: the Admin page shows only Dev, through [`dev_call`].
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub developer: bool,
 }
 
 // ---------- Remembered PCs ----------
@@ -97,6 +100,7 @@ fn status_of(account: &MicrosoftAccount, admin: bool, u: Option<&Unlocked>, need
         dashboard_user: u.and_then(|u| u.user.clone()),
         need_code,
         remembered,
+        developer: false,
     }
 }
 
@@ -138,7 +142,7 @@ async fn open(account: &MicrosoftAccount, token: Option<&str>, password: &str, c
 /// Whether the active account may see the Admin page; a remembered PC unlocks right here.
 pub async fn status() -> AdminStatus {
     let Some(account) = accounts::microsoft_account(None).await else {
-        return AdminStatus { admin: false, unlocked: false, username: None, dashboard_user: None, need_code: false, remembered: false };
+        return AdminStatus { admin: false, unlocked: false, username: None, dashboard_user: None, need_code: false, remembered: false, developer: false };
     };
     let mut guard = ADMIN.lock().await;
     if let Some(u) = guard.as_ref().filter(|u| same(&u.uuid, &account.uuid)) {
@@ -161,7 +165,9 @@ pub async fn status() -> AdminStatus {
         Ok(conn) => conn.has_listings() && conn.admin,
         Err(_) => false,
     };
-    status_of(&account, admin, None, false, false)
+    let mut st = status_of(&account, admin, None, false, false);
+    st.developer = !admin && crate::updater::is_developer().await;
+    st
 }
 
 #[derive(Debug, Deserialize)]
@@ -280,13 +286,45 @@ pub struct DevUploadReq {
     pub target: String,
     #[serde(default)]
     pub notes: String,
+    /// A developer's upload: the ticket comes from [`dev_call`], not the admin connection.
+    #[serde(default)]
+    pub developer: bool,
 }
 
-/// Uploads a Dev build to the relay with a one-time ticket from the admin connection (`/api/devs/upload-ticket`).
-/// The update signature comes from the `.sig` next to the file.
+/// A developer's Dev API: `path` is the admin route (`/api/devs`, `/api/devs/add`...), sent to the relay as
+/// `/api/dev/manage...` over HTTPS with the account's relay session (no admin unlock). The relay checks the role.
+pub async fn dev_call(method: &str, path: &str, body: Option<Value>) -> Result<Value> {
+    let Some(rest) = path.strip_prefix("/api/devs").filter(|r| r.is_empty() || r.starts_with('/')) else {
+        anyhow::bail!("not a Dev route: {path}")
+    };
+    let Some(account) = accounts::microsoft_account(None).await else { return Err(relay::needs_microsoft()) };
+    for retry in [false, true] {
+        let (session, domain) = relay::session_token(&account).await?;
+        let url = format!("https://{domain}/api/dev/manage{rest}");
+        let http = crate::core::ctx::http();
+        let req = if method == "GET" { http.get(url) } else { http.post(url).json(&body.clone().unwrap_or_else(|| serde_json::json!({}))) };
+        let res = req.bearer_auth(&session).timeout(std::time::Duration::from_secs(30)).send().await.map_err(|e| anyhow::anyhow!("{}", e.without_url()))?;
+        let status = res.status();
+        // The saved session ran out: sign in again, once.
+        if status.as_u16() == 401 && !retry {
+            relay::forget_session(&account).await;
+            continue;
+        }
+        let answer: Value = res.json().await.unwrap_or(Value::Null);
+        if !status.is_success() {
+            let why = answer.get("error").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+            return Err(tr!("admin.refused", "The relay refused: {error}", error = why).into());
+        }
+        return Ok(answer);
+    }
+    Err(tr!("admin.refused", "The relay refused: {error}", error = "HTTP 401").into())
+}
+
+/// Uploads a Dev build to the relay with a one-time ticket (`/api/devs/upload-ticket`, from the admin connection or a
+/// developer's [`dev_call`]). The update signature comes from the `.sig` next to the file.
 pub async fn dev_upload(req: DevUploadReq) -> Result<Value> {
     let signature = tokio::fs::read_to_string(format!("{}.sig", req.path)).await.map_err(|e| anyhow::anyhow!("{}.sig: {e}", req.path))?;
-    let ticket = call("POST", "/api/devs/upload-ticket", None).await?;
+    let ticket = if req.developer { dev_call("POST", "/api/devs/upload-ticket", None).await? } else { call("POST", "/api/devs/upload-ticket", None).await? };
     let (Some(url), Some(t)) = (ticket["url"].as_str(), ticket["ticket"].as_str()) else { anyhow::bail!("the relay didn't give an upload ticket") };
     let body = tokio::fs::read(&req.path).await?;
     let res = crate::core::ctx::http()

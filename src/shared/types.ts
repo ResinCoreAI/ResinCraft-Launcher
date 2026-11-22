@@ -1693,6 +1693,8 @@ export interface AdminStatus {
   needCode?: boolean
   /** This PC unlocks by itself. */
   remembered?: boolean
+  /** Not an admin but one of the relay's developers: the Admin page shows only Dev (server.devCall). */
+  developer?: boolean
 }
 
 /** One world backup zip (a server's or an instance's). */
@@ -2996,7 +2998,9 @@ export interface ResinApi {
     /** Admin → Dev: picks a Dev build's update file on this PC (null if cancelled). */
     devPickBuild(): Promise<DevBuildFile | null>
     /** Admin → Dev: uploads it to the relay's Dev channel, with the .sig next to it. */
-    devUpload(req: { path: string; version: string; target: string; notes?: string }): Promise<unknown>
+    devUpload(req: { path: string; version: string; target: string; notes?: string; developer?: boolean }): Promise<unknown>
+    /** Admin → Dev for the relay's developers: the same /api/devs routes with the relay session, no unlock. */
+    devCall(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
     submitListing(req: { address: string; info: ListingInfo }): Promise<ListingStatus>
     myListings(): Promise<MyListing[]>
     removeListing(id: string): Promise<ListingStatus>
