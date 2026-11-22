@@ -6,6 +6,7 @@ import {
   Check,
   CreditCard,
   EyeOff,
+  FlaskConical,
   Eye,
   Flag,
   Gauge,
@@ -45,6 +46,7 @@ import { TwoFactorSetup, UsersAdmin } from '../components/admin/Users'
 import { RelaySettingsAdmin } from '../components/admin/RelaySettings'
 import { EventsAdmin } from '../components/admin/Events'
 import { PaymentsAdmin } from '../components/admin/Payments'
+import { DevAdmin } from '../components/admin/Dev'
 import '../serverlist.css'
 
 type Promo = { kind: 'recommended' | 'sponsored'; until?: number | null; order?: number; since?: number; active?: boolean }
@@ -110,7 +112,7 @@ type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
 /** The relay's screens, in the dashboard's order. */
-type Section = 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'settings' | 'events'
+type Section = 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
 const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
   { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
   { id: 'names', label: 'servers.admin.nav.names', icon: <Tag size={16} /> },
@@ -120,6 +122,7 @@ const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
   { id: 'reports', label: 'servers.admin.nav.reports', icon: <Inbox size={16} /> },
   { id: 'payments', label: 'servers.admin.nav.payments', icon: <CreditCard size={16} /> },
   { id: 'users', label: 'servers.admin.nav.users', icon: <Users size={16} /> },
+  { id: 'dev', label: 'servers.admin.nav.dev', icon: <FlaskConical size={16} /> },
   { id: 'settings', label: 'servers.admin.nav.settings', icon: <Settings2 size={16} /> },
   { id: 'events', label: 'servers.admin.nav.events', icon: <ScrollText size={16} /> }
 ]
@@ -340,6 +343,8 @@ export default function Admin() {
             <ReportsAdmin />
           ) : section === 'users' ? (
             <UsersAdmin />
+          ) : section === 'dev' ? (
+            <DevAdmin />
           ) : section === 'settings' ? (
             <RelaySettingsAdmin />
           ) : (

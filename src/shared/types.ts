@@ -447,8 +447,8 @@ export interface Settings {
   autoUpdate: boolean
   /** Install found updates in the background without asking, once no game or hosted server runs. */
   silentUpdate?: boolean
-  /** 'stable' or 'beta' (pre-releases too). */
-  updateChannel?: 'stable' | 'beta'
+  /** 'stable', 'beta' (pre-releases too) or 'dev' (the relay's Dev builds, for invited accounts). */
+  updateChannel?: 'stable' | 'beta' | 'dev'
   /** Closing the window keeps ResinCraft running in the system tray. */
   tray?: boolean
   /** Hidden for 30 s (in the tray, or while a game runs), the window closes completely to free WebView2's memory and
@@ -490,6 +490,8 @@ export interface UpdateAvailable {
   notesUrl: string
   /** The version already installed, offered again by Reinstall (not shown as an update). */
   reinstall?: boolean
+  /** A Dev build from the relay: no release page (`notesUrl` is empty). */
+  dev?: boolean
 }
 
 /** Games and hosted servers (their names) that installing an update would cut off. */
@@ -512,6 +514,8 @@ export interface UpdateStatus {
   waitingFor?: UpdateBlockers
   /** Installed from the Microsoft Store: the Store updates it, so ResinCraft never looks. */
   store?: boolean
+  /** Whether the signed-in account may use the Dev channel (the relay's admin invited it); missing until the relay said. */
+  dev?: boolean
 }
 
 export interface AppInfo {
@@ -2609,6 +2613,8 @@ export interface ResinApi {
     /** Reinstall: the newest release even when it's the one installed; then `install()` as for an update. */
     checkReinstall(): Promise<UpdateStatus>
     blockers(): Promise<UpdateBlockers>
+    /** Asks the relay whether this account may use the Dev channel (`dev` in the status; at most every 10 minutes). */
+    devAccess(): Promise<UpdateStatus>
     /** Downloads and installs the found update (the app restarts). `waitForStop`: install once games and servers stop. */
     /** true: once every game and server has stopped; 'close': stop servers and close games first. */
     install(mode?: boolean | 'close'): Promise<void>

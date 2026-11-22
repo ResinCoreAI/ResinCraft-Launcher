@@ -11,6 +11,27 @@ export default {
   'servers.admin.nav.users': 'Users',
   'servers.admin.nav.settings': 'Settings',
   'servers.admin.nav.events': 'Events',
+  'servers.admin.nav.dev': 'Dev',
+
+  // Dev channel (who gets the launcher's Dev builds)
+  'servers.admin.dev.lead': 'Invited accounts see Dev in Settings → Updates and get the Dev build before Beta. Launcher admins have it without an invite. Taking an invite back moves that launcher to Beta at its next check.',
+  'servers.admin.dev.build': 'Dev build {version}',
+  'servers.admin.dev.noBuildTitle': 'No Dev build',
+  'servers.admin.dev.uploaded': 'Uploaded {when}',
+  'servers.admin.dev.noBuild': 'Run release-dev.bat to build and upload one.',
+  'servers.admin.dev.uploadsOff': 'Uploads are off: add [dev_builds] upload_tokens to relay.toml, then run release-dev.bat.',
+  'servers.admin.dev.removeBuild': 'Remove the build',
+  'servers.admin.dev.removeBuildConfirm': 'Remove Dev build {version}? Dev users keep what they have installed.',
+  'servers.admin.dev.buildRemoved': 'Dev build removed.',
+  'servers.admin.dev.invite': 'Invite an account',
+  'servers.admin.dev.inviteHint': 'Minecraft name or UUID',
+  'servers.admin.dev.inviteButton': 'Invite',
+  'servers.admin.dev.invited': 'Invited {name}.',
+  'servers.admin.dev.list': 'Invited ({count})',
+  'servers.admin.dev.none': 'Nobody is invited yet.',
+  'servers.admin.dev.invitedBy': 'Invited {when} by {by}',
+  'servers.admin.dev.uninvite': 'Uninvite',
+  'servers.admin.dev.uninvited': 'Invite taken back.',
 
   // Service switch
   'servers.admin.relay.service': 'Relay',

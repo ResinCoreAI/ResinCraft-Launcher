@@ -1,6 +1,6 @@
 // ResinCraft's own updates in the browser preview. A newer version is "found" a moment after start, so the banner
 // and Settings → Updates can be designed. Add ?update=none, ?update=offline or ?update=busy (a game and a server
-// are running) to the preview URL to see the other states.
+// are running) to the preview URL to see the other states. ?dev=1: this account is invited to the Dev channel.
 import type { EngineText, ResinApi, TaskInfo, UpdateStatus } from '@shared/types'
 import { mockEngine } from './mock-engine'
 
@@ -47,6 +47,7 @@ export function mockUpdate(): { update: ResinApi['update']; onUpdate: ResinApi['
         return set({ state: 'idle', lastChecked: Date.now(), error: undefined, available: { version, notesUrl: `https://github.com/ResinCoreAI/ResinCraft-Launcher/releases/tag/v${version}`, reinstall: true } })
       },
       blockers: async () => running(),
+      devAccess: async () => set({ dev: new URLSearchParams(location.search).get('dev') === '1' }),
       install: async (how) => {
         const waitForStop = !!how
         closing = how === 'close'

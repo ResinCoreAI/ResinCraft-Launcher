@@ -110,6 +110,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       check: fn('update:check'),
       checkReinstall: fn('update:checkReinstall'),
       blockers: fn('update:blockers'),
+      devAccess: fn('update:devAccess'),
       install: fn('update:install'),
       closeRunning: fn('update:closeRunning'),
       cancel: fn('update:cancel')

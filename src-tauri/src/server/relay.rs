@@ -345,6 +345,13 @@ pub(crate) async fn session_token(account: &MicrosoftAccount) -> Result<(String,
     Ok((t, s.domain.clone()))
 }
 
+/// Forgets `account`'s saved relay session (the relay answered 401 to it), so the next [`session_token`] signs in again.
+pub(crate) async fn forget_session(account: &MicrosoftAccount) {
+    if let Some(s) = settings() {
+        save_session(&s, &account.uuid, None).await;
+    }
+}
+
 /// Connects and signs in as `account` for the server list (listing.rs); errors are worded for players.
 pub(crate) async fn connect_for_list(account: &MicrosoftAccount) -> Result<Connection> {
     let Some(s) = settings() else { return Err(describe(&AgentError::Config("no relay in this build".into()), "")) };
