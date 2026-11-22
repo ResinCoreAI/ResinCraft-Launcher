@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ArrowLeft, BellRing, Gift, Inbox as InboxIcon, Mail, MailOpen, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import type { InboxData, InboxMessage, InboxReward } from '@shared/types'
-import { creditText, inbox, setInbox } from '../inboxState'
+import { inbox, setInbox } from '../inboxState'
+import { money, setWalletBalance } from '../storeStatus'
 import creditIcon from '../assets/resin-credit.svg'
 import { useStore } from '../store'
 import { currentLanguage, t, type Key } from '../i18n'
@@ -28,7 +29,7 @@ function RewardCard({ r, currency }: { r: InboxReward; currency?: string }) {
     <div className="ib-reward credit">
       <img src={creditIcon} alt="" />
       <div>
-        <b>{creditText(r.amount, currency)}</b>
+        <b>{money(r.amount, currency ?? 'thb')}</b>
         <span>{t('inbox.reward.credit')}</span>
       </div>
     </div>
@@ -162,11 +163,13 @@ export default function InboxPage() {
           : d
       )
       setInbox({ unread: r.unread })
+      // The header's Resin Credit shows the new balance at once.
+      if (activeAccount?.uuid) setWalletBalance(activeAccount.uuid, r.credit, data?.currency ?? 'thb')
       celebrate(from)
       const credit = r.given.filter((g) => g.kind === 'credit').reduce((n, g) => n + (g.kind === 'credit' ? g.amount : 0), 0)
       const items = r.given.filter((g) => g.kind === 'item').length
       toast(
-        [credit > 0 && t('inbox.claimed.credit', { amount: creditText(credit, data?.currency) }), items > 0 && t('inbox.claimed.items', { count: items })].filter(Boolean).join(' · ') || t('inbox.claimed.done'),
+        [credit > 0 && t('inbox.claimed.credit', { amount: money(credit, data?.currency ?? 'thb') }), items > 0 && t('inbox.claimed.items', { count: items })].filter(Boolean).join(' · ') || t('inbox.claimed.done'),
         'success'
       )
       if (r.error) toast(r.error, 'error')

@@ -23,9 +23,6 @@ export const inbox = {
   setStatus: (on: boolean, email: boolean) => call<InboxStatusSub>('POST', '/api/inbox/status', { on, email })
 }
 
-/** "50.00 THB" for an amount in the currency's smallest unit. */
-export const creditText = (amount: number, currency?: string) => `${(amount / 100).toFixed(2)} ${(currency ?? '').toUpperCase()}`.trim()
-
 /** `available`: the relay answered for this account (a Microsoft account, a relay with mail). */
 interface State {
   unread: number
