@@ -14,9 +14,17 @@ import { AnnouncementsCard } from '../components/Announcements'
 import { RtxBanner, useRtxRemix } from '../components/RtxBanner'
 import { usePackArt } from '../components/packArt'
 import { BasicIcon, iconPng, RTX_ICON } from '../components/BasicIcons'
+import { useWelcome } from '../welcomeState'
+import { makeStarterInstance } from '../starterInstance'
 
 export default function Home() {
-  const { instances, activeAccount, go, setNewInstanceOpen, settings } = useStore()
+  const { instances, activeAccount, go, setNewInstanceOpen, settings, ready, refreshInstances } = useStore()
+  // A first install gets one instance to start with (starterInstance.ts). The welcome's state is read so this runs
+  // again once App has decided it is a first install (App's effects run after this page's).
+  const welcome = useWelcome()
+  useEffect(() => {
+    if (ready) void makeStarterInstance(instances.length, refreshInstances)
+  }, [ready, welcome.open, instances.length])
   const featured = instances.find((i) => i.lastPlayed) ?? instances[0]
   const total = instances.reduce((s, i) => s + i.playtime, 0)
   const versionCount = new Set(instances.map((i) => i.mcVersion)).size

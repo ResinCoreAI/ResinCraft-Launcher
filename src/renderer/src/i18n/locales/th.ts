@@ -5030,6 +5030,7 @@ const dict: Dict = {
   "servers.admin.dev.removeDeveloper": "เอาออก",
   "servers.admin.dev.testersList": "ผู้ทดสอบ ({count})",
   "servers.admin.dev.testersLead": "บัญชีที่ได้รับเชิญให้ทดสอบ จะได้เฉพาะบิลด์ Test ไม่ได้บิลด์ Dev",
+  "starter.name": "โลกแรกของฉัน",
 }
 
 export default dict

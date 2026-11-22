@@ -5028,6 +5028,7 @@ const dict: Dict = {
   "servers.admin.dev.removeDeveloper": "移除",
   "servers.admin.dev.testersList": "測試者（{count}）",
   "servers.admin.dev.testersLead": "受邀參與測試的帳號。他們只會收到 Test 版本，不會收到 Dev 版本。",
+  "starter.name": "我的第一個世界",
 }
 
 export default dict

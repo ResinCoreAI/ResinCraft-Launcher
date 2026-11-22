@@ -5038,6 +5038,7 @@ const dict: Dict = {
   "servers.admin.dev.removeDeveloper": "Gỡ",
   "servers.admin.dev.testersList": "Người thử nghiệm ({count})",
   "servers.admin.dev.testersLead": "Các tài khoản được mời thử nghiệm. Họ chỉ nhận bản Test, không nhận bản Dev.",
+  "starter.name": "Thế giới đầu tiên",
 }
 
 export default dict

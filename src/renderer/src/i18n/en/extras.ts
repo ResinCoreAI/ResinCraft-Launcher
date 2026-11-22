@@ -664,4 +664,5 @@ export default {
   "servers.admin.dev.removeDeveloper": "Remove",
   "servers.admin.dev.testersList": "Testers ({count})",
   "servers.admin.dev.testersLead": "Accounts invited to test. They get the Test build only, not the Dev build.",
+  "starter.name": "My First World",
 } as const

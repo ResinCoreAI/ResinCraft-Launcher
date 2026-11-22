@@ -6,6 +6,10 @@ import { startGuide } from './guideState'
 const STORAGE = 'resincraft.welcomed'
 let open: boolean | undefined
 let step = 0
+let firstInstall = false
+
+/** This start is a brand-new launcher's first (no account, no instance, never welcomed): starterInstance.ts. */
+export const isFirstInstall = () => firstInstall
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
 const subscribe = (cb: () => void) => {
@@ -35,7 +39,8 @@ function remember() {
  */
 export function decideWelcome(empty: boolean) {
   if (open !== undefined) return
-  open = (empty && !seen()) || location.hash === '#welcome'
+  firstInstall = empty && !seen()
+  open = firstInstall || location.hash === '#welcome'
   if (!open && !empty) remember()
   emit()
 }

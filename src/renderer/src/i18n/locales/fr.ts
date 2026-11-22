@@ -5101,6 +5101,7 @@ const dict: Dict = {
   "servers.admin.dev.removeDeveloper": "Retirer",
   "servers.admin.dev.testersList": "Testeurs ({count})",
   "servers.admin.dev.testersLead": "Comptes invités à tester. Ils reçoivent seulement la version Test, pas la version Dev.",
+  "starter.name": "Mon premier monde",
 }
 
 export default dict

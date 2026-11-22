@@ -5038,6 +5038,7 @@ const dict: Dict = {
   "servers.admin.dev.removeDeveloper": "削除",
   "servers.admin.dev.testersList": "テスター ({count})",
   "servers.admin.dev.testersLead": "テストに招待されたアカウントです。受け取るのは Test ビルドだけで、Dev ビルドは受け取りません。",
+  "starter.name": "はじめてのワールド",
 }
 
 export default dict

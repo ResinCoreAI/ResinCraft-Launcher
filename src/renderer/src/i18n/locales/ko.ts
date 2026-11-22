@@ -5033,6 +5033,7 @@ const dict: Dict = {
   "servers.admin.dev.removeDeveloper": "삭제",
   "servers.admin.dev.testersList": "테스터 ({count})",
   "servers.admin.dev.testersLead": "테스트에 초대된 계정입니다. Test 빌드만 받고 Dev 빌드는 받지 않습니다.",
+  "starter.name": "나의 첫 월드",
 }
 
 export default dict
