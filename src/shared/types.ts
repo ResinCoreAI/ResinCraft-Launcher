@@ -1854,6 +1854,25 @@ export interface ListedServer {
   last_seen?: number | null
 }
 
+/** One service on the Status page, as checked just now (status.rs `ServiceCheck`). */
+export interface ServiceCheck {
+  /** "microsoft", "versions", "modrinth", "relayApi", … (the page names it and says what it is for). */
+  id: string
+  /** "signin" | "downloads" | "content" | "loaders" | "resincraft" */
+  group: string
+  /** "off": this build doesn't use it (no relay built in). */
+  state: 'up' | 'slow' | 'down' | 'off'
+  /** How long the slowest of its hosts took to answer, in ms. */
+  ms: number | null
+  /** Why it's down; with "http", `code` is the status (502, …). */
+  problem: 'timeout' | 'dns' | 'connect' | 'http' | null
+  code: number | null
+  hosts: string[]
+  failedHost: string | null
+  /** When it was checked (ms since 1970). */
+  checkedAt: number
+}
+
 /** The MCP server for AI assistants (mcp.rs). */
 export interface McpInfo {
   state: 'off' | 'on' | 'error'
@@ -2511,6 +2530,8 @@ export interface ResinApi {
     }): Promise<{ id?: string | null }>
     /** The status page's word for each service right now ("java" → "operational"); empty when it can't be reached. */
     serviceStatus(): Promise<Record<string, string>>
+    /** The Status page: every service the launcher depends on, checked from this PC just now (status.rs). */
+    checkServices(): Promise<ServiceCheck[]>
     /** An https picture as a data: URL (for pictures the UI draws on a canvas, like the overview card). */
     imageData(url: string): Promise<string>
     /** A modpack's gallery picture shrunk for a backdrop (at most 1280 wide), as a data: URL; fetched once, then cached. */

@@ -152,6 +152,11 @@ const GUIDES: Record<string, Step[]> = {
     { at: '.fm-list', title: 'guide.ifiles.list', body: 'guide.ifiles.list.body' }
   ],
   'server:settings': [{ at: '.main .settings-section', title: 'guide.ssettings.list', body: 'guide.ssettings.list.body' }],
+  status: [
+    { at: '.st-summary', title: 'guide.status.summary', body: 'guide.status.summary.body' },
+    { at: '[data-guide="status-refresh"]', title: 'guide.status.refresh', body: 'guide.status.refresh.body' },
+    { at: '.st-list .st-row:not(.st-skeleton)', title: 'guide.status.row', body: 'guide.status.row.body' }
+  ],
   settings: [
     { at: '.settings-nav', title: 'guide.settings.nav', body: 'guide.settings.nav.body' },
     { at: '#appearance', title: 'guide.settings.appearance', body: 'guide.settings.appearance.body' },

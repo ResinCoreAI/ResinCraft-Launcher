@@ -36,6 +36,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       discordPage: fn('app:discordPage'),
       sendReport: fn('app:sendReport'),
       serviceStatus: fn('app:serviceStatus'),
+      checkServices: fn('app:checkServices'),
       imageData: fn('app:imageData'),
       artData: fn('app:artData'),
       mcpInfo: fn('app:mcpInfo'),

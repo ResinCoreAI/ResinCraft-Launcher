@@ -1,0 +1,173 @@
+/* The Status page (pages/Status.tsx): a summary line, then each group's services as rows in one flat card. */
+.status-page {
+  max-width: 980px;
+}
+.st-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  font-size: 14.5px;
+}
+.st-summary.st-down {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.st-summary.st-slow {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+}
+.st-summary .faint {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.st-error {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.st-group {
+  margin-top: 22px;
+}
+.st-group-title {
+  margin: 0 0 8px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.st-list {
+  padding: 0;
+  overflow: hidden;
+}
+.st-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 13px 18px;
+  transition: opacity 0.2s var(--ease);
+}
+.st-row + .st-row {
+  border-top: 1px solid var(--border);
+}
+.st-row.st-stale {
+  opacity: 0.55;
+}
+.st-skeleton {
+  height: 58px;
+  background: linear-gradient(90deg, transparent, var(--surface-2), transparent) 0 0 / 200% 100%;
+  animation: st-shimmer 1.4s linear infinite;
+}
+@keyframes st-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.st-lamp {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.st-summary .st-lamp {
+  margin-top: 0;
+  width: 10px;
+  height: 10px;
+}
+.st-lamp.st-up {
+  background: var(--play);
+}
+.st-lamp.st-slow {
+  background: var(--warning);
+}
+.st-lamp.st-down {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+.st-lamp.st-off {
+  background: transparent;
+  border: 1.5px solid var(--text-faint);
+}
+
+.st-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.st-text b {
+  font-size: 14px;
+  color: var(--text);
+}
+.st-impact {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.st-problem {
+  margin-top: 3px;
+  color: var(--danger);
+  font-size: 12.5px;
+}
+.st-off .st-problem {
+  color: var(--text-faint);
+}
+.st-hosts {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.st-meta {
+  flex: none;
+  min-width: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.st-state {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.st-state.st-up {
+  color: var(--play);
+}
+.st-state.st-slow {
+  color: var(--warning);
+}
+.st-state.st-down {
+  color: var(--danger);
+}
+.st-state.st-off {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+.st-foot {
+  margin: 18px 2px 0;
+}
+
+@media (max-width: 640px) {
+  .st-row {
+    flex-wrap: wrap;
+  }
+  .st-meta {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding-left: 23px;
+  }
+}

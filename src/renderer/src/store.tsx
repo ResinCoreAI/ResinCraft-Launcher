@@ -25,6 +25,8 @@ export type Route =
   | { page: 'settings'; section?: string; find?: string }
   /** Report a problem (pages/Report.tsx); the crash window fills in `type`, `title` and `message`. */
   | { page: 'report'; type?: 'bug' | 'crash' | 'idea' | 'question' | 'down'; title?: string; message?: string }
+  /** Whether the services the launcher depends on answer right now (pages/Status.tsx). */
+  | { page: 'status' }
 
 export type GameState = GameEvent['state']
 

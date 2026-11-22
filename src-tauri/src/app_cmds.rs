@@ -76,6 +76,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         // "Report a problem" from inside the launcher (report.rs), to the same team inbox as the report website.
         "app:sendReport" => json(crate::report::send(serde_json::from_value(args.raw(0))?).await?),
         "app:serviceStatus" => json(crate::report::status().await),
+        "app:checkServices" => json(crate::status::check_all().await),
         // A picture from the web as a data: URL, for pictures the UI draws itself (the overview card): a page can't
         // read pixels from sites that don't allow it, the engine can.
         "app:imageData" => json(image_data(&args.get::<String>(0)?).await?),

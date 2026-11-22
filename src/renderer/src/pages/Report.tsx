@@ -159,6 +159,10 @@ export default function Report({ type: startType, title: startTitle, message: st
             <button className="link" onClick={() => void api.app.openExternal(STATUS_PAGE)}>
               {t('report.statusOpen')}
             </button>
+            {' · '}
+            <button className="link" onClick={() => go({ page: 'status' })}>
+              {t('report.statusHere')}
+            </button>
           </p>
         </div>
       </div>

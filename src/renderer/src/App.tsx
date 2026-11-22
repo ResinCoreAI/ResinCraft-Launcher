@@ -1,4 +1,5 @@
 import {
+  Activity,
   ChevronDown,
   ChevronRight,
   Compass,
@@ -83,6 +84,7 @@ const SettingsPage = page(() => import('./pages/SettingsPage'))
 const StorePage = lazy(() => import('./pages/Store'))
 const FindServers = page(() => import('./pages/FindServers'))
 const Report = lazy(() => import('./pages/Report'))
+const Status = lazy(() => import('./pages/Status'))
 const Admin = lazy(() => import('./pages/Admin'))
 // Only a brand-new launcher (or Settings → About) ever shows it.
 const Welcome = lazy(() => import('./components/Welcome'))
@@ -179,6 +181,9 @@ export default function App() {
   const instance = route.page === 'instance' ? instances.find((i) => i.id === route.id) : undefined
   const nav = NAV.filter((n) => (n.page !== 'bedrock' || hasBedrockApp) && (n.page !== 'admin' || isAdmin) && (n.page !== 'store' || storeOpen))
   const playing = Object.values(games).some((g) => g === 'running')
+  // The quick search finds every header page, and the Status page (not in the header: it's for when something's
+  // wrong, so it waits in Settings → About, Report a problem and here).
+  const searchPages = [...nav.map((n) => ({ page: n.page, label: t(n.label), icon: n.icon })), { page: 'status' as const, label: t('status.title'), icon: <Activity /> }]
 
   // The window buttons float over the header's right end; it keeps clear of however wide they are just now
   // (an "Update" button joins them when there is one).
@@ -225,7 +230,7 @@ export default function App() {
         />
 
         <div className="head-tools" data-tauri-drag-region>
-          <QuickSearch pages={nav.map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))} />
+          <QuickSearch pages={searchPages} />
           <button className="head-btn" data-guide="bigscreen" title={`${t('bigscreen.enter')} (F11)`} aria-label={t('bigscreen.enter')} onClick={() => void setBigScreen(true)}>
             <Tv />
           </button>
@@ -267,8 +272,8 @@ export default function App() {
       <main className="main">
         {classic && (
           <ClassicTopBar
-            title={t(nav.find((n) => n.page === current)?.label ?? 'nav.home')}
-            searchPages={nav.map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))}
+            title={current === 'status' ? t('status.title') : t(nav.find((n) => n.page === current)?.label ?? 'nav.home')}
+            searchPages={searchPages}
           />
         )}
         <div className="content">
@@ -304,6 +309,7 @@ export default function App() {
             {route.page === 'store' && <StorePage />}
             {route.page === 'findservers' && <FindServers />}
             {route.page === 'report' && <Report type={route.type} title={route.title} message={route.message} />}
+            {route.page === 'status' && <Status />}
             {route.page === 'servers' && <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />}
           </Suspense>
         </div>

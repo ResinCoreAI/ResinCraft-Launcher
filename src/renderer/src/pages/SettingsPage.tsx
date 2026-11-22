@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sparkles, Sun, Terminal, Trash2, Tv } from 'lucide-react'
+  Activity, Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, RefreshCw, RotateCcw, Sparkles, Sun, Terminal, Trash2, Tv } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { showWelcome } from '../welcomeState'
@@ -734,6 +734,9 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button className="btn" onClick={() => go({ page: 'report' })}>
                   <Bug /> {t('settings.about.report')}
+                </button>
+                <button className="btn" onClick={() => go({ page: 'status' })}>
+                  <Activity /> {t('settings.about.status')}
                 </button>
                 <button className="btn" onClick={showWelcome}>
                   <Sparkles /> {t('welcome.again')}
