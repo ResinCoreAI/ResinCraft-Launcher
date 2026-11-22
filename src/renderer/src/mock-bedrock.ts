@@ -356,9 +356,11 @@ export function mockBedrock(now: number): ResinApi['bedrock'] {
     },
     xboxUser: async () => {
       await sleep(350)
-      if (xboxMode === 'none') return { unknown: [] }
-      if (xboxMode === 'other' && xbox === 'a2') return { user: { xuid: '2535499999999999', gamertag: 'FamilyPC' }, unknown: [] }
-      return { user: { xuid: xbox === 'a1' ? '2535400000000001' : '2535412345678901', gamertag: xbox === 'a1' ? 'PuirkleXbox' : 'PuirkleBE' }, accountId: xbox, unknown: [] }
+      // Puirkle (a1) owns Java Edition, and with it Minecraft for Windows; the Bedrock-only PuirkleBE (a2) doesn't.
+      const own = { owners: ['a1'], notOwners: ['a2'] }
+      if (xboxMode === 'none') return { unknown: [], ...own }
+      if (xboxMode === 'other' && xbox === 'a2') return { user: { xuid: '2535499999999999', gamertag: 'FamilyPC' }, unknown: [], ...own }
+      return { user: { xuid: xbox === 'a1' ? '2535400000000001' : '2535412345678901', gamertag: xbox === 'a1' ? 'PuirkleXbox' : 'PuirkleBE' }, accountId: xbox, unknown: [], ...own }
     },
     update: () => sleep(300),
     openFolder: () => sleep(100),

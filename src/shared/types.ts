@@ -1114,6 +1114,12 @@ export interface XboxSignIn {
   accountId?: string
   /** ResinCraft's Microsoft accounts whose Xbox account isn't known, so they can't be matched. */
   unknown: string[]
+  /**
+   * ResinCraft's accounts that own Minecraft for Windows, and those that don't, as Minecraft's entitlement service
+   * says (unknown ones are in neither). An account that doesn't own it plays the trial.
+   */
+  owners: string[]
+  notOwners: string[]
 }
 
 export interface BedrockStatus {

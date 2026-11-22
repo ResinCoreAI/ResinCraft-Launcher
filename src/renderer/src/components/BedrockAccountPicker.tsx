@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ExternalLink, Loader2, Play, UserRound } from 'lucide-react'
+import { AlertTriangle, Check, ExternalLink, Loader2, Play, UserRound } from 'lucide-react'
 import type { AccountView, BedrockEditionKind, XboxSignIn } from '@shared/types'
 import { api } from '../api'
 import { useStore } from '../store'
@@ -75,7 +75,7 @@ export function BedrockAccountPicker() {
           setSign(s)
           setPicked(s.accountId ?? (s.user ? XBOX : oursRef.current.find((a) => a.active)?.id))
         })
-        .catch(() => setSign({ unknown: [] }))
+        .catch(() => setSign({ unknown: [], owners: [], notOwners: [] }))
     }
     return () => {
       open = undefined
@@ -165,6 +165,8 @@ export function BedrockAccountPicker() {
                     <div className="title ellipsis">{a.username}</div>
                     <div className="file">{kind(a)}</div>
                   </div>
+                  {sign.owners.includes(a.id) && <span className="chip success">{t('bedrock.account.owns')}</span>}
+                  {sign.notOwners.includes(a.id) && <span className="chip warn">{t('bedrock.account.trialOnly')}</span>}
                   {a.id === sign.accountId ? (
                     <span className="chip accent">
                       <Check size={12} /> {t('bedrock.account.inXbox')}
@@ -190,6 +192,12 @@ export function BedrockAccountPicker() {
                 </label>
               )}
             </div>
+            {picked && sign.notOwners.includes(picked) && (
+              <div className="callout" style={{ marginTop: 12 }}>
+                <AlertTriangle />
+                <span>{t('bedrock.account.trialWarn', { name: chosen?.username ?? '' })}</span>
+              </div>
+            )}
           </>
         )}
       </Modal>
@@ -239,5 +247,58 @@ export function BedrockAccountPicker() {
         {t('bedrock.account.whole')}
       </p>
     </Modal>
+  )
+}
+
+/**
+ * Under Play: when Minecraft for Windows would run as the trial. Windows checks the licence of the account the Xbox
+ * app and the Microsoft Store are signed in with; owning Minecraft: Java Edition includes Minecraft for Windows, but
+ * only on that same Microsoft account. ResinCraft can't read the game's trial state, so this goes by what Minecraft's
+ * entitlement service says about ResinCraft's accounts: shown when the Xbox app's account is one that doesn't own
+ * it, or isn't one of ResinCraft's while another account does.
+ */
+export function BedrockTrialNote() {
+  const { accounts, toast } = useStore()
+  const [sign, setSign] = useState<XboxSignIn>()
+  useEffect(() => {
+    void api.bedrock
+      .xboxUser()
+      .then(setSign)
+      .catch(() => {})
+  }, [accounts.length])
+  if (!sign?.user) return null
+  const name = (id: string) => accounts.find((a) => a.id === id)?.username ?? ''
+  const owner = sign.owners.map(name).find(Boolean)
+  const xboxName = sign.user.gamertag || t('bedrock.account.unnamed')
+  const notOwned = !!sign.accountId && sign.notOwners.includes(sign.accountId)
+  const outside = !sign.accountId && !!owner
+  if (!notOwned && !outside) return null
+  return (
+    <div className="callout bd-trial" style={{ marginTop: 12, maxWidth: 560, alignItems: 'flex-start' }}>
+      <AlertTriangle />
+      <div className="grow" style={{ minWidth: 0 }}>
+        <div>{notOwned ? t('bedrock.trial.notOwned', { name: xboxName }) : t('bedrock.trial.unknownXbox', { name: xboxName })}</div>
+        {owner ? (
+          <>
+            <div style={{ marginTop: 6 }}>{t('bedrock.trial.owner', { owner })}</div>
+            <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'grid', gap: 2 }}>
+              <li>{t('bedrock.trial.step1', { owner })}</li>
+              <li>{t('bedrock.trial.step2')}</li>
+              <li>{t('bedrock.trial.step3')}</li>
+            </ol>
+            <div className="row wrap" style={{ marginTop: 8 }}>
+              <button className="btn sm" onClick={() => void api.bedrock.xboxAccount().catch((e: Error) => toast(e.message, 'error'))}>
+                <ExternalLink /> {t('bedrock.account.openXbox')}
+              </button>
+              <button className="btn sm" onClick={() => void api.bedrock.get('release').catch((e: Error) => toast(e.message, 'error'))}>
+                <ExternalLink /> {t('bedrock.openStore')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div style={{ marginTop: 6 }}>{t('bedrock.trial.noOwner')}</div>
+        )}
+      </div>
+    </div>
   )
 }

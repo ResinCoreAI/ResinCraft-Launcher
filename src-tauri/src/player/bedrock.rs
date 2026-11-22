@@ -527,6 +527,9 @@ pub struct XboxSignIn {
     /// ResinCraft's Microsoft accounts whose Xbox account isn't known (signed in before it was stored): they can't
     /// be matched.
     pub unknown: Vec<String>,
+    /// ResinCraft's accounts that own Minecraft for Windows, and those that don't (unknown ones are in neither).
+    pub owners: Vec<String>,
+    pub not_owners: Vec<String>,
 }
 
 /// Matches the Xbox app's account to ResinCraft's: by Xbox user ID, or for a Bedrock account without one, by its
@@ -540,7 +543,9 @@ fn match_xbox(user: Option<XboxUser>, accounts: &[super::accounts::XboxIdentity]
             .map(|a| a.id.clone())
     });
     let unknown = accounts.iter().filter(|a| a.xuid.is_none() && a.kind != "bedrock").map(|a| a.id.clone()).collect();
-    XboxSignIn { user, account_id, unknown }
+    let owners = accounts.iter().filter(|a| a.owns_bedrock == Some(true)).map(|a| a.id.clone()).collect();
+    let not_owners = accounts.iter().filter(|a| a.owns_bedrock == Some(false)).map(|a| a.id.clone()).collect();
+    XboxSignIn { user, account_id, unknown, owners, not_owners }
 }
 
 pub async fn handle(channel: &str, args: Args) -> Result<Value> {
@@ -648,7 +653,17 @@ mod tests {
     #[test]
     fn matches_the_xbox_account_to_ours() {
         use super::super::accounts::XboxIdentity;
-        let acc = |id: &str, kind: &str, name: &str, xuid: Option<&str>| XboxIdentity { id: id.into(), kind: kind.into(), username: name.into(), xuid: xuid.map(str::to_string) };
+        let acc = |id: &str, kind: &str, name: &str, xuid: Option<&str>| XboxIdentity {
+            id: id.into(),
+            kind: kind.into(),
+            username: name.into(),
+            xuid: xuid.map(str::to_string),
+            owns_bedrock: match id {
+                "a" => Some(true),
+                "b" => Some(false),
+                _ => None,
+            },
+        };
         let ours = vec![acc("a", "msa", "Steve", Some("111")), acc("b", "bedrock", "PuirkleGamer", None), acc("c", "msa", "Alex", None)];
         let user = |xuid: &str, tag: &str| Some(XboxUser { xuid: xuid.into(), gamertag: tag.into() });
         assert_eq!(match_xbox(user("111", "Whoever"), &ours).account_id.as_deref(), Some("a"));
@@ -657,7 +672,7 @@ mod tests {
         let none = match_xbox(None, &ours);
         assert_eq!((none.account_id, none.unknown), (None, vec!["c".to_string()]));
         let v = serde_json::to_value(match_xbox(user("111", "T"), &ours)).unwrap();
-        assert_eq!(v, serde_json::json!({"user": {"xuid": "111", "gamertag": "T"}, "accountId": "a", "unknown": ["c"]}));
+        assert_eq!(v, serde_json::json!({"user": {"xuid": "111", "gamertag": "T"}, "accountId": "a", "unknown": ["c"], "owners": ["a"], "notOwners": ["b"]}));
     }
 
     #[test]

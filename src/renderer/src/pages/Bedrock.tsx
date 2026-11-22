@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { AlertTriangle, Archive, Download, ExternalLink, FolderOpen, Gamepad2, Globe, Loader2, Play, Plus, RefreshCw, Server, Smartphone, Trash2, UserRound, Wrench, X } from 'lucide-react'
 import type { BedrockEdition, BedrockEditionKind, BedrockInstallMode, BedrockStatus, ServerInfo } from '@shared/types'
 import { api } from '../api'
-import { BedrockAccountPicker, playBedrock } from '../components/BedrockAccountPicker'
+import { BedrockAccountPicker, BedrockTrialNote, playBedrock } from '../components/BedrockAccountPicker'
 import { BackupsCard, BackupsList, useBedrockVersions, VersionPlate, type BedrockFailure, type BedrockVersionsState } from '../components/BedrockVersions'
 import { ConfirmModal, Empty, MoreButton, type ContextEntry } from '../components/ui'
 import { useInstanceTask, useStore } from '../store'
@@ -398,6 +398,7 @@ function Hero(p: EditionProps & { versions: BedrockVersionsState }) {
               <MoreButton className="ghost lg" items={() => menu(p, false)} />
             </div>
             <XboxAccountNote />
+            <BedrockTrialNote />
           </>
         ) : installing ? (
           <span className="bd-waiting">
