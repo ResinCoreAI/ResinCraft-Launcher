@@ -3131,5 +3131,7 @@ export interface ResinApi {
     openFile(cb: (e: { path: string }) => void): () => void
     /** A resincraft:// link opened while ResinCraft runs. */
     openLink(cb: (e: { url: string }) => void): () => void
+    /** The launcher went over its memory budget while in use (webview.rs): empty the caches that can be read again. */
+    memoryTrim(cb: () => void): () => void
   }
 }

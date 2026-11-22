@@ -1,7 +1,10 @@
+import { api } from './api'
+
 /**
  * Caches that can be read again when they're next needed (screenshot thumbnails, modpack version lists): emptied
- * when the launcher is hidden or minimized, and when it's been left alone for a few minutes, so a launcher nobody is
- * using doesn't hold on to them. (The engine also puts the whole page at WebView2's low memory level then.)
+ * when the launcher is hidden or minimized, when it's been left alone for a few minutes, so a launcher nobody is
+ * using doesn't hold on to them, and when the engine says the launcher went over its memory budget while in use.
+ * (The engine also puts the whole page at WebView2's low memory level then.)
  */
 
 const IDLE_MS = 3 * 60_000
@@ -21,6 +24,10 @@ export function onTrim(fn: () => void): () => void {
 export function trimMemory() {
   if (trimmed) return
   trimmed = true
+  emptyCaches()
+}
+
+function emptyCaches() {
   for (const fn of trims) {
     try {
       fn()
@@ -41,6 +48,12 @@ function watch() {
   // A controller in use: gamepad.ts puts "gamepad" on <html> for every press.
   new MutationObserver(used).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
   document.addEventListener('visibilitychange', () => (document.hidden ? trimMemory() : used()))
+  // Over the memory budget while in use: emptied again, even if nothing was used since the last time.
+  api.on.memoryTrim(() => {
+    // Seen by measuring tools (performance.getEntriesByName('memory-trim')).
+    performance.mark('memory-trim')
+    emptyCaches()
+  })
   window.setInterval(() => {
     if (!trimmed && Date.now() - last > IDLE_MS) trimMemory()
   }, 30_000)

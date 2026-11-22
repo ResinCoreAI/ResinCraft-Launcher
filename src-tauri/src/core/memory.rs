@@ -178,6 +178,43 @@ pub async fn usage() -> MemoryUsage {
     })
 }
 
+/// The launcher's processes (itself and WebView2's, no games or servers) as last looked up, and when.
+static LAUNCHER_TREE: std::sync::Mutex<Option<(std::time::Instant, Vec<u32>)>> = std::sync::Mutex::new(None);
+/// WebView2 starts and ends helper processes now and then; the list is looked up again this often.
+const TREE_FRESH_FOR: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The launcher's own share alone (`MemoryUsage::launcher`), for the memory budget in `webview`, which reads it every
+/// second: only the launcher's few processes are read, from a list looked up again every `TREE_FRESH_FOR` or when
+/// one of them has gone.
+pub async fn launcher_bytes() -> u64 {
+    tokio::task::spawn_blocking(|| {
+        let mut cached = LAUNCHER_TREE.lock().unwrap();
+        if let Some((_, pids)) = cached.as_ref().filter(|(at, _)| at.elapsed() < TREE_FRESH_FOR) {
+            let read: Vec<u64> = pids.iter().filter_map(|p| private_bytes(*p)).collect();
+            if read.len() == pids.len() {
+                return read.iter().sum();
+            }
+        }
+        let games = crate::game::launch::game_processes();
+        let servers = crate::server::runtime::server_processes();
+        let roots: HashSet<u32> = games.iter().map(|g| g.pid).chain(servers.iter().map(|s| s.1)).collect();
+        let mut sys = System::new_with_specifics(RefreshKind::nothing());
+        sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+        let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+        for (pid, p) in sys.processes().iter().filter(|(_, p)| p.thread_kind().is_none()) {
+            if let Some(parent) = p.parent() {
+                children.entry(parent.as_u32()).or_default().push(pid.as_u32());
+            }
+        }
+        let pids = tree(std::process::id(), &children, &roots);
+        let bytes = pids.iter().filter_map(|p| private_bytes(*p)).sum();
+        *cached = Some((std::time::Instant::now(), pids));
+        bytes
+    })
+    .await
+    .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

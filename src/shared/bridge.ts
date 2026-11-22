@@ -394,6 +394,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), gameWindow: on('gameWindow'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile'), openLink: on('openLink') }
+    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), gameWindow: on('gameWindow'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile'), openLink: on('openLink'), memoryTrim: on('memoryTrim') }
   } as ResinApi
 }

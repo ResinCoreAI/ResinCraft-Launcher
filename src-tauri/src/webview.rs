@@ -45,17 +45,80 @@ fn lean_in_use() -> bool {
     LEAN_FROM_NOW.load(Ordering::SeqCst) && crate::core::settings::free_memory_hidden()
 }
 
-/// The launcher has started: after `LEAN_AFTER_START` its page goes to the level for using it.
+/// The launcher has started: after `LEAN_AFTER_START` its page goes to the level for using it, and the memory
+/// budget starts watching.
 pub fn started() {
     tauri::async_runtime::spawn(async {
         tokio::time::sleep(LEAN_AFTER_START).await;
         LEAN_FROM_NOW.store(true, Ordering::SeqCst);
-        if !crate::game::running_ids().is_empty() {
-            return;
+        if crate::game::running_ids().is_empty() {
+            set_low_memory(false);
         }
-        set_low_memory(false);
+        watch_budget().await;
     });
 }
+
+/// The most the whole launcher (Task Manager's memory for it and its WebView2 processes, the RAM card's number)
+/// should use while it's open, with room to spare under the 120 MB it's held to: over it, the page gives memory back.
+const BUDGET: u64 = 110 * 1024 * 1024;
+const CHECK_EVERY: std::time::Duration = std::time::Duration::from_millis(500);
+/// After giving memory back, WebView2 takes a moment to do it: not asked again before then. When the page is still
+/// over the budget right after (what's on screen needs more), the wait doubles each time, up to `MOST_SETTLE`, so a
+/// big page isn't redrawn over and over.
+const SETTLE_AFTER_TRIM: std::time::Duration = std::time::Duration::from_millis(1500);
+const MOST_SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Keeps the launcher under `BUDGET` while it's used (part of Settings → Appearance → Free memory while hidden).
+/// The low memory level alone keeps it at about 110-140 MB while pages are opened; over the budget, the level is
+/// set again (WebView2 then drops the page's cached tiles and decoded images and collects its garbage, and they're
+/// made again for what's on screen) and the page empties its own caches (`memoryTrim`).
+///
+/// Measured on the UI rework with 9 instances (one with 224 mods, one with 18 screenshots), every page opened twice
+/// a few seconds apart, the whole launcher read 4 times a second: without the budget it averaged 109 MB and was
+/// over 120 MB 60 % of the time (up to 172 MB); with it, 87 MB on average and over 120 MB 1.2 % of the time, for
+/// about a second while a heavy page opened (up to 127 MB). Pages opened as fast, pictures of the window taken every
+/// 150 ms didn't change when memory was given back, and no frame was slower than without it.
+async fn watch_budget() {
+    let mut settle = SETTLE_AFTER_TRIM;
+    let mut just_trimmed = false;
+    loop {
+        tokio::time::sleep(CHECK_EVERY).await;
+        if !lean_in_use() || unloaded() || !crate::game::running_ids().is_empty() {
+            continue;
+        }
+        if crate::core::memory::launcher_bytes().await <= BUDGET {
+            settle = SETTLE_AFTER_TRIM;
+            just_trimmed = false;
+            continue;
+        }
+        if just_trimmed {
+            settle = (settle * 2).min(MOST_SETTLE);
+        }
+        give_back_memory();
+        crate::core::events::emit("memoryTrim", ());
+        just_trimmed = true;
+        tokio::time::sleep(settle).await;
+    }
+}
+
+/// Goes to the normal memory level and straight back to the low one: setting the low level is what makes WebView2
+/// give memory back.
+#[cfg(windows)]
+fn give_back_memory() {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL};
+    use windows_core::Interface;
+
+    let Some(window) = crate::core::ctx::app().and_then(|a| a.get_webview_window("main")) else { return };
+    let _ = window.with_webview(move |w| unsafe {
+        if let Some(core) = w.controller().CoreWebView2().ok().and_then(|c| c.cast::<ICoreWebView2_19>().ok()) {
+            let _ = core.SetMemoryUsageTargetLevel(COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL);
+            let _ = core.SetMemoryUsageTargetLevel(COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW);
+        }
+    });
+}
+
+#[cfg(not(windows))]
+fn give_back_memory() {}
 
 /// How long the window stays out of sight before it closes: long enough that a quick look at the tray or a game
 /// that crashes at start doesn't pay for a reload.

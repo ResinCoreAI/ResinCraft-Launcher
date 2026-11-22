@@ -73,7 +73,8 @@ pub struct Settings {
     pub tray: bool,
     /// Out of sight for a while (in the tray, or hidden while a game runs), the window closes completely and
     /// WebView2's ~200 MB go back to Windows; it opens again in a second when it's wanted (Settings → Appearance).
-    /// While it's used, its page runs at WebView2's low memory level too (`webview::lean_in_use`).
+    /// While it's used, its page runs at WebView2's low memory level too (`webview::lean_in_use`), and the launcher is
+    /// kept under a memory budget (`webview::watch_budget`).
     pub free_memory_hidden: bool,
     /// When the same mod is on Modrinth and CurseForge: "ask" | "modrinth" | "curseforge" (Settings → Downloads,
     /// or "Don't ask again" in the duplicate dialog).
