@@ -1,19 +1,49 @@
 /* Quick join (pages/QuickJoin.tsx, components/QuickJoin.tsx and the Home section). Theme variables only. */
 
 /* Join is a play action: the same green as Play. */
+/* Join plus a ▾ that picks the instance or account: one piece, like Play's (styles.css .split-btn). The pair is clipped
+   to a single rounded shape; the ▾ is narrow and a shade darker, with a hairline between. */
 .qj-split {
   display: inline-flex;
   flex: none;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  transition: transform 0.22s var(--spring);
 }
-.qj-split > .btn:first-child {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+.qj-split:hover {
+  transform: translateY(-1px);
 }
-.qj-split-more {
-  padding: 0 6px;
-  margin-left: 1px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+.qj-split > .btn {
+  border-radius: 0;
+  margin: 0;
+}
+.qj-split > .btn:hover,
+.qj-split > .btn:active:not(:disabled) {
+  transform: none;
+}
+.qj-split > .btn.primary {
+  border-color: transparent;
+}
+/* Darker by a tint over whatever colour the Join button has (purple, or green on the Quick join page). */
+.qj-split > .btn.primary.qj-split-more {
+  min-width: 30px;
+  padding: 0 7px;
+  background-image: linear-gradient(rgb(0 0 0 / 0.14), rgb(0 0 0 / 0.14));
+  box-shadow: inset 1px 0 0 rgb(255 255 255 / 0.16);
+}
+.qj-split > .btn.primary.qj-split-more:hover:not(:disabled) {
+  background-image: linear-gradient(rgb(0 0 0 / 0.06), rgb(0 0 0 / 0.06));
+}
+.qj-split-more svg {
+  width: 16px;
+  height: 16px;
+}
+.qj-last-actions .qj-split {
+  border-radius: calc(var(--radius) - 2px);
+}
+.qj-last-actions .qj-split > .btn.qj-split-more {
+  min-width: 44px;
+  padding: 0 12px;
 }
 .qj-page .btn.primary.sm,
 .qj-home .btn.primary.sm {
