@@ -1,5 +1,5 @@
 // A mail's body as the relay's admins wrote it: plain text with **bold**, *italic*, [text](https://…) and bare links,
-// "- " lists, "# " headings and blank lines between paragraphs. The same rules as the relay's emails and its
+// "- " lists, "# " headings, "> " quotes (a gift's note) and blank lines between paragraphs. The same rules as the relay's emails and its
 // dashboard (relay-server mail.rs `body_html`); nothing is ever read as HTML.
 import { type ReactNode } from 'react'
 import { api } from '../api'
@@ -111,8 +111,30 @@ export default function MailText({ text }: { text: string }) {
           )
         list = []
       }
+      let quote: string[] = []
+      const flushQuote = () => {
+        if (quote.length)
+          blocks.push(
+            <blockquote key={`q${b}.${blocks.length}`}>
+              {quote.map((l, n) => (
+                <span key={n}>
+                  {n > 0 && <br />}
+                  {inline(l, `${b}.q${n}`)}
+                </span>
+              ))}
+            </blockquote>
+          )
+        quote = []
+      }
       for (const line of block.split('\n')) {
         const t = line.trimStart()
+        if (t === '>' || t.startsWith('> ')) {
+          flushPara()
+          flushList()
+          quote.push(t.slice(1).trim())
+          continue
+        }
+        flushQuote()
         if (t.startsWith('- ') || t.startsWith('• ')) {
           flushPara()
           list.push(t.slice(2).trim())
@@ -125,6 +147,7 @@ export default function MailText({ text }: { text: string }) {
           para.push(line.trimEnd())
         }
       }
+      flushQuote()
       flushPara()
       flushList()
     })

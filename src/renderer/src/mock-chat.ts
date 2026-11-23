@@ -400,11 +400,48 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       changed()
       return { ok: true, summary: g.kind === 'credit' ? `${(g.amount / 100).toFixed(2)} THB Resin Credit` : `${g.name} (1 month)`, balance: wallet.balance }
     }
+    case 'GET /api/chat/gifts': {
+      const info = (m: (typeof messages)[number]) => {
+        const g = m.data as { gift: string; kind: 'credit' | 'item'; amount: number; name?: string; yearly?: boolean; to?: string | null; claimedBy?: string; expires?: number; returned?: number }
+        const state = g.claimedBy ? 'received' : g.returned || (g.expires && g.expires < now()) ? 'returned' : 'waiting'
+        return {
+          kind: 'gift' as const, id: g.gift, gift: g.kind, amount: g.amount, currency: 'thb', name: g.name, yearly: g.yearly,
+          summary: g.kind === 'credit' ? `${(g.amount / 100).toFixed(2)} THB Resin Credit` : `${g.name} (1 month)`,
+          from: m.sender, fromName: (names[m.sender] ?? m.sender.slice(0, 8)), to: g.claimedBy ?? g.to ?? null, toName: g.claimedBy ?? g.to ? (names[(g.claimedBy ?? g.to)!] ?? '') : null,
+          conv: m.conv, inbox: false, at: m.at, state, expires: state === 'waiting' ? g.expires ?? null : null
+        }
+      }
+      const gifts = messages.filter((x) => x.kind === 'gift' && x.data).sort((a, b2) => b2.at - a.at)
+      const received = gifts.filter((x) => x.sender !== ME && ((x.data as { to?: string | null }).to === ME || (x.data as { open?: boolean }).open || (x.data as { claimedBy?: string }).claimedBy === ME)).map(info)
+      const sent = gifts.filter((x) => x.sender === ME).map(info)
+      return { received, sent, waiting: received.filter((g) => g.state === 'waiting').length, currency: 'thb' }
+    }
+    case 'POST /api/chat/gift/claim-all': {
+      const got: string[] = []
+      for (const m of messages.filter((x) => x.kind === 'gift' && x.sender !== ME)) {
+        const g = m.data as { kind: string; amount: number; to?: string | null; claimedBy?: string; name?: string; expires?: number }
+        if (g.to !== ME || g.claimedBy || !g.expires || g.expires < now()) continue
+        g.claimedBy = ME
+        m.seq = ++seq
+        if (g.kind === 'credit') wallet.balance += g.amount
+        got.push(g.kind === 'credit' ? `${(g.amount / 100).toFixed(2)} THB Resin Credit` : `${g.name} (1 month)`)
+      }
+      changed()
+      return { received: got, failed: [], balance: wallet.balance }
+    }
     case 'POST /api/chat/gift': {
       if (b.toName) {
         if (String(b.toName).toLowerCase() === 'nobody') return err(`no ResinCraft player is called ${b.toName}`)
-        wallet.balance -= b.kind === 'credit' ? Number(b.amount) : 9900
-        return { message: null, balance: wallet.balance, direct: true }
+        // A friend gets it in your chat with them; anyone else in their Inbox.
+        const friend = friends.friends.find((f) => f.name.toLowerCase() === String(b.toName).toLowerCase())?.uuid
+        if (!friend) {
+          wallet.balance -= b.kind === 'credit' ? Number(b.amount) : 9900
+          return { message: null, balance: wallet.balance, direct: true }
+        }
+        b.to = friend
+        delete b.toName
+        const r = (await call('POST', '/api/chat/gift', b)) as Record<string, unknown>
+        return { ...r, viaChat: true }
       }
       const to = b.to ? String(b.to) : ''
       const giftConv = b.conv ? String(b.conv) : dm(ME, to)

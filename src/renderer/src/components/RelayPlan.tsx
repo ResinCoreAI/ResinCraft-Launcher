@@ -53,6 +53,7 @@ import { money, setWalletBalance } from '../storeStatus'
 import { openStoreHistory } from './StoreHistory'
 import ShareModal from './chat/ShareModal'
 import GiftModal from './chat/GiftModal'
+import GiftsModal from './chat/GiftsModal'
 import { useChat } from '../chatState'
 
 
@@ -606,6 +607,7 @@ const WALLET_METHODS: Record<string, Key> = {
 function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: number) => void }) {
   const { toast, go } = useStore()
   const [sending, setSending] = useState(false)
+  const [giftsOpen, setGiftsOpen] = useState(false)
   const chatReady = useChat().status === 'ready'
   const plan = a.plan!
   const w = useWallet(a.account, !!plan.wallet, plan.wallet_balance)
@@ -639,8 +641,14 @@ function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: num
             <Gift /> {t('chat.gift.sendCredit')}
           </button>
         )}
+        {chatReady && (
+          <button className="btn sm" onClick={() => setGiftsOpen(true)}>
+            <Gift /> {t('chat.gifts.title')}
+          </button>
+        )}
       </div>
       {sending && <GiftModal preset={{ kind: 'credit' }} onClose={() => setSending(false)} />}
+      {giftsOpen && <GiftsModal onClose={() => setGiftsOpen(false)} />}
       {w.error && <p className="hint bad">{w.error}</p>}
       {topup && wallet && (
         <TopupModal

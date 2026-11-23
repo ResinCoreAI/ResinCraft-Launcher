@@ -18,6 +18,7 @@ import { chat, displayName, popupsOn, setPopups, setSound, soundOn, useChat } fr
 import { ChatAvatar } from '../components/chat/ChatMedia'
 import { GroupTile, NewGroupModal } from '../components/chat/ChatGroups'
 import { ProfileModal, STATUS_LABEL, StatusTextModal, statusMenu } from '../components/chat/ChatProfile'
+import GiftsModal from '../components/chat/GiftsModal'
 import '../inbox.css'
 
 const CATEGORY: Record<Exclude<InboxMessage['category'], ''>, Key> = {
@@ -29,8 +30,50 @@ const CATEGORY: Record<Exclude<InboxMessage['category'], ''>, Key> = {
   status: 'inbox.category.status'
 }
 
-/** One reward as a card: Resin Credit with its icon, or a Store item with its days. */
+/** One reward as a card: Resin Credit with its icon, a Store item with its days, a gift code, or a player's gift. */
 function RewardCard({ r, currency }: { r: InboxReward; currency?: string }) {
+  if (r.kind === 'gift') {
+    const left = r.state === 'waiting' && r.expires ? new Intl.RelativeTimeFormat(currentLanguage(), { numeric: 'always' }).format(...giftLeft(r.expires)) : ''
+    return (
+      <div className={`ib-reward ${r.gift === 'credit' ? 'credit' : 'item'} ${r.state !== 'waiting' ? 'done' : ''}`}>
+        {r.gift === 'credit' ? (
+          <img src={creditIcon} alt="" />
+        ) : (
+          <span className="ib-reward-gift" aria-hidden>
+            <Gift />
+          </span>
+        )}
+        <div>
+          <b>{r.gift === 'credit' ? money(r.amount, r.currency) : r.summary}</b>
+          <span>
+            {t('inbox.reward.from', { name: r.fromName || '?' })}
+            {' · '}
+            {r.state === 'waiting' ? t('inbox.reward.backIn', { when: left }) : r.state === 'received' ? t('inbox.reward.received') : t('inbox.reward.wentBack', { name: r.fromName || '?' })}
+          </span>
+        </div>
+      </div>
+    )
+  }
+  if (r.kind === 'code') {
+    return (
+      <div className={`ib-reward ${r.credit ? 'credit' : 'item'}`}>
+        {r.credit ? (
+          <img src={creditIcon} alt="" />
+        ) : (
+          <span className="ib-reward-gift" aria-hidden>
+            <Gift />
+          </span>
+        )}
+        <div>
+          <b>{r.credit ? money(r.credit, currency ?? 'thb') : r.name ?? r.code}</b>
+          <span>
+            {t('inbox.reward.code', { code: r.code })}
+            {!r.credit && r.name ? ` · ${r.days ? t('inbox.reward.days', { days: r.days }) : t('inbox.reward.forGood')}` : ''}
+          </span>
+        </div>
+      </div>
+    )
+  }
   return r.kind === 'credit' ? (
     <div className="ib-reward credit">
       <img src={creditIcon} alt="" />
@@ -51,6 +94,19 @@ function RewardCard({ r, currency }: { r: InboxReward; currency?: string }) {
     </div>
   )
 }
+
+/** How long until a gift goes back, for a relative time: minutes under two hours, hours under two days, then days. */
+function giftLeft(at: number): [number, Intl.RelativeTimeFormatUnit] {
+  const minutes = Math.max(1, Math.ceil((at * 1000 - Date.now()) / 60_000))
+  if (minutes < 120) return [minutes, 'minute']
+  if (minutes < 48 * 60) return [Math.round(minutes / 60), 'hour']
+  return [Math.round(minutes / 1440), 'day']
+}
+
+/** A mail of gift codes or players' gifts: its button says Receive. */
+const receivable = (m: InboxMessage) => !!m.attachments?.some((a) => a.kind === 'code' || a.kind === 'gift')
+/** A player's gift that went back before it was received: there's nothing to receive. */
+const wentBack = (m: InboxMessage) => !!m.attachments?.length && m.attachments.every((a) => a.kind === 'gift' && a.state === 'returned')
 
 /** "14:05" today, "Mon" this week, "12 Nov" this year, "12 Nov 2025" before. */
 function shortTime(secs: number): string {
@@ -139,6 +195,7 @@ export default function InboxPage() {
   const [emailOpen, setEmailOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [claiming, setClaiming] = useState(false)
+  const [giftsOpen, setGiftsOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [showCode, setShowCode] = useState(false)
   const [newGroup, setNewGroup] = useState(false)
@@ -234,10 +291,20 @@ export default function InboxPage() {
       celebrate(from)
       const credit = r.given.filter((g) => g.kind === 'credit').reduce((n, g) => n + (g.kind === 'credit' ? g.amount : 0), 0)
       const items = r.given.filter((g) => g.kind === 'item').length
+      const gifts = r.given.flatMap((g) => ((g.kind === 'gift' || g.kind === 'code') && 'summary' in g && typeof g.summary === 'string' ? [g.summary] : []))
+      const codes = r.given.filter((g) => g.kind === 'code').length
       toast(
-        [credit > 0 && t('inbox.claimed.credit', { amount: money(credit, data?.currency ?? 'thb') }), items > 0 && t('inbox.claimed.items', { count: items })].filter(Boolean).join(' · ') || t('inbox.claimed.done'),
+        [
+          credit > 0 && t('inbox.claimed.credit', { amount: money(credit, data?.currency ?? 'thb') }),
+          items > 0 && t('inbox.claimed.items', { count: items }),
+          ...gifts.map((s) => t('chat.gift.received', { what: s })),
+          codes > 0 && !gifts.length && t('inbox.claimed.codes', { count: codes })
+        ]
+          .filter(Boolean)
+          .join(' · ') || t('inbox.claimed.done'),
         'success'
       )
+      if (r.given.some((g) => g.kind === 'gift' || g.kind === 'code')) void load()
       if (r.error) toast(r.error, 'error')
     } catch (e) {
       fail(e)
@@ -245,7 +312,7 @@ export default function InboxPage() {
       setClaiming(false)
     }
   }
-  const unclaimed = (m: InboxMessage) => !!m.attachments?.length && !m.claimed
+  const unclaimed = (m: InboxMessage) => !!m.attachments?.length && !m.claimed && !wentBack(m)
   const remove = async (m: InboxMessage) => {
     await inbox.remove([m.id])
     patch([m.id], null)
@@ -254,7 +321,7 @@ export default function InboxPage() {
   }
   const mailMenu = (m: InboxMessage): ContextEntry[] => [
     m.read ? { label: t('inbox.markUnread'), icon: <Mail />, onSelect: () => mark(m, false) } : { label: t('inbox.markRead'), icon: <MailOpen />, onSelect: () => mark(m, true) },
-    unclaimed(m) && { label: t('inbox.claim'), icon: <Gift />, onSelect: () => void claim(m.id) },
+    unclaimed(m) && { label: t(receivable(m) ? 'chat.gift.receive' : 'inbox.claim'), icon: <Gift />, onSelect: () => void claim(m.id) },
     '-',
     { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: unclaimed(m), onSelect: () => setDeleting(m) }
   ]
@@ -423,6 +490,12 @@ export default function InboxPage() {
           <RailButton f="mail" icon={<Mail />} label={t('inbox.rail.mail')} count={mailUnread} />
           {chatOn && <RailButton f="friends" icon={<MessageCircle />} label={t('inbox.rail.friends')} count={dmUnread} />}
           {chatOn && <RailButton f="requests" icon={<UserPlus />} label={t('inbox.rail.requests')} count={requests} />}
+          {chatOn && (
+            <button className="ib2-rb" title={t('chat.gifts.title')} aria-label={t('chat.gifts.title')} onClick={() => setGiftsOpen(true)}>
+              <Gift />
+              <span className="ib2-rl">{t('chat.gifts.rail')}</span>
+            </button>
+          )}
           {chatOn && <hr />}
           {chatOn &&
             v.groups.map((g) => (
@@ -567,11 +640,13 @@ export default function InboxPage() {
                       <RewardCard key={i} r={r} currency={data?.currency} />
                     ))}
                   </div>
-                  {open.claimed ? (
-                    <span className="ib-claimed">{t('inbox.claimedLabel')}</span>
+                  {wentBack(open) ? (
+                    <span className="ib-claimed gone">{t('inbox.reward.nothingLeft')}</span>
+                  ) : open.claimed ? (
+                    <span className="ib-claimed">{t(receivable(open) ? 'inbox.reward.received' : 'inbox.claimedLabel')}</span>
                   ) : (
                     <button className="btn primary" onClick={(e) => void claim(open.id, e.currentTarget)} disabled={claiming}>
-                      <Gift /> {t('inbox.claim')}
+                      <Gift /> {t(receivable(open) ? 'chat.gift.receive' : 'inbox.claim')}
                     </button>
                   )}
                 </section>
@@ -594,6 +669,7 @@ export default function InboxPage() {
         </div>
       </div>
 
+      {giftsOpen && <GiftsModal onClose={() => (setGiftsOpen(false), void load())} />}
       {newGroup && <NewGroupModal onClose={() => setNewGroup(false)} />}
       {editProfile && <ProfileModal onClose={() => setEditProfile(false)} />}
       {statusText && <StatusTextModal onClose={() => setStatusText(false)} />}

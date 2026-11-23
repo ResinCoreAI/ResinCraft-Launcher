@@ -35,6 +35,54 @@ interface Sent {
 const T = now()
 const sent: Sent[] = [
   {
+    id: 'store-gift',
+    from: 'ResinCraft Store',
+    subject: 'GolfZzz sent you a gift',
+    body: '**GolfZzz** sent you **+1 server online (1 month)**.\n\n> for the SMP\n\nPress **Receive** to get it. If it isn\u2019t received within 3 days, it goes back to GolfZzz.',
+    category: 'account',
+    sentAt: T - 60 * 2,
+    by: 'Store gift',
+    audience: 'players',
+    toNames: ['Puirkle_Gamer'],
+    toCount: 1,
+    inbox: true,
+    email: false,
+    inboxCount: 1,
+    readCount: 0,
+    emailTotal: 0,
+    emailSent: 0,
+    emailFailed: 0,
+    emailSkipped: 0,
+    emailDone: true,
+    emailError: '',
+    attachments: [
+      { kind: 'gift', id: 'cg-store-1', gift: 'item', amount: 6900, currency: 'thb', product: 'addon-server', name: '+1 server online', yearly: false, summary: '+1 server online (1 month)', from: 'golf', fromName: 'GolfZzz', to: 'me', toName: 'Puirkle_Gamer', conv: '', inbox: true, at: T - 60 * 2, state: 'waiting', expires: T + 3 * 86400 }
+    ]
+  },
+  {
+    id: 'code-gift',
+    from: 'ResinCraft Store',
+    subject: 'A gift code for you',
+    body: 'You got a gift code from the ResinCraft team:\n\n> thanks for testing\n\n- `WELCOMEBOB`: 50.00 THB of Resin Credit\n\nPress **Receive** to add it to your account, or type it in the **Store** under **Gift code**.',
+    category: 'account',
+    sentAt: T - 60 * 4,
+    by: 'Store gift',
+    audience: 'players',
+    toNames: ['Puirkle_Gamer'],
+    toCount: 1,
+    inbox: true,
+    email: false,
+    inboxCount: 1,
+    readCount: 0,
+    emailTotal: 0,
+    emailSent: 0,
+    emailFailed: 0,
+    emailSkipped: 0,
+    emailDone: true,
+    emailError: '',
+    attachments: [{ kind: 'code', code: 'WELCOMEBOB', credit: 5000 }]
+  },
+  {
     id: 'welcome',
     from: 'ResinCraft',
     subject: 'Welcome to ResinCraft Relay!',
@@ -264,6 +312,12 @@ export async function mockMailCall(method: string, path: string, body?: unknown)
         done.push(id)
         for (const a of m.attachments) {
           if (a.kind === 'credit') credit += a.amount
+          if (a.kind === 'code' && a.credit) credit += a.credit
+          if (a.kind === 'gift') {
+            a.state = 'received'
+            a.expires = null
+            if (a.gift === 'credit') credit += a.amount
+          }
           given.push(a)
         }
       }

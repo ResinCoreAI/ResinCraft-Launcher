@@ -2,7 +2,7 @@
 // so messages arrive as they're sent (relay chat.rs `sync?wait=1`), and keeps the launcher's own copy of the chats
 // (src-tauri chat.rs) in step. The Inbox's Chat tab reads it with useChat() and acts through `chat`.
 import { useEffect, useSyncExternalStore } from 'react'
-import type { ChatEmbed, ChatFile, ChatFileKind, ChatFriends, ChatGiftOptions, ChatGroup, ChatMessage, ChatPerson, ChatProfile, ChatStatus, ChatSync } from '@shared/types'
+import type { ChatEmbed, ChatFile, ChatFileKind, ChatFriends, ChatGiftOptions, ChatGiftsList, ChatGroup, ChatMessage, ChatPerson, ChatProfile, ChatStatus, ChatSync } from '@shared/types'
 import { api } from './api'
 import { setChatBadge } from './inboxState'
 import { t } from './i18n'
@@ -481,8 +481,16 @@ export const chat = {
   },
   giftOptions: () => call<ChatGiftOptions>('GET', '/api/chat/gift'),
   /** A gift from the Store to any player by name (friend or not): it arrives with an Inbox mail. */
-  giftByName: (name: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }) =>
-    call<{ message: null; balance: number }>('POST', '/api/chat/gift', { toName: name, ...gift }),
+  async giftByName(name: string, gift: ({ kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }) & { waitHours?: number }) {
+    // To a friend it goes in your chat with them (viaChat); to anyone else, to their Inbox, to Receive there.
+    const r = await call<{ message: ChatMessage | null; balance: number; viaChat?: boolean; direct?: boolean }>('POST', '/api/chat/gift', { toName: name, ...gift })
+    if (r.message) took(r.message)
+    return r
+  },
+  /** The gifts page: received and sent, with where each stands. */
+  gifts: () => call<ChatGiftsList>('GET', '/api/chat/gifts'),
+  /** Receives every gift that waits for me (chats and the Inbox). */
+  claimAllGifts: () => call<{ received: string[]; failed: { id: string; error: string }[]; balance: number }>('POST', '/api/chat/gift/claim-all', {}),
   /** Receives a gift from a chat (in a group, the first to press gets an open one). */
   async claimGift(id: string) {
     const r = await call<{ ok: true; summary: string; balance: number }>('POST', '/api/chat/gift/claim', { id })

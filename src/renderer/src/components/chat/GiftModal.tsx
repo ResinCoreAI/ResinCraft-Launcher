@@ -71,9 +71,10 @@ export default function GiftModal({
     try {
       const what = kind === 'credit' ? { kind, amount: minor, note: note.trim() || undefined } : { kind, product, yearly, note: note.trim() || undefined }
       const waitHours = opts.waits?.length ? (wait ?? opts.waitDefault) : undefined
-      const r = byName ? await chat.giftByName(toName.trim(), what) : await chat.gift(to ?? '', { ...what, waitHours }, conv)
+      const r = byName ? await chat.giftByName(toName.trim(), { ...what, waitHours }) : await chat.gift(to ?? '', { ...what, waitHours }, conv)
       if (activeAccount?.type === 'msa') setWalletBalance(activeAccount.uuid, r.balance, cur)
-      toast(t('chat.gift.sent', { name: byName ? toName.trim() : name ?? '' }), 'success')
+      const via = byName ? ((r as { viaChat?: boolean }).viaChat ? 'chat.gift.sentViaChat' : 'chat.gift.sentToInbox') : 'chat.gift.sent'
+      toast(t(via, { name: byName ? toName.trim() : name ?? '' }), 'success')
       onClose()
     } catch (e) {
       setError((e as Error).message)
@@ -176,7 +177,7 @@ export default function GiftModal({
               {item && price > opts.balance && <p className="hint bad">{t('chat.gift.short', { need: money(price, cur), have: money(opts.balance, cur) })}</p>}
             </>
           )}
-          {!byName && !!opts.waits?.length && (
+          {!!opts.waits?.length && (
             <div className="field">
               <span>{t('chat.gift.waitLabel')}</span>
               <Segmented<string>
@@ -184,7 +185,7 @@ export default function GiftModal({
                 onChange={(v) => setWait(Number(v))}
                 options={opts.waits.map((h) => ({ value: String(h), label: hours(h) }))}
               />
-              <span className="hint">{t('chat.gift.waitHint')}</span>
+              <span className="hint">{t(byName ? 'chat.gift.waitHintStore' : 'chat.gift.waitHint')}</span>
             </div>
           )}
           <label className="field">

@@ -1986,7 +1986,45 @@ export interface InboxMessage {
   claimed?: boolean
 }
 
-export type InboxReward = { kind: 'credit'; amount: number } | { kind: 'item'; product: string; name: string; days: number }
+export type InboxReward =
+  | { kind: 'credit'; amount: number }
+  | { kind: 'item'; product: string; name: string; days: number }
+  /** A gift code: Receive redeems it (credit, or a product for some days). */
+  | { kind: 'code'; code: string; credit?: number; product?: string; name?: string; days?: number }
+  /** A gift another player sent from the Store: it waits here like a gift in chat. */
+  | ChatGiftInfo
+
+/** One gift as the Inbox and the gifts page show it (relay chat.rs gift_info). */
+export interface ChatGiftInfo {
+  kind: 'gift'
+  id: string
+  gift: 'credit' | 'item'
+  amount: number
+  currency: string
+  product?: string | null
+  name?: string
+  yearly?: boolean
+  summary: string
+  from: string
+  fromName: string
+  to?: string | null
+  toName?: string | null
+  conv: string
+  /** Sent from the Store to someone not a friend: it's in their Inbox, not a chat. */
+  inbox: boolean
+  at: number
+  state: 'waiting' | 'received' | 'returned'
+  /** When it goes back to the sender, while it waits. */
+  expires?: number | null
+}
+
+/** The gifts page: what came to me and what I sent, newest first. */
+export interface ChatGiftsList {
+  received: ChatGiftInfo[]
+  sent: ChatGiftInfo[]
+  waiting: number
+  currency: string
+}
 
 /** Whether the account gets the relay's status notices as mail (and by email). */
 export interface InboxStatusSub {
