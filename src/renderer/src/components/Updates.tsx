@@ -200,12 +200,10 @@ export function UpdatesSection() {
     )
   }, [])
 
-  // No longer on the list while on Dev or Test: back to Beta (the engine already checks Beta's feed for it).
+  // The channel stays what the player picked, even when the relay says no (or the account in use isn't the invited
+  // one, or the relay is down): the engine then checks Beta's feed for it, and the Dev or Test build comes back once
+  // the relay says yes again. Only the player changes it.
   const channel = settings?.updateChannel ?? 'stable'
-  const devTaken = (channel === 'dev' && status?.dev === false) || (channel === 'test' && status?.test === false)
-  useEffect(() => {
-    if (devTaken) void updateSettings({ updateChannel: 'beta' })
-  }, [devTaken, updateSettings])
 
   if (!settings || !status) return null
   if (status.store)

@@ -67,7 +67,7 @@ pub struct UpdateStatus {
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub store: bool,
     /// Whether the signed-in account may use the Dev channel (the relay's admin invited it), once the relay said:
-    /// Settings offers it, and moves a launcher on Dev that isn't invited any more back to Beta.
+    /// Settings offers it. A launcher left on Dev without it keeps the setting and gets Beta's updates meanwhile.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dev: Option<bool>,
     /// The same for the Test channel: a tester's invitation (separate from Dev, which is for developers).
