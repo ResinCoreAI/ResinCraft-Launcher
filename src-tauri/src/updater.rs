@@ -163,7 +163,9 @@ fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
-fn current_version() -> String {
+/// The version this copy was built as: the bundle's version (a Dev/Test/Beta build sets it at build time), not
+/// Cargo.toml's, which stays the last release.
+pub(crate) fn current_version() -> String {
     ctx::app().map(|a| a.package_info().version.to_string()).unwrap_or_else(|| env!("CARGO_PKG_VERSION").into())
 }
 

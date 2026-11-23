@@ -128,7 +128,7 @@ pub fn body(r: &Report) -> Result<serde_json::Value> {
         "services": services,
         "address": if down { clip(&r.address, 120) } else { String::new() },
         "since": if down && SINCE.contains(&r.since.as_str()) { r.since.clone() } else { String::new() },
-        "version": env!("CARGO_PKG_VERSION"),
+        "version": crate::updater::current_version(),
         "os": os(),
         "name": name,
         "email": clip(email, 254),

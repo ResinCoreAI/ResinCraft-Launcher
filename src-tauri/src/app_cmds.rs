@@ -11,7 +11,7 @@ use crate::bail_tr;
 pub async fn handle(channel: &str, args: Args) -> Result<Value> {
     match channel {
         "app:info" => json(AppInfo {
-            version: env!("CARGO_PKG_VERSION").into(),
+            version: crate::updater::current_version(),
             data_dir: paths::root().to_string_lossy().into(),
             platform: match std::env::consts::OS {
                 "windows" => "win32".into(),
