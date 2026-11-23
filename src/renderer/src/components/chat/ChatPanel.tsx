@@ -35,6 +35,7 @@ import GiftModal from './GiftModal'
 import Embeds from './Embeds'
 import { GroupPanel, GroupTile, NewGroupModal, SystemNote } from './ChatGroups'
 import '../../chat.css'
+import PlayerHead from '../PlayerHead'
 
 const CODE = /^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/
 const GROUP_CODE = /^G-?[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/i
@@ -47,7 +48,7 @@ const REASONS: [string, Key][] = [
 ]
 
 function Head({ uuid, size = 32 }: { uuid: string; size?: number }) {
-  return <img className="chat-head" src={`https://mc-heads.net/avatar/${uuid}/${size * 2}`} width={size} height={size} alt="" loading="lazy" draggable={false} />
+  return <PlayerHead who={uuid} name={nameOf(uuid)} size={size} className="chat-head" />
 }
 
 const time = (secs: number) => new Date(secs * 1000).toLocaleTimeString(currentLanguage(), { hour: '2-digit', minute: '2-digit' })

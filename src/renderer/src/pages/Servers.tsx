@@ -93,6 +93,7 @@ import { ServerMemoryChip } from '../components/Memory'
 import JoinRequests from '../components/JoinRequests'
 import { usePicturePicker } from '../components/ImagePicker'
 import { ServerMulticore } from '../components/Multicore'
+import PlayerHead from '../components/PlayerHead'
 
 const EULA_URL = 'https://aka.ms/MinecraftEULA'
 const MAX_LOG = 3000
@@ -1033,11 +1034,7 @@ function PlayersTab({ s, reload }: { s: ServerInfo; reload: () => Promise<void> 
             {s.players.map((p) => (
               <div key={p} className="list-row">
                 <div className="ico">
-                  <img loading="lazy" decoding="async"
-                    src={`https://mc-heads.net/avatar/${encodeURIComponent(p)}/40`}
-                    alt=""
-                    onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
-                  />
+                  <PlayerHead who={p.startsWith('.') ? '' : p} name={p} size={40} />
                 </div>
                 <div className="grow title">{p}</div>
                 <button className="btn sm" disabled={busy} onClick={() => void command(`op ${p}`)}>
@@ -1092,11 +1089,7 @@ function PlayersTab({ s, reload }: { s: ServerInfo; reload: () => Promise<void> 
               <div key={en.name} className="list-row">
                 <div className="ico">
                   {kind !== 'ipBans' && (
-                    <img loading="lazy" decoding="async"
-                      src={`https://mc-heads.net/avatar/${encodeURIComponent(en.uuid ?? en.name)}/40`}
-                      alt=""
-                      onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
-                    />
+                    <PlayerHead who={en.uuid ?? (en.name.startsWith('.') ? '' : en.name)} name={en.name} size={40} />
                   )}
                 </div>
                 <div className="grow">

@@ -148,6 +148,8 @@ function mockSkins(
       remember(current(accountId))
       return save(accountId, { ...current(accountId), skin: { url: e.preview, variant: e.variant } })
     },
+    // The preview can't ask Mojang: heads show their letter.
+    headOf: async () => null,
     lookupPlayer: async (name) => {
       const n = name.trim()
       if (!/^[A-Za-z0-9_]{2,16}$/.test(n)) throw new Error('Player names are up to 16 characters: letters, numbers and _.')

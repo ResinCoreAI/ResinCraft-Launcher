@@ -3148,6 +3148,8 @@ export interface ResinApi {
     apply(accountId: string, id: string): Promise<PlayerProfile>
     /** A Java player's current skin, by name (Mojang's public API). */
     lookupPlayer(name: string): Promise<OnlineSkin>
+    /** Any Java player's skin texture (UUID or name), to draw their head; null for a default skin or unknown player. */
+    headOf(who: string): Promise<string | null>
     /** MineSkin's public gallery; an empty query lists the newest. */
     search(query: string, after?: string): Promise<OnlineSkinPage>
     saveOnline(skin: OnlineSkin): Promise<SavedSkin>

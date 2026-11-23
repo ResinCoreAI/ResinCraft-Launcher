@@ -273,6 +273,56 @@ pub async fn lookup_player(name: &str) -> Result<OnlineSkin> {
     Ok(OnlineSkin { id: found.id, name: found.name, url, variant: Some(variant.into()), source: "player".into() })
 }
 
+/// The skin texture of any Java player (a UUID, dashes optional, or a name), for drawing their head: friends in chat,
+/// people who use your servers, join requests. None for a default skin, or an unknown player. Kept for 6 hours, and an
+/// answer Mojang couldn't give (busy, offline) for a minute.
+pub async fn head_of(who: &str) -> Result<Option<String>> {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    static CACHE: std::sync::OnceLock<Mutex<HashMap<String, (Option<String>, Instant)>>> = std::sync::OnceLock::new();
+    let key = who.trim().replace('-', "").to_ascii_lowercase();
+    if key.is_empty() || key.len() > 32 || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Ok(None);
+    }
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some((url, at)) = cache.lock().unwrap().get(&key) {
+        if at.elapsed() < Duration::from_secs(6 * 3600) {
+            return Ok(url.clone());
+        }
+    }
+    let found: Result<Option<String>> = async {
+        let id = if key.len() == 32 && key.chars().all(|c| c.is_ascii_hexdigit()) {
+            key.clone()
+        } else {
+            let res = http().get(format!("https://api.mojang.com/users/profiles/minecraft/{}", urlencoding::encode(&key))).timeout(TIMEOUT).send().await?;
+            match res.status().as_u16() {
+                200 => res.json::<NameLookup>().await?.id,
+                204 | 404 => return Ok(None),
+                code => anyhow::bail!("Mojang answered {code}"),
+            }
+        };
+        let res = http().get(format!("https://sessionserver.mojang.com/session/minecraft/profile/{id}")).timeout(TIMEOUT).send().await?;
+        match res.status().as_u16() {
+            200 => Ok(parse_textures(&res.json::<Value>().await?).map(|(url, _)| url)),
+            204 | 404 => Ok(None),
+            code => anyhow::bail!("Mojang answered {code}"),
+        }
+    }
+    .await;
+    match found {
+        Ok(url) => {
+            cache.lock().unwrap().insert(key, (url.clone(), Instant::now()));
+            Ok(url)
+        }
+        // Busy or offline: no head for now, asked again in a minute.
+        Err(_) => {
+            cache.lock().unwrap().insert(key, (None, Instant::now() - Duration::from_secs(6 * 3600 - 60)));
+            Ok(None)
+        }
+    }
+}
+
 // ---------- Online search (MineSkin) ----------
 
 #[derive(Deserialize)]

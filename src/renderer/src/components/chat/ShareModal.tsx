@@ -6,6 +6,7 @@ import { useStore } from '../../store'
 import { t } from '../../i18n'
 import { Modal } from '../ui'
 import { GroupTile } from './ChatGroups'
+import PlayerHead from '../PlayerHead'
 
 export default function ShareModal({ product, name, onClose }: { product: string; name: string; onClose: () => void }) {
   const v = useChat()
@@ -49,7 +50,7 @@ export default function ShareModal({ product, name, onClose }: { product: string
             {chats.map((c) => (
               <label key={c.conv} className="chat-pick-row">
                 <input type="radio" name="share-to" checked={to === c.conv} onChange={() => setTo(c.conv)} />
-                {c.group ? <GroupTile name={c.name} size={24} /> : <img className="chat-head" src={`https://mc-heads.net/avatar/${c.uuid}/48`} width={24} height={24} alt="" />}
+                {c.group ? <GroupTile name={c.name} size={24} /> : <PlayerHead who={c.uuid} name={c.name} size={24} className="chat-head" />}
                 <span className="ellipsis">{c.name}</span>
               </label>
             ))}

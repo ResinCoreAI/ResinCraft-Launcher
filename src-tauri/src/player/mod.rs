@@ -67,6 +67,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "skins:apply" => json(skins::apply(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         "skins:lookupPlayer" => json(skins::lookup_player(&args.get::<String>(0)?).await?),
+        "skins:headOf" => json(skins::head_of(&args.get::<String>(0)?).await?),
         "skins:search" => json(skins::search(&args.get::<String>(0)?, args.get::<Option<String>>(1)?.as_deref()).await?),
         "skins:saveOnline" => json(skins::save_online(&args.get::<OnlineSkin>(0)?).await?),
         "skins:fetchPng" => json(skins::fetch_png(&args.get::<String>(0)?).await?),

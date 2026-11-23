@@ -8,6 +8,7 @@ import { onRemotePcGone, remotePc, setRemotePc, subscribeRemotePc, thisPc } from
 import { useStore } from '../store'
 import { t, type Key } from '../i18n'
 import { openMenuBelow, Segmented, type ContextEntry } from './ui'
+import PlayerHead from './PlayerHead'
 
 /** The other PC whose servers are shown (undefined: this PC). */
 export function useRemotePc(): RemotePc | undefined {
@@ -154,7 +155,7 @@ export function RemotePeople() {
           {grants.map((g) => (
             <div key={g.uuid} className="remote-person">
               <div className="list-row">
-                <img loading="lazy" decoding="async" className="remote-head" src={`https://mc-heads.net/avatar/${g.uuid}/32`} alt="" width={28} height={28} />
+                <PlayerHead who={g.uuid} name={g.name} size={28} className="remote-head" />
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="title ellipsis">{g.name}</div>
                   <div className="hint">{t(`servers.people.roleHint.${g.role}` as Key)}</div>

@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useStore } from '../store'
 import { timeAgo } from '../util'
 import { Switch, useCopy } from './ui'
+import PlayerHead from './PlayerHead'
 
 const OFF: JoinRequestsConfig = { enabled: false, web: true, discord: false }
 
@@ -166,11 +167,7 @@ export default function JoinRequests({ s, reload, onAccepted }: { s: ServerInfo;
               waiting.map((r) => (
                 <div key={r.id} className="list-row">
                   <div className="ico">
-                    <img loading="lazy" decoding="async"
-                      src={`https://mc-heads.net/avatar/${encodeURIComponent(r.username.replace(/^\./, ''))}/40`}
-                      alt=""
-                      onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
-                    />
+                    <PlayerHead who={r.username.startsWith('.') ? '' : r.username} name={r.username} size={40} />
                   </div>
                   <div className="grow">
                     <div className="title">{r.username}</div>

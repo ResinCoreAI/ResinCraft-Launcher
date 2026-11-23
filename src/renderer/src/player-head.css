@@ -1,0 +1,17 @@
+/* A player's head from their skin (components/PlayerHead.tsx), or their first letter. */
+.player-head {
+  display: inline-block;
+  flex: none;
+  border-radius: 6px;
+  background-color: var(--surface-2);
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  vertical-align: middle;
+}
+.player-head.letter {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-dim);
+  font-weight: 700;
+  line-height: 1;
+}

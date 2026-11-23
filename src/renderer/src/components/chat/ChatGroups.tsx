@@ -7,6 +7,7 @@ import { chat, nameOf, useChat } from '../../chatState'
 import { useStore } from '../../store'
 import { t } from '../../i18n'
 import { ConfirmModal, Modal, openContextMenu, type ContextEntry } from '../ui'
+import PlayerHead from '../PlayerHead'
 
 export function GroupTile({ name, size = 32 }: { name: string; size?: number }) {
   const letters = name
@@ -32,7 +33,7 @@ function FriendPicker({ picked, setPicked, skip = [] }: { picked: string[]; setP
       {list.map((f) => (
         <label key={f.uuid} className="chat-pick-row">
           <input type="checkbox" checked={picked.includes(f.uuid)} onChange={(e) => setPicked(e.target.checked ? [...picked, f.uuid] : picked.filter((x) => x !== f.uuid))} />
-          <img className="chat-head" src={`https://mc-heads.net/avatar/${f.uuid}/48`} width={24} height={24} alt="" />
+          <PlayerHead who={f.uuid} name={f.name} size={24} className="chat-head" />
           <span className="ellipsis">{f.name}</span>
         </label>
       ))}
@@ -188,7 +189,7 @@ export function GroupPanel({ g, onClose }: { g: ChatGroup; onClose: () => void }
           return (
             <div key={m.uuid} className="chat-member">
               <span className="chat-head-wrap">
-                <img className="chat-head" src={`https://mc-heads.net/avatar/${m.uuid}/56`} width={28} height={28} alt="" />
+                <PlayerHead who={m.uuid} name={m.name} size={28} className="chat-head" />
                 <span className={`chat-presence ${m.online ? 'on' : ''}`} />
               </span>
               <span className="grow ellipsis">

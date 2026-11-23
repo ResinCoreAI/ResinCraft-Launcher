@@ -180,6 +180,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       remove: fn('skins:remove'),
       apply: fn('skins:apply'),
       lookupPlayer: fn('skins:lookupPlayer'),
+      headOf: fn('skins:headOf'),
       search: fn('skins:search'),
       saveOnline: fn('skins:saveOnline'),
       fetchPng: fn('skins:fetchPng')
