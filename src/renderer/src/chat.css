@@ -943,9 +943,14 @@
   background: rgb(0 0 0 / 0.82);
   cursor: zoom-out;
 }
+/* The whole picture in the window, at its own shape: never past the edges or under the bar (a percentage of the grid
+ * cell doesn't hold a tall picture back, so the window's own size does). */
 .chat-lightbox-img {
-  max-width: 100%;
-  max-height: 100%;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 80px);
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
   border-radius: var(--radius-sm);
 }
 .chat-lightbox-bar {
