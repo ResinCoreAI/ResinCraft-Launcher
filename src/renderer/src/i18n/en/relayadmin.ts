@@ -542,4 +542,8 @@ export default {
   "servers.admin.sales.percentAll": "% off everything (0: only the items below)",
   "servers.admin.sales.perItem": "% off each item",
   "servers.admin.sales.perItemHint": "Empty: the % for everything. An item's own % wins. At most 90%.",
+  "servers.admin.pay.f.sendTo": "Send to a player (optional)",
+  "servers.admin.pay.f.sendToPlaceholder": "Minecraft name or UUID",
+  "servers.admin.pay.f.sendToHint": "The codes go to their Inbox at once, with the note. Leave it empty to hand them out yourself.",
+  "servers.admin.pay.madeNotSent": "The codes were made, but couldn't be sent: {error}. Use Send on a code to try again.",
 }

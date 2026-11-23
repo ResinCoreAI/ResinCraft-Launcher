@@ -1056,11 +1056,19 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
         <GiftModal
           d={d}
           onClose={() => setGift(false)}
-          onMake={async (body) => {
+          onMake={async (body, to) => {
             try {
               const r = await post<Payments>('/api/payments/gift', body)
               setMade(r.made ?? [])
-              toast(t('servers.admin.pay.giftsMade', { n: r.made?.length ?? 0 }), 'success')
+              // Sent straight to a player, when the dialog names one (to their Inbox, like Send on a code).
+              if (to && r.made?.length) {
+                try {
+                  await post('/api/payments/gift/send', { codes: r.made, player: to, note: String(body.note ?? '') })
+                  toast(t('servers.admin.pay.sent', { name: to }), 'success')
+                } catch (e) {
+                  toast(t('servers.admin.pay.madeNotSent', { error: (e as Error).message }), 'error')
+                }
+              } else toast(t('servers.admin.pay.giftsMade', { n: r.made?.length ?? 0 }), 'success')
               await reload()
               return true
             } catch (e) {
@@ -1222,8 +1230,8 @@ function PromoModal({ d, onAdd, onClose }: { d: Payments; onAdd: (body: Record<s
 /** The gift form's "product" when the code gives Resin Credit. */
 const CREDIT = '__credit'
 
-function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<string, unknown>) => Promise<boolean>; onClose: () => void }) {
-  const [f, setF] = useState({ product: d.products[0]?.id ?? (d.walletOn ? CREDIT : ''), days: '30', code: '', count: '1', uses: '1', expires: '', note: '', credit: '100' })
+function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<string, unknown>, to: string) => Promise<boolean>; onClose: () => void }) {
+  const [f, setF] = useState({ product: d.products[0]?.id ?? (d.walletOn ? CREDIT : ''), days: '30', code: '', count: '1', uses: '1', expires: '', note: '', credit: '100', to: '' })
   // Resin Credit instead of a product: the code adds that much to the balance.
   const credit = f.product === CREDIT
   const creditAmount = Math.round(Number(f.credit) * 100)
@@ -1242,7 +1250,7 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
     if (f.code.trim()) body.code = f.code.trim()
     else body.count = Math.max(1, Number(f.count) || 1)
     if (Number(f.expires) > 0) body.expires_days = Number(f.expires)
-    return onMake(body)
+    return onMake(body, f.to.trim())
   }
   return (
     <FormModal
@@ -1294,6 +1302,11 @@ function GiftModal({ d, onMake, onClose }: { d: Payments; onMake: (body: Record<
         {!f.code.trim() && field('count', t('servers.admin.pay.f.count'))}
       </div>
       {field('note', t('servers.admin.pay.f.note'), t('servers.admin.pay.notePlaceholder'))}
+      <label className="field">
+        <span>{t('servers.admin.pay.f.sendTo')}</span>
+        <input className="input" spellCheck={false} maxLength={36} value={f.to} placeholder={t('servers.admin.pay.f.sendToPlaceholder')} onChange={(e) => setF({ ...f, to: e.target.value })} />
+        <span className="hint">{t('servers.admin.pay.f.sendToHint')}</span>
+      </label>
     </FormModal>
   )
 }
