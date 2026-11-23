@@ -6011,6 +6011,9 @@ const dict: Dict = {
   "chat.popups.on": "Windows 알림 켜기",
   "chat.popups.off": "Windows 알림 끄기",
   "chat.popups.hint": "ResinCraft가 앞에 없을 때 온 메시지",
+  "chat.receipts.on": "읽음 표시 켜기",
+  "chat.receipts.off": "읽음 표시 끄기",
+  "chat.receipts.hint": "끄면 친구에게 내 '읽음'이 보이지 않고, 나도 친구의 읽음을 볼 수 없어요",
 }
 
 export default dict

@@ -1695,4 +1695,7 @@ export default {
   "chat.popups.on": "Turn Windows pop-ups on",
   "chat.popups.off": "Turn Windows pop-ups off",
   "chat.popups.hint": "For messages while ResinCraft isn't in front",
+  "chat.receipts.on": "Turn read receipts on",
+  "chat.receipts.off": "Turn read receipts off",
+  "chat.receipts.hint": "Off: friends don't see \"Seen\" for you, and you don't see theirs",
 } as const

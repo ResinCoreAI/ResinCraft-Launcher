@@ -453,7 +453,7 @@ export default function ChatPanel() {
       <aside className="chat-side">
         <button
           className="chat-me"
-          onClick={(e) => openContextMenu(e, [...statusMenu(() => setEditProfile(true), () => setStatusText(true)), '-', { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) }, { label: t(popups ? 'chat.popups.off' : 'chat.popups.on'), hint: t('chat.popups.hint'), onSelect: () => (setPopups(!popups), setPopupsState(!popups)) }])}
+          onClick={(e) => openContextMenu(e, [...statusMenu(() => setEditProfile(true), () => setStatusText(true)), '-', { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) }, { label: t(popups ? 'chat.popups.off' : 'chat.popups.on'), hint: t('chat.popups.hint'), onSelect: () => (setPopups(!popups), setPopupsState(!popups)) }, { label: t(v.profile?.readReceipts === false ? 'chat.receipts.on' : 'chat.receipts.off'), hint: t('chat.receipts.hint'), onSelect: () => void chat.setReadReceipts(v.profile?.readReceipts === false).catch(fail) }])}
           title={t('chat.status.change')}
         >
           <ChatAvatar uuid={v.me} size={34} dot status={v.profile?.status === 'invisible' ? 'offline' : v.profile?.status ?? 'online'} />

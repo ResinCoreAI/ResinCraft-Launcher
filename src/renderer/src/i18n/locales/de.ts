@@ -6048,6 +6048,9 @@ const dict: Dict = {
   "chat.popups.on": "Windows-Benachrichtigungen einschalten",
   "chat.popups.off": "Windows-Benachrichtigungen ausschalten",
   "chat.popups.hint": "Für Nachrichten, während ResinCraft nicht im Vordergrund ist",
+  "chat.receipts.on": "Lesebestätigungen einschalten",
+  "chat.receipts.off": "Lesebestätigungen ausschalten",
+  "chat.receipts.hint": "Aus: Freunde sehen bei dir kein „Gesehen“, und du siehst ihres nicht",
 }
 
 export default dict

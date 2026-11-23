@@ -6016,6 +6016,9 @@ const dict: Dict = {
   "chat.popups.on": "Bật thông báo Windows",
   "chat.popups.off": "Tắt thông báo Windows",
   "chat.popups.hint": "Cho tin nhắn khi ResinCraft không ở phía trước",
+  "chat.receipts.on": "Bật thông báo đã xem",
+  "chat.receipts.off": "Tắt thông báo đã xem",
+  "chat.receipts.hint": "Tắt: bạn bè không thấy \"Đã xem\" của bạn, và bạn cũng không thấy của họ",
 }
 
 export default dict

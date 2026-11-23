@@ -6019,6 +6019,9 @@ const dict: Dict = {
   "chat.popups.on": "Nyalakan notifikasi Windows",
   "chat.popups.off": "Matikan notifikasi Windows",
   "chat.popups.hint": "Untuk pesan saat ResinCraft tidak di depan",
+  "chat.receipts.on": "Nyalakan tanda dibaca",
+  "chat.receipts.off": "Matikan tanda dibaca",
+  "chat.receipts.hint": "Mati: teman tidak melihat \"Dilihat\" darimu, dan kamu tidak melihat punya mereka",
 }
 
 export default dict

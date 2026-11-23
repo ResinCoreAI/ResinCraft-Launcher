@@ -2061,6 +2061,8 @@ export interface ChatProfile {
   avatar: string | null
   friend: boolean
   mutualGroups: { conv: string; name: string }[]
+  /** Your own profile only: you share read receipts (and see others'). */
+  readReceipts?: boolean
 }
 /** A Store item someone shared into a chat, as the Store has it. */
 export interface ChatEmbed {

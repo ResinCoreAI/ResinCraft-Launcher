@@ -6029,6 +6029,9 @@ const dict: Dict = {
   "chat.popups.on": "Windows bildirimlerini aç",
   "chat.popups.off": "Windows bildirimlerini kapat",
   "chat.popups.hint": "ResinCraft önde değilken gelen mesajlar için",
+  "chat.receipts.on": "Okundu bilgisini aç",
+  "chat.receipts.off": "Okundu bilgisini kapat",
+  "chat.receipts.hint": "Kapalıyken arkadaşların senin için \"Görüldü\" görmez, sen de onlarınkini görmezsin",
 }
 
 export default dict

@@ -6016,6 +6016,9 @@ const dict: Dict = {
   "chat.popups.on": "Windows の通知をオンにする",
   "chat.popups.off": "Windows の通知をオフにする",
   "chat.popups.hint": "ResinCraft が前面にないときのメッセージ",
+  "chat.receipts.on": "既読表示をオンにする",
+  "chat.receipts.off": "既読表示をオフにする",
+  "chat.receipts.hint": "オフ：友だちにあなたの「既読」が表示されず、あなたも相手の既読を見られません",
 }
 
 export default dict

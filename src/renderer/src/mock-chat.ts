@@ -231,6 +231,12 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       changed()
       return p
     }
+    case 'POST /api/chat/privacy': {
+      const p = profileOf(ME)
+      p.readReceipts = !!b.readReceipts
+      changed()
+      return p
+    }
     case 'GET /api/chat/profile':
       return profileOf(q.get('uuid') ?? ME)
     case 'POST /api/chat/nickname': {

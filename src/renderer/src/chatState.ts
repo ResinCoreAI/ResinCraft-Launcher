@@ -416,6 +416,10 @@ export const chat = {
     return p
   },
   profile: (uuid: string) => call<ChatProfile>('GET', `/api/chat/profile?uuid=${uuid}`),
+  /** Read receipts on (others see "Seen" for you, you see theirs) or off (neither). */
+  async setReadReceipts(on: boolean) {
+    set({ profile: await call<ChatProfile>('POST', '/api/chat/privacy', { readReceipts: on }) })
+  },
   async setNickname(conv: string, uuid: string, nick: string) {
     const r = await call<{ nicknames: Record<string, Record<string, string>> }>('POST', '/api/chat/nickname', { conv, uuid, nick })
     set({ nicknames: r.nicknames ?? view.nicknames })

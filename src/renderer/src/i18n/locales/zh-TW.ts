@@ -6006,6 +6006,9 @@ const dict: Dict = {
   "chat.popups.on": "開啟 Windows 通知",
   "chat.popups.off": "關閉 Windows 通知",
   "chat.popups.hint": "ResinCraft 不在前景時收到的訊息",
+  "chat.receipts.on": "開啟已讀回條",
+  "chat.receipts.off": "關閉已讀回條",
+  "chat.receipts.hint": "關閉後，好友看不到你的「已讀」，你也看不到他們的",
 }
 
 export default dict
