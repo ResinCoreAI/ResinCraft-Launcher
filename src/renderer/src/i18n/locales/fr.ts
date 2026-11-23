@@ -5910,7 +5910,7 @@ const dict: Dict = {
   "chat.blockBody": "Cette personne est retirée de vos amis et ne pourra plus vous envoyer de demandes ni de messages. Vous pourrez la débloquer plus tard.",
   "chat.placeholder": "Message pour {name}",
   "chat.send": "Envoyer",
-  "chat.formatHint": "Enter envoie, Shift+Enter passe à la ligne. **gras** *italique* ~~barré~~ `code` ```bloc de code``` ||spoiler|| > citation",
+  "chat.formatHint": "Enter envoie, Shift+Enter passe à la ligne. **gras** *italique* ~~barré~~ `code` ```bloc de code``` ||spoiler|| > citation __souligné__ # titre -# petit - liste [texte](lien)",
   "chat.off": "Le chat est désactivé sur le relais pour le moment.",
   "chat.muted": "Vous ne pouvez pas envoyer de messages avant {until} : {reason}",
   "chat.newMessage": "{name} : {text}",

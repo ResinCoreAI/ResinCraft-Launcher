@@ -5837,7 +5837,7 @@ const dict: Dict = {
   "chat.blockBody": "对方会被移出你的好友列表，并且无法再向你发送请求或消息。之后可以取消屏蔽。",
   "chat.placeholder": "发消息给 {name}",
   "chat.send": "发送",
-  "chat.formatHint": "Enter 发送，Shift+Enter 换行。**粗体** *斜体* ~~删除线~~ `代码` ```代码块``` ||剧透|| > 引用",
+  "chat.formatHint": "Enter 发送，Shift+Enter 换行。**粗体** *斜体* ~~删除线~~ `代码` ```代码块``` ||剧透|| > 引用 __下划线__ # 标题 -# 小字 - 列表 [文字](链接)",
   "chat.off": "中继目前已关闭聊天。",
   "chat.muted": "在 {until} 之前你无法发送消息：{reason}",
   "chat.newMessage": "{name}：{text}",

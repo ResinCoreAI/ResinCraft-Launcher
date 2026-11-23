@@ -1472,7 +1472,7 @@ export default {
   "chat.blockBody": "They're removed from your friends and can't send you requests or messages. You can unblock them later.",
   "chat.placeholder": "Message {name}",
   "chat.send": "Send",
-  "chat.formatHint": "Enter sends, Shift+Enter is a new line. **bold** *italic* ~~strike~~ `code` ```code block``` ||spoiler|| > quote",
+  "chat.formatHint": "Enter sends, Shift+Enter is a new line. **bold** *italic* ~~strike~~ `code` ```code block``` ||spoiler|| > quote __underline__ # heading -# small - list [text](link)",
   "chat.off": "Chat is turned off on the relay right now.",
   "chat.muted": "You can't send messages until {until}: {reason}",
   "chat.newMessage": "{name}: {text}",

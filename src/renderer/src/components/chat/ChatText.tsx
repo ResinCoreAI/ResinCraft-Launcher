@@ -1,13 +1,21 @@
-// A chat message as typed, drawn like Discord: **bold**, *italic* or _italic_, ~~strike~~, `code`, ``` code blocks ```
-// (with an optional language on the first line), ||spoilers|| (hidden until clicked), lines starting with "> " (a quote)
-// and https:// links. Nothing is ever read as HTML. A message of only a few emoji shows them big.
+// A chat message as typed, drawn like Discord: **bold**, *italic* or _italic_, ***both***, __underline__, ~~strike~~,
+// `code`, ``` code blocks ``` (with an optional language on the first line), ||spoilers|| (hidden until clicked),
+// [masked links](https://…), <t:1700000000:R> times (in the reader's own time), https:// links; and by line: "# ",
+// "## ", "### " headings, "-# " small text, "- " or "* " lists (indent for a level more), "1. " numbered lists, "> "
+// quotes and ">>> " (the rest of the message is a quote). Nothing is ever read as HTML. A message of only a few emoji
+// shows them big.
 import { useState, type ReactNode } from 'react'
 import { api } from '../../api'
+import { currentLanguage } from '../../i18n'
 import { FileImage } from './ChatMedia'
 
 type Emoji = Map<string, string>
 
 const LINK = /https?:\/\/[^\s<>"]+[^\s<>".,;:!?)\]'*_~|]/y
+/** [text](https://…): the text shows, the address is on hover and opens in the browser. */
+const MASKED = /^\[([^\]\n]{1,200})\]\((https?:\/\/[^\s)<>"]{1,2000})\)/
+/** <t:unix> or <t:unix:style>, Discord's timestamps. */
+const TIME = /^<t:(-?\d{1,13})(?::([tTdDfFR]))?>/
 
 function Spoiler({ children }: { children: ReactNode }) {
   const [shown, setShown] = useState(false)
@@ -27,7 +35,54 @@ function Spoiler({ children }: { children: ReactNode }) {
   )
 }
 
-/** The pairs `**`, `~~`, `||`, `*` and `_`: their closing mark further on the same text. */
+function Link({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      title={href}
+      onClick={(e) => {
+        e.preventDefault()
+        void api.app.openExternal(href)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+
+/** A Discord timestamp in the reader's language and time zone. */
+function timestamp(secs: number, style: string): string {
+  const d = new Date(secs * 1000)
+  const lang = currentLanguage()
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(lang, o).format(d)
+  switch (style) {
+    case 't':
+      return f({ timeStyle: 'short' })
+    case 'T':
+      return f({ timeStyle: 'medium' })
+    case 'd':
+      return f({ dateStyle: 'short' })
+    case 'D':
+      return f({ dateStyle: 'long' })
+    case 'F':
+      return f({ dateStyle: 'full', timeStyle: 'short' })
+    case 'R': {
+      const s = Math.round((d.getTime() - Date.now()) / 1000)
+      const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' })
+      const a = Math.abs(s)
+      if (a < 60) return rtf.format(s, 'second')
+      if (a < 3600) return rtf.format(Math.round(s / 60), 'minute')
+      if (a < 86_400) return rtf.format(Math.round(s / 3600), 'hour')
+      if (a < 2_592_000) return rtf.format(Math.round(s / 86_400), 'day')
+      if (a < 31_536_000) return rtf.format(Math.round(s / 2_592_000), 'month')
+      return rtf.format(Math.round(s / 31_536_000), 'year')
+    }
+    default:
+      return f({ dateStyle: 'long', timeStyle: 'short' })
+  }
+}
+
+/** The pairs `***`, `**`, `__`, `~~`, `||`, `*` and `_`: their closing mark further on the same text. */
 function closing(rest: string, mark: string): number {
   const end = rest.indexOf(mark, mark.length)
   // Something between, and not a lone "*" between words like "2 * 3 * 4".
@@ -67,17 +122,53 @@ function inline(text: string, key: string, emoji: Emoji): ReactNode[] {
         continue
       }
     }
+    if (rest[0] === '[') {
+      const m = MASKED.exec(rest)
+      if (m) {
+        flush()
+        out.push(
+          <Link key={k} href={m[2]}>
+            {inline(m[1], k, emoji)}
+          </Link>
+        )
+        i += m[0].length
+        continue
+      }
+    }
+    if (rest.startsWith('<t:')) {
+      const m = TIME.exec(rest)
+      if (m) {
+        flush()
+        const secs = Number(m[1])
+        out.push(
+          <time key={k} className="ct-time" dateTime={new Date(secs * 1000).toISOString()} title={timestamp(secs, 'F')}>
+            {timestamp(secs, m[2] ?? 'f')}
+          </time>
+        )
+        i += m[0].length
+        continue
+      }
+    }
     let matched = false
     for (const [mark, wrap] of [
+      [
+        '***',
+        (c: ReactNode[]) => (
+          <strong key={k}>
+            <em>{c}</em>
+          </strong>
+        )
+      ],
       ['**', (c: ReactNode[]) => <strong key={k}>{c}</strong>],
+      ['__', (c: ReactNode[]) => <u key={k}>{c}</u>],
       ['~~', (c: ReactNode[]) => <s key={k}>{c}</s>],
       ['||', (c: ReactNode[]) => <Spoiler key={k}>{c}</Spoiler>],
       ['*', (c: ReactNode[]) => <em key={k}>{c}</em>],
       ['_', (c: ReactNode[]) => <em key={k}>{c}</em>]
     ] as const) {
       if (!rest.startsWith(mark)) continue
-      // "_" only at a word's start (snake_case stays as it is).
-      if (mark === '_' && i > 0 && /\w/.test(text[i - 1])) continue
+      // "_" and "__" only at a word's start (snake_case stays as it is).
+      if (mark.startsWith('_') && i > 0 && /\w/.test(text[i - 1])) continue
       const end = closing(rest, mark)
       if (end < 0) continue
       flush()
@@ -93,17 +184,9 @@ function inline(text: string, key: string, emoji: Emoji): ReactNode[] {
       flush()
       const href = link[0]
       out.push(
-        <a
-          key={k}
-          href={href}
-          title={href}
-          onClick={(e) => {
-            e.preventDefault()
-            void api.app.openExternal(href)
-          }}
-        >
+        <Link key={k} href={href}>
           {href}
-        </a>
+        </Link>
       )
       i += href.length
       continue
@@ -115,30 +198,117 @@ function inline(text: string, key: string, emoji: Emoji): ReactNode[] {
   return out
 }
 
-/** Lines, with runs of "> " lines as quotes. */
+/** A list item: its level (0, or 1 when indented) and whether it's numbered, and its text. */
+function listItem(row: string): { level: number; ordered: boolean; n: number; text: string } | null {
+  const m = /^( {0,1}|\t| {2,})([-*•]|(\d{1,3})[.)]) (.*)$/.exec(row)
+  if (!m) return null
+  return { level: m[1].length >= 2 || m[1] === '\t' ? 1 : 0, ordered: m[3] !== undefined, n: Number(m[3] ?? 1), text: m[4] }
+}
+
+/** Lines: headings, small text, lists, quotes ("> " runs, and ">>> " to the end), and plain lines. */
 function lines(text: string, key: string, emoji: Emoji): ReactNode[] {
   const out: ReactNode[] = []
   const rows = text.split('\n')
   let quote: string[] = []
+  let list: { level: number; ordered: boolean; n: number; text: string }[] = []
   const flushQuote = (at: number) => {
     if (!quote.length) return
-    out.push(
-      <blockquote key={`${key}.q${at}`}>
-        {quote.map((q, n) => (
-          <div key={n}>{q ? inline(q, `${key}.q${at}.${n}`, emoji) : ' '}</div>
-        ))}
-      </blockquote>
-    )
+    const q = quote
     quote = []
+    out.push(<blockquote key={`${key}.q${at}`}>{lines(q.join('\n'), `${key}.q${at}`, emoji)}</blockquote>)
   }
-  rows.forEach((row, n) => {
+  const flushList = (at: number) => {
+    if (!list.length) return
+    const items = list
+    list = []
+    // Top-level items, each with its indented ones under it.
+    const top: { item: (typeof items)[number]; subs: (typeof items)[number][] }[] = []
+    for (const it of items) {
+      if (it.level === 1 && top.length) top[top.length - 1].subs.push(it)
+      else top.push({ item: { ...it, level: 0 }, subs: [] })
+    }
+    const make = (group: (typeof items)[number][], k: string, nested: ReactNode[][] = []) => {
+      const ordered = group[0].ordered
+      const children = group.map((it, n) => (
+        <li key={n} value={ordered ? it.n : undefined}>
+          {inline(it.text, `${k}.${n}`, emoji)}
+          {nested[n]}
+        </li>
+      ))
+      return ordered ? (
+        <ol key={k} start={group[0].n}>
+          {children}
+        </ol>
+      ) : (
+        <ul key={k}>{children}</ul>
+      )
+    }
+    const k = `${key}.l${at}`
+    out.push(
+      make(
+        top.map((t) => t.item),
+        k,
+        top.map((t, n) => (t.subs.length ? [make(t.subs, `${k}.s${n}`)] : []))
+      )
+    )
+  }
+  for (let n = 0; n < rows.length; n++) {
+    const row = rows[n]
+    // ">>> ": everything after is a quote.
+    if (row.startsWith('>>> ') || row === '>>>') {
+      flushList(n)
+      flushQuote(n)
+      quote = [row.slice(4), ...rows.slice(n + 1)]
+      flushQuote(n)
+      return out
+    }
     if (row.startsWith('> ') || row === '>') {
+      flushList(n)
       quote.push(row.slice(2))
-      return
+      continue
     }
     flushQuote(n)
-    out.push(<div key={`${key}.${n}`}>{row ? inline(row, `${key}.${n}`, emoji) : ' '}</div>)
-  })
+    const item = listItem(row)
+    if (item) {
+      // Bullets after numbers (or numbers after bullets) start a list of their own.
+      const lastTop = [...list].reverse().find((x) => x.level === 0)
+      if (item.level === 0 && lastTop && lastTop.ordered !== item.ordered) flushList(n)
+      list.push(item)
+      continue
+    }
+    flushList(n)
+    const h = /^(#{1,3}) (.+)$/.exec(row)
+    if (h) {
+      const level = h[1].length
+      const body = inline(h[2], `${key}.${n}`, emoji)
+      out.push(
+        level === 1 ? (
+          <h3 key={`${key}.${n}`} className="ct-h1">
+            {body}
+          </h3>
+        ) : level === 2 ? (
+          <h4 key={`${key}.${n}`} className="ct-h2">
+            {body}
+          </h4>
+        ) : (
+          <h5 key={`${key}.${n}`} className="ct-h3">
+            {body}
+          </h5>
+        )
+      )
+      continue
+    }
+    if (row.startsWith('-# ')) {
+      out.push(
+        <div key={`${key}.${n}`} className="ct-small">
+          {inline(row.slice(3), `${key}.${n}`, emoji)}
+        </div>
+      )
+      continue
+    }
+    out.push(<div key={`${key}.${n}`}>{row ? inline(row, `${key}.${n}`, emoji) : ' '}</div>)
+  }
+  flushList(rows.length)
   flushQuote(rows.length)
   return out
 }

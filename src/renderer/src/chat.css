@@ -372,6 +372,48 @@
 .ct a {
   color: var(--accent);
 }
+/* Discord's headings, small text, lists and times (ChatText.tsx). */
+.ct .ct-h1,
+.ct .ct-h2,
+.ct .ct-h3 {
+  margin: 6px 0 2px;
+  font-family: var(--font-display);
+  line-height: 1.25;
+}
+.ct .ct-h1 {
+  font-size: 22px;
+}
+.ct .ct-h2 {
+  font-size: 18px;
+}
+.ct .ct-h3 {
+  font-size: 15.5px;
+}
+.ct-small {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.ct ul,
+.ct ol {
+  margin: 2px 0;
+  padding-left: 22px;
+}
+.ct li {
+  margin: 1px 0;
+}
+.ct li > ul,
+.ct li > ol {
+  margin: 1px 0;
+}
+.ct-time {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  white-space: nowrap;
+}
+.ct u {
+  text-underline-offset: 2px;
+}
 .ct-spoiler {
   border-radius: 4px;
   background: var(--text-faint);

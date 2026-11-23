@@ -5941,7 +5941,7 @@ const dict: Dict = {
   "chat.blockBody": "Ta osoba zostanie usunięta ze znajomych i nie będzie mogła wysyłać ci zaproszeń ani wiadomości. Możesz ją później odblokować.",
   "chat.placeholder": "Napisz do {name}",
   "chat.send": "Wyślij",
-  "chat.formatHint": "Enter wysyła, Shift+Enter to nowa linia. **pogrubienie** *kursywa* ~~przekreślenie~~ `kod` ```blok kodu``` ||spoiler|| > cytat",
+  "chat.formatHint": "Enter wysyła, Shift+Enter to nowa linia. **pogrubienie** *kursywa* ~~przekreślenie~~ `kod` ```blok kodu``` ||spoiler|| > cytat __podkreślenie__ # nagłówek -# mały - lista [tekst](link)",
   "chat.off": "Czat jest teraz wyłączony na przekaźniku.",
   "chat.muted": "Nie możesz wysyłać wiadomości do {until}: {reason}",
   "chat.newMessage": "{name}: {text}",

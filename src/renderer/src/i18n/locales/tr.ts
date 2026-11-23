@@ -5860,7 +5860,7 @@ const dict: Dict = {
   "chat.blockBody": "Arkadaşlarından çıkarılır ve sana istek ya da mesaj gönderemez. Engeli daha sonra kaldırabilirsin.",
   "chat.placeholder": "{name} için mesaj yaz",
   "chat.send": "Gönder",
-  "chat.formatHint": "Enter gönderir, Shift+Enter yeni satır açar. **kalın** *italik* ~~üstü çizili~~ `kod` ```kod bloğu``` ||spoiler|| > alıntı",
+  "chat.formatHint": "Enter gönderir, Shift+Enter yeni satır açar. **kalın** *italik* ~~üstü çizili~~ `kod` ```kod bloğu``` ||spoiler|| > alıntı __altı çizili__ # başlık -# küçük - liste [metin](bağlantı)",
   "chat.off": "Sohbet şu anda rölede kapalı.",
   "chat.muted": "{until} tarihine kadar mesaj gönderemezsin: {reason}",
   "chat.newMessage": "{name}: {text}",

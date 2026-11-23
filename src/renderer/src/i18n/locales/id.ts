@@ -5850,7 +5850,7 @@ const dict: Dict = {
   "chat.blockBody": "Dia akan dihapus dari daftar temanmu dan tidak bisa mengirimimu permintaan atau pesan. Kamu bisa membuka blokirnya nanti.",
   "chat.placeholder": "Kirim pesan ke {name}",
   "chat.send": "Kirim",
-  "chat.formatHint": "Enter untuk kirim, Shift+Enter untuk baris baru. **tebal** *miring* ~~coret~~ `kode` ```blok kode``` ||spoiler|| > kutipan",
+  "chat.formatHint": "Enter untuk kirim, Shift+Enter untuk baris baru. **tebal** *miring* ~~coret~~ `kode` ```blok kode``` ||spoiler|| > kutipan __garis bawah__ # judul -# kecil - daftar [teks](tautan)",
   "chat.off": "Obrolan sedang dimatikan di relay.",
   "chat.muted": "Kamu tidak bisa mengirim pesan sampai {until}: {reason}",
   "chat.newMessage": "{name}: {text}",

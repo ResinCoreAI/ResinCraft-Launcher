@@ -5842,7 +5842,7 @@ const dict: Dict = {
   "chat.blockBody": "친구에서 삭제되고, 상대는 나에게 요청이나 메시지를 보낼 수 없어요. 나중에 차단을 해제할 수 있어요.",
   "chat.placeholder": "{name} 님에게 메시지 보내기",
   "chat.send": "보내기",
-  "chat.formatHint": "Enter로 보내기, Shift+Enter로 줄바꿈. **굵게** *기울임* ~~취소선~~ `코드` ```코드 블록``` ||스포일러|| > 인용",
+  "chat.formatHint": "Enter로 보내기, Shift+Enter로 줄바꿈. **굵게** *기울임* ~~취소선~~ `코드` ```코드 블록``` ||스포일러|| > 인용 __밑줄__ # 제목 -# 작은 글씨 - 목록 [텍스트](링크)",
   "chat.off": "지금은 릴레이에서 채팅이 꺼져 있어요.",
   "chat.muted": "{until}까지 메시지를 보낼 수 없어요: {reason}",
   "chat.newMessage": "{name}: {text}",

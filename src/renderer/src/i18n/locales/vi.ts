@@ -5847,7 +5847,7 @@ const dict: Dict = {
   "chat.blockBody": "Người này sẽ bị xóa khỏi danh sách bạn bè và không thể gửi lời mời hay tin nhắn cho bạn. Bạn có thể bỏ chặn sau.",
   "chat.placeholder": "Nhắn tin cho {name}",
   "chat.send": "Gửi",
-  "chat.formatHint": "Enter để gửi, Shift+Enter để xuống dòng. **đậm** *nghiêng* ~~gạch ngang~~ `mã` ```khối mã``` ||spoiler|| > trích dẫn",
+  "chat.formatHint": "Enter để gửi, Shift+Enter để xuống dòng. **đậm** *nghiêng* ~~gạch ngang~~ `mã` ```khối mã``` ||spoiler|| > trích dẫn __gạch chân__ # tiêu đề -# chữ nhỏ - danh sách [chữ](liên kết)",
   "chat.off": "Relay hiện đang tắt tính năng trò chuyện.",
   "chat.muted": "Bạn không thể gửi tin nhắn cho đến {until}: {reason}",
   "chat.newMessage": "{name}: {text}",

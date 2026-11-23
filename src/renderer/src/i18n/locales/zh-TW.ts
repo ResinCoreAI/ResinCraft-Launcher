@@ -5837,7 +5837,7 @@ const dict: Dict = {
   "chat.blockBody": "對方會被移出你的好友名單，也無法再傳送邀請或訊息給你。之後可以解除封鎖。",
   "chat.placeholder": "傳訊息給 {name}",
   "chat.send": "傳送",
-  "chat.formatHint": "Enter 傳送，Shift+Enter 換行。**粗體** *斜體* ~~刪除線~~ `程式碼` ```程式碼區塊``` ||暴雷|| > 引用",
+  "chat.formatHint": "Enter 傳送，Shift+Enter 換行。**粗體** *斜體* ~~刪除線~~ `程式碼` ```程式碼區塊``` ||暴雷|| > 引用 __底線__ # 標題 -# 小字 - 清單 [文字](連結)",
   "chat.off": "中繼目前已關閉聊天。",
   "chat.muted": "在 {until} 之前你無法傳送訊息：{reason}",
   "chat.newMessage": "{name}：{text}",

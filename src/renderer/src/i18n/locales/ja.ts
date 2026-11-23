@@ -5847,7 +5847,7 @@ const dict: Dict = {
   "chat.blockBody": "フレンドから解除され、相手はあなたに申請やメッセージを送れなくなります。ブロックはあとで解除できます。",
   "chat.placeholder": "{name} さんにメッセージを送信",
   "chat.send": "送信",
-  "chat.formatHint": "Enter で送信、Shift+Enter で改行。**太字** *斜体* ~~取り消し線~~ `コード` ```コードブロック``` ||ネタバレ|| > 引用",
+  "chat.formatHint": "Enter で送信、Shift+Enter で改行。**太字** *斜体* ~~取り消し線~~ `コード` ```コードブロック``` ||ネタバレ|| > 引用 __下線__ # 見出し -# 小さい文字 - リスト [テキスト](リンク)",
   "chat.off": "現在、リレーでチャットがオフになっています。",
   "chat.muted": "{until} までメッセージを送信できません: {reason}",
   "chat.newMessage": "{name}: {text}",

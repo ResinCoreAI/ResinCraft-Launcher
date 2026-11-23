@@ -5879,7 +5879,7 @@ const dict: Dict = {
   "chat.blockBody": "Die Person wird aus deinen Freunden entfernt und kann dir keine Anfragen oder Nachrichten mehr schicken. Du kannst sie später wieder entblocken.",
   "chat.placeholder": "Nachricht an {name}",
   "chat.send": "Senden",
-  "chat.formatHint": "Enter sendet, Shift+Enter macht eine neue Zeile. **fett** *kursiv* ~~durchgestrichen~~ `Code` ```Codeblock``` ||Spoiler|| > Zitat",
+  "chat.formatHint": "Enter sendet, Shift+Enter macht eine neue Zeile. **fett** *kursiv* ~~durchgestrichen~~ `Code` ```Codeblock``` ||Spoiler|| > Zitat __unterstrichen__ # Überschrift -# klein - Liste [Text](Link)",
   "chat.off": "Der Chat ist auf dem Relay gerade ausgeschaltet.",
   "chat.muted": "Du kannst bis {until} keine Nachrichten senden: {reason}",
   "chat.newMessage": "{name}: {text}",
