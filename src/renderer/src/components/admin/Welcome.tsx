@@ -9,6 +9,7 @@ import { ConfirmModal, Switch } from '../ui'
 import MailText from '../MailText'
 import { money } from '../../storeStatus'
 import { Loading, Stat, useAct, useAdmin, when } from './common'
+import { fillName, MailTags, WELCOME_TAGS } from './MailTags'
 
 export type Category = '' | 'news' | 'update' | 'event' | 'account' | 'support' | 'status'
 export type Reward = { kind: 'credit'; amount: number } | { kind: 'item'; product: string; days: number; name?: string }
@@ -171,7 +172,7 @@ function render(body: string, name: string, credit: string | null) {
   return body
     .split('\n')
     .filter((l) => credit != null || !l.includes('{credit}'))
-    .map((l) => l.replaceAll('{name}', name).replaceAll('{credit}', credit ?? ''))
+    .map((l) => fillName(l, name).replaceAll('{credit}', credit ?? ''))
     .join('\n')
 }
 
@@ -375,13 +376,14 @@ export function WelcomeAdmin() {
                     </div>
                     <label className="field">
                       <span>{t('servers.admin.mail.subject')}</span>
-                      <input className="input" value={e.subject} maxLength={lim.subject} onChange={(v) => update(e.key, { subject: v.target.value })} />
+                      <input className="input" data-tags={`welcome-${e.key}`} value={e.subject} maxLength={lim.subject} onChange={(v) => update(e.key, { subject: v.target.value })} />
                     </label>
                     <label className="field">
                       <span>{t('servers.admin.mail.message')}</span>
-                      <textarea className="input" rows={8} value={e.body} maxLength={lim.body} onChange={(v) => update(e.key, { body: v.target.value })} />
-                      <span className="hint">{t('servers.admin.mail.welcome.placeholders', { name: '{name}', credit: '{credit}' })}</span>
+                      <textarea className="input" data-tags={`welcome-${e.key}`} rows={8} value={e.body} maxLength={lim.body} onChange={(v) => update(e.key, { body: v.target.value })} />
+                      <span className="hint">{t('servers.admin.mail.welcome.placeholders', { name: '{playername}', credit: '{credit}' })}</span>
                     </label>
+                    <MailTags group={`welcome-${e.key}`} tags={WELCOME_TAGS} />
                     <div className="field">
                       <span>{t('servers.admin.mail.rewards')}</span>
                       <RewardsEditor

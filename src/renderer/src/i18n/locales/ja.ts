@@ -5765,6 +5765,13 @@ const dict: Dict = {
   "updates.switch.body": "現在の {current} は {channel} にはありません。ResinCraft は最新の {channel} リリースを上からインストールして再起動します。インスタンス、アカウント、設定はそのまま残ります。",
   "updates.switch.confirm": "切り替えて再インストール",
   "updates.switch.none": "インストールできる {channel} リリースが見つかりませんでした。チャンネルは {channel} になっています。あとで再インストールをお試しください。",
+  "servers.admin.mail.tags": "プレースホルダー",
+  "servers.admin.mail.tags.hint": "クリックするとカーソルの位置に入ります。{playername}、{player}、{name} はどれもプレイヤーの Minecraft 名です。",
+  "servers.admin.mail.tag.playername": "各プレイヤーの Minecraft 名（不明なときは「there」）",
+  "servers.admin.mail.tag.date": "送信日（例: 2026-11-23）",
+  "servers.admin.mail.tag.month": "送信月（例: November 2026）",
+  "servers.admin.mail.tag.year": "送信年（例: 2026）",
+  "servers.admin.mail.tag.credit": "このメールの Resin Credit（例: 40.00 THB）。ない場合、それを含む行は省かれます",
 }
 
 export default dict

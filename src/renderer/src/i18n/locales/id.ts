@@ -5768,6 +5768,13 @@ const dict: Dict = {
   "updates.switch.body": "Kamu memakai {current}, yang tidak ada di {channel}. ResinCraft akan memasang rilis {channel} terbaru di atasnya lalu memulai ulang. Instance, akun, dan pengaturanmu tetap ada.",
   "updates.switch.confirm": "Pindah dan pasang ulang",
   "updates.switch.none": "Tidak menemukan rilis {channel} untuk dipasang. Kanalmu sekarang {channel}; coba Pasang ulang nanti.",
+  "servers.admin.mail.tags": "Penanda",
+  "servers.admin.mail.tags.hint": "Klik salah satu untuk menaruhnya di posisi kursor. {playername}, {player}, dan {name} sama-sama berarti nama Minecraft pemain.",
+  "servers.admin.mail.tag.playername": "Nama Minecraft tiap pemain, diisi untuk mereka (\"there\" jika tidak diketahui)",
+  "servers.admin.mail.tag.date": "Hari dikirim, misalnya 2026-11-23",
+  "servers.admin.mail.tag.month": "Bulan dikirim, misalnya November 2026",
+  "servers.admin.mail.tag.year": "Tahun dikirim, misalnya 2026",
+  "servers.admin.mail.tag.credit": "Resin Credit surat ini, misalnya 40.00 THB. Baris yang memakainya dihapus jika surat tidak punya",
 }
 
 export default dict

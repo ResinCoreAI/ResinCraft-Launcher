@@ -5859,6 +5859,13 @@ const dict: Dict = {
   "updates.switch.body": "Używasz {current}, którego nie ma w {channel}. ResinCraft zainstaluje na nim najnowsze wydanie {channel} i uruchomi się ponownie. Instancje, konta i ustawienia zostaną.",
   "updates.switch.confirm": "Przełącz i zainstaluj ponownie",
   "updates.switch.none": "Nie znaleziono wydania {channel} do zainstalowania. Twój kanał to teraz {channel}; spróbuj później Zainstaluj ponownie.",
+  "servers.admin.mail.tags": "Symbole zastępcze",
+  "servers.admin.mail.tags.hint": "Kliknij, aby wstawić w miejscu kursora. {playername}, {player} i {name} oznaczają nazwę gracza w Minecrafcie.",
+  "servers.admin.mail.tag.playername": "Nazwa każdego gracza w Minecrafcie, wstawiana dla niego („there”, gdy nieznana)",
+  "servers.admin.mail.tag.date": "Dzień wysyłki, np. 2026-11-23",
+  "servers.admin.mail.tag.month": "Miesiąc wysyłki, np. November 2026",
+  "servers.admin.mail.tag.year": "Rok wysyłki, np. 2026",
+  "servers.admin.mail.tag.credit": "Resin Credit tej wiadomości, np. 40.00 THB. Wiersze z nim znikają, gdy wiadomość go nie ma",
 }
 
 export default dict

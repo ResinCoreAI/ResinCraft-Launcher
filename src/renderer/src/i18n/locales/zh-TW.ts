@@ -5755,6 +5755,13 @@ const dict: Dict = {
   "updates.switch.body": "你正在使用的 {current} 不在 {channel} 中。ResinCraft 會覆蓋安裝最新的 {channel} 版本並重新啟動。你的實例、帳號和設定都會保留。",
   "updates.switch.confirm": "切換並重新安裝",
   "updates.switch.none": "找不到可安裝的 {channel} 版本。你的頻道現在是 {channel}，請稍後再試重新安裝。",
+  "servers.admin.mail.tags": "預留位置",
+  "servers.admin.mail.tags.hint": "點一下即可插入到游標處。{playername}、{player} 和 {name} 都代表玩家的 Minecraft 名稱。",
+  "servers.admin.mail.tag.playername": "每位玩家的 Minecraft 名稱，為其個別填入（未知時為 \"there\"）",
+  "servers.admin.mail.tag.date": "寄出日期，如 2026-11-23",
+  "servers.admin.mail.tag.month": "寄出月份，如 November 2026",
+  "servers.admin.mail.tag.year": "寄出年份，如 2026",
+  "servers.admin.mail.tag.credit": "這封郵件的 Resin Credit，如 40.00 THB。郵件沒有時，含它的行會被省略",
 }
 
 export default dict

@@ -5827,6 +5827,13 @@ const dict: Dict = {
   "updates.switch.body": "У вас {current}, которой нет в {channel}. ResinCraft установит поверх неё новейший выпуск {channel} и перезапустится. Сборки, аккаунты и настройки сохранятся.",
   "updates.switch.confirm": "Перейти и переустановить",
   "updates.switch.none": "Не удалось найти выпуск {channel} для установки. Ваш канал теперь {channel}; попробуйте «Переустановить» позже.",
+  "servers.admin.mail.tags": "Подстановки",
+  "servers.admin.mail.tags.hint": "Нажмите, чтобы вставить в место курсора. {playername}, {player} и {name} — это имя игрока в Minecraft.",
+  "servers.admin.mail.tag.playername": "Имя каждого игрока в Minecraft, подставляется для него («there», если неизвестно)",
+  "servers.admin.mail.tag.date": "День отправки, например 2026-11-23",
+  "servers.admin.mail.tag.month": "Месяц отправки, например November 2026",
+  "servers.admin.mail.tag.year": "Год отправки, например 2026",
+  "servers.admin.mail.tag.credit": "Resin Credit этого письма, например 40.00 THB. Строки с ним убираются, если его нет",
 }
 
 export default dict

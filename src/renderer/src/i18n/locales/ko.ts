@@ -5760,6 +5760,13 @@ const dict: Dict = {
   "updates.switch.body": "지금 쓰는 {current}은(는) {channel}에 없습니다. ResinCraft가 최신 {channel} 릴리스를 덮어 설치하고 다시 시작합니다. 인스턴스, 계정, 설정은 그대로 남습니다.",
   "updates.switch.confirm": "바꾸고 다시 설치",
   "updates.switch.none": "설치할 {channel} 릴리스를 찾지 못했습니다. 채널은 이제 {channel}입니다. 나중에 다시 설치를 시도하세요.",
+  "servers.admin.mail.tags": "자리 표시자",
+  "servers.admin.mail.tags.hint": "클릭하면 커서 위치에 들어갑니다. {playername}, {player}, {name}은 모두 플레이어의 Minecraft 이름입니다.",
+  "servers.admin.mail.tag.playername": "각 플레이어의 Minecraft 이름(모르면 \"there\")",
+  "servers.admin.mail.tag.date": "보내는 날짜, 예: 2026-11-23",
+  "servers.admin.mail.tag.month": "보내는 달, 예: November 2026",
+  "servers.admin.mail.tag.year": "보내는 해, 예: 2026",
+  "servers.admin.mail.tag.credit": "이 메일의 Resin Credit, 예: 40.00 THB. 메일에 없으면 그 줄은 빠집니다",
 }
 
 export default dict

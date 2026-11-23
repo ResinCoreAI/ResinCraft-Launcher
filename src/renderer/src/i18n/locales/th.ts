@@ -5757,6 +5757,13 @@ const dict: Dict = {
   "updates.switch.body": "ตอนนี้คุณใช้ {current} ซึ่งไม่มีใน {channel} ResinCraft จะติดตั้ง {channel} รุ่นล่าสุดทับแล้วเปิดใหม่ อินสแตนซ์ บัญชี และการตั้งค่าจะยังอยู่ครบ",
   "updates.switch.confirm": "เปลี่ยนและติดตั้งใหม่",
   "updates.switch.none": "ไม่พบรุ่น {channel} ที่จะติดตั้ง ตอนนี้ช่องของคุณเป็น {channel} แล้ว ลองกดติดตั้งใหม่ภายหลัง",
+  "servers.admin.mail.tags": "ตัวแทนข้อความ",
+  "servers.admin.mail.tags.hint": "คลิกเพื่อใส่ตรงตำแหน่งเคอร์เซอร์ {playername} {player} และ {name} หมายถึงชื่อ Minecraft ของผู้เล่นเหมือนกัน",
+  "servers.admin.mail.tag.playername": "ชื่อ Minecraft ของผู้เล่นแต่ละคน เติมให้แต่ละคน (เป็น \"there\" ถ้าไม่รู้ชื่อ)",
+  "servers.admin.mail.tag.date": "วันที่ส่ง เช่น 2026-11-23",
+  "servers.admin.mail.tag.month": "เดือนที่ส่ง เช่น November 2026",
+  "servers.admin.mail.tag.year": "ปีที่ส่ง เช่น 2026",
+  "servers.admin.mail.tag.credit": "Resin Credit ของจดหมายนี้ เช่น 40.00 THB บรรทัดที่มีจะถูกตัดออกถ้าจดหมายไม่มีเครดิต",
 }
 
 export default dict

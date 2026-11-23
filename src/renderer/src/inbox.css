@@ -599,3 +599,16 @@
     flex-wrap: wrap;
   }
 }
+
+/* Admin → Mail: placeholder buttons under the message (MailTags.tsx). */
+.mail-tags .row {
+  gap: 6px;
+}
+.mail-tags .chip.tag {
+  cursor: pointer;
+  font-family: var(--mono);
+}
+.mail-tags .chip.tag:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}

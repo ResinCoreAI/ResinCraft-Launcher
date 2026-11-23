@@ -10,6 +10,7 @@ import MailText from '../MailText'
 import { ago, Loading, Stat, useAct, useAdmin, when } from './common'
 import '../../inbox.css'
 import { CATEGORY, RewardsEditor, WelcomeAdmin, type Category, type Reward } from './Welcome'
+import { MailTags, SEND_TAGS } from './MailTags'
 import { fromSchedule, newTiming, ScheduleTiming, SchedulesList, timingOk, toEnds, toRepeat, type Schedule, type SchedulesData, type ScheduleSend } from './Schedules'
 
 type Delivery = 'inbox' | 'email' | 'both'
@@ -318,13 +319,14 @@ export function MailAdmin() {
               </div>
               <label className="field">
                 <span>{t('servers.admin.mail.subject')}</span>
-                <input className="input" value={form.subject} maxLength={data.limits.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
+                <input className="input" data-tags="compose" value={form.subject} maxLength={data.limits.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
               </label>
               <label className="field">
                 <span>{t('servers.admin.mail.message')}</span>
-                <textarea className="input" rows={8} value={form.body} maxLength={data.limits.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+                <textarea className="input" data-tags="compose" rows={8} value={form.body} maxLength={data.limits.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
                 <span className="hint">{t('servers.admin.mail.formatting')}</span>
               </label>
+              <MailTags group="compose" tags={SEND_TAGS} />
               <div className="field">
                 <span>{t('servers.admin.mail.rewards')}</span>
                 <RewardsEditor

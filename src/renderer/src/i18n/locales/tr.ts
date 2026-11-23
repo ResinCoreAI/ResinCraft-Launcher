@@ -5778,6 +5778,13 @@ const dict: Dict = {
   "updates.switch.body": "Kullandığın {current}, {channel} kanalında yok. ResinCraft en yeni {channel} sürümünü üzerine kuracak ve yeniden başlayacak. Örneklerin, hesapların ve ayarların korunur.",
   "updates.switch.confirm": "Geç ve yeniden yükle",
   "updates.switch.none": "Yüklenecek bir {channel} sürümü bulunamadı. Kanalın artık {channel}; daha sonra Yeniden yükle'yi dene.",
+  "servers.admin.mail.tags": "Yer tutucular",
+  "servers.admin.mail.tags.hint": "İmlecin olduğu yere koymak için birine tıkla. {playername}, {player} ve {name}, oyuncunun Minecraft adı demektir.",
+  "servers.admin.mail.tag.playername": "Her oyuncunun Minecraft adı, ona göre doldurulur (bilinmiyorsa \"there\")",
+  "servers.admin.mail.tag.date": "Gönderildiği gün, ör. 2026-11-23",
+  "servers.admin.mail.tag.month": "Gönderildiği ay, ör. November 2026",
+  "servers.admin.mail.tag.year": "Gönderildiği yıl, ör. 2026",
+  "servers.admin.mail.tag.credit": "Bu postanın Resin Credit'i, ör. 40.00 THB. Postada yoksa bunu içeren satırlar çıkarılır",
 }
 
 export default dict

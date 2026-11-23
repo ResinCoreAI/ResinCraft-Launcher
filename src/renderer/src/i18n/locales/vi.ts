@@ -5765,6 +5765,13 @@ const dict: Dict = {
   "updates.switch.body": "Bạn đang dùng {current}, bản mà {channel} không có. ResinCraft sẽ cài bản {channel} mới nhất đè lên rồi khởi động lại. Các bản cài, tài khoản và cài đặt vẫn được giữ.",
   "updates.switch.confirm": "Chuyển và cài lại",
   "updates.switch.none": "Không tìm thấy bản {channel} để cài. Kênh của bạn giờ là {channel}; hãy thử Cài lại sau.",
+  "servers.admin.mail.tags": "Phần giữ chỗ",
+  "servers.admin.mail.tags.hint": "Bấm vào một cái để chèn vào chỗ con trỏ. {playername}, {player} và {name} đều là tên Minecraft của người chơi.",
+  "servers.admin.mail.tag.playername": "Tên Minecraft của từng người chơi, điền riêng cho họ (\"there\" nếu không biết)",
+  "servers.admin.mail.tag.date": "Ngày gửi, như 2026-11-23",
+  "servers.admin.mail.tag.month": "Tháng gửi, như November 2026",
+  "servers.admin.mail.tag.year": "Năm gửi, như 2026",
+  "servers.admin.mail.tag.credit": "Resin Credit của thư này, như 40.00 THB. Các dòng có nó bị bỏ khi thư không có",
 }
 
 export default dict

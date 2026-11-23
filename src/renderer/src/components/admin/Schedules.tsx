@@ -364,7 +364,7 @@ export function ScheduleTiming({ value, onChange, data }: { value: Timing; onCha
           <span className="hint bad">{t('servers.admin.mail.schedule.never')}</span>
         )}
       </div>
-      <span className="hint">{t('servers.admin.mail.schedule.placeholders', { name: '{name}', date: '{date}', month: '{month}' })}</span>
+      <span className="hint">{t('servers.admin.mail.schedule.placeholders', { name: '{playername}', date: '{date}', month: '{month}' })}</span>
     </div>
   )
 }
@@ -397,7 +397,7 @@ export function SchedulesList({
       <h3>
         <CalendarClock className="inline" /> {t('servers.admin.mail.schedule.title', { count: list.length })}
       </h3>
-      <p className="hint">{t('servers.admin.mail.schedule.lead', { name: '{name}', date: '{date}', month: '{month}' })}</p>
+      <p className="hint">{t('servers.admin.mail.schedule.lead', { name: '{playername}', date: '{date}', month: '{month}' })}</p>
       {list.length === 0 ? (
         <p className="hint">{t('servers.admin.mail.schedule.none')}</p>
       ) : (

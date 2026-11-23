@@ -5828,6 +5828,13 @@ const dict: Dict = {
   "updates.switch.body": "Tu utilises {current}, que {channel} n'a pas. ResinCraft va installer par-dessus la dernière version {channel} puis redémarrer. Tes instances, comptes et réglages sont conservés.",
   "updates.switch.confirm": "Changer et réinstaller",
   "updates.switch.none": "Aucune version {channel} à installer. Ton canal est maintenant {channel} ; réessaie Réinstaller plus tard.",
+  "servers.admin.mail.tags": "Variables",
+  "servers.admin.mail.tags.hint": "Clique sur l'une pour l'insérer à la position du curseur. {playername}, {player} et {name} désignent tous le nom Minecraft du joueur.",
+  "servers.admin.mail.tag.playername": "Le nom Minecraft de chaque joueur, rempli pour lui (« there » s'il est inconnu)",
+  "servers.admin.mail.tag.date": "Le jour de l'envoi, comme 2026-11-23",
+  "servers.admin.mail.tag.month": "Le mois de l'envoi, comme November 2026",
+  "servers.admin.mail.tag.year": "L'année de l'envoi, comme 2026",
+  "servers.admin.mail.tag.credit": "Le Resin Credit de ce message, comme 40.00 THB. Les lignes qui l'utilisent sont retirées s'il n'y en a pas",
 }
 
 export default dict

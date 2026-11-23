@@ -1390,4 +1390,11 @@ export default {
   "updates.switch.body": "You're on {current}, which {channel} doesn't have. ResinCraft will install the newest {channel} release over it and restart. Your instances, accounts and settings stay.",
   "updates.switch.confirm": "Switch and reinstall",
   "updates.switch.none": "Couldn't find a {channel} release to install. Your channel is now {channel}; try Reinstall later.",
+  "servers.admin.mail.tags": "Placeholders",
+  "servers.admin.mail.tags.hint": "Click one to put it where the cursor is. {playername}, {player} and {name} all mean the player's Minecraft name.",
+  "servers.admin.mail.tag.playername": "Each player's Minecraft name, filled in for them (\"there\" when it isn't known)",
+  "servers.admin.mail.tag.date": "The day it goes out, like 2026-11-23",
+  "servers.admin.mail.tag.month": "The month it goes out, like November 2026",
+  "servers.admin.mail.tag.year": "The year it goes out, like 2026",
+  "servers.admin.mail.tag.credit": "This mail's Resin Credit, like 40.00 THB. Lines with it are left out when the mail has none",
 } as const
