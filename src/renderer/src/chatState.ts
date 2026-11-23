@@ -22,7 +22,7 @@ export interface ChatView {
   unread: Record<string, number>
   reads: Record<string, Record<string, number>>
   enabled: boolean
-  muted: { until: number; reason: string } | null
+  muted: { until: number; reason: string; kind?: 'mute' | 'ban' } | null
   /** The conversation on screen (the Inbox's Chat tab while it's open). */
   open: string | null
   /** The account's friend code. */
@@ -447,7 +447,7 @@ export const chat = {
     return r
   },
   /** rename {name}, add {members}, remove {uuid}, leave, role {uuid, role}, invite {reset?}. */
-  async group(action: 'rename' | 'add' | 'remove' | 'leave' | 'role' | 'invite' | 'emoji' | 'emoji/remove', conv: string, extra: Record<string, unknown> = {}) {
+  async group(action: 'rename' | 'add' | 'remove' | 'leave' | 'role' | 'invite' | 'emoji' | 'emoji/remove' | 'kick' | 'timeout' | 'untimeout' | 'ban' | 'unban', conv: string, extra: Record<string, unknown> = {}) {
     const r = await call<{ groups: ChatGroup[]; code?: string }>('POST', `/api/chat/groups/${action}`, { conv, ...extra })
     set({ groups: r.groups, names: namesFrom(view.friends, view.names, r.groups), ...(action === 'leave' && view.open === conv ? { open: null } : {}) })
     return r

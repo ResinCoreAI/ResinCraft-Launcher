@@ -35,7 +35,19 @@ import { ConfirmModal, Modal } from './ui'
 import { loadStripe, stripeAppearance, type StripeJs } from '../stripe'
 import '../relay-plan.css'
 import '../resin-credit.css'
-import { countText } from '../relayCount'
+import { countText, UNLIMITED_COUNT } from '../relayCount'
+
+/**
+ * Buying these would let the account run more servers at once than it has relay names for (each server online needs
+ * its own name): (servers, names) after buying; null when it's fine.
+ */
+export function namesShort(totals: { servers: number; names: number } | undefined, products: { grants: { servers: number; names: number } }[]): { servers: number; names: number } | null {
+  if (!totals) return null
+  const servers = totals.servers + products.reduce((n, p) => n + (p.grants.servers || 0), 0)
+  const names = totals.names + products.reduce((n, p) => n + (p.grants.names || 0), 0)
+  const addsServers = products.some((p) => (p.grants.servers || 0) > 0)
+  return addsServers && names < UNLIMITED_COUNT && servers < UNLIMITED_COUNT && servers > names ? { servers, names } : null
+}
 import { givesParts, ProductIcon, StoreProductRow } from './StoreProduct'
 import { money, setWalletBalance } from '../storeStatus'
 import { openStoreHistory } from './StoreHistory'
@@ -805,6 +817,9 @@ function CheckoutModal({
         </>
       }
     >
+      {!renewOf && namesShort(plan.totals, items) && (
+        <p className="hint it-warn rp-names-warn">{t('servers.relayPlan.namesShort', namesShort(plan.totals, items)!)}</p>
+      )}
       <div className="rp-lines">
         {(
           quote?.lines ??
@@ -813,6 +828,7 @@ function CheckoutModal({
           <div key={l.product} className="rp-line">
             <span className="grow">
               {l.name}
+              {'sale' in l && l.sale && <span className="rp-sale">{l.sale}</span>}
               <MinutesNote minutes={l.session_minutes} />
             </span>
             {l.discount > 0 && <span className="rp-was">{money(l.price, currency)}</span>}
@@ -1680,7 +1696,12 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
         price={price}
         currency={plan.currency}
         yearly={yearly}
-        notes={others.length > 0 && <span className="hint it-warn">{t('servers.relayPlan.otherHas', { account: others.join(', ') })}</span>}
+        notes={
+          <>
+            {others.length > 0 && <span className="hint it-warn">{t('servers.relayPlan.otherHas', { account: others.join(', ') })}</span>}
+            {!p.owned && namesShort(plan.totals, [p]) && <span className="hint it-warn">{t('servers.relayPlan.namesShort', namesShort(plan.totals, [p])!)}</span>}
+          </>
+        }
         buttons={
           <>
             <button className="btn sm primary" disabled={p.owned || busy != null} onClick={() => void buy(p)}>

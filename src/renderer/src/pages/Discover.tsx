@@ -235,8 +235,11 @@ export default function Discover({
   initialKind,
   instanceId,
   build,
-  initialQuery
+  initialQuery,
+  project
 }: {
+  /** A project to open straight away (a resincraft://mod/ link). */
+  project?: string
   initialKind?: ContentKind
   instanceId?: string
   build?: boolean
@@ -690,6 +693,18 @@ export default function Discover({
     setChoosing({ hit, inst: target, current: installed.get(hit.id) })
   }
 
+  // A share link: that project's page, on top of the results.
+  useEffect(() => {
+    if (!project) return
+    let live = true
+    api.content.details(project).then(
+      (d) => live && setPages([d]),
+      (e) => live && toast(t('share.notFound', { error: (e as Error).message }), 'error')
+    )
+    return () => {
+      live = false
+    }
+  }, [project])
   const top = pages[pages.length - 1]
   const topSite = top && SOURCES.find((s) => s.value === top.source)
 

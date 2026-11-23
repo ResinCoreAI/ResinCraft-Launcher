@@ -56,6 +56,9 @@ export interface RowProduct {
   highlight?: boolean
   icon?: string
   owned?: boolean
+  sale_percent?: number
+  sale_name?: string
+  sale_ends?: number
 }
 
 /** The Store page's product row; `notes` go under what it gives, `buttons` at its end. */
@@ -83,12 +86,18 @@ export function StoreProductRow({
         <b>
           {p.name}
           {p.badge && <span className="rp-badge">{p.badge}</span>}
+          {!!p.sale_percent && (
+            <span className="rp-sale" title={p.sale_ends ? t('servers.relayPlan.saleEnds', { when: new Date(p.sale_ends * 1000).toLocaleString() }) : undefined}>
+              {t('servers.relayPlan.sale', { name: p.sale_name ?? '', percent: p.sale_percent })}
+            </span>
+          )}
         </b>
         <span className="hint">{givesParts(p.grants).join(' · ')}</span>
         {notes}
       </div>
       <div className="rp-row-price">
-        {money(price, currency)}
+        {!!p.sale_percent && <span className="rp-was">{money(price, currency)}</span>}
+        {money(p.sale_percent ? price - Math.round((price * p.sale_percent) / 100) : price, currency)}
         <span className="hint"> / {yearly ? t('servers.relayPlan.year') : t('servers.relayPlan.month')}</span>
       </div>
       {buttons && <div className="rp-row-buttons">{buttons}</div>}

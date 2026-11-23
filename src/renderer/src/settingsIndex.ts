@@ -32,6 +32,7 @@ export const SETTING_SECTIONS: { id: string; label: Key }[] = [
 export const SETTINGS_INDEX: { label: Key; hint?: Key; section: string }[] = [
   { label: 'settings.theme', section: 'appearance' },
   { label: 'settings.language', hint: 'settings.language.hint', section: 'appearance' },
+  { label: 'settings.zoom', hint: 'settings.zoom.hint', section: 'appearance' },
   { label: 'memory.setting', hint: 'memory.settingHint', section: 'appearance' },
   { label: 'settings.tray', hint: 'settings.tray.hint', section: 'appearance' },
   { label: 'settings.freeMemory', hint: 'settings.freeMemory.hint', section: 'appearance' },

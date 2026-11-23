@@ -335,8 +335,9 @@ export default function App() {
             {route.page === 'instance' && <InstancePage key={`${route.id}:${route.tab ?? ''}`} id={route.id} tab={route.tab} />}
             {route.page === 'discover' && (
               <Discover
-                key={`${route.instanceId ?? ''}${route.kind ?? ''}${route.query ?? ''}`}
+                key={`${route.instanceId ?? ''}${route.kind ?? ''}${route.query ?? ''}${route.project ?? ''}`}
                 initialKind={route.kind}
+                project={route.project}
                 instanceId={route.instanceId}
                 build={route.build}
                 initialQuery={route.query}

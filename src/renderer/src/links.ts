@@ -3,6 +3,7 @@
  * them in):
  *   resincraft://join/<address>?name=<name>&edition=bedrock   a server: Quick join opens with it ready to add
  *   resincraft://friend/<code>                                 a friend's world: the invite code is filled in
+ *   resincraft://mod/<project id>                              a mod or modpack: its page in Discover, to install
  *   resincraft://play/<instance id>                            a desktop shortcut: the instance starts. The engine
  *                                                              makes this one itself from a shortcut's `--play=`
  *                                                              argument and never accepts it as a real link.
@@ -12,6 +13,7 @@ export type LinkTarget =
   | { kind: 'join'; address: string; name: string; edition: 'java' | 'bedrock' }
   | { kind: 'friend'; code: string }
   | { kind: 'play'; id: string }
+  | { kind: 'mod'; id: string }
 
 const SCHEME = 'resincraft://'
 
@@ -38,6 +40,11 @@ export function parseLink(url: string): LinkTarget | undefined {
     case 'friend': {
       const code = value.trim()
       return CODE.test(code) ? { kind: 'friend', code } : undefined
+    }
+    case 'mod': {
+      // A project id as the launcher writes it: bare (Modrinth) or with its source ("cf:238222", "gh:owner/repo").
+      const id = value.trim()
+      return /^[a-z]{2,10}:[\w.\-/]{1,100}$|^[\w.\-]{1,100}$/i.test(id) && !id.includes('..') ? { kind: 'mod', id } : undefined
     }
     case 'play':
       // An instance's id (its folder name); OpenLinks looks it up among the instances that exist. Only the exact

@@ -320,6 +320,20 @@ function paymentsMock(method: string, p: string, b: Row): unknown {
   } else if (p.endsWith('/promo')) {
     if (pay.promos.some((x) => x.code === String(b.code).toUpperCase())) throw new Error('The relay refused: that code is taken')
     pay.promos.unshift({ ...b, code: String(b.code).toUpperCase(), amount_off: b.amount_off ? b.amount_off * 100 : undefined, active: true, usable: true, uses: 0, products: b.products ?? [] })
+  } else if (p.endsWith('/sale')) {
+    const list = ((pay as unknown as { sales?: Record<string, unknown>[] }).sales ??= [])
+    const now = Math.floor(Date.now() / 1000)
+    const sale = { ...b, id: b.id ?? `sale-${now}`, active: true, created: now, by: 'Admin Puirkle', live: b.repeat === 'once' ? Number(b.start) <= now && now < Number(b.end) : false, ends: null, next: null, ended: false, items: b.items ?? {} }
+    const i = list.findIndex((x) => x.id === sale.id)
+    if (i >= 0) list[i] = sale
+    else list.unshift(sale)
+  } else if (p.endsWith('/sale/off') || p.endsWith('/sale/remove')) {
+    const list = ((pay as unknown as { sales?: Record<string, unknown>[] }).sales ??= [])
+    const i = list.findIndex((x) => x.id === b.id)
+    if (i >= 0) {
+      if (p.endsWith('/remove')) list.splice(i, 1)
+      else Object.assign(list[i], { active: false, live: false, ended: true })
+    }
   } else if (p.endsWith('/gift/send')) {
     if (!b.player) throw new Error('The relay refused: player: a Minecraft name or UUID')
   } else if (p.endsWith('/promo/off') || p.endsWith('/gift/off')) {

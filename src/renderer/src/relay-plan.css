@@ -444,3 +444,21 @@
   width: 14px;
   height: 14px;
 }
+
+/* A sale running on an item (the relay admin's Black Friday…): a warm tag next to its name. */
+.rp-sale {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+  font: 700 11.5px var(--font);
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.rp-row-price .rp-was {
+  display: block;
+  text-align: right;
+}

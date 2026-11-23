@@ -34,6 +34,14 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         // Kept for older front ends: the window controls are drawn in the UI, so there's nothing to recolour.
         "app:setTitleBar" => done(),
+        // Settings → Appearance → Interface size: the window's zoom, like a browser's (0.5 to 2).
+        "app:setZoom" => {
+            let scale = args.get::<f64>(0)?.clamp(0.5, 2.0);
+            if let Some(w) = crate::core::ctx::app().and_then(|a| tauri::Manager::get_webview_window(a, "main")) {
+                w.set_zoom(scale)?;
+            }
+            done()
+        }
         "app:memory" => json(crate::core::memory::usage().await),
         "app:rest" => {
             crate::webview::rest().await;

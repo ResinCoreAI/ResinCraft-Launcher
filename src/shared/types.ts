@@ -1505,6 +1505,10 @@ export interface PlanProduct {
   highlight?: boolean
   /** One of PRODUCT_ICONS (absent: the launcher's own for the product). */
   icon?: ProductIcon | string
+  /** A sale running on it now (the relay's admin set it: Black Friday…): percent off, its name, when it ends. */
+  sale_percent?: number
+  sale_name?: string
+  sale_ends?: number
 }
 
 export interface PlanSub {
@@ -1601,7 +1605,7 @@ export interface PlanAccess {
 /** What a cart costs before buying it: each item's price and the promo code's discount on it. */
 export interface PlanQuote {
   /** session_minutes: what the item adds to every session (absent: none). */
-  lines: { product: string; name: string; price: number; discount: number; session_minutes?: number }[]
+  lines: { product: string; name: string; price: number; discount: number; session_minutes?: number; sale?: string }[]
   subtotal: number
   discount: number
   /** Unused days of purchases the cart covers, taken off after the discount (only when the relay's admin counts
@@ -2039,11 +2043,14 @@ export interface ChatGiftData {
 }
 /** A note in a group's chat: it was made, someone joined, left, was added or removed, it was renamed, a role changed. */
 export interface ChatSystemData {
-  event: 'created' | 'joined' | 'left' | 'added' | 'removed' | 'renamed' | 'role' | 'nickname'
+  event: 'created' | 'joined' | 'left' | 'added' | 'removed' | 'renamed' | 'role' | 'nickname' | 'timeout' | 'untimeout' | 'banned'
   by: string
   who?: string[]
   name?: string
   role?: string
+  /** A timeout: until when (Unix seconds). */
+  until?: number
+  reason?: string
 }
 export type ChatFileKind = 'image' | 'voice' | 'file' | 'avatar' | 'emoji'
 /** A file on the relay's Telegram drive: in a message, a profile picture or a group's emoji. */
@@ -2095,6 +2102,8 @@ export interface ChatMember {
   online: boolean
   status?: ChatStatus
   avatar?: string | null
+  /** Timed out in this group until (Unix seconds): can read, can't post. */
+  timeout?: number | null
 }
 /** A group chat the account is in. `invite`: its invite code, for owners and admins (null until made). */
 export interface ChatGroup {
@@ -2107,6 +2116,8 @@ export interface ChatGroup {
   members: ChatMember[]
   /** The group's own emoji, written :name: in messages. */
   emoji?: { name: string; file: string }[]
+  /** Who's banned from it (owners and admins only see this). */
+  bans?: { uuid: string; name: string; by: string; at: number; reason: string }[]
 }
 export interface ChatMessage {
   id: number
@@ -2137,7 +2148,8 @@ export interface ChatSync {
   reads: Record<string, Record<string, number>>
   friends: ChatFriends
   enabled: boolean
-  muted: { until: number; reason: string } | null
+  /** A mute (reads, can't send) or a chat ban ("ban": no chat at all). */
+  muted: { until: number; reason: string; kind?: 'mute' | 'ban' } | null
   /** The account's friend code (XXXX-XXXX): whoever types it becomes a friend at once. */
   code: string
   groups: ChatGroup[]
@@ -2898,6 +2910,8 @@ export interface ResinApi {
     /** Absolute path of a file dropped onto the window (synchronous, preload-side). */
     pathForFile(file: File): string
     setTitleBar(bg: string, fg: string): Promise<void>
+    /** The interface size: the window's zoom (0.5 to 2). */
+    setZoom(scale: number): Promise<void>
     /** Stops a running task: its downloads stop and anything half-made is removed. False if it already ended. */
     cancelTask(id: string): Promise<boolean>
     /** A custom theme's background picture (a data URL, up to 8 MB), or null to remove it. */
@@ -3377,6 +3391,8 @@ export interface ResinApi {
     drivePick(): Promise<{ path: string; name: string; size: number; mime: string }[]>
     drivePut(path: string, ticket: string, mime: string): Promise<string>
     driveGet(ticket: string, name: string): Promise<string | null>
+    /** A mod or modpack's share link: the relay's page for it (https://<relay>/mod/<id>), or resincraft://mod/<id>. */
+    shareLink(projectId: string): Promise<string>
     /** Flashes the taskbar button when the window isn't in front. */
     attention(): Promise<boolean>
     /** A Windows pop-up (who, what); clicking it opens `conv` (on.chatOpen). False where there are none. */

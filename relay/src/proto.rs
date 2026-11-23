@@ -1278,6 +1278,13 @@ pub struct ProductInfo {
     /// The card's icon, one of [`PRODUCT_ICONS`]; empty: the launcher's own for the product.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub icon: String,
+    /// A sale running on it now: percent off, its name, when it ends (Unix seconds); 0/empty: none.
+    #[serde(skip_serializing_if = "is_zero_u32")]
+    pub sale_percent: u32,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub sale_name: String,
+    #[serde(skip_serializing_if = "is_zero_u64_sale")]
+    pub sale_ends: u64,
 }
 
 /// The icons a product card can have.
@@ -1477,8 +1484,11 @@ pub struct QuoteLine {
     pub product: String,
     pub name: String,
     pub price: u64,
-    /// Taken off this item by the promo code.
+    /// Taken off this item by a sale and/or the promo code.
     pub discount: u64,
+    /// The sale running on it ("Black Friday -30%"); empty: none.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub sale: String,
     /// Minutes the item adds to every session (0: none, left out).
     #[serde(skip_serializing_if = "is_zero_u32")]
     pub session_minutes: u32,
@@ -1719,3 +1729,7 @@ mod tests {
         let i: ListingInfo = serde_json::from_str(r#"{"title":"x"}"#).unwrap();
         assert_eq!(i.edition, Edition::Java);
     }}
+
+fn is_zero_u64_sale(n: &u64) -> bool {
+    *n == 0
+}

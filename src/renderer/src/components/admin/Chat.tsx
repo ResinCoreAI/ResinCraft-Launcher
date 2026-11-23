@@ -2,7 +2,7 @@
 // reported messages (dismiss, delete, delete and mute the sender), muted players, gifts friends sent each other (take
 // one back), how long messages are kept and the gift rules, and the daily copies of chat.db.
 import { useEffect, useState } from 'react'
-import { Flag, Gift, MicOff, Save, ShieldCheck, Trash2, Undo2 } from 'lucide-react'
+import { Ban, Flag, Gift, MicOff, Save, ShieldCheck, Trash2, TriangleAlert, Undo2 } from 'lucide-react'
 import { money } from '../../storeStatus'
 import { t, type Key } from '../../i18n'
 import { ConfirmModal, Switch } from '../ui'
@@ -53,7 +53,9 @@ interface ChatAdminData {
   stats: { groups?: number; messages: number; today: number; online: number; friendships: number; bytes: number; freeBytes: number; oldest: number; conversations: number; players: number }
   reports: Report[]
   openReports: number
-  mutes: { uuid: string; name: string; until: number; reason: string; by: string; at: number }[]
+  mutes: { uuid: string; name: string; until: number; reason: string; by: string; at: number; kind?: 'mute' | 'ban' }[]
+  /** Warnings given (newest first); count: how many that player has in all. */
+  warnings?: { id: number; uuid: string; name: string; reason: string; by: string; at: number; count: number }[]
   gifts: { id: string; at: number; sender: string; senderName: string; receiver: string; receiverName: string; kind: 'credit' | 'item'; amount: number; product: string | null; yearly: boolean; reversed: number | null; reversedBy: string | null; claimedAt?: number | null; open?: boolean }[]
   backups: { name: string; bytes: number; at: number }[]
   drive?: { configured: boolean; url: string; maxUploadMb: number; error: string | null; errorAt: number | null }
@@ -71,7 +73,8 @@ export function ChatAdmin() {
   const { data, error, reload } = useAdmin<ChatAdminData>('/api/chat-admin', 30_000)
   const act = useAct(reload)
   const [s, setS] = useState<Settings>()
-  const [muting, setMuting] = useState<{ report?: Report } | null>(null)
+  const [muting, setMuting] = useState<{ report?: Report; kind: 'mute' | 'ban' } | null>(null)
+  const [warning, setWarning] = useState<{ report?: Report } | null>(null)
   const [reversing, setReversing] = useState<ChatAdminData['gifts'][number]>()
   useEffect(() => {
     if (data?.settings) setS(data.settings)
@@ -160,8 +163,14 @@ export function ChatAdmin() {
                     <button className="btn sm" onClick={() => void act('/api/chat-admin/report', { id: r.id, action: 'delete' }, 'servers.admin.chat.deletedMsg')}>
                       <Trash2 /> {t('servers.admin.chat.deleteMsg')}
                     </button>
-                    <button className="btn sm danger" onClick={() => setMuting({ report: r })}>
+                    <button className="btn sm" onClick={() => setWarning({ report: r })}>
+                      <TriangleAlert /> {t('servers.admin.chat.warn')}
+                    </button>
+                    <button className="btn sm danger" onClick={() => setMuting({ report: r, kind: 'mute' })}>
                       <MicOff /> {t('servers.admin.chat.mute')}
+                    </button>
+                    <button className="btn sm danger" onClick={() => setMuting({ report: r, kind: 'ban' })}>
+                      <Ban /> {t('servers.admin.chat.ban')}
                     </button>
                   </div>
                 )}
@@ -176,8 +185,14 @@ export function ChatAdmin() {
           <h3 className="grow">
             <MicOff className="inline" /> {t('servers.admin.chat.muted')}
           </h3>
-          <button className="btn sm" onClick={() => setMuting({})}>
+          <button className="btn sm" onClick={() => setWarning({})}>
+            <TriangleAlert /> {t('servers.admin.chat.warnPlayer')}
+          </button>
+          <button className="btn sm" onClick={() => setMuting({ kind: 'mute' })}>
             {t('servers.admin.chat.mutePlayer')}
+          </button>
+          <button className="btn sm danger" onClick={() => setMuting({ kind: 'ban' })}>
+            <Ban /> {t('servers.admin.chat.banPlayer')}
           </button>
         </div>
         {data.mutes.length === 0 ? (
@@ -187,12 +202,38 @@ export function ChatAdmin() {
             {data.mutes.map((m) => (
               <div key={m.uuid} className="setting">
                 <div className="text">
-                  <span>{who(m.name, m.uuid)}</span>
+                  <span>
+                    {who(m.name, m.uuid)} <span className={`chip compact ${m.kind === 'ban' ? 'danger' : 'warn'}`}>{t(m.kind === 'ban' ? 'servers.admin.chat.bannedChip' : 'servers.admin.chat.mutedChip')}</span>
+                  </span>
                   <span>{t('servers.admin.chat.mutedUntil', { when: when(m.until), reason: m.reason || '—', by: m.by })}</span>
                 </div>
                 <button className="btn sm" onClick={() => void act('/api/chat-admin/unmute', { uuid: m.uuid }, 'servers.admin.chat.unmuted')}>
                   {t('servers.admin.chat.unmute')}
                 </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="settings-section">
+        <h3>
+          <TriangleAlert className="inline" /> {t('servers.admin.chat.warnings')}
+        </h3>
+        {(data.warnings?.length ?? 0) === 0 ? (
+          <p className="hint">{t('servers.admin.chat.noWarnings')}</p>
+        ) : (
+          <div className="card admin-items">
+            {data.warnings!.map((w) => (
+              <div key={w.id} className="setting">
+                <div className="text">
+                  <span>
+                    {who(w.name, w.uuid)} <span className={`chip compact ${w.count >= 3 ? 'danger' : 'warn'}`}>{t('servers.admin.chat.warnCount', { count: w.count })}</span>
+                  </span>
+                  <span>
+                    {w.reason} · {w.by} · {ago(w.at)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -317,21 +358,42 @@ export function ChatAdmin() {
         )}
       </div>
 
+      {warning && (
+        <AskModal
+          title={warning.report ? t('servers.admin.chat.warnTitle', { name: warning.report.senderName || shortId(warning.report.sender) }) : t('servers.admin.chat.warnPlayer')}
+          fields={[
+            ...(warning.report ? [] : [{ key: 'player', label: t('servers.admin.chat.player') }]),
+            { key: 'reason', label: t('servers.admin.chat.warnReason'), type: 'textarea' as const, value: warning.report ? t(REASON[warning.report.reason] ?? 'chat.report.other') : '' }
+          ]}
+          confirm={t('servers.admin.chat.warn')}
+          body={<p className="hint">{t('servers.admin.chat.warnBody')}</p>}
+          onSubmit={(v) =>
+            warning.report
+              ? act('/api/chat-admin/report', { id: warning.report.id, action: 'warn', reason: v.reason }, 'servers.admin.chat.warned')
+              : act('/api/chat-admin/warn', { player: v.player, reason: v.reason }, 'servers.admin.chat.warned')
+          }
+          onClose={() => setWarning(null)}
+        />
+      )}
       {muting && (
         <AskModal
-          title={muting.report ? t('servers.admin.chat.muteTitle', { name: muting.report.senderName || shortId(muting.report.sender) }) : t('servers.admin.chat.mutePlayer')}
+          title={
+            muting.report
+              ? t(muting.kind === 'ban' ? 'servers.admin.chat.banTitle' : 'servers.admin.chat.muteTitle', { name: muting.report.senderName || shortId(muting.report.sender) })
+              : t(muting.kind === 'ban' ? 'servers.admin.chat.banPlayer' : 'servers.admin.chat.mutePlayer')
+          }
           fields={[
             ...(muting.report ? [] : [{ key: 'player', label: t('servers.admin.chat.player') }]),
             { key: 'days', label: t('servers.admin.chat.days'), type: 'number' as const, value: '7' },
             { key: 'reason', label: t('servers.admin.chat.reason'), value: muting.report ? t(REASON[muting.report.reason] ?? 'chat.report.other') : '' }
           ]}
-          confirm={t('servers.admin.chat.mute')}
+          confirm={t(muting.kind === 'ban' ? 'servers.admin.chat.ban' : 'servers.admin.chat.mute')}
           danger
-          body={muting.report ? <p className="hint">{t('servers.admin.chat.muteBody')}</p> : undefined}
+          body={<p className="hint">{t(muting.kind === 'ban' ? 'servers.admin.chat.banBody' : 'servers.admin.chat.muteBody')}</p>}
           onSubmit={(v) =>
             muting.report
-              ? act('/api/chat-admin/report', { id: muting.report.id, action: 'mute', days: Number(v.days) || 7, reason: v.reason }, 'servers.admin.chat.mutedDone')
-              : act('/api/chat-admin/mute', { player: v.player, days: Number(v.days) || 7, reason: v.reason }, 'servers.admin.chat.mutedDone')
+              ? act('/api/chat-admin/report', { id: muting.report.id, action: muting.kind, days: Number(v.days) || 7, reason: v.reason }, 'servers.admin.chat.mutedDone')
+              : act('/api/chat-admin/mute', { player: v.player, kind: muting.kind, days: Number(v.days) || 7, reason: v.reason }, 'servers.admin.chat.mutedDone')
           }
           onClose={() => setMuting(null)}
         />

@@ -580,8 +580,10 @@ async fn run_install(update: Update, close_running: bool, task: std::sync::Arc<T
     Ok(())
 }
 
-/// Stops every hosted server (`stop`, which saves its world) and closes every running game.
+/// Stops every hosted server (`stop`, which saves its world) and closes every running game. The servers that were
+/// running start again by themselves once the new version is up (`server::runtime::resume_after_update`).
 async fn close_running() {
+    crate::server::runtime::remember_for_update();
     crate::server::runtime::shutdown_all(Duration::from_secs(60)).await;
     for id in crate::game::running_ids() {
         crate::game::launch::kill_instance(&id, None);

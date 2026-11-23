@@ -20,6 +20,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       info: fn('app:info'),
       openExternal: fn('app:openExternal'),
       setTitleBar: fn('app:setTitleBar'),
+      setZoom: fn('app:setZoom'),
       memory: fn('app:memory'),
       rest: fn('app:rest'),
       cancelTask: fn('app:cancelTask'),
@@ -256,7 +257,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       leave: fn('friends:leave')
     },
     mail: { call: fn('mail:call') },
-    chat: { call: fn('chat:call'), save: fn('chat:save'), load: fn('chat:load'), older: fn('chat:older'), info: fn('chat:info'), export: fn('chat:export'), import: fn('chat:import'), pickFiles: fn('chat:pickFiles'), upload: fn('chat:upload'), uploadBytes: fn('chat:uploadBytes'), fileData: fn('chat:fileData'), fileLocal: fn('chat:fileLocal'), fileSave: fn('chat:fileSave'), drivePick: fn('chat:drivePick'), drivePut: fn('chat:drivePut'), driveGet: fn('chat:driveGet'), attention: fn('chat:attention'), notify: fn('chat:notify') },
+    chat: { call: fn('chat:call'), save: fn('chat:save'), load: fn('chat:load'), older: fn('chat:older'), info: fn('chat:info'), export: fn('chat:export'), import: fn('chat:import'), pickFiles: fn('chat:pickFiles'), upload: fn('chat:upload'), uploadBytes: fn('chat:uploadBytes'), fileData: fn('chat:fileData'), fileLocal: fn('chat:fileLocal'), fileSave: fn('chat:fileSave'), drivePick: fn('chat:drivePick'), drivePut: fn('chat:drivePut'), driveGet: fn('chat:driveGet'), shareLink: fn('chat:shareLink'), attention: fn('chat:attention'), notify: fn('chat:notify') },
     quickjoin: {
       get: fn('quickjoin:get'),
       save: fn('quickjoin:save'),

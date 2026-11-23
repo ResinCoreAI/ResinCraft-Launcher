@@ -10,7 +10,7 @@ export type Route =
   | { page: 'library' }
   | { page: 'instance'; id: string; tab?: 'content' | 'worlds' | 'servers' | 'screenshots' | 'notes' | 'files' | 'logs' | 'options' | 'settings' }
   /** `query`: what to search for as it opens (from the quick search). */
-  | { page: 'discover'; kind?: ContentKind; instanceId?: string; build?: boolean; query?: string }
+  | { page: 'discover'; kind?: ContentKind; instanceId?: string; build?: boolean; query?: string; project?: string }
   | { page: 'accounts' }
   | { page: 'servers'; id?: string; fromInstance?: string }
   | { page: 'bedrock' }

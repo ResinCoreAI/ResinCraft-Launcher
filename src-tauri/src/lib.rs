@@ -95,6 +95,8 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)?;
             core::ctx::init(data_dir, Some(app.handle().clone()));
             openfile::at_start();
+            // Servers that an update stopped start again by themselves.
+            tauri::async_runtime::spawn(server::runtime::resume_after_update());
             // resincraft:// links open this copy. Installed builds only: a test build would take them over.
             #[cfg(all(not(debug_assertions), any(windows, target_os = "linux")))]
             {

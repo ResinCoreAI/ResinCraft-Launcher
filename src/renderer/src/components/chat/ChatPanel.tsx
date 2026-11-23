@@ -839,7 +839,9 @@ export default function ChatPanel() {
             {!v.enabled ? (
               <p className="chat-banner">{t('chat.off')}</p>
             ) : v.muted ? (
-              <p className="chat-banner bad">{t('chat.muted', { until: new Date(v.muted.until * 1000).toLocaleString(currentLanguage()), reason: v.muted.reason || '–' })}</p>
+              <p className="chat-banner bad">
+                {t(v.muted.kind === 'ban' ? 'chat.bannedChat' : 'chat.muted', { until: new Date(v.muted.until * 1000).toLocaleString(currentLanguage()), reason: v.muted.reason || '–' })}
+              </p>
             ) : !friend && !group ? (
               <p className="chat-banner">{t('chat.notFriendsHint')}</p>
             ) : (

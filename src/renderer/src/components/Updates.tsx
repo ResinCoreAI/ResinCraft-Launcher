@@ -76,7 +76,7 @@ function useInstall() {
     >
       <p className="muted">{t('updates.busy.ask')}</p>
       <Running list={running} />
-      <p className="hint">{t('updates.busy.closeHint')}</p>
+      <p className="hint">{t('updates.busy.closeHintResume')}</p>
     </Modal>
   )
   return { start, dialog }
@@ -174,7 +174,7 @@ export function UpdateTitleButton() {
         >
           <p className="muted">{t('updates.waiting.body')}</p>
           {status.waitingFor && <Running list={status.waitingFor} />}
-          <p className="hint">{t('updates.busy.closeHint')}</p>
+          <p className="hint">{t('updates.busy.closeHintResume')}</p>
         </Modal>
       )}
       {dialog}

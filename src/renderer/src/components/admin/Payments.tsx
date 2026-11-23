@@ -9,6 +9,7 @@ import { ConfirmModal, Empty, Modal, MoreButton, Segmented, Switch, type Context
 import { account, AskModal, Loading, post, shortId, useAct, useAdmin, when } from './common'
 import { UNLIMITED_COUNT } from '../../relayCount'
 import { WalletAdmin } from './Wallet'
+import { Sales, type Sale } from './Sales'
 import { isProductIcon, ProductIcon, StoreProductRow } from '../StoreProduct'
 import '../../relay-plan.css'
 import '../../pay-product.css'
@@ -95,6 +96,8 @@ interface GiftCode {
 }
 type Free = { servers: number; names: number; monthly_gb: number; bonus_gb: number; session_minutes: number }
 interface Payments {
+  /** Sales (sales.rs); absent on relays before them. */
+  sales?: Sale[]
   enabled: boolean
   switchFromFile: boolean
   creditUnused: boolean
@@ -139,7 +142,7 @@ interface Payments {
   productIcons?: string[]
 }
 
-type View = 'selling' | 'products' | 'codes' | 'purchases' | 'truemoney' | 'wallet'
+type View = 'selling' | 'products' | 'codes' | 'sales' | 'purchases' | 'truemoney' | 'wallet'
 const COUNTS = ['servers', 'names', 'traffic_gb', 'session_minutes'] as const
 /** The relay's limits for a product (its payments.rs). */
 const MAX_BADGE = 20
@@ -195,6 +198,7 @@ export function PaymentsAdmin() {
             { value: 'selling', label: t('servers.admin.pay.view.selling') },
             { value: 'products', label: t('servers.admin.pay.view.products') },
             { value: 'codes', label: t('servers.admin.pay.view.codes') },
+            { value: 'sales', label: t('servers.admin.sales.title') },
             { value: 'purchases', label: t('servers.admin.pay.view.purchases') },
             { value: 'truemoney', label: t('servers.admin.pay.view.truemoney') },
             ...(hasWallet ? [{ value: 'wallet' as const, label: t('servers.wallet.title') }] : [])
@@ -211,6 +215,8 @@ export function PaymentsAdmin() {
         <Products d={data} act={act} reload={reload} />
       ) : view === 'codes' ? (
         <Codes d={data} act={act} reload={reload} />
+      ) : view === 'sales' ? (
+        <Sales sales={data.sales ?? []} products={data.products} act={(path, body) => act(path, body, 'servers.admin.pay.saved')} />
       ) : view === 'purchases' ? (
         <Purchases
           d={data}

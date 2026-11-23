@@ -45,15 +45,15 @@ export default class ErrorBoundary extends Component<Props, State> {
     }
     return (
       <div className="crash-card card" role="alert">
-        <b>{say('crash.title', 'This page ran into a problem')}</b>
-        <p className="hint">{say('crash.body', 'The rest of ResinCraft still works. Copy the details below into Report an issue so it can be fixed.')}</p>
+        <b>{say('pageCrash.title', 'This page ran into a problem')}</b>
+        <p className="hint">{say('pageCrash.body', 'The rest of ResinCraft still works. Copy the details below into Report an issue so it can be fixed.')}</p>
         <pre className="mono crash-details">{`${error.name}: ${error.message}`}</pre>
         <div className="row">
           <button className="btn sm" onClick={() => void navigator.clipboard?.writeText(details)}>
-            {say('crash.copy', 'Copy details')}
+            {say('pageCrash.copy', 'Copy details')}
           </button>
           <button className="btn sm primary" onClick={() => (this.props.onHome ? (this.setState({ error: null, where: '' }), this.props.onHome()) : location.reload())}>
-            {this.props.onHome ? say('crash.home', 'Back to Home') : say('crash.reload', 'Reload')}
+            {this.props.onHome ? say('pageCrash.home', 'Back to Home') : say('pageCrash.reload', 'Reload')}
           </button>
         </div>
       </div>

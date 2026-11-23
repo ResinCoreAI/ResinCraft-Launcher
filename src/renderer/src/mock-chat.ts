@@ -507,6 +507,9 @@ export function mockChat(): ResinApi['chat'] {
     async fileSave(_id, name) {
       return `C:\\Users\\you\\Downloads\\${name}`
     },
+    async shareLink(id) {
+      return `https://rscraft.resincore.tech/mod/${id}`
+    },
     async drivePick() {
       return [{ path: 'C:\\Users\\you\\Downloads\\spawn-backup.zip', name: 'spawn-backup.zip', size: 48_200_000, mime: 'application/zip' }]
     },

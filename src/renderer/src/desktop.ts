@@ -1,4 +1,5 @@
 import { isTauri } from './tauri-api'
+import { restoreZoom, setZoom, stepZoom } from './uiZoom'
 
 /**
  * Makes the Tauri window behave like an app, not a web page: no browser right-click menu (Back, Refresh,
@@ -7,6 +8,16 @@ import { isTauri } from './tauri-api'
  * Development builds keep Inspect and reload for debugging.
  */
 export function installDesktopBehaviour(): void {
+  // The interface size (Settings → Appearance): Ctrl + / Ctrl − / Ctrl 0, and Ctrl + mouse wheel.
+  restoreZoom()
+  window.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+    if (e.key === '=' || e.key === '+') stepZoom(1)
+    else if (e.key === '-' || e.key === '_') stepZoom(-1)
+    else if (e.key === '0') setZoom(1)
+    else return
+    e.preventDefault()
+  })
   if (!isTauri) return
   const dev = import.meta.env.DEV
 
@@ -42,6 +53,14 @@ export function installDesktopBehaviour(): void {
     { capture: true }
   )
 
-  // Ctrl+wheel would zoom the whole window like a web page.
-  window.addEventListener('wheel', (e) => e.ctrlKey && e.preventDefault(), { passive: false })
+  // Ctrl+wheel: the interface size, kept (not the web page's own zoom).
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      stepZoom(e.deltaY < 0 ? 1 : -1)
+    },
+    { passive: false }
+  )
 }

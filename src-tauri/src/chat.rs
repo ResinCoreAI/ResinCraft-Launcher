@@ -68,6 +68,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "chat:import" => json(import_picked().await?),
         "chat:drivePick" => json(drive_pick().await?),
         "chat:drivePut" => json(drive_put(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?),
+        "chat:shareLink" => json(share_link(&args.get::<String>(0)?)),
         "chat:driveGet" => json(drive_get(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         _ => bail!("Unknown channel {channel}"),
     }
@@ -391,6 +392,15 @@ async fn drive_get(ticket: &str, name: &str) -> Result<Option<String>> {
     tokio::fs::rename(&tmp, &dest).await?;
     let _ = shell::reveal(&dest);
     Ok(Some(dest.display().to_string()))
+}
+
+/// A mod or modpack's share link: the relay's page for it, which opens it in ResinCraft (or offers the download).
+fn share_link(project: &str) -> String {
+    let id = urlencoding::encode(project.trim()).replace("%3A", ":").replace("%2F", "/");
+    match relay::settings() {
+        Some(s) => format!("https://{}/mod/{id}", s.domain),
+        None => format!("resincraft://mod/{id}"),
+    }
 }
 
 /// A Windows pop-up for a chat message (the launcher isn't in front): who and what. Clicking it brings the launcher

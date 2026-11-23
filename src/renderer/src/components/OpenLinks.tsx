@@ -29,6 +29,7 @@ export function OpenLinks() {
       const target = parseLink(url)
       if (!target) return toast(t('links.unknown'), 'error')
       if (target.kind === 'play') return setStarting(target.id)
+      if (target.kind === 'mod') return go({ page: 'discover', project: target.id })
       if (target.kind === 'join') go({ page: 'quickjoin', add: { name: target.name, address: target.address, edition: target.edition } })
       else go({ page: 'quickjoin', friendCode: target.code })
     }

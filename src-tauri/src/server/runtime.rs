@@ -1593,6 +1593,45 @@ pub async fn wait_state(id: &str, states: &[&str], timeout: Duration) -> Result<
     }
 }
 
+/// The servers running before an update, started again after it (a file next to the data, read once).
+fn resume_file() -> PathBuf {
+    crate::core::paths::root().join("resume-servers.json")
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+/// Before an update stops them: which servers were running.
+pub fn remember_for_update() {
+    let ids = running_ids();
+    if ids.is_empty() {
+        return;
+    }
+    let body = serde_json::json!({ "at": unix_now(), "servers": ids });
+    let _ = std::fs::write(resume_file(), body.to_string());
+}
+
+/// After an update: starts the servers that were running before it (if it happened in the last half hour).
+pub async fn resume_after_update() {
+    let path = resume_file();
+    let Ok(text) = tokio::fs::read_to_string(&path).await else { return };
+    let _ = tokio::fs::remove_file(&path).await;
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+    let at = v.get("at").and_then(serde_json::Value::as_u64).unwrap_or(0);
+    if unix_now().saturating_sub(at) > 30 * 60 {
+        return;
+    }
+    let ids: Vec<String> = v.get("servers").and_then(serde_json::Value::as_array).into_iter().flatten().filter_map(|i| i.as_str().map(str::to_string)).collect();
+    // Give the relay connection a moment after the start.
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    for id in ids {
+        if let Err(e) = start(&id).await {
+            eprintln!("[servers] couldn't start {id} again after the update: {e:#}");
+        }
+    }
+}
+
 /// Stops every running server (used when the launcher quits): `stop` first, then kill whatever is left.
 pub async fn shutdown_all(grace: Duration) {
     let ids = running_ids();

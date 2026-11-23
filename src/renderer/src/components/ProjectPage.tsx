@@ -4,8 +4,8 @@ import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
   Ban,
-  BookOpen,
   Blocks,
+  BookOpen,
   Bug,
   Calendar,
   Check,
@@ -24,6 +24,7 @@ import {
   Repeat,
   Scale,
   Search,
+  Share2,
   ShieldCheck,
   ShieldOff,
   Star,
@@ -257,6 +258,13 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
               </button>
               <button className="btn ghost icon sm" title={t('menu.copyLink')} aria-label={t('menu.copyLink')} onClick={() => void copy(p.url)}>
                 <Link />
+              </button>
+              <button
+                className="btn ghost sm"
+                title={t('share.hint')}
+                onClick={() => void api.chat.shareLink(p.id).then((url) => copy(url, t('share.copied')))}
+              >
+                <Share2 /> {t('share.button')}
               </button>
             </div>
           )}

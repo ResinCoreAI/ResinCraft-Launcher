@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  Activity, Bot, Archive, ArrowLeftRight, Bug, Hammer, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, HardDrive, Info, Monitor, Moon, Palette, Receipt, RefreshCw, RotateCcw, Sparkles, Sun, Terminal, Trash2, Tv } from 'lucide-react'
+import { Activity, Archive, ArrowLeftRight, Bot, Bug, Coffee, Download, FolderPlus, FolderSearch, Gamepad2, Globe, Hammer, HardDrive, Info, Minus, Monitor, Moon, Palette, Plus, Receipt, RefreshCw, RotateCcw, Sparkles, Sun, Terminal, Trash2, Tv } from 'lucide-react'
 import type { JavaInstall, ModSourcePreference, Settings } from '@shared/types'
 import { api } from '../api'
 import { showWelcome } from '../welcomeState'
@@ -18,6 +17,7 @@ import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../compo
 import { useStore } from '../store'
 import { LANGUAGES, matchLanguage, t, type Key } from '../i18n'
 import { DISCLAIMER, fixed } from '../util'
+import { setZoom, stepZoom, useZoom, ZOOM_STEPS } from '../uiZoom'
 import { SETTING_SECTIONS } from '../settingsIndex'
 import { setLaunchScreen, useLaunchScreen } from '../launchScreenState'
 import { setClassicLayout, useClassicLayout } from '../classicLayoutState'
@@ -202,6 +202,39 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
 }
 const SECTIONS = SETTING_SECTIONS.map((x) => ({ ...x, icon: SECTION_ICONS[x.id] }))
 
+
+/** Interface size: like a browser's zoom, kept on this PC. */
+function ZoomSetting() {
+  const zoom = useZoom()
+  const pct = Math.round(zoom * 100)
+  return (
+    <div className="setting">
+      <div className="text">
+        <b>{t('settings.zoom')}</b>
+        <span>{t('settings.zoom.hint')}</span>
+      </div>
+      <div className="row zoom-setting">
+        <button className="btn sm icon" aria-label={t('settings.zoom.smaller')} title={t('settings.zoom.smaller')} disabled={zoom <= ZOOM_STEPS[0]} onClick={() => stepZoom(-1)}>
+          <Minus />
+        </button>
+        <select className="select" value={ZOOM_STEPS.includes(zoom) ? zoom : 1} onChange={(e) => setZoom(Number(e.target.value))} aria-label={t('settings.zoom')}>
+          {ZOOM_STEPS.map((z) => (
+            <option key={z} value={z}>
+              {Math.round(z * 100)}%
+            </option>
+          ))}
+        </select>
+        <button className="btn sm icon" aria-label={t('settings.zoom.bigger')} title={t('settings.zoom.bigger')} disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]} onClick={() => stepZoom(1)}>
+          <Plus />
+        </button>
+        <button className="btn sm ghost" disabled={pct === 100} onClick={() => setZoom(1)}>
+          {t('settings.zoom.reset')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const { settings: s, updateSettings, info, toast, route, go } = useStore()
   const launchScreen = useLaunchScreen()
@@ -334,6 +367,7 @@ export default function SettingsPage() {
                 </div>
                 <Switch on={classicLayout} onChange={setClassicLayout} label={t('settings.classicLayout')} />
               </div>
+              <ZoomSetting />
               <div className="setting">
                 <div className="text">
                   <b>{t('settings.language')}</b>

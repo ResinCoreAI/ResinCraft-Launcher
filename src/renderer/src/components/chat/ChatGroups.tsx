@@ -1,12 +1,12 @@
 // Group chats in the Inbox's Chat tab: the group's tile, a new group, adding friends, the members panel (invite code,
 // roles, rename, leave) and the notes a group's chat shows (made, joined, left, …).
 import { useRef, useState } from 'react'
-import { Copy, Crown, Gift, LogOut, MoreHorizontal, Pencil, RefreshCw, Shield, Smile, UserPlus, Users, X } from 'lucide-react'
+import { Ban, Clock, Copy, Crown, Gift, LogOut, MoreHorizontal, Pencil, RefreshCw, Shield, Smile, UserPlus, Users, X } from 'lucide-react'
 import type { ChatGroup, ChatMessage, ChatSystemData } from '@shared/types'
 import { chat, displayName, nameOf, useChat } from '../../chatState'
 import { ChatAvatar, FileImage } from './ChatMedia'
 import { useStore } from '../../store'
-import { t } from '../../i18n'
+import { t, type Key } from '../../i18n'
 import { ConfirmModal, Modal, openContextMenu, type ContextEntry } from '../ui'
 import PlayerHead from '../PlayerHead'
 
@@ -151,18 +151,42 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
       fail(e)
     }
   }
-  const memberMenu = (uuid: string, role: string): ContextEntry[] => [
+  // Moderation: like a Discord server's owner and admins (an admin can't act on other admins or the owner).
+  const [banning, setBanning] = useState<{ uuid: string; name: string } | null>(null)
+  const canModerate = (role: string) => (g.role === 'owner' && role !== 'owner') || (g.role === 'admin' && role === 'member')
+  const timeoutFor = (uuid: string, minutes: number) => void chat.group('timeout', g.conv, { uuid, minutes }).catch(fail)
+  const TIMEOUTS: [number, Key][] = [
+    [5, 'chat.mod.min5'],
+    [60, 'chat.mod.hour1'],
+    [1440, 'chat.mod.day1'],
+    [10080, 'chat.mod.week1']
+  ]
+  const memberMenu = (uuid: string, role: string, timeout?: number | null): ContextEntry[] => [
     { label: t('chat.profile.view'), icon: <Users size={14} />, onSelect: () => onProfile(uuid) },
     { label: t('chat.nickname.set'), icon: <Pencil size={14} />, onSelect: () => onNick(uuid) },
     { label: t('chat.sendGift'), icon: <Gift size={14} />, onSelect: () => onGift(uuid) },
     '-',
     g.role === 'owner' && role === 'member' && { label: t('chat.group.makeAdmin'), icon: <Shield size={14} />, onSelect: () => void chat.group('role', g.conv, { uuid, role: 'admin' }).catch(fail) },
     g.role === 'owner' && role === 'admin' && { label: t('chat.group.makeMember'), onSelect: () => void chat.group('role', g.conv, { uuid, role: 'member' }).catch(fail) },
-    ((g.role === 'owner' && role !== 'owner') || (g.role === 'admin' && role === 'member')) && {
-      label: t('chat.group.remove'),
+    canModerate(role) &&
+      (timeout && timeout * 1000 > Date.now()
+        ? { label: t('chat.mod.untimeout'), icon: <Clock size={14} />, onSelect: () => void chat.group('untimeout', g.conv, { uuid }).catch(fail) }
+        : {
+            label: t('chat.mod.timeout'),
+            icon: <Clock size={14} />,
+            items: TIMEOUTS.map(([m, k]) => ({ label: t(k), onSelect: () => timeoutFor(uuid, m) }))
+          }),
+    canModerate(role) && {
+      label: t('chat.mod.kick'),
       icon: <X size={14} />,
       danger: true,
-      onSelect: () => void chat.group('remove', g.conv, { uuid }).catch(fail)
+      onSelect: () => void chat.group('kick', g.conv, { uuid }).catch(fail)
+    },
+    canModerate(role) && {
+      label: t('chat.mod.ban'),
+      icon: <Ban size={14} />,
+      danger: true,
+      onSelect: () => setBanning({ uuid, name: displayName(g.conv, uuid) || nameOf(uuid) })
     }
   ]
   const invite = async (reset: boolean) => {
@@ -211,7 +235,8 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
       </div>
       <div className="chat-member-list">
         {g.members.map((m) => {
-          const menu = m.uuid === v.me ? [{ label: t('chat.nickname.setMine'), icon: <Pencil size={14} />, onSelect: () => onNick(m.uuid) }] : memberMenu(m.uuid, m.role).filter(Boolean)
+          const menu = m.uuid === v.me ? [{ label: t('chat.nickname.setMine'), icon: <Pencil size={14} />, onSelect: () => onNick(m.uuid) }] : memberMenu(m.uuid, m.role, m.timeout).filter(Boolean)
+          const timedOut = !!m.timeout && m.timeout * 1000 > Date.now()
           return (
             <div key={m.uuid} className="chat-member">
               <button className="chat-avatar-btn" onClick={() => onProfile(m.uuid)} aria-label={t('chat.profile.view')}>
@@ -221,6 +246,11 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
                 {displayName(g.conv, m.uuid) || m.name || nameOf(m.uuid)}
                 {m.uuid === v.me && <span className="hint"> ({t('chat.you')})</span>}
               </span>
+              {timedOut && (
+                <Clock size={14} className="chat-role timeout" aria-label={t('chat.mod.timedOutUntil', { when: new Date(m.timeout! * 1000).toLocaleString() })}>
+                  <title>{t('chat.mod.timedOutUntil', { when: new Date(m.timeout! * 1000).toLocaleString() })}</title>
+                </Clock>
+              )}
               {m.role === 'owner' && <Crown size={14} className="chat-role owner" aria-label={t('chat.group.owner')} />}
               {m.role === 'admin' && <Shield size={14} className="chat-role" aria-label={t('chat.group.admin')} />}
               {menu.length > 0 && (
@@ -232,6 +262,25 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
           )
         })}
       </div>
+      {boss && (g.bans?.length ?? 0) > 0 && (
+        <details className="chat-bans">
+          <summary className="hint">
+            <Ban size={14} className="inline" /> {t('chat.mod.bannedCount', { count: g.bans!.length })}
+          </summary>
+          {g.bans!.map((b) => (
+            <div key={b.uuid} className="chat-member">
+              <ChatAvatar uuid={b.uuid} size={24} />
+              <span className="grow ellipsis" title={b.reason || undefined}>
+                {b.name || nameOf(b.uuid)}
+                {b.reason && <span className="hint"> · {b.reason}</span>}
+              </span>
+              <button className="btn sm ghost" onClick={() => void chat.group('unban', g.conv, { uuid: b.uuid }).catch(fail)}>
+                {t('chat.mod.unban')}
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
       <div className="chat-members-head">
         <b className="grow">
           <Smile size={14} className="inline" /> {t('chat.emoji.groupCount', { count: g.emoji?.length ?? 0 })}
@@ -292,6 +341,18 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
           <input className="input" autoFocus maxLength={50} value={renaming} onChange={(e) => setRenaming(e.target.value)} />
         </Modal>
       )}
+      {banning && (
+        <BanModal
+          name={banning.name}
+          onBan={(reason) =>
+            chat.group('ban', g.conv, { uuid: banning.uuid, reason }).then(
+              () => setBanning(null),
+              (e) => fail(e)
+            )
+          }
+          onClose={() => setBanning(null)}
+        />
+      )}
       {leaving && (
         <ConfirmModal
           title={t('chat.group.leaveTitle', { name: g.name })}
@@ -309,6 +370,38 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
 }
 
 /** A group note: "Steve added Alex", "Alex joined", … */
+/** Ban someone from a group: an optional reason (they don't see it; owners and admins do). */
+function BanModal({ name, onBan, onClose }: { name: string; onBan: (reason: string) => Promise<void>; onClose: () => void }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <Modal
+      title={t('chat.mod.banTitle', { name })}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button
+            className="btn danger"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true)
+              void onBan(reason.trim()).finally(() => setBusy(false))
+            }}
+          >
+            <Ban /> {t('chat.mod.ban')}
+          </button>
+        </>
+      }
+    >
+      <p className="hint">{t('chat.mod.banBody')}</p>
+      <input className="input" autoFocus maxLength={200} value={reason} placeholder={t('chat.mod.reason')} onChange={(e) => setReason(e.target.value)} />
+    </Modal>
+  )
+}
+
 export function SystemNote({ m }: { m: ChatMessage }) {
   const d = m.data as ChatSystemData | null
   if (!d) return null
@@ -331,6 +424,12 @@ export function SystemNote({ m }: { m: ChatMessage }) {
                   ? d.name
                     ? t('chat.note.nickname', { by, who, name: d.name })
                     : t('chat.note.nicknameCleared', { by, who })
+                : d.event === 'timeout'
+                  ? t('chat.note.timeout', { by, who, when: d.until ? new Date(d.until * 1000).toLocaleString() : '' })
+                : d.event === 'untimeout'
+                  ? t('chat.note.untimeout', { by, who })
+                : d.event === 'banned'
+                  ? t('chat.note.banned', { by, who })
                 : d.role === 'admin'
                   ? t('chat.note.madeAdmin', { by, who })
                   : t('chat.note.madeMember', { by, who })

@@ -298,6 +298,7 @@ export function mockApi(): ResinApi {
         else window.open(u)
       },
       setTitleBar: async () => {},
+      setZoom: async () => {},
       cancelTask: async (id) => mockEngine.cancelTask(id),
       saveThemeImage: async (id, url) => void (url ? mockThemeImages.set(id, url) : mockThemeImages.delete(id)),
       themeImage: async (id) => mockThemeImages.get(id) ?? null,

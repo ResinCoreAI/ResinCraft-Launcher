@@ -153,3 +153,18 @@
     position: static;
   }
 }
+
+/* Admin → Payments → Sales: a percentage per item. */
+.sale-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 12px;
+}
+.sale-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sale-item .input {
+  width: 72px;
+}
