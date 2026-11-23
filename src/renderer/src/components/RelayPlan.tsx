@@ -585,7 +585,7 @@ const WALLET_METHODS: Record<string, Key> = {
   truemoney: 'servers.wallet.method.truemoney'
 }
 
-/** The Store's Resin Credit card: the balance, Top up, the newest changes and the whole history. */
+/** The Store's Resin Credit card: the balance, Top up and History (every change is listed there, not on the card). */
 function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: number) => void }) {
   const { toast, go } = useStore()
   const plan = a.plan!
@@ -616,7 +616,6 @@ function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: num
           <History /> {t('servers.wallet.history')}
         </button>
       </div>
-      {wallet && wallet.history.length > 0 && <WalletEntries entries={wallet.history.slice(0, 3)} currency={cur} />}
       {w.error && <p className="hint bad">{w.error}</p>}
       {topup && wallet && (
         <TopupModal
