@@ -5785,6 +5785,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "Gönderildiği ay, ör. November 2026",
   "servers.admin.mail.tag.year": "Gönderildiği yıl, ör. 2026",
   "servers.admin.mail.tag.credit": "Bu postanın Resin Credit'i, ör. 40.00 THB. Postada yoksa bunu içeren satırlar çıkarılır",
+  "servers.relayPlan.noneRunning": "Şu an etkin bir şey yok.",
+  "servers.relayPlan.endedInHistory": "Biten ve iade edilenler ({count}): Mağaza geçmişinde gör",
 }
 
 export default dict

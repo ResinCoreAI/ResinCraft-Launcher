@@ -5834,6 +5834,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "Месяц отправки, например November 2026",
   "servers.admin.mail.tag.year": "Год отправки, например 2026",
   "servers.admin.mail.tag.credit": "Resin Credit этого письма, например 40.00 THB. Строки с ним убираются, если его нет",
+  "servers.relayPlan.noneRunning": "Сейчас ничего не активно.",
+  "servers.relayPlan.endedInHistory": "Завершённые и возвращённые ({count}): смотрите в Истории Магазина",
 }
 
 export default dict

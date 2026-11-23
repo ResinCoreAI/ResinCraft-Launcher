@@ -1397,4 +1397,6 @@ export default {
   "servers.admin.mail.tag.month": "The month it goes out, like November 2026",
   "servers.admin.mail.tag.year": "The year it goes out, like 2026",
   "servers.admin.mail.tag.credit": "This mail's Resin Credit, like 40.00 THB. Lines with it are left out when the mail has none",
+  "servers.relayPlan.noneRunning": "Nothing running right now.",
+  "servers.relayPlan.endedInHistory": "Ended and refunded ({count}): see them in Store history",
 } as const

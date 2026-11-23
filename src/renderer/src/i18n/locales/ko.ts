@@ -5767,6 +5767,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "보내는 달, 예: November 2026",
   "servers.admin.mail.tag.year": "보내는 해, 예: 2026",
   "servers.admin.mail.tag.credit": "이 메일의 Resin Credit, 예: 40.00 THB. 메일에 없으면 그 줄은 빠집니다",
+  "servers.relayPlan.noneRunning": "지금 사용 중인 것이 없습니다.",
+  "servers.relayPlan.endedInHistory": "종료·환불됨({count}): 스토어 내역에서 보기",
 }
 
 export default dict

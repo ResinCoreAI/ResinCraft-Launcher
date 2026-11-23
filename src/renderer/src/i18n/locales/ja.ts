@@ -5772,6 +5772,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "送信月（例: November 2026）",
   "servers.admin.mail.tag.year": "送信年（例: 2026）",
   "servers.admin.mail.tag.credit": "このメールの Resin Credit（例: 40.00 THB）。ない場合、それを含む行は省かれます",
+  "servers.relayPlan.noneRunning": "いま有効なものはありません。",
+  "servers.relayPlan.endedInHistory": "終了・返金済み（{count}）: ストアの履歴で確認",
 }
 
 export default dict

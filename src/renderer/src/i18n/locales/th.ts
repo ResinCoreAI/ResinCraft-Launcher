@@ -5764,6 +5764,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "เดือนที่ส่ง เช่น November 2026",
   "servers.admin.mail.tag.year": "ปีที่ส่ง เช่น 2026",
   "servers.admin.mail.tag.credit": "Resin Credit ของจดหมายนี้ เช่น 40.00 THB บรรทัดที่มีจะถูกตัดออกถ้าจดหมายไม่มีเครดิต",
+  "servers.relayPlan.noneRunning": "ตอนนี้ไม่มีรายการที่ใช้งานอยู่",
+  "servers.relayPlan.endedInHistory": "สิ้นสุดและคืนเงินแล้ว ({count}): ดูได้ในประวัติร้านค้า",
 }
 
 export default dict

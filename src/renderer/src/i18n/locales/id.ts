@@ -5775,6 +5775,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "Bulan dikirim, misalnya November 2026",
   "servers.admin.mail.tag.year": "Tahun dikirim, misalnya 2026",
   "servers.admin.mail.tag.credit": "Resin Credit surat ini, misalnya 40.00 THB. Baris yang memakainya dihapus jika surat tidak punya",
+  "servers.relayPlan.noneRunning": "Tidak ada yang berjalan saat ini.",
+  "servers.relayPlan.endedInHistory": "Berakhir dan dikembalikan ({count}): lihat di Riwayat Toko",
 }
 
 export default dict

@@ -1377,7 +1377,7 @@ function SubRow({
  * and add-ons to its right), with `heading` at the top of the panel. Without it, the compact block in Servers.
  */
 export default function RelayPlan({ page, empty, heading }: { page?: boolean; empty?: React.ReactNode; heading?: React.ReactNode } = {}) {
-  const { toast } = useStore()
+  const { toast, go } = useStore()
   const { plans, setPlans, load } = usePlans()
   const [picked, setPicked] = useState<string>()
   const [yearly, setYearly] = useState(false)
@@ -1556,11 +1556,15 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
       </button>
     </div>
   )
+  // Running ones, and ones waiting for a payment; what ended (or was refunded) is in Settings → Store history.
+  const current = plan.mine.filter((s) => s.active || s.status === 'incomplete' || s.status === 'past_due' || s.status === 'unpaid')
+  const ended = plan.mine.length - current.length
   const mine = plan.mine.length > 0 && (
     <>
       <h4>{t('servers.relayPlan.mine')}</h4>
+      {current.length === 0 && <p className="hint">{t('servers.relayPlan.noneRunning')}</p>}
       <div className="list">
-        {plan.mine.map((s) => (
+        {current.map((s) => (
           <SubRow
             key={s.id}
             s={s}
@@ -1574,6 +1578,11 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
           />
         ))}
       </div>
+      {ended > 0 && (
+        <button className="link rp-ended-link" onClick={() => openStoreHistory(go, 'purchases')}>
+          <History /> {t('servers.relayPlan.endedInHistory', { count: ended })}
+        </button>
+      )}
     </>
   )
   const period = (

@@ -5804,6 +5804,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "Der Monat, in dem sie rausgeht, z. B. November 2026",
   "servers.admin.mail.tag.year": "Das Jahr, in dem sie rausgeht, z. B. 2026",
   "servers.admin.mail.tag.credit": "Das Resin Credit dieser Mail, z. B. 40.00 THB. Zeilen damit fallen weg, wenn die Mail keins hat",
+  "servers.relayPlan.noneRunning": "Gerade läuft nichts.",
+  "servers.relayPlan.endedInHistory": "Beendet und erstattet ({count}): im Shop-Verlauf ansehen",
 }
 
 export default dict

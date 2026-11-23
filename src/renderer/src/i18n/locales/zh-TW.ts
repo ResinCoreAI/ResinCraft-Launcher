@@ -5762,6 +5762,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "寄出月份，如 November 2026",
   "servers.admin.mail.tag.year": "寄出年份，如 2026",
   "servers.admin.mail.tag.credit": "這封郵件的 Resin Credit，如 40.00 THB。郵件沒有時，含它的行會被省略",
+  "servers.relayPlan.noneRunning": "目前沒有生效中的項目。",
+  "servers.relayPlan.endedInHistory": "已結束和已退款（{count}）：在商店紀錄中查看",
 }
 
 export default dict

@@ -5772,6 +5772,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "Tháng gửi, như November 2026",
   "servers.admin.mail.tag.year": "Năm gửi, như 2026",
   "servers.admin.mail.tag.credit": "Resin Credit của thư này, như 40.00 THB. Các dòng có nó bị bỏ khi thư không có",
+  "servers.relayPlan.noneRunning": "Hiện không có gói nào đang chạy.",
+  "servers.relayPlan.endedInHistory": "Đã kết thúc và hoàn tiền ({count}): xem trong Lịch sử Cửa hàng",
 }
 
 export default dict

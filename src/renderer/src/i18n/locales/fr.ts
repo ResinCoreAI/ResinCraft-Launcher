@@ -5835,6 +5835,8 @@ const dict: Dict = {
   "servers.admin.mail.tag.month": "Le mois de l'envoi, comme November 2026",
   "servers.admin.mail.tag.year": "L'année de l'envoi, comme 2026",
   "servers.admin.mail.tag.credit": "Le Resin Credit de ce message, comme 40.00 THB. Les lignes qui l'utilisent sont retirées s'il n'y en a pas",
+  "servers.relayPlan.noneRunning": "Rien en cours pour l'instant.",
+  "servers.relayPlan.endedInHistory": "Terminés et remboursés ({count}) : à voir dans l'Historique de la Boutique",
 }
 
 export default dict
