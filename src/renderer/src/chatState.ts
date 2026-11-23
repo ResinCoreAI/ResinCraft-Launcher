@@ -489,7 +489,7 @@ export const chat = {
     return r
   },
   /** A gift to a friend, or (with `conv`) to someone in a group (`to` empty: anyone in it, first come). */
-  async gift(to: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }, conv?: string) {
+  async gift(to: string, gift: ({ kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }) & { waitHours?: number }, conv?: string) {
     const r = await call<{ message: ChatMessage | null; balance: number }>('POST', '/api/chat/gift', { ...(to ? { to } : {}), ...gift, ...(conv && isGroup(conv) ? { conv } : {}) })
     if (r.message) took(r.message)
     return r

@@ -6134,6 +6134,9 @@ const dict: Dict = {
   "chat.side.mutual": "Ortak gruplar · {count}",
   "chat.side.noMutual": "Henüz yok",
   "chat.gift.short": "Bunun fiyatı {need}, sende {have} var. Göndermek için Mağaza'dan yükleme yap.",
+  "chat.gift.waitLabel": "Alınmazsa geri döner",
+  "chat.gift.waitHint": "O zamana kadar kimse Al'a basmazsa, ödediğin her şey Mağaza ürünleri dahil Resin Credit olarak sana geri döner.",
+  "chat.gift.backIn": "{when} geri döner",
 }
 
 export default dict

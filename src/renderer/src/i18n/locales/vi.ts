@@ -6121,6 +6121,9 @@ const dict: Dict = {
   "chat.side.mutual": "Nhóm chung · {count}",
   "chat.side.noMutual": "Chưa có",
   "chat.gift.short": "Món này giá {need}, bạn đang có {have}. Hãy nạp thêm trong Cửa hàng để gửi.",
+  "chat.gift.waitLabel": "Hoàn lại nếu không được nhận trong",
+  "chat.gift.waitHint": "Nếu đến lúc đó không ai bấm Nhận, toàn bộ số bạn đã trả sẽ quay lại dưới dạng Resin Credit, kể cả vật phẩm Cửa hàng.",
+  "chat.gift.backIn": "hoàn lại {when}",
 }
 
 export default dict

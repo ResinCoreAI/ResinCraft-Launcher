@@ -92,6 +92,14 @@ function snippet(m: ChatMessage | undefined, me: string): string {
  * A gift in a chat. It waits until the one it's for presses Receive; a group gift with nobody named goes to whoever
  * presses Got it first. Unreceived after a week, it goes back to the sender.
  */
+/** How long until `at` (Unix seconds), for a relative time: minutes under two hours, hours under two days, then days. */
+function leftOf(at: number): [number, Intl.RelativeTimeFormatUnit] {
+  const minutes = Math.max(1, Math.ceil((at * 1000 - Date.now()) / 60_000))
+  if (minutes < 120) return [minutes, 'minute']
+  if (minutes < 48 * 60) return [Math.round(minutes / 60), 'hour']
+  return [Math.round(minutes / 1440), 'day']
+}
+
 function GiftCard({ m, mine, peer, me, conv }: { m: ChatMessage; mine: boolean; peer: string; me: string; conv: string }) {
   const { toast, activeAccount } = useStore()
   const [busy, setBusy] = useState(false)
@@ -144,7 +152,10 @@ function GiftCard({ m, mine, peer, me, conv }: { m: ChatMessage; mine: boolean; 
       </span>
       <span>
         <b>{what}</b>
-        <span className="hint">{line}</span>
+        <span className="hint">
+          {line}
+          {waiting && !late && <> · {t('chat.gift.backIn', { when: new Intl.RelativeTimeFormat(currentLanguage(), { numeric: 'always' }).format(...leftOf(g.expires!)) })}</>}
+        </span>
       </span>
       {canTake && (
         <button className="btn sm primary chat-giftcard-take" disabled={busy} onClick={() => void take()}>

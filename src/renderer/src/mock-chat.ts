@@ -155,7 +155,9 @@ const giftOptions = (): ChatGiftOptions => ({
     { id: 'name-pack', name: 'Custom name', description: 'Your own relay address', icon: 'tag', monthly: 2900, yearly: 29000 }
   ],
   refused: null,
-  givenSendable: false
+  givenSendable: false,
+  waits: [1, 24, 72, 168],
+  waitDefault: 24
 })
 
 function reply(conv: string, peer: string) {
@@ -412,7 +414,7 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
         if (amount > o.sendable) return err(`you can send ${(o.sendable / 100).toFixed(2)} THB: credit you were given can only be spent in the Store`)
         wallet.balance -= amount
         const open = !b.to
-        const m = add(giftConv, ME, String(b.note ?? ''), 0, { kind: 'gift', data: { gift: `cg-${seq}`, kind: 'credit', amount, currency: 'thb', to: open ? null : to, open, expires: now() + 7 * 86400 } as never })
+        const m = add(giftConv, ME, String(b.note ?? ''), 0, { kind: 'gift', data: { gift: `cg-${seq}`, kind: 'credit', amount, currency: 'thb', to: open ? null : to, open, expires: now() + (Number(b.waitHours) || 24) * 3600 } as never })
         changed()
         return { message: m, balance: wallet.balance }
       }
@@ -423,7 +425,7 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       wallet.given = Math.max(0, wallet.given - price)
       const m = add(giftConv, ME, String(b.note ?? ''), 0, {
         kind: 'gift',
-        data: { gift: `cg-${seq}`, kind: 'item', amount: price, currency: 'thb', product: item.id, name: item.name, icon: item.icon, yearly: !!b.yearly, days: b.yearly ? 365 : 30, to: to || null, open: !to, expires: now() + 7 * 86400 }
+        data: { gift: `cg-${seq}`, kind: 'item', amount: price, currency: 'thb', product: item.id, name: item.name, icon: item.icon, yearly: !!b.yearly, days: b.yearly ? 365 : 30, to: to || null, open: !to, expires: now() + (Number(b.waitHours) || 24) * 3600 }
       })
       changed()
       return { message: m, balance: wallet.balance }

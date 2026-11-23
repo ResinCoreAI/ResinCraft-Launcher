@@ -6116,6 +6116,9 @@ const dict: Dict = {
   "chat.side.mutual": "함께 있는 그룹 · {count}",
   "chat.side.noMutual": "아직 없어요",
   "chat.gift.short": "이 선물은 {need}이고 보유 금액은 {have}입니다. 보내려면 스토어에서 충전하세요.",
+  "chat.gift.waitLabel": "받지 않으면 돌아오는 시간",
+  "chat.gift.waitHint": "그때까지 아무도 받기를 누르지 않으면 지불한 금액 전부가 Resin Credit으로 돌아옵니다. 스토어 아이템도 포함됩니다.",
+  "chat.gift.backIn": "{when} 돌아옴",
 }
 
 export default dict

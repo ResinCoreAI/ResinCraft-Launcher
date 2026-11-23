@@ -6,8 +6,14 @@ import type { ChatGiftOptions } from '@shared/types'
 import { chat } from '../../chatState'
 import { money, setWalletBalance } from '../../storeStatus'
 import { useStore } from '../../store'
-import { t } from '../../i18n'
+import { currentLanguage, t } from '../../i18n'
 import { Modal, Segmented } from '../ui'
+
+/** "1 hour", "1 day", "3 days" in the UI language (whole days from 24 hours up). */
+function hours(h: number): string {
+  const days = h >= 24 && h % 24 === 0
+  return new Intl.NumberFormat(currentLanguage(), { style: 'unit', unit: days ? 'day' : 'hour', unitDisplay: 'long' }).format(days ? h / 24 : h)
+}
 
 /**
  * `to`/`name`: a friend or group member (from a chat). Without them (from the Store) it asks for a player's name and
@@ -39,6 +45,8 @@ export default function GiftModal({
   const [product, setProduct] = useState('')
   const [yearly, setYearly] = useState(false)
   const [note, setNote] = useState('')
+  // How long it waits in chat to be received before it goes back (hours; the relay's usual pick until changed).
+  const [wait, setWait] = useState<number>()
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     chat.giftOptions().then(
@@ -62,7 +70,8 @@ export default function GiftModal({
     setError('')
     try {
       const what = kind === 'credit' ? { kind, amount: minor, note: note.trim() || undefined } : { kind, product, yearly, note: note.trim() || undefined }
-      const r = byName ? await chat.giftByName(toName.trim(), what) : await chat.gift(to ?? '', what, conv)
+      const waitHours = opts.waits?.length ? (wait ?? opts.waitDefault) : undefined
+      const r = byName ? await chat.giftByName(toName.trim(), what) : await chat.gift(to ?? '', { ...what, waitHours }, conv)
       if (activeAccount?.type === 'msa') setWalletBalance(activeAccount.uuid, r.balance, cur)
       toast(t('chat.gift.sent', { name: byName ? toName.trim() : name ?? '' }), 'success')
       onClose()
@@ -166,6 +175,17 @@ export default function GiftModal({
               {item && <p className="hint">{t('chat.gift.itemCost', { item: item.name, amount: money(price, cur), name })}</p>}
               {item && price > opts.balance && <p className="hint bad">{t('chat.gift.short', { need: money(price, cur), have: money(opts.balance, cur) })}</p>}
             </>
+          )}
+          {!byName && !!opts.waits?.length && (
+            <div className="field">
+              <span>{t('chat.gift.waitLabel')}</span>
+              <Segmented<string>
+                value={String(wait ?? opts.waitDefault ?? opts.waits[0])}
+                onChange={(v) => setWait(Number(v))}
+                options={opts.waits.map((h) => ({ value: String(h), label: hours(h) }))}
+              />
+              <span className="hint">{t('chat.gift.waitHint')}</span>
+            </div>
           )}
           <label className="field">
             <span>{t('chat.gift.note')}</span>

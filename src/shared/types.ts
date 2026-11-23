@@ -2184,6 +2184,9 @@ export interface ChatGiftOptions {
   /** Why it can't give at all yet (muted, a new account), or null. */
   refused: string | null
   givenSendable: boolean
+  /** How long a gift in chat can wait to be received (hours), and the usual pick; older relays: absent. */
+  waits?: number[]
+  waitDefault?: number
 }
 
 /** The account's email address for mail by email: confirmed with a code the relay emails. */

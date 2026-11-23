@@ -6111,6 +6111,9 @@ const dict: Dict = {
   "chat.side.mutual": "共同群組 · {count}",
   "chat.side.noMutual": "尚無",
   "chat.gift.short": "這需要 {need}，你有 {have}。請在商店儲值後再送出。",
+  "chat.gift.waitLabel": "未領取則退回的時間",
+  "chat.gift.waitHint": "如果到時沒有人點擊領取，你支付的全部金額（包括商店物品）都會以 Resin Credit 退還給你。",
+  "chat.gift.backIn": "{when}退回",
 }
 
 export default dict

@@ -1865,4 +1865,7 @@ export default {
   "chat.side.mutual": "Groups you share · {count}",
   "chat.side.noMutual": "None yet",
   "chat.gift.short": "This costs {need}, and you have {have}. Top up in the Store to send it.",
+  "chat.gift.waitLabel": "Goes back if not received in",
+  "chat.gift.waitHint": "If nobody presses Receive by then, everything you paid comes back to you as Resin Credit, Store items included.",
+  "chat.gift.backIn": "goes back {when}",
 } as const

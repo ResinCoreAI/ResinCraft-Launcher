@@ -6153,6 +6153,9 @@ const dict: Dict = {
   "chat.side.mutual": "Gemeinsame Gruppen · {count}",
   "chat.side.noMutual": "Noch keine",
   "chat.gift.short": "Das kostet {need}, du hast {have}. Lade im Store auf, um es zu senden.",
+  "chat.gift.waitLabel": "Geht zurück, wenn nicht angenommen in",
+  "chat.gift.waitHint": "Drückt bis dahin niemand auf Annehmen, bekommst du alles, was du bezahlt hast, als Resin Credit zurück, auch für Store-Artikel.",
+  "chat.gift.backIn": "geht {when} zurück",
 }
 
 export default dict
