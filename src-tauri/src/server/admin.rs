@@ -141,7 +141,10 @@ async fn open(account: &MicrosoftAccount, token: Option<&str>, password: &str, c
 
 /// Whether the active account may see the Admin page; a remembered PC unlocks right here.
 pub async fn status() -> AdminStatus {
-    let Some(account) = accounts::microsoft_account(None).await else {
+    // Admin belongs to the account being used: an offline or Bedrock account sees none of it, even with an admin's
+    // Microsoft account signed in too (switching to it unlocks again with the remembered token).
+    let Some(account) = accounts::active_microsoft_account().await else {
+        *ADMIN.lock().await = None;
         return AdminStatus { admin: false, unlocked: false, username: None, dashboard_user: None, need_code: false, remembered: false, developer: false };
     };
     let mut guard = ADMIN.lock().await;
@@ -190,7 +193,7 @@ pub struct UnlockReq {
 }
 
 pub async fn unlock(req: UnlockReq) -> Result<AdminStatus> {
-    let Some(account) = accounts::microsoft_account(None).await else { return Err(relay::needs_microsoft()) };
+    let Some(account) = accounts::active_microsoft_account().await else { return Err(relay::needs_microsoft()) };
     let code = req.code.as_deref().map(str::trim).filter(|c| !c.is_empty());
     match open(&account, None, &req.password, code, req.remember).await? {
         Opened::NeedCode => Ok(status_of(&account, true, None, true, false)),
@@ -308,7 +311,7 @@ pub async fn dev_call(method: &str, path: &str, body: Option<Value>) -> Result<V
     let Some(rest) = path.strip_prefix("/api/devs").filter(|r| r.is_empty() || r.starts_with('/')) else {
         anyhow::bail!("not a Dev route: {path}")
     };
-    let Some(account) = accounts::microsoft_account(None).await else { return Err(relay::needs_microsoft()) };
+    let Some(account) = accounts::active_microsoft_account().await else { return Err(relay::needs_microsoft()) };
     for retry in [false, true] {
         let (session, domain) = relay::session_token(&account).await?;
         let url = format!("https://{domain}/api/dev/manage{rest}");

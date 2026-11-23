@@ -870,6 +870,18 @@ pub async fn microsoft_account(preferred: Option<&str>) -> Option<MicrosoftAccou
     Some(MicrosoftAccount { id: acc.id.clone(), uuid: acc.uuid.clone(), username: acc.username.clone() })
 }
 
+/// The account the player is using now, only when it's a Microsoft account. Unlike `microsoft_account`, an offline
+/// or Bedrock account being used doesn't fall back to another Microsoft account on this PC: for things that belong to
+/// the player in front of the launcher (the relay Admin page), not to the PC.
+pub async fn active_microsoft_account() -> Option<MicrosoftAccount> {
+    let list = load().await;
+    let acc = list.iter().find(|a| a.active).or_else(|| list.first())?;
+    if acc.kind != "msa" || is_unreadable(acc.refresh_token.as_deref()) {
+        return None;
+    }
+    Some(MicrosoftAccount { id: acc.id.clone(), uuid: acc.uuid.clone(), username: acc.username.clone() })
+}
+
 /// Every signed-in Microsoft account.
 pub async fn microsoft_accounts() -> Vec<MicrosoftAccount> {
     let list = load().await.into_iter().filter(|a| a.kind == "msa" && !is_unreadable(a.refresh_token.as_deref()));
