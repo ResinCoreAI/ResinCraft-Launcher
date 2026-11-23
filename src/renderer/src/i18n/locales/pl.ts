@@ -5854,6 +5854,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "Usunąć ten harmonogram?",
   "servers.admin.mail.schedule.deleteBody": "„{subject}” nie zostanie już wysłana. Wiadomości już wysłane zostają w skrzynkach.",
   "servers.admin.mail.schedule.deleted": "Usunięto harmonogram.",
+  "engine.update.task.switch": "Instalowanie ResinCraft {version}",
+  "updates.switch.title": "Przełączyć na {channel}?",
+  "updates.switch.body": "Używasz {current}, którego nie ma w {channel}. ResinCraft zainstaluje na nim najnowsze wydanie {channel} i uruchomi się ponownie. Instancje, konta i ustawienia zostaną.",
+  "updates.switch.confirm": "Przełącz i zainstaluj ponownie",
+  "updates.switch.none": "Nie znaleziono wydania {channel} do zainstalowania. Twój kanał to teraz {channel}; spróbuj później Zainstaluj ponownie.",
 }
 
 export default dict

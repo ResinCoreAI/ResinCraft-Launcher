@@ -5755,6 +5755,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "이 예약을 삭제할까요?",
   "servers.admin.mail.schedule.deleteBody": "\"{subject}\"은(는) 더 이상 보내지 않아요. 이미 보낸 메일은 받은편지함에 남아요.",
   "servers.admin.mail.schedule.deleted": "예약을 삭제했어요.",
+  "engine.update.task.switch": "ResinCraft {version} 설치 중",
+  "updates.switch.title": "{channel}(으)로 바꿀까요?",
+  "updates.switch.body": "지금 쓰는 {current}은(는) {channel}에 없습니다. ResinCraft가 최신 {channel} 릴리스를 덮어 설치하고 다시 시작합니다. 인스턴스, 계정, 설정은 그대로 남습니다.",
+  "updates.switch.confirm": "바꾸고 다시 설치",
+  "updates.switch.none": "설치할 {channel} 릴리스를 찾지 못했습니다. 채널은 이제 {channel}입니다. 나중에 다시 설치를 시도하세요.",
 }
 
 export default dict

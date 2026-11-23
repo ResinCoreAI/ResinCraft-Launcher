@@ -1386,4 +1386,8 @@ export default {
   "servers.admin.mail.schedule.deleteTitle": "Delete this schedule?",
   "servers.admin.mail.schedule.deleteBody": "\"{subject}\" won't go out again. Mail it already sent stays in the inboxes.",
   "servers.admin.mail.schedule.deleted": "Schedule deleted.",
+  "updates.switch.title": "Switch to {channel}?",
+  "updates.switch.body": "You're on {current}, which {channel} doesn't have. ResinCraft will install the newest {channel} release over it and restart. Your instances, accounts and settings stay.",
+  "updates.switch.confirm": "Switch and reinstall",
+  "updates.switch.none": "Couldn't find a {channel} release to install. Your channel is now {channel}; try Reinstall later.",
 } as const

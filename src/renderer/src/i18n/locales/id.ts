@@ -5763,6 +5763,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "Hapus jadwal ini?",
   "servers.admin.mail.schedule.deleteBody": "“{subject}” tidak akan dikirim lagi. Surat yang sudah dikirimnya tetap ada di Kotak Masuk.",
   "servers.admin.mail.schedule.deleted": "Jadwal dihapus.",
+  "engine.update.task.switch": "Memasang ResinCraft {version}",
+  "updates.switch.title": "Pindah ke {channel}?",
+  "updates.switch.body": "Kamu memakai {current}, yang tidak ada di {channel}. ResinCraft akan memasang rilis {channel} terbaru di atasnya lalu memulai ulang. Instance, akun, dan pengaturanmu tetap ada.",
+  "updates.switch.confirm": "Pindah dan pasang ulang",
+  "updates.switch.none": "Tidak menemukan rilis {channel} untuk dipasang. Kanalmu sekarang {channel}; coba Pasang ulang nanti.",
 }
 
 export default dict

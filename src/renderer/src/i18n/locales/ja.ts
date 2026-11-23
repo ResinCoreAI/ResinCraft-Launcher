@@ -5760,6 +5760,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "この予約を削除しますか？",
   "servers.admin.mail.schedule.deleteBody": "「{subject}」は今後送信されません。送信済みのメールは受信箱に残ります。",
   "servers.admin.mail.schedule.deleted": "予約を削除しました。",
+  "engine.update.task.switch": "ResinCraft {version} をインストール中",
+  "updates.switch.title": "{channel} に切り替えますか？",
+  "updates.switch.body": "現在の {current} は {channel} にはありません。ResinCraft は最新の {channel} リリースを上からインストールして再起動します。インスタンス、アカウント、設定はそのまま残ります。",
+  "updates.switch.confirm": "切り替えて再インストール",
+  "updates.switch.none": "インストールできる {channel} リリースが見つかりませんでした。チャンネルは {channel} になっています。あとで再インストールをお試しください。",
 }
 
 export default dict

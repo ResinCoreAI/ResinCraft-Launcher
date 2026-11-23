@@ -12,7 +12,7 @@ export function mockUpdate(): { update: ResinApi['update']; onUpdate: ResinApi['
   const listeners = new Set<(s: UpdateStatus) => void>()
   let closing = false
   let cancelled = false
-  let status: UpdateStatus = { current: '0.2.0', state: 'idle', lastChecked: Date.now() - 2 * 3600_000 }
+  let status: UpdateStatus = { current: new URLSearchParams(location.search).get('ver') ?? '0.2.0', state: 'idle', lastChecked: Date.now() - 2 * 3600_000 }
   const set = (patch: Partial<UpdateStatus>) => {
     status = { ...status, ...patch }
     listeners.forEach((l) => l(status))

@@ -5773,6 +5773,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "Bu zamanlama silinsin mi?",
   "servers.admin.mail.schedule.deleteBody": "“{subject}” bir daha gitmez. Önceden gönderdiği postalar gelen kutularında kalır.",
   "servers.admin.mail.schedule.deleted": "Zamanlama silindi.",
+  "engine.update.task.switch": "ResinCraft {version} yükleniyor",
+  "updates.switch.title": "{channel} kanalına geçilsin mi?",
+  "updates.switch.body": "Kullandığın {current}, {channel} kanalında yok. ResinCraft en yeni {channel} sürümünü üzerine kuracak ve yeniden başlayacak. Örneklerin, hesapların ve ayarların korunur.",
+  "updates.switch.confirm": "Geç ve yeniden yükle",
+  "updates.switch.none": "Yüklenecek bir {channel} sürümü bulunamadı. Kanalın artık {channel}; daha sonra Yeniden yükle'yi dene.",
 }
 
 export default dict

@@ -5760,6 +5760,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "Xóa lịch này?",
   "servers.admin.mail.schedule.deleteBody": "“{subject}” sẽ không được gửi nữa. Thư đã gửi vẫn còn trong hộp thư.",
   "servers.admin.mail.schedule.deleted": "Đã xóa lịch.",
+  "engine.update.task.switch": "Đang cài ResinCraft {version}",
+  "updates.switch.title": "Chuyển sang {channel}?",
+  "updates.switch.body": "Bạn đang dùng {current}, bản mà {channel} không có. ResinCraft sẽ cài bản {channel} mới nhất đè lên rồi khởi động lại. Các bản cài, tài khoản và cài đặt vẫn được giữ.",
+  "updates.switch.confirm": "Chuyển và cài lại",
+  "updates.switch.none": "Không tìm thấy bản {channel} để cài. Kênh của bạn giờ là {channel}; hãy thử Cài lại sau.",
 }
 
 export default dict

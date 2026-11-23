@@ -5822,6 +5822,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "Удалить это расписание?",
   "servers.admin.mail.schedule.deleteBody": "«{subject}» больше не будет отправляться. Уже отправленные письма останутся во «Входящих».",
   "servers.admin.mail.schedule.deleted": "Расписание удалено.",
+  "engine.update.task.switch": "Установка ResinCraft {version}",
+  "updates.switch.title": "Перейти на {channel}?",
+  "updates.switch.body": "У вас {current}, которой нет в {channel}. ResinCraft установит поверх неё новейший выпуск {channel} и перезапустится. Сборки, аккаунты и настройки сохранятся.",
+  "updates.switch.confirm": "Перейти и переустановить",
+  "updates.switch.none": "Не удалось найти выпуск {channel} для установки. Ваш канал теперь {channel}; попробуйте «Переустановить» позже.",
 }
 
 export default dict

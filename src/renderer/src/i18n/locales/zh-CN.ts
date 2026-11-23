@@ -5750,6 +5750,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "删除这个定时？",
   "servers.admin.mail.schedule.deleteBody": "“{subject}”将不再发出。已发送的邮件仍保留在收件箱中。",
   "servers.admin.mail.schedule.deleted": "定时已删除。",
+  "engine.update.task.switch": "正在安装 ResinCraft {version}",
+  "updates.switch.title": "切换到 {channel}？",
+  "updates.switch.body": "你正在使用的 {current} 不在 {channel} 中。ResinCraft 会覆盖安装最新的 {channel} 版本并重新启动。你的实例、账户和设置都会保留。",
+  "updates.switch.confirm": "切换并重新安装",
+  "updates.switch.none": "找不到可安装的 {channel} 版本。你的频道现在是 {channel}，请稍后再试重新安装。",
 }
 
 export default dict

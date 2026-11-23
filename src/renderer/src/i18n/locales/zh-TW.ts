@@ -5750,6 +5750,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "刪除這個排程？",
   "servers.admin.mail.schedule.deleteBody": "「{subject}」不會再寄出。已寄出的郵件仍保留在收件匣中。",
   "servers.admin.mail.schedule.deleted": "排程已刪除。",
+  "engine.update.task.switch": "正在安裝 ResinCraft {version}",
+  "updates.switch.title": "切換到 {channel}？",
+  "updates.switch.body": "你正在使用的 {current} 不在 {channel} 中。ResinCraft 會覆蓋安裝最新的 {channel} 版本並重新啟動。你的實例、帳號和設定都會保留。",
+  "updates.switch.confirm": "切換並重新安裝",
+  "updates.switch.none": "找不到可安裝的 {channel} 版本。你的頻道現在是 {channel}，請稍後再試重新安裝。",
 }
 
 export default dict

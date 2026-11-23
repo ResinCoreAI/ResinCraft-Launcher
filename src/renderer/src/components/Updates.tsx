@@ -9,8 +9,8 @@ import { api } from '../api'
 import { useStore } from '../store'
 import { t, tx } from '../i18n'
 import { timeAgo } from '../util'
-import { versionName } from '../versionName'
-import { Modal, Switch } from './ui'
+import { buildKind, versionName } from '../versionName'
+import { ConfirmModal, Modal, Switch } from './ui'
 import '../updates.css'
 
 const RELEASES = 'https://github.com/ResinCoreAI/ResinCraft-Launcher/releases'
@@ -182,10 +182,16 @@ export function UpdateTitleButton() {
 }
 
 /** Settings → Updates. */
+type Channel = 'stable' | 'beta' | 'dev' | 'test'
+
 export function UpdatesSection() {
-  const { settings, updateSettings } = useStore()
+  const { settings, updateSettings, toast } = useStore()
   const { status } = useUpdate()
   const { start, dialog } = useInstall()
+  // Moving to a channel that doesn't have the build installed now (Stable from a Beta, Dev or Test build; Beta from a
+  // Dev or Test one): asked first, then the channel's newest release is installed over this one.
+  const [switchTo, setSwitchTo] = useState<Channel>()
+  const [switching, setSwitching] = useState(false)
 
   useEffect(() => {
     if (!snapshot.status)
@@ -242,6 +248,29 @@ export function UpdatesSection() {
   const notesUrl = available ? available.notesUrl : `${RELEASES}/tag/v${status.current}`
   const showDev = !!status.dev || channel === 'dev'
   const showTest = !!status.test || channel === 'test'
+  const kind = buildKind(status.current)
+  const leaves = (next: Channel) => (next === 'stable' && kind !== 'stable') || (next === 'beta' && (kind === 'dev' || kind === 'test'))
+  const channelName = (c: Channel) => t(`updates.channel.${c}` as const)
+  const pick = (next: Channel) => {
+    if (next === channel) return
+    if (leaves(next)) setSwitchTo(next)
+    else void updateSettings({ updateChannel: next }).then(() => check())
+  }
+  const switchNow = async (next: Channel) => {
+    setSwitchTo(undefined)
+    setSwitching(true)
+    try {
+      await updateSettings({ updateChannel: next })
+      const s = await api.update.checkReinstall()
+      publish({ status: s })
+      if (s.available) await start()
+      else toast(t('updates.switch.none', { channel: channelName(next) }), 'error')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setSwitching(false)
+    }
+  }
 
   return (
     <section className="settings-section" id="updates">
@@ -295,7 +324,8 @@ export function UpdatesSection() {
             className="input"
             style={{ width: 'auto' }}
             value={channel}
-            onChange={(e) => void updateSettings({ updateChannel: e.target.value as 'stable' | 'beta' | 'dev' | 'test' }).then(() => check())}
+            disabled={busy || switching}
+            onChange={(e) => pick(e.target.value as Channel)}
           >
             <option value="stable">{t('updates.channel.stable')}</option>
             <option value="beta">{t('updates.channel.beta')}</option>
@@ -317,6 +347,15 @@ export function UpdatesSection() {
           </div>
         </div>
       </div>
+      {switchTo && (
+        <ConfirmModal
+          title={t('updates.switch.title', { channel: channelName(switchTo) })}
+          body={<p>{t('updates.switch.body', { channel: channelName(switchTo), current: versionName(status.current) })}</p>}
+          confirm={t('updates.switch.confirm')}
+          onConfirm={() => switchNow(switchTo)}
+          onClose={() => setSwitchTo(undefined)}
+        />
+      )}
       {dialog}
     </section>
   )

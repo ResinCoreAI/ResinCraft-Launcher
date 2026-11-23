@@ -5752,6 +5752,11 @@ const dict: Dict = {
   "servers.admin.mail.schedule.deleteTitle": "ลบการตั้งเวลานี้ไหม?",
   "servers.admin.mail.schedule.deleteBody": "\"{subject}\" จะไม่ถูกส่งอีก จดหมายที่ส่งไปแล้วยังอยู่ในกล่องจดหมายเหมือนเดิม",
   "servers.admin.mail.schedule.deleted": "ลบการตั้งเวลาแล้ว",
+  "engine.update.task.switch": "กำลังติดตั้ง ResinCraft {version}",
+  "updates.switch.title": "เปลี่ยนเป็น {channel} ไหม",
+  "updates.switch.body": "ตอนนี้คุณใช้ {current} ซึ่งไม่มีใน {channel} ResinCraft จะติดตั้ง {channel} รุ่นล่าสุดทับแล้วเปิดใหม่ อินสแตนซ์ บัญชี และการตั้งค่าจะยังอยู่ครบ",
+  "updates.switch.confirm": "เปลี่ยนและติดตั้งใหม่",
+  "updates.switch.none": "ไม่พบรุ่น {channel} ที่จะติดตั้ง ตอนนี้ช่องของคุณเป็น {channel} แล้ว ลองกดติดตั้งใหม่ภายหลัง",
 }
 
 export default dict

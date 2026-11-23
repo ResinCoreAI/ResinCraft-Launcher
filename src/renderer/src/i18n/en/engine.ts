@@ -643,6 +643,7 @@ export default {
   'engine.update.task.downloading': 'Downloading the update',
   'engine.update.task.installing': 'Installing. ResinCraft will restart by itself.',
   'engine.update.task.reinstall': 'Reinstalling ResinCraft {version}',
+  'engine.update.task.switch': 'Installing ResinCraft {version}',
   'engine.update.task.title': 'Updating ResinCraft to {version}',
   'engine.update.task.waiting': 'Waiting for Minecraft and hosted servers to stop',
   'engine.versionpatch.notJar': "{file} isn't a jar file.",

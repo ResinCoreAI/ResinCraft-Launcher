@@ -239,7 +239,9 @@ pub async fn check() -> Result<UpdateStatus> {
     check_with(false).await
 }
 
-/// `reinstall`: the newest release counts as an update even when it's the version running.
+/// `reinstall`: the channel's newest release counts as an update even when it's the version running, or older than
+/// it: Settings → Reinstall, and moving from a Dev, Test or Beta build back to Beta or Stable, whose newest release can
+/// be below the build installed now (2.0.0 after 2.0.1-dev.5).
 async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
     let Some(app) = ctx::app() else { bail_tr!("update.noApp", "Updates only work in the installed app.") };
     if packaged() {
@@ -261,7 +263,7 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
         builder = builder.endpoints(vec![BETA_FEED.parse().expect("beta feed address"), STABLE_FEED.parse().expect("stable feed address")])?;
     }
     if reinstall {
-        builder = builder.version_comparator(|current, remote| remote.version >= current);
+        builder = builder.version_comparator(|_, _| true);
     }
     let result = match builder.build() {
         Ok(updater) => updater.check().await,
@@ -297,7 +299,8 @@ async fn check_with(reinstall: bool) -> Result<UpdateStatus> {
             notes: u.body.clone().filter(|b| !b.trim().is_empty()),
             date: u.raw_json.get("pub_date").and_then(Value::as_str).map(str::to_string),
             notes_url: if dev { String::new() } else { format!("{RELEASES}/tag/v{}", u.version.trim_start_matches('v')) },
-            reinstall: u.version.trim_start_matches('v') == current_version(),
+            // Asked for (Reinstall, or a move to an older channel's build): not an update to offer in the title bar.
+            reinstall: reinstall || u.version.trim_start_matches('v') == current_version(),
             dev,
         }
     });
@@ -402,12 +405,12 @@ async fn dev_access() -> DevAccess {
     DevAccess::Unknown
 }
 
-/// The relay's Dev build, when it's newer than the running version (or, `reinstall`, the same).
+/// The relay's Dev or Test build, when it's newer than the running version (or, `reinstall`, whatever it is).
 async fn check_dev(app: &tauri::AppHandle, feed: &str, session: &str, reinstall: bool) -> Result<Option<Update>, UpdaterError> {
     let Ok(url) = feed.parse() else { return Ok(None) };
     let mut builder = app.updater_builder().timeout(Duration::from_secs(30)).endpoints(vec![url])?.header("Authorization", format!("Bearer {session}"))?;
     if reinstall {
-        builder = builder.version_comparator(|current, remote| remote.version >= current);
+        builder = builder.version_comparator(|_, _| true);
     }
     builder.build()?.check().await
 }
@@ -479,9 +482,15 @@ async fn install(mode: Mode) -> Result<()> {
     CANCEL.store(false, Ordering::SeqCst);
     let version = update.version.clone();
     let reinstall = version.trim_start_matches('v') == current_version();
+    let older = matches!(
+        (semver::Version::parse(version.trim_start_matches('v')), semver::Version::parse(&current_version())),
+        (Ok(v), Ok(c)) if v < c
+    );
     tauri::async_runtime::spawn(async move {
         let title = if reinstall {
             tr!("update.task.reinstall", "Reinstalling ResinCraft {version}", version = version)
+        } else if older {
+            tr!("update.task.switch", "Installing ResinCraft {version}", version = version)
         } else {
             tr!("update.task.title", "Updating ResinCraft to {version}", version = version)
         };
