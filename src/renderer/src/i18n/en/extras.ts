@@ -1692,4 +1692,7 @@ export default {
   "servers.admin.chat.driveOn": "Telegram drive: {url}. Pictures, mods and voice messages up to {size} MB go there; so do old messages (archived before they're deleted here) and each day's copy.",
   "servers.admin.chat.driveError": "Last problem ({when}): {error}",
   "servers.admin.chat.driveOff": "Telegram drive: not set up ([drive] in relay.toml), so chat sends text only and old messages are deleted without an archive.",
+  "chat.popups.on": "Turn Windows pop-ups on",
+  "chat.popups.off": "Turn Windows pop-ups off",
+  "chat.popups.hint": "For messages while ResinCraft isn't in front",
 } as const

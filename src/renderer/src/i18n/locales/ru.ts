@@ -6075,6 +6075,9 @@ const dict: Dict = {
   "chat.emoji.fileRule": "Эмодзи — файл PNG, JPEG, GIF or WebP размером до 512 KB.",
   "engine.chat.pickTitle": "Отправить файлы",
   "engine.chat.saveTitle": "Сохранить файл",
+  "chat.popups.on": "Включить уведомления Windows",
+  "chat.popups.off": "Выключить уведомления Windows",
+  "chat.popups.hint": "О сообщениях, когда ResinCraft не на переднем плане",
 }
 
 export default dict

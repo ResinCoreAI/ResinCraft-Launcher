@@ -6013,6 +6013,9 @@ const dict: Dict = {
   "chat.emoji.fileRule": "Emoji là tệp PNG, JPEG, GIF or WebP, tối đa 512 KB.",
   "engine.chat.pickTitle": "Gửi tệp",
   "engine.chat.saveTitle": "Lưu tệp",
+  "chat.popups.on": "Bật thông báo Windows",
+  "chat.popups.off": "Tắt thông báo Windows",
+  "chat.popups.hint": "Cho tin nhắn khi ResinCraft không ở phía trước",
 }
 
 export default dict

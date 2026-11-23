@@ -3361,6 +3361,8 @@ export interface ResinApi {
     fileSave(id: string, name: string): Promise<string | null>
     /** Flashes the taskbar button when the window isn't in front. */
     attention(): Promise<boolean>
+    /** A Windows pop-up (who, what); clicking it opens `conv` (on.chatOpen). False where there are none. */
+    notify(title: string, body: string, conv: string): Promise<boolean>
   }
   screenshots: {
     list(instanceId: string): Promise<ScreenshotInfo[]>
@@ -3658,5 +3660,7 @@ export interface ResinApi {
     openLink(cb: (e: { url: string }) => void): () => void
     /** The launcher went over its memory budget while in use (webview.rs): empty the caches that can be read again. */
     memoryTrim(cb: () => void): () => void
+    /** A chat's Windows pop-up was clicked: open that chat. */
+    chatOpen(cb: (e: { conv: string }) => void): () => void
   }
 }

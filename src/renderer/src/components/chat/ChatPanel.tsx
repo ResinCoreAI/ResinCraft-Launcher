@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import type { ChatFile, ChatGiftData, ChatGroup, ChatMessage, ChatPerson } from '@shared/types'
 import { api } from '../../api'
-import { chat, displayName, isGroup, nameOf, peerOf, setSound, soundOn, statusOf, useChat, type ChatView } from '../../chatState'
+import { chat, displayName, isGroup, nameOf, peerOf, popupsOn, setPopups, setSound, soundOn, statusOf, useChat, type ChatView } from '../../chatState'
 import { money } from '../../storeStatus'
 import { useStore } from '../../store'
 import { currentLanguage, t, type Key } from '../../i18n'
@@ -161,6 +161,7 @@ export default function ChatPanel() {
   const [pending, setPending] = useState<{ key: string; name: string; file?: ChatFile; error?: string }[]>([])
   const [recording, setRecording] = useState(false)
   const [sound, setSoundState] = useState(soundOn)
+  const [popups, setPopupsState] = useState(popupsOn)
   const [members, setMembers] = useState(false)
   const list = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -452,7 +453,7 @@ export default function ChatPanel() {
       <aside className="chat-side">
         <button
           className="chat-me"
-          onClick={(e) => openContextMenu(e, [...statusMenu(() => setEditProfile(true), () => setStatusText(true)), '-', { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) }])}
+          onClick={(e) => openContextMenu(e, [...statusMenu(() => setEditProfile(true), () => setStatusText(true)), '-', { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) }, { label: t(popups ? 'chat.popups.off' : 'chat.popups.on'), hint: t('chat.popups.hint'), onSelect: () => (setPopups(!popups), setPopupsState(!popups)) }])}
           title={t('chat.status.change')}
         >
           <ChatAvatar uuid={v.me} size={34} dot status={v.profile?.status === 'invisible' ? 'offline' : v.profile?.status ?? 'online'} />

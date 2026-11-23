@@ -64,6 +64,7 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
             attention();
             json(true)
         }
+        "chat:notify" => json(notify(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?)),
         "chat:import" => json(import_picked().await?),
         _ => bail!("Unknown channel {channel}"),
     }
@@ -306,6 +307,35 @@ async fn file_save(id: &str, name: &str) -> Result<Option<String>> {
     tokio::fs::copy(&src, &dest).await?;
     let _ = shell::reveal(&dest);
     Ok(Some(dest.display().to_string()))
+}
+
+/// A Windows pop-up for a chat message (the launcher isn't in front): who and what. Clicking it brings the launcher
+/// back and opens that chat (`resin:chatOpen`). False where there are no pop-ups.
+fn notify(title: &str, body: &str, conv: &str) -> bool {
+    #[cfg(windows)]
+    {
+        use tauri_winrt_notification::{Duration, Sound, Toast};
+        let conv = conv.to_string();
+        let shown = Toast::new(crate::APP_ID)
+            .title(&title.chars().take(120).collect::<String>())
+            .text1(&body.chars().take(200).collect::<String>())
+            .sound(Some(Sound::IM))
+            .duration(Duration::Short)
+            .on_activated(move |_| {
+                if let Some(app) = crate::core::ctx::app() {
+                    crate::tray::show(app);
+                }
+                crate::core::events::emit("chatOpen", json!({ "conv": conv }));
+                Ok(())
+            })
+            .show();
+        return shown.is_ok();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (title, body, conv);
+        false
+    }
 }
 
 /// The taskbar button flashes (a message came while the launcher wasn't in front).

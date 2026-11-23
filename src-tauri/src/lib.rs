@@ -51,7 +51,7 @@ async fn ipc(channel: String, args: Vec<Value>) -> Result<Value, Value> {
 /// ResinCraft's identity on the taskbar: the same id tauri.conf.json has (`identifier`), which the installer also
 /// puts on ResinCraft's own shortcuts.
 #[cfg(windows)]
-const APP_ID: &str = "ai.resincore.resincraft";
+pub(crate) const APP_ID: &str = "ai.resincore.resincraft";
 
 /// Tells Windows which app this process is, before any window exists. Without it, a launcher started from an
 /// instance's desktop shortcut (core/shortcut.rs) is taken for that shortcut: its taskbar button wears the

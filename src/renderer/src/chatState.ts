@@ -5,6 +5,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 import type { ChatEmbed, ChatFile, ChatFileKind, ChatFriends, ChatGiftOptions, ChatGroup, ChatMessage, ChatPerson, ChatProfile, ChatStatus, ChatSync } from '@shared/types'
 import { api } from './api'
 import { setChatBadge } from './inboxState'
+import { t } from './i18n'
 
 export interface ChatView {
   /** off: no chat for this account (no relay, an offline account, a relay without chat). */
@@ -111,6 +112,51 @@ export function statusOf(uuid: string): ChatStatus {
     if (m?.status) return m.status
   }
   return 'offline'
+}
+
+// ----- Windows pop-ups while the launcher isn't in front (off in the chat's menu) -----
+const POPUP_KEY = 'resin.chat.popups'
+export function popupsOn(): boolean {
+  try {
+    return localStorage.getItem(POPUP_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+export function setPopups(on: boolean) {
+  try {
+    localStorage.setItem(POPUP_KEY, on ? '1' : '0')
+  } catch {}
+}
+/** "Steve" or "Steve · Build crew". */
+function popupTitle(m: ChatMessage): string {
+  const who = displayName(m.conv, m.sender)
+  const g = isGroup(m.conv) ? view.groups.find((x) => x.conv === m.conv) : undefined
+  return g ? `${who} · ${g.name}` : who
+}
+/** A line of the message: its text, or what it sent. */
+function popupText(m: ChatMessage): string {
+  if (m.kind === 'gift') return t('chat.giftToast', { name: displayName(m.conv, m.sender) })
+  const files = m.data && 'files' in m.data ? m.data.files ?? [] : []
+  const text = m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/\|\|[\s\S]*?\|\|/g, '▒▒▒').replace(/[*_~`>]/g, '').replace(/\s+/g, ' ').trim()
+  if (text) return text
+  if (files.some((f) => f.kind === 'voice')) return t('chat.voice.line')
+  if (files.length) return files.every((f) => f.kind === 'image') ? t('chat.files.pictureLine') : t('chat.files.fileLine')
+  if (m.data && 'embed' in m.data && m.data.embed) return m.data.embed.name
+  return ''
+}
+// A pop-up clicked: that chat opens (App.tsx goes to the Inbox).
+let openHandler: ((conv: string) => void) | null = null
+export function onPopupOpen(cb: (conv: string) => void) {
+  openHandler = cb
+}
+if (typeof window !== 'undefined') {
+  try {
+    api.on.chatOpen((e) => {
+      showChat(e.conv)
+      openHandler?.(e.conv)
+    })
+  } catch {}
 }
 
 // ----- Sound: a soft two-note ping for a new message (off in the chat's menu) -----
@@ -286,7 +332,12 @@ export function useChatWatch(accountId: string | undefined, onNew: (m: ChatMessa
             const shown = fresh.filter((m) => m.kind !== 'system' && (m.conv !== view.open || document.hidden))
             shown.forEach((m) => onNew(m, displayName(m.conv, m.sender)))
             if (shown.length) {
-              if (document.hidden || !document.hasFocus()) void api.chat.attention().catch(() => {})
+              const away = document.hidden || !document.hasFocus()
+              if (away) {
+                void api.chat.attention().catch(() => {})
+                // A Windows pop-up for each (the newest three), unless turned off.
+                if (popupsOn()) for (const m of shown.slice(-3)) void api.chat.notify(popupTitle(m), popupText(m), m.conv).catch(() => {})
+              }
               ping()
             }
           }

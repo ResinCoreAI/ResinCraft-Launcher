@@ -6059,6 +6059,9 @@ const dict: Dict = {
   "chat.emoji.fileRule": "Un emoji es un PNG, JPEG, GIF o WebP de hasta 512 KB.",
   "engine.chat.pickTitle": "Enviar archivos",
   "engine.chat.saveTitle": "Guardar el archivo",
+  "chat.popups.on": "Activar avisos de Windows",
+  "chat.popups.off": "Desactivar avisos de Windows",
+  "chat.popups.hint": "Para mensajes cuando ResinCraft no está en primer plano",
 }
 
 export default dict

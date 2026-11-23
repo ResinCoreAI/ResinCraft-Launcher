@@ -755,7 +755,7 @@ export function mockApi(): ResinApi {
           off()
           timers.forEach((t) => window.clearTimeout(t))
         }
-      }, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop(), openLink: () => noop(), memoryTrim: () => noop() },
+      }, update: updates.onUpdate, listChanged: () => noop(), remote: () => noop(), remoteAction: () => noop(), remoteViewPush: () => noop(), remoteViewGone: () => noop(), openFile: () => noop(), openLink: () => noop(), memoryTrim: () => noop(), chatOpen: () => noop() },
     remote: {
       status: async () => ({ state: settings.remoteControl ? 'online' : 'off', viewers: settings.remoteControl ? 1 : 0, account: 'Puirkle', url: 'https://console.rscraft.resincore.tech' }),
       grants: async () => grants,

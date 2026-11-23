@@ -6026,6 +6026,9 @@ const dict: Dict = {
   "chat.emoji.fileRule": "Emoji en fazla 512 KB boyutunda PNG, JPEG, GIF or WebP olmalı.",
   "engine.chat.pickTitle": "Dosya gönder",
   "engine.chat.saveTitle": "Dosyayı kaydet",
+  "chat.popups.on": "Windows bildirimlerini aç",
+  "chat.popups.off": "Windows bildirimlerini kapat",
+  "chat.popups.hint": "ResinCraft önde değilken gelen mesajlar için",
 }
 
 export default dict

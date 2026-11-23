@@ -6069,6 +6069,9 @@ const dict: Dict = {
   "servers.admin.chat.driveOn": "ไดรฟ์ Telegram: {url} รูป ม็อด และข้อความเสียงขนาดไม่เกิน {size} MB จะเก็บไว้ที่นี่ รวมถึงข้อความเก่า (เก็บถาวรก่อนลบออกจากรีเลย์) และสำเนารายวัน",
   "servers.admin.chat.driveError": "ปัญหาล่าสุด ({when}): {error}",
   "servers.admin.chat.driveOff": "ไดรฟ์ Telegram: ยังไม่ได้ตั้งค่า ([drive] ใน relay.toml) แชทจึงส่งได้แค่ข้อความ และข้อความเก่าจะถูกลบโดยไม่เก็บถาวร",
+  "chat.popups.on": "เปิดการแจ้งเตือนของ Windows",
+  "chat.popups.off": "ปิดการแจ้งเตือนของ Windows",
+  "chat.popups.hint": "สำหรับข้อความตอนที่ ResinCraft ไม่ได้อยู่หน้าจอ",
 }
 
 export default dict

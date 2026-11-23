@@ -6013,6 +6013,9 @@ const dict: Dict = {
   "chat.emoji.fileRule": "絵文字は 512 KB までの PNG, JPEG, GIF or WebP です。",
   "engine.chat.pickTitle": "ファイルを送る",
   "engine.chat.saveTitle": "ファイルを保存",
+  "chat.popups.on": "Windows の通知をオンにする",
+  "chat.popups.off": "Windows の通知をオフにする",
+  "chat.popups.hint": "ResinCraft が前面にないときのメッセージ",
 }
 
 export default dict

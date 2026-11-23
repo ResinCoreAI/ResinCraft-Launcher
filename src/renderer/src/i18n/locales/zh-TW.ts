@@ -6003,6 +6003,9 @@ const dict: Dict = {
   "chat.emoji.fileRule": "表情符號須為 PNG, JPEG, GIF or WebP，最大 512 KB。",
   "engine.chat.pickTitle": "傳送檔案",
   "engine.chat.saveTitle": "儲存檔案",
+  "chat.popups.on": "開啟 Windows 通知",
+  "chat.popups.off": "關閉 Windows 通知",
+  "chat.popups.hint": "ResinCraft 不在前景時收到的訊息",
 }
 
 export default dict

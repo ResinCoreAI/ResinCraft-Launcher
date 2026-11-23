@@ -81,6 +81,8 @@ tauri-plugin-deep-link = "2"
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
+# Windows pop-ups for chat messages while the launcher is in the background (chat.rs), with a click that opens the chat.
+tauri-winrt-notification = "0.7"
 # WebView2's memory target (webview.rs); the same versions Tauri's own wry uses.
 webview2-com = "0.39"
 windows-core = "0.62"

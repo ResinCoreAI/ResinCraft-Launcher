@@ -477,6 +477,9 @@ export function mockChat(): ResinApi['chat'] {
     },
     async attention() {
       return true
+    },
+    async notify() {
+      return false
     }
   }
 }

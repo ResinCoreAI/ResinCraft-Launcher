@@ -256,7 +256,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       leave: fn('friends:leave')
     },
     mail: { call: fn('mail:call') },
-    chat: { call: fn('chat:call'), save: fn('chat:save'), load: fn('chat:load'), older: fn('chat:older'), info: fn('chat:info'), export: fn('chat:export'), import: fn('chat:import'), pickFiles: fn('chat:pickFiles'), upload: fn('chat:upload'), uploadBytes: fn('chat:uploadBytes'), fileData: fn('chat:fileData'), fileLocal: fn('chat:fileLocal'), fileSave: fn('chat:fileSave'), attention: fn('chat:attention') },
+    chat: { call: fn('chat:call'), save: fn('chat:save'), load: fn('chat:load'), older: fn('chat:older'), info: fn('chat:info'), export: fn('chat:export'), import: fn('chat:import'), pickFiles: fn('chat:pickFiles'), upload: fn('chat:upload'), uploadBytes: fn('chat:uploadBytes'), fileData: fn('chat:fileData'), fileLocal: fn('chat:fileLocal'), fileSave: fn('chat:fileSave'), attention: fn('chat:attention'), notify: fn('chat:notify') },
     quickjoin: {
       get: fn('quickjoin:get'),
       save: fn('quickjoin:save'),
@@ -415,6 +415,6 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reveal: fn('files:reveal')
     },
     migrate: { scan: fn('migrate:scan'), scanFolder: fn('migrate:scanFolder'), size: fn('migrate:size'), import: fn('migrate:import') },
-    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), gameWindow: on('gameWindow'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile'), openLink: on('openLink'), memoryTrim: on('memoryTrim') }
+    on: { task: on('task'), game: on('game'), friends: on('friends'), log: on('log'), login: on('login'), server: on('server'), serverLog: on('serverLog'), serverRequests: on('serverRequests'), joinAnswered: on('joinAnswered'), joinStates: on('joinStates'), gameCrash: on('gameCrash'), gameWindow: on('gameWindow'), update: on('update'), listChanged: on('listChanged'), remote: on('remote'), remoteAction: on('remoteAction'), remoteViewPush: on('remoteViewPush'), remoteViewGone: on('remoteViewGone'), openFile: on('openFile'), openLink: on('openLink'), memoryTrim: on('memoryTrim'), chatOpen: on('chatOpen') }
   } as ResinApi
 }

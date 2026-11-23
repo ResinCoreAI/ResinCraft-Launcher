@@ -6008,6 +6008,9 @@ const dict: Dict = {
   "chat.emoji.fileRule": "이모지는 512 KB 이하의 PNG, JPEG, GIF or WebP 파일이에요.",
   "engine.chat.pickTitle": "파일 보내기",
   "engine.chat.saveTitle": "파일 저장",
+  "chat.popups.on": "Windows 알림 켜기",
+  "chat.popups.off": "Windows 알림 끄기",
+  "chat.popups.hint": "ResinCraft가 앞에 없을 때 온 메시지",
 }
 
 export default dict

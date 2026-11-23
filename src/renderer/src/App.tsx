@@ -50,7 +50,7 @@ import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
 import { useAdminStatus } from './adminStatus'
 import { useInboxBadge, useInboxWatch } from './inboxState'
-import { showChat, useChatWatch } from './chatState'
+import { onPopupOpen, showChat, useChatWatch } from './chatState'
 import { useClassicLayout } from './classicLayoutState'
 import { ClassicSidebar, ClassicTopBar } from './components/ClassicShell'
 import './classic.css'
@@ -191,6 +191,8 @@ export default function App() {
   useInboxWatch(activeAccount?.type === 'msa' ? activeAccount.id : undefined, (count) => {
     if (route.page !== 'inbox') toast(t('inbox.newMail', { count }), 'info')
   })
+  // A chat's Windows pop-up clicked: to the Inbox, on that chat.
+  useEffect(() => onPopupOpen(() => go({ page: 'inbox' })), [go])
   // Friends and chat: messages arrive live; one from someone says so unless that chat is on screen.
   useChatWatch(activeAccount?.type === 'msa' ? activeAccount.id : undefined, (m, name) => {
     const text = m.kind === 'gift' ? t('chat.giftToast', { name }) : t('chat.newMessage', { name, text: m.body.length > 80 ? `${m.body.slice(0, 80)}…` : m.body })
