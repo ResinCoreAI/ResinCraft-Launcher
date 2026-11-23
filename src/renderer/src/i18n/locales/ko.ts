@@ -6115,6 +6115,7 @@ const dict: Dict = {
   "chat.side.about": "소개",
   "chat.side.mutual": "함께 있는 그룹 · {count}",
   "chat.side.noMutual": "아직 없어요",
+  "chat.gift.short": "이 선물은 {need}이고 보유 금액은 {have}입니다. 보내려면 스토어에서 충전하세요.",
 }
 
 export default dict

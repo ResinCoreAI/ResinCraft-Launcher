@@ -6123,6 +6123,7 @@ const dict: Dict = {
   "chat.side.about": "Tentang",
   "chat.side.mutual": "Grup yang sama · {count}",
   "chat.side.noMutual": "Belum ada",
+  "chat.gift.short": "Ini seharga {need}, dan kamu punya {have}. Isi ulang di Toko untuk mengirimnya.",
 }
 
 export default dict

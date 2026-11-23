@@ -6110,6 +6110,7 @@ const dict: Dict = {
   "chat.side.about": "關於",
   "chat.side.mutual": "共同群組 · {count}",
   "chat.side.noMutual": "尚無",
+  "chat.gift.short": "這需要 {need}，你有 {have}。請在商店儲值後再送出。",
 }
 
 export default dict

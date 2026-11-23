@@ -889,6 +889,24 @@
 .chat-pics:not(.n1) .chat-pic {
   aspect-ratio: 1;
 }
+/* One picture shows whole, at its own shape: never stretched to the column and cut (a tall picture or a sticker
+ * would lose its top and bottom). It's at most 320 px tall and the column's width; its own size when smaller. */
+.chat-pics.n1 {
+  justify-items: start;
+}
+.chat-pics.n1 img.chat-pic {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+/* While it loads: a box of the picture's shape, as tall as it will be. */
+.chat-pics.n1 .chat-img-wait.chat-pic {
+  width: auto;
+  height: min(320px, 240px);
+  max-width: 100%;
+}
 .chat-voice {
   display: flex;
   align-items: center;

@@ -6133,6 +6133,7 @@ const dict: Dict = {
   "chat.side.about": "Hakkında",
   "chat.side.mutual": "Ortak gruplar · {count}",
   "chat.side.noMutual": "Henüz yok",
+  "chat.gift.short": "Bunun fiyatı {need}, sende {have} var. Göndermek için Mağaza'dan yükleme yap.",
 }
 
 export default dict

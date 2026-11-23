@@ -1864,4 +1864,5 @@ export default {
   "chat.side.about": "About",
   "chat.side.mutual": "Groups you share · {count}",
   "chat.side.noMutual": "None yet",
+  "chat.gift.short": "This costs {need}, and you have {have}. Top up in the Store to send it.",
 } as const

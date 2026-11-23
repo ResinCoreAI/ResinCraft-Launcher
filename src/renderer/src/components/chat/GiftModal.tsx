@@ -136,6 +136,7 @@ export default function GiftModal({
                 {opts.dailyLeft !== null && <> {t('chat.gift.dailyLeft', { amount: money(opts.dailyLeft, cur) })}</>}
               </p>
               {minor > 0 && minor < opts.minGift && <p className="hint bad">{t('chat.gift.min', { amount: money(opts.minGift, cur) })}</p>}
+              {minor > opts.sendable && <p className="hint bad">{t('chat.gift.short', { need: money(minor, cur), have: money(opts.sendable, cur) })}</p>}
             </>
           ) : (
             <>
@@ -163,6 +164,7 @@ export default function GiftModal({
                 />
               )}
               {item && <p className="hint">{t('chat.gift.itemCost', { item: item.name, amount: money(price, cur), name })}</p>}
+              {item && price > opts.balance && <p className="hint bad">{t('chat.gift.short', { need: money(price, cur), have: money(opts.balance, cur) })}</p>}
             </>
           )}
           <label className="field">

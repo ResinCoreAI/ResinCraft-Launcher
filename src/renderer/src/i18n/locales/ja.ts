@@ -6120,6 +6120,7 @@ const dict: Dict = {
   "chat.side.about": "プロフィール情報",
   "chat.side.mutual": "共通のグループ · {count}",
   "chat.side.noMutual": "まだありません",
+  "chat.gift.short": "これは {need} です。残高は {have} です。送るにはストアでチャージしてください。",
 }
 
 export default dict

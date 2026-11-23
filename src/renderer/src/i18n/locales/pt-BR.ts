@@ -6164,6 +6164,7 @@ const dict: Dict = {
   "chat.side.about": "Sobre",
   "chat.side.mutual": "Grupos em comum · {count}",
   "chat.side.noMutual": "Nenhum ainda",
+  "chat.gift.short": "Isso custa {need} e você tem {have}. Recarregue na Loja para enviar.",
 }
 
 export default dict
