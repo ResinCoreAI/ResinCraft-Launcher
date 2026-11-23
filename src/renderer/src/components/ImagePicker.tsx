@@ -13,10 +13,18 @@ import { t } from '../i18n'
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
 const MAX_FILE = 15 * 1024 * 1024
 
-/** What each kind of picture becomes. The engine shrinks further (icon 256 px, banner 960×540). */
-const SHAPE: Record<InstanceImage, { aspect: number; outW: number; outH: number; mime: string }> = {
+/** A picture the crop window makes: an instance's icon or banner, or a chat group's emoji. */
+export type CropKind = InstanceImage | 'emoji'
+
+/**
+ * What each kind of picture becomes. The engine shrinks further (icon 256 px, banner 960×540). An emoji is a 128 px
+ * PNG (see-through kept), small enough for the relay's 512 KB whatever came in; it can be zoomed out past the frame
+ * (`fit`), the rest left see-through, and it starts with the whole picture in.
+ */
+const SHAPE: Record<CropKind, { aspect: number; outW: number; outH: number; mime: string; fit?: boolean }> = {
   icon: { aspect: 1, outW: 512, outH: 512, mime: 'image/png' },
   banner: { aspect: 16 / 9, outW: 1280, outH: 720, mime: 'image/jpeg' },
+  emoji: { aspect: 1, outW: 128, outH: 128, mime: 'image/png', fit: true },
 }
 
 /** Opens the system file dialog. Resolves with the picture as a data URL, or null if cancelled. */
@@ -49,8 +57,11 @@ function choosePicture(onError: (message: string) => void): Promise<string | nul
   })
 }
 
-/** Drag to move, wheel or slider to zoom; the picture always covers the frame. */
-function CropModal({ src, kind, onDone, onCancel }: { src: string; kind: InstanceImage; onDone: (dataUrl: string) => void; onCancel: () => void }) {
+/**
+ * Drag to move, wheel or slider to zoom; the picture covers the frame (an emoji's can also sit inside it). `extra`: a
+ * button of the caller's own in the footer (an animated emoji's "keep as it is").
+ */
+export function CropModal({ src, kind, onDone, onCancel, extra }: { src: string; kind: CropKind; onDone: (dataUrl: string) => void; onCancel: () => void; extra?: React.ReactNode }) {
   const shape = SHAPE[kind]
   const frame = useRef<HTMLDivElement>(null)
   const [img, setImg] = useState<HTMLImageElement>()
@@ -75,25 +86,31 @@ function CropModal({ src, kind, onDone, onCancel }: { src: string; kind: Instanc
     return () => ro.disconnect()
   }, [])
 
-  // Scale at zoom 1 makes the picture just cover the frame.
+  // Scale at zoom 1 makes the picture just cover the frame; `least` is how far out it zooms (1, or for an emoji the
+  // zoom that fits the whole picture in).
   const base = img && box.w ? Math.max(box.w / img.naturalWidth, box.h / img.naturalHeight) : 1
+  const least = img && box.w && shape.fit ? Math.min(1, Math.min(box.w / img.naturalWidth, box.h / img.naturalHeight) / base) : 1
   const scale = base * zoom
   const size = img ? { w: img.naturalWidth * scale, h: img.naturalHeight * scale } : { w: 0, h: 0 }
+  // Bigger than the frame: it can't leave a gap; smaller (an emoji zoomed out): it stays inside.
   const clamp = (p: { x: number; y: number }, s = size) => ({
-    x: Math.min(0, Math.max(box.w - s.w, p.x)),
-    y: Math.min(0, Math.max(box.h - s.h, p.y)),
+    x: Math.min(Math.max(0, box.w - s.w), Math.max(Math.min(0, box.w - s.w), p.x)),
+    y: Math.min(Math.max(0, box.h - s.h), Math.max(Math.min(0, box.h - s.h), p.y)),
   })
 
-  // Start centred once the picture and the frame are known.
+  // Start centred once the picture and the frame are known (an emoji: all of it in).
   useEffect(() => {
-    if (img && box.w) setPos({ x: (box.w - img.naturalWidth * base) / 2, y: (box.h - img.naturalHeight * base) / 2 })
+    if (!img || !box.w) return
+    const z = shape.fit ? least : 1
+    setZoom(z)
+    setPos({ x: (box.w - img.naturalWidth * base * z) / 2, y: (box.h - img.naturalHeight * base * z) / 2 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [img, box.w, box.h])
 
   /** Zooms keeping the point (cx, cy) of the frame still. */
   const zoomTo = (next: number, cx = box.w / 2, cy = box.h / 2) => {
     if (!img) return
-    const z = Math.min(4, Math.max(1, next))
+    const z = Math.min(4, Math.max(least, next))
     const k = z / zoom
     const s = { w: img.naturalWidth * base * z, h: img.naturalHeight * base * z }
     setPos((p) => clamp({ x: cx - (cx - p.x) * k, y: cy - (cy - p.y) * k }, s))
@@ -157,11 +174,13 @@ function CropModal({ src, kind, onDone, onCancel }: { src: string; kind: Instanc
 
   return (
     <Modal
-      title={t(kind === 'icon' ? 'art.cropIcon' : 'art.cropBanner')}
+      title={t(kind === 'icon' ? 'art.cropIcon' : kind === 'emoji' ? 'art.cropEmoji' : 'art.cropBanner')}
       subtitle={t('art.cropHint')}
       onClose={onCancel}
       footer={
         <>
+          {extra}
+          {extra && <div className="spacer" />}
           <button className="btn ghost" onClick={onCancel}>
             {t('common.cancel')}
           </button>
@@ -190,7 +209,7 @@ function CropModal({ src, kind, onDone, onCancel }: { src: string; kind: Instanc
         <button className="btn ghost icon sm" onClick={() => zoomTo(zoom / 1.25)} aria-label={t('art.zoomOut')}>
           <ZoomOut />
         </button>
-        <input type="range" min={1} max={4} step={0.01} value={zoom} onChange={(e) => zoomTo(Number(e.target.value))} aria-label={t('art.zoom')} />
+        <input type="range" min={least} max={4} step={0.01} value={zoom} onChange={(e) => zoomTo(Number(e.target.value))} aria-label={t('art.zoom')} />
         <button className="btn ghost icon sm" onClick={() => zoomTo(zoom * 1.25)} aria-label={t('art.zoomIn')}>
           <ZoomIn />
         </button>

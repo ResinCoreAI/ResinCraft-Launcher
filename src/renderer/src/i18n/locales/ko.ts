@@ -6119,6 +6119,10 @@ const dict: Dict = {
   "chat.gift.waitLabel": "받지 않으면 돌아오는 시간",
   "chat.gift.waitHint": "그때까지 아무도 받기를 누르지 않으면 지불한 금액 전부가 Resin Credit으로 돌아옵니다. 스토어 아이템도 포함됩니다.",
   "chat.gift.backIn": "{when} 돌아옴",
+  "art.cropEmoji": "이모지 자르기",
+  "chat.emoji.fileType": "이모지는 PNG, JPEG, GIF, WebP 이미지입니다.",
+  "chat.emoji.keepGif": "애니메이션 유지",
+  "chat.emoji.keepGifHint": "GIF를 자르지 않고 움직이는 그대로 사용합니다",
 }
 
 export default dict

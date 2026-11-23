@@ -6187,6 +6187,10 @@ const dict: Dict = {
   "chat.gift.waitLabel": "Revient s'il n'est pas reçu sous",
   "chat.gift.waitHint": "Si personne n'appuie sur Recevoir d'ici là, tout ce que tu as payé te revient en Resin Credit, articles de la Boutique compris.",
   "chat.gift.backIn": "revient {when}",
+  "art.cropEmoji": "Recadrer l'emoji",
+  "chat.emoji.fileType": "Un emoji est une image PNG, JPEG, GIF ou WebP.",
+  "chat.emoji.keepGif": "Garder l'animation",
+  "chat.emoji.keepGifHint": "Utilise le GIF tel quel, animé, sans le recadrer",
 }
 
 export default dict

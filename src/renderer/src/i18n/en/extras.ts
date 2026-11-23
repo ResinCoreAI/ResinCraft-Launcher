@@ -1868,4 +1868,8 @@ export default {
   "chat.gift.waitLabel": "Goes back if not received in",
   "chat.gift.waitHint": "If nobody presses Receive by then, everything you paid comes back to you as Resin Credit, Store items included.",
   "chat.gift.backIn": "goes back {when}",
+  "art.cropEmoji": "Crop the emoji",
+  "chat.emoji.fileType": "An emoji is a PNG, JPEG, GIF or WebP picture.",
+  "chat.emoji.keepGif": "Keep animation",
+  "chat.emoji.keepGifHint": "Uses the GIF as it is, moving, without cropping",
 } as const

@@ -3395,6 +3395,13 @@ body.dragging * {
 .crop-frame.icon {
   width: min(320px, 100%);
 }
+/* An emoji keeps what's see-through: a checkerboard shows where that is. */
+.crop-frame.emoji {
+  width: min(280px, 100%);
+  background-color: var(--surface-2);
+  background-image: conic-gradient(rgba(255, 255, 255, 0.06) 25%, transparent 0 50%, rgba(255, 255, 255, 0.06) 0 75%, transparent 0);
+  background-size: 16px 16px;
+}
 .crop-frame:active {
   cursor: grabbing;
 }

@@ -6137,6 +6137,10 @@ const dict: Dict = {
   "chat.gift.waitLabel": "Alınmazsa geri döner",
   "chat.gift.waitHint": "O zamana kadar kimse Al'a basmazsa, ödediğin her şey Mağaza ürünleri dahil Resin Credit olarak sana geri döner.",
   "chat.gift.backIn": "{when} geri döner",
+  "art.cropEmoji": "Emojiyi kırp",
+  "chat.emoji.fileType": "Emoji bir PNG, JPEG, GIF veya WebP resmidir.",
+  "chat.emoji.keepGif": "Animasyonu koru",
+  "chat.emoji.keepGifHint": "GIF'i kırpmadan, hareketli haliyle kullanır",
 }
 
 export default dict

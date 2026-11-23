@@ -6114,6 +6114,10 @@ const dict: Dict = {
   "chat.gift.waitLabel": "未領取則退回的時間",
   "chat.gift.waitHint": "如果到時沒有人點擊領取，你支付的全部金額（包括商店物品）都會以 Resin Credit 退還給你。",
   "chat.gift.backIn": "{when}退回",
+  "art.cropEmoji": "裁切表情",
+  "chat.emoji.fileType": "表情是 PNG、JPEG、GIF 或 WebP 圖片。",
+  "chat.emoji.keepGif": "保留動畫",
+  "chat.emoji.keepGifHint": "按原樣使用 GIF，保持動畫，不裁切",
 }
 
 export default dict

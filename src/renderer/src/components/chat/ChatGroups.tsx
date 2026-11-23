@@ -9,6 +9,7 @@ import { useStore } from '../../store'
 import { t, type Key } from '../../i18n'
 import { ConfirmModal, Modal, openContextMenu, type ContextEntry } from '../ui'
 import PlayerHead from '../PlayerHead'
+import { CropModal } from '../ImagePicker'
 
 export function GroupTile({ name, size = 32 }: { name: string; size?: number }) {
   const letters = name
@@ -132,19 +133,35 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
   const fail = (e: unknown) => toast((e as Error).message, 'error')
   const [emojiName, setEmojiName] = useState('')
   const emojiInput = useRef<HTMLInputElement>(null)
-  const addEmoji = async (file: File | undefined) => {
+  // A picture for an emoji: cropped to a square and made 128 px (any size comes in); a small GIF can stay as it is,
+  // moving (cropping makes a still picture).
+  const [emojiCrop, setEmojiCrop] = useState<{ src: string; file: File } | null>(null)
+  const pickEmoji = (file: File | undefined) => {
+    if (emojiInput.current) emojiInput.current.value = ''
     const name = emojiName.trim().toLowerCase()
     if (!file) return
     if (!/^[a-z0-9_]{2,32}$/.test(name)) {
       toast(t('chat.emoji.nameRule'), 'error')
       return
     }
-    if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type) || file.size > 512_000) {
-      toast(t('chat.emoji.fileRule'), 'error')
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
+      toast(t('chat.emoji.fileType'), 'error')
       return
     }
+    if (file.size > 15 * 1024 * 1024) {
+      toast(t('art.tooBig'), 'error')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => typeof reader.result === 'string' && setEmojiCrop({ src: reader.result, file })
+    reader.onerror = () => toast(t('chat.emoji.fileType'), 'error')
+    reader.readAsDataURL(file)
+  }
+  const addEmoji = async (file: Blob, fileName: string) => {
+    const name = emojiName.trim().toLowerCase()
+    setEmojiCrop(null)
     try {
-      const f = await chat.uploadBlob(g.conv, file, file.name, 'emoji')
+      const f = await chat.uploadBlob(g.conv, file, fileName, 'emoji')
       await chat.group('emoji', g.conv, { name, file: f.id })
       setEmojiName('')
     } catch (e) {
@@ -307,12 +324,27 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
           <button className="btn sm" disabled={!emojiName.trim()} onClick={() => emojiInput.current?.click()}>
             {t('chat.emoji.add')}
           </button>
-          <input ref={emojiInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => void addEmoji(e.target.files?.[0])} />
+          <input ref={emojiInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => pickEmoji(e.target.files?.[0])} />
         </div>
       )}
       <button className="btn sm ghost danger chat-leave" onClick={() => setLeaving(true)}>
         <LogOut /> {t('chat.group.leave')}
       </button>
+      {emojiCrop && (
+        <CropModal
+          src={emojiCrop.src}
+          kind="emoji"
+          onCancel={() => setEmojiCrop(null)}
+          onDone={(png) => void fetch(png).then((r) => r.blob()).then((b) => addEmoji(b, 'emoji.png'))}
+          extra={
+            emojiCrop.file.type === 'image/gif' && emojiCrop.file.size <= 512_000 ? (
+              <button className="btn ghost" title={t('chat.emoji.keepGifHint')} onClick={() => void addEmoji(emojiCrop.file, emojiCrop.file.name)}>
+                {t('chat.emoji.keepGif')}
+              </button>
+            ) : undefined
+          }
+        />
+      )}
       {adding && <AddMembersModal g={g} onClose={() => setAdding(false)} />}
       {renaming !== null && (
         <Modal

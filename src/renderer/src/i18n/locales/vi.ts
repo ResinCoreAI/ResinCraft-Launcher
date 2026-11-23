@@ -6124,6 +6124,10 @@ const dict: Dict = {
   "chat.gift.waitLabel": "Hoàn lại nếu không được nhận trong",
   "chat.gift.waitHint": "Nếu đến lúc đó không ai bấm Nhận, toàn bộ số bạn đã trả sẽ quay lại dưới dạng Resin Credit, kể cả vật phẩm Cửa hàng.",
   "chat.gift.backIn": "hoàn lại {when}",
+  "art.cropEmoji": "Cắt emoji",
+  "chat.emoji.fileType": "Emoji là ảnh PNG, JPEG, GIF hoặc WebP.",
+  "chat.emoji.keepGif": "Giữ chuyển động",
+  "chat.emoji.keepGifHint": "Dùng GIF nguyên bản, vẫn chuyển động, không cắt",
 }
 
 export default dict

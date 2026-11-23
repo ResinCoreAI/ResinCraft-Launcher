@@ -6127,6 +6127,10 @@ const dict: Dict = {
   "chat.gift.waitLabel": "Kembali jika tidak diterima dalam",
   "chat.gift.waitHint": "Jika tidak ada yang menekan Terima sampai saat itu, semua yang kamu bayar kembali sebagai Resin Credit, termasuk item Toko.",
   "chat.gift.backIn": "kembali {when}",
+  "art.cropEmoji": "Potong emoji",
+  "chat.emoji.fileType": "Emoji adalah gambar PNG, JPEG, GIF, atau WebP.",
+  "chat.emoji.keepGif": "Pertahankan animasi",
+  "chat.emoji.keepGifHint": "Memakai GIF apa adanya, tetap bergerak, tanpa dipotong",
 }
 
 export default dict

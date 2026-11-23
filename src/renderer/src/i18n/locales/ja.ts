@@ -6124,6 +6124,10 @@ const dict: Dict = {
   "chat.gift.waitLabel": "受け取られなかった場合に戻るまで",
   "chat.gift.waitHint": "それまでに誰も「受け取る」を押さなければ、支払った全額（ストアのアイテムも含む）がResin Creditとして戻ります。",
   "chat.gift.backIn": "{when}に戻ります",
+  "art.cropEmoji": "絵文字を切り抜く",
+  "chat.emoji.fileType": "絵文字は PNG、JPEG、GIF、WebP の画像です。",
+  "chat.emoji.keepGif": "アニメーションを保持",
+  "chat.emoji.keepGifHint": "GIF を切り抜かずに、動くままで使います",
 }
 
 export default dict
