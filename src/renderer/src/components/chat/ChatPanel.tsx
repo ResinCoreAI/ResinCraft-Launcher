@@ -19,11 +19,12 @@ import {
   Upload,
   UserMinus,
   UserPlus,
+  Users,
   X
 } from 'lucide-react'
-import type { ChatMessage, ChatPerson } from '@shared/types'
+import type { ChatGiftData, ChatGroup, ChatMessage, ChatPerson } from '@shared/types'
 import { api } from '../../api'
-import { chat, nameOf, peerOf, useChat, type ChatView } from '../../chatState'
+import { chat, isGroup, nameOf, peerOf, useChat, type ChatView } from '../../chatState'
 import { money } from '../../storeStatus'
 import { useStore } from '../../store'
 import { currentLanguage, t, type Key } from '../../i18n'
@@ -31,9 +32,12 @@ import { ConfirmModal, Empty, openContextMenu, type ContextEntry } from '../ui'
 import ChatText from './ChatText'
 import EmojiPicker from './EmojiPicker'
 import GiftModal from './GiftModal'
+import Embeds from './Embeds'
+import { GroupPanel, GroupTile, NewGroupModal, SystemNote } from './ChatGroups'
 import '../../chat.css'
 
 const CODE = /^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/
+const GROUP_CODE = /^G-?[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/i
 const REASONS: [string, Key][] = [
   ['spam', 'chat.report.spam'],
   ['harassment', 'chat.report.harassment'],
@@ -68,11 +72,13 @@ function snippet(m: ChatMessage | undefined, me: string): string {
   const who = m.sender === me ? `${t('chat.you')}: ` : ''
   if (m.deleted) return who + t('chat.deleted')
   if (m.kind === 'gift') return who + t('chat.giftLine')
+  if (m.kind === 'system') return ''
+  if (!m.body && m.data && 'embed' in m.data) return who + m.data.embed.name
   return who + m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 function GiftCard({ m, mine, peer }: { m: ChatMessage; mine: boolean; peer: string }) {
-  const g = m.data
+  const g = m.data as ChatGiftData | null
   if (!g) return null
   const what = g.kind === 'credit' ? t('chat.gift.cardCredit', { amount: money(g.amount, g.currency) }) : t(g.yearly ? 'chat.gift.cardItemYear' : 'chat.gift.cardItemMonth', { item: g.name ?? g.product ?? '' })
   return (
@@ -138,12 +144,15 @@ export default function ChatPanel() {
   const [sending, setSending] = useState(false)
   const [confirm, setConfirm] = useState<{ title: string; body: string; ok: string; run: () => Promise<unknown> }>()
   const [showBlocked, setShowBlocked] = useState(false)
+  const [newGroup, setNewGroup] = useState(false)
+  const [members, setMembers] = useState(false)
   const list = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
   const pinned = useRef(true)
 
   const open = v.open
-  const peer = open ? peerOf(open, v.me) : ''
+  const group: ChatGroup | undefined = open && isGroup(open) ? v.groups.find((g) => g.conv === open) : undefined
+  const peer = open && !isGroup(open) ? peerOf(open, v.me) : ''
   const friend = v.friends.friends.find((f) => f.uuid === peer)
   const messages = useMemo(() => (open ? v.convs[open] ?? [] : []), [open, v.convs])
 
@@ -155,6 +164,13 @@ export default function ChatPanel() {
     }
     return [...v.friends.friends].sort((a, b) => last(b) - last(a) || Number(!!b.online) - Number(!!a.online) || a.name.localeCompare(b.name))
   }, [v.friends.friends, v.convs])
+  const groups = useMemo(() => {
+    const last = (g: ChatGroup) => {
+      const c = v.convs[g.conv]
+      return c?.length ? c[c.length - 1].at : g.created
+    }
+    return [...v.groups].sort((a, b) => last(b) - last(a))
+  }, [v.groups, v.convs])
 
   // Leaving the tab: no conversation is on screen any more.
   useEffect(() => () => chat.open(null), [])
@@ -173,6 +189,7 @@ export default function ChatPanel() {
     setReplyTo(null)
     setEditing(null)
     setText('')
+    setMembers(false)
   }, [open])
 
   const fail = (e: unknown) => toast((e as Error).message, 'error')
@@ -182,7 +199,11 @@ export default function ChatPanel() {
     if (!what) return
     setAdding(true)
     try {
-      if (CODE.test(what)) {
+      if (GROUP_CODE.test(what)) {
+        const r = await chat.joinGroup(what)
+        toast(t('chat.group.joined', { name: r.name }), 'success')
+        chat.open(r.conv)
+      } else if (CODE.test(what)) {
         const r = await chat.addByCode(what)
         toast(t('chat.addedByCode', { name: r.name }), 'success')
         chat.open(r.friends.friends.find((f) => f.uuid === r.uuid)?.conv ?? null)
@@ -200,11 +221,11 @@ export default function ChatPanel() {
 
   const send = async () => {
     const body = text.trim()
-    if (!body || !peer || sending) return
+    if (!body || !open || (!peer && !group) || sending) return
     setSending(true)
     try {
       if (editing) await chat.edit(editing.id, body)
-      else await chat.send(peer, body, replyTo?.id)
+      else await chat.send(open, body, replyTo?.id)
       setText('')
       setReplyTo(null)
       setEditing(null)
@@ -341,6 +362,7 @@ export default function ChatPanel() {
   }
 
   const peerRead = open ? v.reads[open]?.[peer] ?? 0 : 0
+  const seenBy = (id: number) => Object.entries(open ? v.reads[open] ?? {} : {}).filter(([u, r]) => u !== v.me && r >= id).length
   const lastMine = [...messages].reverse().find((m) => m.sender === v.me)
 
   return (
@@ -381,6 +403,39 @@ export default function ChatPanel() {
         </form>
         <Requests v={v} />
         <div className="chat-friends" role="listbox" aria-label={t('chat.friends')}>
+          <div className="chat-section-head">
+            <span>{t('chat.groups')}</span>
+            <button className="btn ghost icon sm" title={t('chat.group.new')} aria-label={t('chat.group.new')} onClick={() => setNewGroup(true)}>
+              <Users />
+            </button>
+          </div>
+          {groups.map((g) => {
+            const c = v.convs[g.conv] ?? []
+            const lastMsg = [...c].reverse().find((m) => m.kind !== 'system')
+            const unread = v.unread[g.conv] ?? 0
+            const line = lastMsg ? `${lastMsg.sender === v.me ? t('chat.you') : nameOf(lastMsg.sender)}: ${snippet(lastMsg, '')}` : t('chat.group.members', { count: g.members.length })
+            return (
+              <button key={g.conv} role="option" aria-selected={g.conv === open} className={`chat-friend ${g.conv === open ? 'open' : ''} ${unread ? 'unread' : ''}`} onClick={() => chat.open(g.conv)}>
+                <GroupTile name={g.name} />
+                <span className="chat-friend-text">
+                  <span className="chat-friend-top">
+                    <b className="ellipsis">{g.name}</b>
+                    {lastMsg && <span className="chat-time">{time(lastMsg.at)}</span>}
+                  </span>
+                  <span className="chat-snippet ellipsis">{line}</span>
+                </span>
+                {unread > 0 && <span className="ib-badge">{unread > 99 ? '99+' : unread}</span>}
+              </button>
+            )
+          })}
+          {groups.length === 0 && (
+            <button className="btn ghost sm chat-new-group" onClick={() => setNewGroup(true)}>
+              <Users /> {t('chat.group.new')}
+            </button>
+          )}
+          <div className="chat-section-head">
+            <span>{t('chat.friends')}</span>
+          </div>
           {friends.length === 0 ? (
             <div className="chat-none">
               <UserPlus aria-hidden />
@@ -436,8 +491,8 @@ export default function ChatPanel() {
         </div>
       </aside>
 
-      <section className="chat-main">
-        {!open || !peer ? (
+      <section className={`chat-main ${group && members ? 'with-members' : ''}`}>
+        {!open || (!peer && !group) ? (
           <div className="chat-none chat-pick">
             <MessageCircle aria-hidden />
             <b>{t('chat.pick')}</b>
@@ -449,6 +504,21 @@ export default function ChatPanel() {
               <button className="btn ghost icon sm chat-back" aria-label={t('chat.back')} onClick={() => chat.open(null)}>
                 <ArrowLeft />
               </button>
+              {group ? (
+                <>
+                  <GroupTile name={group.name} size={36} />
+                  <span className="grow">
+                    <b>{group.name}</b>
+                    <span className="hint">
+                      {t('chat.group.members', { count: group.members.length })} · {t('chat.group.onlineCount', { count: group.members.filter((m) => m.online).length })}
+                    </span>
+                  </span>
+                  <button className={`btn sm ${members ? 'primary' : ''}`} onClick={() => setMembers(!members)}>
+                    <Users /> {t('chat.group.membersButton')}
+                  </button>
+                </>
+              ) : (
+                <>
               <Head uuid={peer} size={36} />
               <span className="grow">
                 <b>{nameOf(peer)}</b>
@@ -463,6 +533,8 @@ export default function ChatPanel() {
                 <button className="btn ghost icon sm" aria-label={t('chat.more')} onClick={(e) => openContextMenu(e, friendMenu(friend), friend.name)}>
                   <MoreHorizontal />
                 </button>
+              )}
+                </>
               )}
             </header>
             <div
@@ -483,13 +555,25 @@ export default function ChatPanel() {
                   <span className="chat-wave" aria-hidden>
                     👋
                   </span>
-                  <b>{t('chat.startWith', { name: nameOf(peer) })}</b>
+                  <b>{t('chat.startWith', { name: group ? group.name : nameOf(peer) })}</b>
                 </div>
               )}
               {messages.map((m, i) => {
                 const prev = messages[i - 1]
                 const newDay = !prev || new Date(prev.at * 1000).toDateString() !== new Date(m.at * 1000).toDateString()
-                const grouped = !newDay && prev && prev.sender === m.sender && m.at - prev.at < 300 && !m.reply
+                if (m.kind === 'system') {
+                  return (
+                    <div key={m.id}>
+                      {newDay && (
+                        <div className="chat-day">
+                          <span>{day(m.at)}</span>
+                        </div>
+                      )}
+                      <SystemNote m={m} />
+                    </div>
+                  )
+                }
+                const grouped = !newDay && prev && prev.kind !== 'system' && prev.sender === m.sender && m.at - prev.at < 300 && !m.reply
                 const mine = m.sender === v.me
                 const replied = m.reply ? messages.find((x) => x.id === m.reply) : undefined
                 return (
@@ -533,10 +617,14 @@ export default function ChatPanel() {
                             {m.body && <ChatText text={m.body} />}
                           </>
                         ) : (
-                          <ChatText text={m.body} />
+                          <>
+                            {m.body && <ChatText text={m.body} />}
+                            <Embeds m={m} />
+                          </>
                         )}
                         {m.edited && !m.deleted && <span className="chat-edited">{t('chat.edited')}</span>}
-                        {mine && m.id === lastMine?.id && peerRead >= m.id && <span className="chat-seen">{t('chat.seen')}</span>}
+                        {mine && m.id === lastMine?.id && !group && peerRead >= m.id && <span className="chat-seen">{t('chat.seen')}</span>}
+                        {mine && m.id === lastMine?.id && group && seenBy(m.id) > 0 && <span className="chat-seen">{t('chat.seenBy', { count: seenBy(m.id) })}</span>}
                       </div>
                       {!m.deleted && (
                         <div className="chat-msg-tools">
@@ -557,7 +645,7 @@ export default function ChatPanel() {
               <p className="chat-banner">{t('chat.off')}</p>
             ) : v.muted ? (
               <p className="chat-banner bad">{t('chat.muted', { until: new Date(v.muted.until * 1000).toLocaleString(currentLanguage()), reason: v.muted.reason || '–' })}</p>
-            ) : !friend ? (
+            ) : !friend && !group ? (
               <p className="chat-banner">{t('chat.notFriendsHint')}</p>
             ) : (
               <div className="chat-compose">
@@ -582,16 +670,18 @@ export default function ChatPanel() {
                   </div>
                 )}
                 <div className="chat-compose-row">
-                  <button className="btn ghost icon chat-gift-btn" aria-label={t('chat.sendGift')} title={t('chat.sendGift')} onClick={() => setGift(true)}>
-                    <Gift />
-                  </button>
+                  {friend && (
+                    <button className="btn ghost icon chat-gift-btn" aria-label={t('chat.sendGift')} title={t('chat.sendGift')} onClick={() => setGift(true)}>
+                      <Gift />
+                    </button>
+                  )}
                   <textarea
                     ref={box}
                     className="input chat-box"
                     rows={1}
                     value={text}
                     maxLength={2000}
-                    placeholder={t('chat.placeholder', { name: nameOf(peer) })}
+                    placeholder={t('chat.placeholder', { name: group ? group.name : nameOf(peer) })}
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={onKey}
                     style={{ height: `${Math.min(160, 22 * Math.max(1, text.split('\n').length) + 16)}px` }}
@@ -609,7 +699,9 @@ export default function ChatPanel() {
             )}
           </>
         )}
+        {group && members && <GroupPanel g={group} onClose={() => setMembers(false)} />}
       </section>
+      {newGroup && <NewGroupModal onClose={() => setNewGroup(false)} />}
       {gift && peer && <GiftModal to={peer} name={nameOf(peer)} onClose={() => setGift(false)} />}
       {confirm && (
         <ConfirmModal

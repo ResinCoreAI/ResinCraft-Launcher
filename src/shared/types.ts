@@ -2023,6 +2023,42 @@ export interface ChatGiftData {
   /** The ResinCraft team took it back (Unix seconds). */
   reversed?: number
 }
+/** A note in a group's chat: it was made, someone joined, left, was added or removed, it was renamed, a role changed. */
+export interface ChatSystemData {
+  event: 'created' | 'joined' | 'left' | 'added' | 'removed' | 'renamed' | 'role'
+  by: string
+  who?: string[]
+  name?: string
+  role?: string
+}
+/** A Store item someone shared into a chat, as the Store has it. */
+export interface ChatEmbed {
+  type: 'store'
+  product: string
+  name: string
+  description: string
+  icon: string
+  monthly: number
+  yearly: number
+  currency: string
+}
+export interface ChatMember {
+  uuid: string
+  name: string
+  role: 'owner' | 'admin' | 'member'
+  joined: number
+  online: boolean
+}
+/** A group chat the account is in. `invite`: its invite code, for owners and admins (null until made). */
+export interface ChatGroup {
+  conv: string
+  name: string
+  owner: string
+  created: number
+  role: 'owner' | 'admin' | 'member'
+  invite: string | null
+  members: ChatMember[]
+}
 export interface ChatMessage {
   id: number
   /** Goes up with every change (new, edited, deleted); syncs ask for what's past theirs. */
@@ -2030,10 +2066,11 @@ export interface ChatMessage {
   conv: string
   sender: string
   at: number
-  kind: 'text' | 'gift'
+  kind: 'text' | 'gift' | 'system'
   /** Plain text with **bold**, *italic*, ~~strike~~, `code`, ``` code blocks ```, ||spoilers|| and > quotes. */
   body: string
-  data: ChatGiftData | null
+  /** A gift's (kind gift), a note's (system), or a shared item's ({embed}). */
+  data: ChatGiftData | ChatSystemData | { embed: ChatEmbed } | null
   reply: number | null
   edited: number | null
   deleted: number | null
@@ -2054,6 +2091,7 @@ export interface ChatSync {
   muted: { until: number; reason: string } | null
   /** The account's friend code (XXXX-XXXX): whoever types it becomes a friend at once. */
   code: string
+  groups: ChatGroup[]
 }
 /** The launcher's own copy (`chat:load`): the newest messages of each conversation, oldest first. */
 export interface ChatLocal {

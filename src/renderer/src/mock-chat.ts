@@ -1,6 +1,6 @@
 // The browser preview's friends and chat: a small stand-in for the relay's /api/chat… (relay chat.rs) and the
 // launcher's own copy (src-tauri chat.rs). Steve answers a few seconds after each message, so live updates show.
-import type { ChatFriends, ChatGiftOptions, ChatLocal, ChatMessage, ChatPerson, ResinApi } from '@shared/types'
+import type { ChatFriends, ChatGiftOptions, ChatGroup, ChatLocal, ChatMessage, ChatPerson, ResinApi } from '@shared/types'
 
 const ME = '8667ba71b85a4004af54457a9734eed7'
 const STEVE = '1f2e3d4c5b6a49788796a5b4c3d2e1f0'
@@ -38,7 +38,29 @@ add(s, ME, '', 3600, { kind: 'gift', data: { gift: 'cg-1', kind: 'credit', amoun
 add(s, STEVE, 'thanks!! ❤️ sending you something back', 3000)
 add(s, STEVE, '', 2900, { kind: 'gift', data: { gift: 'cg-2', kind: 'item', amount: 9900, currency: 'thb', product: 'relay-plus', name: 'Relay Plus', icon: 'rocket', yearly: false, days: 30 }, body: '' })
 add(dm(ME, ALEX), ALEX, 'can you add me to the whitelist? `Alex_Builds`', 86400 * 2)
-const reads: Record<string, Record<string, number>> = { [s]: { [ME]: nextId - 1, [STEVE]: nextId - 2 }, [dm(ME, ALEX)]: { [ME]: 0, [ALEX]: nextId } }
+// A group: the build crew, with a note, a shared Store item and a server address.
+const CREW = 'g:5eed5eed5eed5eed'
+const groups: ChatGroup[] = [
+  {
+    conv: CREW,
+    name: 'Build crew',
+    owner: ME,
+    created: now() - 86400 * 3,
+    role: 'owner',
+    invite: 'G-MX7Q-2RKA',
+    members: [
+      { uuid: ME, name: 'Puirkle_Gamer', role: 'owner', joined: now() - 86400 * 3, online: true },
+      { uuid: STEVE, name: 'SteveMines', role: 'admin', joined: now() - 86400 * 3, online: true },
+      { uuid: ALEX, name: 'Alex_Builds', role: 'member', joined: now() - 86400 * 2, online: false }
+    ]
+  }
+]
+add(CREW, ME, '', 86400 * 3, { kind: 'system', data: { event: 'created', by: ME, name: 'Build crew', who: [STEVE] } })
+add(CREW, ALEX, '', 86400 * 2, { kind: 'system', data: { event: 'joined', by: ALEX } })
+add(CREW, STEVE, 'server is up! join at puirkle.rscraft.resincore.tech', 5400)
+add(CREW, ALEX, 'look at this build https://i.imgur.com/example.png', 5000)
+add(CREW, ME, 'we should get this for the server', 4000, { data: { embed: { type: 'store', product: 'relay-plus', name: 'Relay Plus', description: 'More servers and data', icon: 'rocket', monthly: 9900, yearly: 99000, currency: 'thb' } } })
+const reads: Record<string, Record<string, number>> = { [s]: { [ME]: 7, [STEVE]: 6 }, [dm(ME, ALEX)]: { [ME]: 0, [ALEX]: 9 }, [CREW]: { [ME]: 12, [STEVE]: nextId, [ALEX]: 12 } }
 
 let v = 1
 let myCode = 'K7QM-4XRA'
@@ -53,7 +75,7 @@ function changed() {
 function unread(): Record<string, number> {
   const out: Record<string, number> = {}
   for (const m of messages) {
-    if (m.sender !== ME && !m.deleted && m.id > (reads[m.conv]?.[ME] ?? 0)) out[m.conv] = (out[m.conv] ?? 0) + 1
+    if (m.sender !== ME && !m.deleted && m.kind !== 'system' && m.id > (reads[m.conv]?.[ME] ?? 0)) out[m.conv] = (out[m.conv] ?? 0) + 1
   }
   return out
 }
@@ -100,19 +122,81 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
         })
       }
       const list = messages.filter((m) => m.seq > after).sort((x, y) => x.seq - y.seq)
-      return { me: ME, v, cursor: list.length ? list[list.length - 1].seq : after, more: false, messages: list, unread: unread(), reads, friends, enabled: true, muted: null, code: myCode }
+      return { me: ME, v, cursor: list.length ? list[list.length - 1].seq : after, more: false, messages: list, unread: unread(), reads, friends, enabled: true, muted: null, code: myCode, groups }
     }
     case 'GET /api/chat/history':
       return { messages: messages.filter((m) => m.conv === q.get('conv') && m.id < Number(q.get('before') || Infinity)).reverse().slice(0, 50), more: false }
     case 'POST /api/chat/send': {
-      const to = String(b.to)
+      const conv = b.conv ? String(b.conv) : dm(ME, String(b.to))
       const text = String(b.body ?? '').trim()
-      if (!text) return err('the message is empty')
-      const m = add(dm(ME, to), ME, text, 0, { reply: (b.reply as number) ?? null })
+      const embed = b.embed as { product?: string } | undefined
+      if (!text && !embed) return err('the message is empty')
+      // The preview's Store has other items than the gift list: any id shows as a card.
+      const item = embed && (giftOptions().items.find((i) => i.id === embed.product) ?? { id: String(embed.product), name: String(embed.product), description: '', icon: '', monthly: 4900, yearly: 49000 })
+      const data = item ? { embed: { type: 'store' as const, product: item.id, name: item.name, description: item.description, icon: item.icon, monthly: item.monthly, yearly: item.yearly, currency: 'thb' } } : null
+      const m = add(conv, ME, text, 0, { reply: (b.reply as number) ?? null, data })
       reads[m.conv] = { ...reads[m.conv], [ME]: m.id }
       changed()
-      if (to === STEVE) reply(m.conv, STEVE)
+      if (conv === dm(ME, STEVE) || conv === CREW) reply(m.conv, STEVE)
       return { message: m }
+    }
+    case 'POST /api/chat/groups/create': {
+      const conv = `g:${Math.random().toString(16).slice(2, 18)}`
+      const who = (b.members as string[]) ?? []
+      groups.push({
+        conv,
+        name: String(b.name ?? '').trim() || 'Group',
+        owner: ME,
+        created: now(),
+        role: 'owner',
+        invite: null,
+        members: [{ uuid: ME, name: names[ME], role: 'owner', joined: now(), online: true }, ...who.map((u) => ({ uuid: u, name: names[u] ?? u.slice(0, 8), role: 'member' as const, joined: now(), online: u === STEVE }))]
+      })
+      add(conv, ME, '', 0, { kind: 'system', data: { event: 'created', by: ME, name: String(b.name), who } })
+      changed()
+      return { conv, groups }
+    }
+    case 'POST /api/chat/groups/join': {
+      const code = String(b.code ?? '').toUpperCase()
+      if (!/^G-?[A-Z0-9]{4}-?[A-Z0-9]{4}$/.test(code)) return err('a group invite code looks like G-ABCD-EF23')
+      const conv = `g:${Math.random().toString(16).slice(2, 18)}`
+      groups.push({ conv, name: 'Redstone club', owner: ALEX, created: now() - 86400, role: 'member', invite: null, members: [{ uuid: ALEX, name: 'Alex_Builds', role: 'owner', joined: now() - 86400, online: false }, { uuid: ME, name: names[ME], role: 'member', joined: now(), online: true }] })
+      add(conv, ME, '', 0, { kind: 'system', data: { event: 'joined', by: ME } })
+      changed()
+      return { conv, name: 'Redstone club', groups }
+    }
+    case 'POST /api/chat/groups/rename':
+    case 'POST /api/chat/groups/add':
+    case 'POST /api/chat/groups/remove':
+    case 'POST /api/chat/groups/leave':
+    case 'POST /api/chat/groups/role':
+    case 'POST /api/chat/groups/invite': {
+      const g = groups.find((x) => x.conv === b.conv)
+      if (!g) return err("you're not in this group")
+      const action = route.split('/').pop()
+      if (action === 'rename') {
+        g.name = String(b.name)
+        add(g.conv, ME, '', 0, { kind: 'system', data: { event: 'renamed', by: ME, name: g.name } })
+      } else if (action === 'add') {
+        const who = (b.members as string[]).filter((u) => !g.members.some((m) => m.uuid === u))
+        g.members.push(...who.map((u) => ({ uuid: u, name: names[u] ?? u.slice(0, 8), role: 'member' as const, joined: now(), online: false })))
+        add(g.conv, ME, '', 0, { kind: 'system', data: { event: 'added', by: ME, who } })
+      } else if (action === 'remove') {
+        g.members = g.members.filter((m) => m.uuid !== b.uuid)
+        add(g.conv, ME, '', 0, { kind: 'system', data: { event: 'removed', by: ME, who: [String(b.uuid)] } })
+      } else if (action === 'role') {
+        const m = g.members.find((x) => x.uuid === b.uuid)
+        if (m) m.role = b.role as 'admin' | 'member'
+        add(g.conv, ME, '', 0, { kind: 'system', data: { event: 'role', by: ME, who: [String(b.uuid)], role: String(b.role) } })
+      } else if (action === 'leave') {
+        groups.splice(groups.indexOf(g), 1)
+      } else if (action === 'invite') {
+        if (!g.invite || b.reset) g.invite = 'G-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase()
+        changed()
+        return { code: g.invite, groups }
+      }
+      changed()
+      return { ok: true, groups }
     }
     case 'POST /api/chat/edit':
     case 'POST /api/chat/delete': {

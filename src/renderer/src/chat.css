@@ -584,3 +584,178 @@
   padding-left: 6px;
   border-left: 2px solid var(--warning);
 }
+
+/* Groups: the section headings in the list, a group's tile, the members panel, notes. */
+.chat-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 6px 2px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.chat-new-group {
+  margin: 0 4px 4px;
+}
+.chat-group-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+.chat-main {
+  position: relative;
+}
+.chat-members {
+  position: absolute;
+  top: 57px;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  padding: 12px;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+}
+.chat-members-head {
+  display: flex;
+  align-items: center;
+}
+.chat-members > .hint {
+  margin: -6px 0 0;
+}
+.chat-invite {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.chat-invite b {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.chat-member-list {
+  display: grid;
+  gap: 2px;
+}
+.chat-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+.chat-member:hover {
+  background: var(--surface-2);
+}
+.chat-role {
+  color: var(--text-dim);
+  flex: none;
+}
+.chat-role.owner {
+  color: var(--warning);
+}
+.chat-leave {
+  margin-top: auto;
+  align-self: flex-start;
+}
+.chat-pick-list {
+  display: grid;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.chat-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.chat-pick-row:hover {
+  background: var(--surface-2);
+}
+.chat-note {
+  margin: 6px 12px;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Cards under a message (Embeds.tsx). */
+.chat-embeds {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  max-width: 460px;
+}
+.chat-embed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.chat-embed.store {
+  border-left-color: var(--data);
+}
+.chat-embed-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-dim);
+}
+.chat-embed-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.chat-embed-text .data {
+  font-size: 12px;
+}
+.chat-embed-image {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: zoom-in;
+}
+.chat-embed-image img {
+  display: block;
+  max-width: 360px;
+  max-height: 280px;
+  border-radius: var(--radius-sm);
+}
+@media (min-width: 821px) {
+  .chat-main.with-members .chat-list,
+  .chat-main.with-members .chat-compose {
+    margin-right: 260px;
+  }
+}
+@media (max-width: 820px) {
+  .chat-members {
+    width: 100%;
+  }
+}

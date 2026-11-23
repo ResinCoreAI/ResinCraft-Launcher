@@ -50,7 +50,7 @@ interface ChatAdminData {
   currency: string
   path: string
   settings: Settings
-  stats: { messages: number; today: number; online: number; friendships: number; bytes: number; freeBytes: number; oldest: number; conversations: number; players: number }
+  stats: { groups?: number; messages: number; today: number; online: number; friendships: number; bytes: number; freeBytes: number; oldest: number; conversations: number; players: number }
   reports: Report[]
   openReports: number
   mutes: { uuid: string; name: string; until: number; reason: string; by: string; at: number }[]
@@ -113,6 +113,7 @@ export function ChatAdmin() {
         <Stat label={t('servers.admin.chat.today')} value={st.today.toLocaleString()} />
         <Stat label={t('servers.admin.chat.online')} value={st.online} />
         <Stat label={t('servers.admin.chat.friendships')} value={st.friendships.toLocaleString()} />
+        <Stat label={t('servers.admin.chat.groups')} value={(st.groups ?? 0).toLocaleString()} />
         <Stat label={t('servers.admin.chat.size')} value={size(st.bytes)} />
         <Stat label={t('servers.admin.chat.openReports')} value={data.openReports} tone={data.openReports ? 'warn' : 'ok'} />
       </div>

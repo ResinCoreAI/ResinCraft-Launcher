@@ -24,7 +24,8 @@ import {
   Trash2,
   History,
   Wallet,
-  X
+  X,
+  Share2
 } from 'lucide-react'
 import type { AccountPlan, PayStep, PlanInfo, PlanProduct, PlanQuote, PlanSub, RelayPlans, WalletEntry, WalletInfo } from '@shared/types'
 import { api } from '../api'
@@ -38,6 +39,8 @@ import { countText } from '../relayCount'
 import { givesParts, ProductIcon, StoreProductRow } from './StoreProduct'
 import { money, setWalletBalance } from '../storeStatus'
 import { openStoreHistory } from './StoreHistory'
+import ShareModal from './chat/ShareModal'
+import { useChat } from '../chatState'
 
 
 const gb = (bytes: number) => `${Math.round((bytes / 1e9) * 10) / 10} GB`
@@ -1382,6 +1385,9 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
   const [picked, setPicked] = useState<string>()
   const [yearly, setYearly] = useState(false)
   const [busy, setBusy] = useState<string>()
+  // Sharing an item into a chat (while chat is on for this account).
+  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(null)
+  const chatReady = useChat().status === 'ready'
   const [paying, setPaying] = useState<{ step: PayStep; title: string; name: string }>()
   const [buying, setBuying] = useState<PlanProduct[]>()
   const [renewing, setRenewing] = useState<PlanSub>()
@@ -1486,6 +1492,11 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
           {!p.owned && (
             <button className="btn sm" disabled={cart.items.includes(p.id)} onClick={() => cart.add(p.id)}>
               {cart.items.includes(p.id) ? <Check /> : <Plus />} {cart.items.includes(p.id) ? t('servers.relayPlan.inCart') : t('servers.relayPlan.addToCart')}
+            </button>
+          )}
+          {chatReady && (
+            <button className="btn sm ghost icon" title={t('chat.share.button')} aria-label={t('chat.share.button')} onClick={() => setSharing({ id: p.id, name: p.name })}>
+              <Share2 />
             </button>
           )}
         </div>
@@ -1671,6 +1682,11 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
                 {cart.items.includes(p.id) ? <Check /> : <Plus />}
               </button>
             )}
+            {chatReady && (
+              <button className="btn sm ghost icon" title={t('chat.share.button')} aria-label={t('chat.share.button')} onClick={() => setSharing({ id: p.id, name: p.name })}>
+                <Share2 />
+              </button>
+            )}
           </>
         }
       />
@@ -1679,6 +1695,7 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
 
   const dialogs = (
     <>
+    {sharing && <ShareModal product={sharing.id} name={sharing.name} onClose={() => setSharing(null)} />}
     {buying && (
       <CheckoutModal
         a={a}

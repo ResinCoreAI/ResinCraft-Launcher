@@ -2,7 +2,7 @@
 // so messages arrive as they're sent (relay chat.rs `sync?wait=1`), and keeps the launcher's own copy of the chats
 // (src-tauri chat.rs) in step. The Inbox's Chat tab reads it with useChat() and acts through `chat`.
 import { useEffect, useSyncExternalStore } from 'react'
-import type { ChatFriends, ChatGiftOptions, ChatMessage, ChatPerson, ChatSync } from '@shared/types'
+import type { ChatEmbed, ChatFriends, ChatGiftOptions, ChatGroup, ChatMessage, ChatPerson, ChatSync } from '@shared/types'
 import { api } from './api'
 import { setChatBadge } from './inboxState'
 
@@ -26,10 +26,11 @@ export interface ChatView {
   open: string | null
   /** The account's friend code. */
   code: string
+  groups: ChatGroup[]
 }
 
 const NO_FRIENDS: ChatFriends = { friends: [], incoming: [], outgoing: [], blocked: [] }
-const EMPTY: ChatView = { status: 'off', error: '', me: '', friends: NO_FRIENDS, convs: {}, older: {}, names: {}, unread: {}, reads: {}, enabled: true, muted: null, open: null, code: '' }
+const EMPTY: ChatView = { status: 'off', error: '', me: '', friends: NO_FRIENDS, convs: {}, older: {}, names: {}, unread: {}, reads: {}, enabled: true, muted: null, open: null, code: '', groups: [] }
 
 let view: ChatView = EMPTY
 const listeners = new Set<() => void>()
@@ -71,11 +72,15 @@ function merge(list: ChatMessage[], convs = view.convs): Record<string, ChatMess
   return next
 }
 
-function namesFrom(f: ChatFriends, names: Record<string, string>): Record<string, string> {
+function namesFrom(f: ChatFriends, names: Record<string, string>, groups: ChatGroup[] = view.groups): Record<string, string> {
   const out = { ...names }
   for (const p of [...f.friends, ...f.incoming, ...f.outgoing, ...f.blocked] as ChatPerson[]) if (p.name) out[p.uuid] = p.name
+  for (const g of groups) for (const m of g.members) if (m.name) out[m.uuid] = m.name
   return out
 }
+
+export const isGroup = (conv: string) => conv.startsWith('g:')
+export const groupOf = (conv: string) => view.groups.find((g) => g.conv === conv)
 
 const call = <T,>(method: 'GET' | 'POST', path: string, body?: unknown) => api.chat.call(method, path, body) as Promise<T>
 const keep = (messages: ChatMessage[], extra: { cursor?: number; friends?: ChatFriends } = {}) => {
@@ -164,12 +169,13 @@ export function useChatWatch(accountId: string | undefined, onNew: (m: ChatMessa
             me,
             convs: merge(r.messages),
             friends: r.friends,
-            names: namesFrom(r.friends, view.names),
             unread: r.unread,
             reads: r.reads,
             enabled: r.enabled,
             muted: r.muted,
-            code: r.code ?? ''
+            code: r.code ?? '',
+            groups: r.groups ?? [],
+            names: namesFrom(r.friends, view.names, r.groups ?? [])
           })
           cursor = Math.max(cursor, r.cursor)
           keep(r.messages, { cursor, friends: r.friends })
@@ -223,9 +229,33 @@ export const chat = {
     set({ open: conv })
     if (conv) markRead(conv)
   },
-  async send(to: string, body: string, reply?: number | null) {
-    const r = await call<{ message: ChatMessage }>('POST', '/api/chat/send', { to, body, reply: reply ?? undefined })
+  /** A message into a conversation: one-on-one (to the friend) or a group. */
+  async send(conv: string, body: string, reply?: number | null) {
+    const target = isGroup(conv) ? { conv } : { to: peerOf(conv, view.me) }
+    const r = await call<{ message: ChatMessage }>('POST', '/api/chat/send', { ...target, body, reply: reply ?? undefined })
     return took(r.message)
+  },
+  /** Shares a Store item into a conversation, as a card (with an optional line). */
+  async share(conv: string, embed: Pick<ChatEmbed, 'type' | 'product'>, body = '') {
+    const target = isGroup(conv) ? { conv } : { to: peerOf(conv, view.me) }
+    const r = await call<{ message: ChatMessage }>('POST', '/api/chat/send', { ...target, body, embed })
+    return took(r.message)
+  },
+  async createGroup(name: string, members: string[]) {
+    const r = await call<{ conv: string; groups: ChatGroup[] }>('POST', '/api/chat/groups/create', { name, members })
+    set({ groups: r.groups, names: namesFrom(view.friends, view.names, r.groups) })
+    return r.conv
+  },
+  async joinGroup(code: string) {
+    const r = await call<{ conv: string; name: string; groups: ChatGroup[] }>('POST', '/api/chat/groups/join', { code })
+    set({ groups: r.groups, names: namesFrom(view.friends, view.names, r.groups) })
+    return r
+  },
+  /** rename {name}, add {members}, remove {uuid}, leave, role {uuid, role}, invite {reset?}. */
+  async group(action: 'rename' | 'add' | 'remove' | 'leave' | 'role' | 'invite', conv: string, extra: Record<string, unknown> = {}) {
+    const r = await call<{ groups: ChatGroup[]; code?: string }>('POST', `/api/chat/groups/${action}`, { conv, ...extra })
+    set({ groups: r.groups, names: namesFrom(view.friends, view.names, r.groups), ...(action === 'leave' && view.open === conv ? { open: null } : {}) })
+    return r
   },
   async edit(id: number, body: string) {
     return took((await call<{ message: ChatMessage }>('POST', '/api/chat/edit', { id, body })).message)
