@@ -7839,3 +7839,19 @@ button.island-toggle:focus-visible {
     transform: translateY(2px);
   }
 }
+
+/* A page that crashed while drawing (components/ErrorBoundary.tsx). */
+.crash-card {
+  display: grid;
+  gap: 10px;
+  max-width: 640px;
+  margin: 48px auto;
+  padding: 20px;
+}
+.crash-details {
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+

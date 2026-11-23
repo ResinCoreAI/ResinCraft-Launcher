@@ -1,6 +1,6 @@
 // Admin → Live tunnels (refreshes every 5 s) and the relay's service switch.
 import { useState } from 'react'
-import { Clock, Pause, Play, Power, Radio, Timer, UserX } from 'lucide-react'
+import { Clock, HardDrive, Pause, Play, Power, Radio, Timer, UserX } from 'lucide-react'
 import { t } from '../../i18n'
 import { ConfirmModal, Empty, MoreButton } from '../ui'
 import { ago, AskModal, duration, Loading, size, Stat, useAct, useAdmin } from './common'
@@ -109,6 +109,8 @@ export function LiveTunnels() {
   const act = useAct(tunnels.reload)
   const [extending, setExtending] = useState<Tunnel>()
   const [ending, setEnding] = useState<{ t: Tunnel; kick: boolean }>()
+  // Add data: more traffic this month for the tunnel's owner (the Usage page's Add data, from here).
+  const [adding, setAdding] = useState<Tunnel>()
   const o = overview.data
   return (
     <>
@@ -153,6 +155,7 @@ export function LiveTunnels() {
               <MoreButton
                 items={() => [
                   tu.secsLeft != null && { label: t('servers.admin.relay.extend'), icon: <Timer />, onSelect: () => setExtending(tu) },
+                  !tu.unlimited && { label: t('servers.admin.relay.addData'), icon: <HardDrive />, onSelect: () => setAdding(tu) },
                   tu.secsLeft != null && { label: t('servers.admin.relay.endNow'), icon: <Clock />, onSelect: () => setEnding({ t: tu, kick: false }) },
                   { label: t('servers.admin.relay.kick'), icon: <UserX />, danger: true, onSelect: () => setEnding({ t: tu, kick: true }) }
                 ]}
@@ -160,6 +163,16 @@ export function LiveTunnels() {
             </div>
           ))}
         </div>
+      )}
+      {adding && (
+        <AskModal
+          title={t('servers.admin.relay.addDataFor', { name: adding.ownerName ?? adding.owner })}
+          fields={[{ key: 'gb', label: t('servers.admin.relay.addDataGb'), type: 'number', value: '10' }]}
+          confirm={t('servers.admin.relay.addData')}
+          body={<p className="hint">{t('servers.admin.relay.addDataTunnelHint')}</p>}
+          onSubmit={(v) => act('/api/usage/add', { uuid: adding.owner, gb: Number(v.gb) }, 'servers.admin.relay.dataAdded', { gb: v.gb, name: adding.ownerName ?? adding.owner })}
+          onClose={() => setAdding(undefined)}
+        />
       )}
       {extending && (
         <AskModal

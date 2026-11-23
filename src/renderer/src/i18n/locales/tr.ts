@@ -6081,6 +6081,10 @@ const dict: Dict = {
   "chat.giftCode.changed": "Yeni hediye kodun {code}. Eskisi artık çalışmıyor.",
   "chat.gift.toNameOrCode": "Minecraft adı veya hediye kodu",
   "chat.gift.toCodeHint": "Herhangi bir ResinCraft oyuncusu: arkadaşın olması gerekmez. Bazı oyuncular hediyeleri yalnızca hediye koduyla alır (GIFT-XXXX-XXXX). Hediye hemen ulaşır, Gelen kutusuna da bir mesaj düşer.",
+  "crash.body": "ResinCraft'ın geri kalanı çalışmaya devam ediyor. Düzeltilebilmesi için aşağıdaki ayrıntıları \"Sorun bildir\" bölümüne kopyalayın.",
+  "crash.copy": "Ayrıntıları kopyala",
+  "crash.home": "Ana sayfaya dön",
+  "crash.reload": "Yeniden yükle",
 }
 
 export default dict

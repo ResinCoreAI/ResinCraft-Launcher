@@ -6068,6 +6068,10 @@ const dict: Dict = {
   "chat.giftCode.changed": "新しいギフトコードは {code} です。以前のコードは使えなくなりました。",
   "chat.gift.toNameOrCode": "相手のMinecraft名またはギフトコード",
   "chat.gift.toCodeHint": "ResinCraftのプレイヤーなら誰でも送れます。フレンドでなくてもOKです。ギフトコードでしか受け取らない人もいます (GIFT-XXXX-XXXX)。ギフトはすぐに届き、受信箱にメッセージが入ります。",
+  "crash.body": "ResinCraft のそのほかの部分は引き続き使えます。下の詳細をコピーして「問題を報告」に貼り付けてください。修正に役立ちます。",
+  "crash.copy": "詳細をコピー",
+  "crash.home": "ホームに戻る",
+  "crash.reload": "再読み込み",
 }
 
 export default dict

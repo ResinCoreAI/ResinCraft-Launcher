@@ -6068,6 +6068,10 @@ const dict: Dict = {
   "chat.giftCode.changed": "Mã quà tặng mới của bạn là {code}. Mã cũ không còn dùng được nữa.",
   "chat.gift.toNameOrCode": "Tên Minecraft hoặc mã quà tặng của họ",
   "chat.gift.toCodeHint": "Bất kỳ người chơi ResinCraft nào: không cần là bạn bè. Một số người chơi chỉ nhận quà bằng mã quà tặng (GIFT-XXXX-XXXX). Họ nhận ngay, kèm tin nhắn trong Hộp thư.",
+  "crash.body": "Phần còn lại của ResinCraft vẫn hoạt động. Hãy sao chép thông tin bên dưới vào \"Báo lỗi\" để có thể sửa.",
+  "crash.copy": "Sao chép chi tiết",
+  "crash.home": "Về Trang chủ",
+  "crash.reload": "Tải lại",
 }
 
 export default dict

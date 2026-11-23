@@ -51,6 +51,7 @@ import { hasBedrockApp } from './platform'
 import { useAdminStatus } from './adminStatus'
 import { useInboxBadge, useInboxWatch } from './inboxState'
 import { Celebrate } from './components/Celebrate'
+import ErrorBoundary from './components/ErrorBoundary'
 import { onPopupOpen, showChat, useChatWatch } from './chatState'
 import { useClassicLayout } from './classicLayoutState'
 import { ClassicSidebar, ClassicTopBar } from './components/ClassicShell'
@@ -326,6 +327,7 @@ export default function App() {
               </div>
             </div>
           )}
+          <ErrorBoundary resetKey={JSON.stringify(route)} onHome={() => go({ page: 'home' })}>
           <Suspense fallback={null}>
             {route.page === 'home' && <Home />}
             {route.page === 'library' && <Library />}
@@ -352,6 +354,7 @@ export default function App() {
             {route.page === 'inbox' && <Inbox />}
             {route.page === 'servers' && <Servers key={`${route.id ?? ''}${route.fromInstance ?? ''}`} id={route.id} fromInstance={route.fromInstance} />}
           </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
 

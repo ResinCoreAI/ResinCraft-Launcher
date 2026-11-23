@@ -496,5 +496,16 @@ export default {
   "servers.admin.tagsTitle": "Tags for {name}",
   "servers.admin.tagsField": "Tags (comma-separated)",
   "servers.admin.tagsHint": "Categories plus up to 5 own tags, 1 to 24 letters, digits, spaces or dashes.",
-  "servers.admin.tagsSaved": "Tags saved"
+  "servers.admin.tagsSaved": "Tags saved",
+  "servers.admin.pay.sendCode": "Send",
+  "servers.admin.pay.sendToPlayer": "Send to a player",
+  "servers.admin.pay.sendTitle": "Send {code} to a player",
+  "servers.admin.pay.sendTitleMany": "Send {n} gift codes to a player",
+  "servers.admin.pay.sendPlayer": "Minecraft name or UUID",
+  "servers.admin.pay.sendNote": "Note (optional)",
+  "servers.admin.pay.sendHint": "It arrives in their Inbox, and in their email when they confirmed one. They redeem it in the Store.",
+  "servers.admin.pay.sent": "Sent to {name}",
+  "servers.admin.relay.addDataGb": "GB to add",
+  "servers.admin.relay.dataAdded": "Added {gb} GB for {name}",
+  "servers.admin.relay.addDataTunnelHint": "More traffic for this owner for the rest of this month, for all their tunnels. Usage shows what they have.",
 }

@@ -320,6 +320,8 @@ function paymentsMock(method: string, p: string, b: Row): unknown {
   } else if (p.endsWith('/promo')) {
     if (pay.promos.some((x) => x.code === String(b.code).toUpperCase())) throw new Error('The relay refused: that code is taken')
     pay.promos.unshift({ ...b, code: String(b.code).toUpperCase(), amount_off: b.amount_off ? b.amount_off * 100 : undefined, active: true, usable: true, uses: 0, products: b.products ?? [] })
+  } else if (p.endsWith('/gift/send')) {
+    if (!b.player) throw new Error('The relay refused: player: a Minecraft name or UUID')
   } else if (p.endsWith('/promo/off') || p.endsWith('/gift/off')) {
     const c = [...pay.promos, ...pay.gifts].find((x) => x.code === b.code)
     if (c) Object.assign(c, { active: false, usable: false })

@@ -6063,6 +6063,10 @@ const dict: Dict = {
   "chat.giftCode.changed": "새 선물 코드는 {code}예요. 이전 코드는 더 이상 쓸 수 없어요.",
   "chat.gift.toNameOrCode": "상대의 마인크래프트 이름 또는 선물 코드",
   "chat.gift.toCodeHint": "ResinCraft 플레이어라면 누구나 가능해요. 친구가 아니어도 돼요. 선물 코드로만 선물을 받는 플레이어도 있어요 (GIFT-XXXX-XXXX). 선물은 바로 도착하고, 받은편지함에 메시지가 와요.",
+  "crash.body": "ResinCraft의 나머지 기능은 계속 사용할 수 있습니다. 아래 상세 내용을 복사해 '문제 신고'에 붙여넣어 주세요. 수정에 도움이 됩니다.",
+  "crash.copy": "상세 내용 복사",
+  "crash.home": "홈으로 돌아가기",
+  "crash.reload": "새로고침",
 }
 
 export default dict

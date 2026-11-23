@@ -1797,4 +1797,9 @@ export default {
   "chat.giftCode.changed": "Your new gift code is {code}. The old one doesn't work any more.",
   "chat.gift.toNameOrCode": "Their Minecraft name or gift code",
   "chat.gift.toCodeHint": "Any ResinCraft player: they don't have to be your friend. Some players only take gifts by their gift code (GIFT-XXXX-XXXX). They get it at once, with a message in their Inbox.",
+  "crash.title": "This page ran into a problem",
+  "crash.body": "The rest of ResinCraft still works. Copy the details below into Report an issue so it can be fixed.",
+  "crash.copy": "Copy details",
+  "crash.home": "Back to Home",
+  "crash.reload": "Reload",
 } as const

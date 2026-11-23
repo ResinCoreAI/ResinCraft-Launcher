@@ -6119,6 +6119,10 @@ const dict: Dict = {
   "chat.giftCode.changed": "Il tuo nuovo codice regalo è {code}. Quello vecchio non funziona più.",
   "chat.gift.toNameOrCode": "Il suo nome Minecraft o codice regalo",
   "chat.gift.toCodeHint": "Qualsiasi giocatore ResinCraft: non deve essere tuo amico. Alcuni giocatori accettano regali solo con il loro codice regalo (GIFT-XXXX-XXXX). Lo ricevono subito, con un messaggio nella Posta in arrivo.",
+  "crash.body": "Il resto di ResinCraft funziona ancora. Copia i dettagli qui sotto in «Segnala un problema» così che possa essere risolto.",
+  "crash.copy": "Copia dettagli",
+  "crash.home": "Torna alla Home",
+  "crash.reload": "Ricarica",
 }
 
 export default dict

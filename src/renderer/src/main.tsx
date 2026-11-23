@@ -1,3 +1,4 @@
+import ErrorBoundary from './components/ErrorBoundary'
 import { StrictMode, useEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import App from './App'
@@ -42,9 +43,11 @@ void carryStorage()
   .finally(() =>
     (holder.__resinRoot ??= createRoot(document.getElementById('root')!)).render(
       <StrictMode>
-        <StoreProvider>
-          <Localized />
-        </StoreProvider>
+        <ErrorBoundary>
+          <StoreProvider>
+            <Localized />
+          </StoreProvider>
+        </ErrorBoundary>
       </StrictMode>
     )
   )

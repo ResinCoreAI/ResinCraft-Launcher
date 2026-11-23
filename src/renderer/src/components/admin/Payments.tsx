@@ -2,11 +2,11 @@
 // unused-days credit, ended add-ons (grace and cut-off) and TrueMoney angpao. Same routes as the relay dashboard's
 // Payments page (GET /api/payments, POST /api/payments/…); amounts are in the currency's smallest unit.
 import { useEffect, useState, type ReactNode } from 'react'
-import { Ban, Check, CloudUpload, Copy, CreditCard, Gift, Pencil, Plus, RefreshCw, Search, ShoppingBag, Ticket, Trash2, Wallet, X } from 'lucide-react'
+import { Ban, Check, CloudUpload, Copy, CreditCard, Gift, Pencil, Plus, RefreshCw, Search, Send, ShoppingBag, Ticket, Trash2, Wallet, X } from 'lucide-react'
 import { currentLanguage, t, type Key } from '../../i18n'
 import { useStore } from '../../store'
 import { ConfirmModal, Empty, Modal, MoreButton, Segmented, Switch, type ContextEntry } from '../ui'
-import { account, Loading, post, shortId, useAct, useAdmin, when } from './common'
+import { account, AskModal, Loading, post, shortId, useAct, useAdmin, when } from './common'
 import { UNLIMITED_COUNT } from '../../relayCount'
 import { WalletAdmin } from './Wallet'
 import { isProductIcon, ProductIcon, StoreProductRow } from '../StoreProduct'
@@ -885,6 +885,8 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
   const [promo, setPromo] = useState(false)
   const [gift, setGift] = useState(false)
   const [made, setMade] = useState<string[]>()
+  // Gift codes to send to a player (their Inbox, and email when linked).
+  const [sending, setSending] = useState<string[]>()
   const cur = d.currency
   const name = (id: string) => d.products.find((p) => p.id === id)?.name ?? id
   const usablePromos = d.promos.filter((p) => p.usable)
@@ -936,11 +938,18 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
         </span>
         {(g.note || g.redeemed.length > 0) && <span className="hint">{[g.note, g.redeemed.map((u) => u.name).join(', ')].filter(Boolean).join(' · ')}</span>}
       </div>
-      {g.active && (
-        <button className="btn sm" onClick={() => void act('/api/payments/gift/off', { code: g.code }, 'servers.admin.pay.saved')}>
-          <Ban /> {t('servers.admin.pay.end')}
-        </button>
-      )}
+      <div className="row">
+        {g.usable && (
+          <button className="btn sm" onClick={() => setSending([g.code])}>
+            <Send /> {t('servers.admin.pay.sendCode')}
+          </button>
+        )}
+        {g.active && (
+          <button className="btn sm" onClick={() => void act('/api/payments/gift/off', { code: g.code }, 'servers.admin.pay.saved')}>
+            <Ban /> {t('servers.admin.pay.end')}
+          </button>
+        )}
+      </div>
     </div>
   )
   return (
@@ -988,6 +997,9 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
                 >
                   {t('servers.admin.pay.copy')}
                 </button>
+                <button className="btn sm primary" onClick={() => setSending(made)}>
+                  <Send /> {t('servers.admin.pay.sendToPlayer')}
+                </button>
                 <button className="btn sm ghost" aria-label={t('common.close')} onClick={() => setMade(undefined)}>
                   <X />
                 </button>
@@ -1019,6 +1031,19 @@ function Codes({ d, act, reload }: { d: Payments; act: Act; reload: () => unknow
               return false
             }
           }}
+        />
+      )}
+      {sending && (
+        <AskModal
+          title={sending.length === 1 ? t('servers.admin.pay.sendTitle', { code: sending[0] }) : t('servers.admin.pay.sendTitleMany', { n: sending.length })}
+          fields={[
+            { key: 'player', label: t('servers.admin.pay.sendPlayer'), placeholder: 'Steve' },
+            { key: 'note', label: t('servers.admin.pay.sendNote'), type: 'textarea' }
+          ]}
+          confirm={t('servers.admin.pay.sendToPlayer')}
+          body={<p className="hint">{t('servers.admin.pay.sendHint')}</p>}
+          onSubmit={(v) => act('/api/payments/gift/send', { codes: sending, player: v.player.trim(), note: v.note.trim() }, 'servers.admin.pay.sent', { name: v.player.trim() })}
+          onClose={() => setSending(undefined)}
         />
       )}
       {gift && (

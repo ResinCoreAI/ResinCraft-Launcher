@@ -6058,6 +6058,10 @@ const dict: Dict = {
   "chat.giftCode.changed": "你的新礼品码是 {code}。旧的已失效。",
   "chat.gift.toNameOrCode": "对方的 Minecraft 名称或礼品码",
   "chat.gift.toCodeHint": "任何 ResinCraft 玩家都可以，不必是你的好友。有些玩家只通过礼品码接收礼物 (GIFT-XXXX-XXXX)。礼物会立即送达，并在对方的收件箱中留下一条消息。",
+  "crash.body": "ResinCraft 的其他部分仍可正常使用。请将下方详情复制到“报告问题”中，以便修复。",
+  "crash.copy": "复制详情",
+  "crash.home": "返回首页",
+  "crash.reload": "重新加载",
 }
 
 export default dict
