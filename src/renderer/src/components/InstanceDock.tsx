@@ -113,7 +113,8 @@ export default function InstanceDock() {
   // A page that has just opened starts with the dock in view.
   useEffect(() => setAway(false), [here])
 
-  if (!shown) return null
+  // The Inbox is a full-page chat: the dock would sit on the message box.
+  if (!shown || route.page === 'inbox') return null
   if (stowed)
     return (
       <button

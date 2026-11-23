@@ -316,7 +316,8 @@ export default function App() {
             searchPages={searchPages}
           />
         )}
-        <div className="content">
+        {/* The Inbox fills the whole sheet, like a chat app: no page margins, and no page scroll (its lists scroll). */}
+        <div className={`content ${current === 'inbox' ? 'fill' : ''}`}>
           {/* The way back from an instance; it scrolls away with the page. (Classic: it's in the title bar.) */}
           {instance && !classic && (
             <div className="topbar">

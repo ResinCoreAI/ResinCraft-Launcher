@@ -1405,7 +1405,7 @@ function SubRow({
  * and add-ons to its right), with `heading` at the top of the panel. Without it, the compact block in Servers.
  */
 export default function RelayPlan({ page, empty, heading }: { page?: boolean; empty?: React.ReactNode; heading?: React.ReactNode } = {}) {
-  const { toast, go } = useStore()
+  const { toast, go, activeAccount } = useStore()
   const { plans, setPlans, load } = usePlans()
   const [picked, setPicked] = useState<string>()
   const [yearly, setYearly] = useState(false)
@@ -1425,11 +1425,14 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
 
   // Nothing for sale anywhere (payments off, no relay, an older relay): nothing to show.
   const selling = plans?.accounts.filter((a) => a.plan?.enabled) ?? []
+  // The account shown: the one picked here, else the one signed in (the header's balance is its), else the first.
+  const same = (x: string, y: string | undefined) => !!y && x.replace(/-/g, '').toLowerCase() === y.replace(/-/g, '').toLowerCase()
+  const shown = selling.find((x) => x.account === picked) ?? selling.find((x) => activeAccount?.type === 'msa' && (x.account === activeAccount.id || same(x.account, activeAccount.uuid))) ?? selling[0]
   // The cart belongs to the account shown (a hook: before the returns below).
-  const cart = useCart((selling.find((x) => x.account === picked) ?? selling[0])?.account ?? '')
+  const cart = useCart(shown?.account ?? '')
   if (!plans) return page ? <Loader2 className="spin" /> : null
   if (!plans.available || selling.length === 0) return <>{empty ?? null}</>
-  const a = selling.find((x) => x.account === picked) ?? selling[0]
+  const a = shown!
   const plan = a.plan!
   const put = (p: PlanInfo) => {
     setPlans((all) => all && { ...all, accounts: all.accounts.map((x) => (x.account === a.account ? { ...x, plan: p } : x)) })

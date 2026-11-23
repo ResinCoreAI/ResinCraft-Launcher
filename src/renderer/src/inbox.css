@@ -617,6 +617,28 @@
 .ib2-page {
   max-width: 1480px;
 }
+/* Full page: the Inbox fills the sheet under the header, edge to edge; only its lists and the open conversation scroll. */
+.content.fill {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+}
+.content.fill > .ib2-page,
+.content.fill .ib2-page {
+  flex: 1;
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  min-height: 0;
+}
+.content.fill .ib2-shell {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
 .ib2-shell {
   display: grid;
   grid-template-columns: 72px minmax(280px, 330px) minmax(0, 1fr);
