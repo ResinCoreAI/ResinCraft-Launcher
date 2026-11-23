@@ -2001,6 +2001,11 @@ export interface ChatPerson {
   conv?: string
   online?: boolean
   lastSeen?: number
+  status?: ChatStatus
+  statusText?: string
+  banner?: string
+  /** Their profile picture (a file id), else their Minecraft head. */
+  avatar?: string | null
 }
 export interface ChatFriends {
   friends: ChatPerson[]
@@ -2025,11 +2030,37 @@ export interface ChatGiftData {
 }
 /** A note in a group's chat: it was made, someone joined, left, was added or removed, it was renamed, a role changed. */
 export interface ChatSystemData {
-  event: 'created' | 'joined' | 'left' | 'added' | 'removed' | 'renamed' | 'role'
+  event: 'created' | 'joined' | 'left' | 'added' | 'removed' | 'renamed' | 'role' | 'nickname'
   by: string
   who?: string[]
   name?: string
   role?: string
+}
+export type ChatFileKind = 'image' | 'voice' | 'file' | 'avatar' | 'emoji'
+/** A file on the relay's Telegram drive: in a message, a profile picture or a group's emoji. */
+export interface ChatFile {
+  id: string
+  name: string
+  size: number
+  mime: string
+  kind: ChatFileKind
+  w?: number | null
+  h?: number | null
+  duration?: number | null
+}
+export type ChatStatus = 'online' | 'idle' | 'dnd' | 'invisible' | 'offline'
+/** An account's profile card. */
+export interface ChatProfile {
+  uuid: string
+  name: string
+  since: number
+  status: ChatStatus
+  statusText: string
+  bio: string
+  banner: string
+  avatar: string | null
+  friend: boolean
+  mutualGroups: { conv: string; name: string }[]
 }
 /** A Store item someone shared into a chat, as the Store has it. */
 export interface ChatEmbed {
@@ -2048,6 +2079,8 @@ export interface ChatMember {
   role: 'owner' | 'admin' | 'member'
   joined: number
   online: boolean
+  status?: ChatStatus
+  avatar?: string | null
 }
 /** A group chat the account is in. `invite`: its invite code, for owners and admins (null until made). */
 export interface ChatGroup {
@@ -2058,6 +2091,8 @@ export interface ChatGroup {
   role: 'owner' | 'admin' | 'member'
   invite: string | null
   members: ChatMember[]
+  /** The group's own emoji, written :name: in messages. */
+  emoji?: { name: string; file: string }[]
 }
 export interface ChatMessage {
   id: number
@@ -2070,7 +2105,7 @@ export interface ChatMessage {
   /** Plain text with **bold**, *italic*, ~~strike~~, `code`, ``` code blocks ```, ||spoilers|| and > quotes. */
   body: string
   /** A gift's (kind gift), a note's (system), or a shared item's ({embed}). */
-  data: ChatGiftData | ChatSystemData | { embed: ChatEmbed } | null
+  data: ChatGiftData | ChatSystemData | { embed?: ChatEmbed; files?: ChatFile[] } | null
   reply: number | null
   edited: number | null
   deleted: number | null
@@ -2092,6 +2127,13 @@ export interface ChatSync {
   /** The account's friend code (XXXX-XXXX): whoever types it becomes a friend at once. */
   code: string
   groups: ChatGroup[]
+  /** The account's own profile and status. */
+  profile?: ChatProfile
+  /** Nicknames in its chats: conv → uuid → nickname. */
+  nicknames?: Record<string, Record<string, string>>
+  /** The relay takes files (it has its Telegram drive), up to this size. */
+  drive?: boolean
+  maxUploadMb?: number
 }
 /** The launcher's own copy (`chat:load`): the newest messages of each conversation, oldest first. */
 export interface ChatLocal {
@@ -3305,6 +3347,20 @@ export interface ResinApi {
     export(): Promise<{ path: string; messages: number } | null>
     /** Open dialog, then adds what's missing; null when cancelled. */
     import(): Promise<{ added: number } | null>
+    /** Files to send, picked on this PC. */
+    pickFiles(): Promise<{ path: string; name: string; size: number; mime: string }[]>
+    /** Uploads a file on this PC into a chat (through the relay to its drive). */
+    upload(conv: string, path: string, kind: ChatFileKind, extra?: { w?: number; h?: number; duration?: number; mime?: string }): Promise<ChatFile>
+    /** Uploads bytes the page has (base64): a pasted picture, a voice message, a profile picture, an emoji. */
+    uploadBytes(conv: string, name: string, mime: string, kind: ChatFileKind, base64: string, extra?: { w?: number; h?: number; duration?: number }): Promise<ChatFile>
+    /** A picture or voice message to show (kept on this PC after the first time). */
+    fileData(id: string): Promise<{ mime: string; data: string }>
+    /** The file on this PC (downloaded the first time), e.g. to put a mod into an instance. */
+    fileLocal(id: string): Promise<string>
+    /** Save dialog, then the file; null when cancelled. */
+    fileSave(id: string, name: string): Promise<string | null>
+    /** Flashes the taskbar button when the window isn't in front. */
+    attention(): Promise<boolean>
   }
   screenshots: {
     list(instanceId: string): Promise<ScreenshotInfo[]>

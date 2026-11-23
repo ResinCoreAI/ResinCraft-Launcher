@@ -122,8 +122,24 @@
   background: var(--text-faint);
   box-shadow: 0 0 0 2px var(--surface);
 }
-.chat-presence.on {
+.chat-presence.on,
+.chat-presence.online {
   background: var(--success);
+}
+.chat-presence.idle {
+  background: var(--warning);
+}
+.chat-presence.dnd {
+  background: var(--danger, #ef4444);
+}
+.chat-presence.offline,
+.chat-presence.invisible {
+  background: var(--text-faint);
+}
+.chat-presence.inline {
+  position: static;
+  display: inline-block;
+  box-shadow: none;
 }
 .chat-friend-text {
   display: grid;
@@ -758,4 +774,259 @@
   .chat-members {
     width: 100%;
   }
+}
+
+/* You, at the top of the friends list: picture, name and status (click: the status menu). */
+.chat-me {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 8px 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.chat-me:hover {
+  background: var(--surface-2);
+}
+.chat-me .grow {
+  display: grid;
+  min-width: 0;
+}
+.chat-avatar-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  flex: none;
+  align-self: flex-start;
+}
+.chat-name {
+  cursor: pointer;
+}
+.chat-name:hover {
+  text-decoration: underline;
+}
+.chat-avatar-img {
+  display: block;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.chat-avatar-img.big {
+  width: 72px;
+  height: 72px;
+}
+.chat-img-wait {
+  display: inline-block;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+/* Pictures, voice messages and files in a message (ChatMedia.tsx). */
+.chat-files {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  max-width: 460px;
+}
+.chat-pics {
+  display: grid;
+  gap: 4px;
+}
+.chat-pics.n2,
+.chat-pics.n4 {
+  grid-template-columns: 1fr 1fr;
+}
+.chat-pics.n3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.chat-pic {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  cursor: zoom-in;
+}
+.chat-pics:not(.n1) .chat-pic {
+  aspect-ratio: 1;
+}
+.chat-voice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 300px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.chat-voice-bar {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.chat-voice-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}
+.chat-file .chat-embed-icon {
+  color: var(--accent);
+}
+.chat-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 40px 40px 80px;
+  background: rgb(0 0 0 / 0.82);
+  cursor: zoom-out;
+}
+.chat-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-sm);
+}
+.chat-lightbox-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 80vw;
+  padding: 6px 6px 6px 14px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: default;
+}
+
+/* The message box: files waiting to be sent, recording a voice message. */
+.chat-pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.chat-pending .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 240px;
+}
+.spin-dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--text-faint);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.chat-recording {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.chat-rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger, #ef4444);
+  animation: chat-blink 1s ease-in-out infinite;
+}
+@keyframes chat-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-rec-dot,
+  .spin-dot {
+    animation: none;
+  }
+}
+
+/* Profiles. */
+.chat-card,
+.chat-profile-edit {
+  display: grid;
+  gap: 10px;
+  min-width: min(380px, 80vw);
+}
+.chat-card-banner {
+  height: 64px;
+  margin: -4px 0 -36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.chat-card-head,
+.chat-profile-pic {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding-left: 12px;
+}
+.chat-card-head .grow {
+  display: grid;
+  min-width: 0;
+}
+.chat-card-bio {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-swatches {
+  gap: 6px;
+}
+.chat-swatch {
+  width: 26px;
+  height: 26px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.chat-swatch.on {
+  border-color: var(--text);
+}
+
+/* Group emoji. */
+.ct-emoji {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: -5px;
+}
+.ct-big .ct-emoji {
+  width: 44px;
+  height: 44px;
+}
+.chat-emoji-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.chat-emoji-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
 }

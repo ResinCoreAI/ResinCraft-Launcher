@@ -256,7 +256,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       leave: fn('friends:leave')
     },
     mail: { call: fn('mail:call') },
-    chat: { call: fn('chat:call'), save: fn('chat:save'), load: fn('chat:load'), older: fn('chat:older'), info: fn('chat:info'), export: fn('chat:export'), import: fn('chat:import') },
+    chat: { call: fn('chat:call'), save: fn('chat:save'), load: fn('chat:load'), older: fn('chat:older'), info: fn('chat:info'), export: fn('chat:export'), import: fn('chat:import'), pickFiles: fn('chat:pickFiles'), upload: fn('chat:upload'), uploadBytes: fn('chat:uploadBytes'), fileData: fn('chat:fileData'), fileLocal: fn('chat:fileLocal'), fileSave: fn('chat:fileSave'), attention: fn('chat:attention') },
     quickjoin: {
       get: fn('quickjoin:get'),
       save: fn('quickjoin:save'),

@@ -56,6 +56,7 @@ interface ChatAdminData {
   mutes: { uuid: string; name: string; until: number; reason: string; by: string; at: number }[]
   gifts: { id: string; at: number; sender: string; senderName: string; receiver: string; receiverName: string; kind: 'credit' | 'item'; amount: number; product: string | null; yearly: boolean; reversed: number | null; reversedBy: string | null }[]
   backups: { name: string; bytes: number; at: number }[]
+  drive?: { configured: boolean; url: string; maxUploadMb: number; error: string | null; errorAt: number | null }
 }
 
 const REASON: Record<string, Key> = {
@@ -288,6 +289,14 @@ export function ChatAdmin() {
         </div>
         <p className="hint">{t('servers.admin.chat.storageHint', { path: data.path })}</p>
         <p className="hint">{st.oldest ? t('servers.admin.chat.oldest', { when: when(st.oldest) }) : t('servers.admin.chat.noMessages')}</p>
+        {data.drive?.configured ? (
+          <p className={`hint ${data.drive.error ? 'bad' : ''}`}>
+            {t('servers.admin.chat.driveOn', { url: data.drive.url, size: data.drive.maxUploadMb })}
+            {data.drive.error && ` ${t('servers.admin.chat.driveError', { when: ago(data.drive.errorAt), error: data.drive.error })}`}
+          </p>
+        ) : (
+          <p className="hint">{t('servers.admin.chat.driveOff')}</p>
+        )}
         {data.backups.length > 0 && (
           <div className="card admin-items">
             {data.backups.map((b) => (

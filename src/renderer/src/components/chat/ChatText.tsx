@@ -3,6 +3,9 @@
 // and https:// links. Nothing is ever read as HTML. A message of only a few emoji shows them big.
 import { useState, type ReactNode } from 'react'
 import { api } from '../../api'
+import { FileImage } from './ChatMedia'
+
+type Emoji = Map<string, string>
 
 const LINK = /https?:\/\/[^\s<>"]+[^\s<>".,;:!?)\]'*_~|]/y
 
@@ -34,7 +37,7 @@ function closing(rest: string, mark: string): number {
   return end
 }
 
-function inline(text: string, key: string): ReactNode[] {
+function inline(text: string, key: string, emoji: Emoji): ReactNode[] {
   const out: ReactNode[] = []
   let plain = ''
   const flush = () => {
@@ -45,6 +48,16 @@ function inline(text: string, key: string): ReactNode[] {
   while (i < text.length) {
     const rest = text.slice(i)
     const k = `${key}.${i}`
+    if (rest[0] === ':' && emoji.size) {
+      const m = /^:([a-z0-9_]{2,32}):/.exec(rest)
+      const file = m && emoji.get(m[1])
+      if (m && file) {
+        flush()
+        out.push(<FileImage key={k} id={file} alt={`:${m[1]}:`} className="ct-emoji" />)
+        i += m[0].length
+        continue
+      }
+    }
     if (rest[0] === '`') {
       const end = rest.indexOf('`', 1)
       if (end > 1) {
@@ -68,7 +81,7 @@ function inline(text: string, key: string): ReactNode[] {
       const end = closing(rest, mark)
       if (end < 0) continue
       flush()
-      out.push(wrap(inline(rest.slice(mark.length, end), k)))
+      out.push(wrap(inline(rest.slice(mark.length, end), k, emoji)))
       i += end + mark.length
       matched = true
       break
@@ -103,7 +116,7 @@ function inline(text: string, key: string): ReactNode[] {
 }
 
 /** Lines, with runs of "> " lines as quotes. */
-function lines(text: string, key: string): ReactNode[] {
+function lines(text: string, key: string, emoji: Emoji): ReactNode[] {
   const out: ReactNode[] = []
   const rows = text.split('\n')
   let quote: string[] = []
@@ -112,7 +125,7 @@ function lines(text: string, key: string): ReactNode[] {
     out.push(
       <blockquote key={`${key}.q${at}`}>
         {quote.map((q, n) => (
-          <div key={n}>{q ? inline(q, `${key}.q${at}.${n}`) : ' '}</div>
+          <div key={n}>{q ? inline(q, `${key}.q${at}.${n}`, emoji) : ' '}</div>
         ))}
       </blockquote>
     )
@@ -124,7 +137,7 @@ function lines(text: string, key: string): ReactNode[] {
       return
     }
     flushQuote(n)
-    out.push(<div key={`${key}.${n}`}>{row ? inline(row, `${key}.${n}`) : ' '}</div>)
+    out.push(<div key={`${key}.${n}`}>{row ? inline(row, `${key}.${n}`, emoji) : ' '}</div>)
   })
   flushQuote(rows.length)
   return out
@@ -132,7 +145,8 @@ function lines(text: string, key: string): ReactNode[] {
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*){1,3}$/u
 
-export default function ChatText({ text }: { text: string }) {
+export default function ChatText({ text, emoji }: { text: string; emoji?: { name: string; file: string }[] }) {
+  const map: Emoji = new Map((emoji ?? []).map((e) => [e.name, e.file]))
   if (EMOJI_ONLY.test(text.trim())) return <div className="ct ct-big">{text.trim()}</div>
   const parts: ReactNode[] = []
   let rest = text
@@ -141,10 +155,10 @@ export default function ChatText({ text }: { text: string }) {
     const start = rest.indexOf('```')
     const end = start >= 0 ? rest.indexOf('```', start + 3) : -1
     if (start < 0 || end < 0) {
-      parts.push(...lines(rest, `p${n}`))
+      parts.push(...lines(rest, `p${n}`, map))
       break
     }
-    if (start > 0) parts.push(...lines(rest.slice(0, start).replace(/\n$/, ''), `p${n}`))
+    if (start > 0) parts.push(...lines(rest.slice(0, start).replace(/\n$/, ''), `p${n}`, map))
     let code = rest.slice(start + 3, end)
     let lang = ''
     const first = code.indexOf('\n')

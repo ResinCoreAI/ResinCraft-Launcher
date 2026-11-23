@@ -54,6 +54,16 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "chat:info" => json(tokio::task::spawn_blocking(info).await??),
         "chat:export" => json(export_picked().await?),
+        "chat:pickFiles" => json(pick_files().await?),
+        "chat:upload" => json(upload_path(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?, args.get::<Option<Value>>(3)?.unwrap_or(Value::Null)).await?),
+        "chat:uploadBytes" => json(upload_bytes(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?, &args.get::<String>(3)?, &args.get::<String>(4)?, args.get::<Option<Value>>(5)?.unwrap_or(Value::Null)).await?),
+        "chat:fileData" => json(file_data(&args.get::<String>(0)?).await?),
+        "chat:fileLocal" => json(file_local(&args.get::<String>(0)?).await?.display().to_string()),
+        "chat:fileSave" => json(file_save(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
+        "chat:attention" => {
+            attention();
+            json(true)
+        }
         "chat:import" => json(import_picked().await?),
         _ => bail!("Unknown channel {channel}"),
     }
@@ -105,6 +115,209 @@ pub async fn call(method: &str, path: &str, body: Option<Value>) -> Result<Value
         return Ok(answer);
     }
     Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = "HTTP 401"))
+}
+
+// ---------- Files (through the relay, to its Telegram drive) ----------
+
+/// The biggest file the picker hands over (the relay has its own limit, usually lower).
+const PICK_MAX: u64 = 2_000_000_000;
+/// Pictures and voice messages shown in chat are read into the page (bigger files are saved instead).
+const PREVIEW_MAX: u64 = 25_000_000;
+
+/// A content type from a file name (the relay keeps it as sent; unknown: a plain file).
+pub fn mime_of(name: &str) -> &'static str {
+    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "webm" => "audio/webm",
+        "ogg" | "oga" | "opus" => "audio/ogg",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "m4a" => "audio/mp4",
+        "jar" => "application/java-archive",
+        "zip" | "mrpack" => "application/zip",
+        "txt" | "log" => "text/plain",
+        "json" => "application/json",
+        _ => "application/octet-stream",
+    }
+}
+
+/// A request to the relay with the active account's session (one sign-in again on 401).
+async fn relay_send(build: impl Fn(&reqwest::Client, &str) -> reqwest::RequestBuilder) -> Result<reqwest::Response> {
+    if relay::settings().is_none() {
+        return Err(err_tr!("chat.noRelay", "This build of ResinCraft has no relay, so it has no chat."));
+    }
+    let Some(account) = accounts::active_microsoft_account().await else { return Err(relay::needs_microsoft()) };
+    for retry in [false, true] {
+        let (session, domain) = relay::session_token(&account).await?;
+        let res = build(crate::core::ctx::http(), &format!("https://{domain}"))
+            .bearer_auth(&session)
+            .send()
+            .await
+            .map_err(|e| err_tr!("chat.unreachable", "Couldn't reach ResinCraft Relay ({error}).", error = e.without_url().to_string()))?;
+        if res.status().as_u16() == 401 && !retry {
+            relay::forget_session(&account).await;
+            continue;
+        }
+        return Ok(res);
+    }
+    Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = "HTTP 401"))
+}
+
+async fn relay_json(res: reqwest::Response) -> Result<Value> {
+    let status = res.status();
+    let answer: Value = res.json().await.unwrap_or(Value::Null);
+    if !status.is_success() {
+        let why = answer.get("error").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
+        return Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = why));
+    }
+    Ok(answer)
+}
+
+/// The upload's address: the chat, the file's name, kind and type, and what the page measured (w, h, duration).
+fn upload_url(base: &str, conv: &str, name: &str, kind: &str, mime: &str, extra: &Value) -> String {
+    let mut q = format!(
+        "{base}/api/chat/upload?conv={}&name={}&kind={}&mime={}",
+        urlencoding::encode(conv),
+        urlencoding::encode(name),
+        urlencoding::encode(kind),
+        urlencoding::encode(mime)
+    );
+    for k in ["w", "h", "duration"] {
+        if let Some(n) = extra.get(k).and_then(Value::as_f64) {
+            q.push_str(&format!("&{k}={n}"));
+        }
+    }
+    q
+}
+
+/// Files the player picks to send: path, name, size.
+async fn pick_files() -> Result<Vec<Value>> {
+    let title = crate::tr!("chat.pickTitle", "Send files").to_string();
+    let picked = shell::pick_files(&title, &[]).await?;
+    let mut out = Vec::new();
+    for p in picked {
+        let size = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
+        if size == 0 || size > PICK_MAX {
+            continue;
+        }
+        let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
+        out.push(json!({ "path": p.display().to_string(), "name": name, "size": size, "mime": mime_of(&name) }));
+    }
+    Ok(out)
+}
+
+/// Uploads a file from this PC into a chat (`kind`: image, voice, file, avatar, emoji). The relay's file record.
+async fn upload_path(conv: &str, path: &str, kind: &str, extra: Value) -> Result<Value> {
+    let p = PathBuf::from(path);
+    let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
+    let bytes = tokio::fs::read(&p).await.with_context(|| format!("couldn't read {}", p.display()))?;
+    let mime = extra.get("mime").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| mime_of(&name).to_string());
+    send_upload(conv, &name, kind, &mime, bytes, &extra).await
+}
+
+/// Uploads bytes the page has (a pasted picture, a voice message, a profile picture), base64.
+async fn upload_bytes(conv: &str, name: &str, mime: &str, kind: &str, data: &str, extra: Value) -> Result<Value> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(data.trim()).context("the file's data was damaged")?;
+    send_upload(conv, name, kind, mime, bytes, &extra).await
+}
+
+async fn send_upload(conv: &str, name: &str, kind: &str, mime: &str, bytes: Vec<u8>, extra: &Value) -> Result<Value> {
+    let res = relay_send(|http, base| {
+        http.post(upload_url(base, conv, name, kind, mime, extra))
+            .header("Content-Type", "application/octet-stream")
+            .body(bytes.clone())
+            .timeout(std::time::Duration::from_secs(1800))
+    })
+    .await?;
+    Ok(relay_json(res).await?["file"].clone())
+}
+
+fn cache_dir() -> PathBuf {
+    paths::root().join("chat-files")
+}
+
+/// The file in this PC's cache, downloaded through the relay the first time.
+async fn file_local(id: &str) -> Result<PathBuf> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+        bail!("not a file: {id}");
+    }
+    let dest = cache_dir().join(id);
+    if dest.exists() {
+        return Ok(dest);
+    }
+    let res = relay_send(|http, base| http.get(format!("{base}/api/chat/file/{id}")).timeout(std::time::Duration::from_secs(1800))).await?;
+    if !res.status().is_success() {
+        relay_json(res).await?;
+        bail!("couldn't download the file");
+    }
+    let bytes = res.bytes().await.context("the download stopped")?;
+    tokio::fs::create_dir_all(cache_dir()).await?;
+    let tmp = dest.with_extension("part");
+    tokio::fs::write(&tmp, &bytes).await?;
+    tokio::fs::rename(&tmp, &dest).await?;
+    Ok(dest)
+}
+
+/// A picture or voice message for the page: its type and base64 bytes.
+async fn file_data(id: &str) -> Result<Value> {
+    use base64::Engine;
+    let path = file_local(id).await?;
+    let size = tokio::fs::metadata(&path).await.map(|m| m.len()).unwrap_or(0);
+    if size > PREVIEW_MAX {
+        bail!("too big to show here; save it instead");
+    }
+    let bytes = tokio::fs::read(&path).await?;
+    let mime = sniff(&bytes);
+    Ok(json!({ "mime": mime, "data": base64::engine::general_purpose::STANDARD.encode(&bytes) }))
+}
+
+/// The type from the first bytes (what the page may show).
+fn sniff(b: &[u8]) -> &'static str {
+    if b.starts_with(b"\x89PNG") {
+        "image/png"
+    } else if b.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        "image/jpeg"
+    } else if b.starts_with(b"GIF8") {
+        "image/gif"
+    } else if b.len() > 12 && &b[0..4] == b"RIFF" && &b[8..12] == b"WEBP" {
+        "image/webp"
+    } else if b.starts_with(&[0x1A, 0x45, 0xDF, 0xA3]) {
+        "audio/webm"
+    } else if b.starts_with(b"OggS") {
+        "audio/ogg"
+    } else if b.starts_with(b"ID3") || b.starts_with(&[0xFF, 0xFB]) {
+        "audio/mpeg"
+    } else {
+        "application/octet-stream"
+    }
+}
+
+/// Saves a chat file where the player picks. Where it went, or None when cancelled.
+async fn file_save(id: &str, name: &str) -> Result<Option<String>> {
+    let title = crate::tr!("chat.saveTitle", "Save the file").to_string();
+    let default = shell::downloads_dir().join(name);
+    let Some(dest) = shell::save_file(&title, &default, &[]).await? else { return Ok(None) };
+    let src = file_local(id).await?;
+    tokio::fs::copy(&src, &dest).await?;
+    let _ = shell::reveal(&dest);
+    Ok(Some(dest.display().to_string()))
+}
+
+/// The taskbar button flashes (a message came while the launcher wasn't in front).
+fn attention() {
+    use tauri::Manager;
+    if let Some(app) = crate::core::ctx::app() {
+        if let Some(w) = app.webview_windows().values().next() {
+            if !w.is_focused().unwrap_or(false) {
+                let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+            }
+        }
+    }
 }
 
 // ---------- The launcher's own copy ----------

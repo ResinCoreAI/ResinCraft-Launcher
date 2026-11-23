@@ -683,4 +683,6 @@ export default {
   "engine.chat.nothingToSave": "There are no chats to save yet.",
   "engine.chat.exportTitle": "Save your chat history",
   "engine.chat.importTitle": "Open a saved chat history",
+  "engine.chat.pickTitle": "Send files",
+  "engine.chat.saveTitle": "Save the file",
 }

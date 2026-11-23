@@ -1,6 +1,6 @@
 // The browser preview's friends and chat: a small stand-in for the relay's /api/chat… (relay chat.rs) and the
 // launcher's own copy (src-tauri chat.rs). Steve answers a few seconds after each message, so live updates show.
-import type { ChatFriends, ChatGiftOptions, ChatGroup, ChatLocal, ChatMessage, ChatPerson, ResinApi } from '@shared/types'
+import type { ChatFile, ChatFriends, ChatGiftOptions, ChatGroup, ChatLocal, ChatMessage, ChatPerson, ChatProfile, ResinApi } from '@shared/types'
 
 const ME = '8667ba71b85a4004af54457a9734eed7'
 const STEVE = '1f2e3d4c5b6a49788796a5b4c3d2e1f0'
@@ -11,14 +11,70 @@ const dm = (a: string, b: string) => (a < b ? `dm:${a}:${b}` : `dm:${b}:${a}`)
 
 const friends: ChatFriends = {
   friends: [
-    { uuid: ALEX, name: 'Alex_Builds', since: now() - 86400 * 40, conv: dm(ME, ALEX), online: false, lastSeen: now() - 3600 * 5 },
-    { uuid: STEVE, name: 'SteveMines', since: now() - 86400 * 90, conv: dm(ME, STEVE), online: true, lastSeen: now() }
+    { uuid: ALEX, name: 'Alex_Builds', since: now() - 86400 * 40, conv: dm(ME, ALEX), online: true, lastSeen: now(), status: 'dnd', statusText: 'Speedrunning, no DMs' },
+    { uuid: STEVE, name: 'SteveMines', since: now() - 86400 * 90, conv: dm(ME, STEVE), online: true, lastSeen: now(), status: 'online', statusText: '' }
   ],
   incoming: [{ uuid: NOTCH, name: 'CreeperFan42', since: now() - 1800 }],
   outgoing: [],
   blocked: []
 }
 const names: Record<string, string> = { [ME]: 'Puirkle_Gamer', [STEVE]: 'SteveMines', [ALEX]: 'Alex_Builds', [NOTCH]: 'CreeperFan42' }
+
+// Files the preview "stores": id → type and base64 bytes.
+const stored = new Map<string, { mime: string; data: string }>()
+let fileN = 0
+async function picture(color: string, w = 480, h = 300): Promise<string> {
+  const c = new OffscreenCanvas(w, h)
+  const g = c.getContext('2d')!
+  const grad = g.createLinearGradient(0, 0, w, h)
+  grad.addColorStop(0, color)
+  grad.addColorStop(1, '#101018')
+  g.fillStyle = grad
+  g.fillRect(0, 0, w, h)
+  g.fillStyle = 'rgba(255,255,255,0.85)'
+  g.font = 'bold 28px sans-serif'
+  g.fillText('ResinCraft preview', 24, h - 32)
+  const blob = await c.convertToBlob({ type: 'image/png' })
+  return new Promise((resolve) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result).split(',')[1])
+    r.readAsDataURL(blob)
+  })
+}
+/** One second of a soft tone as a WAV, for the sample voice message. */
+function tone(): string {
+  const rate = 8000
+  const n = rate
+  const buf = new ArrayBuffer(44 + n)
+  const v = new DataView(buf)
+  const w = (o: number, t: string) => [...t].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)))
+  w(0, 'RIFF')
+  v.setUint32(4, 36 + n, true)
+  w(8, 'WAVEfmt ')
+  v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true)
+  v.setUint16(22, 1, true)
+  v.setUint32(24, rate, true)
+  v.setUint32(28, rate, true)
+  v.setUint16(32, 1, true)
+  v.setUint16(34, 8, true)
+  w(36, 'data')
+  v.setUint32(40, n, true)
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128 + Math.round(30 * Math.sin((i / rate) * 2 * Math.PI * 440) * Math.min(1, (n - i) / 800)))
+  let bin = ''
+  new Uint8Array(buf).forEach((b) => (bin += String.fromCharCode(b)))
+  return btoa(bin)
+}
+function newFile(kind: ChatFile['kind'], name: string, mime: string, size: number, extra: Partial<ChatFile> = {}): ChatFile {
+  return { id: `pf${++fileN}`, name, size, mime, kind, ...extra }
+}
+const castle = newFile('image', 'castle.png', 'image/png', 182_000, { w: 480, h: 300 })
+const clip = newFile('voice', 'voice.webm', 'audio/wav', 8044, { duration: 1 })
+const modFile = newFile('file', 'create-0.5.1.jar', 'application/java-archive', 14_200_000)
+void picture('#8b5cf6').then((d) => stored.set(castle.id, { mime: 'image/png', data: d }))
+stored.set(clip.id, { mime: 'audio/wav', data: tone() })
+const profiles: Record<string, ChatProfile> = {}
+const nicknames: Record<string, Record<string, string>> = {}
 
 let seq = 0
 let nextId = 0
@@ -48,10 +104,11 @@ const groups: ChatGroup[] = [
     created: now() - 86400 * 3,
     role: 'owner',
     invite: 'G-MX7Q-2RKA',
+    emoji: [],
     members: [
-      { uuid: ME, name: 'Puirkle_Gamer', role: 'owner', joined: now() - 86400 * 3, online: true },
-      { uuid: STEVE, name: 'SteveMines', role: 'admin', joined: now() - 86400 * 3, online: true },
-      { uuid: ALEX, name: 'Alex_Builds', role: 'member', joined: now() - 86400 * 2, online: false }
+      { uuid: ME, name: 'Puirkle_Gamer', role: 'owner', joined: now() - 86400 * 3, online: true, status: 'online' },
+      { uuid: STEVE, name: 'SteveMines', role: 'admin', joined: now() - 86400 * 3, online: true, status: 'online' },
+      { uuid: ALEX, name: 'Alex_Builds', role: 'member', joined: now() - 86400 * 2, online: true, status: 'dnd' }
     ]
   }
 ]
@@ -59,6 +116,9 @@ add(CREW, ME, '', 86400 * 3, { kind: 'system', data: { event: 'created', by: ME,
 add(CREW, ALEX, '', 86400 * 2, { kind: 'system', data: { event: 'joined', by: ALEX } })
 add(CREW, STEVE, 'server is up! join at puirkle.rscraft.resincore.tech', 5400)
 add(CREW, ALEX, 'look at this build https://i.imgur.com/example.png', 5000)
+add(CREW, STEVE, 'the castle so far', 3800, { data: { files: [castle] } })
+add(CREW, ALEX, '', 3700, { data: { files: [clip] } })
+add(CREW, STEVE, 'here is the mod', 3600, { data: { files: [modFile] } })
 add(CREW, ME, 'we should get this for the server', 4000, { data: { embed: { type: 'store', product: 'relay-plus', name: 'Relay Plus', description: 'More servers and data', icon: 'rocket', monthly: 9900, yearly: 99000, currency: 'thb' } } })
 const reads: Record<string, Record<string, number>> = { [s]: { [ME]: 7, [STEVE]: 6 }, [dm(ME, ALEX)]: { [ME]: 0, [ALEX]: 9 }, [CREW]: { [ME]: 12, [STEVE]: nextId, [ALEX]: 12 } }
 
@@ -106,6 +166,21 @@ function reply(conv: string, peer: string) {
   }, 2500)
 }
 
+function profileOf(uuid: string): ChatProfile {
+  return (profiles[uuid] ??= {
+    uuid,
+    name: names[uuid] ?? uuid.slice(0, 8),
+    since: now() - 86400 * 120,
+    status: uuid === ALEX ? 'dnd' : 'online',
+    statusText: uuid === ALEX ? 'Speedrunning, no DMs' : '',
+    bio: uuid === STEVE ? 'Redstone and castles. Ask me about Create.' : '',
+    banner: uuid === STEVE ? '#06b6d4' : '',
+    avatar: null,
+    friend: uuid !== ME,
+    mutualGroups: uuid === ME ? [] : [{ conv: CREW, name: 'Build crew' }]
+  })
+}
+
 const err = (msg: string) => Promise.reject(new Error(`ResinCraft Relay: ${msg}`))
 
 async function call(method: string, path: string, body?: unknown): Promise<unknown> {
@@ -122,7 +197,7 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
         })
       }
       const list = messages.filter((m) => m.seq > after).sort((x, y) => x.seq - y.seq)
-      return { me: ME, v, cursor: list.length ? list[list.length - 1].seq : after, more: false, messages: list, unread: unread(), reads, friends, enabled: true, muted: null, code: myCode, groups }
+      return { me: ME, v, cursor: list.length ? list[list.length - 1].seq : after, more: false, messages: list, unread: unread(), reads, friends, enabled: true, muted: null, code: myCode, groups, profile: profileOf(ME), nicknames, drive: true, maxUploadMb: 50 }
     }
     case 'GET /api/chat/history':
       return { messages: messages.filter((m) => m.conv === q.get('conv') && m.id < Number(q.get('before') || Infinity)).reverse().slice(0, 50), more: false }
@@ -130,15 +205,51 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       const conv = b.conv ? String(b.conv) : dm(ME, String(b.to))
       const text = String(b.body ?? '').trim()
       const embed = b.embed as { product?: string } | undefined
-      if (!text && !embed) return err('the message is empty')
+      if (!text && !embed && !(b.files as string[] | undefined)?.length) return err('the message is empty')
       // The preview's Store has other items than the gift list: any id shows as a card.
       const item = embed && (giftOptions().items.find((i) => i.id === embed.product) ?? { id: String(embed.product), name: String(embed.product), description: '', icon: '', monthly: 4900, yearly: 49000 })
       const data = item ? { embed: { type: 'store' as const, product: item.id, name: item.name, description: item.description, icon: item.icon, monthly: item.monthly, yearly: item.yearly, currency: 'thb' } } : null
-      const m = add(conv, ME, text, 0, { reply: (b.reply as number) ?? null, data })
+      const files = ((b.files as string[] | undefined) ?? []).map((id) => uploads.get(id)).filter(Boolean) as ChatFile[]
+      const m = add(conv, ME, text, 0, { reply: (b.reply as number) ?? null, data: files.length ? { ...(data ?? {}), files } : data })
       reads[m.conv] = { ...reads[m.conv], [ME]: m.id }
       changed()
       if (conv === dm(ME, STEVE) || conv === CREW) reply(m.conv, STEVE)
       return { message: m }
+    }
+    case 'POST /api/chat/status': {
+      const p = profileOf(ME)
+      p.status = b.status as ChatProfile['status']
+      if (typeof b.text === 'string') p.statusText = b.text
+      changed()
+      return { ok: true }
+    }
+    case 'POST /api/chat/profile': {
+      const p = profileOf(ME)
+      if (typeof b.bio === 'string') p.bio = b.bio
+      if (typeof b.banner === 'string') p.banner = b.banner
+      if ('avatar' in b) p.avatar = (b.avatar as string | null) ?? null
+      changed()
+      return p
+    }
+    case 'GET /api/chat/profile':
+      return profileOf(q.get('uuid') ?? ME)
+    case 'POST /api/chat/nickname': {
+      const conv = String(b.conv)
+      const nick = String(b.nick ?? '').trim()
+      nicknames[conv] = { ...nicknames[conv] }
+      if (nick) nicknames[conv][String(b.uuid)] = nick
+      else delete nicknames[conv][String(b.uuid)]
+      add(conv, ME, '', 0, { kind: 'system', data: { event: 'nickname', by: ME, who: [String(b.uuid)], name: nick } })
+      changed()
+      return { nicknames }
+    }
+    case 'POST /api/chat/groups/emoji':
+    case 'POST /api/chat/groups/emoji/remove': {
+      const g = groups.find((x) => x.conv === b.conv)!
+      g.emoji = (g.emoji ?? []).filter((e) => e.name !== b.name)
+      if (route.endsWith('emoji')) g.emoji.push({ name: String(b.name), file: String(b.file) })
+      changed()
+      return { ok: true, groups }
     }
     case 'POST /api/chat/groups/create': {
       const conv = `g:${Math.random().toString(16).slice(2, 18)}`
@@ -265,12 +376,13 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       return giftOptions()
     case 'POST /api/chat/gift': {
       const to = String(b.to)
+      const giftConv = b.conv ? String(b.conv) : dm(ME, to)
       const o = giftOptions()
       if (b.kind === 'credit') {
         const amount = Number(b.amount)
         if (amount > o.sendable) return err(`you can send ${(o.sendable / 100).toFixed(2)} THB: credit you were given can only be spent in the Store`)
         wallet.balance -= amount
-        const m = add(dm(ME, to), ME, String(b.note ?? ''), 0, { kind: 'gift', data: { gift: `cg-${seq}`, kind: 'credit', amount, currency: 'thb' } })
+        const m = add(giftConv, ME, String(b.note ?? ''), 0, { kind: 'gift', data: { gift: `cg-${seq}`, kind: 'credit', amount, currency: 'thb', to } as never })
         changed()
         return { message: m, balance: wallet.balance }
       }
@@ -279,7 +391,7 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       if (price > wallet.balance) return err(`${item.name} costs ${(price / 100).toFixed(2)} THB`)
       wallet.balance -= price
       wallet.given = Math.max(0, wallet.given - price)
-      const m = add(dm(ME, to), ME, String(b.note ?? ''), 0, {
+      const m = add(giftConv, ME, String(b.note ?? ''), 0, {
         kind: 'gift',
         data: { gift: `cg-${seq}`, kind: 'item', amount: price, currency: 'thb', product: item.id, name: item.name, icon: item.icon, yearly: !!b.yearly, days: b.yearly ? 365 : 30 }
       })
@@ -289,6 +401,9 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
   }
   return err(`not found: ${method} ${path}`)
 }
+
+// Uploads in the preview (kept in memory).
+const uploads = new Map<string, ChatFile>()
 
 // The launcher's copy, in memory.
 const local: Record<string, { cursor: number; friends: ChatFriends | null; messages: Map<number, ChatMessage> }> = {}
@@ -330,6 +445,38 @@ export function mockChat(): ResinApi['chat'] {
     },
     async import() {
       return { added: 0 }
+    },
+    async pickFiles() {
+      return [{ path: 'C:\\Users\\you\\Downloads\\sodium-0.6.jar', name: 'sodium-0.6.jar', size: 1_200_000, mime: 'application/java-archive' }]
+    },
+    async upload(_conv, path, kind, extra) {
+      await new Promise((r) => setTimeout(r, 700))
+      const name = path.split(/[\\/]/).pop() ?? 'file'
+      const f = newFile(kind, name, extra?.mime ?? 'application/octet-stream', 1_200_000, extra)
+      uploads.set(f.id, f)
+      return f
+    },
+    async uploadBytes(_conv, name, mime, kind, data, extra) {
+      await new Promise((r) => setTimeout(r, 500))
+      const f = newFile(kind, name, mime, Math.round((data.length * 3) / 4), extra)
+      stored.set(f.id, { mime, data })
+      uploads.set(f.id, f)
+      return f
+    },
+    async fileData(id) {
+      for (let i = 0; i < 20 && !stored.has(id); i++) await new Promise((r) => setTimeout(r, 100))
+      const f = stored.get(id)
+      if (!f) throw new Error('not in the preview')
+      return f
+    },
+    async fileLocal(id) {
+      return `C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher\\chat-files\\${id}`
+    },
+    async fileSave(_id, name) {
+      return `C:\\Users\\you\\Downloads\\${name}`
+    },
+    async attention() {
+      return true
     }
   }
 }

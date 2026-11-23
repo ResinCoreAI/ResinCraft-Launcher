@@ -9,6 +9,8 @@ import {
   Download,
   Flag,
   Gift,
+  Mic,
+  Paperclip,
   MessageCircle,
   MoreHorizontal,
   Pencil,
@@ -22,9 +24,9 @@ import {
   Users,
   X
 } from 'lucide-react'
-import type { ChatGiftData, ChatGroup, ChatMessage, ChatPerson } from '@shared/types'
+import type { ChatFile, ChatGiftData, ChatGroup, ChatMessage, ChatPerson } from '@shared/types'
 import { api } from '../../api'
-import { chat, isGroup, nameOf, peerOf, useChat, type ChatView } from '../../chatState'
+import { chat, displayName, isGroup, nameOf, peerOf, setSound, soundOn, statusOf, useChat, type ChatView } from '../../chatState'
 import { money } from '../../storeStatus'
 import { useStore } from '../../store'
 import { currentLanguage, t, type Key } from '../../i18n'
@@ -34,6 +36,8 @@ import EmojiPicker from './EmojiPicker'
 import GiftModal from './GiftModal'
 import Embeds from './Embeds'
 import { GroupPanel, GroupTile, NewGroupModal, SystemNote } from './ChatGroups'
+import { ChatAvatar, MessageFiles, VoiceRecorder } from './ChatMedia'
+import { NicknameModal, ProfileCard, ProfileModal, STATUS_LABEL, StatusTextModal, statusMenu } from './ChatProfile'
 import '../../chat.css'
 import PlayerHead from '../PlayerHead'
 
@@ -48,7 +52,7 @@ const REASONS: [string, Key][] = [
 ]
 
 function Head({ uuid, size = 32 }: { uuid: string; size?: number }) {
-  return <PlayerHead who={uuid} name={nameOf(uuid)} size={size} className="chat-head" />
+  return <ChatAvatar uuid={uuid} size={size} />
 }
 
 const time = (secs: number) => new Date(secs * 1000).toLocaleTimeString(currentLanguage(), { hour: '2-digit', minute: '2-digit' })
@@ -61,6 +65,7 @@ function day(secs: number): string {
   return d.toLocaleDateString(currentLanguage(), { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' })
 }
 function seen(p: ChatPerson): string {
+  if (p.status && p.status !== 'offline') return p.statusText || t(STATUS_LABEL[p.status])
   if (p.online) return t('chat.online')
   if (!p.lastSeen) return t('chat.offline')
   const mins = Math.max(1, Math.round((Date.now() / 1000 - p.lastSeen) / 60))
@@ -74,7 +79,9 @@ function snippet(m: ChatMessage | undefined, me: string): string {
   if (m.deleted) return who + t('chat.deleted')
   if (m.kind === 'gift') return who + t('chat.giftLine')
   if (m.kind === 'system') return ''
-  if (!m.body && m.data && 'embed' in m.data) return who + m.data.embed.name
+  const files = m.data && 'files' in m.data ? m.data.files ?? [] : []
+  if (!m.body && files.length) return who + (files.some((f) => f.kind === 'voice') ? t('chat.voice.line') : files.every((f) => f.kind === 'image') ? t('chat.files.pictureLine') : t('chat.files.fileLine'))
+  if (!m.body && m.data && 'embed' in m.data && m.data.embed) return who + m.data.embed.name
   return who + m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
 }
 
@@ -146,6 +153,14 @@ export default function ChatPanel() {
   const [confirm, setConfirm] = useState<{ title: string; body: string; ok: string; run: () => Promise<unknown> }>()
   const [showBlocked, setShowBlocked] = useState(false)
   const [newGroup, setNewGroup] = useState(false)
+  const [profileOf, setProfileOf] = useState<string | null>(null)
+  const [editProfile, setEditProfile] = useState(false)
+  const [statusText, setStatusText] = useState(false)
+  const [nickFor, setNickFor] = useState<string | null>(null)
+  const [giftTo, setGiftTo] = useState<{ uuid: string; conv?: string } | null>(null)
+  const [pending, setPending] = useState<{ key: string; name: string; file?: ChatFile; error?: string }[]>([])
+  const [recording, setRecording] = useState(false)
+  const [sound, setSoundState] = useState(soundOn)
   const [members, setMembers] = useState(false)
   const list = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -220,13 +235,18 @@ export default function ChatPanel() {
     }
   }
 
+  const ready = pending.filter((x) => x.file).map((x) => x.file!)
+  const uploading = pending.some((x) => !x.file && !x.error)
   const send = async () => {
     const body = text.trim()
-    if (!body || !open || (!peer && !group) || sending) return
+    if ((!body && !ready.length) || !open || (!peer && !group) || sending || uploading) return
     setSending(true)
     try {
       if (editing) await chat.edit(editing.id, body)
-      else await chat.send(open, body, replyTo?.id)
+      else if (ready.length) {
+        await chat.sendFiles(open, body, ready, replyTo?.id)
+        setPending([])
+      } else await chat.send(open, body, replyTo?.id)
       setText('')
       setReplyTo(null)
       setEditing(null)
@@ -258,6 +278,65 @@ export default function ChatPanel() {
     }
   }
 
+  // Files: picked on this PC, pasted or dropped. Each uploads at once; Send puts them in one message.
+  const kindOf = (mime: string) => (/^image\/(png|jpeg|gif|webp)$/.test(mime) ? 'image' : mime.startsWith('audio/') ? 'voice' : 'file')
+  const track = async (name: string, upload: () => Promise<ChatFile>) => {
+    const key = `${Date.now()}-${Math.random()}`
+    setPending((p) => [...p, { key, name }])
+    try {
+      const file = await upload()
+      setPending((p) => p.map((x) => (x.key === key ? { ...x, file } : x)))
+    } catch (e) {
+      setPending((p) => p.map((x) => (x.key === key ? { ...x, error: (e as Error).message } : x)))
+    }
+  }
+  const tooBig = (size: number) => {
+    if (size <= v.maxUploadMb * 1_000_000) return false
+    toast(t('chat.files.tooBig', { size: v.maxUploadMb }), 'error')
+    return true
+  }
+  const attach = async () => {
+    if (!open) return
+    try {
+      for (const f of await api.chat.pickFiles()) {
+        if (tooBig(f.size)) continue
+        const kind = kindOf(f.mime) === 'voice' ? 'file' : kindOf(f.mime)
+        void track(f.name, () => chat.uploadPath(open, f.path, kind as 'image' | 'file', { mime: f.mime }))
+      }
+    } catch (e) {
+      fail(e)
+    }
+  }
+  const addBlobs = (files: File[]) => {
+    if (!open || !v.drive) return
+    for (const f of files) {
+      if (tooBig(f.size)) continue
+      const kind = kindOf(f.type) === 'voice' ? 'file' : kindOf(f.type)
+      void track(f.name || 'image.png', async () => {
+        let extra: { w?: number; h?: number } | undefined
+        if (kind === 'image') {
+          try {
+            const b = await createImageBitmap(f)
+            extra = { w: b.width, h: b.height }
+          } catch {}
+        }
+        return chat.uploadBlob(open, f, f.name || 'image.png', kind as 'image' | 'file', extra)
+      })
+    }
+  }
+  const sendVoice = async (blob: Blob, secs: number) => {
+    setRecording(false)
+    if (!open) return
+    try {
+      const f = await chat.uploadBlob(open, blob, 'voice.webm', 'voice', { duration: Math.round(secs * 10) / 10 })
+      await chat.sendFiles(open, '', [f], replyTo?.id)
+      setReplyTo(null)
+      pinned.current = true
+    } catch (e) {
+      fail(e)
+    }
+  }
+
   const insert = (s: string) => {
     const el = box.current
     const a = el?.selectionStart ?? text.length
@@ -270,7 +349,9 @@ export default function ChatPanel() {
   }
 
   const friendMenu = (p: ChatPerson): ContextEntry[] => [
+    { label: t('chat.profile.view'), icon: <Users size={14} />, onSelect: () => setProfileOf(p.uuid) },
     { label: t('chat.sendGift'), icon: <Gift size={14} />, onSelect: () => (chat.open(p.conv ?? null), setGift(true)) },
+    !!p.conv && { label: t('chat.nickname.set'), icon: <Pencil size={14} />, onSelect: () => (chat.open(p.conv ?? null), setNickFor(p.uuid)) },
     { label: t('chat.copyName'), icon: <Copy size={14} />, onSelect: () => void navigator.clipboard.writeText(p.name) },
     '-',
     {
@@ -369,6 +450,17 @@ export default function ChatPanel() {
   return (
     <div className={`card chat-shell ${open ? 'reading' : ''}`}>
       <aside className="chat-side">
+        <button
+          className="chat-me"
+          onClick={(e) => openContextMenu(e, [...statusMenu(() => setEditProfile(true), () => setStatusText(true)), '-', { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) }])}
+          title={t('chat.status.change')}
+        >
+          <ChatAvatar uuid={v.me} size={34} dot status={v.profile?.status === 'invisible' ? 'offline' : v.profile?.status ?? 'online'} />
+          <span className="grow">
+            <b className="ellipsis">{nameOf(v.me)}</b>
+            <span className="hint ellipsis">{v.profile?.statusText || t(STATUS_LABEL[v.profile?.status ?? 'online'])}</span>
+          </span>
+        </button>
         <div className="chat-code">
           <span className="hint">{t('chat.yourCode')}</span>
           <b className="data">{v.code || '····-····'}</b>
@@ -414,7 +506,7 @@ export default function ChatPanel() {
             const c = v.convs[g.conv] ?? []
             const lastMsg = [...c].reverse().find((m) => m.kind !== 'system')
             const unread = v.unread[g.conv] ?? 0
-            const line = lastMsg ? `${lastMsg.sender === v.me ? t('chat.you') : nameOf(lastMsg.sender)}: ${snippet(lastMsg, '')}` : t('chat.group.members', { count: g.members.length })
+            const line = lastMsg ? `${lastMsg.sender === v.me ? t('chat.you') : displayName(g.conv, lastMsg.sender)}: ${snippet(lastMsg, '')}` : t('chat.group.members', { count: g.members.length })
             return (
               <button key={g.conv} role="option" aria-selected={g.conv === open} className={`chat-friend ${g.conv === open ? 'open' : ''} ${unread ? 'unread' : ''}`} onClick={() => chat.open(g.conv)}>
                 <GroupTile name={g.name} />
@@ -458,11 +550,11 @@ export default function ChatPanel() {
                 >
                   <span className="chat-head-wrap">
                     <Head uuid={p.uuid} />
-                    <span className={`chat-presence ${p.online ? 'on' : ''}`} aria-label={p.online ? t('chat.online') : t('chat.offline')} />
+                    <span className={`chat-presence ${p.status ?? (p.online ? 'online' : 'offline')}`} aria-label={t(STATUS_LABEL[p.status ?? (p.online ? 'online' : 'offline')])} />
                   </span>
                   <span className="chat-friend-text">
                     <span className="chat-friend-top">
-                      <b className="ellipsis">{p.name}</b>
+                      <b className="ellipsis">{displayName(p.conv, p.uuid)}</b>
                       {c.length > 0 && <span className="chat-time">{time(c[c.length - 1].at)}</span>}
                     </span>
                     <span className="chat-snippet ellipsis">{snippet(c[c.length - 1], v.me) || seen(p)}</span>
@@ -514,15 +606,30 @@ export default function ChatPanel() {
                       {t('chat.group.members', { count: group.members.length })} · {t('chat.group.onlineCount', { count: group.members.filter((m) => m.online).length })}
                     </span>
                   </span>
+                  <button
+                    className="btn sm"
+                    disabled={!v.enabled || !!v.muted || group.members.length < 2}
+                    onClick={(e) =>
+                      openContextMenu(
+                        e,
+                        group.members.filter((m) => m.uuid !== v.me).map((m) => ({ label: displayName(group.conv, m.uuid), onSelect: () => setGiftTo({ uuid: m.uuid, conv: group.conv }) })),
+                        t('chat.gift.who')
+                      )
+                    }
+                  >
+                    <Gift /> {t('chat.sendGift')}
+                  </button>
                   <button className={`btn sm ${members ? 'primary' : ''}`} onClick={() => setMembers(!members)}>
                     <Users /> {t('chat.group.membersButton')}
                   </button>
                 </>
               ) : (
                 <>
-              <Head uuid={peer} size={36} />
+              <button className="chat-avatar-btn" onClick={() => setProfileOf(peer)} aria-label={t('chat.profile.view')}>
+                <ChatAvatar uuid={peer} size={36} dot />
+              </button>
               <span className="grow">
-                <b>{nameOf(peer)}</b>
+                <b>{displayName(open, peer)}</b>
                 <span className="hint">{friend ? seen(friend) : t('chat.notFriends')}</span>
               </span>
               {friend && (
@@ -556,7 +663,7 @@ export default function ChatPanel() {
                   <span className="chat-wave" aria-hidden>
                     👋
                   </span>
-                  <b>{t('chat.startWith', { name: group ? group.name : nameOf(peer) })}</b>
+                  <b>{t('chat.startWith', { name: group ? group.name : displayName(open, peer) })}</b>
                 </div>
               )}
               {messages.map((m, i) => {
@@ -588,11 +695,17 @@ export default function ChatPanel() {
                       className={`chat-msg ${mine ? 'mine' : ''} ${grouped ? 'grouped' : ''} ${m.deleted ? 'deleted' : ''} ${editing?.id === m.id ? 'editing' : ''}`}
                       onContextMenu={(e) => openContextMenu(e, messageMenu(m))}
                     >
-                      {!grouped && <Head uuid={m.sender} size={34} />}
+                      {!grouped && (
+                        <button className="chat-avatar-btn" onClick={() => setProfileOf(m.sender)} aria-label={t('chat.profile.view')}>
+                          <Head uuid={m.sender} size={34} />
+                        </button>
+                      )}
                       <div className="chat-msg-body">
                         {!grouped && (
                           <div className="chat-msg-head">
-                            <b>{mine ? t('chat.you') : nameOf(m.sender)}</b>
+                            <b className="chat-name" onClick={() => setProfileOf(m.sender)}>
+                              {mine ? t('chat.you') : displayName(open, m.sender)}
+                            </b>
                             <span className="chat-time" title={new Date(m.at * 1000).toLocaleString(currentLanguage())}>
                               {time(m.at)}
                             </span>
@@ -603,7 +716,7 @@ export default function ChatPanel() {
                             <Reply size={12} aria-hidden />
                             {replied ? (
                               <>
-                                <b>{replied.sender === v.me ? t('chat.you') : nameOf(replied.sender)}</b> <span className="ellipsis">{snippet(replied, '')}</span>
+                                <b>{replied.sender === v.me ? t('chat.you') : displayName(open, replied.sender)}</b> <span className="ellipsis">{snippet(replied, '')}</span>
                               </>
                             ) : (
                               <span className="hint">{t('chat.replyOlder')}</span>
@@ -614,12 +727,13 @@ export default function ChatPanel() {
                           <span className="hint">{t('chat.deleted')}</span>
                         ) : m.kind === 'gift' ? (
                           <>
-                            <GiftCard m={m} mine={mine} peer={nameOf(peer)} />
+                            <GiftCard m={m} mine={mine} peer={displayName(open, (m.data as ChatGiftData & { to?: string })?.to ?? peer)} />
                             {m.body && <ChatText text={m.body} />}
                           </>
                         ) : (
                           <>
-                            {m.body && <ChatText text={m.body} />}
+                            {m.body && <ChatText text={m.body} emoji={group?.emoji} />}
+                            {m.data && 'files' in m.data && m.data.files && <MessageFiles files={m.data.files} />}
                             <Embeds m={m} />
                           </>
                         )}
@@ -654,7 +768,7 @@ export default function ChatPanel() {
                   <div className="chat-compose-bar">
                     {editing ? <Pencil size={13} /> : <Reply size={13} />}
                     <span className="grow ellipsis">
-                      {editing ? t('chat.editing') : t('chat.replyingTo', { name: replyTo!.sender === v.me ? t('chat.you') : nameOf(replyTo!.sender) })}
+                      {editing ? t('chat.editing') : t('chat.replyingTo', { name: replyTo!.sender === v.me ? t('chat.you') : displayName(open, replyTo!.sender) })}
                       {replyTo && <span className="hint"> {snippet(replyTo, '')}</span>}
                     </span>
                     <button
@@ -670,7 +784,35 @@ export default function ChatPanel() {
                     </button>
                   </div>
                 )}
-                <div className="chat-compose-row">
+                {pending.length > 0 && (
+                  <div className="chat-pending">
+                    {pending.map((x) => (
+                      <span key={x.key} className={`chip ${x.error ? 'bad' : ''}`} title={x.error}>
+                        {!x.file && !x.error && <span className="spin-dot" aria-hidden />} {x.name}
+                        <button className="btn ghost icon sm" aria-label={t('common.remove')} onClick={() => setPending((p) => p.filter((y) => y.key !== x.key))}>
+                          <X />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {recording ? (
+                  <VoiceRecorder onDone={(b, secs) => void sendVoice(b, secs)} onCancel={() => setRecording(false)} />
+                ) : (
+                <div
+                  className="chat-compose-row"
+                  onDragOver={(e) => v.drive && e.dataTransfer.types.includes('Files') && e.preventDefault()}
+                  onDrop={(e) => {
+                    if (!v.drive || !e.dataTransfer.files.length) return
+                    e.preventDefault()
+                    addBlobs([...e.dataTransfer.files])
+                  }}
+                >
+                  {v.drive && (
+                    <button className="btn ghost icon" aria-label={t('chat.files.attach')} title={t('chat.files.attach')} onClick={() => void attach()}>
+                      <Paperclip />
+                    </button>
+                  )}
                   {friend && (
                     <button className="btn ghost icon chat-gift-btn" aria-label={t('chat.sendGift')} title={t('chat.sendGift')} onClick={() => setGift(true)}>
                       <Gift />
@@ -682,28 +824,64 @@ export default function ChatPanel() {
                     rows={1}
                     value={text}
                     maxLength={2000}
-                    placeholder={t('chat.placeholder', { name: group ? group.name : nameOf(peer) })}
+                    placeholder={t('chat.placeholder', { name: group ? group.name : displayName(open, peer) })}
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={onKey}
+                    onPaste={(e) => {
+                      const files = [...e.clipboardData.files]
+                      if (files.length && v.drive) {
+                        e.preventDefault()
+                        addBlobs(files)
+                      }
+                    }}
                     style={{ height: `${Math.min(160, 22 * Math.max(1, text.split('\n').length) + 16)}px` }}
                   />
                   <button className="btn ghost icon chat-emoji-btn" aria-label={t('chat.emoji.title')} title={t('chat.emoji.title')} onClick={() => setEmoji(!emoji)}>
                     <Smile />
                   </button>
-                  <button className="btn primary icon" aria-label={t('chat.send')} title={t('chat.send')} disabled={!text.trim() || sending} onClick={() => void send()}>
-                    <Send />
-                  </button>
-                  {emoji && <EmojiPicker onPick={insert} onClose={() => setEmoji(false)} />}
+                  {v.drive && !text.trim() && !ready.length && !editing ? (
+                    <button className="btn ghost icon" aria-label={t('chat.voice.record')} title={t('chat.voice.record')} onClick={() => setRecording(true)}>
+                      <Mic />
+                    </button>
+                  ) : (
+                    <button className="btn primary icon" aria-label={t('chat.send')} title={t('chat.send')} disabled={(!text.trim() && !ready.length) || sending || uploading} onClick={() => void send()}>
+                      <Send />
+                    </button>
+                  )}
+                  {emoji && <EmojiPicker onPick={insert} onClose={() => setEmoji(false)} groupEmoji={group?.emoji} />}
                 </div>
+                )}
                 <span className="chat-hint hint">{t('chat.formatHint')}</span>
               </div>
             )}
           </>
         )}
-        {group && members && <GroupPanel g={group} onClose={() => setMembers(false)} />}
+        {group && members && (
+          <GroupPanel g={group} onClose={() => setMembers(false)} onProfile={setProfileOf} onNick={setNickFor} onGift={(uuid) => setGiftTo({ uuid, conv: group.conv })} />
+        )}
       </section>
       {newGroup && <NewGroupModal onClose={() => setNewGroup(false)} />}
-      {gift && peer && <GiftModal to={peer} name={nameOf(peer)} onClose={() => setGift(false)} />}
+      {gift && peer && <GiftModal to={peer} name={displayName(open, peer)} onClose={() => setGift(false)} />}
+      {giftTo && <GiftModal to={giftTo.uuid} name={displayName(giftTo.conv ?? open, giftTo.uuid)} conv={giftTo.conv} onClose={() => setGiftTo(null)} />}
+      {profileOf && (
+        <ProfileCard
+          uuid={profileOf}
+          conv={open}
+          onClose={() => setProfileOf(null)}
+          onGift={
+            profileOf !== v.me && (v.friends.friends.some((f) => f.uuid === profileOf) || group?.members.some((m) => m.uuid === profileOf))
+              ? () => {
+                  const to = profileOf
+                  setProfileOf(null)
+                  setGiftTo({ uuid: to, conv: group ? group.conv : undefined })
+                }
+              : undefined
+          }
+        />
+      )}
+      {editProfile && <ProfileModal onClose={() => setEditProfile(false)} />}
+      {statusText && <StatusTextModal onClose={() => setStatusText(false)} />}
+      {nickFor && open && <NicknameModal conv={open} uuid={nickFor} onClose={() => setNickFor(null)} />}
       {confirm && (
         <ConfirmModal
           title={confirm.title}

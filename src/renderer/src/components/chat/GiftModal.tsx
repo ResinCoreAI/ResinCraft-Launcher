@@ -9,7 +9,7 @@ import { useStore } from '../../store'
 import { t } from '../../i18n'
 import { Modal, Segmented } from '../ui'
 
-export default function GiftModal({ to, name, onClose }: { to: string; name: string; onClose: () => void }) {
+export default function GiftModal({ to, name, conv, onClose }: { to: string; name: string; conv?: string; onClose: () => void }) {
   const { toast, go, activeAccount } = useStore()
   const [opts, setOpts] = useState<ChatGiftOptions>()
   const [error, setError] = useState('')
@@ -40,7 +40,7 @@ export default function GiftModal({ to, name, onClose }: { to: string; name: str
     setBusy(true)
     setError('')
     try {
-      const r = await chat.gift(to, kind === 'credit' ? { kind, amount: minor, note: note.trim() || undefined } : { kind, product, yearly, note: note.trim() || undefined })
+      const r = await chat.gift(to, kind === 'credit' ? { kind, amount: minor, note: note.trim() || undefined } : { kind, product, yearly, note: note.trim() || undefined }, conv)
       if (activeAccount?.type === 'msa') setWalletBalance(activeAccount.uuid, r.balance, cur)
       toast(t('chat.gift.sent', { name }), 'success')
       onClose()

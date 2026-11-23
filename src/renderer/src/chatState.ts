@@ -2,7 +2,7 @@
 // so messages arrive as they're sent (relay chat.rs `sync?wait=1`), and keeps the launcher's own copy of the chats
 // (src-tauri chat.rs) in step. The Inbox's Chat tab reads it with useChat() and acts through `chat`.
 import { useEffect, useSyncExternalStore } from 'react'
-import type { ChatEmbed, ChatFriends, ChatGiftOptions, ChatGroup, ChatMessage, ChatPerson, ChatSync } from '@shared/types'
+import type { ChatEmbed, ChatFile, ChatFileKind, ChatFriends, ChatGiftOptions, ChatGroup, ChatMessage, ChatPerson, ChatProfile, ChatStatus, ChatSync } from '@shared/types'
 import { api } from './api'
 import { setChatBadge } from './inboxState'
 
@@ -27,10 +27,15 @@ export interface ChatView {
   /** The account's friend code. */
   code: string
   groups: ChatGroup[]
+  profile: ChatProfile | null
+  nicknames: Record<string, Record<string, string>>
+  /** The relay takes files, up to this many MB. */
+  drive: boolean
+  maxUploadMb: number
 }
 
 const NO_FRIENDS: ChatFriends = { friends: [], incoming: [], outgoing: [], blocked: [] }
-const EMPTY: ChatView = { status: 'off', error: '', me: '', friends: NO_FRIENDS, convs: {}, older: {}, names: {}, unread: {}, reads: {}, enabled: true, muted: null, open: null, code: '', groups: [] }
+const EMPTY: ChatView = { status: 'off', error: '', me: '', friends: NO_FRIENDS, convs: {}, older: {}, names: {}, unread: {}, reads: {}, enabled: true, muted: null, open: null, code: '', groups: [], profile: null, nicknames: {}, drive: false, maxUploadMb: 50 }
 
 let view: ChatView = EMPTY
 const listeners = new Set<() => void>()
@@ -80,6 +85,99 @@ function namesFrom(f: ChatFriends, names: Record<string, string>, groups: ChatGr
 }
 
 export const isGroup = (conv: string) => conv.startsWith('g:')
+
+/** What `uuid` is called in a chat: its nickname there, else its name. */
+export const displayName = (conv: string | null | undefined, uuid: string) => (conv && view.nicknames[conv]?.[uuid]) || nameOf(uuid)
+
+/** Profile pictures of everyone known (file ids). */
+export function avatarOf(uuid: string): string | null {
+  if (uuid === view.me) return view.profile?.avatar ?? null
+  const f = view.friends.friends.find((p) => p.uuid === uuid)
+  if (f?.avatar) return f.avatar
+  for (const g of view.groups) {
+    const m = g.members.find((x) => x.uuid === uuid)
+    if (m?.avatar) return m.avatar
+  }
+  return null
+}
+
+/** A friend's or group member's status (offline when unknown). */
+export function statusOf(uuid: string): ChatStatus {
+  if (uuid === view.me) return view.profile?.status ?? 'online'
+  const f = view.friends.friends.find((p) => p.uuid === uuid)
+  if (f?.status) return f.status
+  for (const g of view.groups) {
+    const m = g.members.find((x) => x.uuid === uuid)
+    if (m?.status) return m.status
+  }
+  return 'offline'
+}
+
+// ----- Sound: a soft two-note ping for a new message (off in the chat's menu) -----
+const SOUND_KEY = 'resin.chat.sound'
+export function soundOn(): boolean {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+export function setSound(on: boolean) {
+  try {
+    localStorage.setItem(SOUND_KEY, on ? '1' : '0')
+  } catch {}
+}
+let audio: AudioContext | null = null
+function ping() {
+  if (!soundOn()) return
+  try {
+    audio ??= new AudioContext()
+    const t0 = audio.currentTime
+    for (const [i, f] of [880, 1320].entries()) {
+      const o = audio.createOscillator()
+      const g = audio.createGain()
+      o.type = 'sine'
+      o.frequency.value = f
+      g.gain.setValueAtTime(0.0001, t0 + i * 0.09)
+      g.gain.exponentialRampToValueAtTime(0.08, t0 + i * 0.09 + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.09 + 0.18)
+      o.connect(g).connect(audio.destination)
+      o.start(t0 + i * 0.09)
+      o.stop(t0 + i * 0.09 + 0.2)
+    }
+  } catch {}
+}
+
+// ----- Idle: after 10 minutes without a key or the mouse, Online shows as Idle until the player is back -----
+const IDLE_MS = 10 * 60_000
+let lastActive = Date.now()
+let autoIdle = false
+if (typeof window !== 'undefined') {
+  const active = () => {
+    lastActive = Date.now()
+    if (autoIdle) {
+      autoIdle = false
+      void chat.setStatus('online').catch(() => {})
+    }
+  }
+  for (const e of ['pointerdown', 'keydown', 'mousemove', 'wheel']) window.addEventListener(e, active, { passive: true })
+  window.setInterval(() => {
+    if (!autoIdle && view.status === 'ready' && view.profile?.status === 'online' && Date.now() - lastActive > IDLE_MS) {
+      autoIdle = true
+      void chat.setStatus('idle').catch(() => {})
+    }
+  }, 60_000)
+}
+
+/** Reads a File (or Blob) as base64, for uploads from the page. */
+export function base64Of(b: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''))
+    r.onerror = () => reject(r.error)
+    r.readAsDataURL(b)
+  })
+}
 export const groupOf = (conv: string) => view.groups.find((g) => g.conv === conv)
 
 const call = <T,>(method: 'GET' | 'POST', path: string, body?: unknown) => api.chat.call(method, path, body) as Promise<T>
@@ -175,12 +273,23 @@ export function useChatWatch(accountId: string | undefined, onNew: (m: ChatMessa
             muted: r.muted,
             code: r.code ?? '',
             groups: r.groups ?? [],
+            profile: r.profile ?? view.profile,
+            nicknames: r.nicknames ?? {},
+            drive: !!r.drive,
+            maxUploadMb: r.maxUploadMb ?? 50,
             names: namesFrom(r.friends, view.names, r.groups ?? [])
           })
           cursor = Math.max(cursor, r.cursor)
           keep(r.messages, { cursor, friends: r.friends })
           // Not for the conversation on screen.
-          if (!first) fresh.filter((m) => m.conv !== view.open || document.hidden).forEach((m) => onNew(m, nameOf(m.sender)))
+          if (!first && view.profile?.status !== 'dnd') {
+            const shown = fresh.filter((m) => m.kind !== 'system' && (m.conv !== view.open || document.hidden))
+            shown.forEach((m) => onNew(m, displayName(m.conv, m.sender)))
+            if (shown.length) {
+              if (document.hidden || !document.hasFocus()) void api.chat.attention().catch(() => {})
+              ping()
+            }
+          }
           // The open conversation is read as messages arrive.
           if (view.open && !document.hidden) markRead(view.open)
           v = r.more ? -1 : r.v
@@ -235,6 +344,31 @@ export const chat = {
     const r = await call<{ message: ChatMessage }>('POST', '/api/chat/send', { ...target, body, reply: reply ?? undefined })
     return took(r.message)
   },
+  /** A message with files already uploaded (and text, or none). */
+  async sendFiles(conv: string, body: string, files: ChatFile[], reply?: number | null) {
+    const target = isGroup(conv) ? { conv } : { to: peerOf(conv, view.me) }
+    const r = await call<{ message: ChatMessage }>('POST', '/api/chat/send', { ...target, body, files: files.map((f) => f.id), reply: reply ?? undefined })
+    return took(r.message)
+  },
+  /** Uploads a file on this PC, or bytes from the page, into a chat (or as a profile picture / group emoji). */
+  uploadPath: (conv: string, path: string, kind: ChatFileKind, extra?: { w?: number; h?: number; duration?: number; mime?: string }) => api.chat.upload(conv, path, kind, extra),
+  async uploadBlob(conv: string, blob: Blob, name: string, kind: ChatFileKind, extra?: { w?: number; h?: number; duration?: number }) {
+    return api.chat.uploadBytes(conv, name, blob.type || 'application/octet-stream', kind, await base64Of(blob), extra)
+  },
+  async setStatus(status: Exclude<ChatStatus, 'offline'>, text?: string) {
+    await call('POST', '/api/chat/status', text === undefined ? { status } : { status, text })
+    if (view.profile) set({ profile: { ...view.profile, status, ...(text === undefined ? {} : { statusText: text }) } })
+  },
+  async saveProfile(patch: { bio?: string; banner?: string; avatar?: string | null }) {
+    const p = await call<ChatProfile>('POST', '/api/chat/profile', patch)
+    set({ profile: p })
+    return p
+  },
+  profile: (uuid: string) => call<ChatProfile>('GET', `/api/chat/profile?uuid=${uuid}`),
+  async setNickname(conv: string, uuid: string, nick: string) {
+    const r = await call<{ nicknames: Record<string, Record<string, string>> }>('POST', '/api/chat/nickname', { conv, uuid, nick })
+    set({ nicknames: r.nicknames ?? view.nicknames })
+  },
   /** Shares a Store item into a conversation, as a card (with an optional line). */
   async share(conv: string, embed: Pick<ChatEmbed, 'type' | 'product'>, body = '') {
     const target = isGroup(conv) ? { conv } : { to: peerOf(conv, view.me) }
@@ -252,7 +386,7 @@ export const chat = {
     return r
   },
   /** rename {name}, add {members}, remove {uuid}, leave, role {uuid, role}, invite {reset?}. */
-  async group(action: 'rename' | 'add' | 'remove' | 'leave' | 'role' | 'invite', conv: string, extra: Record<string, unknown> = {}) {
+  async group(action: 'rename' | 'add' | 'remove' | 'leave' | 'role' | 'invite' | 'emoji' | 'emoji/remove', conv: string, extra: Record<string, unknown> = {}) {
     const r = await call<{ groups: ChatGroup[]; code?: string }>('POST', `/api/chat/groups/${action}`, { conv, ...extra })
     set({ groups: r.groups, names: namesFrom(view.friends, view.names, r.groups), ...(action === 'leave' && view.open === conv ? { open: null } : {}) })
     return r
@@ -285,8 +419,9 @@ export const chat = {
     set({ friends: r.friends, names: namesFrom(r.friends, view.names) })
   },
   giftOptions: () => call<ChatGiftOptions>('GET', '/api/chat/gift'),
-  async gift(to: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }) {
-    const r = await call<{ message: ChatMessage | null; balance: number }>('POST', '/api/chat/gift', { to, ...gift })
+  /** A gift to a friend, or (with `conv`) to someone in a group. */
+  async gift(to: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }, conv?: string) {
+    const r = await call<{ message: ChatMessage | null; balance: number }>('POST', '/api/chat/gift', { to, ...gift, ...(conv && isGroup(conv) ? { conv } : {}) })
     if (r.message) took(r.message)
     return r
   },

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { t, type Key } from '../../i18n'
+import { FileImage } from './ChatMedia'
 
 /** "emoji name name …" per line, by group. */
 const GROUPS: [Key, string][] = [
@@ -50,7 +51,7 @@ function recent(): string[] {
   }
 }
 
-export default function EmojiPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
+export default function EmojiPicker({ onPick, onClose, groupEmoji }: { onPick: (emoji: string) => void; onClose: () => void; groupEmoji?: { name: string; file: string }[] }) {
   const [query, setQuery] = useState('')
   const box = useRef<HTMLDivElement>(null)
   const recents = useMemo(recent, [])
@@ -98,6 +99,18 @@ export default function EmojiPicker({ onPick, onClose }: { onPick: (emoji: strin
           )
         ) : (
           <>
+            {groupEmoji && groupEmoji.length > 0 && (
+              <>
+                <h5>{t('chat.emoji.group')}</h5>
+                <div className="ep-grid">
+                  {groupEmoji.map((g) => (
+                    <button key={g.name} type="button" className="ep-emoji" title={`:${g.name}:`} onClick={() => onPick(`:${g.name}:`)}>
+                      <FileImage id={g.file} alt={`:${g.name}:`} className="ct-emoji" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {recents.length > 0 && (
               <>
                 <h5>{t('chat.emoji.recent')}</h5>

@@ -1,9 +1,10 @@
 // Group chats in the Inbox's Chat tab: the group's tile, a new group, adding friends, the members panel (invite code,
 // roles, rename, leave) and the notes a group's chat shows (made, joined, left, …).
-import { useState } from 'react'
-import { Copy, Crown, LogOut, MoreHorizontal, Pencil, RefreshCw, Shield, UserPlus, Users, X } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Copy, Crown, Gift, LogOut, MoreHorizontal, Pencil, RefreshCw, Shield, Smile, UserPlus, Users, X } from 'lucide-react'
 import type { ChatGroup, ChatMessage, ChatSystemData } from '@shared/types'
-import { chat, nameOf, useChat } from '../../chatState'
+import { chat, displayName, nameOf, useChat } from '../../chatState'
+import { ChatAvatar, FileImage } from './ChatMedia'
 import { useStore } from '../../store'
 import { t } from '../../i18n'
 import { ConfirmModal, Modal, openContextMenu, type ContextEntry } from '../ui'
@@ -121,7 +122,7 @@ function AddMembersModal({ g, onClose }: { g: ChatGroup; onClose: () => void }) 
 }
 
 /** The members panel at the side of a group's chat. */
-export function GroupPanel({ g, onClose }: { g: ChatGroup; onClose: () => void }) {
+export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatGroup; onClose: () => void; onProfile: (uuid: string) => void; onNick: (uuid: string) => void; onGift: (uuid: string) => void }) {
   const { toast } = useStore()
   const v = useChat()
   const [adding, setAdding] = useState(false)
@@ -129,7 +130,32 @@ export function GroupPanel({ g, onClose }: { g: ChatGroup; onClose: () => void }
   const [leaving, setLeaving] = useState(false)
   const boss = g.role === 'owner' || g.role === 'admin'
   const fail = (e: unknown) => toast((e as Error).message, 'error')
+  const [emojiName, setEmojiName] = useState('')
+  const emojiInput = useRef<HTMLInputElement>(null)
+  const addEmoji = async (file: File | undefined) => {
+    const name = emojiName.trim().toLowerCase()
+    if (!file) return
+    if (!/^[a-z0-9_]{2,32}$/.test(name)) {
+      toast(t('chat.emoji.nameRule'), 'error')
+      return
+    }
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type) || file.size > 512_000) {
+      toast(t('chat.emoji.fileRule'), 'error')
+      return
+    }
+    try {
+      const f = await chat.uploadBlob(g.conv, file, file.name, 'emoji')
+      await chat.group('emoji', g.conv, { name, file: f.id })
+      setEmojiName('')
+    } catch (e) {
+      fail(e)
+    }
+  }
   const memberMenu = (uuid: string, role: string): ContextEntry[] => [
+    { label: t('chat.profile.view'), icon: <Users size={14} />, onSelect: () => onProfile(uuid) },
+    { label: t('chat.nickname.set'), icon: <Pencil size={14} />, onSelect: () => onNick(uuid) },
+    { label: t('chat.sendGift'), icon: <Gift size={14} />, onSelect: () => onGift(uuid) },
+    '-',
     g.role === 'owner' && role === 'member' && { label: t('chat.group.makeAdmin'), icon: <Shield size={14} />, onSelect: () => void chat.group('role', g.conv, { uuid, role: 'admin' }).catch(fail) },
     g.role === 'owner' && role === 'admin' && { label: t('chat.group.makeMember'), onSelect: () => void chat.group('role', g.conv, { uuid, role: 'member' }).catch(fail) },
     ((g.role === 'owner' && role !== 'owner') || (g.role === 'admin' && role === 'member')) && {
@@ -185,15 +211,14 @@ export function GroupPanel({ g, onClose }: { g: ChatGroup; onClose: () => void }
       </div>
       <div className="chat-member-list">
         {g.members.map((m) => {
-          const menu = m.uuid === v.me ? [] : memberMenu(m.uuid, m.role).filter(Boolean)
+          const menu = m.uuid === v.me ? [{ label: t('chat.nickname.setMine'), icon: <Pencil size={14} />, onSelect: () => onNick(m.uuid) }] : memberMenu(m.uuid, m.role).filter(Boolean)
           return (
             <div key={m.uuid} className="chat-member">
-              <span className="chat-head-wrap">
-                <PlayerHead who={m.uuid} name={m.name} size={28} className="chat-head" />
-                <span className={`chat-presence ${m.online ? 'on' : ''}`} />
-              </span>
-              <span className="grow ellipsis">
-                {m.name || nameOf(m.uuid)}
+              <button className="chat-avatar-btn" onClick={() => onProfile(m.uuid)} aria-label={t('chat.profile.view')}>
+                <ChatAvatar uuid={m.uuid} size={28} dot status={m.status ?? (m.online ? 'online' : 'offline')} />
+              </button>
+              <span className="grow ellipsis chat-name" onClick={() => onProfile(m.uuid)}>
+                {displayName(g.conv, m.uuid) || m.name || nameOf(m.uuid)}
                 {m.uuid === v.me && <span className="hint"> ({t('chat.you')})</span>}
               </span>
               {m.role === 'owner' && <Crown size={14} className="chat-role owner" aria-label={t('chat.group.owner')} />}
@@ -207,6 +232,35 @@ export function GroupPanel({ g, onClose }: { g: ChatGroup; onClose: () => void }
           )
         })}
       </div>
+      <div className="chat-members-head">
+        <b className="grow">
+          <Smile size={14} className="inline" /> {t('chat.emoji.groupCount', { count: g.emoji?.length ?? 0 })}
+        </b>
+      </div>
+      {(g.emoji?.length ?? 0) > 0 && (
+        <div className="chat-emoji-list">
+          {g.emoji!.map((e) => (
+            <span key={e.name} className="chat-emoji-item" title={`:${e.name}:`}>
+              <FileImage id={e.file} alt={e.name} className="ct-emoji" />
+              <span className="ellipsis">:{e.name}:</span>
+              {boss && (
+                <button className="btn ghost icon sm" aria-label={t('common.remove')} onClick={() => void chat.group('emoji/remove', g.conv, { name: e.name }).catch(fail)}>
+                  <X />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      {boss && v.drive && (
+        <div className="row">
+          <input className="input grow" maxLength={32} value={emojiName} onChange={(e) => setEmojiName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} placeholder={t('chat.emoji.namePlaceholder')} />
+          <button className="btn sm" disabled={!emojiName.trim()} onClick={() => emojiInput.current?.click()}>
+            {t('chat.emoji.add')}
+          </button>
+          <input ref={emojiInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => void addEmoji(e.target.files?.[0])} />
+        </div>
+      )}
       <button className="btn sm ghost danger chat-leave" onClick={() => setLeaving(true)}>
         <LogOut /> {t('chat.group.leave')}
       </button>
@@ -273,6 +327,10 @@ export function SystemNote({ m }: { m: ChatMessage }) {
               ? t('chat.note.removed', { by, who })
               : d.event === 'renamed'
                 ? t('chat.note.renamed', { by, name: d.name ?? '' })
+                : d.event === 'nickname'
+                  ? d.name
+                    ? t('chat.note.nickname', { by, who, name: d.name })
+                    : t('chat.note.nicknameCleared', { by, who })
                 : d.role === 'admin'
                   ? t('chat.note.madeAdmin', { by, who })
                   : t('chat.note.madeMember', { by, who })
