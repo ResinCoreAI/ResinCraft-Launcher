@@ -13,6 +13,10 @@ import { WalletEntries } from './RelayPlan'
 
 type Tab = 'topups' | 'activity' | 'purchases'
 
+/** What the Top-ups tab lists: credit that came in (top-ups, gift codes, and credit given by an admin or claimed from
+ * an Inbox mail, which the relay keeps as a grant). */
+const CREDIT_IN = ['topup', 'gift', 'grant']
+
 let nextTab: Tab | undefined
 /** From the Store: Settings → Store history, on Top-ups (or another tab). */
 export function openStoreHistory(go: (r: { page: 'settings'; section: string }) => void, tab: Tab = 'topups') {
@@ -85,7 +89,7 @@ function AccountHistory({ a, tab }: { a: AccountPlan; tab: Tab }) {
   const cur = plan.currency
   if (tab === 'purchases') return <Purchases subs={plan.mine ?? []} currency={cur} />
   if (!plan.wallet) return <p className="hint">{t('storeHistory.noCredit')}</p>
-  return <Ledger account={a.account} currency={cur} only={tab === 'topups' ? ['topup', 'gift'] : undefined} />
+  return <Ledger account={a.account} currency={cur} only={tab === 'topups' ? CREDIT_IN : undefined} />
 }
 
 /** The Resin Credit ledger, newest first, read a page at a time (`only`: just these kinds). */
