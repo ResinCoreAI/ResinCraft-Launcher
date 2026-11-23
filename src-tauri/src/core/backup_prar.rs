@@ -171,3 +171,24 @@ pub fn files_in(dir: &Path) -> Vec<(String, PathBuf)> {
     go(dir, "", &mut out);
     out
 }
+
+/// Packs a few small files (name inside, path) into `dest`, with `comment`, without a task bar (chat history: chat.rs).
+pub fn pack_small(dest: &Path, files: &[(String, PathBuf)], comment: Option<&str>) -> Result<()> {
+    let mut entries = Vec::new();
+    for (name, path) in files {
+        let md = std::fs::metadata(path)?;
+        entries.push(util::Entry { name: name.clone(), path: path.clone(), is_dir: false, size: md.len(), mtime_ns: util::mtime_ns(&md) });
+    }
+    let never = AtomicBool::new(false);
+    let sink = AtomicU64::new(0);
+    prar::pack(dest, entries, util::Level::Normal, None, comment, &Report::new(&never, &sink, 1.0))?;
+    Ok(())
+}
+
+/// Unpacks everything in a small archive into `work` (chat history: chat.rs).
+pub fn unpack_small(path: &Path, work: &Path) -> Result<()> {
+    let never = AtomicBool::new(false);
+    let sink = AtomicU64::new(0);
+    prar::extract(path, work, None, true, &util::Selection::default(), &Report::new(&never, &sink, 1.0))?;
+    Ok(())
+}

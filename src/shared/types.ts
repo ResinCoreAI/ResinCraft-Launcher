@@ -1991,6 +1991,95 @@ export interface InboxStatusSub {
   since: number
 }
 
+/** Friends and chat (relay chat.rs; the launcher's own copy of them: src-tauri chat.rs). UUIDs without dashes. */
+export interface ChatPerson {
+  uuid: string
+  name: string
+  /** When they became friends, or asked. */
+  since: number
+  /** Friends only: their conversation, whether a launcher of theirs is open now, and when it last was. */
+  conv?: string
+  online?: boolean
+  lastSeen?: number
+}
+export interface ChatFriends {
+  friends: ChatPerson[]
+  incoming: ChatPerson[]
+  outgoing: ChatPerson[]
+  blocked: ChatPerson[]
+}
+/** A gift in a chat: Resin Credit, or a month or a year of a Store item (paid with the sender's credit). */
+export interface ChatGiftData {
+  gift: string
+  kind: 'credit' | 'item'
+  /** What it cost the sender (smallest unit). */
+  amount: number
+  currency: string
+  product?: string
+  name?: string
+  icon?: string
+  yearly?: boolean
+  days?: number
+  /** The ResinCraft team took it back (Unix seconds). */
+  reversed?: number
+}
+export interface ChatMessage {
+  id: number
+  /** Goes up with every change (new, edited, deleted); syncs ask for what's past theirs. */
+  seq: number
+  conv: string
+  sender: string
+  at: number
+  kind: 'text' | 'gift'
+  /** Plain text with **bold**, *italic*, ~~strike~~, `code`, ``` code blocks ```, ||spoilers|| and > quotes. */
+  body: string
+  data: ChatGiftData | null
+  reply: number | null
+  edited: number | null
+  deleted: number | null
+}
+/** `GET /api/chat/sync`. */
+export interface ChatSync {
+  me: string
+  v: number
+  cursor: number
+  more: boolean
+  messages: ChatMessage[]
+  /** Unread messages per conversation. */
+  unread: Record<string, number>
+  /** How far each member has read each conversation (message id). */
+  reads: Record<string, Record<string, number>>
+  friends: ChatFriends
+  enabled: boolean
+  muted: { until: number; reason: string } | null
+  /** The account's friend code (XXXX-XXXX): whoever types it becomes a friend at once. */
+  code: string
+}
+/** The launcher's own copy (`chat:load`): the newest messages of each conversation, oldest first. */
+export interface ChatLocal {
+  cursor: number
+  friends: ChatFriends | null
+  names: Record<string, string>
+  convs: { conv: string; count: number; last: number; messages: ChatMessage[] }[]
+}
+/** `GET /api/chat/gift`: what the account can give. */
+export interface ChatGiftOptions {
+  currency: string
+  balance: number
+  /** Credit it can send now: paid-for credit, within today's limit. */
+  sendable: number
+  /** Credit that was given to it (gifts, codes): spendable, not sendable (unless the relay allows it). */
+  given: number
+  dailyLimit: number
+  dailyLeft: number | null
+  minGift: number
+  credit: boolean
+  items: { id: string; name: string; description: string; icon: string; monthly: number; yearly: number }[]
+  /** Why it can't give at all yet (muted, a new account), or null. */
+  refused: string | null
+  givenSendable: boolean
+}
+
 /** The account's email address for mail by email: confirmed with a code the relay emails. */
 export interface InboxEmail {
   /** The relay can send email at all. */
@@ -3164,6 +3253,18 @@ export interface ResinApi {
   /** The Inbox page: one of the relay's `/api/inbox…` requests with the active account's relay session (mail.rs). */
   mail: {
     call(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
+  }
+  /** Friends and chat (src-tauri chat.rs): the relay's /api/chat… and the launcher's own copy of the chats. */
+  chat: {
+    call(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown>
+    save(account: string, payload: { messages?: ChatMessage[]; cursor?: number; friends?: ChatFriends }): Promise<{ saved: number }>
+    load(account: string): Promise<ChatLocal>
+    older(account: string, conv: string, before: number, limit?: number): Promise<{ messages: ChatMessage[] }>
+    info(): Promise<{ bytes: number; messages: number; accounts: number; path: string; prar: boolean }>
+    /** Save dialog, then the file; null when cancelled. */
+    export(): Promise<{ path: string; messages: number } | null>
+    /** Open dialog, then adds what's missing; null when cancelled. */
+    import(): Promise<{ added: number } | null>
   }
   screenshots: {
     list(instanceId: string): Promise<ScreenshotInfo[]>

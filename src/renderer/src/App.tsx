@@ -50,6 +50,7 @@ import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
 import { useAdminStatus } from './adminStatus'
 import { useInboxBadge, useInboxWatch } from './inboxState'
+import { showChat, useChatWatch } from './chatState'
 import { useClassicLayout } from './classicLayoutState'
 import { ClassicSidebar, ClassicTopBar } from './components/ClassicShell'
 import './classic.css'
@@ -189,6 +190,17 @@ export default function App() {
   // The Inbox's unread count, asked now and then; new mail says so unless the Inbox is open.
   useInboxWatch(activeAccount?.type === 'msa' ? activeAccount.id : undefined, (count) => {
     if (route.page !== 'inbox') toast(t('inbox.newMail', { count }), 'info')
+  })
+  // Friends and chat: messages arrive live; one from someone says so unless that chat is on screen.
+  useChatWatch(activeAccount?.type === 'msa' ? activeAccount.id : undefined, (m, name) => {
+    const text = m.kind === 'gift' ? t('chat.giftToast', { name }) : t('chat.newMessage', { name, text: m.body.length > 80 ? `${m.body.slice(0, 80)}…` : m.body })
+    toast(text, 'info', {
+      label: t('chat.openChat'),
+      run: () => {
+        showChat(m.conv)
+        go({ page: 'inbox' })
+      }
+    })
   })
   const mail = useInboxBadge()
   const current = route.page === 'instance' ? 'library' : route.page

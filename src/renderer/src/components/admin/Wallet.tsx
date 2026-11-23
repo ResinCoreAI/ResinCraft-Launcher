@@ -82,7 +82,8 @@ const KINDS: Record<string, Key> = {
   refund: 'servers.wallet.kind.refund',
   grant: 'servers.wallet.kind.grant',
   deduct: 'servers.wallet.kind.deduct',
-  gift: 'servers.wallet.kind.gift'
+  gift: 'servers.wallet.kind.gift',
+  transfer: 'servers.wallet.kind.transfer'
 }
 
 function money(amount: number, currency: string) {

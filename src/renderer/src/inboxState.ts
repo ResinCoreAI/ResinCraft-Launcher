@@ -43,8 +43,24 @@ export function setInbox(next: Partial<State>): void {
   listeners.forEach((cb) => cb())
 }
 
+/** Chat's unread messages and friend requests (chatState.ts), counted on the same badge. */
+let chatBadge = { count: 0, on: false }
+let badge: State = state
+const badgeOf = (): State => {
+  const unread = state.unread + chatBadge.count
+  const available = state.available || chatBadge.on
+  if (badge.unread !== unread || badge.available !== available) badge = { unread, available }
+  return badge
+}
+export function setChatBadge(count: number, on: boolean): void {
+  if (count === chatBadge.count && on === chatBadge.on) return
+  chatBadge = { count, on }
+  listeners.forEach((cb) => cb())
+}
+
+/** Mail and chat together, for the header. */
 export function useInboxBadge(): State {
-  return useSyncExternalStore(subscribe, () => state)
+  return useSyncExternalStore(subscribe, badgeOf)
 }
 
 /** How often the badge asks while the window is shown, and again on focus after this long. */

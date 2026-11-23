@@ -375,7 +375,8 @@ const WALLET_KINDS: Record<string, Key> = {
   refund: 'servers.wallet.kind.refund',
   grant: 'servers.wallet.kind.grant',
   deduct: 'servers.wallet.kind.deduct',
-  gift: 'servers.wallet.kind.gift'
+  gift: 'servers.wallet.kind.gift',
+  transfer: 'servers.wallet.kind.transfer'
 }
 const signed = (n: number, currency: string) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${money(Math.abs(n), currency)}`
 const stamp = (unix: number) => new Date(unix * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })

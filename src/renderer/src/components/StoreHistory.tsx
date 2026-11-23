@@ -15,7 +15,7 @@ type Tab = 'topups' | 'activity' | 'purchases'
 
 /** What the Top-ups tab lists: credit that came in (top-ups, gift codes, and credit given by an admin or claimed from
  * an Inbox mail, which the relay keeps as a grant). */
-const CREDIT_IN = ['topup', 'gift', 'grant']
+const CREDIT_IN = ['topup', 'gift', 'grant', 'transfer']
 
 let nextTab: Tab | undefined
 /** From the Store: Settings → Store history, on Top-ups (or another tab). */

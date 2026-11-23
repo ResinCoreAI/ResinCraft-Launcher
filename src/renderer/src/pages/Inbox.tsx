@@ -12,6 +12,8 @@ import { currentLanguage, t, type Key } from '../i18n'
 import { ConfirmModal, Empty, Modal, Segmented, Switch, celebrate, openContextMenu, type ContextEntry } from '../components/ui'
 import MailText from '../components/MailText'
 import EmailAddress from '../components/EmailAddress'
+import ChatPanel from '../components/chat/ChatPanel'
+import { inboxTab, setInboxTab, useChat } from '../chatState'
 import '../inbox.css'
 
 const CATEGORY: Record<Exclude<InboxMessage['category'], ''>, Key> = {
@@ -71,6 +73,10 @@ function SenderMark({ name }: { name: string }) {
 
 export default function InboxPage() {
   const { toast, activeAccount } = useStore()
+  // Mail from ResinCraft, or chat with friends (remembered).
+  const [tab, setTab] = useState<'mail' | 'chat'>(inboxTab)
+  const chatView = useChat()
+  const chatUnread = Object.values(chatView.unread).reduce((a, b) => a + b, 0) + chatView.friends.incoming.length
   const [data, setData] = useState<InboxData>()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -217,6 +223,36 @@ export default function InboxPage() {
   }
 
   const email = data?.email
+  const pick = (next: 'mail' | 'chat') => {
+    setTab(next)
+    setInboxTab(next)
+  }
+  const tabs = (
+    <div className="inbox-tabs">
+      <Segmented
+        value={tab}
+        onChange={pick}
+        options={[
+          { value: 'mail', label: data?.unread ? t('inbox.tab.mailCount', { count: data.unread }) : t('inbox.tab.mail') },
+          { value: 'chat', label: chatUnread ? t('inbox.tab.chatCount', { count: chatUnread }) : t('inbox.tab.chat') }
+        ]}
+      />
+    </div>
+  )
+  if (tab === 'chat') {
+    return (
+      <div className="page inbox-page">
+        <div className="page-head">
+          <div>
+            <h1>{t('inbox.title')}</h1>
+            <p>{t('chat.lead')}</p>
+          </div>
+        </div>
+        {tabs}
+        <ChatPanel />
+      </div>
+    )
+  }
   return (
     <div className="page inbox-page">
       <div className="page-head">
@@ -239,6 +275,7 @@ export default function InboxPage() {
           <RefreshCw className={busy ? 'spin' : undefined} /> {t('common.refresh')}
         </button>
       </div>
+      {tabs}
 
       {error && !data ? (
         <div className="card">

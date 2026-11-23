@@ -20,6 +20,7 @@ import { mockVersions } from './mock-versions'
 import { mockCheckServices, mockStatusNotices } from './mock-status'
 import { mockStatusSite } from './mock-statussite'
 import { mockMailCall } from './mock-mail'
+import { mockChat } from './mock-chat'
 
 export function mockApi(): ResinApi {
   const servers = mockServers()
@@ -723,6 +724,7 @@ export function mockApi(): ResinApi {
     bedrock: mockBedrock(now),
     friends: friends.friends,
     mail: { call: (method: 'GET' | 'POST', path: string, body?: unknown) => mockMailCall(method, path, body) },
+    chat: mockChat(),
     horizon: {
       status: async () => ({ supported: true, minecraft: '26.3', installed: null, latest: '0.2.30' }),
       install: async () => '0.2.30',

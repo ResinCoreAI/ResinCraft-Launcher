@@ -674,5 +674,13 @@ export default {
   'engine.worlds.sameInstance': 'Pick a different instance',
   'engine.worlds.unsafeZip': "That zip has a file outside its own folders ({path}), so it wasn't unpacked",
   'engine.worlds.writeFailed': 'Could not write level.dat',
-  'engine.worlds.writingZip': 'Writing zip…'
+  'engine.worlds.writingZip': 'Writing zip…',
+  "engine.chat.noRelay": "This build of ResinCraft has no relay, so it has no chat.",
+  "engine.chat.unreachable": "Couldn't reach ResinCraft Relay ({error}).",
+  "engine.chat.notYet": "ResinCraft Relay doesn't have chat yet.",
+  "engine.chat.relaySaid": "ResinCraft Relay: {error}",
+  "engine.chat.notHistory": "That file isn't a ResinCraft chat history.",
+  "engine.chat.nothingToSave": "There are no chats to save yet.",
+  "engine.chat.exportTitle": "Save your chat history",
+  "engine.chat.importTitle": "Open a saved chat history",
 }

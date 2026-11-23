@@ -13,6 +13,7 @@
 //! - `discord`: Discord Rich Presence for running games
 
 pub mod app_cmds;
+pub mod chat;
 pub mod content;
 pub mod core;
 pub mod discord;
@@ -69,6 +70,12 @@ fn claim_taskbar_identity() {
 }
 
 pub fn run() {
+    // The uninstaller's "save your chat history": no window, just the file (chat.rs).
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--export-chats") {
+        let folder = args.get(i + 1).map(std::path::PathBuf::from).unwrap_or_else(std::env::temp_dir);
+        std::process::exit(chat::export_cli(&folder));
+    }
     #[cfg(windows)]
     claim_taskbar_identity();
     tauri::Builder::default()
