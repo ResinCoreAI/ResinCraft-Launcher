@@ -6014,6 +6014,12 @@ const dict: Dict = {
   "chat.receipts.on": "읽음 표시 켜기",
   "chat.receipts.off": "읽음 표시 끄기",
   "chat.receipts.hint": "끄면 친구에게 내 '읽음'이 보이지 않고, 나도 친구의 읽음을 볼 수 없어요",
+  "chat.gift.titleStore": "스토어에서 선물 보내기",
+  "chat.gift.to": "받는 사람",
+  "chat.gift.toPlaceholder": "상대의 Minecraft 이름",
+  "chat.gift.toHint": "친구가 아니어도 ResinCraft 플레이어라면 누구나 받을 수 있어요. 바로 전달되고 받은편지함에 알림이 가요.",
+  "chat.gift.sendCredit": "크레딧 보내기",
+  "chat.gift.giftItem": "선물하기",
 }
 
 export default dict

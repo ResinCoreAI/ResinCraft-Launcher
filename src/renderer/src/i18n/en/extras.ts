@@ -1698,4 +1698,10 @@ export default {
   "chat.receipts.on": "Turn read receipts on",
   "chat.receipts.off": "Turn read receipts off",
   "chat.receipts.hint": "Off: friends don't see \"Seen\" for you, and you don't see theirs",
+  "chat.gift.titleStore": "Send a gift from the Store",
+  "chat.gift.to": "To",
+  "chat.gift.toPlaceholder": "Their Minecraft name",
+  "chat.gift.toHint": "Any ResinCraft player: they don't have to be your friend. They get it at once, with a message in their Inbox.",
+  "chat.gift.sendCredit": "Send credit",
+  "chat.gift.giftItem": "Gift this",
 } as const

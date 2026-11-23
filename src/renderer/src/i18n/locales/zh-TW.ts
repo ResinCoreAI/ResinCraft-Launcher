@@ -6009,6 +6009,12 @@ const dict: Dict = {
   "chat.receipts.on": "開啟已讀回條",
   "chat.receipts.off": "關閉已讀回條",
   "chat.receipts.hint": "關閉後，好友看不到你的「已讀」，你也看不到他們的",
+  "chat.gift.titleStore": "從商店送禮物",
+  "chat.gift.to": "送給",
+  "chat.gift.toPlaceholder": "對方的 Minecraft 名稱",
+  "chat.gift.toHint": "任何 ResinCraft 玩家都可以，不必是好友。對方會立刻收到，收件匣裡也會有通知。",
+  "chat.gift.sendCredit": "贈送額度",
+  "chat.gift.giftItem": "送出",
 }
 
 export default dict

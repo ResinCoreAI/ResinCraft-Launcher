@@ -474,6 +474,9 @@ export const chat = {
     set({ friends: r.friends, names: namesFrom(r.friends, view.names) })
   },
   giftOptions: () => call<ChatGiftOptions>('GET', '/api/chat/gift'),
+  /** A gift from the Store to any player by name (friend or not): it arrives with an Inbox mail. */
+  giftByName: (name: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }) =>
+    call<{ message: null; balance: number }>('POST', '/api/chat/gift', { toName: name, ...gift }),
   /** A gift to a friend, or (with `conv`) to someone in a group. */
   async gift(to: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }, conv?: string) {
     const r = await call<{ message: ChatMessage | null; balance: number }>('POST', '/api/chat/gift', { to, ...gift, ...(conv && isGroup(conv) ? { conv } : {}) })

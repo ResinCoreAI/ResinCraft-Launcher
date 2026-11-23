@@ -40,6 +40,7 @@ import { givesParts, ProductIcon, StoreProductRow } from './StoreProduct'
 import { money, setWalletBalance } from '../storeStatus'
 import { openStoreHistory } from './StoreHistory'
 import ShareModal from './chat/ShareModal'
+import GiftModal from './chat/GiftModal'
 import { useChat } from '../chatState'
 
 
@@ -592,6 +593,8 @@ const WALLET_METHODS: Record<string, Key> = {
 /** The Store's Resin Credit card: the balance, Top up and History (every change is listed there, not on the card). */
 function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: number) => void }) {
   const { toast, go } = useStore()
+  const [sending, setSending] = useState(false)
+  const chatReady = useChat().status === 'ready'
   const plan = a.plan!
   const w = useWallet(a.account, !!plan.wallet, plan.wallet_balance)
   const [topup, setTopup] = useState(false)
@@ -619,7 +622,13 @@ function WalletCard({ a, onBalance }: { a: AccountPlan; onBalance: (balance: num
         <button className="btn sm" disabled={!wallet} onClick={() => openStoreHistory(go)}>
           <History /> {t('servers.wallet.history')}
         </button>
+        {chatReady && wallet?.enabled && (
+          <button className="btn sm" onClick={() => setSending(true)}>
+            <Gift /> {t('chat.gift.sendCredit')}
+          </button>
+        )}
       </div>
+      {sending && <GiftModal preset={{ kind: 'credit' }} onClose={() => setSending(false)} />}
       {w.error && <p className="hint bad">{w.error}</p>}
       {topup && wallet && (
         <TopupModal
@@ -1387,6 +1396,7 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
   const [busy, setBusy] = useState<string>()
   // Sharing an item into a chat (while chat is on for this account).
   const [sharing, setSharing] = useState<{ id: string; name: string } | null>(null)
+  const [gifting, setGifting] = useState<string | null>(null)
   const chatReady = useChat().status === 'ready'
   const [paying, setPaying] = useState<{ step: PayStep; title: string; name: string }>()
   const [buying, setBuying] = useState<PlanProduct[]>()
@@ -1492,6 +1502,11 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
           {!p.owned && (
             <button className="btn sm" disabled={cart.items.includes(p.id)} onClick={() => cart.add(p.id)}>
               {cart.items.includes(p.id) ? <Check /> : <Plus />} {cart.items.includes(p.id) ? t('servers.relayPlan.inCart') : t('servers.relayPlan.addToCart')}
+            </button>
+          )}
+          {chatReady && (
+            <button className="btn sm ghost icon" title={t('chat.gift.giftItem')} aria-label={t('chat.gift.giftItem')} onClick={() => setGifting(p.id)}>
+              <Gift />
             </button>
           )}
           {chatReady && (
@@ -1683,6 +1698,11 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
               </button>
             )}
             {chatReady && (
+              <button className="btn sm ghost icon" title={t('chat.gift.giftItem')} aria-label={t('chat.gift.giftItem')} onClick={() => setGifting(p.id)}>
+                <Gift />
+              </button>
+            )}
+            {chatReady && (
               <button className="btn sm ghost icon" title={t('chat.share.button')} aria-label={t('chat.share.button')} onClick={() => setSharing({ id: p.id, name: p.name })}>
                 <Share2 />
               </button>
@@ -1696,6 +1716,7 @@ export default function RelayPlan({ page, empty, heading }: { page?: boolean; em
   const dialogs = (
     <>
     {sharing && <ShareModal product={sharing.id} name={sharing.name} onClose={() => setSharing(null)} />}
+    {gifting && <GiftModal preset={{ kind: 'item', product: gifting }} onClose={() => setGifting(null)} />}
     {buying && (
       <CheckoutModal
         a={a}

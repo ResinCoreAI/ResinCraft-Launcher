@@ -9,11 +9,17 @@ import { useStore } from '../../store'
 import { t } from '../../i18n'
 import { Modal, Segmented } from '../ui'
 
-export default function GiftModal({ to, name, conv, onClose }: { to: string; name: string; conv?: string; onClose: () => void }) {
+/**
+ * `to`/`name`: a friend or group member (from a chat). Without them (from the Store) it asks for a player's name and
+ * the gift goes straight to that account, friend or not; `preset` opens it on credit or on a Store item.
+ */
+export default function GiftModal({ to, name, conv, preset, onClose }: { to?: string; name?: string; conv?: string; preset?: { kind: 'credit' } | { kind: 'item'; product: string }; onClose: () => void }) {
+  const [toName, setToName] = useState('')
+  const byName = !to
   const { toast, go, activeAccount } = useStore()
   const [opts, setOpts] = useState<ChatGiftOptions>()
   const [error, setError] = useState('')
-  const [kind, setKind] = useState<'credit' | 'item'>('credit')
+  const [kind, setKind] = useState<'credit' | 'item'>(preset?.kind ?? 'credit')
   const [amount, setAmount] = useState('')
   const [product, setProduct] = useState('')
   const [yearly, setYearly] = useState(false)
@@ -24,7 +30,7 @@ export default function GiftModal({ to, name, conv, onClose }: { to: string; nam
       (o) => {
         setOpts(o)
         if (!o.credit && o.items.length) setKind('item')
-        setProduct(o.items[0]?.id ?? '')
+        setProduct(preset?.kind === 'item' && o.items.some((i) => i.id === preset.product) ? preset.product : o.items[0]?.id ?? '')
       },
       (e) => setError((e as Error).message)
     )
@@ -40,9 +46,10 @@ export default function GiftModal({ to, name, conv, onClose }: { to: string; nam
     setBusy(true)
     setError('')
     try {
-      const r = await chat.gift(to, kind === 'credit' ? { kind, amount: minor, note: note.trim() || undefined } : { kind, product, yearly, note: note.trim() || undefined }, conv)
+      const what = kind === 'credit' ? { kind, amount: minor, note: note.trim() || undefined } : { kind, product, yearly, note: note.trim() || undefined }
+      const r = byName ? await chat.giftByName(toName.trim(), what) : await chat.gift(to!, what, conv)
       if (activeAccount?.type === 'msa') setWalletBalance(activeAccount.uuid, r.balance, cur)
-      toast(t('chat.gift.sent', { name }), 'success')
+      toast(t('chat.gift.sent', { name: byName ? toName.trim() : name ?? '' }), 'success')
       onClose()
     } catch (e) {
       setError((e as Error).message)
@@ -53,7 +60,7 @@ export default function GiftModal({ to, name, conv, onClose }: { to: string; nam
   const short = kind === 'credit' ? !!opts && minor > opts.sendable : !!opts && price > opts.balance
   return (
     <Modal
-      title={t('chat.gift.title', { name })}
+      title={byName ? t('chat.gift.titleStore') : t('chat.gift.title', { name: name ?? '' })}
       subtitle={opts ? t('chat.gift.balance', { amount: money(opts.balance, cur) }) : undefined}
       onClose={onClose}
       footer={
@@ -73,7 +80,7 @@ export default function GiftModal({ to, name, conv, onClose }: { to: string; nam
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={busy || !opts || !!opts.refused || (kind === 'credit' ? !creditOk : !itemOk)} onClick={() => void send()}>
+          <button className="btn primary" disabled={busy || !opts || !!opts.refused || (byName && !toName.trim()) || (kind === 'credit' ? !creditOk : !itemOk)} onClick={() => void send()}>
             <Gift /> {t('chat.gift.send')}
           </button>
         </>
@@ -85,6 +92,13 @@ export default function GiftModal({ to, name, conv, onClose }: { to: string; nam
         <p className="hint bad">{opts.refused}</p>
       ) : (
         <div className="chat-gift">
+          {byName && (
+            <label className="field">
+              <span>{t('chat.gift.to')}</span>
+              <input className="input" autoFocus maxLength={36} value={toName} onChange={(e) => setToName(e.target.value)} placeholder={t('chat.gift.toPlaceholder')} />
+              <span className="hint">{t('chat.gift.toHint')}</span>
+            </label>
+          )}
           {opts.credit && opts.items.length > 0 && (
             <Segmented
               value={kind}

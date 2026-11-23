@@ -6032,6 +6032,12 @@ const dict: Dict = {
   "chat.receipts.on": "Okundu bilgisini aç",
   "chat.receipts.off": "Okundu bilgisini kapat",
   "chat.receipts.hint": "Kapalıyken arkadaşların senin için \"Görüldü\" görmez, sen de onlarınkini görmezsin",
+  "chat.gift.titleStore": "Mağazadan hediye gönder",
+  "chat.gift.to": "Kime",
+  "chat.gift.toPlaceholder": "Minecraft adı",
+  "chat.gift.toHint": "Herhangi bir ResinCraft oyuncusu, arkadaşın olması gerekmez. Hemen ulaşır, Gelen kutusuna da bir mesaj gider.",
+  "chat.gift.sendCredit": "Kredi gönder",
+  "chat.gift.giftItem": "Hediye et",
 }
 
 export default dict

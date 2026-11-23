@@ -6019,6 +6019,12 @@ const dict: Dict = {
   "chat.receipts.on": "既読表示をオンにする",
   "chat.receipts.off": "既読表示をオフにする",
   "chat.receipts.hint": "オフ：友だちにあなたの「既読」が表示されず、あなたも相手の既読を見られません",
+  "chat.gift.titleStore": "ストアからギフトを贈る",
+  "chat.gift.to": "宛先",
+  "chat.gift.toPlaceholder": "相手の Minecraft の名前",
+  "chat.gift.toHint": "ResinCraft のプレイヤーなら誰でもOK（フレンドでなくても）。すぐに届き、受信箱にもお知らせが届きます。",
+  "chat.gift.sendCredit": "クレジットを送る",
+  "chat.gift.giftItem": "ギフトにする",
 }
 
 export default dict

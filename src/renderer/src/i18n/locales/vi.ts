@@ -6019,6 +6019,12 @@ const dict: Dict = {
   "chat.receipts.on": "Bật thông báo đã xem",
   "chat.receipts.off": "Tắt thông báo đã xem",
   "chat.receipts.hint": "Tắt: bạn bè không thấy \"Đã xem\" của bạn, và bạn cũng không thấy của họ",
+  "chat.gift.titleStore": "Gửi quà từ Cửa hàng",
+  "chat.gift.to": "Đến",
+  "chat.gift.toPlaceholder": "Tên Minecraft của họ",
+  "chat.gift.toHint": "Bất kỳ người chơi ResinCraft nào, không cần là bạn bè. Họ nhận ngay, kèm tin nhắn trong Hộp thư.",
+  "chat.gift.sendCredit": "Gửi tín dụng",
+  "chat.gift.giftItem": "Tặng",
 }
 
 export default dict

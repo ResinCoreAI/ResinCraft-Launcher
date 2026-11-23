@@ -6075,6 +6075,12 @@ const dict: Dict = {
   "chat.receipts.on": "เปิดการแสดงว่าอ่านแล้ว",
   "chat.receipts.off": "ปิดการแสดงว่าอ่านแล้ว",
   "chat.receipts.hint": "ปิด: เพื่อนจะไม่เห็นว่าคุณอ่านแล้ว และคุณก็จะไม่เห็นของเพื่อนด้วย",
+  "chat.gift.titleStore": "ส่งของขวัญจากร้านค้า",
+  "chat.gift.to": "ถึง",
+  "chat.gift.toPlaceholder": "ชื่อ Minecraft ของเขา",
+  "chat.gift.toHint": "ผู้เล่น ResinCraft คนไหนก็ได้ ไม่ต้องเป็นเพื่อนกัน เขาจะได้รับทันที พร้อมข้อความในกล่องจดหมาย",
+  "chat.gift.sendCredit": "ส่งเครดิต",
+  "chat.gift.giftItem": "ให้เป็นของขวัญ",
 }
 
 export default dict

@@ -6022,6 +6022,12 @@ const dict: Dict = {
   "chat.receipts.on": "Nyalakan tanda dibaca",
   "chat.receipts.off": "Matikan tanda dibaca",
   "chat.receipts.hint": "Mati: teman tidak melihat \"Dilihat\" darimu, dan kamu tidak melihat punya mereka",
+  "chat.gift.titleStore": "Kirim hadiah dari Toko",
+  "chat.gift.to": "Untuk",
+  "chat.gift.toPlaceholder": "Nama Minecraft-nya",
+  "chat.gift.toHint": "Pemain ResinCraft siapa saja, tidak harus temanmu. Langsung diterima, dengan pesan di Kotak Masuk.",
+  "chat.gift.sendCredit": "Kirim kredit",
+  "chat.gift.giftItem": "Hadiahkan",
 }
 
 export default dict

@@ -6081,6 +6081,12 @@ const dict: Dict = {
   "chat.receipts.on": "Включить отметки о прочтении",
   "chat.receipts.off": "Выключить отметки о прочтении",
   "chat.receipts.hint": "Выключено: друзья не видят у тебя «Прочитано», а ты не видишь их отметки",
+  "chat.gift.titleStore": "Отправить подарок из магазина",
+  "chat.gift.to": "Кому",
+  "chat.gift.toPlaceholder": "Его ник в Minecraft",
+  "chat.gift.toHint": "Любому игроку ResinCraft, даже не другу. Подарок придёт сразу, с письмом во «Входящих».",
+  "chat.gift.sendCredit": "Отправить кредиты",
+  "chat.gift.giftItem": "Подарить",
 }
 
 export default dict

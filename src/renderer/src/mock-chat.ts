@@ -381,6 +381,11 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
     case 'GET /api/chat/gift':
       return giftOptions()
     case 'POST /api/chat/gift': {
+      if (b.toName) {
+        if (String(b.toName).toLowerCase() === 'nobody') return err(`no ResinCraft player is called ${b.toName}`)
+        wallet.balance -= b.kind === 'credit' ? Number(b.amount) : 9900
+        return { message: null, balance: wallet.balance, direct: true }
+      }
       const to = String(b.to)
       const giftConv = b.conv ? String(b.conv) : dm(ME, to)
       const o = giftOptions()
