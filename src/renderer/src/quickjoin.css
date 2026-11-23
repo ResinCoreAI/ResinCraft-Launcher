@@ -410,3 +410,8 @@
     flex-wrap: wrap;
   }
 }
+
+/* Home's cards, each in a slot that only carries the right-click menu. */
+.qj-home-slot {
+  display: contents;
+}

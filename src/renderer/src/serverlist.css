@@ -1114,3 +1114,44 @@
   border-radius: 999px;
   background: var(--play);
 }
+
+/* Admin → Drive (components/admin/Drive.tsx) */
+.admin-drive-path {
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.admin-drive-path > .row {
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-drive-open {
+  justify-content: flex-start;
+  padding-left: 0;
+}
+
+.admin-drive-name {
+  overflow-wrap: anywhere;
+}
+
+.admin-drive-moving {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-color: var(--accent);
+}
+
+.admin-drive-errors {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.admin-drive-actions {
+  flex: none;
+  gap: 4px;
+}

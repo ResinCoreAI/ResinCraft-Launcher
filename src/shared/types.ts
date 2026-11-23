@@ -2027,6 +2027,15 @@ export interface ChatGiftData {
   days?: number
   /** The ResinCraft team took it back (Unix seconds). */
   reversed?: number
+  /** Who it's for (a group gift with nobody named: null, the first to take it gets it). */
+  to?: string | null
+  /** It waits to be received (gifts from before it did are received already). */
+  open?: boolean
+  expires?: number
+  claimedBy?: string
+  claimedAt?: number
+  /** Nobody received it in time (or the team took it back first): the sender got it back. */
+  returned?: number
 }
 /** A note in a group's chat: it was made, someone joined, left, was added or removed, it was renamed, a role changed. */
 export interface ChatSystemData {
@@ -2063,6 +2072,9 @@ export interface ChatProfile {
   mutualGroups: { conv: string; name: string }[]
   /** Your own profile only: you share read receipts (and see others'). */
   readReceipts?: boolean
+  /** Your own profile only: friend requests by name (off: by friend code only), Store gifts by name (off: gift code). */
+  byName?: boolean
+  giftsByName?: boolean
 }
 /** A Store item someone shared into a chat, as the Store has it. */
 export interface ChatEmbed {
@@ -3361,6 +3373,10 @@ export interface ResinApi {
     fileLocal(id: string): Promise<string>
     /** Save dialog, then the file; null when cancelled. */
     fileSave(id: string, name: string): Promise<string | null>
+    /** Admin → Drive: files to upload, one upload from a ticket (the stored id), one download from a ticket. */
+    drivePick(): Promise<{ path: string; name: string; size: number; mime: string }[]>
+    drivePut(path: string, ticket: string, mime: string): Promise<string>
+    driveGet(ticket: string, name: string): Promise<string | null>
     /** Flashes the taskbar button when the window isn't in front. */
     attention(): Promise<boolean>
     /** A Windows pop-up (who, what); clicking it opens `conv` (on.chatOpen). False where there are none. */

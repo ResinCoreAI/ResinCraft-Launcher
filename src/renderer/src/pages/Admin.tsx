@@ -16,6 +16,7 @@ import {
   Lock,
   Mail,
   MessageCircle,
+  HardDrive,
   Pencil,
   Pin,
   PinOff,
@@ -53,6 +54,7 @@ import { DevAdmin } from '../components/admin/Dev'
 import { StatusAdmin } from '../components/admin/Status'
 import { MailAdmin } from '../components/admin/Mail'
 import { ChatAdmin } from '../components/admin/Chat'
+import { DriveAdmin } from '../components/admin/Drive'
 import '../serverlist.css'
 
 type Promo = { kind: 'recommended' | 'sponsored'; until?: number | null; order?: number; since?: number; active?: boolean }
@@ -118,11 +120,12 @@ type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
 /** The relay's screens, in the dashboard's order. */
-type Section = 'status' | 'mail' | 'chat' | 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
+type Section = 'status' | 'mail' | 'chat' | 'drive' | 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
 const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
   { id: 'status', label: 'servers.admin.nav.status', icon: <Activity size={16} /> },
   { id: 'mail', label: 'servers.admin.nav.mail', icon: <Mail size={16} /> },
   { id: 'chat', label: 'servers.admin.nav.chat', icon: <MessageCircle size={16} /> },
+  { id: 'drive', label: 'servers.admin.nav.drive', icon: <HardDrive size={16} /> },
   { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
   { id: 'names', label: 'servers.admin.nav.names', icon: <Tag size={16} /> },
   { id: 'bans', label: 'servers.admin.nav.bans', icon: <Ban size={16} /> },
@@ -358,6 +361,8 @@ export default function Admin() {
             <MailAdmin />
           ) : section === 'chat' ? (
             <ChatAdmin />
+          ) : section === 'drive' ? (
+            <DriveAdmin />
           ) : section === 'live' ? (
             <LiveTunnels />
           ) : section === 'names' ? (

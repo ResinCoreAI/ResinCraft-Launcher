@@ -23,7 +23,7 @@ tauri-plugin-clipboard-manager = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "stream"] }
 semver = "1"
 futures = "0.3"
 anyhow = "1"
@@ -53,7 +53,7 @@ igd-next = "0.17"
 playit-agent-core = { git = "https://github.com/playit-cloud/playit-agent", rev = "633d650869a9cdb2c906efa9effc58aa8b7725a3" }
 playit-api-client = { git = "https://github.com/playit-cloud/playit-agent", rev = "633d650869a9cdb2c906efa9effc58aa8b7725a3" }
 hmac = "0.12"
-tokio-util = "0.7"
+tokio-util = { version = "0.7", features = ["io"] }
 # Internationalised domain names (to punycode) for a hosted server's own domain.
 idna = "1"
 # In-app updates: the signed NSIS installer from each release, installed in place (see src/updater.rs).

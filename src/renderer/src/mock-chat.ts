@@ -92,7 +92,7 @@ add(s, ME, 'nice 😄 the ending of the series was ||the warden||', 86400 + 300)
 add(s, STEVE, '> the ending of the series\nno spoilers!! 😭', 7200)
 add(s, ME, '', 3600, { kind: 'gift', data: { gift: 'cg-1', kind: 'credit', amount: 5000, currency: 'thb' }, body: 'for the server rent' })
 add(s, STEVE, 'thanks!! ❤️ sending you something back', 3000)
-add(s, STEVE, '', 2900, { kind: 'gift', data: { gift: 'cg-2', kind: 'item', amount: 9900, currency: 'thb', product: 'relay-plus', name: 'Relay Plus', icon: 'rocket', yearly: false, days: 30 }, body: '' })
+add(s, STEVE, '', 2900, { kind: 'gift', data: { gift: 'cg-2', kind: 'item', amount: 9900, currency: 'thb', product: 'relay-plus', name: 'Relay Plus', icon: 'rocket', yearly: false, days: 30, to: ME, open: false, expires: now() + 7 * 86400 }, body: '' })
 add(dm(ME, ALEX), ALEX, 'can you add me to the whitelist? `Alex_Builds`', 86400 * 2)
 // A group: the build crew, with a note, a shared Store item and a server address.
 const CREW = 'g:5eed5eed5eed5eed'
@@ -232,8 +232,10 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       return p
     }
     case 'POST /api/chat/privacy': {
-      const p = profileOf(ME)
-      p.readReceipts = !!b.readReceipts
+      const p = profileOf(ME) as ReturnType<typeof profileOf> & { byName?: boolean; giftsByName?: boolean }
+      if (typeof b.readReceipts === 'boolean') p.readReceipts = b.readReceipts
+      if (typeof b.byName === 'boolean') p.byName = b.byName
+      if (typeof b.giftsByName === 'boolean') p.giftsByName = b.giftsByName
       changed()
       return p
     }
@@ -378,22 +380,39 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       changed()
       return { friends }
     }
+    case 'GET /api/chat/gift-code':
+      return { code: mockGiftCode }
+    case 'POST /api/chat/gift-code/reset':
+      mockGiftCode = `GIFT-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+      return { code: mockGiftCode }
     case 'GET /api/chat/gift':
       return giftOptions()
+    case 'POST /api/chat/gift/claim': {
+      const m = messages.find((x) => x.kind === 'gift' && (x.data as { gift?: string } | null)?.gift === b.id)
+      const g = m?.data as { kind: string; amount: number; claimedBy?: string; name?: string } | undefined
+      if (!m || !g) return err('there is no such gift')
+      if (g.claimedBy) return err('someone else got this gift first')
+      g.claimedBy = ME
+      m.seq = ++seq
+      if (g.kind === 'credit') wallet.balance += g.amount
+      changed()
+      return { ok: true, summary: g.kind === 'credit' ? `${(g.amount / 100).toFixed(2)} THB Resin Credit` : `${g.name} (1 month)`, balance: wallet.balance }
+    }
     case 'POST /api/chat/gift': {
       if (b.toName) {
         if (String(b.toName).toLowerCase() === 'nobody') return err(`no ResinCraft player is called ${b.toName}`)
         wallet.balance -= b.kind === 'credit' ? Number(b.amount) : 9900
         return { message: null, balance: wallet.balance, direct: true }
       }
-      const to = String(b.to)
+      const to = b.to ? String(b.to) : ''
       const giftConv = b.conv ? String(b.conv) : dm(ME, to)
       const o = giftOptions()
       if (b.kind === 'credit') {
         const amount = Number(b.amount)
         if (amount > o.sendable) return err(`you can send ${(o.sendable / 100).toFixed(2)} THB: credit you were given can only be spent in the Store`)
         wallet.balance -= amount
-        const m = add(giftConv, ME, String(b.note ?? ''), 0, { kind: 'gift', data: { gift: `cg-${seq}`, kind: 'credit', amount, currency: 'thb', to } as never })
+        const open = !b.to
+        const m = add(giftConv, ME, String(b.note ?? ''), 0, { kind: 'gift', data: { gift: `cg-${seq}`, kind: 'credit', amount, currency: 'thb', to: open ? null : to, open, expires: now() + 7 * 86400 } as never })
         changed()
         return { message: m, balance: wallet.balance }
       }
@@ -404,7 +423,7 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       wallet.given = Math.max(0, wallet.given - price)
       const m = add(giftConv, ME, String(b.note ?? ''), 0, {
         kind: 'gift',
-        data: { gift: `cg-${seq}`, kind: 'item', amount: price, currency: 'thb', product: item.id, name: item.name, icon: item.icon, yearly: !!b.yearly, days: b.yearly ? 365 : 30 }
+        data: { gift: `cg-${seq}`, kind: 'item', amount: price, currency: 'thb', product: item.id, name: item.name, icon: item.icon, yearly: !!b.yearly, days: b.yearly ? 365 : 30, to: to || null, open: !to, expires: now() + 7 * 86400 }
       })
       changed()
       return { message: m, balance: wallet.balance }
@@ -418,6 +437,8 @@ const uploads = new Map<string, ChatFile>()
 
 // The launcher's copy, in memory.
 const local: Record<string, { cursor: number; friends: ChatFriends | null; messages: Map<number, ChatMessage> }> = {}
+
+let mockGiftCode = 'GIFT-K7QM-4XRT'
 
 export function mockChat(): ResinApi['chat'] {
   return {
@@ -484,6 +505,17 @@ export function mockChat(): ResinApi['chat'] {
       return `C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher\\chat-files\\${id}`
     },
     async fileSave(_id, name) {
+      return `C:\\Users\\you\\Downloads\\${name}`
+    },
+    async drivePick() {
+      return [{ path: 'C:\\Users\\you\\Downloads\\spawn-backup.zip', name: 'spawn-backup.zip', size: 48_200_000, mime: 'application/zip' }]
+    },
+    async drivePut(_path, ticket) {
+      await new Promise((r) => setTimeout(r, 900))
+      return mockDriveTicket(ticket)
+    },
+    async driveGet(_ticket, name) {
+      await new Promise((r) => setTimeout(r, 600))
       return `C:\\Users\\you\\Downloads\\${name}`
     },
     async attention() {
@@ -567,6 +599,117 @@ export function mockChatAdmin(method: string, path: string, b: Record<string, un
     case '/api/chat-admin/backup':
       adminBackups.unshift({ name: `chat-2026-11-23-${now() % 86400}.db`, bytes: 1_851_392, at: now() })
       return view()
+  }
+  throw new Error(`The relay said: not found (${path})`)
+}
+
+// The admins' Drive (Admin → Drive, relay `/api/storage…`): folders and files kept in the preview's memory, and an
+// import that counts up for a few seconds.
+type DriveItem = { id: string; name: string; created: number; parent: string | null; size?: number; mime?: string }
+const driveFolders: DriveItem[] = [
+  { id: 'd1', name: 'Worlds', created: now() - 86400 * 9, parent: null },
+  { id: 'd2', name: 'Backups', created: now() - 86400 * 8, parent: 'd1' },
+  { id: 'd3', name: 'Modpacks', created: now() - 86400 * 3, parent: null }
+]
+const driveFiles: DriveItem[] = [
+  { id: 's1', name: 'server-rules.txt', created: now() - 7200, parent: null, size: 4_210, mime: 'text/plain' },
+  { id: 's2', name: 'survival-season-3.zip', created: now() - 86400 * 2, parent: 'd1', size: 412_000_000, mime: 'application/zip' },
+  { id: 's3', name: 'spawn-2026-11-01.zip', created: now() - 86400 * 20, parent: 'd2', size: 96_400_000, mime: 'application/zip' },
+  { id: 's4', name: 'ResinCraft-Plus-1.4.mrpack', created: now() - 86400 * 3, parent: 'd3', size: 18_900_000, mime: 'application/zip' }
+]
+const driveTickets = new Map<string, { folder: string | null; name: string; size: number }>()
+const driveImport = { running: false, started: 0, finished: 0, files: 0, copied: 0, skipped: 0, failed: 0, bytes: 0, current: '', errors: [] as string[], by: '' }
+
+function mockDriveTicket(ticket: string): string {
+  const t = driveTickets.get(ticket)
+  if (!t) throw new Error('The relay said: this ticket ran out or was used: ask for another')
+  driveTickets.delete(ticket)
+  const id = `s${Date.now()}`
+  driveFiles.push({ id, name: t.name, created: now(), parent: t.folder, size: t.size, mime: 'application/octet-stream' })
+  return id
+}
+
+export function mockDriveAdmin(method: string, path: string, b: Record<string, unknown>, folder: string | null): unknown {
+  const view = (at: string | null) => {
+    const trail: { id: string; name: string }[] = []
+    let f = driveFolders.find((x) => x.id === at)
+    while (f) {
+      trail.unshift({ id: f.id, name: f.name })
+      const parent = f.parent
+      f = driveFolders.find((x) => x.id === parent)
+    }
+    return {
+      storage: { configured: true, chats: 2, maxUploadMb: 50, files: driveFiles.length + 312, bytes: driveFiles.reduce((n, x) => n + (x.size ?? 0), 0) + 840_000_000, driveFiles: driveFiles.length, problem: null, error: null, errorAt: null },
+      import: { ...driveImport, errors: [...driveImport.errors] },
+      list: { folder: at, path: trail, folders: driveFolders.filter((x) => x.parent === at), files: driveFiles.filter((x) => x.parent === at) }
+    }
+  }
+  const at = (b.folder as string | null | undefined) ?? null
+  if (method === 'GET') return view(folder)
+  const item = () => [...driveFolders, ...driveFiles].find((x) => x.id === b.id)
+  switch (path) {
+    case '/api/storage/folder': {
+      const parent = (b.parent as string | null | undefined) ?? null
+      driveFolders.push({ id: `d${Date.now()}`, name: String(b.name), created: now(), parent })
+      return view(parent)
+    }
+    case '/api/storage/rename': {
+      const it = item()
+      if (it) it.name = String(b.name)
+      return view(at)
+    }
+    case '/api/storage/move': {
+      const it = item()
+      if (it && it.id === b.to) throw new Error('The relay said: a folder can not go inside itself')
+      if (it) it.parent = (b.to as string | null | undefined) ?? null
+      return view(at)
+    }
+    case '/api/storage/delete': {
+      const gone = new Set([String(b.id)])
+      let grew = true
+      while (grew) {
+        grew = false
+        for (const x of driveFolders) {
+          if (x.parent && gone.has(x.parent) && !gone.has(x.id)) {
+            gone.add(x.id)
+            grew = true
+          }
+        }
+      }
+      for (const list of [driveFolders, driveFiles]) {
+        for (let i = list.length - 1; i >= 0; i--) {
+          const p = list[i].parent
+          if (gone.has(list[i].id) || (p && gone.has(p))) list.splice(i, 1)
+        }
+      }
+      return view(at)
+    }
+    case '/api/storage/ticket': {
+      const ticket = `/api/chat/drive-ticket/dt${Date.now()}`
+      driveTickets.set(ticket, { folder: (b.folder as string | null | undefined) ?? null, name: String(b.name ?? 'file'), size: Number(b.size ?? 0) })
+      return { path: ticket }
+    }
+    case '/api/storage/import': {
+      if (!b.email || !b.password) throw new Error('The relay said: email and password: your account on RESINWEBDRIVETG')
+      Object.assign(driveImport, { running: true, started: now(), finished: 0, files: 0, copied: 0, skipped: 0, failed: 0, bytes: 0, current: '', errors: [], by: 'Admin Puirkle' })
+      const names = ['/Photos/spawn.png', '/Photos/castle.png', '/Worlds/hardcore.zip', '/Mods/sodium-0.6.jar', '/notes.txt']
+      let i = 0
+      const tick = setInterval(() => {
+        if (!driveImport.running || i >= names.length) {
+          clearInterval(tick)
+          Object.assign(driveImport, { running: false, finished: now(), current: '' })
+          return
+        }
+        driveImport.files++
+        driveImport.copied++
+        driveImport.bytes += 3_400_000
+        driveImport.current = names[i++]
+      }, 900)
+      return view(null)
+    }
+    case '/api/storage/import/stop':
+      driveImport.running = false
+      return view(null)
   }
   throw new Error(`The relay said: not found (${path})`)
 }

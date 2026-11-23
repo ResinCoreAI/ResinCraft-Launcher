@@ -54,7 +54,7 @@ interface ChatAdminData {
   reports: Report[]
   openReports: number
   mutes: { uuid: string; name: string; until: number; reason: string; by: string; at: number }[]
-  gifts: { id: string; at: number; sender: string; senderName: string; receiver: string; receiverName: string; kind: 'credit' | 'item'; amount: number; product: string | null; yearly: boolean; reversed: number | null; reversedBy: string | null }[]
+  gifts: { id: string; at: number; sender: string; senderName: string; receiver: string; receiverName: string; kind: 'credit' | 'item'; amount: number; product: string | null; yearly: boolean; reversed: number | null; reversedBy: string | null; claimedAt?: number | null; open?: boolean }[]
   backups: { name: string; bytes: number; at: number }[]
   drive?: { configured: boolean; url: string; maxUploadMb: number; error: string | null; errorAt: number | null }
 }
@@ -212,11 +212,15 @@ export function ChatAdmin() {
               <div key={g.id} className={`setting ${g.reversed ? 'faint' : ''}`}>
                 <div className="text">
                   <span>
-                    {who(g.senderName, g.sender)} → {who(g.receiverName, g.receiver)}
+                    {who(g.senderName, g.sender)} → {g.open && !g.claimedAt ? t('servers.admin.chat.giftAnyone') : who(g.receiverName, g.receiver)}
                   </span>
                   <span>
                     {giftWhat(g)} · {ago(g.at)}
-                    {g.reversed ? ` · ${t('servers.admin.chat.takenBack', { by: g.reversedBy ?? '' })}` : ''}
+                    {g.reversed
+                      ? ` · ${t('servers.admin.chat.takenBack', { by: g.reversedBy ?? '' })}`
+                      : g.claimedAt
+                        ? ` · ${t('servers.admin.chat.giftReceived', { when: ago(g.claimedAt) })}`
+                        : ` · ${t('servers.admin.chat.giftWaiting')}`}
                   </span>
                 </div>
                 {!g.reversed && (

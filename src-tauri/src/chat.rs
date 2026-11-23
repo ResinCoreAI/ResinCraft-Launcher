@@ -66,6 +66,9 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         }
         "chat:notify" => json(notify(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?)),
         "chat:import" => json(import_picked().await?),
+        "chat:drivePick" => json(drive_pick().await?),
+        "chat:drivePut" => json(drive_put(&args.get::<String>(0)?, &args.get::<String>(1)?, &args.get::<String>(2)?).await?),
+        "chat:driveGet" => json(drive_get(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         _ => bail!("Unknown channel {channel}"),
     }
 }
@@ -305,6 +308,87 @@ async fn file_save(id: &str, name: &str) -> Result<Option<String>> {
     let Some(dest) = shell::save_file(&title, &default, &[]).await? else { return Ok(None) };
     let src = file_local(id).await?;
     tokio::fs::copy(&src, &dest).await?;
+    let _ = shell::reveal(&dest);
+    Ok(Some(dest.display().to_string()))
+}
+
+// ----- Admin → Drive: files in the relay's own storage (relay drive_admin.rs) -----
+// The page asks the relay for a one-time ticket over the admin connection (`/api/storage/ticket`); the file itself goes
+// to or comes from `/api/chat/drive-ticket/<ticket>` here, streamed, so big files never sit in memory.
+
+/// The relay's address (`https://<domain>`), from the active account's session.
+async fn relay_base() -> Result<String> {
+    if relay::settings().is_none() {
+        return Err(err_tr!("chat.noRelay", "This build of ResinCraft has no relay, so it has no chat."));
+    }
+    let Some(account) = accounts::active_microsoft_account().await else { return Err(relay::needs_microsoft()) };
+    let (_, domain) = relay::session_token(&account).await?;
+    Ok(format!("https://{domain}"))
+}
+
+/// Files to upload to the Drive (no size limit here; the relay takes up to 4 GB): path, name, size, type.
+async fn drive_pick() -> Result<Vec<Value>> {
+    let title = crate::tr!("servers.admin.drive.pickTitle", "Upload to the Drive").to_string();
+    let picked = shell::pick_files(&title, &[]).await?;
+    Ok(picked
+        .into_iter()
+        .filter_map(|p| {
+            let size = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
+            let name = p.file_name().map(|n| n.to_string_lossy().to_string())?;
+            (size > 0).then(|| json!({ "path": p.display().to_string(), "name": name, "size": size, "mime": mime_of(&name) }))
+        })
+        .collect())
+}
+
+/// Streams a file from this PC to an upload ticket's address. The stored file's id.
+async fn drive_put(path: &str, ticket: &str, mime: &str) -> Result<String> {
+    if !ticket.starts_with("/api/chat/drive-ticket/") {
+        bail!("not a Drive ticket");
+    }
+    let file = tokio::fs::File::open(path).await.with_context(|| format!("couldn't read {path}"))?;
+    let len = file.metadata().await?.len();
+    let body = reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::with_capacity(file, 256 * 1024));
+    let base = relay_base().await?;
+    let mime = if mime.is_empty() { "application/octet-stream" } else { mime };
+    let res = crate::core::ctx::http()
+        .put(format!("{base}{ticket}?mime={}", urlencoding::encode(mime)))
+        .header("Content-Type", "application/octet-stream")
+        .header("Content-Length", len)
+        .body(body)
+        .timeout(std::time::Duration::from_secs(4 * 3600))
+        .send()
+        .await
+        .map_err(|e| err_tr!("chat.unreachable", "Couldn't reach ResinCraft Relay ({error}).", error = e.without_url().to_string()))?;
+    Ok(relay_json(res).await?["id"].as_str().unwrap_or_default().to_string())
+}
+
+/// Saves a Drive file where the admin picks, from a download ticket. Where it went, or None when cancelled.
+async fn drive_get(ticket: &str, name: &str) -> Result<Option<String>> {
+    use tokio::io::AsyncWriteExt;
+    if !ticket.starts_with("/api/chat/drive-ticket/") {
+        bail!("not a Drive ticket");
+    }
+    let title = crate::tr!("chat.saveTitle", "Save the file").to_string();
+    let Some(dest) = shell::save_file(&title, &shell::downloads_dir().join(name), &[]).await? else { return Ok(None) };
+    let base = relay_base().await?;
+    let mut res = crate::core::ctx::http()
+        .get(format!("{base}{ticket}"))
+        .timeout(std::time::Duration::from_secs(4 * 3600))
+        .send()
+        .await
+        .map_err(|e| err_tr!("chat.unreachable", "Couldn't reach ResinCraft Relay ({error}).", error = e.without_url().to_string()))?;
+    if !res.status().is_success() {
+        relay_json(res).await?;
+        bail!("couldn't download the file");
+    }
+    let tmp = dest.with_extension("part");
+    let mut out = tokio::fs::File::create(&tmp).await?;
+    while let Some(chunk) = res.chunk().await.context("the download stopped")? {
+        out.write_all(&chunk).await?;
+    }
+    out.flush().await?;
+    drop(out);
+    tokio::fs::rename(&tmp, &dest).await?;
     let _ = shell::reveal(&dest);
     Ok(Some(dest.display().to_string()))
 }

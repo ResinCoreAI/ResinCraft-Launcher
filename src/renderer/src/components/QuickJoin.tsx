@@ -1,7 +1,7 @@
 // Quick join: every multiplayer server the player has (their own entries, the instances' in-game lists and the
 // servers hosted in ResinCraft), with a ping and one-click Join. Used by pages/QuickJoin.tsx and the Home page.
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { ChevronDown, Gamepad2, Loader2, Pin, Play, Plus, Server, Signal, Smartphone, UserRound, Users, WifiOff, Zap } from 'lucide-react'
+import { ChevronDown, EyeOff, Gamepad2, Loader2, Pin, Play, Plus, Server, Signal, Smartphone, UserRound, Users, WifiOff, Zap } from 'lucide-react'
 import {
   HYBRID_SERVERS,
   PLUGIN_SERVERS,
@@ -15,7 +15,7 @@ import {
 import { api } from '../api'
 import { useStore } from '../store'
 import { t } from '../i18n'
-import { InstanceTile, Modal, openMenuBelow, playAsEntries, Segmented, Switch, type ContextEntry } from './ui'
+import { InstanceTile, Modal, openContextMenu, openMenuBelow, playAsEntries, Segmented, Switch, type ContextEntry } from './ui'
 import type { Ping } from './ServersTab'
 import '../instance-tabs.css'
 import '../quickjoin.css'
@@ -627,13 +627,41 @@ function listNames(names: string[]): string {
 
 // ---------- Home ----------
 
+/** Cards on Home at most (servers first, then worlds). */
+const HOME_MAX = 4
+/** What the player removed from Home (right-click): key → when. Joining or playing it again later brings it back. */
+const HIDDEN_KEY = 'resin.home.qjHidden'
+function readHidden(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '{}') as Record<string, number>
+  } catch {
+    return {}
+  }
+}
+
 /** Home: pinned servers first, then the ones joined lately, each one click from playing. */
 export function QuickJoinHome() {
   const q = useQuickJoin()
   const { go } = useStore()
-  const list = homeItems(q)
+  const [hidden, setHidden] = useState(readHidden)
+  const hide = (key: string) => {
+    const next = { ...readHidden(), [key]: Date.now() }
+    try {
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(next))
+    } catch {}
+    setHidden(next)
+  }
+  // Hidden until it's joined (or played) again after it was removed.
+  const shown = (key: string, last?: number) => !hidden[key] || (!!last && last > hidden[key])
+  const servers = homeItems(q, HOME_MAX + 8).filter((i) => shown(`s:${addressKey(i.address)}`, i.lastJoined ? i.lastJoined * (i.lastJoined < 1e12 ? 1000 : 1) : undefined))
   // The worlds played last sit next to the servers.
-  const worlds = useRecentWorlds(3) ?? []
+  const allWorlds = useRecentWorlds(HOME_MAX + 4) ?? []
+  const list = servers.slice(0, HOME_MAX)
+  const worlds = allWorlds.filter((w) => shown(`w:${w.instanceId}/${w.folder}`, w.lastPlayed)).slice(0, HOME_MAX - list.length)
+  const menu = (e: React.MouseEvent, key: string) => {
+    e.preventDefault()
+    openContextMenu(e, [{ label: t('quickjoin.home.remove'), icon: <EyeOff size={14} />, onSelect: () => hide(key) }])
+  }
   useEffect(
     () => list.forEach((i) => i.edition === 'java' && (!i.hosted || i.hosted.state === 'running') && pingAddress(i.address)),
     [list.map((i) => i.key).join()]
@@ -658,10 +686,14 @@ export function QuickJoinHome() {
       ) : (
         <div className="qj-home">
           {list.map((i) => (
-            <QuickJoinCard key={i.key} item={i} q={q} />
+            <div key={i.key} className="qj-home-slot" onContextMenu={(e) => menu(e, `s:${addressKey(i.address)}`)}>
+              <QuickJoinCard item={i} q={q} />
+            </div>
           ))}
           {worlds.map((w) => (
-            <WorldCard key={`${w.instanceId}/${w.folder}`} w={w} />
+            <div key={`${w.instanceId}/${w.folder}`} className="qj-home-slot" onContextMenu={(e) => menu(e, `w:${w.instanceId}/${w.folder}`)}>
+              <WorldCard w={w} />
+            </div>
           ))}
         </div>
       )}

@@ -7,6 +7,8 @@ import {
   Check,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   Flag,
   Gift,
   Mic,
@@ -27,7 +29,7 @@ import {
 import type { ChatFile, ChatGiftData, ChatGroup, ChatMessage, ChatPerson } from '@shared/types'
 import { api } from '../../api'
 import { chat, displayName, isGroup, nameOf, peerOf, popupsOn, setPopups, setSound, soundOn, statusOf, useChat, type ChatView } from '../../chatState'
-import { money } from '../../storeStatus'
+import { money, setWalletBalance } from '../../storeStatus'
 import { useStore } from '../../store'
 import { currentLanguage, t, type Key } from '../../i18n'
 import { ConfirmModal, Empty, openContextMenu, type ContextEntry } from '../ui'
@@ -85,19 +87,69 @@ function snippet(m: ChatMessage | undefined, me: string): string {
   return who + m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
 }
 
-function GiftCard({ m, mine, peer }: { m: ChatMessage; mine: boolean; peer: string }) {
+/**
+ * A gift in a chat. It waits until the one it's for presses Receive; a group gift with nobody named goes to whoever
+ * presses Got it first. Unreceived after a week, it goes back to the sender.
+ */
+function GiftCard({ m, mine, peer, me, conv }: { m: ChatMessage; mine: boolean; peer: string; me: string; conv: string }) {
+  const { toast, activeAccount } = useStore()
+  const [busy, setBusy] = useState(false)
   const g = m.data as ChatGiftData | null
   if (!g) return null
   const what = g.kind === 'credit' ? t('chat.gift.cardCredit', { amount: money(g.amount, g.currency) }) : t(g.yearly ? 'chat.gift.cardItemYear' : 'chat.gift.cardItemMonth', { item: g.name ?? g.product ?? '' })
+  // Gifts from before claiming (no `expires`) were received when sent.
+  const waiting = !!g.expires && !g.claimedBy && !g.reversed && !g.returned
+  const late = waiting && g.expires! * 1000 < Date.now()
+  const forMe = g.open ? !mine : g.to === me
+  const canTake = waiting && !late && forMe
+  const gone = !!g.reversed || !!g.returned || late
+  const line = g.reversed
+    ? t('chat.gift.reversed')
+    : g.returned || late
+      ? mine
+        ? t('chat.gift.returnedMine')
+        : t('chat.gift.returned')
+      : g.claimedBy
+        ? g.claimedBy === me
+          ? t('chat.gift.youGot')
+          : t('chat.gift.gotBy', { name: displayName(conv, g.claimedBy) })
+        : !g.expires
+          ? mine
+            ? t('chat.gift.youSent', { name: peer })
+            : t('chat.gift.sentYou')
+          : g.open
+            ? mine
+              ? t('chat.gift.waitingGroup')
+              : t('chat.gift.firstGets')
+            : mine
+              ? t('chat.gift.waitingFor', { name: peer })
+              : t('chat.gift.forYou')
+  const take = async () => {
+    setBusy(true)
+    try {
+      const r = await chat.claimGift(g.gift)
+      if (activeAccount?.type === 'msa') setWalletBalance(activeAccount.uuid, r.balance, g.currency)
+      toast(t('chat.gift.received', { what: r.summary }), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
-    <div className={`chat-giftcard ${g.reversed ? 'reversed' : ''}`}>
+    <div className={`chat-giftcard ${gone ? 'reversed' : ''} ${canTake ? 'waiting' : ''}`}>
       <span className="chat-giftcard-icon" aria-hidden>
         <Gift />
       </span>
       <span>
         <b>{what}</b>
-        <span className="hint">{g.reversed ? t('chat.gift.reversed') : mine ? t('chat.gift.youSent', { name: peer }) : t('chat.gift.sentYou')}</span>
+        <span className="hint">{line}</span>
       </span>
+      {canTake && (
+        <button className="btn sm primary chat-giftcard-take" disabled={busy} onClick={() => void take()}>
+          {g.open ? t('chat.gift.gotIt') : t('chat.gift.receive')}
+        </button>
+      )}
     </div>
   )
 }
@@ -158,6 +210,7 @@ export default function ChatPanel() {
   const [statusText, setStatusText] = useState(false)
   const [nickFor, setNickFor] = useState<string | null>(null)
   const [giftTo, setGiftTo] = useState<{ uuid: string; conv?: string } | null>(null)
+  const [showCode, setShowCode] = useState(false)
   const [pending, setPending] = useState<{ key: string; name: string; file?: ChatFile; error?: string }[]>([])
   const [recording, setRecording] = useState(false)
   const [sound, setSoundState] = useState(soundOn)
@@ -453,7 +506,7 @@ export default function ChatPanel() {
       <aside className="chat-side">
         <button
           className="chat-me"
-          onClick={(e) => openContextMenu(e, [...statusMenu(() => setEditProfile(true), () => setStatusText(true)), '-', { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) }, { label: t(popups ? 'chat.popups.off' : 'chat.popups.on'), hint: t('chat.popups.hint'), onSelect: () => (setPopups(!popups), setPopupsState(!popups)) }, { label: t(v.profile?.readReceipts === false ? 'chat.receipts.on' : 'chat.receipts.off'), hint: t('chat.receipts.hint'), onSelect: () => void chat.setReadReceipts(v.profile?.readReceipts === false).catch(fail) }])}
+          onClick={(e) => openContextMenu(e, [...statusMenu(() => setEditProfile(true), () => setStatusText(true)), '-', { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) }, { label: t(popups ? 'chat.popups.off' : 'chat.popups.on'), hint: t('chat.popups.hint'), onSelect: () => (setPopups(!popups), setPopupsState(!popups)) }, { label: t(v.profile?.readReceipts === false ? 'chat.receipts.on' : 'chat.receipts.off'), hint: t('chat.receipts.hint'), onSelect: () => void chat.setReadReceipts(v.profile?.readReceipts === false).catch(fail) }, { label: t(v.profile?.byName === false ? 'chat.privacy.byNameOn' : 'chat.privacy.byNameOff'), hint: t('chat.privacy.byNameHint'), onSelect: () => void chat.setPrivacy({ byName: v.profile?.byName === false }).catch(fail) }, { label: t(v.profile?.giftsByName === false ? 'chat.privacy.giftsOn' : 'chat.privacy.giftsOff'), hint: t('chat.privacy.giftsHint'), onSelect: () => void chat.setPrivacy({ giftsByName: v.profile?.giftsByName === false }).catch(fail) }])}
           title={t('chat.status.change')}
         >
           <ChatAvatar uuid={v.me} size={34} dot status={v.profile?.status === 'invisible' ? 'offline' : v.profile?.status ?? 'online'} />
@@ -464,7 +517,11 @@ export default function ChatPanel() {
         </button>
         <div className="chat-code">
           <span className="hint">{t('chat.yourCode')}</span>
-          <b className="data">{v.code || '····-····'}</b>
+          {/* Hidden until asked for, so it isn't shown on a stream or a screenshot by accident. */}
+          <b className={`data ${showCode ? '' : 'chat-code-hidden'}`}>{showCode && v.code ? v.code : '••••-••••'}</b>
+          <button className="btn ghost icon sm" title={t(showCode ? 'chat.code.hide' : 'chat.code.show')} aria-label={t(showCode ? 'chat.code.hide' : 'chat.code.show')} disabled={!v.code} onClick={() => setShowCode(!showCode)}>
+            {showCode ? <EyeOff /> : <Eye />}
+          </button>
           <button className="btn ghost icon sm" title={t('chat.copyCode')} aria-label={t('chat.copyCode')} disabled={!v.code} onClick={() => void navigator.clipboard.writeText(v.code).then(() => toast(t('chat.codeCopied'), 'success'))}>
             <Copy />
           </button>
@@ -474,6 +531,25 @@ export default function ChatPanel() {
             onClick={(e) =>
               openContextMenu(e, [
                 { label: t('chat.newCode'), hint: t('chat.newCodeHint'), onSelect: () => void chat.resetCode().then(() => toast(t('chat.codeChanged'), 'success'), fail) },
+                '-',
+                {
+                  label: t('chat.giftCode.copy'),
+                  hint: t('chat.giftCode.hint'),
+                  icon: <Gift size={14} />,
+                  onSelect: () =>
+                    void chat
+                      .giftCode()
+                      .then((code) => navigator.clipboard.writeText(code).then(() => toast(t('chat.giftCode.copied', { code }), 'success')))
+                      .catch(fail)
+                },
+                {
+                  label: t('chat.giftCode.reset'),
+                  onSelect: () =>
+                    void chat
+                      .giftCode(true)
+                      .then((code) => toast(t('chat.giftCode.changed', { code }), 'success'))
+                      .catch(fail)
+                },
                 '-',
                 { label: t('chat.history.save'), icon: <Download size={14} />, onSelect: () => void saveHistory() },
                 { label: t('chat.history.open'), icon: <Upload size={14} />, onSelect: () => void openHistory() }
@@ -613,7 +689,10 @@ export default function ChatPanel() {
                     onClick={(e) =>
                       openContextMenu(
                         e,
-                        group.members.filter((m) => m.uuid !== v.me).map((m) => ({ label: displayName(group.conv, m.uuid), onSelect: () => setGiftTo({ uuid: m.uuid, conv: group.conv }) })),
+                        [
+                          { label: t('chat.gift.anyone'), icon: <Users size={14} />, onSelect: () => setGiftTo({ uuid: '', conv: group.conv }) },
+                          ...group.members.filter((m) => m.uuid !== v.me).map((m) => ({ label: displayName(group.conv, m.uuid), onSelect: () => setGiftTo({ uuid: m.uuid, conv: group.conv }) }))
+                        ],
                         t('chat.gift.who')
                       )
                     }
@@ -728,7 +807,7 @@ export default function ChatPanel() {
                           <span className="hint">{t('chat.deleted')}</span>
                         ) : m.kind === 'gift' ? (
                           <>
-                            <GiftCard m={m} mine={mine} peer={displayName(open, (m.data as ChatGiftData & { to?: string })?.to ?? peer)} />
+                            <GiftCard m={m} mine={mine} me={v.me} conv={open} peer={displayName(open, (m.data as ChatGiftData)?.to ?? peer)} />
                             {m.body && <ChatText text={m.body} />}
                           </>
                         ) : (
@@ -863,7 +942,15 @@ export default function ChatPanel() {
       </section>
       {newGroup && <NewGroupModal onClose={() => setNewGroup(false)} />}
       {gift && peer && <GiftModal to={peer} name={displayName(open, peer)} onClose={() => setGift(false)} />}
-      {giftTo && <GiftModal to={giftTo.uuid} name={displayName(giftTo.conv ?? open, giftTo.uuid)} conv={giftTo.conv} onClose={() => setGiftTo(null)} />}
+      {giftTo && (
+        <GiftModal
+          to={giftTo.uuid}
+          anyone={!giftTo.uuid}
+          name={giftTo.uuid ? displayName(giftTo.conv ?? open, giftTo.uuid) : t('chat.gift.anyoneName')}
+          conv={giftTo.conv}
+          onClose={() => setGiftTo(null)}
+        />
+      )}
       {profileOf && (
         <ProfileCard
           uuid={profileOf}

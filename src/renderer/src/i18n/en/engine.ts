@@ -685,4 +685,5 @@ export default {
   "engine.chat.importTitle": "Open a saved chat history",
   "engine.chat.pickTitle": "Send files",
   "engine.chat.saveTitle": "Save the file",
+  "engine.servers.admin.drive.pickTitle": "Upload to the Drive",
 }

@@ -420,6 +420,12 @@ export const chat = {
   async setReadReceipts(on: boolean) {
     set({ profile: await call<ChatProfile>('POST', '/api/chat/privacy', { readReceipts: on }) })
   },
+  /** Friend requests by name, Store gifts by name (off: only by friend code / gift code). */
+  async setPrivacy(patch: { byName?: boolean; giftsByName?: boolean }) {
+    set({ profile: await call<ChatProfile>('POST', '/api/chat/privacy', patch) })
+  },
+  /** The gift code (GIFT-XXXX-XXXX) others type in the Store to send this player a gift; `reset`: a new one. */
+  giftCode: async (reset = false) => (await call<{ code: string }>(reset ? 'POST' : 'GET', reset ? '/api/chat/gift-code/reset' : '/api/chat/gift-code', reset ? {} : undefined)).code,
   async setNickname(conv: string, uuid: string, nick: string) {
     const r = await call<{ nicknames: Record<string, Record<string, string>> }>('POST', '/api/chat/nickname', { conv, uuid, nick })
     set({ nicknames: r.nicknames ?? view.nicknames })
@@ -477,9 +483,14 @@ export const chat = {
   /** A gift from the Store to any player by name (friend or not): it arrives with an Inbox mail. */
   giftByName: (name: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }) =>
     call<{ message: null; balance: number }>('POST', '/api/chat/gift', { toName: name, ...gift }),
-  /** A gift to a friend, or (with `conv`) to someone in a group. */
+  /** Receives a gift from a chat (in a group, the first to press gets an open one). */
+  async claimGift(id: string) {
+    const r = await call<{ ok: true; summary: string; balance: number }>('POST', '/api/chat/gift/claim', { id })
+    return r
+  },
+  /** A gift to a friend, or (with `conv`) to someone in a group (`to` empty: anyone in it, first come). */
   async gift(to: string, gift: { kind: 'credit'; amount: number; note?: string } | { kind: 'item'; product: string; yearly: boolean; note?: string }, conv?: string) {
-    const r = await call<{ message: ChatMessage | null; balance: number }>('POST', '/api/chat/gift', { to, ...gift, ...(conv && isGroup(conv) ? { conv } : {}) })
+    const r = await call<{ message: ChatMessage | null; balance: number }>('POST', '/api/chat/gift', { ...(to ? { to } : {}), ...gift, ...(conv && isGroup(conv) ? { conv } : {}) })
     if (r.message) took(r.message)
     return r
   },

@@ -1,0 +1,49 @@
+/* The invitation and Beta pop-up (components/Celebrate.tsx). */
+.celebrate {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 8px 4px 4px;
+  text-align: center;
+}
+
+.celebrate p {
+  max-width: 44ch;
+  margin: 0;
+}
+
+.celebrate-badge {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel, transparent));
+  color: var(--accent);
+  animation: celebrate-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+.celebrate-badge svg {
+  width: 30px;
+  height: 30px;
+}
+
+.celebrate-lead {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+@keyframes celebrate-in {
+  from {
+    transform: scale(0.6) rotate(-8deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebrate-badge {
+    animation: none;
+  }
+}

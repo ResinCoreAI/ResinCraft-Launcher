@@ -1,6 +1,7 @@
 // ResinCraft's own updates: a quiet check at start and every 6 hours, the Update button in the title bar, the
 // choice when a game or hosted server is running, silent updates, and Settings → Updates. The engine does the work (src-tauri/src/updater.rs);
 // the download shows in the task dock.
+import { joinedBeta } from '../inboxState'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { CheckCircle2, Download, Hourglass, Info, Loader2, Power, RefreshCw } from 'lucide-react'
 import type { UpdateBlockers, UpdateStatus } from '@shared/types'
@@ -254,10 +255,15 @@ export function UpdatesSection() {
   const pick = (next: Channel) => {
     if (next === channel) return
     if (leaves(next)) setSwitchTo(next)
-    else void updateSettings({ updateChannel: next }).then(() => check())
+    else
+      void updateSettings({ updateChannel: next }).then(() => {
+        if (next === 'beta') joinedBeta()
+        return check()
+      })
   }
   const switchNow = async (next: Channel) => {
     setSwitchTo(undefined)
+    if (next === 'beta') joinedBeta()
     setSwitching(true)
     try {
       await updateSettings({ updateChannel: next })

@@ -221,6 +221,9 @@ const unread = () => mine().filter((m) => !read.has(m.id)).length
 const emailState = () => ({ on: mode() !== 'off', address, verifiedAt, pending: pending && pending.expiresAt > now() ? pending : null })
 
 /** `mail:call` in the preview. */
+/** Pop-ups the preview showed already (?celebrate=…). */
+const celebratedHere = new Set<string>()
+
 export async function mockMailCall(method: string, path: string, body?: unknown): Promise<unknown> {
   await wait()
   if (mode() === 'none') throw new Error('This build of ResinCraft has no relay, so it has no inbox.')
@@ -230,8 +233,16 @@ export async function mockMailCall(method: string, path: string, body?: unknown)
   switch (route) {
     case 'GET /api/inbox':
       return { messages: mine().map(asMessage), unread: unread(), total: mine().length, email: emailState(), unclaimed: unclaimed().length, credit, currency: 'thb', status: statusSub }
-    case 'GET /api/inbox/unread':
-      return { unread: unread() }
+    case 'GET /api/inbox/unread': {
+      // ?celebrate=tester (or developer): the relay has an invitation's pop-up waiting, until it's shown.
+      const kind = new URLSearchParams(location.search).get('celebrate')
+      return { unread: unread(), celebrate: kind && !celebratedHere.has(kind) ? [{ kind, by: 'Developer Notch', at: Math.floor(Date.now() / 1000) }] : [] }
+    }
+    case 'POST /api/inbox/celebrated':
+      celebratedHere.add(String((body as { kind?: string })?.kind ?? ''))
+      return { ok: true }
+    case 'POST /api/inbox/beta':
+      return { mailed: true }
     case 'POST /api/inbox/read': {
       const m = mine().find((x) => x.id === b.id)
       if (!m) throw new Error('ResinCraft Relay: there’s no such mail')

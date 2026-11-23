@@ -58,6 +58,41 @@ export function setChatBadge(count: number, on: boolean): void {
   listeners.forEach((cb) => cb())
 }
 
+/**
+ * Pop-ups the relay keeps for this account until shown ("you're a tester now"), plus the Beta welcome this launcher
+ * shows by itself when the player picks the Beta channel. Components/Celebrate.tsx shows the first.
+ */
+export type Celebration = { kind: 'tester' | 'developer' | 'beta'; by?: string; at?: number }
+let celebrations: Celebration[] = []
+const celebrationListeners = new Set<() => void>()
+function setCelebrations(next: Celebration[]): void {
+  celebrations = next
+  celebrationListeners.forEach((cb) => cb())
+}
+function addCelebrations(list: Celebration[]): void {
+  const fresh = list.filter((c) => !celebrations.some((x) => x.kind === c.kind))
+  if (fresh.length) setCelebrations([...celebrations, ...fresh])
+}
+export function useCelebrations(): Celebration[] {
+  return useSyncExternalStore(
+    (cb) => {
+      celebrationListeners.add(cb)
+      return () => celebrationListeners.delete(cb)
+    },
+    () => celebrations
+  )
+}
+/** Shown: off the list here, and on the relay (it keeps the invitations' ones until then). */
+export function celebrated(c: Celebration): void {
+  setCelebrations(celebrations.filter((x) => x.kind !== c.kind))
+  if (c.kind !== 'beta') void call('POST', '/api/inbox/celebrated', { kind: c.kind }).catch(() => {})
+}
+/** The player chose the Beta channel: the pop-up now, and the relay's welcome mail (Inbox, and email if linked). */
+export function joinedBeta(): void {
+  addCelebrations([{ kind: 'beta' }])
+  void call('POST', '/api/inbox/beta', {}).catch(() => {})
+}
+
 /** Mail and chat together, for the header. */
 export function useInboxBadge(): State {
   return useSyncExternalStore(subscribe, badgeOf)
@@ -79,11 +114,12 @@ export function useInboxWatch(accountId: string | undefined, onNew: (count: numb
     setInbox({ unread: 0, available: false })
     const ask = () => {
       asked = Date.now()
-      call<{ unread: number }>('GET', '/api/inbox/unread').then(
+      call<{ unread: number; celebrate?: Celebration[] }>('GET', '/api/inbox/unread').then(
         (r) => {
           if (!live) return
           const before = state.unread
           setInbox({ unread: r.unread, available: true })
+          if (r.celebrate?.length) addCelebrations(r.celebrate)
           if (!first && r.unread > before) onNew(r.unread - before)
           first = false
         },

@@ -13,9 +13,24 @@ import { Modal, Segmented } from '../ui'
  * `to`/`name`: a friend or group member (from a chat). Without them (from the Store) it asks for a player's name and
  * the gift goes straight to that account, friend or not; `preset` opens it on credit or on a Store item.
  */
-export default function GiftModal({ to, name, conv, preset, onClose }: { to?: string; name?: string; conv?: string; preset?: { kind: 'credit' } | { kind: 'item'; product: string }; onClose: () => void }) {
+export default function GiftModal({
+  to,
+  anyone,
+  name,
+  conv,
+  preset,
+  onClose
+}: {
+  to?: string
+  /** A group gift for whoever takes it first (`conv` is the group). */
+  anyone?: boolean
+  name?: string
+  conv?: string
+  preset?: { kind: 'credit' } | { kind: 'item'; product: string }
+  onClose: () => void
+}) {
   const [toName, setToName] = useState('')
-  const byName = !to
+  const byName = !to && !anyone
   const { toast, go, activeAccount } = useStore()
   const [opts, setOpts] = useState<ChatGiftOptions>()
   const [error, setError] = useState('')
@@ -47,7 +62,7 @@ export default function GiftModal({ to, name, conv, preset, onClose }: { to?: st
     setError('')
     try {
       const what = kind === 'credit' ? { kind, amount: minor, note: note.trim() || undefined } : { kind, product, yearly, note: note.trim() || undefined }
-      const r = byName ? await chat.giftByName(toName.trim(), what) : await chat.gift(to!, what, conv)
+      const r = byName ? await chat.giftByName(toName.trim(), what) : await chat.gift(to ?? '', what, conv)
       if (activeAccount?.type === 'msa') setWalletBalance(activeAccount.uuid, r.balance, cur)
       toast(t('chat.gift.sent', { name: byName ? toName.trim() : name ?? '' }), 'success')
       onClose()
@@ -95,8 +110,8 @@ export default function GiftModal({ to, name, conv, preset, onClose }: { to?: st
           {byName && (
             <label className="field">
               <span>{t('chat.gift.to')}</span>
-              <input className="input" autoFocus maxLength={36} value={toName} onChange={(e) => setToName(e.target.value)} placeholder={t('chat.gift.toPlaceholder')} />
-              <span className="hint">{t('chat.gift.toHint')}</span>
+              <input className="input" autoFocus maxLength={36} value={toName} onChange={(e) => setToName(e.target.value)} placeholder={t('chat.gift.toNameOrCode')} />
+              <span className="hint">{t('chat.gift.toCodeHint')}</span>
             </label>
           )}
           {opts.credit && opts.items.length > 0 && (

@@ -50,6 +50,7 @@ import { t, type Key } from './i18n'
 import { hasBedrockApp } from './platform'
 import { useAdminStatus } from './adminStatus'
 import { useInboxBadge, useInboxWatch } from './inboxState'
+import { Celebrate } from './components/Celebrate'
 import { onPopupOpen, showChat, useChatWatch } from './chatState'
 import { useClassicLayout } from './classicLayoutState'
 import { ClassicSidebar, ClassicTopBar } from './components/ClassicShell'
@@ -365,6 +366,7 @@ export default function App() {
           <BigScreen pages={nav.filter((n) => n.page !== 'home' && n.page !== 'library').map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))} />
         </Suspense>
       )}
+      <Celebrate />
       <LaunchScreen />
       <InstanceDock />
       <Dock />
