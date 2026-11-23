@@ -6107,6 +6107,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "Lebih besar",
   "settings.zoom.reset": "Atur ulang",
   "updates.busy.closeHintResume": "Server menyimpan dunianya lalu berhenti, kemudian menyala lagi sendiri setelah pembaruan terpasang. Minecraft ditutup, jadi simpan permainan dulu.",
+  "inbox.rail.all": "Semua",
+  "inbox.rail.mail": "Surat",
+  "inbox.rail.friends": "Teman",
+  "inbox.rail.requests": "Permintaan",
+  "inbox.earlier": "Sebelumnya",
+  "inbox.searchOrAdd": "Cari, atau tambah lewat nama atau kode",
+  "inbox.noRequests": "Tidak ada permintaan pertemanan",
+  "inbox.joinGroup": "Gabung ke grup ini",
+  "inbox.addFriend": "Tambahkan {name} sebagai teman",
+  "inbox.pickAny": "Pilih surat atau obrolan",
+  "inbox.giftWaiting": "Hadiah",
+  "chat.side.show": "Tampilkan profilnya",
+  "chat.side.hide": "Sembunyikan profilnya",
+  "chat.side.about": "Tentang",
+  "chat.side.mutual": "Grup yang sama · {count}",
+  "chat.side.noMutual": "Belum ada",
 }
 
 export default dict

@@ -1,19 +1,23 @@
-// The Inbox: mail from ResinCraft to the active Microsoft account, laid out like a mail client: the list on the left
-// (unread in bold, sender, subject, a line of the message, when), the open mail on the right. Mail comes from the
-// relay's admins (relay-server mail.rs); the same mail may also arrive by email at a confirmed address.
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { ArrowLeft, BellRing, Gift, Inbox as InboxIcon, Mail, MailOpen, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import type { InboxData, InboxMessage, InboxReward } from '@shared/types'
+// The Inbox: mail from ResinCraft (relay-server mail.rs; the same mail may also arrive by email at a confirmed address)
+// and chats with friends and groups (components/chat), in one list. Laid out as a rail of filters and groups, the list,
+// and the open mail or chat (with the friend's profile or the group's members beside it).
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ArrowLeft, BellRing, Copy, Download, Eye, EyeOff, Gift, Inbox as InboxIcon, Mail, MailOpen, MessageCircle, MoreHorizontal, Plus, RefreshCw, Search, Trash2, Upload, UserPlus, X } from 'lucide-react'
+import type { ChatGiftData, ChatGroup, ChatMessage, ChatPerson, InboxData, InboxMessage, InboxReward } from '@shared/types'
+import { api } from '../api'
 import { inbox, setInbox } from '../inboxState'
 import { money, setWalletBalance } from '../storeStatus'
 import creditIcon from '../assets/resin-credit.svg'
 import { useStore } from '../store'
 import { currentLanguage, t, type Key } from '../i18n'
-import { ConfirmModal, Empty, Modal, Segmented, Switch, celebrate, openContextMenu, type ContextEntry } from '../components/ui'
+import { ConfirmModal, Modal, Switch, celebrate, openContextMenu, type ContextEntry } from '../components/ui'
 import MailText from '../components/MailText'
 import EmailAddress from '../components/EmailAddress'
-import ChatPanel from '../components/chat/ChatPanel'
-import { inboxTab, setInboxTab, useChat } from '../chatState'
+import ChatPanel, { Requests } from '../components/chat/ChatPanel'
+import { chat, displayName, popupsOn, setPopups, setSound, soundOn, useChat } from '../chatState'
+import { ChatAvatar } from '../components/chat/ChatMedia'
+import { GroupTile, NewGroupModal } from '../components/chat/ChatGroups'
+import { ProfileModal, STATUS_LABEL, StatusTextModal, statusMenu } from '../components/chat/ChatProfile'
 import '../inbox.css'
 
 const CATEGORY: Record<Exclude<InboxMessage['category'], ''>, Key> = {
@@ -71,23 +75,80 @@ function SenderMark({ name }: { name: string }) {
   )
 }
 
+type Filter = 'all' | 'mail' | 'friends' | 'groups' | 'requests'
+const FILTER_KEY = 'resin.inbox.filter'
+const savedFilter = (): Filter => {
+  try {
+    const f = localStorage.getItem(FILTER_KEY) as Filter | null
+    return f && ['all', 'mail', 'friends', 'groups', 'requests'].includes(f) ? f : 'all'
+  } catch {
+    return 'all'
+  }
+}
+const FRIEND_CODE = /^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/
+const GROUP_CODE = /^G-?[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/i
+
+/** A chat's line in the list: who said what last. */
+function chatLine(m: ChatMessage | undefined, me: string, conv: string, group: boolean): string {
+  if (!m) return ''
+  const who = m.sender === me ? `${t('chat.you')}: ` : group ? `${displayName(conv, m.sender)}: ` : ''
+  if (m.deleted) return who + t('chat.deleted')
+  if (m.kind === 'gift') return who + t('chat.giftLine')
+  if (m.kind === 'system') return ''
+  const files = m.data && 'files' in m.data ? m.data.files ?? [] : []
+  if (!m.body && files.length) return who + (files.some((f) => f.kind === 'voice') ? t('chat.voice.line') : files.every((f) => f.kind === 'image') ? t('chat.files.pictureLine') : t('chat.files.fileLine'))
+  if (!m.body && m.data && 'embed' in m.data && m.data.embed) return who + m.data.embed.name
+  return who + m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+type Row =
+  | { kind: 'mail'; key: string; at: number; unread: boolean; m: InboxMessage }
+  | { kind: 'dm'; key: string; at: number; unread: number; p: ChatPerson; conv: string; last?: ChatMessage }
+  | { kind: 'group'; key: string; at: number; unread: number; g: ChatGroup; last?: ChatMessage }
+
+/** "Today", "Yesterday", or earlier. */
+function bucketOf(secs: number): 'today' | 'yesterday' | 'earlier' {
+  const d = new Date(secs * 1000)
+  const now = new Date()
+  if (d.toDateString() === now.toDateString()) return 'today'
+  if (d.toDateString() === new Date(now.getTime() - 86_400_000).toDateString()) return 'yesterday'
+  return 'earlier'
+}
+
+/**
+ * The Inbox: mail from ResinCraft and chats with friends and groups in one list, newest first. On the left a rail of
+ * filters (All, Mail, Friends, Requests) and the groups you're in; the open mail or chat beside the list, and for a chat
+ * the friend's profile or the group's members on the right.
+ */
 export default function InboxPage() {
   const { toast, activeAccount } = useStore()
-  // Mail from ResinCraft, or chat with friends (remembered).
-  const [tab, setTab] = useState<'mail' | 'chat'>(inboxTab)
-  const chatView = useChat()
-  const chatUnread = Object.values(chatView.unread).reduce((a, b) => a + b, 0) + chatView.friends.incoming.length
+  const v = useChat()
+  const [filter, setFilterState] = useState<Filter>(savedFilter)
+  const setFilter = (f: Filter) => {
+    setFilterState(f)
+    try {
+      localStorage.setItem(FILTER_KEY, f)
+    } catch {}
+  }
   const [data, setData] = useState<InboxData>()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState<string>()
   const [deleting, setDeleting] = useState<InboxMessage>()
   const [emailOpen, setEmailOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [claiming, setClaiming] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [showCode, setShowCode] = useState(false)
+  const [newGroup, setNewGroup] = useState(false)
+  const [editProfile, setEditProfile] = useState(false)
+  const [statusText, setStatusText] = useState(false)
+  const [sound, setSoundState] = useState(soundOn)
+  const [popups, setPopupsState] = useState(popupsOn)
   const list = useRef<HTMLDivElement>(null)
+  const chatOn = v.status !== 'off' && !(v.status === 'error' && !v.me)
+  const fail = (e: unknown) => toast((e as Error).message, 'error')
 
   const load = useCallback(async () => {
     setBusy(true)
@@ -107,14 +168,20 @@ export default function InboxPage() {
     setOpenId(undefined)
     void load()
   }, [load, activeAccount?.id])
-
-  const messages = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return (data?.messages ?? []).filter(
-      (m) => (filter === 'all' || !m.read || m.id === openId) && (!q || `${m.from}\n${m.subject}\n${m.body}`.toLowerCase().includes(q))
-    )
-  }, [data, filter, query, openId])
-  const open = data?.messages.find((m) => m.id === openId)
+  // Leaving the Inbox: no chat is on screen any more (so its messages count as unread and pop up again). React runs
+  // effects twice while developing; only a real close clears it.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      setTimeout(() => !mounted.current && chat.open(null), 0)
+    }
+  }, [])
+  // A chat opened from elsewhere (a pop-up, a profile): it's what's on screen now.
+  useEffect(() => {
+    if (v.open) setOpenId(undefined)
+  }, [v.open])
 
   /** Changes one mail here at once; the relay follows. */
   const patch = (ids: string[], change: Partial<InboxMessage> | null) =>
@@ -125,22 +192,26 @@ export default function InboxPage() {
       setInbox({ unread })
       return { ...d, messages: next, unread, total: change ? d.total : d.total - (d.messages.length - next.length) }
     })
-
-  const select = (m: InboxMessage) => {
+  const openMail = (m: InboxMessage) => {
+    chat.open(null)
     setOpenId(m.id)
     if (!m.read) {
       patch([m.id], { read: true })
       inbox.read(m.id).then(
         (r) => setInbox({ unread: r.unread }),
-        (e) => toast((e as Error).message, 'error')
+        (e) => fail(e)
       )
     }
+  }
+  const openChat = (conv: string) => {
+    setOpenId(undefined)
+    chat.open(conv)
   }
   const mark = (m: InboxMessage, read: boolean) => {
     patch([m.id], { read })
     inbox.mark([m.id], read).then(
       (r) => setInbox({ unread: r.unread }),
-      (e) => (toast((e as Error).message, 'error'), void load())
+      (e) => (fail(e), void load())
     )
   }
   const markAll = () => {
@@ -149,7 +220,7 @@ export default function InboxPage() {
     patch(ids, { read: true })
     inbox.mark(ids, true).then(
       (r) => setInbox({ unread: r.unread }),
-      (e) => (toast((e as Error).message, 'error'), void load())
+      (e) => (fail(e), void load())
     )
   }
   /** Claims one mail's rewards (or all of them): marks them here, celebrates, and says what came. */
@@ -157,19 +228,8 @@ export default function InboxPage() {
     setClaiming(true)
     try {
       const r = await inbox.claim(id)
-      setData((d) =>
-        d
-          ? {
-              ...d,
-              messages: d.messages.map((m) => (r.claimed.includes(m.id) ? { ...m, claimed: true, read: true } : m)),
-              unread: r.unread,
-              unclaimed: r.unclaimed,
-              credit: r.credit
-            }
-          : d
-      )
+      setData((d) => (d ? { ...d, messages: d.messages.map((m) => (r.claimed.includes(m.id) ? { ...m, claimed: true, read: true } : m)), unread: r.unread, unclaimed: r.unclaimed, credit: r.credit } : d))
       setInbox({ unread: r.unread })
-      // The header's Resin Credit shows the new balance at once.
       if (activeAccount?.uuid) setWalletBalance(activeAccount.uuid, r.credit, data?.currency ?? 'thb')
       celebrate(from)
       const credit = r.given.filter((g) => g.kind === 'credit').reduce((n, g) => n + (g.kind === 'credit' ? g.amount : 0), 0)
@@ -180,263 +240,370 @@ export default function InboxPage() {
       )
       if (r.error) toast(r.error, 'error')
     } catch (e) {
-      toast((e as Error).message, 'error')
+      fail(e)
     } finally {
       setClaiming(false)
     }
   }
   const unclaimed = (m: InboxMessage) => !!m.attachments?.length && !m.claimed
   const remove = async (m: InboxMessage) => {
-    // The next one down opens in its place, like a mail client.
-    const i = messages.findIndex((x) => x.id === m.id)
-    const after = messages[i + 1] ?? messages[i - 1]
     await inbox.remove([m.id])
     patch([m.id], null)
-    if (openId === m.id) setOpenId(after?.id)
+    if (openId === m.id) setOpenId(undefined)
     toast(t('inbox.deleted'), 'info')
   }
-
-  const menu = (m: InboxMessage): ContextEntry[] => [
+  const mailMenu = (m: InboxMessage): ContextEntry[] => [
     m.read ? { label: t('inbox.markUnread'), icon: <Mail />, onSelect: () => mark(m, false) } : { label: t('inbox.markRead'), icon: <MailOpen />, onSelect: () => mark(m, true) },
     unclaimed(m) && { label: t('inbox.claim'), icon: <Gift />, onSelect: () => void claim(m.id) },
     '-',
     { label: t('common.delete'), icon: <Trash2 />, danger: true, disabled: unclaimed(m), onSelect: () => setDeleting(m) }
   ]
 
-  // ↑/↓ move through the list, Delete deletes, U toggles read.
-  const onKey = (e: ReactKeyboardEvent) => {
-    if ((e.target as HTMLElement).tagName === 'INPUT') return
-    const i = messages.findIndex((m) => m.id === openId)
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault()
-      const next = messages[Math.min(messages.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))]
-      if (next) {
-        select(next)
-        list.current?.querySelector<HTMLElement>(`[data-id="${next.id}"]`)?.scrollIntoView({ block: 'nearest' })
+  // ----- The one list -----
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const out: Row[] = []
+    if (filter === 'all' || filter === 'mail')
+      for (const m of data?.messages ?? []) out.push({ kind: 'mail', key: `m:${m.id}`, at: m.sentAt, unread: !m.read, m })
+    if (chatOn && (filter === 'all' || filter === 'friends'))
+      for (const p of v.friends.friends) {
+        if (!p.conv) continue
+        const c = v.convs[p.conv] ?? []
+        const last = [...c].reverse().find((x) => x.kind !== 'system')
+        out.push({ kind: 'dm', key: p.conv, at: last?.at ?? p.since, unread: v.unread[p.conv] ?? 0, p, conv: p.conv, last })
       }
-    } else if (e.key === 'Delete' && open && !unclaimed(open)) {
-      e.preventDefault()
-      setDeleting(open)
-    } else if ((e.key === 'u' || e.key === 'U') && open) {
-      mark(open, !open.read)
+    if (chatOn && (filter === 'all' || filter === 'groups'))
+      for (const g of v.groups) {
+        const c = v.convs[g.conv] ?? []
+        const last = [...c].reverse().find((x) => x.kind !== 'system')
+        out.push({ kind: 'group', key: g.conv, at: last?.at ?? g.created, unread: v.unread[g.conv] ?? 0, g, last })
+      }
+    const text = (r: Row) =>
+      r.kind === 'mail' ? `${r.m.from}\n${r.m.subject}\n${r.m.body}` : r.kind === 'dm' ? `${r.p.name}\n${displayName(r.conv, r.p.uuid)}` : r.g.name
+    return out.filter((r) => !q || text(r).toLowerCase().includes(q)).sort((a, b) => b.at - a.at)
+  }, [data, v.friends.friends, v.groups, v.convs, v.unread, filter, query, chatOn])
+
+  const mailUnread = data?.unread ?? 0
+  const dmUnread = v.friends.friends.reduce((n, p) => n + (p.conv ? v.unread[p.conv] ?? 0 : 0), 0)
+  const groupUnread = v.groups.reduce((n, g) => n + (v.unread[g.conv] ?? 0), 0)
+  const requests = v.friends.incoming.length
+
+  // Search box: Enter adds a friend by name or code, or joins a group by its code.
+  const addFromSearch = async () => {
+    const what = query.trim()
+    if (!what || !chatOn) return
+    setAdding(true)
+    try {
+      if (GROUP_CODE.test(what)) {
+        const r = await chat.joinGroup(what)
+        toast(t('chat.group.joined', { name: r.name }), 'success')
+        openChat(r.conv)
+      } else if (FRIEND_CODE.test(what)) {
+        const r = await chat.addByCode(what)
+        toast(t('chat.addedByCode', { name: r.name }), 'success')
+        const conv = r.friends.friends.find((f) => f.uuid === r.uuid)?.conv
+        if (conv) openChat(conv)
+      } else {
+        const r = await chat.addFriend(what)
+        toast(r.state === 'friends' ? t('chat.nowFriends', { name: r.name }) : t('chat.requestSent', { name: r.name }), 'success')
+      }
+      setQuery('')
+    } catch (e) {
+      fail(e)
+    } finally {
+      setAdding(false)
     }
   }
 
-  const email = data?.email
-  const pick = (next: 'mail' | 'chat') => {
-    setTab(next)
-    setInboxTab(next)
-  }
-  const tabs = (
-    <div className="inbox-tabs">
-      <Segmented
-        value={tab}
-        onChange={pick}
-        options={[
-          { value: 'mail', label: data?.unread ? t('inbox.tab.mailCount', { count: data.unread }) : t('inbox.tab.mail') },
-          { value: 'chat', label: chatUnread ? t('inbox.tab.chatCount', { count: chatUnread }) : t('inbox.tab.chat') }
-        ]}
-      />
-    </div>
+  const meMenu = (): ContextEntry[] => [
+    ...statusMenu(() => setEditProfile(true), () => setStatusText(true)),
+    '-',
+    { label: t(sound ? 'chat.sound.off' : 'chat.sound.on'), onSelect: () => (setSound(!sound), setSoundState(!sound)) },
+    { label: t(popups ? 'chat.popups.off' : 'chat.popups.on'), hint: t('chat.popups.hint'), onSelect: () => (setPopups(!popups), setPopupsState(!popups)) },
+    { label: t(v.profile?.readReceipts === false ? 'chat.receipts.on' : 'chat.receipts.off'), hint: t('chat.receipts.hint'), onSelect: () => void chat.setReadReceipts(v.profile?.readReceipts === false).catch(fail) },
+    { label: t(v.profile?.byName === false ? 'chat.privacy.byNameOn' : 'chat.privacy.byNameOff'), hint: t('chat.privacy.byNameHint'), onSelect: () => void chat.setPrivacy({ byName: v.profile?.byName === false }).catch(fail) },
+    { label: t(v.profile?.giftsByName === false ? 'chat.privacy.giftsOn' : 'chat.privacy.giftsOff'), hint: t('chat.privacy.giftsHint'), onSelect: () => void chat.setPrivacy({ giftsByName: v.profile?.giftsByName === false }).catch(fail) }
+  ]
+  const codeMenu = (): ContextEntry[] => [
+    { label: t('chat.newCode'), hint: t('chat.newCodeHint'), onSelect: () => void chat.resetCode().then(() => toast(t('chat.codeChanged'), 'success'), fail) },
+    '-',
+    {
+      label: t('chat.giftCode.copy'),
+      hint: t('chat.giftCode.hint'),
+      icon: <Gift size={14} />,
+      onSelect: () => void chat.giftCode().then((code) => navigator.clipboard.writeText(code).then(() => toast(t('chat.giftCode.copied', { code }), 'success'))).catch(fail)
+    },
+    { label: t('chat.giftCode.reset'), onSelect: () => void chat.giftCode(true).then((code) => toast(t('chat.giftCode.changed', { code }), 'success')).catch(fail) }
+  ]
+  const listMenu = (): ContextEntry[] => [
+    { label: data?.email?.address ? t('inbox.email.button', { address: data.email.address }) : t('inbox.email.add'), icon: <Mail size={14} />, disabled: !data, onSelect: () => setEmailOpen(true) },
+    { label: data?.status?.on ? t('inbox.status.on') : t('inbox.status.button'), icon: <BellRing size={14} />, disabled: !data, onSelect: () => setStatusOpen(true) },
+    { label: t('inbox.markAllRead'), icon: <MailOpen size={14} />, disabled: !mailUnread, onSelect: markAll },
+    { label: t('common.refresh'), icon: <RefreshCw size={14} />, onSelect: () => void load() },
+    ...(chatOn
+      ? (['-', { label: t('chat.history.save'), icon: <Download size={14} />, onSelect: () => void api.chat.export().then((r) => r && toast(t('chat.history.saved', { count: r.messages }), 'success'), fail) }, { label: t('chat.history.open'), icon: <Upload size={14} />, onSelect: () => void api.chat.import().then((r) => r && toast(t('chat.history.opened', { count: r.added }), 'success'), fail) }] as ContextEntry[])
+      : [])
+  ]
+
+  const open = openId ? data?.messages.find((m) => m.id === openId) : undefined
+  const showingChat = !open && !!v.open
+  const title = { all: t('inbox.title'), mail: t('inbox.rail.mail'), friends: t('inbox.rail.friends'), groups: t('chat.groups'), requests: t('inbox.rail.requests') }[filter]
+  const RailButton = ({ f, icon, label, count }: { f: Filter; icon: ReactNode; label: string; count: number }) => (
+    <button className={`ib2-rb ${filter === f ? 'on' : ''}`} title={label} aria-label={label} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+      {icon}
+      {count > 0 && <span className="ib2-n">{count > 99 ? '99+' : count}</span>}
+      <span className="ib2-rl">{label}</span>
+    </button>
   )
-  if (tab === 'chat') {
+  const timeOf = (secs: number) => (bucketOf(secs) === 'today' ? new Date(secs * 1000).toLocaleTimeString(currentLanguage(), { hour: '2-digit', minute: '2-digit' }) : shortTime(secs))
+
+  const rowEl = (r: Row) => {
+    if (r.kind === 'mail') {
+      const m = r.m
+      return (
+        <button key={r.key} className={`ib2-row ${r.unread ? 'unread' : ''} ${openId === m.id ? 'on' : ''}`} onClick={() => openMail(m)} onContextMenu={(e) => (e.preventDefault(), openContextMenu(e, mailMenu(m), m.subject))}>
+          <SenderMark name={m.from} />
+          <span className="ib2-row-text">
+            <span className="ib2-l1">
+              <b className="ellipsis">{m.subject}</b>
+              {unclaimed(m) ? (
+                <span className="chip compact ib2-gift">
+                  <Gift /> {m.attachments!.length}
+                </span>
+              ) : (
+                m.category && m.category !== 'account' && <span className={`chip compact ib-cat ib-cat-${m.category}`}>{t(CATEGORY[m.category])}</span>
+              )}
+            </span>
+            <span className="ib2-l2 ellipsis">
+              {m.from} · {m.snippet}
+            </span>
+          </span>
+          <span className="ib2-r">
+            <span title={longTime(m.sentAt)}>{timeOf(m.sentAt)}</span>
+            {r.unread && <span className="ib-dot" />}
+          </span>
+        </button>
+      )
+    }
+    const conv = r.kind === 'dm' ? r.conv : r.g.conv
+    const waiting = (v.convs[conv] ?? []).some((x) => x.kind === 'gift' && !x.deleted && (x.data as ChatGiftData | null)?.expires && !(x.data as ChatGiftData).claimedBy && !(x.data as ChatGiftData).reversed && !(x.data as ChatGiftData).returned && ((x.data as ChatGiftData).to === v.me || ((x.data as ChatGiftData).open && x.sender !== v.me)))
     return (
-      <div className="page inbox-page">
-        <div className="page-head">
-          <div>
-            <h1>{t('inbox.title')}</h1>
-            <p>{t('chat.lead')}</p>
-          </div>
-        </div>
-        {tabs}
-        <ChatPanel />
-      </div>
+      <button key={r.key} className={`ib2-row ${r.unread ? 'unread' : ''} ${showingChat && v.open === conv ? 'on' : ''}`} onClick={() => openChat(conv)}>
+        {r.kind === 'dm' ? <ChatAvatar uuid={r.p.uuid} size={40} dot status={r.p.status ?? (r.p.online ? 'online' : 'offline')} /> : <GroupTile name={r.g.name} size={40} />}
+        <span className="ib2-row-text">
+          <span className="ib2-l1">
+            <b className="ellipsis">{r.kind === 'dm' ? displayName(conv, r.p.uuid) : r.g.name}</b>
+            {r.kind === 'group' && <span className="hint">· {r.g.members.length}</span>}
+            {waiting && (
+              <span className="chip compact ib2-gift">
+                <Gift /> {t('inbox.giftWaiting')}
+              </span>
+            )}
+          </span>
+          <span className="ib2-l2 ellipsis">{chatLine(r.last, v.me, conv, r.kind === 'group') || (r.kind === 'dm' ? t(STATUS_LABEL[r.p.status ?? (r.p.online ? 'online' : 'offline')]) : t('chat.group.members', { count: r.g.members.length }))}</span>
+        </span>
+        <span className="ib2-r">
+          {r.last && <span>{timeOf(r.last.at)}</span>}
+          {r.unread > 0 && <span className="ib-badge">{r.unread > 99 ? '99+' : r.unread}</span>}
+        </span>
+      </button>
     )
   }
-  return (
-    <div className="page inbox-page">
-      <div className="page-head">
-        <div>
-          <h1>{t('inbox.title')}</h1>
-          <p>{t('inbox.lead')}</p>
-        </div>
-        <div className="spacer" />
-        {data && (
-          <button className="btn" onClick={() => setEmailOpen(true)} title={email?.address ?? t('inbox.email.add')}>
-            <Mail /> {email?.address ? t('inbox.email.button', { address: email.address }) : t('inbox.email.add')}
-          </button>
-        )}
-        {data && (
-          <button className="btn" onClick={() => setStatusOpen(true)} title={t('inbox.status.title')}>
-            <BellRing /> {data.status?.on ? t('inbox.status.on') : t('inbox.status.button')}
-          </button>
-        )}
-        <button className="btn" onClick={() => void load()} disabled={busy}>
-          <RefreshCw className={busy ? 'spin' : undefined} /> {t('common.refresh')}
-        </button>
-      </div>
-      {tabs}
+  const sections: [string, Row[]][] = [
+    [t('chat.today'), rows.filter((r) => bucketOf(r.at) === 'today')],
+    [t('chat.yesterday'), rows.filter((r) => bucketOf(r.at) === 'yesterday')],
+    [t('inbox.earlier'), rows.filter((r) => bucketOf(r.at) === 'earlier')]
+  ]
 
-      {error && !data ? (
-        <div className="card">
-          <Empty icon={<InboxIcon />} title={t('inbox.unavailable')}>
-            {error}
-          </Empty>
-        </div>
-      ) : (
-        <div className={`card ib-shell ${open ? 'reading' : ''}`} onKeyDown={onKey}>
-          <div className="ib-list-col">
-            <div className="ib-tools">
-              <Segmented
-                value={filter}
-                onChange={setFilter}
-                options={[
-                  { value: 'all', label: t('inbox.filter.all') },
-                  { value: 'unread', label: data?.unread ? t('inbox.filter.unreadCount', { count: data.unread }) : t('inbox.filter.unread') }
-                ]}
-              />
-              <div className="ib-search">
-                <Search aria-hidden />
-                <input className="input" placeholder={t('inbox.search')} aria-label={t('inbox.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
-                {query && (
-                  <button className="btn ghost icon sm" onClick={() => setQuery('')} aria-label={t('inbox.clearSearch')}>
-                    <X />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="ib-list-head">
-              <span>{data ? t('inbox.count', { count: data.total }) : ''}</span>
+  return (
+    <div className="page inbox-page ib2-page">
+      <div className={`card ib2-shell ${open || showingChat ? 'reading' : ''}`}>
+        <nav className="ib2-rail" aria-label={t('inbox.title')}>
+          <RailButton f="all" icon={<InboxIcon />} label={t('inbox.rail.all')} count={mailUnread + dmUnread + groupUnread + requests} />
+          <RailButton f="mail" icon={<Mail />} label={t('inbox.rail.mail')} count={mailUnread} />
+          {chatOn && <RailButton f="friends" icon={<MessageCircle />} label={t('inbox.rail.friends')} count={dmUnread} />}
+          {chatOn && <RailButton f="requests" icon={<UserPlus />} label={t('inbox.rail.requests')} count={requests} />}
+          {chatOn && <hr />}
+          {chatOn &&
+            v.groups.map((g) => (
+              <button key={g.conv} className={`ib2-group ${showingChat && v.open === g.conv ? 'on' : ''}`} title={g.name} aria-label={g.name} onClick={() => openChat(g.conv)}>
+                {(v.unread[g.conv] ?? 0) > 0 && <span className="ib2-mark" />}
+                <GroupTile name={g.name} size={44} />
+              </button>
+            ))}
+          {chatOn && (
+            <button className="ib2-rb" title={t('chat.group.new')} aria-label={t('chat.group.new')} onClick={() => setNewGroup(true)}>
+              <Plus />
+            </button>
+          )}
+          <span className="grow" />
+          {chatOn && v.me && (
+            <button className="ib2-me" title={t('chat.status.change')} aria-label={t('chat.status.change')} onClick={(e) => openContextMenu(e, meMenu())}>
+              <ChatAvatar uuid={v.me} size={40} dot status={v.profile?.status === 'invisible' ? 'offline' : v.profile?.status ?? 'online'} />
+            </button>
+          )}
+        </nav>
+
+        <div className="ib2-list">
+          <div className="ib2-lh">
+            <div className="row">
+              <h2 className="grow">{title}</h2>
               {!!data?.unclaimed && (
-                <button className="btn primary sm" onClick={(e) => void claim('all', e.currentTarget)} disabled={claiming}>
+                <button className="btn ghost sm" onClick={(e) => void claim('all', e.currentTarget)} disabled={claiming}>
                   <Gift /> {t('inbox.claimAll', { count: data.unclaimed })}
                 </button>
               )}
-              <button className="btn ghost sm" onClick={markAll} disabled={!data?.unread}>
-                <MailOpen /> {t('inbox.markAllRead')}
+              <button className="btn ghost icon sm" aria-label={t('chat.more')} title={t('chat.more')} onClick={(e) => openContextMenu(e, listMenu())}>
+                {busy ? <RefreshCw className="spin" /> : <MoreHorizontal />}
               </button>
             </div>
-            <div className="ib-list" ref={list} role="listbox" aria-label={t('inbox.title')} tabIndex={-1}>
-              {!data ? (
-                [0, 1, 2, 3].map((i) => <div key={i} className="ib-row ib-skeleton" aria-hidden />)
-              ) : messages.length === 0 ? (
-                <div className="ib-none">
-                  <InboxIcon aria-hidden />
-                  <b>{query ? t('inbox.noMatch') : filter === 'unread' ? t('inbox.allRead') : t('inbox.empty')}</b>
-                  {!query && filter === 'all' && <span className="hint">{t('inbox.emptyHint')}</span>}
-                </div>
-              ) : (
-                messages.map((m) => (
-                  <button
-                    key={m.id}
-                    data-id={m.id}
-                    role="option"
-                    aria-selected={m.id === openId}
-                    className={`ib-row ${m.read ? '' : 'unread'} ${m.id === openId ? 'open' : ''}`}
-                    onClick={() => select(m)}
-                    onContextMenu={(e) => {
-                      e.preventDefault()
-                      openContextMenu(e, menu(m), m.subject)
-                    }}
-                  >
-                    <span className="ib-dot" aria-label={m.read ? undefined : t('inbox.unread')} />
-                    <SenderMark name={m.from} />
-                    <span className="ib-row-text">
-                      <span className="ib-row-top">
-                        <span className="ib-from ellipsis">{m.from}</span>
-                        <span className="ib-time" title={longTime(m.sentAt)}>
-                          {shortTime(m.sentAt)}
-                        </span>
-                      </span>
-                      <span className="ib-subject ellipsis">{m.subject}</span>
-                      <span className="ib-snippet">{m.snippet}</span>
-                      {unclaimed(m) && (
-                        <span className="ib-row-gift">
-                          <Gift /> {t('inbox.rewardWaiting')}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                ))
+            {chatOn && (
+              <div className="ib2-code">
+                <span className="hint">{t('chat.yourCode')}</span>
+                <b className={`data ${showCode ? '' : 'chat-code-hidden'}`}>{showCode && v.code ? v.code : '••••-••••'}</b>
+                <button className="btn ghost icon sm" title={t(showCode ? 'chat.code.hide' : 'chat.code.show')} aria-label={t(showCode ? 'chat.code.hide' : 'chat.code.show')} disabled={!v.code} onClick={() => setShowCode(!showCode)}>
+                  {showCode ? <EyeOff /> : <Eye />}
+                </button>
+                <button className="btn ghost icon sm" title={t('chat.copyCode')} aria-label={t('chat.copyCode')} disabled={!v.code} onClick={() => void navigator.clipboard.writeText(v.code).then(() => toast(t('chat.codeCopied'), 'success'))}>
+                  <Copy />
+                </button>
+                <button className="btn ghost icon sm" aria-label={t('chat.more')} onClick={(e) => openContextMenu(e, codeMenu())}>
+                  <MoreHorizontal />
+                </button>
+              </div>
+            )}
+            <form
+              className="ib-search"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void addFromSearch()
+              }}
+            >
+              <Search aria-hidden />
+              <input className="input" placeholder={chatOn ? t('inbox.searchOrAdd') : t('inbox.search')} aria-label={t('inbox.search')} value={query} maxLength={60} onChange={(e) => setQuery(e.target.value)} />
+              {query && (
+                <button type="button" className="btn ghost icon sm" onClick={() => setQuery('')} aria-label={t('inbox.clearSearch')}>
+                  <X />
+                </button>
               )}
-            </div>
+            </form>
           </div>
-
-          <div className="ib-reader">
-            {!open ? (
-              <div className="ib-none ib-pick">
-                <MailOpen aria-hidden />
-                <b>{data?.messages.length ? t('inbox.pick') : t('inbox.empty')}</b>
-                {data && !data.email.address && data.email.on && (
-                  <span className="hint">
-                    {t('inbox.email.nudge')}{' '}
-                    <button className="btn sm" onClick={() => setEmailOpen(true)}>
-                      <Mail /> {t('inbox.email.add')}
-                    </button>
-                  </span>
+          {chatOn && (filter === 'all' || filter === 'friends' || filter === 'requests') && <Requests v={v} />}
+          <div className="ib2-items" ref={list}>
+            {error && !data && filter !== 'friends' && filter !== 'groups' && filter !== 'requests' && <p className="hint bad ib2-err">{error}</p>}
+            {filter === 'requests' ? (
+              !v.friends.incoming.length &&
+              !v.friends.outgoing.length && (
+                <div className="ib-none">
+                  <UserPlus aria-hidden />
+                  <b>{t('inbox.noRequests')}</b>
+                  <span className="hint">{t('chat.noFriendsHint')}</span>
+                </div>
+              )
+            ) : !data && !chatOn && !error ? (
+              [0, 1, 2, 3].map((i) => <div key={i} className="ib-row ib-skeleton" aria-hidden />)
+            ) : rows.length === 0 ? (
+              <div className="ib-none">
+                {query ? <Search aria-hidden /> : <InboxIcon aria-hidden />}
+                <b>{query ? t('inbox.noMatch') : t('inbox.empty')}</b>
+                {query && chatOn && (
+                  <button className="btn sm" disabled={adding} onClick={() => void addFromSearch()}>
+                    <UserPlus /> {GROUP_CODE.test(query.trim()) ? t('inbox.joinGroup') : t('inbox.addFriend', { name: query.trim() })}
+                  </button>
                 )}
               </div>
             ) : (
-              <article className="ib-mail" aria-label={open.subject}>
-                <div className="ib-mail-bar">
-                  <button className="btn ghost icon sm ib-back" onClick={() => setOpenId(undefined)} aria-label={t('common.back')} title={t('common.back')}>
-                    <ArrowLeft />
-                  </button>
-                  <div className="spacer" />
-                  <button className="btn ghost sm" onClick={() => mark(open, !open.read)} title={`${open.read ? t('inbox.markUnread') : t('inbox.markRead')} (U)`}>
-                    {open.read ? <Mail /> : <MailOpen />} {open.read ? t('inbox.markUnread') : t('inbox.markRead')}
-                  </button>
-                  <button className="btn ghost sm danger" onClick={() => setDeleting(open)} disabled={unclaimed(open)} title={unclaimed(open) ? t('inbox.claimFirst') : `${t('common.delete')} (Del)`}>
-                    <Trash2 /> {t('common.delete')}
-                  </button>
-                </div>
-                <h2 className="ib-mail-subject">{open.subject}</h2>
-                <div className="ib-mail-meta">
-                  <SenderMark name={open.from} />
-                  <div className="grow">
-                    <b>{open.from}</b>
-                    <span className="hint">{t('inbox.to', { name: activeAccount?.username ?? '' })}</span>
+              sections.map(([label, rs]) =>
+                rs.length ? (
+                  <div key={label}>
+                    <div className="ib2-sect">{label}</div>
+                    {rs.map(rowEl)}
                   </div>
-                  <div className="ib-mail-when">
-                    {open.category && <span className={`chip ib-cat ib-cat-${open.category}`}>{t(CATEGORY[open.category])}</span>}
-                    <span className="hint" title={longTime(open.sentAt)}>
-                      {longTime(open.sentAt)}
-                    </span>
-                  </div>
-                </div>
-                <MailText text={open.body} />
-                {!!open.attachments?.length && (
-                  <section className={`ib-rewards ${open.claimed ? 'claimed' : ''}`} aria-label={t('inbox.rewards')}>
-                    <h3>
-                      <Gift /> {t('inbox.rewards')}
-                    </h3>
-                    <div className="ib-reward-list">
-                      {open.attachments.map((r, i) => (
-                        <RewardCard key={i} r={r} currency={data?.currency} />
-                      ))}
-                    </div>
-                    {open.claimed ? (
-                      <span className="ib-claimed">{t('inbox.claimedLabel')}</span>
-                    ) : (
-                      <button className="btn primary" onClick={(e) => void claim(open.id, e.currentTarget)} disabled={claiming}>
-                        <Gift /> {t('inbox.claim')}
-                      </button>
-                    )}
-                  </section>
-                )}
-              </article>
+                ) : null
+              )
             )}
           </div>
         </div>
-      )}
 
+        <div className="ib2-pane">
+          {showingChat ? (
+            <ChatPanel mode="pane" />
+          ) : open ? (
+            <article className="ib-mail" aria-label={open.subject}>
+              <div className="ib-mail-bar">
+                <button className="btn ghost icon sm ib-back" onClick={() => setOpenId(undefined)} aria-label={t('common.back')} title={t('common.back')}>
+                  <ArrowLeft />
+                </button>
+                <div className="spacer" />
+                <button className="btn ghost sm" onClick={() => mark(open, !open.read)}>
+                  {open.read ? <Mail /> : <MailOpen />} {open.read ? t('inbox.markUnread') : t('inbox.markRead')}
+                </button>
+                <button className="btn ghost sm danger" onClick={() => setDeleting(open)} disabled={unclaimed(open)} title={unclaimed(open) ? t('inbox.claimFirst') : t('common.delete')}>
+                  <Trash2 /> {t('common.delete')}
+                </button>
+              </div>
+              <h2 className="ib-mail-subject">{open.subject}</h2>
+              <div className="ib-mail-meta">
+                <SenderMark name={open.from} />
+                <div className="grow">
+                  <b>{open.from}</b>
+                  <span className="hint">{t('inbox.to', { name: activeAccount?.username ?? '' })}</span>
+                </div>
+                <div className="ib-mail-when">
+                  {open.category && <span className={`chip ib-cat ib-cat-${open.category}`}>{t(CATEGORY[open.category])}</span>}
+                  <span className="hint" title={longTime(open.sentAt)}>
+                    {longTime(open.sentAt)}
+                  </span>
+                </div>
+              </div>
+              <MailText text={open.body} />
+              {!!open.attachments?.length && (
+                <section className={`ib-rewards ${open.claimed ? 'claimed' : ''}`} aria-label={t('inbox.rewards')}>
+                  <h3>
+                    <Gift /> {t('inbox.rewards')}
+                  </h3>
+                  <div className="ib-reward-list">
+                    {open.attachments.map((r, i) => (
+                      <RewardCard key={i} r={r} currency={data?.currency} />
+                    ))}
+                  </div>
+                  {open.claimed ? (
+                    <span className="ib-claimed">{t('inbox.claimedLabel')}</span>
+                  ) : (
+                    <button className="btn primary" onClick={(e) => void claim(open.id, e.currentTarget)} disabled={claiming}>
+                      <Gift /> {t('inbox.claim')}
+                    </button>
+                  )}
+                </section>
+              )}
+            </article>
+          ) : (
+            <div className="ib-none ib-pick">
+              <InboxIcon aria-hidden />
+              <b>{t('inbox.pickAny')}</b>
+              {data && !data.email.address && data.email.on && (
+                <span className="hint">
+                  {t('inbox.email.nudge')}{' '}
+                  <button className="btn sm" onClick={() => setEmailOpen(true)}>
+                    <Mail /> {t('inbox.email.add')}
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {newGroup && <NewGroupModal onClose={() => setNewGroup(false)} />}
+      {editProfile && <ProfileModal onClose={() => setEditProfile(false)} />}
+      {statusText && <StatusTextModal onClose={() => setStatusText(false)} />}
       {deleting && (
         <ConfirmModal
           title={t('inbox.deleteTitle')}
           body={t('inbox.deleteBody', { subject: deleting.subject })}
           confirm={t('common.delete')}
           onClose={() => setDeleting(undefined)}
-          onConfirm={() => remove(deleting).catch((e) => toast((e as Error).message, 'error'))}
+          onConfirm={() => remove(deleting).catch(fail)}
         />
       )}
       {statusOpen && data && (
@@ -452,7 +619,7 @@ export default function InboxPage() {
               onChange={(on) =>
                 void inbox.setStatus(on, on && !!data.status?.email).then(
                   (st) => (setData({ ...data, status: st }), toast(t(on ? 'inbox.status.subscribed' : 'inbox.status.unsubscribed'), 'success')),
-                  (e) => toast((e as Error).message, 'error')
+                  fail
                 )
               }
             />
@@ -466,12 +633,7 @@ export default function InboxPage() {
               on={!!data.status?.email}
               label={t('inbox.status.email')}
               disabled={!data.status?.on || !data.email.address}
-              onChange={(email) =>
-                void inbox.setStatus(true, email).then(
-                  (st) => setData({ ...data, status: st }),
-                  (e) => toast((e as Error).message, 'error')
-                )
-              }
+              onChange={(email) => void inbox.setStatus(true, email).then((st) => setData({ ...data, status: st }), fail)}
             />
           </div>
         </Modal>

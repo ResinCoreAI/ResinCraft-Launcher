@@ -1060,3 +1060,76 @@
   min-width: 0;
   font-size: 12px;
 }
+
+/* The friend's profile beside their chat on the Inbox page (ChatProfile.tsx ProfileSide), in the members panel's place. */
+.chat-profile-side {
+  padding: 0;
+  gap: 0;
+  overflow-y: auto;
+}
+.chat-side-banner {
+  display: flex;
+  justify-content: flex-end;
+  height: 84px;
+  padding: 6px;
+  flex: none;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 55%, #000), var(--accent));
+}
+.chat-side-banner .btn {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.25);
+}
+.chat-side-who {
+  display: grid;
+  gap: 2px;
+  padding: 0 14px 12px;
+  margin-top: -36px;
+}
+.chat-side-who > :first-child {
+  margin-bottom: 8px;
+  border: 4px solid var(--surface);
+  border-radius: 50%;
+  justify-self: start;
+}
+.chat-side-who b {
+  font: 600 18px var(--display, var(--font));
+}
+.chat-side-sect {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+}
+.chat-side-sect h4 {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.chat-side-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.chat-side-link:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chat-side-acts {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.chat-side-acts .btn {
+  justify-content: flex-start;
+}
+.chat-top .btn.on {
+  background: var(--surface-2);
+  color: var(--text);
+}

@@ -612,3 +612,302 @@
   border-color: var(--accent);
   color: var(--text);
 }
+
+/* ---------- The Inbox: rail, one list, the open mail or chat (pages/Inbox.tsx) ---------- */
+.ib2-page {
+  max-width: 1480px;
+}
+.ib2-shell {
+  display: grid;
+  grid-template-columns: 72px minmax(280px, 330px) minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+  height: max(500px, calc(100vh - var(--titlebar) - 96px));
+}
+
+/* The rail: filters, then your groups, then you. */
+.ib2-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 0;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.ib2-rail hr {
+  width: 28px;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.ib2-rb {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: 58px;
+  padding: 6px 0 4px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--text-dim);
+  transition: background 0.15s, color 0.15s;
+}
+.ib2-rb > svg {
+  width: 40px;
+  height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+.ib2-rb:hover {
+  color: var(--text);
+}
+.ib2-rb:hover > svg {
+  border-color: var(--border-strong);
+}
+.ib2-rb.on {
+  color: var(--text);
+}
+.ib2-rb.on > svg {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ib2-rl {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ib2-n {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: 700 10px/14px var(--font);
+  text-align: center;
+  box-sizing: border-box;
+}
+.ib2-group {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 14px;
+}
+.ib2-group .chat-group-tile {
+  border-radius: 14px;
+  transition: border-radius 0.2s var(--ease, ease);
+}
+.ib2-group:hover .chat-group-tile,
+.ib2-group.on .chat-group-tile {
+  border-radius: 10px;
+}
+.ib2-group.on .chat-group-tile {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ib2-mark {
+  position: absolute;
+  left: -14px;
+  top: 18px;
+  width: 6px;
+  height: 8px;
+  border-radius: 0 4px 4px 0;
+  background: var(--text);
+}
+.ib2-me {
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+}
+
+/* The list. */
+.ib2-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+.ib2-lh {
+  display: grid;
+  gap: 10px;
+  padding: 14px 14px 8px;
+}
+.ib2-lh .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ib2-lh h2 {
+  font-size: 19px;
+}
+.ib2-code {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface);
+}
+.ib2-code b {
+  flex: 1;
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  font-size: 13px;
+}
+.ib2-items {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 8px 12px;
+}
+.ib2-sect {
+  margin: 12px 8px 6px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ib2-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  transition: background 0.12s;
+}
+.ib2-row:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+.ib2-row.on {
+  background: var(--surface-2);
+}
+.ib2-row .ib-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.ib2-row-text {
+  display: grid;
+  min-width: 0;
+}
+.ib2-l1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ib2-l1 b {
+  font-weight: 600;
+}
+.ib2-l2 {
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.ib2-row.unread .ib2-l1 b {
+  color: var(--text);
+}
+.ib2-row.unread .ib2-l2 {
+  color: var(--text-dim);
+}
+.ib2-r {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.ib2-r .ib-dot {
+  margin: 0;
+  background: var(--accent);
+}
+.ib2-r .ib-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.ib2-gift {
+  flex: none;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ib2-gift svg {
+  width: 12px;
+  height: 12px;
+}
+.ib2-err {
+  margin: 8px;
+}
+.ib2-list .chat-requests {
+  padding: 0 8px;
+}
+
+/* The pane: the mail reader, or the conversation (ChatPanel mode="pane"). */
+.ib2-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ib2-pane .chat-pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.ib2-pane .chat-main {
+  flex: 1;
+}
+.ib2-pane .ib-mail {
+  margin: 0 auto;
+  width: 100%;
+}
+
+@media (max-width: 980px) {
+  .ib2-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .ib2-shell.reading .ib2-list,
+  .ib2-shell:not(.reading) .ib2-pane {
+    display: none;
+  }
+  .ib2-list {
+    border-right: 0;
+  }
+  .ib2-pane .chat-back,
+  .ib2-pane .ib-back {
+    display: inline-flex;
+  }
+}

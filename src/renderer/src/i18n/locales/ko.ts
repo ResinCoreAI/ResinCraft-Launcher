@@ -6099,6 +6099,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "크게",
   "settings.zoom.reset": "초기화",
   "updates.busy.closeHintResume": "서버는 월드를 저장하고 멈췄다가, 업데이트가 끝나면 알아서 다시 시작합니다. Minecraft가 닫히므로 먼저 저장하세요.",
+  "inbox.rail.all": "전체",
+  "inbox.rail.mail": "메일",
+  "inbox.rail.friends": "친구",
+  "inbox.rail.requests": "요청",
+  "inbox.earlier": "이전",
+  "inbox.searchOrAdd": "검색하거나 이름 또는 코드로 추가",
+  "inbox.noRequests": "친구 요청이 없어요",
+  "inbox.joinGroup": "이 그룹에 참여",
+  "inbox.addFriend": "{name}님을 친구로 추가",
+  "inbox.pickAny": "메일이나 채팅을 선택하세요",
+  "inbox.giftWaiting": "선물",
+  "chat.side.show": "프로필 보기",
+  "chat.side.hide": "프로필 숨기기",
+  "chat.side.about": "소개",
+  "chat.side.mutual": "함께 있는 그룹 · {count}",
+  "chat.side.noMutual": "아직 없어요",
 }
 
 export default dict

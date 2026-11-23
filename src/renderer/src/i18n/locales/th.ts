@@ -6160,6 +6160,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "ใหญ่ขึ้น",
   "settings.zoom.reset": "รีเซ็ต",
   "updates.busy.closeHintResume": "เซิร์ฟเวอร์จะบันทึกโลกแล้วหยุด จากนั้นจะเริ่มทำงานใหม่เองเมื่ออัปเดตเสร็จ Minecraft จะปิด จึงควรเซฟเกมก่อน",
+  "inbox.rail.all": "ทั้งหมด",
+  "inbox.rail.mail": "จดหมาย",
+  "inbox.rail.friends": "เพื่อน",
+  "inbox.rail.requests": "คำขอ",
+  "inbox.earlier": "ก่อนหน้า",
+  "inbox.searchOrAdd": "ค้นหา หรือเพิ่มด้วยชื่อหรือโค้ด",
+  "inbox.noRequests": "ไม่มีคำขอเป็นเพื่อน",
+  "inbox.joinGroup": "เข้าร่วมกลุ่มนี้",
+  "inbox.addFriend": "เพิ่ม {name} เป็นเพื่อน",
+  "inbox.pickAny": "เลือกจดหมายหรือแชท",
+  "inbox.giftWaiting": "ของขวัญ",
+  "chat.side.show": "แสดงโปรไฟล์",
+  "chat.side.hide": "ซ่อนโปรไฟล์",
+  "chat.side.about": "เกี่ยวกับ",
+  "chat.side.mutual": "กลุ่มที่อยู่ด้วยกัน · {count}",
+  "chat.side.noMutual": "ยังไม่มี",
 }
 
 export default dict

@@ -6166,6 +6166,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "Больше",
   "settings.zoom.reset": "Сбросить",
   "updates.busy.closeHintResume": "Серверы сохранят миры и остановятся, а после установки обновления запустятся сами. Minecraft закроется, поэтому сначала сохраните игру.",
+  "inbox.rail.all": "Все",
+  "inbox.rail.mail": "Почта",
+  "inbox.rail.friends": "Друзья",
+  "inbox.rail.requests": "Заявки",
+  "inbox.earlier": "Ранее",
+  "inbox.searchOrAdd": "Поиск или добавление по имени или коду",
+  "inbox.noRequests": "Нет заявок в друзья",
+  "inbox.joinGroup": "Вступить в эту группу",
+  "inbox.addFriend": "Добавить {name} в друзья",
+  "inbox.pickAny": "Выберите письмо или чат",
+  "inbox.giftWaiting": "Подарок",
+  "chat.side.show": "Показать профиль",
+  "chat.side.hide": "Скрыть профиль",
+  "chat.side.about": "О себе",
+  "chat.side.mutual": "Общие группы · {count}",
+  "chat.side.noMutual": "Пока нет",
 }
 
 export default dict

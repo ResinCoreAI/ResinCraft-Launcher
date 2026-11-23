@@ -6104,6 +6104,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "大きく",
   "settings.zoom.reset": "リセット",
   "updates.busy.closeHintResume": "サーバーはワールドを保存して停止し、アップデートの完了後に自動で再開します。Minecraftは終了するので先に保存してください。",
+  "inbox.rail.all": "すべて",
+  "inbox.rail.mail": "メール",
+  "inbox.rail.friends": "フレンド",
+  "inbox.rail.requests": "申請",
+  "inbox.earlier": "以前",
+  "inbox.searchOrAdd": "検索、または名前かコードで追加",
+  "inbox.noRequests": "フレンド申請はありません",
+  "inbox.joinGroup": "このグループに参加",
+  "inbox.addFriend": "{name}をフレンドに追加",
+  "inbox.pickAny": "メールかチャットを選んでください",
+  "inbox.giftWaiting": "ギフト",
+  "chat.side.show": "プロフィールを表示",
+  "chat.side.hide": "プロフィールを隠す",
+  "chat.side.about": "プロフィール情報",
+  "chat.side.mutual": "共通のグループ · {count}",
+  "chat.side.noMutual": "まだありません",
 }
 
 export default dict

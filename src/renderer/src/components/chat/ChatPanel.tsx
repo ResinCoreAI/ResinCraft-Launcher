@@ -15,6 +15,7 @@ import {
   Paperclip,
   MessageCircle,
   MoreHorizontal,
+  PanelRight,
   Pencil,
   Reply,
   Send,
@@ -39,7 +40,7 @@ import GiftModal from './GiftModal'
 import Embeds from './Embeds'
 import { GroupPanel, GroupTile, NewGroupModal, SystemNote } from './ChatGroups'
 import { ChatAvatar, MessageFiles, VoiceRecorder } from './ChatMedia'
-import { NicknameModal, ProfileCard, ProfileModal, STATUS_LABEL, StatusTextModal, statusMenu } from './ChatProfile'
+import { NicknameModal, ProfileCard, ProfileModal, ProfileSide, STATUS_LABEL, StatusTextModal, statusMenu } from './ChatProfile'
 import '../../chat.css'
 import PlayerHead from '../PlayerHead'
 
@@ -154,7 +155,7 @@ function GiftCard({ m, mine, peer, me, conv }: { m: ChatMessage; mine: boolean; 
   )
 }
 
-function Requests({ v }: { v: ChatView }) {
+export function Requests({ v }: { v: ChatView }) {
   const { toast } = useStore()
   const act = (p: Promise<unknown>) => p.catch((e) => toast((e as Error).message, 'error'))
   if (!v.friends.incoming.length && !v.friends.outgoing.length) return null
@@ -191,7 +192,22 @@ function Requests({ v }: { v: ChatView }) {
   )
 }
 
-export default function ChatPanel() {
+const SIDE_KEY = 'resin.inbox.side'
+const sideSaved = () => {
+  try {
+    return localStorage.getItem(SIDE_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+/**
+ * `mode`: "full" is the friends list and the conversation (as before); "pane" is the conversation alone, for the Inbox
+ * page, which has its own list. In the pane the right panel (the friend's profile, or the group's members) stays open
+ * until it's closed, and is remembered.
+ */
+export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } = {}) {
+  const pane = mode === 'pane'
   const v = useChat()
   const { toast } = useStore()
   const [add, setAdd] = useState('')
@@ -215,7 +231,14 @@ export default function ChatPanel() {
   const [recording, setRecording] = useState(false)
   const [sound, setSoundState] = useState(soundOn)
   const [popups, setPopupsState] = useState(popupsOn)
-  const [members, setMembers] = useState(false)
+  const [members, setMembersState] = useState(() => pane && sideSaved())
+  const setMembers = (on: boolean) => {
+    setMembersState(on)
+    if (pane)
+      try {
+        localStorage.setItem(SIDE_KEY, on ? '1' : '0')
+      } catch {}
+  }
   const list = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
   const pinned = useRef(true)
@@ -242,12 +265,12 @@ export default function ChatPanel() {
     return [...v.groups].sort((a, b) => last(b) - last(a))
   }, [v.groups, v.convs])
 
-  // Leaving the tab: no conversation is on screen any more.
-  useEffect(() => () => chat.open(null), [])
-  // Opening the first friend when there's none open yet (on wide windows).
+  // Leaving the tab: no conversation is on screen any more. (In the pane, the Inbox page says so when it closes.)
+  useEffect(() => () => void (!pane && chat.open(null)), [pane])
+  // Opening the first friend when there's none open yet (on wide windows). The Inbox page picks for itself.
   useEffect(() => {
-    if (!open && friends[0]?.conv && window.innerWidth > 900) chat.open(friends[0].conv)
-  }, [open, friends])
+    if (!pane && !open && friends[0]?.conv && window.innerWidth > 900) chat.open(friends[0].conv)
+  }, [open, friends, pane])
 
   // Stay at the bottom while new messages come (unless scrolled up to read older ones).
   useLayoutEffect(() => {
@@ -259,7 +282,7 @@ export default function ChatPanel() {
     setReplyTo(null)
     setEditing(null)
     setText('')
-    setMembers(false)
+    if (!pane) setMembersState(false)
   }, [open])
 
   const fail = (e: unknown) => toast((e as Error).message, 'error')
@@ -502,7 +525,8 @@ export default function ChatPanel() {
   const lastMine = [...messages].reverse().find((m) => m.sender === v.me)
 
   return (
-    <div className={`card chat-shell ${open ? 'reading' : ''}`}>
+    <div className={pane ? 'chat-pane' : `card chat-shell ${open ? 'reading' : ''}`}>
+      {!pane && (
       <aside className="chat-side">
         <button
           className="chat-me"
@@ -660,8 +684,9 @@ export default function ChatPanel() {
           )}
         </div>
       </aside>
+      )}
 
-      <section className={`chat-main ${group && members ? 'with-members' : ''}`}>
+      <section className={`chat-main ${(group || (pane && friend)) && members ? 'with-members' : ''}`}>
         {!open || (!peer && !group) ? (
           <div className="chat-none chat-pick">
             <MessageCircle aria-hidden />
@@ -715,6 +740,17 @@ export default function ChatPanel() {
               {friend && (
                 <button className="btn sm" onClick={() => setGift(true)} disabled={!v.enabled || !!v.muted}>
                   <Gift /> {t('chat.sendGift')}
+                </button>
+              )}
+              {friend && pane && (
+                <button
+                  className={`btn ghost icon sm ${members ? 'on' : ''}`}
+                  aria-label={t(members ? 'chat.side.hide' : 'chat.side.show')}
+                  title={t(members ? 'chat.side.hide' : 'chat.side.show')}
+                  aria-pressed={members}
+                  onClick={() => setMembers(!members)}
+                >
+                  <PanelRight />
                 </button>
               )}
               {friend && (
@@ -940,6 +976,16 @@ export default function ChatPanel() {
         )}
         {group && members && (
           <GroupPanel g={group} onClose={() => setMembers(false)} onProfile={setProfileOf} onNick={setNickFor} onGift={(uuid) => setGiftTo({ uuid, conv: group.conv })} />
+        )}
+        {pane && !group && friend && open && members && (
+          <ProfileSide
+            uuid={friend.uuid}
+            conv={open}
+            onClose={() => setMembers(false)}
+            onGift={() => setGift(true)}
+            onRemove={() => setConfirm({ title: t('chat.removeFriendTitle', { name: friend.name }), body: t('chat.removeFriendBody'), ok: t('chat.removeFriend'), run: () => chat.friend('remove', friend.uuid) })}
+            onBlock={() => setConfirm({ title: t('chat.blockTitle', { name: friend.name }), body: t('chat.blockBody'), ok: t('chat.block'), run: () => chat.friend('block', friend.uuid) })}
+          />
         )}
       </section>
       {newGroup && <NewGroupModal onClose={() => setNewGroup(false)} />}

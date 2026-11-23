@@ -6148,6 +6148,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "Maior",
   "settings.zoom.reset": "Restaurar",
   "updates.busy.closeHintResume": "Os servidores salvam seus mundos e param, e voltam a iniciar sozinhos quando a atualização for instalada. O Minecraft fecha, então salve o jogo antes.",
+  "inbox.rail.all": "Tudo",
+  "inbox.rail.mail": "E-mail",
+  "inbox.rail.friends": "Amigos",
+  "inbox.rail.requests": "Pedidos",
+  "inbox.earlier": "Anteriores",
+  "inbox.searchOrAdd": "Buscar, ou adicionar por nome ou código",
+  "inbox.noRequests": "Nenhum pedido de amizade",
+  "inbox.joinGroup": "Entrar neste grupo",
+  "inbox.addFriend": "Adicionar {name} como amigo",
+  "inbox.pickAny": "Escolha um e-mail ou um chat",
+  "inbox.giftWaiting": "Presente",
+  "chat.side.show": "Mostrar o perfil",
+  "chat.side.hide": "Ocultar o perfil",
+  "chat.side.about": "Sobre",
+  "chat.side.mutual": "Grupos em comum · {count}",
+  "chat.side.noMutual": "Nenhum ainda",
 }
 
 export default dict

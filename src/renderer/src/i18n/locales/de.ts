@@ -6136,6 +6136,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "Größer",
   "settings.zoom.reset": "Zurücksetzen",
   "updates.busy.closeHintResume": "Gehostete Server speichern ihre Welten und stoppen, danach starten sie von selbst wieder, sobald das Update installiert ist. Minecraft wird geschlossen, speichere also vorher.",
+  "inbox.rail.all": "Alle",
+  "inbox.rail.mail": "Post",
+  "inbox.rail.friends": "Freunde",
+  "inbox.rail.requests": "Anfragen",
+  "inbox.earlier": "Früher",
+  "inbox.searchOrAdd": "Suchen oder per Name oder Code hinzufügen",
+  "inbox.noRequests": "Keine Freundschaftsanfragen",
+  "inbox.joinGroup": "Dieser Gruppe beitreten",
+  "inbox.addFriend": "{name} als Freund hinzufügen",
+  "inbox.pickAny": "Wähle eine Nachricht oder einen Chat",
+  "inbox.giftWaiting": "Geschenk",
+  "chat.side.show": "Profil anzeigen",
+  "chat.side.hide": "Profil ausblenden",
+  "chat.side.about": "Info",
+  "chat.side.mutual": "Gemeinsame Gruppen · {count}",
+  "chat.side.noMutual": "Noch keine",
 }
 
 export default dict

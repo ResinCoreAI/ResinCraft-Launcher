@@ -6117,6 +6117,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "Daha büyük",
   "settings.zoom.reset": "Sıfırla",
   "updates.busy.closeHintResume": "Sunucular dünyalarını kaydedip durur, güncelleme yüklendikten sonra kendiliğinden yeniden başlar. Minecraft kapanır, önce oyununu kaydet.",
+  "inbox.rail.all": "Tümü",
+  "inbox.rail.mail": "Posta",
+  "inbox.rail.friends": "Arkadaş",
+  "inbox.rail.requests": "İstekler",
+  "inbox.earlier": "Daha önce",
+  "inbox.searchOrAdd": "Ara veya ada ya da koda göre ekle",
+  "inbox.noRequests": "Arkadaşlık isteği yok",
+  "inbox.joinGroup": "Bu gruba katıl",
+  "inbox.addFriend": "{name} kişisini arkadaş olarak ekle",
+  "inbox.pickAny": "Bir posta ya da sohbet seç",
+  "inbox.giftWaiting": "Hediye",
+  "chat.side.show": "Profilini göster",
+  "chat.side.hide": "Profilini gizle",
+  "chat.side.about": "Hakkında",
+  "chat.side.mutual": "Ortak gruplar · {count}",
+  "chat.side.noMutual": "Henüz yok",
 }
 
 export default dict

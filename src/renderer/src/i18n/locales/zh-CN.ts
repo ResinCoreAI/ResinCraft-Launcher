@@ -6094,6 +6094,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "放大",
   "settings.zoom.reset": "重置",
   "updates.busy.closeHintResume": "服务器会保存世界并停止，更新完成后自动重新启动。Minecraft 会关闭，请先保存游戏。",
+  "inbox.rail.all": "全部",
+  "inbox.rail.mail": "邮件",
+  "inbox.rail.friends": "好友",
+  "inbox.rail.requests": "请求",
+  "inbox.earlier": "更早",
+  "inbox.searchOrAdd": "搜索，或通过名称或代码添加",
+  "inbox.noRequests": "没有好友请求",
+  "inbox.joinGroup": "加入此群聊",
+  "inbox.addFriend": "添加 {name} 为好友",
+  "inbox.pickAny": "选择一封邮件或一个聊天",
+  "inbox.giftWaiting": "礼物",
+  "chat.side.show": "显示对方资料",
+  "chat.side.hide": "隐藏对方资料",
+  "chat.side.about": "关于",
+  "chat.side.mutual": "共同群聊 · {count}",
+  "chat.side.noMutual": "暂无",
 }
 
 export default dict

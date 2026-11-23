@@ -2,13 +2,14 @@
 // banner colour, bio), other players' profile cards (with mutual groups, Message, Send a gift, Set nickname), and
 // nicknames, which everyone in that chat sees.
 import { useEffect, useRef, useState } from 'react'
-import { Gift, ImagePlus, MessageCircle, Pencil, Trash2 } from 'lucide-react'
+import { Ban, Gift, ImagePlus, MessageCircle, Pencil, Trash2, UserMinus, X } from 'lucide-react'
 import type { ChatProfile, ChatStatus } from '@shared/types'
 import { chat, displayName, dmId, nameOf, useChat } from '../../chatState'
 import { useStore } from '../../store'
 import { currentLanguage, t, type Key } from '../../i18n'
 import { Modal, type ContextEntry } from '../ui'
 import { ChatAvatar, FileImage } from './ChatMedia'
+import { GroupTile } from './ChatGroups'
 
 export const STATUS_LABEL: Record<ChatStatus, Key> = {
   online: 'chat.status.online',
@@ -253,3 +254,81 @@ export function ProfileCard({ uuid, conv, onClose, onGift }: { uuid: string; con
     </Modal>
   )
 }
+
+/**
+ * The Inbox's right-hand panel for a friend's chat: their banner, picture, status, bio, how long you've been friends,
+ * the groups you share (click: open it) and what you can do (gift, nickname, remove, block).
+ */
+export function ProfileSide({ uuid, conv, onClose, onGift, onRemove, onBlock }: { uuid: string; conv: string; onClose: () => void; onGift?: () => void; onRemove?: () => void; onBlock?: () => void }) {
+  const { toast } = useStore()
+  const [p, setP] = useState<ChatProfile | null>(null)
+  const [nick, setNick] = useState(false)
+  useEffect(() => {
+    setP(null)
+    void chat.profile(uuid).then(setP, (e) => toast((e as Error).message, 'error'))
+  }, [uuid, toast])
+  const shown = displayName(conv, uuid)
+  const status = p?.status ?? 'offline'
+  return (
+    <aside className="chat-members chat-profile-side" aria-label={shown}>
+      <div className="chat-side-banner" style={{ background: p?.banner || undefined }}>
+        <button className="btn ghost icon sm" aria-label={t('common.close')} title={t('common.close')} onClick={onClose}>
+          <X />
+        </button>
+      </div>
+      <div className="chat-side-who">
+        <ChatAvatar uuid={uuid} size={72} dot status={status === 'invisible' ? 'offline' : status} />
+        <b>{shown}</b>
+        {shown !== (p?.name ?? nameOf(uuid)) && <span className="hint">{p?.name ?? nameOf(uuid)}</span>}
+        <span className="hint">
+          {t(STATUS_LABEL[status])}
+          {p?.statusText ? ` · ${p.statusText}` : ''}
+        </span>
+      </div>
+      {p?.bio && (
+        <section className="chat-side-sect">
+          <h4>{t('chat.side.about')}</h4>
+          <p className="chat-card-bio">{p.bio}</p>
+        </section>
+      )}
+      {p && (
+        <section className="chat-side-sect">
+          <h4>{t('chat.side.mutual', { count: p.mutualGroups.length })}</h4>
+          {p.mutualGroups.length === 0 ? (
+            <span className="hint">{t('chat.side.noMutual')}</span>
+          ) : (
+            p.mutualGroups.map((g) => (
+              <button key={g.conv} className="chat-side-link" onClick={() => chat.open(g.conv)}>
+                <GroupTile name={g.name} size={26} />
+                <span className="ellipsis">{g.name}</span>
+              </button>
+            ))
+          )}
+          <span className="hint">{t('chat.profile.since', { date: new Date(p.since * 1000).toLocaleDateString(currentLanguage(), { dateStyle: 'medium' }) })}</span>
+        </section>
+      )}
+      <section className="chat-side-sect chat-side-acts">
+        {onGift && (
+          <button className="btn sm" onClick={onGift}>
+            <Gift /> {t('chat.sendGift')}
+          </button>
+        )}
+        <button className="btn sm" onClick={() => setNick(true)}>
+          <Pencil /> {t('chat.nickname.set')}
+        </button>
+        {onRemove && (
+          <button className="btn sm ghost" onClick={onRemove}>
+            <UserMinus /> {t('chat.removeFriend')}
+          </button>
+        )}
+        {onBlock && (
+          <button className="btn sm ghost danger" onClick={onBlock}>
+            <Ban /> {t('chat.block')}
+          </button>
+        )}
+      </section>
+      {nick && <NicknameModal conv={conv} uuid={uuid} onClose={() => setNick(false)} />}
+    </aside>
+  )
+}
+

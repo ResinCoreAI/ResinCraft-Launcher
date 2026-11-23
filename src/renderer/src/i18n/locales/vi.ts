@@ -6104,6 +6104,22 @@ const dict: Dict = {
   "settings.zoom.bigger": "Lớn hơn",
   "settings.zoom.reset": "Đặt lại",
   "updates.busy.closeHintResume": "Máy chủ sẽ lưu thế giới rồi dừng, sau đó tự chạy lại khi cập nhật xong. Minecraft sẽ đóng, hãy lưu game trước.",
+  "inbox.rail.all": "Tất cả",
+  "inbox.rail.mail": "Thư",
+  "inbox.rail.friends": "Bạn bè",
+  "inbox.rail.requests": "Lời mời",
+  "inbox.earlier": "Trước đó",
+  "inbox.searchOrAdd": "Tìm kiếm, hoặc thêm bằng tên hay mã",
+  "inbox.noRequests": "Không có lời mời kết bạn",
+  "inbox.joinGroup": "Tham gia nhóm này",
+  "inbox.addFriend": "Thêm {name} làm bạn",
+  "inbox.pickAny": "Chọn một thư hoặc cuộc trò chuyện",
+  "inbox.giftWaiting": "Quà",
+  "chat.side.show": "Hiện hồ sơ của họ",
+  "chat.side.hide": "Ẩn hồ sơ của họ",
+  "chat.side.about": "Giới thiệu",
+  "chat.side.mutual": "Nhóm chung · {count}",
+  "chat.side.noMutual": "Chưa có",
 }
 
 export default dict
