@@ -6123,6 +6123,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "이모지는 PNG, JPEG, GIF, WebP 이미지입니다.",
   "chat.emoji.keepGif": "애니메이션 유지",
   "chat.emoji.keepGifHint": "GIF를 자르지 않고 움직이는 그대로 사용합니다",
+  "chat.embed.modLink": "모드 또는 모드팩",
+  "chat.embed.openMod": "열기",
+  "chat.embed.downloads": "다운로드 {n}회",
 }
 
 export default dict

@@ -6222,6 +6222,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "Emoji to obraz PNG, JPEG, GIF lub WebP.",
   "chat.emoji.keepGif": "Zachowaj animację",
   "chat.emoji.keepGifHint": "Używa GIF-a takiego, jaki jest, ruchomego, bez przycinania",
+  "chat.embed.modLink": "Mod lub modpack",
+  "chat.embed.openMod": "Otwórz",
+  "chat.embed.downloads": "{n} pobrań",
 }
 
 export default dict

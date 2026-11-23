@@ -6128,6 +6128,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "Emoji là ảnh PNG, JPEG, GIF hoặc WebP.",
   "chat.emoji.keepGif": "Giữ chuyển động",
   "chat.emoji.keepGifHint": "Dùng GIF nguyên bản, vẫn chuyển động, không cắt",
+  "chat.embed.modLink": "Một mod hoặc modpack",
+  "chat.embed.openMod": "Mở",
+  "chat.embed.downloads": "{n} lượt tải",
 }
 
 export default dict

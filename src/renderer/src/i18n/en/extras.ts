@@ -1872,4 +1872,7 @@ export default {
   "chat.emoji.fileType": "An emoji is a PNG, JPEG, GIF or WebP picture.",
   "chat.emoji.keepGif": "Keep animation",
   "chat.emoji.keepGifHint": "Uses the GIF as it is, moving, without cropping",
+  "chat.embed.modLink": "A mod or modpack",
+  "chat.embed.openMod": "Open",
+  "chat.embed.downloads": "{n} downloads",
 } as const

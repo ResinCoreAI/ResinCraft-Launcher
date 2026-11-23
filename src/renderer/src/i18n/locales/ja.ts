@@ -6128,6 +6128,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "絵文字は PNG、JPEG、GIF、WebP の画像です。",
   "chat.emoji.keepGif": "アニメーションを保持",
   "chat.emoji.keepGifHint": "GIF を切り抜かずに、動くままで使います",
+  "chat.embed.modLink": "Mod またはモッドパック",
+  "chat.embed.openMod": "開く",
+  "chat.embed.downloads": "{n} ダウンロード",
 }
 
 export default dict

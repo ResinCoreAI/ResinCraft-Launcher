@@ -759,6 +759,65 @@
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
+/* A mod or modpack link: Discord's link card (an accent bar, the site, the name as a link, what it is, the logo). */
+.chat-embed.chat-modcard {
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 460px;
+  padding: 10px 12px 12px 14px;
+  border-left: 4px solid var(--accent);
+}
+.chat-modcard-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.chat-modcard-site {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.chat-modcard-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-modcard-title:hover {
+  text-decoration: underline;
+}
+.chat-modcard-desc {
+  font-size: 13px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.chat-modcard-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.chat-modcard-icon {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.chat-modcard-icon.blank {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
 .chat-embed.store {
   border-left-color: var(--data);
 }

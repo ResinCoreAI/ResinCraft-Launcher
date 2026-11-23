@@ -6184,6 +6184,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "อีโมจิต้องเป็นรูป PNG, JPEG, GIF หรือ WebP",
   "chat.emoji.keepGif": "เก็บภาพเคลื่อนไหว",
   "chat.emoji.keepGifHint": "ใช้ GIF ตามเดิม ยังขยับได้ ไม่ครอบตัด",
+  "chat.embed.modLink": "ม็อดหรือม็อดแพ็ก",
+  "chat.embed.openMod": "เปิด",
+  "chat.embed.downloads": "ดาวน์โหลด {n} ครั้ง",
 }
 
 export default dict

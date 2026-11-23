@@ -6118,6 +6118,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "表情是 PNG、JPEG、GIF 或 WebP 圖片。",
   "chat.emoji.keepGif": "保留動畫",
   "chat.emoji.keepGifHint": "按原樣使用 GIF，保持動畫，不裁切",
+  "chat.embed.modLink": "模組或模組包",
+  "chat.embed.openMod": "開啟",
+  "chat.embed.downloads": "{n} 次下載",
 }
 
 export default dict

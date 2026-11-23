@@ -6131,6 +6131,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "Emoji adalah gambar PNG, JPEG, GIF, atau WebP.",
   "chat.emoji.keepGif": "Pertahankan animasi",
   "chat.emoji.keepGifHint": "Memakai GIF apa adanya, tetap bergerak, tanpa dipotong",
+  "chat.embed.modLink": "Sebuah mod atau modpack",
+  "chat.embed.openMod": "Buka",
+  "chat.embed.downloads": "{n} unduhan",
 }
 
 export default dict

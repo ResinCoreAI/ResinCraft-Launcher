@@ -6190,6 +6190,9 @@ const dict: Dict = {
   "chat.emoji.fileType": "Эмодзи: картинка PNG, JPEG, GIF или WebP.",
   "chat.emoji.keepGif": "Сохранить анимацию",
   "chat.emoji.keepGifHint": "Использует GIF как есть, с анимацией, без обрезки",
+  "chat.embed.modLink": "Мод или сборка",
+  "chat.embed.openMod": "Открыть",
+  "chat.embed.downloads": "Загрузок: {n}",
 }
 
 export default dict

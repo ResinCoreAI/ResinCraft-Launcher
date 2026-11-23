@@ -1,9 +1,9 @@
 // Cards under a chat message: a ResinCraft Relay server address in the text (copy it, or join it from Quick join), a
-// Store item someone shared, and image links. Images load only when clicked, so the site they're on doesn't see who's
-// looking until then.
-import { useState } from 'react'
-import { Copy, ExternalLink, Image as ImageIcon, Play, Server, ShoppingBag } from 'lucide-react'
-import type { ChatEmbed, ChatMessage } from '@shared/types'
+// Store item someone shared, a mod or modpack share link (its card, as Discord shows it), and image links. Images
+// load only when clicked, so the site they're on doesn't see who's looking until then.
+import { useEffect, useState } from 'react'
+import { Copy, ExternalLink, Image as ImageIcon, Package, Play, Server, ShoppingBag } from 'lucide-react'
+import type { ChatEmbed, ChatMessage, ProjectHit } from '@shared/types'
 import { api } from '../../api'
 import { money } from '../../storeStatus'
 import { useStore } from '../../store'
@@ -11,6 +11,60 @@ import { t } from '../../i18n'
 
 const SERVER = /\b([a-z0-9][a-z0-9-]{0,62})\.rscraft\.resincore\.tech(?::\d{2,5})?\b/gi
 const IMAGE = /https?:\/\/[^\s<>"]+?\.(?:png|jpe?g|gif|webp)(?:\?[^\s<>"]*)?(?=[\s)>\]]|$)/gi
+/** A share link for a mod or modpack: the relay's page (https://rscraft.resincore.tech/mod/<id>) or resincraft://mod/<id>. */
+const MOD = /(?:https?:\/\/(?:[a-z0-9-]+\.)*rscraft\.resincore\.tech\/mod\/|resincraft:\/\/mod\/)([^\s<>"?#]+)/gi
+
+/** Projects looked up for cards, kept while the launcher runs (each link asks once). */
+const projects = new Map<string, Promise<ProjectHit | null>>()
+function projectOf(id: string): Promise<ProjectHit | null> {
+  let p = projects.get(id)
+  if (!p) {
+    p = api.content.details(id).then(
+      (d) => d,
+      () => null
+    )
+    projects.set(id, p)
+  }
+  return p
+}
+
+/** A mod or modpack link's card, like Discord's: the launcher, its name, what it is and its logo; Open goes to its page. */
+function ModCard({ id }: { id: string }) {
+  const { go } = useStore()
+  const [p, setP] = useState<ProjectHit | null | undefined>()
+  useEffect(() => {
+    let live = true
+    void projectOf(id).then((x) => live && setP(x))
+    return () => {
+      live = false
+    }
+  }, [id])
+  const open = () => go({ page: 'discover', project: id })
+  return (
+    <div className="chat-embed chat-modcard">
+      <div className="chat-modcard-text">
+        <span className="chat-modcard-site">ResinCraft Launcher</span>
+        <button className="chat-modcard-title" onClick={open}>
+          {p ? p.title : p === null ? t('chat.embed.modLink') : '…'}
+        </button>
+        {p?.description && <span className="chat-modcard-desc">{p.description}</span>}
+        <span className="chat-modcard-foot">
+          <button className="btn sm primary" onClick={open}>
+            {t('chat.embed.openMod')}
+          </button>
+          {!!p?.downloads && <span className="hint">{t('chat.embed.downloads', { n: new Intl.NumberFormat().format(p.downloads) })}</span>}
+        </span>
+      </div>
+      {p?.iconUrl ? (
+        <img className="chat-modcard-icon" src={p.iconUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
+      ) : (
+        <span className="chat-modcard-icon blank" aria-hidden>
+          <Package />
+        </span>
+      )}
+    </div>
+  )
+}
 
 function ServerCard({ address }: { address: string }) {
   const { go, toast } = useStore()
@@ -98,10 +152,14 @@ export default function Embeds({ m }: { m: ChatMessage }) {
   const text = m.body.replace(/```[\s\S]*?```/g, ' ')
   const servers = [...new Set([...text.matchAll(SERVER)].map((x) => x[0].toLowerCase()))].slice(0, 3)
   const images = [...new Set([...text.matchAll(IMAGE)].map((x) => x[0]))].slice(0, 3)
-  if (!shared && !servers.length && !images.length) return null
+  const mods = [...new Set([...text.matchAll(MOD)].map((x) => decodeURIComponent(x[1]).replace(/[).,!]+$/, '')))].filter(Boolean).slice(0, 3)
+  if (!shared && !servers.length && !images.length && !mods.length) return null
   return (
     <div className="chat-embeds">
       {shared?.type === 'store' && <StoreCard e={shared} />}
+      {mods.map((id) => (
+        <ModCard key={id} id={id} />
+      ))}
       {servers.map((a) => (
         <ServerCard key={a} address={a} />
       ))}
