@@ -1,5 +1,6 @@
 // ResinCraft Status (status.<relay domain>) on the launcher's Status page: what the team posted (incidents happening
-// now, planned maintenance), the relay's last 90 days as day bars, past incidents, and "Get email updates". The data
+// now, planned maintenance), each part's last 90 days as day bars in its group (website, relay, launcher), the last 14
+// days of posted incidents and of outages the checker noticed by itself, and "Get email updates", as the site shows them. The data
 // is the service's own status.json, fetched by the engine (statussite.rs); the email sign-up uses its own flow (it
 // sends a link to confirm).
 import { useState } from 'react'
@@ -34,16 +35,53 @@ const LEVEL: Record<string, Key> = {
   major: 'status.site.level.major',
   unknown: 'status.site.level.unknown'
 }
-/** The service's parts by id, in the launcher's words (the same parts "Report a problem" lists). */
+/** The service's parts by id, in the launcher's words (the first seven are the parts "Report a problem" lists). */
 const PART: Record<string, Key> = {
   website: 'report.service.website',
   tools: 'report.service.tools',
   java: 'report.service.java',
+  bedrock: 'status.site.part.bedrock',
   agents: 'report.service.agents',
   list: 'report.service.list',
   console: 'report.service.console',
+  dashboard: 'status.site.part.dashboard',
+  chat: 'status.site.part.chat',
+  files: 'status.site.part.files',
+  inbox: 'status.site.part.inbox',
+  share: 'status.site.part.share',
   payments: 'report.service.payments'
 }
+/** What each part covers, in the launcher's words; a part the launcher doesn't know yet shows the site's own line. */
+const ABOUT: Record<string, Key> = {
+  website: 'status.site.about.website',
+  tools: 'status.site.about.tools',
+  java: 'status.site.about.java',
+  bedrock: 'status.site.about.bedrock',
+  agents: 'status.site.about.agents',
+  list: 'status.site.about.list',
+  console: 'status.site.about.console',
+  dashboard: 'status.site.about.dashboard',
+  chat: 'status.site.about.chat',
+  files: 'status.site.about.files',
+  inbox: 'status.site.about.inbox',
+  share: 'status.site.about.share',
+  payments: 'status.site.about.payments'
+}
+/** A group's heading: the products keep their names. */
+const groupName = (g: string) => (g === 'Website' ? t('status.site.group.website') : g)
+/** A group's uptime: the average of its parts', as the site works it out. */
+function groupUptime(parts: StatusSitePart[]): string | null {
+  const u = parts.map((c) => c.uptime).filter((x): x is number => typeof x === 'number')
+  return u.length ? (u.reduce((a, b) => a + b, 0) / u.length).toFixed(2) : null
+}
+/** "2 min", "6 h 55 min". */
+function duration(ms: number): string {
+  const min = Math.max(1, Math.round(ms / 60_000))
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return h === 0 ? t('status.site.dur.min', { n: min }) : m === 0 ? t('status.site.dur.h', { h }) : t('status.site.dur.hm', { h, m })
+}
+const clock = (ms: number) => new Date(ms).toLocaleTimeString(currentLanguage(), { hour: '2-digit', minute: '2-digit' })
 
 const word = (map: Record<string, Key>, v: string) => (map[v] ? t(map[v]) : v)
 const at = (ms: number) => new Date(ms).toLocaleString(currentLanguage(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -51,8 +89,25 @@ const dayName = (k: string) => new Date(`${k}T12:00:00Z`).toLocaleDateString(cur
 
 /** A part's name in the launcher's words: by id, or by the English name the service gives an incident's parts. */
 function partName(site: StatusSite, nameOrId: string): string {
-  const id = PART[nameOrId] ? nameOrId : site.components.find((c) => c.name === nameOrId)?.id
-  return id && PART[id] ? t(PART[id]) : nameOrId
+  const part = site.components.find((c) => c.id === nameOrId || c.name === nameOrId)
+  const id = PART[nameOrId] ? nameOrId : part?.id
+  return id && PART[id] ? t(PART[id]) : part?.name || nameOrId
+}
+
+/** An outage the checker noticed by itself (two failed checks in a row): which part, how long, what it saw. */
+function Outage({ site, o }: { site: StatusSite; o: StatusSite['outages'][number] }) {
+  const span = o.end
+    ? `${t('status.site.span', { from: clock(o.start), to: clock(o.end) })} · ${duration(o.end - o.start)}`
+    : t('status.site.soFar', { time: clock(o.start), duration: duration(Date.now() - o.start) })
+  return (
+    <div className={`ss-out ${o.end ? '' : 'on'}`}>
+      <b>{t('status.site.wasDown', { name: partName(site, o.name) })}</b>
+      <span className="faint">
+        {span}
+        {o.note && <> · {o.note}</>} · {t('status.site.auto')}
+      </span>
+    </div>
+  )
 }
 
 /** An incident's colour: its impact, or maintenance. */
@@ -141,58 +196,102 @@ function dayTip(k: string, d: StatusSitePart['daily'][number]): string {
 
 /** The relay's last 90 days (day bars per part), past incidents, and email updates: below the checks. */
 export function StatusSiteHistory({ site, error }: { site?: StatusSite; error?: string }) {
-  const [past, setPast] = useState(5)
+  const [shown, setShown] = useState(7)
   const base = 'https://status.rscraft.resincore.tech/'
   if (!site) {
     return error ? <p className="hint ss-unreachable">{t('status.site.unreachable')}</p> : null
   }
+  // The parts in their groups, in the site's order.
+  const groups: { name: string; parts: StatusSitePart[] }[] = []
+  for (const c of site.components) {
+    let g = groups.find((x) => x.name === (c.group || ''))
+    if (!g) groups.push((g = { name: c.group || '', parts: [] }))
+    g.parts.push(c)
+  }
+  // The last 14 days, newest first: what the team posted and what the checker noticed, each on the day it began.
   const ended = site.incidents.filter((i) => !i.on && !i.upcoming)
+  const days = Array.from({ length: 14 }, (_, n) => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - n)
+    const from = d.getTime()
+    const to = from + 86_400_000
+    return {
+      from,
+      posted: ended.filter((x) => x.start >= from && x.start < to),
+      auto: (site.outages ?? []).filter((o) => o.start >= from && o.start < to).sort((a, b) => b.start - a.start)
+    }
+  })
   return (
     <section className="ss-history">
       <div className="ss-history-head">
         <div>
-          <h2 className="st-group-title">{t('status.site.history')}</h2>
-          <p className="hint">{t('status.site.historyLead')}</p>
+          <h2 className="st-group-title">{t('status.site.historyAll')}</h2>
+          <p className="hint">
+            {t('status.site.historyLead')}
+            {typeof site.online === 'number' && <> {t('status.site.online', { count: site.online })}</>}
+          </p>
         </div>
         <button className="btn sm ghost" onClick={() => void api.app.openExternal(base)}>
           <ExternalLink /> {t('status.site.open')}
         </button>
       </div>
-      <div className="card ss-parts">
-        {site.components.map((c) => (
-          <div key={c.id} className="ss-part">
-            <div className="ss-part-head">
-              <b>{partName(site, c.id)}</b>
-              <span className={`ss-level ss-l-${c.state}`}>{word(LEVEL, c.state)}</span>
-              {c.uptime != null && <span className="faint mono">{t('status.site.uptime', { uptime: c.uptime })}</span>}
-            </div>
-            <div className="ss-bars" role="img" aria-label={t('status.site.barsLabel', { name: partName(site, c.id) })}>
-              {c.daily.map((d, i) => (
-                <span key={site.days[i] ?? i} className={`ss-bar ss-b-${dayTone(d)}`} title={dayTip(site.days[i] ?? '', d)} />
-              ))}
+      {groups.map((g) => {
+        const up = groupUptime(g.parts)
+        return (
+          <div key={g.name} className="card ss-parts">
+            {g.name && (
+              <div className="ss-group-head">
+                <h3>{groupName(g.name)}</h3>
+                {up && <span className="mono">{t('status.site.uptime', { uptime: up })}</span>}
+              </div>
+            )}
+            {g.parts.map((c) => (
+              <div key={c.id} className="ss-part">
+                <div className="ss-part-head">
+                  <b>{partName(site, c.id)}</b>
+                  <span className={`ss-level ss-l-${c.state}`}>{word(LEVEL, c.state)}</span>
+                  {c.uptime != null && <span className="faint mono">{t('status.site.uptime', { uptime: c.uptime })}</span>}
+                </div>
+                {(ABOUT[c.id] || c.about) && <p className="ss-about">{ABOUT[c.id] ? t(ABOUT[c.id]) : c.about}</p>}
+                <div className="ss-bars" role="img" aria-label={t('status.site.barsLabel', { name: partName(site, c.id) })}>
+                  {c.daily.map((d, i) => (
+                    <span key={site.days[i] ?? i} className={`ss-bar ss-b-${dayTone(d)}`} title={dayTip(site.days[i] ?? '', d)} />
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="ss-axis faint">
+              <span>{t('status.site.daysAgo')}</span>
+              <span>{t('status.site.today')}</span>
             </div>
           </div>
-        ))}
-        <div className="ss-axis faint">
-          <span>{t('status.site.daysAgo')}</span>
-          <span>{t('status.site.today')}</span>
-        </div>
-      </div>
+        )
+      })}
 
       <h2 className="st-group-title ss-past-title">{t('status.site.past')}</h2>
-      {ended.length === 0 ? (
-        <p className="hint">{t('status.site.noPast')}</p>
-      ) : (
-        <>
-          {ended.slice(0, past).map((i) => (
-            <Incident key={i.id} site={site} inc={i} past />
-          ))}
-          {ended.length > past && (
-            <button className="btn sm" onClick={() => setPast(past + 10)}>
-              {t('status.site.more')}
-            </button>
+      <p className="hint ss-past-lead">{t('status.site.pastLead')}</p>
+      {days.slice(0, shown).map((d) => (
+        <div key={d.from} className="ss-day">
+          <h3>{new Date(d.from).toLocaleDateString(currentLanguage(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</h3>
+          {d.posted.length || d.auto.length ? (
+            <>
+              {d.posted.map((i) => (
+                <Incident key={i.id} site={site} inc={i} past />
+              ))}
+              {d.auto.map((o) => (
+                <Outage key={`${o.name}-${o.start}`} site={site} o={o} />
+              ))}
+            </>
+          ) : (
+            <p className="hint ss-none">{t('status.site.noIncidents')}</p>
           )}
-        </>
+        </div>
+      ))}
+      {shown < days.length && (
+        <button className="btn sm" onClick={() => setShown(days.length)}>
+          {t('status.site.more')}
+        </button>
       )}
 
       {site.features?.subscribe && <Subscribe />}

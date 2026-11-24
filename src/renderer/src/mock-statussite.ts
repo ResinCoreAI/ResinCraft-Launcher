@@ -10,9 +10,15 @@ const PARTS: Record<string, string> = {
   website: 'Website',
   tools: 'Minecraft tools',
   java: 'Joining servers',
+  bedrock: 'Bedrock joining',
   agents: 'Hosting from the launcher',
   list: 'Server list and join pages',
   console: 'Web console',
+  dashboard: 'Admin dashboard',
+  chat: 'Chat and friends',
+  files: 'Chat files and Drive',
+  inbox: 'Inbox and notices',
+  share: 'Mod share links',
   payments: 'Store and payments'
 }
 const LEVELS: Record<string, string> = {
@@ -22,7 +28,7 @@ const LEVELS: Record<string, string> = {
   partial: 'Partial outage',
   major: 'Major outage'
 }
-const GROUP: Record<string, string> = { website: 'Website', tools: 'Website' }
+const GROUP: Record<string, string> = { website: 'Website', tools: 'Website', chat: 'ResinCraft Launcher', files: 'ResinCraft Launcher', inbox: 'ResinCraft Launcher', share: 'ResinCraft Launcher', payments: 'ResinCraft Launcher' }
 const ABOUT: Record<string, string> = {
   website: 'rscraft.resincore.tech, the features page and the guide.',
   tools: 'The MOTD, banner, gradient and other tools.',
@@ -141,7 +147,13 @@ function site(): StatusSite {
     updated: now,
     days,
     components,
-    outages: [{ name: 'Server list and join pages', start: now - 6 * DAY - 4 * HOUR, end: now - 6 * DAY - 2 * HOUR, note: 'HTTP 502' }],
+    online: 3,
+    outages: [
+      { name: 'Joining servers', start: now - DAY - 2 * HOUR, end: now - DAY - 2 * HOUR + 2 * 60_000, note: 'refused' },
+      { name: 'Hosting from the launcher', start: now - DAY - 2 * HOUR, end: now - DAY - 2 * HOUR + 2 * 60_000, note: 'relay not answering' },
+      { name: 'Web console', start: now - 2 * DAY - 9 * HOUR, end: now - 2 * DAY - 2 * HOUR - 5 * 60_000, note: 'timed out' },
+      { name: 'Server list and join pages', start: now - 6 * DAY - 4 * HOUR, end: now - 6 * DAY - 2 * HOUR, note: 'HTTP 502' }
+    ],
     incidents: out,
     features: { subscribe: true, reportEmail: true }
   }

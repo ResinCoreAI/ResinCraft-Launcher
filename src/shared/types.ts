@@ -2289,6 +2289,11 @@ export interface StatusSiteIncident {
 /** status.json, as ResinCraft Status's own page reads it (written by its monitor.js every minute). */
 export interface StatusSite {
   updated: number
+  /** When the checker started (ms); how often it checks (s). */
+  since?: number
+  every?: number
+  /** Servers online through the relay right now. */
+  online?: number
   /** UTC days, oldest first (90). */
   days: string[]
   components: StatusSitePart[]
