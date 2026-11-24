@@ -269,7 +269,8 @@ function KeyButton({ value, clash, disabled, label, onChange }: { value: string;
  * written until Save, and not while the game runs (it writes the file itself when it closes).
  */
 export default function GameOptionsTab({ inst }: { inst: Instance }) {
-  const { games, toast } = useStore()
+  const { games, toast, settings } = useStore()
+  const synced = inst.loader !== 'horizon' && (inst.syncSettings ?? settings?.syncSettings ?? false)
   const root = useMemo<FileRoot>(() => ({ kind: 'instance', id: inst.id }), [inst.id])
   const [lines, setLines] = useState<Line[]>()
   /** The file's last-modified time when it was read, or undefined when there is no file yet. */
@@ -318,7 +319,9 @@ export default function GameOptionsTab({ inst }: { inst: Instance }) {
       const done = await api.files.writeText(root, FILE, write(lines), modified == null ? { create: true } : { expectModified: modified })
       setModified(done.modified)
       setDirty(false)
-      toast(t('options.saved'))
+      toast(t(synced ? 'gameSync.options.saved' : 'options.saved'))
+      // Shared game settings: what changed here goes to the other instances now, not at this one's next start.
+      if (synced) void api.instances.syncSettingsNow(inst.id).catch(() => undefined)
     } catch (e) {
       toast((e as Error).message, 'error')
       // Most likely the file changed underneath (the game closed): show what is there now.
@@ -436,6 +439,7 @@ export default function GameOptionsTab({ inst }: { inst: Instance }) {
         </button>
       </div>
       {running && <div className="callout">{t('options.running')}</div>}
+      {synced && <div className="callout">{t('gameSync.options.shared')}</div>}
       {!running && modified == null && <div className="callout">{t('options.none')}</div>}
 
       <div className="gopt-bar">

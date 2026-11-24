@@ -99,6 +99,7 @@ pub async fn create(data: NewInstance, extra: impl FnOnce(&mut Instance)) -> Res
         liteloader: None,
         jar_mods: Vec::new(),
         version_patch: None,
+        sync_settings: None,
     };
     extra(&mut inst);
     tokio::fs::create_dir_all(paths::game_dir(&id)).await?;

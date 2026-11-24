@@ -101,6 +101,13 @@ pub struct Settings {
     pub env: Vec<EnvVar>,
     /// Pre-launch, wrapper and post-exit commands for instances without their own (Settings → Commands).
     pub commands: LaunchCommands,
+    /// Game settings (options.txt) shared by every instance, as the Modrinth App does (an instance can choose its own;
+    /// see player/settingsync.rs). Off by default.
+    pub sync_settings: bool,
+    /// With it: the server list, command history and creative hotbars are shared too.
+    pub sync_servers: bool,
+    pub sync_command_history: bool,
+    pub sync_hotbars: bool,
 }
 
 pub fn total_memory_mb() -> u64 {
@@ -157,6 +164,10 @@ impl Default for Settings {
             defaults_version: DEFAULTS_VERSION,
             env: Vec::new(),
             commands: LaunchCommands::default(),
+            sync_settings: false,
+            sync_servers: true,
+            sync_command_history: true,
+            sync_hotbars: true,
         }
     }
 }

@@ -54,7 +54,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       showItem: fn('app:showItem'),
       pathForFile
     },
-    settings: { get: fn('settings:get'), set: fn('settings:set'), reset: fn('settings:reset') },
+    settings: { get: fn('settings:get'), set: fn('settings:set'), reset: fn('settings:reset'), syncInfo: fn('settings:syncInfo'), syncFrom: fn('settings:syncFrom') },
     storage: {
       info: fn('storage:info'),
       drives: fn('storage:drives'),
@@ -147,6 +147,9 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       reinstall: fn('instances:reinstall'),
       setVersion: fn('instances:setVersion'),
       copyFrom: fn('instances:copyFrom'),
+      ownSettings: fn('instances:ownSettings'),
+      restoreOwnSettings: fn('instances:restoreOwnSettings'),
+      syncSettingsNow: fn('instances:syncSettingsNow'),
       resetIcon: fn('instances:resetIcon'),
       setImage: fn('instances:setImage'),
       remove: fn('instances:remove'),

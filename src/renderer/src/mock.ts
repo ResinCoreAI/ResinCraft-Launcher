@@ -1,5 +1,5 @@
 // A fake backend so the UI can be designed and previewed in a normal browser (npm run dev, then open the Vite URL).
-import type { AccountView, BackupFormat, ContentItem,Instance, McVersion, ProjectHit, RemoteGrant, ResinApi, Settings } from '@shared/types'
+import type { AccountView, BackupFormat, ContentItem,Instance, McVersion, ProjectHit, RemoteGrant, ResinApi, Settings, SyncInfo } from '@shared/types'
 import { mockInstanceTabs } from './mock-instance-tabs'
 import { mockEngine } from './mock-engine'
 import { mockProfile } from './mock-profile'
@@ -159,8 +159,15 @@ export function mockApi(): ResinApi {
     discordShowServer: false,
     discordInLauncher: true,
     env: [],
-    commands: { preLaunch: '', wrapper: '', postExit: '' }
+    commands: { preLaunch: '', wrapper: '', postExit: '' },
+    syncSettings: false,
+    syncServers: true,
+    syncCommandHistory: true,
+    syncHotbars: true
   }
+  // Shared game settings (player/settingsync.rs): nothing until an instance is played or picked.
+  let syncInfo: SyncInfo = { settings: 0, files: [], from: '', updated: 0 }
+  const ownSettings = new Set<string>()
   const defaultSettings: Settings = { ...settings }
   const versions: McVersion[] = [
     { id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' },
@@ -345,7 +352,15 @@ export function mockApi(): ResinApi {
       get: () => wait(settings, 0),
       set: (p) => wait((settings = { ...settings, ...p }), 150),
       // Like settings.rs reset(): back to the defaults, the player's own themes kept.
-      reset: () => wait((settings = { ...defaultSettings, customThemes: settings.customThemes }), 150)
+      reset: () => wait((settings = { ...defaultSettings, customThemes: settings.customThemes }), 150),
+      syncInfo: () => wait(syncInfo, 80),
+      syncFrom: (id) => {
+        const inst = instances.find((i) => i.id === id)!
+        syncInfo = { settings: 112, files: ['servers.dat', 'command_history.txt'], from: inst.name, updated: Date.now() }
+        // Every other instance kept its own settings when it joined.
+        instances.filter((i) => i.id !== id).forEach((i) => ownSettings.add(i.id))
+        return wait(syncInfo, 400)
+      }
     },
     storage: mockStorage(),
     // The preview can't open file dialogs: it pretends a backup was saved, and that one was picked.
@@ -422,6 +437,12 @@ export function mockApi(): ResinApi {
         const copy: Instance = { ...src, id: String(Date.now()), name: `${src.name} (copy)`, createdAt: Date.now(), playtime: 0, lastPlayed: undefined }
         instances = [copy, ...instances]
         return copy
+      },
+      ownSettings: (id) => wait(ownSettings.has(id), 60),
+      syncSettingsNow: () => wait(1, 100),
+      restoreOwnSettings: async (id) => {
+        await wait(null, 300)
+        ownSettings.delete(id)
       },
       copyFrom: (_id, _from, picks) =>
         wait(

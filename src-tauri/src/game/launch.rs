@@ -1076,6 +1076,21 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
 
     let game_dir = paths::game_dir(id);
     let _ = tokio::fs::create_dir_all(&game_dir).await;
+    // Game settings shared with other instances go in now (a second run of the instance finds them there already).
+    if slot == 1 {
+        match crate::player::settingsync::before_launch(&inst, settings).await {
+            Ok(Some(synced)) => push(LogLine {
+                text: if synced.first {
+                    format!("Game settings are shared with the other instances from now on ({} settings); this instance's own were kept", synced.settings)
+                } else {
+                    format!("Game settings synced from the other instances ({} settings)", synced.settings)
+                },
+                level: "info",
+            }),
+            Ok(None) => {}
+            Err(e) => push(LogLine { text: format!("Game settings couldn't be synced: {e}"), level: "warn" }),
+        }
+    }
     let pre_launch = own.pre_launch.trim().to_string();
     if !pre_launch.is_empty() {
         push(LogLine { text: format!("Running pre-launch command: {pre_launch}"), level: "info" });
@@ -1254,6 +1269,14 @@ pub async fn launch_instance_to(id: &str, settings: &Settings, auth: LaunchAuth,
                 Err(e) => LogLine { text: format!("Post-exit command didn't run: {e}"), level: "error" },
             };
             push(line);
+        }
+        // What the player changed in the game's settings goes to the other instances (once the last run closed).
+        if !running_instances().contains(&id) {
+            match crate::player::settingsync::after_exit(&id).await {
+                Ok(0) => {}
+                Ok(n) => push(LogLine { text: format!("{n} changed game settings were shared with the other instances"), level: "info" }),
+                Err(e) => push(LogLine { text: format!("Game settings couldn't be synced: {e}"), level: "warn" }),
+            }
         }
         flush();
         ticker.abort();

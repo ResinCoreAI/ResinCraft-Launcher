@@ -10,6 +10,7 @@ import type { Key } from './i18n'
 export const SETTING_SECTIONS: { id: string; label: Key }[] = [
   { id: 'appearance', label: 'settings.nav.appearance' },
   { id: 'game', label: 'settings.nav.game' },
+  { id: 'sync', label: 'gameSync.title' },
   { id: 'java', label: 'settings.nav.java' },
   { id: 'commands', label: 'commands.nav' },
   { id: 'downloads', label: 'settings.nav.downloads' },
@@ -48,6 +49,12 @@ export const SETTINGS_INDEX: { label: Key; hint?: Key; section: string }[] = [
   { label: 'settings.discord', section: 'game' },
   { label: 'settings.discordServer', hint: 'settings.discordServer.hint', section: 'game' },
   { label: 'settings.discordLauncher', hint: 'settings.discordLauncher.hint', section: 'game' },
+
+  { label: 'gameSync.share', hint: 'gameSync.share.hint', section: 'sync' },
+  { label: 'gameSync.servers', hint: 'gameSync.servers.hint', section: 'sync' },
+  { label: 'gameSync.history', hint: 'gameSync.history.hint', section: 'sync' },
+  { label: 'gameSync.hotbars', hint: 'gameSync.hotbars.hint', section: 'sync' },
+  { label: 'gameSync.startFrom', section: 'sync' },
 
   { label: 'settings.autoJava', hint: 'settings.autoJava.hint', section: 'java' },
   { label: 'settings.javaToUse', section: 'java' },

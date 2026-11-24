@@ -687,4 +687,6 @@ export default {
   "engine.chat.saveTitle": "Save the file",
   "engine.servers.admin.drive.pickTitle": "Upload to the Drive",
   "engine.chat.uploadTooBig": "That file is too big for ResinCraft Relay right now.",
+  'engine.settingsSync.closeFirst': 'Close {name} before you put its own settings back',
+  'engine.settingsSync.noOwn': '{name} has no settings of its own kept',
 }

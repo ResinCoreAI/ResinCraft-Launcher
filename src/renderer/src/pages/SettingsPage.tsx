@@ -10,6 +10,7 @@ import { ThemePicker } from '../components/ThemePicker'
 import { RemoteControlSection } from '../components/RemoteControl'
 import { McpSection } from '../components/McpSection'
 import { BackupSection } from '../components/Backup'
+import { SettingsSyncSection } from '../components/SettingsSync'
 import { UpdatesSection } from '../components/Updates'
 import { PackUpdatesSetting } from '../components/PackUpdates'
 import { NativeCacheSection } from '../components/HorizonNative'
@@ -544,6 +545,8 @@ export default function SettingsPage() {
               )}
             </div>
           </section>
+
+          <SettingsSyncSection />
 
           <section className="settings-section" id="java">
             <h3>{t('settings.nav.java')}</h3>

@@ -208,6 +208,9 @@ pub struct Instance {
     /// The player's own changes to the version the game starts with (instance settings → Version).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version_patch: Option<VersionPatch>,
+    /// Game settings shared with the other instances (player/settingsync.rs); None follows Settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_settings: Option<bool>,
 }
 
 /// One environment variable the player set for the game and its commands.

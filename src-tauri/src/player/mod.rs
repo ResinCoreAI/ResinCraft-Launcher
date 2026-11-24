@@ -16,6 +16,7 @@ pub mod profile;
 pub mod quickjoin;
 pub mod screenshots;
 pub mod servers;
+pub mod settingsync;
 pub mod skins;
 pub mod worlds;
 

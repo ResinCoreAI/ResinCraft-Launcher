@@ -76,6 +76,7 @@ import { VersionSection } from '../components/VersionSettings'
 import { HorizonBuildSection } from '../components/HorizonBuild'
 import { NativeBuildBar } from '../components/HorizonNative'
 import { GameMemoryChip } from '../components/Memory'
+import { InstanceSettingsSync } from '../components/SettingsSync'
 import { Send } from 'lucide-react'
 import { sendProject, sendToChat } from '../components/chat/SendToChat'
 
@@ -1040,6 +1041,8 @@ function SettingsTab({ inst }: { inst: Instance }) {
       </div>
 
       <InstanceController inst={inst} />
+
+      <InstanceSettingsSync inst={inst} />
 
       {inst.modpack && !inst.ownPack && <PackVersionSetting owner={instanceOwner(inst, games)} />}
 

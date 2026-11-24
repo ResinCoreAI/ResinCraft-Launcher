@@ -146,6 +146,22 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "instances:copyFrom" => json(
             crate::player::carry::copy_from(&args.get::<String>(0)?, &args.get::<String>(1)?, args.get::<crate::player::carry::CopyPicks>(2)?).await?,
         ),
+        // Game settings shared by every instance (player/settingsync.rs).
+        "instances:ownSettings" => json(crate::player::settingsync::has_own(&args.get::<String>(0)?).await),
+        "instances:restoreOwnSettings" => {
+            crate::player::settingsync::restore_own(&args.get::<String>(0)?).await?;
+            done()
+        }
+        "instances:syncSettingsNow" => {
+            let id: String = args.get(0)?;
+            if crate::game::running_ids().contains(&id) {
+                json(0)
+            } else {
+                json(crate::player::settingsync::after_exit(&id).await?)
+            }
+        }
+        "settings:syncInfo" => json(crate::player::settingsync::info().await),
+        "settings:syncFrom" => json(crate::player::settingsync::start_from(&args.get::<String>(0)?).await?),
         "instances:setImage" => {
             let id: String = args.get(0)?;
             crate::player::files::instance_root(&id).await?;

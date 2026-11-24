@@ -138,6 +138,8 @@ export interface Instance {
   jarMods?: JarMod[]
   /** The player's own changes to the version the game starts with (instance settings → Version). */
   versionPatch?: VersionPatch
+  /** Game settings shared with the other instances; unset follows Settings. */
+  syncSettings?: boolean
 }
 
 /** One environment variable for the game and its commands. */
@@ -252,6 +254,8 @@ export type InstancePatch = Partial<Pick<Instance, 'name' | 'color' | 'loaderVer
   env?: EnvVar[] | null
   /** `null` goes back to the commands in Settings. */
   commands?: LaunchCommands | null
+  /** `null` follows Settings again. */
+  syncSettings?: boolean | null
 }
 
 export interface McVersion {
@@ -482,6 +486,23 @@ export interface Settings {
   env: EnvVar[]
   /** Pre-launch, wrapper and post-exit commands for instances without their own. */
   commands: LaunchCommands
+  /** Game settings (options.txt) shared by every instance, as the Modrinth App does (an instance can choose its own). */
+  syncSettings: boolean
+  /** With it: the server list, command history and creative hotbars are shared too. */
+  syncServers: boolean
+  syncCommandHistory: boolean
+  syncHotbars: boolean
+}
+
+/** What the shared game settings hold (Settings → Sync game settings). */
+export interface SyncInfo {
+  /** Shared options.txt and OptiFine settings. */
+  settings: number
+  /** Shared whole files: servers.dat, command_history.txt, hotbar.nbt. */
+  files: string[]
+  /** The instance that changed something last, and when (0: nothing shared yet). */
+  from: string
+  updated: number
 }
 
 export type ModSourcePreference = 'ask' | 'modrinth' | 'curseforge'
@@ -3033,6 +3054,10 @@ export interface ResinApi {
     set(patch: Partial<Settings>): Promise<Settings>
     /** Every setting back to its default; the player's own themes stay. */
     reset(): Promise<Settings>
+    /** What the shared game settings hold. */
+    syncInfo(): Promise<SyncInfo>
+    /** The shared game settings become this instance's (everything shared before is replaced). */
+    syncFrom(id: string): Promise<SyncInfo>
   }
   /** Where instances and game files are kept, and moving them (Settings → Storage). */
   storage: {
@@ -3219,6 +3244,12 @@ export interface ResinApi {
      * the ones there (renamed when taken), packs only when missing; settings replace this instance's.
      */
     copyFrom(id: string, fromId: string, picks: CopyPicks): Promise<CopyResult>
+    /** Whether the settings the instance had before it was first synced are kept. */
+    ownSettings(id: string): Promise<boolean>
+    /** Puts those settings back (once sync is off for it; the game must be closed). */
+    restoreOwnSettings(id: string): Promise<void>
+    /** Takes what changed in the instance's game settings (Game options tab) into the shared ones; how many changed. */
+    syncSettingsNow(id: string): Promise<number>
     /** Drops a custom icon (see screenshots.setIcon): back to the modpack's icon, or the generated block art. */
     resetIcon(id: string): Promise<Instance>
     /** Sets a picture the player chose (a cropped image as a data URL), or removes it with null. */
