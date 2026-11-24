@@ -6252,6 +6252,16 @@ const dict: Dict = {
   "status.site.about.inbox": "Письма от ResinCraft и уведомления в лаунчере.",
   "status.site.about.share": "Ссылки на моды и сборки на rscraft.resincore.tech/mod/…",
   "status.site.about.payments": "Покупки и подтверждения оплаты от Stripe.",
+  "chat.emoji.manage": "Управлять эмодзи",
+  "chat.emoji.managerTitle": "Эмодзи",
+  "chat.emoji.managerLead": "Эмодзи ваших групп работают в любом чате: с друзьями и в других группах. Напишите :имя: или выберите кнопкой эмодзи.",
+  "chat.emoji.noGroups": "Эмодзи групп пока нет",
+  "chat.emoji.noGroupsHint": "Эмодзи группы добавляют её владелец и администраторы. Создайте группу или вступите в неё.",
+  "chat.emoji.ofMax": "{count}/{max}",
+  "chat.emoji.noneYet": "В этой группе пока нет эмодзи.",
+  "chat.emoji.rename": "Переименовать",
+  "chat.emoji.copyName": "Копировать имя",
+  "chat.emoji.copied": "Скопировано: {name}",
 }
 
 export default dict

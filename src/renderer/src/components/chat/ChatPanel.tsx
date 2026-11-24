@@ -36,6 +36,8 @@ import { currentLanguage, t, type Key } from '../../i18n'
 import { ConfirmModal, Empty, openContextMenu, type ContextEntry } from '../ui'
 import ChatText from './ChatText'
 import EmojiPicker from './EmojiPicker'
+import EmojiManager from './EmojiManager'
+import { forEditing, plainEmoji, withEmojiFiles } from './chatEmoji'
 import GiftModal from './GiftModal'
 import Embeds from './Embeds'
 import { GroupPanel, GroupTile, NewGroupModal, SystemNote } from './ChatGroups'
@@ -85,7 +87,7 @@ function snippet(m: ChatMessage | undefined, me: string): string {
   const files = m.data && 'files' in m.data ? m.data.files ?? [] : []
   if (!m.body && files.length) return who + (files.some((f) => f.kind === 'voice') ? t('chat.voice.line') : files.every((f) => f.kind === 'image') ? t('chat.files.pictureLine') : t('chat.files.fileLine'))
   if (!m.body && m.data && 'embed' in m.data && m.data.embed) return who + m.data.embed.name
-  return who + m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
+  return who + plainEmoji(m.body).replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -326,8 +328,10 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
   const ready = pending.filter((x) => x.file).map((x) => x.file!)
   const uploading = pending.some((x) => !x.file && !x.error)
   const send = async () => {
-    const body = text.trim()
-    if ((!body && !ready.length) || !open || (!peer && !group) || sending || uploading) return
+    const typed = text.trim()
+    if ((!typed && !ready.length) || !open || (!peer && !group) || sending || uploading) return
+    // Emoji of your other groups go as <:name:file>, so they show in this chat too.
+    const body = withEmojiFiles(typed, open, v.groups, picked.current)
     setSending(true)
     try {
       if (editing) await chat.edit(editing.id, body)
@@ -338,6 +342,7 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
       setText('')
       setReplyTo(null)
       setEditing(null)
+      picked.current.clear()
       pinned.current = true
     } catch (e) {
       fail(e)
@@ -361,7 +366,7 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
       if (mine) {
         e.preventDefault()
         setEditing(mine)
-        setText(mine.body)
+        setText(forEditing(mine.body, picked.current))
       }
     }
   }
@@ -425,6 +430,13 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
     }
   }
 
+  // Group emoji picked for this message: their files, so a name two groups share sends the one picked.
+  const picked = useRef(new Map<string, string>())
+  const [emojiManager, setEmojiManager] = useState(false)
+  const pickEmoji = (s: string, file?: string) => {
+    if (file) picked.current.set(s.slice(1, -1), file)
+    insert(s)
+  }
   const insert = (s: string) => {
     const el = box.current
     const a = el?.selectionStart ?? text.length
@@ -459,8 +471,8 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
     const mine = m.sender === v.me
     return [
       !m.deleted && { label: t('chat.reply'), icon: <Reply size={14} />, onSelect: () => (setEditing(null), setReplyTo(m), box.current?.focus()) },
-      !m.deleted && m.kind === 'text' && { label: t('chat.copyText'), icon: <Copy size={14} />, onSelect: () => void navigator.clipboard.writeText(m.body) },
-      mine && m.kind === 'text' && !m.deleted && { label: t('chat.edit'), icon: <Pencil size={14} />, onSelect: () => (setReplyTo(null), setEditing(m), setText(m.body), box.current?.focus()) },
+      !m.deleted && m.kind === 'text' && { label: t('chat.copyText'), icon: <Copy size={14} />, onSelect: () => void navigator.clipboard.writeText(plainEmoji(m.body)) },
+      mine && m.kind === 'text' && !m.deleted && { label: t('chat.edit'), icon: <Pencil size={14} />, onSelect: () => (setReplyTo(null), setEditing(m), setText(forEditing(m.body, picked.current)), box.current?.focus()) },
       mine &&
         m.kind === 'text' &&
         !m.deleted && {
@@ -977,7 +989,16 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
                       <Send />
                     </button>
                   )}
-                  {emoji && <EmojiPicker onPick={insert} onClose={() => setEmoji(false)} groupEmoji={group?.emoji} />}
+                  {emoji && (
+                    <EmojiPicker
+                      onPick={pickEmoji}
+                      onClose={() => setEmoji(false)}
+                      groups={v.groups}
+                      here={open ?? undefined}
+                      onManage={() => (setEmoji(false), setEmojiManager(true))}
+                    />
+                  )}
+                  {emojiManager && <EmojiManager onClose={() => setEmojiManager(false)} />}
                 </div>
                 )}
                 <span className="chat-hint hint">{t('chat.formatHint')}</span>

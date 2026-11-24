@@ -23,6 +23,28 @@ const names: Record<string, string> = { [ME]: 'Puirkle_Gamer', [STEVE]: 'SteveMi
 // Files the preview "stores": id → type and base64 bytes.
 const stored = new Map<string, { mime: string; data: string }>()
 let fileN = 0
+/** A group emoji for the preview: a coloured square with a letter or two. */
+function emojiPic(text: string, color: string): ChatFile {
+  const f = newFile('emoji', 'emoji.png', 'image/png', 900)
+  const c = new OffscreenCanvas(128, 128)
+  const g = c.getContext('2d')!
+  g.fillStyle = color
+  g.beginPath()
+  g.roundRect(8, 8, 112, 112, 28)
+  g.fill()
+  g.fillStyle = '#0b0b10'
+  g.font = 'bold 56px sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText(text, 64, 68)
+  void c.convertToBlob({ type: 'image/png' }).then((blob) => {
+    const r = new FileReader()
+    r.onload = () => stored.set(f.id, { mime: 'image/png', data: String(r.result).split(',')[1] })
+    r.readAsDataURL(blob)
+  })
+  return f
+}
+
 async function picture(color: string, w = 480, h = 300): Promise<string> {
   const c = new OffscreenCanvas(w, h)
   const g = c.getContext('2d')!
@@ -66,7 +88,8 @@ function tone(): string {
   return btoa(bin)
 }
 function newFile(kind: ChatFile['kind'], name: string, mime: string, size: number, extra: Partial<ChatFile> = {}): ChatFile {
-  return { id: `pf${++fileN}`, name, size, mime, kind, ...extra }
+  // As the relay names them: f and 20 hex digits (a group emoji in a message carries it, chatEmoji.ts).
+  return { id: `f${(++fileN).toString(16).padStart(20, '0')}`, name, size, mime, kind, ...extra }
 }
 const castle = newFile('image', 'castle.png', 'image/png', 182_000, { w: 480, h: 300 })
 const clip = newFile('voice', 'voice.webm', 'audio/wav', 8044, { duration: 1 })
@@ -104,7 +127,10 @@ const groups: ChatGroup[] = [
     created: now() - 86400 * 3,
     role: 'owner',
     invite: 'G-MX7Q-2RKA',
-    emoji: [],
+    emoji: [
+      { name: 'gg', file: emojiPic('gg', '#22c55e').id },
+      { name: 'diamond', file: emojiPic('◆', '#38bdf8').id }
+    ],
     members: [
       { uuid: ME, name: 'Puirkle_Gamer', role: 'owner', joined: now() - 86400 * 3, online: true, status: 'online' },
       { uuid: STEVE, name: 'SteveMines', role: 'admin', joined: now() - 86400 * 3, online: true, status: 'online' },
@@ -113,6 +139,21 @@ const groups: ChatGroup[] = [
   }
 ]
 add(CREW, ME, '', 86400 * 3, { kind: 'system', data: { event: 'created', by: ME, name: 'Build crew', who: [STEVE] } })
+const REDSTONE = 'g:7ed57013e7ed5701'
+groups.push({
+  conv: REDSTONE,
+  name: 'Redstone lab',
+  owner: STEVE,
+  created: now() - 86400 * 5,
+  role: 'member',
+  invite: null,
+  emoji: [{ name: 'creeper', file: emojiPic('C', '#4ade80').id }],
+  members: [
+    { uuid: STEVE, name: 'SteveMines', role: 'owner', joined: now() - 86400 * 5, online: true, status: 'online' },
+    { uuid: ME, name: 'Puirkle_Gamer', role: 'member', joined: now() - 86400 * 4, online: true, status: 'online' }
+  ]
+})
+add(REDSTONE, STEVE, 'piston door works :creeper:', 86400)
 add(CREW, ALEX, '', 86400 * 2, { kind: 'system', data: { event: 'joined', by: ALEX } })
 add(CREW, STEVE, 'server is up! join at puirkle.rscraft.resincore.tech', 5400)
 add(CREW, ALEX, 'look at this build https://i.imgur.com/example.png', 5000)
@@ -252,6 +293,14 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       add(conv, ME, '', 0, { kind: 'system', data: { event: 'nickname', by: ME, who: [String(b.uuid)], name: nick } })
       changed()
       return { nicknames }
+    }
+    case 'POST /api/chat/groups/emoji/rename': {
+      const g = groups.find((x) => x.conv === b.conv)!
+      const to = String(b.to).toLowerCase()
+      if (g.emoji?.some((e) => e.name === to)) throw new Error(`this group has a :${to}: already`)
+      for (const e of g.emoji ?? []) if (e.name === b.name) e.name = to
+      changed()
+      return { ok: true, groups }
     }
     case 'POST /api/chat/groups/emoji':
     case 'POST /api/chat/groups/emoji/remove': {

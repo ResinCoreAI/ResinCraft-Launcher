@@ -6185,6 +6185,16 @@ const dict: Dict = {
   "status.site.about.inbox": "ResinCraft에서 보낸 메일과 런처에 표시되는 공지.",
   "status.site.about.share": "rscraft.resincore.tech/mod/…의 모드와 모드팩 링크.",
   "status.site.about.payments": "구매와 Stripe의 결제 확인.",
+  "chat.emoji.manage": "이모지 관리",
+  "chat.emoji.managerTitle": "이모지",
+  "chat.emoji.managerLead": "그룹 이모지는 모든 채팅에서 쓸 수 있어요. 친구와의 채팅과 다른 그룹에서도요. :이름:을 입력하거나 이모지 버튼에서 고르세요.",
+  "chat.emoji.noGroups": "아직 그룹 이모지가 없어요",
+  "chat.emoji.noGroupsHint": "그룹 이모지는 그룹 소유자와 관리자가 추가해요. 그룹을 만들거나 참여하세요.",
+  "chat.emoji.ofMax": "{count}/{max}",
+  "chat.emoji.noneYet": "이 그룹에는 아직 이모지가 없어요.",
+  "chat.emoji.rename": "이름 바꾸기",
+  "chat.emoji.copyName": "이름 복사",
+  "chat.emoji.copied": "{name} 복사함",
 }
 
 export default dict

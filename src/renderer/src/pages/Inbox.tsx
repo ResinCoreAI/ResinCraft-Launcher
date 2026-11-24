@@ -2,6 +2,7 @@
 // and chats with friends and groups (components/chat), in one list. Laid out as a rail of filters and groups, the list,
 // and the open mail or chat (with the friend's profile or the group's members beside it).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { plainEmoji } from '../components/chat/chatEmoji'
 import { ArrowLeft, BellRing, Copy, Download, Eye, EyeOff, Gift, Inbox as InboxIcon, Mail, MailOpen, MessageCircle, MoreHorizontal, Plus, RefreshCw, Search, Trash2, Upload, UserPlus, X } from 'lucide-react'
 import type { ChatGiftData, ChatGroup, ChatMessage, ChatPerson, InboxData, InboxMessage, InboxReward } from '@shared/types'
 import { api } from '../api'
@@ -154,7 +155,7 @@ function chatLine(m: ChatMessage | undefined, me: string, conv: string, group: b
   const files = m.data && 'files' in m.data ? m.data.files ?? [] : []
   if (!m.body && files.length) return who + (files.some((f) => f.kind === 'voice') ? t('chat.voice.line') : files.every((f) => f.kind === 'image') ? t('chat.files.pictureLine') : t('chat.files.fileLine'))
   if (!m.body && m.data && 'embed' in m.data && m.data.embed) return who + m.data.embed.name
-  return who + m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
+  return who + plainEmoji(m.body).replace(/```[\s\S]*?```/g, '[code]').replace(/[*_~|`>]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 type Row =

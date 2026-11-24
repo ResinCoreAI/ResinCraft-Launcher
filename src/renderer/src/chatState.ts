@@ -2,6 +2,7 @@
 // so messages arrive as they're sent (relay chat.rs `sync?wait=1`), and keeps the launcher's own copy of the chats
 // (src-tauri chat.rs) in step. The Inbox's Chat tab reads it with useChat() and acts through `chat`.
 import { useEffect, useSyncExternalStore } from 'react'
+import { plainEmoji } from './components/chat/chatEmoji'
 import type { ChatEmbed, ChatFile, ChatFileKind, ChatFriends, ChatGiftOptions, ChatGiftsList, ChatGroup, ChatMessage, ChatPerson, ChatProfile, ChatStatus, ChatSync } from '@shared/types'
 import { api } from './api'
 import { setChatBadge } from './inboxState'
@@ -138,7 +139,7 @@ function popupTitle(m: ChatMessage): string {
 function popupText(m: ChatMessage): string {
   if (m.kind === 'gift') return t('chat.giftToast', { name: displayName(m.conv, m.sender) })
   const files = m.data && 'files' in m.data ? m.data.files ?? [] : []
-  const text = m.body.replace(/```[\s\S]*?```/g, '[code]').replace(/\|\|[\s\S]*?\|\|/g, '▒▒▒').replace(/[*_~`>]/g, '').replace(/\s+/g, ' ').trim()
+  const text = plainEmoji(m.body).replace(/```[\s\S]*?```/g, '[code]').replace(/\|\|[\s\S]*?\|\|/g, '▒▒▒').replace(/[*_~`>]/g, '').replace(/\s+/g, ' ').trim()
   if (text) return text
   if (files.some((f) => f.kind === 'voice')) return t('chat.voice.line')
   if (files.length) return files.every((f) => f.kind === 'image') ? t('chat.files.pictureLine') : t('chat.files.fileLine')
@@ -447,7 +448,7 @@ export const chat = {
     return r
   },
   /** rename {name}, add {members}, remove {uuid}, leave, role {uuid, role}, invite {reset?}. */
-  async group(action: 'rename' | 'add' | 'remove' | 'leave' | 'role' | 'invite' | 'emoji' | 'emoji/remove' | 'kick' | 'timeout' | 'untimeout' | 'ban' | 'unban', conv: string, extra: Record<string, unknown> = {}) {
+  async group(action: 'rename' | 'add' | 'remove' | 'leave' | 'role' | 'invite' | 'emoji' | 'emoji/rename' | 'emoji/remove' | 'kick' | 'timeout' | 'untimeout' | 'ban' | 'unban', conv: string, extra: Record<string, unknown> = {}) {
     const r = await call<{ groups: ChatGroup[]; code?: string }>('POST', `/api/chat/groups/${action}`, { conv, ...extra })
     set({ groups: r.groups, names: namesFrom(view.friends, view.names, r.groups), ...(action === 'leave' && view.open === conv ? { open: null } : {}) })
     return r

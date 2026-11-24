@@ -554,10 +554,13 @@
 }
 .ep-search {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px;
   border-bottom: 1px solid var(--border);
 }
-.ep-search svg {
+.ep-search > svg {
   position: absolute;
   top: 50%;
   left: 18px;
@@ -567,7 +570,8 @@
   color: var(--text-faint);
 }
 .ep-search .input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding-left: 32px;
 }
 .ep-body {
@@ -1256,4 +1260,103 @@
 .chat-top .btn.on {
   background: var(--surface-2);
   color: var(--text);
+}
+
+/* The emoji manager (EmojiManager.tsx): every group's emoji, by group. */
+.em-search {
+  position: relative;
+  margin-bottom: 12px;
+}
+.em-search > svg {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+}
+.em-search .input {
+  width: 100%;
+  padding-left: 33px;
+}
+.em-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.em-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.em-group-head b {
+  color: var(--text);
+  font-size: 14px;
+}
+.em-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 6px;
+}
+.em-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 6px 6px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.em-pic {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.em-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.em-actions {
+  display: flex;
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.em-tile:hover .em-actions,
+.em-tile:focus-within .em-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .em-actions {
+    opacity: 1;
+  }
+}
+.em-actions .btn.danger:hover {
+  color: var(--danger);
+}
+.em-rename {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.em-rename .input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  font-size: 13px;
+}
+.em-empty {
+  margin: 0;
+}
+.em-group .emoji-add {
+  margin-top: 8px;
+  max-width: 420px;
 }

@@ -6193,6 +6193,16 @@ const dict: Dict = {
   "status.site.about.inbox": "Surat dari ResinCraft dan pemberitahuan di launcher.",
   "status.site.about.share": "Tautan ke mod dan modpack di rscraft.resincore.tech/mod/…",
   "status.site.about.payments": "Pembelian dan konfirmasi pembayaran dari Stripe.",
+  "chat.emoji.manage": "Kelola emoji",
+  "chat.emoji.managerTitle": "Emoji",
+  "chat.emoji.managerLead": "Emoji grup kamu bisa dipakai di semua chat: dengan teman dan di grup lain juga. Ketik :nama: atau pilih lewat tombol emoji.",
+  "chat.emoji.noGroups": "Belum ada emoji grup",
+  "chat.emoji.noGroupsHint": "Pemilik dan admin grup yang menambah emojinya. Buat grup atau gabung ke salah satunya.",
+  "chat.emoji.ofMax": "{count}/{max}",
+  "chat.emoji.noneYet": "Belum ada emoji di grup ini.",
+  "chat.emoji.rename": "Ganti nama",
+  "chat.emoji.copyName": "Salin nama",
+  "chat.emoji.copied": "{name} disalin",
 }
 
 export default dict

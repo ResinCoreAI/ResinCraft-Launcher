@@ -6203,6 +6203,16 @@ const dict: Dict = {
   "status.site.about.inbox": "ResinCraft'tan gelen postalar ve launcher'daki duyurular.",
   "status.site.about.share": "rscraft.resincore.tech/mod/… adresindeki mod ve mod paketi bağlantıları.",
   "status.site.about.payments": "Satın almalar ve Stripe ödeme onayları.",
+  "chat.emoji.manage": "Emojileri yönet",
+  "chat.emoji.managerTitle": "Emoji",
+  "chat.emoji.managerLead": "Gruplarının emojileri her sohbette çalışır: arkadaşlarınla ve diğer gruplarında da. :ad: yaz ya da emoji düğmesinden seç.",
+  "chat.emoji.noGroups": "Henüz grup emojisi yok",
+  "chat.emoji.noGroupsHint": "Bir grubun emojilerini sahibi ve yöneticileri ekler. Bir grup kur ya da birine katıl.",
+  "chat.emoji.ofMax": "{count}/{max}",
+  "chat.emoji.noneYet": "Bu grupta henüz emoji yok.",
+  "chat.emoji.rename": "Yeniden adlandır",
+  "chat.emoji.copyName": "Adı kopyala",
+  "chat.emoji.copied": "{name} kopyalandı",
 }
 
 export default dict

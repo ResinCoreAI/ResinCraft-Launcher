@@ -6253,6 +6253,16 @@ const dict: Dict = {
   "status.site.about.inbox": "Le courrier de ResinCraft et les annonces affichées dans le launcher.",
   "status.site.about.share": "Liens vers des mods et modpacks sur rscraft.resincore.tech/mod/…",
   "status.site.about.payments": "Achats et confirmations de paiement de Stripe.",
+  "chat.emoji.manage": "Gérer les emojis",
+  "chat.emoji.managerTitle": "Emojis",
+  "chat.emoji.managerLead": "Les emojis de tes groupes marchent dans tous les chats : avec tes amis et dans tes autres groupes. Tape :nom: ou choisis-en un avec le bouton emoji.",
+  "chat.emoji.noGroups": "Pas encore d'emojis de groupe",
+  "chat.emoji.noGroupsHint": "Le propriétaire et les admins d'un groupe ajoutent ses emojis. Crée un groupe ou rejoins-en un.",
+  "chat.emoji.ofMax": "{count}/{max}",
+  "chat.emoji.noneYet": "Pas encore d'emojis dans ce groupe.",
+  "chat.emoji.rename": "Renommer",
+  "chat.emoji.copyName": "Copier le nom",
+  "chat.emoji.copied": "{name} copié",
 }
 
 export default dict

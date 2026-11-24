@@ -6190,6 +6190,16 @@ const dict: Dict = {
   "status.site.about.inbox": "Thư từ ResinCraft và thông báo hiển thị trong launcher.",
   "status.site.about.share": "Liên kết tới mod và modpack tại rscraft.resincore.tech/mod/…",
   "status.site.about.payments": "Mua hàng và xác nhận thanh toán từ Stripe.",
+  "chat.emoji.manage": "Quản lý emoji",
+  "chat.emoji.managerTitle": "Emoji",
+  "chat.emoji.managerLead": "Emoji của các nhóm bạn dùng được ở mọi cuộc trò chuyện: với bạn bè và trong các nhóm khác. Gõ :tên: hoặc chọn từ nút emoji.",
+  "chat.emoji.noGroups": "Chưa có emoji nhóm",
+  "chat.emoji.noGroupsHint": "Chủ nhóm và quản trị viên thêm emoji cho nhóm. Hãy tạo hoặc tham gia một nhóm.",
+  "chat.emoji.ofMax": "{count}/{max}",
+  "chat.emoji.noneYet": "Nhóm này chưa có emoji.",
+  "chat.emoji.rename": "Đổi tên",
+  "chat.emoji.copyName": "Sao chép tên",
+  "chat.emoji.copied": "Đã sao chép {name}",
 }
 
 export default dict

@@ -1,9 +1,11 @@
 // The emoji picker under the chat's message box: recent ones first, then by group, with a search by name (English
 // words, as emoji are named in most pickers). Picking one puts it where the cursor was.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Settings2 } from 'lucide-react'
+import type { ChatGroup } from '@shared/types'
 import { t, type Key } from '../../i18n'
 import { FileImage } from './ChatMedia'
+import { myEmoji } from './chatEmoji'
 
 /** "emoji name name …" per line, by group. */
 const GROUPS: [Key, string][] = [
@@ -51,7 +53,11 @@ function recent(): string[] {
   }
 }
 
-export default function EmojiPicker({ onPick, onClose, groupEmoji }: { onPick: (emoji: string) => void; onClose: () => void; groupEmoji?: { name: string; file: string }[] }) {
+/**
+ * `groups`: every group's emoji shows (they work in every chat), the open chat's group (`here`) first. `onPick` gets a
+ * group emoji as `:name:` with its file. `onManage`: the emoji manager.
+ */
+export default function EmojiPicker({ onPick, onClose, groups = [], here, onManage }: { onPick: (emoji: string, file?: string) => void; onClose: () => void; groups?: ChatGroup[]; here?: string; onManage?: () => void }) {
   const [query, setQuery] = useState('')
   const box = useRef<HTMLDivElement>(null)
   const recents = useMemo(recent, [])
@@ -75,6 +81,21 @@ export default function EmojiPicker({ onPick, onClose, groupEmoji }: { onPick: (
   }
   const q = query.trim().toLowerCase()
   const found = q ? ALL.flatMap((g) => g.list).filter((x) => x.words.includes(q)) : []
+  const custom = myEmoji(groups, here)
+  const customFound = q ? custom.filter((e) => e.name.includes(q.replace(/:/g, ''))) : []
+  // By group, in the order myEmoji gives (the open group first).
+  const sets = groups
+    .filter((g) => g.emoji?.length)
+    .sort((a, b) => Number(b.conv === here) - Number(a.conv === here))
+  const customGrid = (list: typeof custom) => (
+    <div className="ep-grid">
+      {list.map((e) => (
+        <button key={`${e.conv}:${e.name}`} type="button" className="ep-emoji" title={e.conv === here ? `:${e.name}:` : `:${e.name}: · ${e.group}`} onClick={() => onPick(`:${e.name}:`, e.file)}>
+          <FileImage id={e.file} alt={`:${e.name}:`} className="ct-emoji" />
+        </button>
+      ))}
+    </div>
+  )
   const grid = (list: string[]) => (
     <div className="ep-grid">
       {list.map((e) => (
@@ -89,28 +110,30 @@ export default function EmojiPicker({ onPick, onClose, groupEmoji }: { onPick: (
       <div className="ep-search">
         <Search aria-hidden />
         <input className="input" autoFocus placeholder={t('chat.emoji.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
+        {onManage && (
+          <button type="button" className="btn ghost icon sm" title={t('chat.emoji.manage')} aria-label={t('chat.emoji.manage')} onClick={onManage}>
+            <Settings2 />
+          </button>
+        )}
       </div>
       <div className="ep-body">
         {q ? (
-          found.length ? (
-            grid(found.map((x) => x.e))
+          found.length || customFound.length ? (
+            <>
+              {customFound.length > 0 && customGrid(customFound)}
+              {found.length > 0 && grid(found.map((x) => x.e))}
+            </>
           ) : (
             <p className="hint ep-none">{t('chat.emoji.none')}</p>
           )
         ) : (
           <>
-            {groupEmoji && groupEmoji.length > 0 && (
-              <>
-                <h5>{t('chat.emoji.group')}</h5>
-                <div className="ep-grid">
-                  {groupEmoji.map((g) => (
-                    <button key={g.name} type="button" className="ep-emoji" title={`:${g.name}:`} onClick={() => onPick(`:${g.name}:`)}>
-                      <FileImage id={g.file} alt={`:${g.name}:`} className="ct-emoji" />
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+            {sets.map((g) => (
+              <div key={g.conv}>
+                <h5>{g.conv === here ? t('chat.emoji.group') : g.name}</h5>
+                {customGrid(custom.filter((e) => e.conv === g.conv))}
+              </div>
+            ))}
             {recents.length > 0 && (
               <>
                 <h5>{t('chat.emoji.recent')}</h5>

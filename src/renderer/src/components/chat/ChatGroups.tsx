@@ -1,6 +1,6 @@
 // Group chats in the Inbox's Chat tab: the group's tile, a new group, adding friends, the members panel (invite code,
 // roles, rename, leave) and the notes a group's chat shows (made, joined, left, …).
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Ban, Clock, Copy, Crown, Gift, LogOut, MoreHorizontal, Pencil, RefreshCw, Shield, Smile, UserPlus, Users, X } from 'lucide-react'
 import type { ChatGroup, ChatMessage, ChatSystemData } from '@shared/types'
 import { chat, displayName, nameOf, useChat } from '../../chatState'
@@ -9,7 +9,7 @@ import { useStore } from '../../store'
 import { t, type Key } from '../../i18n'
 import { ConfirmModal, Modal, openContextMenu, type ContextEntry } from '../ui'
 import PlayerHead from '../PlayerHead'
-import { CropModal } from '../ImagePicker'
+import EmojiManager, { EmojiAdd } from './EmojiManager'
 
 export function GroupTile({ name, size = 32 }: { name: string; size?: number }) {
   const letters = name
@@ -131,43 +131,7 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
   const [leaving, setLeaving] = useState(false)
   const boss = g.role === 'owner' || g.role === 'admin'
   const fail = (e: unknown) => toast((e as Error).message, 'error')
-  const [emojiName, setEmojiName] = useState('')
-  const emojiInput = useRef<HTMLInputElement>(null)
-  // A picture for an emoji: cropped to a square and made 128 px (any size comes in); a small GIF can stay as it is,
-  // moving (cropping makes a still picture).
-  const [emojiCrop, setEmojiCrop] = useState<{ src: string; file: File } | null>(null)
-  const pickEmoji = (file: File | undefined) => {
-    if (emojiInput.current) emojiInput.current.value = ''
-    const name = emojiName.trim().toLowerCase()
-    if (!file) return
-    if (!/^[a-z0-9_]{2,32}$/.test(name)) {
-      toast(t('chat.emoji.nameRule'), 'error')
-      return
-    }
-    if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
-      toast(t('chat.emoji.fileType'), 'error')
-      return
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      toast(t('art.tooBig'), 'error')
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = () => typeof reader.result === 'string' && setEmojiCrop({ src: reader.result, file })
-    reader.onerror = () => toast(t('chat.emoji.fileType'), 'error')
-    reader.readAsDataURL(file)
-  }
-  const addEmoji = async (file: Blob, fileName: string) => {
-    const name = emojiName.trim().toLowerCase()
-    setEmojiCrop(null)
-    try {
-      const f = await chat.uploadBlob(g.conv, file, fileName, 'emoji')
-      await chat.group('emoji', g.conv, { name, file: f.id })
-      setEmojiName('')
-    } catch (e) {
-      fail(e)
-    }
-  }
+  const [emojiManager, setEmojiManager] = useState(false)
   // Moderation: like a Discord server's owner and admins (an admin can't act on other admins or the owner).
   const [banning, setBanning] = useState<{ uuid: string; name: string } | null>(null)
   const canModerate = (role: string) => (g.role === 'owner' && role !== 'owner') || (g.role === 'admin' && role === 'member')
@@ -302,6 +266,9 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
         <b className="grow">
           <Smile size={14} className="inline" /> {t('chat.emoji.groupCount', { count: g.emoji?.length ?? 0 })}
         </b>
+        <button className="btn ghost sm" onClick={() => setEmojiManager(true)}>
+          {t('chat.emoji.manage')}
+        </button>
       </div>
       {(g.emoji?.length ?? 0) > 0 && (
         <div className="chat-emoji-list">
@@ -318,41 +285,11 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
           ))}
         </div>
       )}
-      {boss && v.drive && (
-        <div className="row">
-          <input className="input grow" maxLength={32} value={emojiName} onChange={(e) => setEmojiName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} placeholder={t('chat.emoji.namePlaceholder')} />
-          <button className="btn sm" disabled={!emojiName.trim()} onClick={() => emojiInput.current?.click()}>
-            {t('chat.emoji.add')}
-          </button>
-          <input ref={emojiInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => pickEmoji(e.target.files?.[0])} />
-        </div>
-      )}
+      {boss && v.drive && (g.emoji?.length ?? 0) < 50 && <EmojiAdd conv={g.conv} />}
       <button className="btn sm ghost danger chat-leave" onClick={() => setLeaving(true)}>
         <LogOut /> {t('chat.group.leave')}
       </button>
-      {emojiCrop && (
-        <CropModal
-          src={emojiCrop.src}
-          kind="emoji"
-          onCancel={() => setEmojiCrop(null)}
-          // Not fetch(): the app's connect-src doesn't allow data: URLs, so that failed without a word.
-          onDone={(png) => {
-            try {
-              const bytes = Uint8Array.from(atob(png.slice(png.indexOf(',') + 1)), (c) => c.charCodeAt(0))
-              void addEmoji(new Blob([bytes], { type: 'image/png' }), 'emoji.png')
-            } catch (e) {
-              fail(e)
-            }
-          }}
-          extra={
-            emojiCrop.file.type === 'image/gif' && emojiCrop.file.size <= 512_000 ? (
-              <button className="btn ghost" title={t('chat.emoji.keepGifHint')} onClick={() => void addEmoji(emojiCrop.file, emojiCrop.file.name)}>
-                {t('chat.emoji.keepGif')}
-              </button>
-            ) : undefined
-          }
-        />
-      )}
+      {emojiManager && <EmojiManager onClose={() => setEmojiManager(false)} />}
       {adding && <AddMembersModal g={g} onClose={() => setAdding(false)} />}
       {renaming !== null && (
         <Modal

@@ -6180,6 +6180,16 @@ const dict: Dict = {
   "status.site.about.inbox": "来自 ResinCraft 的邮件和启动器中显示的通知。",
   "status.site.about.share": "rscraft.resincore.tech/mod/… 上的模组和整合包链接。",
   "status.site.about.payments": "购买以及来自 Stripe 的付款确认。",
+  "chat.emoji.manage": "管理表情",
+  "chat.emoji.managerTitle": "表情",
+  "chat.emoji.managerLead": "你所在群组的表情可以在所有聊天中使用：与好友的聊天和其他群组都可以。输入 :名称: 或用表情按钮选择。",
+  "chat.emoji.noGroups": "还没有群组表情",
+  "chat.emoji.noGroupsHint": "群组的表情由群主和管理员添加。创建或加入一个群组即可拥有。",
+  "chat.emoji.ofMax": "{count}/{max}",
+  "chat.emoji.noneYet": "这个群组还没有表情。",
+  "chat.emoji.rename": "重命名",
+  "chat.emoji.copyName": "复制名称",
+  "chat.emoji.copied": "已复制 {name}",
 }
 
 export default dict

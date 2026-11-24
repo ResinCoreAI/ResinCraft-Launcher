@@ -8,6 +8,7 @@ import { useState, type ReactNode } from 'react'
 import { api } from '../../api'
 import { currentLanguage } from '../../i18n'
 import { FileImage } from './ChatMedia'
+import { EMOJI_TOKEN_AT } from './chatEmoji'
 
 type Emoji = Map<string, string>
 
@@ -103,6 +104,14 @@ function inline(text: string, key: string, emoji: Emoji): ReactNode[] {
   while (i < text.length) {
     const rest = text.slice(i)
     const k = `${key}.${i}`
+    // Any group's emoji, in any chat (chatEmoji.ts): the picture is the file named in it.
+    const custom = rest[0] === '<' ? EMOJI_TOKEN_AT.exec(rest) : null
+    if (custom) {
+      flush()
+      out.push(<FileImage key={k} id={custom[2]} alt={`:${custom[1]}:`} className="ct-emoji" />)
+      i += custom[0].length
+      continue
+    }
     if (rest[0] === ':' && emoji.size) {
       const m = /^:([a-z0-9_]{2,32}):/.exec(rest)
       const file = m && emoji.get(m[1])
@@ -318,6 +327,13 @@ const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictograp
 export default function ChatText({ text, emoji }: { text: string; emoji?: { name: string; file: string }[] }) {
   const map: Emoji = new Map((emoji ?? []).map((e) => [e.name, e.file]))
   if (EMOJI_ONLY.test(text.trim())) return <div className="ct ct-big">{text.trim()}</div>
+  // Only group emoji (with or without plain ones), three at most: big too, like Discord.
+  const custom = text.trim().match(/<:[a-z0-9_]{2,32}:f[0-9a-f]{20}>|:[a-z0-9_]{2,32}:/g)?.filter((m) => m.startsWith('<') || map.has(m.slice(1, -1))) ?? []
+  if (custom.length > 0) {
+    const left = custom.reduce((s, m) => s.replace(m, ' '), text.trim()).trim()
+    const plain = left ? left.match(/\p{Extended_Pictographic}/gu)?.length ?? 0 : 0
+    if (custom.length + plain <= 3 && (!left || EMOJI_ONLY.test(left))) return <div className="ct ct-big">{inline(text.trim(), 'big', map)}</div>
+  }
   const parts: ReactNode[] = []
   let rest = text
   let n = 0
