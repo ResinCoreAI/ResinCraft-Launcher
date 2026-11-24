@@ -124,8 +124,8 @@ pub async fn call(method: &str, path: &str, body: Option<Value>) -> Result<Value
 
 // ---------- Files (through the relay, to its Telegram drive) ----------
 
-/// The biggest file the picker hands over (the relay has its own limit, usually lower).
-const PICK_MAX: u64 = 2_000_000_000;
+/// The biggest file the picker hands over (the relay has its own limit, up to 100 GB).
+const PICK_MAX: u64 = 100_000_000_000;
 /// Pictures and voice messages shown in chat are read into the page (bigger files are saved instead).
 const PREVIEW_MAX: u64 = 25_000_000;
 
@@ -225,9 +225,39 @@ async fn pick_files() -> Result<Vec<Value>> {
 async fn upload_path(conv: &str, path: &str, kind: &str, extra: Value) -> Result<Value> {
     let p = PathBuf::from(path);
     let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
-    let bytes = tokio::fs::read(&p).await.with_context(|| format!("couldn't read {}", p.display()))?;
+    let len = tokio::fs::metadata(&p).await.with_context(|| format!("couldn't read {}", p.display()))?.len();
     let mime = extra.get("mime").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| mime_of(&name).to_string());
-    send_upload(conv, &name, kind, &mime, bytes, &extra).await
+    // Streamed from the file (an instance can be a gigabyte): opened again for the second try after a sign-in.
+    if relay::settings().is_none() {
+        return Err(err_tr!("chat.noRelay", "This build of ResinCraft has no relay, so it has no chat."));
+    }
+    let Some(account) = accounts::active_microsoft_account().await else { return Err(relay::needs_microsoft()) };
+    for retry in [false, true] {
+        let (session, domain) = relay::session_token(&account).await?;
+        let file = tokio::fs::File::open(&p).await.with_context(|| format!("couldn't read {}", p.display()))?;
+        let body = reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::with_capacity(file, 256 * 1024));
+        let res = crate::core::ctx::http()
+            .post(upload_url(&format!("https://{domain}"), conv, &name, kind, &mime, &extra))
+            .bearer_auth(&session)
+            .header("Content-Type", "application/octet-stream")
+            .header("Content-Length", len)
+            .body(body)
+            .timeout(upload_time(len))
+            .send()
+            .await
+            .map_err(|e| err_tr!("chat.unreachable", "Couldn't reach ResinCraft Relay ({error}).", error = e.without_url().to_string()))?;
+        if res.status().as_u16() == 401 && !retry {
+            relay::forget_session(&account).await;
+            continue;
+        }
+        return Ok(relay_json(res).await?["file"].clone());
+    }
+    Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = "HTTP 401"))
+}
+
+/// How long an upload of `len` bytes may take: half an hour, and more for big files (at 250 kB/s).
+fn upload_time(len: u64) -> std::time::Duration {
+    std::time::Duration::from_secs(1800 + len / 250_000)
 }
 
 /// Uploads bytes the page has (a pasted picture, a voice message, a profile picture), base64.
@@ -242,7 +272,7 @@ async fn send_upload(conv: &str, name: &str, kind: &str, mime: &str, bytes: Vec<
         http.post(upload_url(base, conv, name, kind, mime, extra))
             .header("Content-Type", "application/octet-stream")
             .body(bytes.clone())
-            .timeout(std::time::Duration::from_secs(1800))
+            .timeout(upload_time(bytes.len() as u64))
     })
     .await?;
     Ok(relay_json(res).await?["file"].clone())
@@ -261,15 +291,29 @@ async fn file_local(id: &str) -> Result<PathBuf> {
     if dest.exists() {
         return Ok(dest);
     }
-    let res = relay_send(|http, base| http.get(format!("{base}/api/chat/file/{id}")).timeout(std::time::Duration::from_secs(1800))).await?;
+    use tokio::io::AsyncWriteExt;
+    let mut res = relay_send(|http, base| http.get(format!("{base}/api/chat/file/{id}")).timeout(std::time::Duration::from_secs(4 * 3600))).await?;
     if !res.status().is_success() {
         relay_json(res).await?;
         bail!("couldn't download the file");
     }
-    let bytes = res.bytes().await.context("the download stopped")?;
+    // Written as it comes (an instance can be a gigabyte), never held whole in memory.
     tokio::fs::create_dir_all(cache_dir()).await?;
     let tmp = dest.with_extension("part");
-    tokio::fs::write(&tmp, &bytes).await?;
+    let mut out = tokio::fs::File::create(&tmp).await?;
+    let copied: Result<()> = async {
+        while let Some(chunk) = res.chunk().await.context("the download stopped")? {
+            out.write_all(&chunk).await?;
+        }
+        out.flush().await?;
+        Ok(())
+    }
+    .await;
+    drop(out);
+    if let Err(e) = copied {
+        let _ = tokio::fs::remove_file(&tmp).await;
+        return Err(e);
+    }
     tokio::fs::rename(&tmp, &dest).await?;
     Ok(dest)
 }

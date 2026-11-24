@@ -16,7 +16,7 @@ use super::index::{index_key, load_index};
 use super::modrinth;
 use crate::core::events::Task;
 use crate::core::instances;
-use crate::core::net::{hash_bytes, HashAlgo};
+use crate::core::net::{hash_read, HashAlgo};
 use crate::core::paths;
 use crate::core::types::{ContentKind, ExportEntry, ExportOptions, ExportResult, Instance, LoaderType, OwnPack};
 use crate::tr;
@@ -61,12 +61,14 @@ struct LocalFile {
     /// Path inside the game directory, with forward slashes ("mods/sodium.jar").
     rel: String,
     abs: PathBuf,
-    data: Vec<u8>,
+    /// Empty when nothing is looked up (bundle_all): the file goes in the pack as it is.
     sha1: String,
 }
 
 /// The enabled mods, resource packs and shaders in game directory `dir`, and how many disabled ones were left out.
-fn content_files(dir: &Path) -> Result<(Vec<LocalFile>, u64)> {
+/// Read from disk as they're needed, never held in memory (an instance can be many gigabytes); `hash`: their SHA-1s,
+/// for looking them up on the sites.
+fn content_files(dir: &Path, hash: bool) -> Result<(Vec<LocalFile>, u64)> {
     let mut files = Vec::new();
     let mut skipped_disabled = 0;
     for folder in CONTENT_FOLDERS {
@@ -87,9 +89,8 @@ fn content_files(dir: &Path) -> Result<(Vec<LocalFile>, u64)> {
                 continue;
             }
             let abs = dir.join(folder).join(&name);
-            let data = std::fs::read(&abs)?;
-            let sha1 = hash_bytes(&data, HashAlgo::Sha1);
-            files.push(LocalFile { rel: format!("{folder}/{name}"), abs, data, sha1 });
+            let sha1 = if hash { hash_read(std::fs::File::open(&abs)?, HashAlgo::Sha1)? } else { String::new() };
+            files.push(LocalFile { rel: format!("{folder}/{name}"), abs, sha1 });
         }
     }
     Ok((files, skipped_disabled))
@@ -131,8 +132,9 @@ fn add_overrides(zip: &mut zip::ZipWriter<std::fs::File>, dir: &Path, include: &
         }
     }
     for f in extra {
-        zip.start_file(format!("overrides/{}", f.rel), deflate())?;
-        zip.write_all(&f.data)?;
+        // Jars and zips are compressed already: stored as they are, which is much faster for big ones.
+        zip.start_file(format!("overrides/{}", f.rel), SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored).large_file(true))?;
+        std::io::copy(&mut std::fs::File::open(&f.abs)?, zip)?;
     }
     Ok(())
 }
@@ -379,7 +381,8 @@ pub async fn export_modpack(instance_id: &str, opts: ExportOptions, dest: &Path)
         task.update(tr!("export.readingMods", "Reading mods…"), None);
         let dir = paths::game_dir(&inst.id);
         let d2 = dir.clone();
-        let (files, skipped_disabled) = tokio::task::spawn_blocking(move || content_files(&d2)).await??;
+        let hash = !opts.bundle_all;
+        let (files, skipped_disabled) = tokio::task::spawn_blocking(move || content_files(&d2, hash)).await??;
         let (manifest_name, manifest, linked, bundled) = if opts.bundle_all {
             // Nothing looked up: an index with no links, and every file under overrides/.
             if opts.format == "mrpack" { mrpack_from(&inst, &opts, files, &HashMap::new())? } else { curseforge_from(&inst, &opts, files, &HashMap::new())? }
@@ -487,7 +490,7 @@ mod tests {
     #[test]
     fn mrpack_matches_instance_content() {
         let dir = game_dir("mr");
-        let (files, skipped) = content_files(&dir).unwrap();
+        let (files, skipped) = content_files(&dir, true).unwrap();
         assert_eq!(skipped, 1);
         let hit = |name: &str| modrinth::HashHit { url: format!("https://cdn.modrinth.com/{name}"), sha512: format!("{name}-512"), size: 7 };
         let by_name: HashMap<String, String> = files.iter().map(|f| (f.rel.clone(), f.sha1.clone())).collect();
@@ -520,7 +523,7 @@ mod tests {
     #[test]
     fn curseforge_zip_matches_instance_content() {
         let dir = game_dir("cf");
-        let (files, _) = content_files(&dir).unwrap();
+        let (files, _) = content_files(&dir, true).unwrap();
         let refs = HashMap::from([(dir.join("mods").join("sodium.jar"), (394468, 5_000_001)), (dir.join("shaderpacks").join("complementary.zip"), (627557, 6_000_002))]);
         let (manifest_name, manifest, linked, bundled) = curseforge_from(&instance(), &options("curseforge"), files, &refs).unwrap();
         assert_eq!((manifest_name, linked), ("manifest.json", 2));
