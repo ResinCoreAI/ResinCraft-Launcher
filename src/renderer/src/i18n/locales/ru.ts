@@ -6268,7 +6268,7 @@ const dict: Dict = {
   "chat.send.to": "Кому",
   "chat.send.sending": "Отправка…",
   "chat.send.exporting": "Упаковка сборки…",
-  "chat.send.instanceHint": "Уходит как файл сборки (.mrpack): моды с Modrinth и CurseForge как ссылки на скачивание, вместе с конфигами. Миры и скриншоты остаются на этом ПК.",
+  "chat.send.instanceHint": "Уходит файлом модпака (.mrpack) с модами, ресурспаками, шейдерами и конфигами этой сборки внутри, поэтому может быть большим. Миры и скриншоты остаются на этом ПК.",
   "chat.send.noChat": "Чат для этой учётной записи недоступен. Войдите с учётной записью Microsoft, чтобы общаться с друзьями.",
   "chat.send.noFiles": "Этот relay не принимает файлы в чате.",
   "chat.send.files": "Файлов: {count}",
@@ -6276,6 +6276,10 @@ const dict: Dict = {
   "chat.file.installed": "{name} устанавливается. Она появится в библиотеке, когда будет готова.",
   "chat.file.asShader": "Как шейдер",
   "chat.file.asResourcePack": "Как пакет ресурсов",
+  "chat.send.inBackground": "{item} отправляется: {name}. Можно продолжать пользоваться лаунчером.",
+  "chat.send.failed": "Не удалось отправить {item}: {why}",
+  "engine.chat.uploadTooBig": "Этот файл сейчас слишком большой для ResinCraft Relay.",
+  "chat.send.packTooBig": "В упакованном виде эта сборка весит {size} МБ, а файлы в чате здесь не больше {max} МБ. Отключите крупные моды, которые не нужно отправлять, или поделитесь сборкой иначе.",
 }
 
 export default dict

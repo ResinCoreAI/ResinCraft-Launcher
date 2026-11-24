@@ -6206,7 +6206,7 @@ const dict: Dict = {
   "chat.send.to": "Gửi tới",
   "chat.send.sending": "Đang gửi…",
   "chat.send.exporting": "Đang đóng gói phiên bản…",
-  "chat.send.instanceHint": "Gửi dưới dạng tệp modpack (.mrpack): mod từ Modrinth và CurseForge là liên kết tải về, kèm các tệp config. Thế giới và ảnh chụp màn hình vẫn ở máy này.",
+  "chat.send.instanceHint": "Gửi dưới dạng tệp modpack (.mrpack) chứa sẵn mod, gói tài nguyên, shader và cấu hình của bản cài này, nên có thể khá nặng. Thế giới và ảnh chụp màn hình vẫn ở máy này.",
   "chat.send.noChat": "Trò chuyện chưa bật cho tài khoản này. Đăng nhập bằng tài khoản Microsoft để trò chuyện với bạn bè.",
   "chat.send.noFiles": "Relay này không nhận tệp trong trò chuyện.",
   "chat.send.files": "{count} tệp",
@@ -6214,6 +6214,10 @@ const dict: Dict = {
   "chat.file.installed": "Đang cài {name}. Nó sẽ hiện trong Thư viện khi xong.",
   "chat.file.asShader": "Làm shader",
   "chat.file.asResourcePack": "Làm gói tài nguyên",
+  "chat.send.inBackground": "Đang gửi {item} cho {name}. Bạn vẫn có thể dùng launcher.",
+  "chat.send.failed": "Không gửi được {item}: {why}",
+  "engine.chat.uploadTooBig": "Tệp này hiện quá lớn đối với ResinCraft Relay.",
+  "chat.send.packTooBig": "Khi đóng gói, bản cài này nặng {size} MB; tệp trong trò chuyện ở đây tối đa {max} MB. Hãy tắt các mod lớn không cần gửi, hoặc chia sẻ theo cách khác.",
 }
 
 export default dict

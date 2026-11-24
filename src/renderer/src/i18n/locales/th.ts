@@ -6262,7 +6262,7 @@ const dict: Dict = {
   "chat.send.to": "ส่งถึง",
   "chat.send.sending": "กำลังส่ง…",
   "chat.send.exporting": "กำลังแพ็กอินสแตนซ์…",
-  "chat.send.instanceHint": "ส่งเป็นไฟล์ม็อดแพ็ก (.mrpack): ม็อดจาก Modrinth และ CurseForge ไปเป็นลิงก์ดาวน์โหลด พร้อมไฟล์คอนฟิก ส่วนโลกและภาพหน้าจออยู่ในเครื่องนี้",
+  "chat.send.instanceHint": "ส่งเป็นไฟล์ม็อดแพ็ก (.mrpack) ที่มีม็อด รีซอร์สแพ็ก เชเดอร์ และไฟล์คอนฟิกของอินสแตนซ์นี้อยู่ข้างใน ไฟล์จึงอาจใหญ่ ส่วนโลกและภาพหน้าจออยู่ในเครื่องนี้",
   "chat.send.noChat": "บัญชีนี้ใช้แชทไม่ได้ ลงชื่อเข้าใช้ด้วยบัญชี Microsoft เพื่อแชทกับเพื่อน",
   "chat.send.noFiles": "Relay นี้ไม่รับไฟล์ในแชท",
   "chat.send.files": "{count} ไฟล์",
@@ -6270,6 +6270,10 @@ const dict: Dict = {
   "chat.file.installed": "กำลังติดตั้ง {name} จะขึ้นในคลังเมื่อพร้อม",
   "chat.file.asShader": "เป็นเชดเดอร์",
   "chat.file.asResourcePack": "เป็นรีซอร์สแพ็ก",
+  "chat.send.inBackground": "กำลังส่ง {item} ไปให้ {name} ใช้ลันเชอร์ต่อได้เลย",
+  "chat.send.failed": "ส่ง {item} ไม่สำเร็จ: {why}",
+  "engine.chat.uploadTooBig": "ไฟล์นี้ใหญ่เกินไปสำหรับ ResinCraft Relay ในตอนนี้",
+  "chat.send.packTooBig": "เมื่อแพ็กแล้วอินสแตนซ์นี้มีขนาด {size} MB แต่ไฟล์ในแชทที่นี่ใหญ่ได้ไม่เกิน {max} MB ปิดม็อดใหญ่ที่ไม่ต้องส่ง หรือแชร์ด้วยวิธีอื่น",
 }
 
 export default dict

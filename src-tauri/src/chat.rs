@@ -176,8 +176,14 @@ async fn relay_json(res: reqwest::Response) -> Result<Value> {
     let status = res.status();
     let answer: Value = res.json().await.unwrap_or(Value::Null);
     if !status.is_success() {
-        let why = answer.get("error").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
-        return Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = why));
+        let Some(why) = answer.get("error").and_then(Value::as_str) else {
+            // No answer from the relay itself: something in front of it (a proxy's own page) refused the file.
+            if status.as_u16() == 413 {
+                return Err(err_tr!("chat.uploadTooBig", "That file is too big for ResinCraft Relay right now."));
+            }
+            return Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = format!("HTTP {}", status.as_u16())));
+        };
+        return Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = why.to_string()));
     }
     Ok(answer)
 }

@@ -702,7 +702,8 @@ export function mockApi(): ResinApi {
             path: 'C:/Users/you/Downloads/' + o.name + '-' + o.version + (o.format === 'mrpack' ? '.mrpack' : '.zip'),
             linked: own ? own.length : 41,
             bundled: own ? [] : ['mods/my-handmade-mod.jar'],
-            skippedDisabled: own ? 0 : 1
+            skippedDisabled: own ? 0 : 1,
+            size: 2_400_000
           },
           900
         )
@@ -711,7 +712,7 @@ export function mockApi(): ResinApi {
       exportModpackTo: (id, o, folder) => {
         const own = packContent.get(id)
         const file = `${o.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${o.version}.${o.format === 'mrpack' ? 'mrpack' : 'zip'}`
-        return wait({ path: `${folder}/${file}`, linked: own ? own.length : 41, bundled: [], skippedDisabled: 0 }, 900)
+        return wait({ path: `${folder}/${file}`, linked: own ? own.length : 41, bundled: [], skippedDisabled: 0, size: o.bundleAll ? 38_000_000 : 2_400_000 }, 900)
       }
     },
     ...mockInstanceTabs((id, iconUrl) => {

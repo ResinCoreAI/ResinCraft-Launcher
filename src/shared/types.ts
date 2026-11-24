@@ -900,6 +900,8 @@ export interface ExportOptions {
   include: string[]
   /** For the player's own modpack: whether the next export should suggest a bumped version. */
   bumpOnExport?: boolean
+  /** Every mod, resource pack and shader inside the pack as a file, nothing looked up on Modrinth or CurseForge. */
+  bundleAll?: boolean
 }
 
 export interface ExportResult {
@@ -910,6 +912,8 @@ export interface ExportResult {
   bundled: string[]
   /** Disabled mods left out. */
   skippedDisabled: number
+  /** The pack file's size in bytes. */
+  size: number
 }
 
 export type GameMode = 'survival' | 'creative' | 'adventure' | 'spectator'

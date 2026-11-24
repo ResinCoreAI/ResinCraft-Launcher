@@ -797,6 +797,10 @@ pub struct ExportOptions {
     /// For the player's own modpack: whether the next export should suggest a bumped version.
     #[serde(default)]
     pub bump_on_export: Option<bool>,
+    /// Every mod, resource pack and shader goes inside the pack as a file, with no lookup on Modrinth or CurseForge
+    /// (sending an instance to a chat: quick, and the receiver gets exactly these files).
+    #[serde(default)]
+    pub bundle_all: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -806,6 +810,8 @@ pub struct ExportResult {
     pub linked: u64,
     pub bundled: Vec<String>,
     pub skipped_disabled: u64,
+    /// The pack file's size in bytes.
+    pub size: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]

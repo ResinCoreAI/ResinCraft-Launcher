@@ -6209,7 +6209,7 @@ const dict: Dict = {
   "chat.send.to": "Kirim ke",
   "chat.send.sending": "Mengirim…",
   "chat.send.exporting": "Mengemas instance…",
-  "chat.send.instanceHint": "Dikirim sebagai file modpack (.mrpack): mod dari Modrinth dan CurseForge sebagai tautan unduhan, beserta config-nya. Dunia dan tangkapan layar tetap di PC ini.",
+  "chat.send.instanceHint": "Dikirim sebagai file modpack (.mrpack) berisi mod, resource pack, shader, dan config instance ini, jadi ukurannya bisa besar. Dunia dan tangkapan layar tetap di PC ini.",
   "chat.send.noChat": "Chat tidak aktif untuk akun ini. Masuk dengan akun Microsoft untuk chat dengan teman.",
   "chat.send.noFiles": "Relay ini tidak menerima file di chat.",
   "chat.send.files": "{count} file",
@@ -6217,6 +6217,10 @@ const dict: Dict = {
   "chat.file.installed": "Memasang {name}. Akan muncul di Pustaka saat siap.",
   "chat.file.asShader": "Sebagai shader",
   "chat.file.asResourcePack": "Sebagai resource pack",
+  "chat.send.inBackground": "Mengirim {item} ke {name}. Kamu bisa terus memakai launcher.",
+  "chat.send.failed": "Tidak bisa mengirim {item}: {why}",
+  "engine.chat.uploadTooBig": "File itu terlalu besar untuk ResinCraft Relay saat ini.",
+  "chat.send.packTooBig": "Setelah dikemas, instance ini {size} MB; file chat paling besar {max} MB di sini. Matikan mod besar yang tidak perlu dikirim, atau bagikan dengan cara lain.",
 }
 
 export default dict

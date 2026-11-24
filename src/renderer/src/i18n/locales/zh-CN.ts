@@ -6196,7 +6196,7 @@ const dict: Dict = {
   "chat.send.to": "发送给",
   "chat.send.sending": "正在发送…",
   "chat.send.exporting": "正在打包实例…",
-  "chat.send.instanceHint": "以整合包文件（.mrpack）发送：Modrinth 和 CurseForge 上的模组作为下载链接，并附带配置文件。存档和截图留在这台电脑上。",
+  "chat.send.instanceHint": "以整合包文件（.mrpack）发送，里面直接包含此实例的模组、资源包、光影和配置，所以可能比较大。世界和截图留在这台电脑上。",
   "chat.send.noChat": "这个账户无法使用聊天。用 Microsoft 账户登录后可以和好友聊天。",
   "chat.send.noFiles": "这个 Relay 不接受聊天中的文件。",
   "chat.send.files": "{count} 个文件",
@@ -6204,6 +6204,10 @@ const dict: Dict = {
   "chat.file.installed": "正在安装 {name}，完成后会出现在库中。",
   "chat.file.asShader": "作为光影",
   "chat.file.asResourcePack": "作为资源包",
+  "chat.send.inBackground": "正在把 {item} 发送给 {name}，你可以继续使用启动器。",
+  "chat.send.failed": "无法发送 {item}：{why}",
+  "engine.chat.uploadTooBig": "这个文件目前对 ResinCraft Relay 来说太大了。",
+  "chat.send.packTooBig": "打包后此实例为 {size} MB，这里的聊天文件最大 {max} MB。请关闭不需要发送的大模组，或用其他方式分享。",
 }
 
 export default dict

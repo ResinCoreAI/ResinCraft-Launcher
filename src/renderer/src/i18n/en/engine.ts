@@ -686,4 +686,5 @@ export default {
   "engine.chat.pickTitle": "Send files",
   "engine.chat.saveTitle": "Save the file",
   "engine.servers.admin.drive.pickTitle": "Upload to the Drive",
+  "engine.chat.uploadTooBig": "That file is too big for ResinCraft Relay right now.",
 }

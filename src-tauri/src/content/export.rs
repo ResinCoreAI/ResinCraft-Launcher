@@ -380,8 +380,14 @@ pub async fn export_modpack(instance_id: &str, opts: ExportOptions, dest: &Path)
         let dir = paths::game_dir(&inst.id);
         let d2 = dir.clone();
         let (files, skipped_disabled) = tokio::task::spawn_blocking(move || content_files(&d2)).await??;
-        let (manifest_name, manifest, linked, bundled) =
-            if opts.format == "mrpack" { build_mrpack(&inst, &opts, files, &task).await? } else { build_curseforge(&inst, &opts, files, &task).await? };
+        let (manifest_name, manifest, linked, bundled) = if opts.bundle_all {
+            // Nothing looked up: an index with no links, and every file under overrides/.
+            if opts.format == "mrpack" { mrpack_from(&inst, &opts, files, &HashMap::new())? } else { curseforge_from(&inst, &opts, files, &HashMap::new())? }
+        } else if opts.format == "mrpack" {
+            build_mrpack(&inst, &opts, files, &task).await?
+        } else {
+            build_curseforge(&inst, &opts, files, &task).await?
+        };
         task.update(tr!("export.packingConfigs", "Packing configs…"), None);
         let bundled_names: Vec<String> = bundled.iter().map(|f| f.rel.clone()).collect();
         let (d, include) = (dest.clone(), opts.include.clone());
@@ -389,7 +395,8 @@ pub async fn export_modpack(instance_id: &str, opts: ExportOptions, dest: &Path)
         if inst.own_pack.is_some() {
             remember_export(&inst.id, &opts).await?;
         }
-        Ok(ExportResult { path: dest.to_string_lossy().into_owned(), linked, bundled: bundled_names, skipped_disabled })
+        let size = tokio::fs::metadata(&dest).await.map(|m| m.len()).unwrap_or(0);
+        Ok(ExportResult { path: dest.to_string_lossy().into_owned(), linked, bundled: bundled_names, skipped_disabled, size })
     })
     .await
 }
@@ -418,6 +425,7 @@ mod tests {
             summary: "Cozy survival".into(),
             include: vec!["config".into()],
             bump_on_export: None,
+            bundle_all: false,
         }
     }
 

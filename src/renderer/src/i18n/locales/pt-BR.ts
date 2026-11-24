@@ -6250,7 +6250,7 @@ const dict: Dict = {
   "chat.send.to": "Enviar para",
   "chat.send.sending": "Enviando…",
   "chat.send.exporting": "Empacotando a instância…",
-  "chat.send.instanceHint": "Vai como arquivo de modpack (.mrpack): mods do Modrinth e CurseForge como links de download, junto com as configs. Mundos e capturas ficam neste PC.",
+  "chat.send.instanceHint": "Vai como arquivo de modpack (.mrpack) com os mods, pacotes de recursos, shaders e configs desta instância dentro, então pode ficar grande. Mundos e capturas ficam neste PC.",
   "chat.send.noChat": "O chat não está ativo nesta conta. Entre com uma conta Microsoft para conversar com amigos.",
   "chat.send.noFiles": "Este relay não aceita arquivos no chat.",
   "chat.send.files": "{count} arquivos",
@@ -6258,6 +6258,10 @@ const dict: Dict = {
   "chat.file.installed": "Instalando {name}. Ele aparece na sua Biblioteca quando estiver pronto.",
   "chat.file.asShader": "Como shader",
   "chat.file.asResourcePack": "Como pacote de recursos",
+  "chat.send.inBackground": "Enviando {item} para {name}. Você pode continuar usando o launcher.",
+  "chat.send.failed": "Não foi possível enviar {item}: {why}",
+  "engine.chat.uploadTooBig": "Esse arquivo é grande demais para o ResinCraft Relay no momento.",
+  "chat.send.packTooBig": "Empacotada, esta instância tem {size} MB; arquivos no chat têm no máximo {max} MB aqui. Desative mods grandes que não precisa enviar ou compartilhe de outro jeito.",
 }
 
 export default dict

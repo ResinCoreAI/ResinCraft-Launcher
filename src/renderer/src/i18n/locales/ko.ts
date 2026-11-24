@@ -6201,7 +6201,7 @@ const dict: Dict = {
   "chat.send.to": "받는 곳",
   "chat.send.sending": "보내는 중…",
   "chat.send.exporting": "인스턴스를 묶는 중…",
-  "chat.send.instanceHint": "모드팩 파일(.mrpack)로 보내요. Modrinth와 CurseForge 모드는 다운로드 링크로, 설정 파일도 함께요. 월드와 스크린샷은 이 PC에 남아요.",
+  "chat.send.instanceHint": "이 인스턴스의 모드, 리소스 팩, 셰이더, 설정 파일을 그대로 담은 모드팩 파일(.mrpack)로 보내서 용량이 클 수 있어요. 월드와 스크린샷은 이 PC에 남아요.",
   "chat.send.noChat": "이 계정은 채팅을 쓸 수 없어요. Microsoft 계정으로 로그인하면 친구와 채팅할 수 있어요.",
   "chat.send.noFiles": "이 릴레이는 채팅 파일을 받지 않아요.",
   "chat.send.files": "파일 {count}개",
@@ -6209,6 +6209,10 @@ const dict: Dict = {
   "chat.file.installed": "{name} 설치 중이에요. 끝나면 라이브러리에 보여요.",
   "chat.file.asShader": "셰이더로",
   "chat.file.asResourcePack": "리소스팩으로",
+  "chat.send.inBackground": "{item}을(를) {name}에게 보내는 중이에요. 런처는 계속 쓸 수 있어요.",
+  "chat.send.failed": "{item}을(를) 보내지 못했어요: {why}",
+  "engine.chat.uploadTooBig": "이 파일은 지금 ResinCraft Relay에 올리기엔 너무 커요.",
+  "chat.send.packTooBig": "묶으면 이 인스턴스는 {size}MB예요. 여기 채팅 파일은 최대 {max}MB예요. 보낼 필요 없는 큰 모드를 끄거나 다른 방법으로 공유하세요.",
 }
 
 export default dict

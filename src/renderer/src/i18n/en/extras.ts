@@ -1950,7 +1950,7 @@ export default {
   "chat.send.to": "Send to",
   "chat.send.sending": "Sending…",
   "chat.send.exporting": "Packing the instance…",
-  "chat.send.instanceHint": "It goes as a modpack file (.mrpack): mods from Modrinth and CurseForge as download links, with its configs. Worlds and screenshots stay on this PC.",
+  "chat.send.instanceHint": "It goes as a modpack file (.mrpack) with this instance's own mods, resource packs, shaders and configs inside, so it can be big. Worlds and screenshots stay on this PC.",
   "chat.send.noChat": "Chat isn't on for this account. Sign in with a Microsoft account to chat with friends.",
   "chat.send.noFiles": "This relay doesn't take files in chat.",
   "chat.send.files": "{count} files",
@@ -1958,4 +1958,7 @@ export default {
   "chat.file.installed": "Installing {name}. It shows in your Library when it's ready.",
   "chat.file.asShader": "As a shader",
   "chat.file.asResourcePack": "As a resource pack",
+  "chat.send.inBackground": "Sending {item} to {name}. You can keep using the launcher.",
+  "chat.send.failed": "Couldn't send {item}: {why}",
+  "chat.send.packTooBig": "Packed, this instance is {size} MB; chat files are at most {max} MB here. Turn off big mods you don't need to send, or share it another way.",
 } as const

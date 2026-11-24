@@ -6219,7 +6219,7 @@ const dict: Dict = {
   "chat.send.to": "Alıcı",
   "chat.send.sending": "Gönderiliyor…",
   "chat.send.exporting": "Profil paketleniyor…",
-  "chat.send.instanceHint": "Mod paketi dosyası (.mrpack) olarak gider: Modrinth ve CurseForge modları indirme bağlantısı olarak, ayarlarıyla birlikte. Dünyalar ve ekran görüntüleri bu bilgisayarda kalır.",
+  "chat.send.instanceHint": "Bu kurulumun kendi modları, kaynak paketleri, gölgelendiricileri ve ayarları içinde bir modpack dosyası (.mrpack) olarak gider, bu yüzden büyük olabilir. Dünyalar ve ekran görüntüleri bu bilgisayarda kalır.",
   "chat.send.noChat": "Bu hesapta sohbet kapalı. Arkadaşlarınla sohbet etmek için Microsoft hesabıyla giriş yap.",
   "chat.send.noFiles": "Bu relay sohbette dosya kabul etmiyor.",
   "chat.send.files": "{count} dosya",
@@ -6227,6 +6227,10 @@ const dict: Dict = {
   "chat.file.installed": "{name} kuruluyor. Hazır olunca Kitaplığında görünür.",
   "chat.file.asShader": "Gölgelendirici olarak",
   "chat.file.asResourcePack": "Kaynak paketi olarak",
+  "chat.send.inBackground": "{item}, {name} adlı sohbete gönderiliyor. Launcher'ı kullanmaya devam edebilirsin.",
+  "chat.send.failed": "{item} gönderilemedi: {why}",
+  "engine.chat.uploadTooBig": "Bu dosya şu an ResinCraft Relay için fazla büyük.",
+  "chat.send.packTooBig": "Paketlenince bu kurulum {size} MB; burada sohbet dosyaları en fazla {max} MB olabilir. Göndermen gerekmeyen büyük modları kapat ya da başka bir yolla paylaş.",
 }
 
 export default dict

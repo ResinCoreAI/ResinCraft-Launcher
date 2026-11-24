@@ -1,13 +1,13 @@
 // "Send to chat" from anywhere in the launcher: pick a friend's chat or a group, add a note, send. What can go:
 // - a mod, modpack, shader or resource pack: its share link (rscraft.resincore.tech/mod/…), which shows as a card with
 //   Open (Embeds.tsx ModCard); a file with no project behind it goes as the file;
-// - an instance: exported as a .mrpack (mods that are on Modrinth or CurseForge go as download links, so it stays small;
-//   the instance's configs and other suggested folders go inside), which the receiver installs from the chat;
+// - an instance: exported as a .mrpack with its own files inside (mods, resource packs, shaders, configs and the other
+//   suggested folders; nothing is looked up on Modrinth or CurseForge), which the receiver installs from the chat;
 // - files: screenshots (as pictures) and config or other files from an instance's Files tab;
 // - a Store item: its card with the price.
 // One host (SendToChatHost, in App) shows the window; anything opens it with sendToChat(item).
 import { useEffect, useState } from 'react'
-import { Loader2, Send } from 'lucide-react'
+import { Send } from 'lucide-react'
 import type { Instance } from '@shared/types'
 import { api } from '../../api'
 import { chat, dmId, showChat, useChat } from '../../chatState'
@@ -17,6 +17,8 @@ import { dataPath } from '../../util'
 import { Modal } from '../ui'
 import { GroupTile } from './ChatGroups'
 import PlayerHead from '../PlayerHead'
+// Its list and tiles are chat's: loaded here too, since this opens from anywhere before chat ever has.
+import '../../chat.css'
 
 export type Sendable =
   | { kind: 'link'; title: string; url: string }
@@ -70,7 +72,6 @@ export function SendToChatModal({ item, onClose }: { item: Sendable; onClose: ()
   const { toast, info, activeAccount, go } = useStore()
   const [to, setTo] = useState('')
   const [note, setNote] = useState('')
-  const [busy, setBusy] = useState<string | null>(null)
   const chats = [
     ...v.groups.map((g) => ({ conv: g.conv, name: g.name, group: true, uuid: '' })),
     ...v.friends.friends.map((f) => ({ conv: f.conv ?? dmId(v.me, f.uuid), name: f.name, group: false, uuid: f.uuid }))
@@ -84,14 +85,18 @@ export function SendToChatModal({ item, onClose }: { item: Sendable; onClose: ()
   const upload = async (conv: string, path: string, image?: boolean, size?: { w: number; h: number }) =>
     chat.uploadPath(conv, path, image ? 'image' : 'file', image && size ? { w: size.w, h: size.h } : undefined)
 
-  const send = async () => {
+  // Send closes the window at once: packing an instance takes a while, and it shows its progress where exports do
+  // (the instance page and the tasks corner). A toast says when it's in the chat, or why it isn't.
+  const send = () => {
     const target = chats.find((c) => c.conv === to)
     if (!target) return
     const text = note.trim()
-    setBusy(t('chat.send.sending'))
-    try {
+    onClose()
+    if (item.kind === 'instance' || item.kind === 'files') toast(t('chat.send.inBackground', { item: item.title, name: target.name }), 'info')
+    void (async () => {
       if (item.kind === 'link') {
-        await chat.send(to, text ? `${text}\n${item.url}` : item.url)
+        await chat.send(to, text ? `${text}
+${item.url}` : item.url)
       } else if (item.kind === 'store') {
         await chat.share(to, { type: 'store', product: item.product }, text)
       } else if (item.kind === 'files') {
@@ -105,7 +110,6 @@ export function SendToChatModal({ item, onClose }: { item: Sendable; onClose: ()
       } else {
         // An instance: as a .mrpack in the launcher's cache, then like any file.
         if (!info) throw new Error(t('chat.send.noChat'))
-        setBusy(t('chat.send.exporting'))
         const own = item.inst.ownPack
         const include = (await api.content.exportPreview(item.inst.id)).filter((e) => e.suggested).map((e) => e.name)
         const r = await api.content.exportModpackTo(
@@ -116,45 +120,40 @@ export function SendToChatModal({ item, onClose }: { item: Sendable; onClose: ()
             version: own?.version || '1.0.0',
             author: own?.author || activeAccount?.username || '',
             summary: own?.summary ?? '',
-            include
+            include,
+            // The instance's own files, as they are: no lookups, and it's exactly what this PC plays.
+            bundleAll: true
           },
           dataPath(info.dataDir, 'cache', 'chat-send')
         )
-        setBusy(t('chat.send.sending'))
+        if (r.size > limit) throw new Error(t('chat.send.packTooBig', { size: Math.ceil(r.size / 1_000_000), max: v.maxUploadMb }))
         await chat.sendFiles(to, text, [await upload(to, r.path)])
       }
-      toast(t('chat.share.sent', { name: target.name }), 'success', {
-        label: t('chat.openChat'),
-        run: () => {
-          showChat(to)
-          go({ page: 'inbox' })
-        }
-      })
-      onClose()
-    } catch (e) {
-      toast((e as Error).message, 'error')
-    } finally {
-      setBusy(null)
-    }
+    })().then(
+      () =>
+        toast(t('chat.share.sent', { name: target.name }), 'success', {
+          label: t('chat.openChat'),
+          run: () => {
+            showChat(to)
+            go({ page: 'inbox' })
+          }
+        }),
+      (e) => toast(t('chat.send.failed', { item: item.title, why: (e as Error).message }), 'error')
+    )
   }
 
   return (
     <Modal
       title={t('chat.send.title', { item: item.title })}
       subtitle={item.kind === 'instance' ? t('chat.send.instanceHint') : undefined}
-      onClose={() => !busy && onClose()}
+      onClose={onClose}
       footer={
         <>
-          {busy && (
-            <span className="hint row chat-send-busy" role="status">
-              <Loader2 className="spin" size={14} /> {busy}
-            </span>
-          )}
           <div className="spacer" />
-          <button className="btn ghost" onClick={onClose} disabled={!!busy}>
+          <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={!to || !!busy || !!blocked} onClick={() => void send()}>
+          <button className="btn primary" disabled={!to || !!blocked} onClick={send}>
             <Send /> {t('chat.send.send')}
           </button>
         </>
@@ -169,7 +168,7 @@ export function SendToChatModal({ item, onClose }: { item: Sendable; onClose: ()
           <div className="chat-pick-list" role="radiogroup" aria-label={t('chat.send.to')}>
             {chats.map((c) => (
               <label key={c.conv} className="chat-pick-row">
-                <input type="radio" name="send-to" checked={to === c.conv} onChange={() => setTo(c.conv)} disabled={!!busy} />
+                <input type="radio" name="send-to" checked={to === c.conv} onChange={() => setTo(c.conv)} />
                 {c.group ? <GroupTile name={c.name} size={24} /> : <PlayerHead who={c.uuid} name={c.name} size={24} className="chat-head" />}
                 <span className="ellipsis">{c.name}</span>
               </label>
@@ -179,7 +178,7 @@ export function SendToChatModal({ item, onClose }: { item: Sendable; onClose: ()
         {!blocked && (
           <label className="field">
             <span>{t('chat.gift.note')}</span>
-            <input className="input" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('chat.share.placeholder')} disabled={!!busy} />
+            <input className="input" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('chat.share.placeholder')} />
           </label>
         )}
       </div>
