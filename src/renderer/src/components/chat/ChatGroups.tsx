@@ -335,7 +335,15 @@ export function GroupPanel({ g, onClose, onProfile, onNick, onGift }: { g: ChatG
           src={emojiCrop.src}
           kind="emoji"
           onCancel={() => setEmojiCrop(null)}
-          onDone={(png) => void fetch(png).then((r) => r.blob()).then((b) => addEmoji(b, 'emoji.png'))}
+          // Not fetch(): the app's connect-src doesn't allow data: URLs, so that failed without a word.
+          onDone={(png) => {
+            try {
+              const bytes = Uint8Array.from(atob(png.slice(png.indexOf(',') + 1)), (c) => c.charCodeAt(0))
+              void addEmoji(new Blob([bytes], { type: 'image/png' }), 'emoji.png')
+            } catch (e) {
+              fail(e)
+            }
+          }}
           extra={
             emojiCrop.file.type === 'image/gif' && emojiCrop.file.size <= 512_000 ? (
               <button className="btn ghost" title={t('chat.emoji.keepGifHint')} onClick={() => void addEmoji(emojiCrop.file, emojiCrop.file.name)}>
