@@ -117,12 +117,63 @@ pub async fn call(method: &str, path: &str, body: Option<Value>) -> Result<Value
             let why = answer.get("error").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| format!("HTTP {}", status.as_u16()));
             return Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = why));
         }
+        if path.starts_with("/api/chat/sync") && answer.get("maxUploadMb").is_some() {
+            remember_files_url(&answer, &domain);
+        }
         return Ok(answer);
     }
     Err(err_tr!("chat.relaySaid", "ResinCraft Relay: {error}", error = "HTTP 401"))
 }
 
 // ---------- Files (through the relay, to its Telegram drive) ----------
+
+/// The relay's own address for chat files, from its sync (`filesUrl`): past the website's proxy, which takes at most
+/// 100 MB a request (Cloudflare). None: files use the usual address.
+static FILES_URL: Mutex<Option<String>> = Mutex::new(None);
+/// Whether that address could be reached from here, and when that was checked (some networks block its port).
+static FILES_REACH: Mutex<Option<(String, bool, std::time::Instant)>> = Mutex::new(None);
+
+/// Keeps the sync's `filesUrl` when it's an https address on the relay's own domain (the session goes there).
+fn remember_files_url(answer: &Value, domain: &str) {
+    let url = answer.get("filesUrl").and_then(Value::as_str).map(|u| u.trim().trim_end_matches('/').to_string()).filter(|u| files_url_ok(u, domain));
+    *FILES_URL.lock().unwrap() = url;
+}
+
+fn files_url_ok(url: &str, domain: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else { return false };
+    if rest.is_empty() || rest.contains(['/', '?', '#', '@', ' ']) {
+        return false;
+    }
+    let host = match rest.rsplit_once(':') {
+        Some((h, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => h,
+        Some(_) => return false,
+        None => rest,
+    }
+    .to_ascii_lowercase();
+    let domain = domain.to_ascii_lowercase();
+    host == domain || host.ends_with(&format!(".{domain}"))
+}
+
+/// Where chat files go and come from: the relay's direct address when it has one and it answers from here (checked
+/// at most every 10 minutes), else the usual one.
+async fn files_base(domain: &str) -> String {
+    let usual = format!("https://{domain}");
+    let Some(direct) = FILES_URL.lock().unwrap().clone() else { return usual };
+    if let Some((url, ok, at)) = FILES_REACH.lock().unwrap().clone() {
+        if url == direct && at.elapsed() < std::time::Duration::from_secs(600) {
+            return if ok { direct } else { usual };
+        }
+    }
+    let rest = &direct["https://".len()..];
+    let addr = if rest.contains(':') { rest.to_string() } else { format!("{rest}:443") };
+    let ok = matches!(tokio::time::timeout(std::time::Duration::from_secs(5), tokio::net::TcpStream::connect(addr)).await, Ok(Ok(_)));
+    *FILES_REACH.lock().unwrap() = Some((direct.clone(), ok, std::time::Instant::now()));
+    if ok {
+        direct
+    } else {
+        usual
+    }
+}
 
 /// The biggest file the picker hands over (the relay has its own limit, up to 100 GB).
 const PICK_MAX: u64 = 100_000_000_000;
@@ -150,7 +201,8 @@ pub fn mime_of(name: &str) -> &'static str {
     }
 }
 
-/// A request to the relay with the active account's session (one sign-in again on 401).
+/// A chat file request to the relay (to its direct address when it has one: [`files_base`]) with the active account's
+/// session (one sign-in again on 401).
 async fn relay_send(build: impl Fn(&reqwest::Client, &str) -> reqwest::RequestBuilder) -> Result<reqwest::Response> {
     if relay::settings().is_none() {
         return Err(err_tr!("chat.noRelay", "This build of ResinCraft has no relay, so it has no chat."));
@@ -158,7 +210,7 @@ async fn relay_send(build: impl Fn(&reqwest::Client, &str) -> reqwest::RequestBu
     let Some(account) = accounts::active_microsoft_account().await else { return Err(relay::needs_microsoft()) };
     for retry in [false, true] {
         let (session, domain) = relay::session_token(&account).await?;
-        let res = build(crate::core::ctx::http(), &format!("https://{domain}"))
+        let res = build(crate::core::ctx::http(), &files_base(&domain).await)
             .bearer_auth(&session)
             .send()
             .await
@@ -237,7 +289,7 @@ async fn upload_path(conv: &str, path: &str, kind: &str, extra: Value) -> Result
         let file = tokio::fs::File::open(&p).await.with_context(|| format!("couldn't read {}", p.display()))?;
         let body = reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::with_capacity(file, 256 * 1024));
         let res = crate::core::ctx::http()
-            .post(upload_url(&format!("https://{domain}"), conv, &name, kind, &mime, &extra))
+            .post(upload_url(&files_base(&domain).await, conv, &name, kind, &mime, &extra))
             .bearer_auth(&session)
             .header("Content-Type", "application/octet-stream")
             .header("Content-Length", len)
@@ -374,7 +426,7 @@ async fn relay_base() -> Result<String> {
     }
     let Some(account) = accounts::active_microsoft_account().await else { return Err(relay::needs_microsoft()) };
     let (_, domain) = relay::session_token(&account).await?;
-    Ok(format!("https://{domain}"))
+    Ok(files_base(&domain).await)
 }
 
 /// Files to upload to the Drive (no size limit here; the relay takes up to 4 GB): path, name, size, type.
@@ -797,6 +849,21 @@ pub fn export_cli(folder: &Path) -> i32 {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn files_go_only_to_the_relays_own_https_addresses() {
+        let d = "rscraft.resincore.tech";
+        assert!(super::files_url_ok("https://relay.rscraft.resincore.tech:7443", d));
+        assert!(super::files_url_ok("https://rscraft.resincore.tech", d));
+        assert!(super::files_url_ok("https://UP.rscraft.resincore.tech", d));
+        assert!(!super::files_url_ok("http://relay.rscraft.resincore.tech:7443", d), "not https");
+        assert!(!super::files_url_ok("https://evil.example.com:7443", d), "another domain");
+        assert!(!super::files_url_ok("https://evilrscraft.resincore.tech", d), "not a subdomain");
+        assert!(!super::files_url_ok("https://relay.rscraft.resincore.tech:7443/x", d), "a path");
+        assert!(!super::files_url_ok("https://a@relay.rscraft.resincore.tech", d), "a user part");
+        assert!(!super::files_url_ok("https://relay.rscraft.resincore.tech:port", d), "a bad port");
+    }
+
     use super::*;
 
     const ME: &str = "8667ba71b85a4004af54457a9734eed7";
