@@ -6190,6 +6190,20 @@ const dict: Dict = {
   "chat.emoji.rename": "重新命名",
   "chat.emoji.copyName": "複製名稱",
   "chat.emoji.copied": "已複製 {name}",
+  "chat.send.menu": "傳送到聊天",
+  "chat.send.title": "將 {item} 傳送到聊天",
+  "chat.send.send": "傳送",
+  "chat.send.to": "傳送給",
+  "chat.send.sending": "傳送中…",
+  "chat.send.exporting": "正在打包實例…",
+  "chat.send.instanceHint": "以模組包檔案（.mrpack）傳送：Modrinth 和 CurseForge 上的模組作為下載連結，並附帶設定檔。世界和截圖留在這台電腦上。",
+  "chat.send.noChat": "這個帳號無法使用聊天。用 Microsoft 帳號登入後可以和好友聊天。",
+  "chat.send.noFiles": "這個 Relay 不接受聊天中的檔案。",
+  "chat.send.files": "{count} 個檔案",
+  "chat.file.installPack": "安裝模組包",
+  "chat.file.installed": "正在安裝 {name}，完成後會出現在收藏庫中。",
+  "chat.file.asShader": "作為光影",
+  "chat.file.asResourcePack": "作為資源包",
 }
 
 export default dict

@@ -1,13 +1,13 @@
 // Pictures, voice messages and files in chat (kept on the relay's Telegram drive, fetched through the relay and kept on
 // this PC after the first time), profile pictures with a status dot, and the voice recorder for the message box.
 import { useEffect, useRef, useState } from 'react'
-import { Download, FileArchive, FileText, Mic, Package, Pause, Play, Square, X } from 'lucide-react'
+import { ChevronDown, Download, FileArchive, FileText, Loader2, Mic, Package, Pause, Play, Square, X } from 'lucide-react'
 import type { ChatFile, ChatStatus } from '@shared/types'
 import { api } from '../../api'
 import { avatarOf, nameOf, statusOf } from '../../chatState'
 import { useStore } from '../../store'
 import { t } from '../../i18n'
-import { Modal } from '../ui'
+import { Modal, openContextMenu } from '../ui'
 import PlayerHead from '../PlayerHead'
 
 // ----- Files the page shows, as blob URLs (one fetch per file) -----
@@ -100,8 +100,24 @@ function VoicePlayer({ f }: { f: ChatFile }) {
 
 function FileCard({ f }: { f: ChatFile }) {
   const { toast, instances } = useStore()
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<null | 'mods' | 'shaderpacks' | 'resourcepacks'>(null)
+  const [installing, setInstalling] = useState(false)
   const mod = /\.jar$/i.test(f.name)
+  const pack = /\.mrpack$/i.test(f.name)
+  const zip = /\.zip$/i.test(f.name)
+  // A modpack sent from an instance: installed as a new instance.
+  const install = async () => {
+    setInstalling(true)
+    try {
+      const path = await api.chat.fileLocal(f.id)
+      await api.content.importModpackFile(path)
+      toast(t('chat.file.installed', { name: f.name }), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setInstalling(false)
+    }
+  }
   const save = async () => {
     try {
       const where = await api.chat.fileSave(f.id, f.name)
@@ -111,10 +127,11 @@ function FileCard({ f }: { f: ChatFile }) {
     }
   }
   const addTo = async (instanceId: string, name: string) => {
-    setAdding(false)
+    const folder = adding ?? 'mods'
+    setAdding(null)
     try {
       const path = await api.chat.fileLocal(f.id)
-      await api.files.import({ kind: 'instance', id: instanceId }, 'mods', [path])
+      await api.files.import({ kind: 'instance', id: instanceId }, folder, [path])
       toast(t('chat.file.addedTo', { name: f.name, instance: name }), 'success')
     } catch (e) {
       toast((e as Error).message, 'error')
@@ -130,15 +147,33 @@ function FileCard({ f }: { f: ChatFile }) {
         <span className="hint">{size(f.size)}</span>
       </span>
       {mod && instances.length > 0 && (
-        <button className="btn sm" onClick={() => setAdding(true)}>
+        <button className="btn sm" onClick={() => setAdding('mods')}>
           {t('chat.file.addToInstance')}
+        </button>
+      )}
+      {pack && (
+        <button className="btn sm" disabled={installing} onClick={() => void install()}>
+          {installing ? <Loader2 className="spin" /> : <Package />} {t('chat.file.installPack')}
+        </button>
+      )}
+      {zip && instances.length > 0 && (
+        <button
+          className="btn sm"
+          onClick={(e) =>
+            openContextMenu(e, [
+              { label: t('chat.file.asShader'), onSelect: () => setAdding('shaderpacks') },
+              { label: t('chat.file.asResourcePack'), onSelect: () => setAdding('resourcepacks') }
+            ])
+          }
+        >
+          {t('chat.file.addToInstance')} <ChevronDown />
         </button>
       )}
       <button className="btn ghost icon sm" title={t('chat.file.save')} aria-label={t('chat.file.save')} onClick={() => void save()}>
         <Download />
       </button>
       {adding && (
-        <Modal title={t('chat.file.pickInstance', { name: f.name })} onClose={() => setAdding(false)}>
+        <Modal title={t('chat.file.pickInstance', { name: f.name })} onClose={() => setAdding(null)}>
           <div className="chat-pick-list">
             {instances.map((i) => (
               <button key={i.id} className="chat-pick-row" onClick={() => void addTo(i.id, i.name)}>

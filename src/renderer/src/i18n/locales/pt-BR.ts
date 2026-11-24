@@ -6244,6 +6244,20 @@ const dict: Dict = {
   "chat.emoji.rename": "Renomear",
   "chat.emoji.copyName": "Copiar nome",
   "chat.emoji.copied": "{name} copiado",
+  "chat.send.menu": "Enviar para o chat",
+  "chat.send.title": "Enviar {item} para um chat",
+  "chat.send.send": "Enviar",
+  "chat.send.to": "Enviar para",
+  "chat.send.sending": "Enviando…",
+  "chat.send.exporting": "Empacotando a instância…",
+  "chat.send.instanceHint": "Vai como arquivo de modpack (.mrpack): mods do Modrinth e CurseForge como links de download, junto com as configs. Mundos e capturas ficam neste PC.",
+  "chat.send.noChat": "O chat não está ativo nesta conta. Entre com uma conta Microsoft para conversar com amigos.",
+  "chat.send.noFiles": "Este relay não aceita arquivos no chat.",
+  "chat.send.files": "{count} arquivos",
+  "chat.file.installPack": "Instalar modpack",
+  "chat.file.installed": "Instalando {name}. Ele aparece na sua Biblioteca quando estiver pronto.",
+  "chat.file.asShader": "Como shader",
+  "chat.file.asResourcePack": "Como pacote de recursos",
 }
 
 export default dict

@@ -45,6 +45,8 @@ import { ConfirmModal, Empty, fromKeyboard, Modal, openContextMenu, useCopy, typ
 import { useDropTarget, type DropTarget } from './DropImport'
 import type { CodeEditorHandle } from './CodeEditor'
 import '../files.css'
+import { Send } from 'lucide-react'
+import { sendToChat } from './chat/SendToChat'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
 
@@ -345,6 +347,22 @@ export default function FileManager({ root, rootLabel, running }: { root: FileRo
       '-',
       { label: t('files.showInExplorer'), icon: <FolderOpen />, onSelect: () => reveal(e.path) },
       { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => copyPaths(paths) },
+      info && !e.dir
+        ? {
+            label: t('chat.send.menu'),
+            icon: <Send />,
+            onSelect: () => {
+              const full = (p: string) => (root.kind === 'instance' ? instancePath(info.dataDir, root.id, p) : serverPath(info.dataDir, root.id, p))
+              const picked = (entries ?? []).filter((x) => paths.includes(x.path) && !x.dir)
+              const list = picked.length ? picked : [e]
+              sendToChat({
+                kind: 'files',
+                title: list.length === 1 ? list[0].name : t('chat.send.files', { count: list.length }),
+                files: list.map((x) => ({ path: full(x.path), size: x.size, image: /\.(png|jpe?g|gif|webp)$/i.test(x.name) }))
+              })
+            }
+          }
+        : null,
       '-',
       { label: t('common.delete'), icon: <Trash2 />, danger: true, shortcut: 'Del', onSelect: () => setTrashing(paths) }
     ]

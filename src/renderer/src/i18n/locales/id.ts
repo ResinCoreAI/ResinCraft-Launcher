@@ -6203,6 +6203,20 @@ const dict: Dict = {
   "chat.emoji.rename": "Ganti nama",
   "chat.emoji.copyName": "Salin nama",
   "chat.emoji.copied": "{name} disalin",
+  "chat.send.menu": "Kirim ke chat",
+  "chat.send.title": "Kirim {item} ke chat",
+  "chat.send.send": "Kirim",
+  "chat.send.to": "Kirim ke",
+  "chat.send.sending": "Mengirim…",
+  "chat.send.exporting": "Mengemas instance…",
+  "chat.send.instanceHint": "Dikirim sebagai file modpack (.mrpack): mod dari Modrinth dan CurseForge sebagai tautan unduhan, beserta config-nya. Dunia dan tangkapan layar tetap di PC ini.",
+  "chat.send.noChat": "Chat tidak aktif untuk akun ini. Masuk dengan akun Microsoft untuk chat dengan teman.",
+  "chat.send.noFiles": "Relay ini tidak menerima file di chat.",
+  "chat.send.files": "{count} file",
+  "chat.file.installPack": "Pasang modpack",
+  "chat.file.installed": "Memasang {name}. Akan muncul di Pustaka saat siap.",
+  "chat.file.asShader": "Sebagai shader",
+  "chat.file.asResourcePack": "Sebagai resource pack",
 }
 
 export default dict

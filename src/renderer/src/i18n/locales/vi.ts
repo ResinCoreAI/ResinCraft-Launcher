@@ -6200,6 +6200,20 @@ const dict: Dict = {
   "chat.emoji.rename": "Đổi tên",
   "chat.emoji.copyName": "Sao chép tên",
   "chat.emoji.copied": "Đã sao chép {name}",
+  "chat.send.menu": "Gửi vào trò chuyện",
+  "chat.send.title": "Gửi {item} vào trò chuyện",
+  "chat.send.send": "Gửi",
+  "chat.send.to": "Gửi tới",
+  "chat.send.sending": "Đang gửi…",
+  "chat.send.exporting": "Đang đóng gói phiên bản…",
+  "chat.send.instanceHint": "Gửi dưới dạng tệp modpack (.mrpack): mod từ Modrinth và CurseForge là liên kết tải về, kèm các tệp config. Thế giới và ảnh chụp màn hình vẫn ở máy này.",
+  "chat.send.noChat": "Trò chuyện chưa bật cho tài khoản này. Đăng nhập bằng tài khoản Microsoft để trò chuyện với bạn bè.",
+  "chat.send.noFiles": "Relay này không nhận tệp trong trò chuyện.",
+  "chat.send.files": "{count} tệp",
+  "chat.file.installPack": "Cài modpack",
+  "chat.file.installed": "Đang cài {name}. Nó sẽ hiện trong Thư viện khi xong.",
+  "chat.file.asShader": "Làm shader",
+  "chat.file.asResourcePack": "Làm gói tài nguyên",
 }
 
 export default dict

@@ -37,6 +37,9 @@ import { t, type Key } from '../i18n'
 import { Empty, Segmented, Switch, useCopy } from './ui'
 import { SafeHtml } from './SafeHtml'
 import '../project.css'
+import { Send } from 'lucide-react'
+import { sendProject } from './chat/SendToChat'
+import { useStore } from '../store'
 
 const LOADER_NAMES: Record<string, string> = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge', minecraft: 'Vanilla', horizon: 'Horizon' }
 const LINK_KEYS: Record<ProjectLink['kind'], Key> = {
@@ -114,6 +117,7 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
   const [tab, setTab] = useState<Tab>('description')
   const [viewing, setViewing] = useState<number>()
   const copy = useCopy()
+  const { toast } = useStore()
 
   useEffect(() => {
     let live = true
@@ -265,6 +269,9 @@ export function ProjectPage({ hit, site, target, installed, blocked, state, back
                 onClick={() => void api.chat.shareLink(p.id).then((url) => copy(url, t('share.copied')))}
               >
                 <Share2 /> {t('share.button')}
+              </button>
+              <button className="btn ghost sm" onClick={() => void sendProject(p.id, p.title).catch((e) => toast(e.message, 'error'))}>
+                <Send /> {t('chat.send.menu')}
               </button>
             </div>
           )}

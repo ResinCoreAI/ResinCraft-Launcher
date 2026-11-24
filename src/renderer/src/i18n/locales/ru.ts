@@ -6262,6 +6262,20 @@ const dict: Dict = {
   "chat.emoji.rename": "Переименовать",
   "chat.emoji.copyName": "Копировать имя",
   "chat.emoji.copied": "Скопировано: {name}",
+  "chat.send.menu": "Отправить в чат",
+  "chat.send.title": "Отправить {item} в чат",
+  "chat.send.send": "Отправить",
+  "chat.send.to": "Кому",
+  "chat.send.sending": "Отправка…",
+  "chat.send.exporting": "Упаковка сборки…",
+  "chat.send.instanceHint": "Уходит как файл сборки (.mrpack): моды с Modrinth и CurseForge как ссылки на скачивание, вместе с конфигами. Миры и скриншоты остаются на этом ПК.",
+  "chat.send.noChat": "Чат для этой учётной записи недоступен. Войдите с учётной записью Microsoft, чтобы общаться с друзьями.",
+  "chat.send.noFiles": "Этот relay не принимает файлы в чате.",
+  "chat.send.files": "Файлов: {count}",
+  "chat.file.installPack": "Установить сборку",
+  "chat.file.installed": "{name} устанавливается. Она появится в библиотеке, когда будет готова.",
+  "chat.file.asShader": "Как шейдер",
+  "chat.file.asResourcePack": "Как пакет ресурсов",
 }
 
 export default dict

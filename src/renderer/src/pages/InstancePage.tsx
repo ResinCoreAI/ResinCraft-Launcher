@@ -52,7 +52,7 @@ import {
 } from '../components/ui'
 import { CommandFields, CommandsWarning, EnvEditor, NO_COMMANDS } from '../components/LaunchCommands'
 import { isLive, useStore } from '../store'
-import { bytes, describe, fixed, playtime, projectUrl, timeAgo } from '../util'
+import { bytes, describe, fixed, instancePath, playtime, projectUrl, timeAgo } from '../util'
 import { engineError, t } from '../i18n'
 import ExportModal from '../components/ExportModal'
 import { ReinstallInstanceModal, type InstanceReinstall } from '../components/Reinstall'
@@ -76,6 +76,8 @@ import { VersionSection } from '../components/VersionSettings'
 import { HorizonBuildSection } from '../components/HorizonBuild'
 import { NativeBuildBar } from '../components/HorizonNative'
 import { GameMemoryChip } from '../components/Memory'
+import { Send } from 'lucide-react'
+import { sendProject, sendToChat } from '../components/chat/SendToChat'
 
 // Loaded with the Files tab, so the editor and file browser stay out of the startup bundle.
 const FileManager = lazy(() => import('../components/FileManager'))
@@ -156,6 +158,9 @@ export default function InstancePage({ id, tab: initialTab }: { id: string; tab?
         )}
         <button className="btn lg" data-guide="export" title={t('instance.exportHint')} onClick={() => setExporting(true)}>
           <PackageOpen /> {t('instance.export')}
+        </button>
+        <button className="btn lg icon" title={t('chat.send.menu')} aria-label={t('chat.send.menu')} onClick={() => sendToChat({ kind: 'instance', title: inst.name, inst })}>
+          <Send />
         </button>
         <button className="btn lg icon" title={t('copyFrom.title')} aria-label={t('copyFrom.title')} onClick={() => setCopyingFrom(true)}>
           <FolderInput />
@@ -246,7 +251,7 @@ const bareName = (filename: string) => filename.replace(/\.(jar|zip|hmod|hnmod|h
 const fileKey = (m: ContentItem) => m.filename.replace(/\.disabled$/, '')
 
 function ContentTab({ inst }: { inst: Instance }) {
-  const { go, toast } = useStore()
+  const { go, toast, info } = useStore()
   const copy = useCopy()
   const [kind, setKind] = useState<Kind>(inst.loader === 'vanilla' ? 'resourcepack' : 'mod')
   const [items, setItems] = useState<ContentItem[]>()
@@ -470,6 +475,21 @@ function ContentTab({ inst }: { inst: Instance }) {
         icon: <Copy />,
         onSelect: () => void copy(list.map((m) => m.filename).join('\n'))
       },
+      // One with a project: its card (a link); else the file itself (all of them when several are picked).
+      one?.projectId
+        ? { label: t('chat.send.menu'), icon: <Send />, onSelect: () => void sendProject(one.projectId!, one.title || one.filename).catch((e) => toast(e.message, 'error')) }
+        : info && !list.some((m) => m.native)
+          ? {
+              label: t('chat.send.menu'),
+              icon: <Send />,
+              onSelect: () =>
+                sendToChat({
+                  kind: 'files',
+                  title: one ? one.title || one.filename : t('chat.send.files', { count: list.length }),
+                  files: list.map((m) => ({ path: instancePath(info.dataDir, inst.id, `${folderOf(inst, kind)}/${m.filename}`), size: m.size }))
+                })
+            }
+          : null,
       '-',
       { label: t('common.remove'), icon: <Trash2 />, danger: true, shortcut: 'Del', onSelect: () => setRemoving(list) }
     ]

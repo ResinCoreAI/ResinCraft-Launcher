@@ -59,6 +59,8 @@ import './classic.css'
 import { money, useStoreOpen, useWalletOf } from './storeStatus'
 import './resin-credit.css'
 import { decideWelcome, useWelcome } from './welcomeState'
+import { SendToChatHost } from './components/chat/SendToChat'
+import { plainEmoji } from './components/chat/chatEmoji'
 
 /**
  * A page whose code loads apart from the launcher's start: on its first visit, or before that with `preload`. Once
@@ -197,7 +199,8 @@ export default function App() {
   useEffect(() => onPopupOpen(() => go({ page: 'inbox' })), [go])
   // Friends and chat: messages arrive live; one from someone says so unless that chat is on screen.
   useChatWatch(activeAccount?.type === 'msa' ? activeAccount.id : undefined, (m, name) => {
-    const text = m.kind === 'gift' ? t('chat.giftToast', { name }) : t('chat.newMessage', { name, text: m.body.length > 80 ? `${m.body.slice(0, 80)}…` : m.body })
+    const body = plainEmoji(m.body)
+    const text = m.kind === 'gift' ? t('chat.giftToast', { name }) : t('chat.newMessage', { name, text: body.length > 80 ? `${body.slice(0, 80)}…` : body })
     toast(text, 'info', {
       label: t('chat.openChat'),
       run: () => {
@@ -366,6 +369,7 @@ export default function App() {
         </Suspense>
       )}
       {newInstanceOpen && <NewInstanceModal onClose={() => setNewInstanceOpen(false)} />}
+      <SendToChatHost />
       {bigScreen && (
         <Suspense fallback={null}>
           <BigScreen pages={nav.filter((n) => n.page !== 'home' && n.page !== 'library').map((n) => ({ page: n.page, label: t(n.label), icon: n.icon }))} />

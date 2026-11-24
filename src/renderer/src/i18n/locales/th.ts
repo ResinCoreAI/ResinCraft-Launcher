@@ -6256,6 +6256,20 @@ const dict: Dict = {
   "chat.emoji.rename": "เปลี่ยนชื่อ",
   "chat.emoji.copyName": "คัดลอกชื่อ",
   "chat.emoji.copied": "คัดลอก {name} แล้ว",
+  "chat.send.menu": "ส่งไปที่แชท",
+  "chat.send.title": "ส่ง {item} ไปที่แชท",
+  "chat.send.send": "ส่ง",
+  "chat.send.to": "ส่งถึง",
+  "chat.send.sending": "กำลังส่ง…",
+  "chat.send.exporting": "กำลังแพ็กอินสแตนซ์…",
+  "chat.send.instanceHint": "ส่งเป็นไฟล์ม็อดแพ็ก (.mrpack): ม็อดจาก Modrinth และ CurseForge ไปเป็นลิงก์ดาวน์โหลด พร้อมไฟล์คอนฟิก ส่วนโลกและภาพหน้าจออยู่ในเครื่องนี้",
+  "chat.send.noChat": "บัญชีนี้ใช้แชทไม่ได้ ลงชื่อเข้าใช้ด้วยบัญชี Microsoft เพื่อแชทกับเพื่อน",
+  "chat.send.noFiles": "Relay นี้ไม่รับไฟล์ในแชท",
+  "chat.send.files": "{count} ไฟล์",
+  "chat.file.installPack": "ติดตั้งม็อดแพ็ก",
+  "chat.file.installed": "กำลังติดตั้ง {name} จะขึ้นในคลังเมื่อพร้อม",
+  "chat.file.asShader": "เป็นเชดเดอร์",
+  "chat.file.asResourcePack": "เป็นรีซอร์สแพ็ก",
 }
 
 export default dict

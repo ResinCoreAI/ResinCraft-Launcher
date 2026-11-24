@@ -8,6 +8,8 @@ import { bytes, instancePath } from '../util'
 import { currentLanguage, rich, t } from '../i18n'
 import { ConfirmModal, Empty, openContextMenu, useCopy, type ContextEntry } from './ui'
 import '../instance-tabs.css'
+import { Send } from 'lucide-react'
+import { pictureSize, sendToChat } from './chat/SendToChat'
 
 // Thumbnails survive tab switches; keyed by instance, file name and modification time.
 const thumbs = new Map<string, string>()
@@ -62,6 +64,16 @@ export default function ScreenshotsTab({ inst }: { inst: Instance }) {
     { label: t('screenshots.copyImage'), icon: <Copy />, onSelect: () => void copy(s) },
     { label: t('screenshots.showInFolder'), icon: <FolderOpen />, onSelect: () => show(s) },
     { label: t('menu.screenshot.setIcon'), icon: <ImageUp />, onSelect: () => void setIcon(s) },
+    info && {
+      label: t('chat.send.menu'),
+      icon: <Send />,
+      onSelect: () =>
+        sendToChat({
+          kind: 'files',
+          title: s.name,
+          files: [{ path: instancePath(info.dataDir, inst.id, `screenshots/${s.name}`), size: s.size, image: true, measure: () => api.screenshots.image(inst.id, s.name).then(pictureSize) }]
+        })
+    },
     '-',
     { label: t('menu.copyFileName'), icon: <FileText />, onSelect: () => void copyText(s.name) },
     info && { label: t('menu.copyPath'), icon: <ClipboardCopy />, onSelect: () => void copyText(instancePath(info.dataDir, inst.id, `screenshots/${s.name}`)) },

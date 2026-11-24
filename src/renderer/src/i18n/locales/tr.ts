@@ -6213,6 +6213,20 @@ const dict: Dict = {
   "chat.emoji.rename": "Yeniden adlandır",
   "chat.emoji.copyName": "Adı kopyala",
   "chat.emoji.copied": "{name} kopyalandı",
+  "chat.send.menu": "Sohbete gönder",
+  "chat.send.title": "{item} bir sohbete gönder",
+  "chat.send.send": "Gönder",
+  "chat.send.to": "Alıcı",
+  "chat.send.sending": "Gönderiliyor…",
+  "chat.send.exporting": "Profil paketleniyor…",
+  "chat.send.instanceHint": "Mod paketi dosyası (.mrpack) olarak gider: Modrinth ve CurseForge modları indirme bağlantısı olarak, ayarlarıyla birlikte. Dünyalar ve ekran görüntüleri bu bilgisayarda kalır.",
+  "chat.send.noChat": "Bu hesapta sohbet kapalı. Arkadaşlarınla sohbet etmek için Microsoft hesabıyla giriş yap.",
+  "chat.send.noFiles": "Bu relay sohbette dosya kabul etmiyor.",
+  "chat.send.files": "{count} dosya",
+  "chat.file.installPack": "Mod paketini kur",
+  "chat.file.installed": "{name} kuruluyor. Hazır olunca Kitaplığında görünür.",
+  "chat.file.asShader": "Gölgelendirici olarak",
+  "chat.file.asResourcePack": "Kaynak paketi olarak",
 }
 
 export default dict

@@ -6195,6 +6195,20 @@ const dict: Dict = {
   "chat.emoji.rename": "이름 바꾸기",
   "chat.emoji.copyName": "이름 복사",
   "chat.emoji.copied": "{name} 복사함",
+  "chat.send.menu": "채팅으로 보내기",
+  "chat.send.title": "{item}을(를) 채팅으로 보내기",
+  "chat.send.send": "보내기",
+  "chat.send.to": "받는 곳",
+  "chat.send.sending": "보내는 중…",
+  "chat.send.exporting": "인스턴스를 묶는 중…",
+  "chat.send.instanceHint": "모드팩 파일(.mrpack)로 보내요. Modrinth와 CurseForge 모드는 다운로드 링크로, 설정 파일도 함께요. 월드와 스크린샷은 이 PC에 남아요.",
+  "chat.send.noChat": "이 계정은 채팅을 쓸 수 없어요. Microsoft 계정으로 로그인하면 친구와 채팅할 수 있어요.",
+  "chat.send.noFiles": "이 릴레이는 채팅 파일을 받지 않아요.",
+  "chat.send.files": "파일 {count}개",
+  "chat.file.installPack": "모드팩 설치",
+  "chat.file.installed": "{name} 설치 중이에요. 끝나면 라이브러리에 보여요.",
+  "chat.file.asShader": "셰이더로",
+  "chat.file.asResourcePack": "리소스팩으로",
 }
 
 export default dict

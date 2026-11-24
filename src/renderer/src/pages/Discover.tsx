@@ -61,6 +61,8 @@ import { currentLanguage, engineError, rich, t, type Key } from '../i18n'
 import { PackBuilderBanner } from '../components/OwnPack'
 import { ProjectPage } from '../components/ProjectPage'
 import { NativeInstallNotice } from '../components/HorizonNative'
+import { Send } from 'lucide-react'
+import { sendProject } from '../components/chat/SendToChat'
 
 /** Which half of Discover was open last (this session). */
 
@@ -671,7 +673,8 @@ export default function Discover({
       '-',
       { label: t('discover.result.details'), icon: <Info />, onSelect: () => openDetails(h) },
       { label: t('discover.result.openOn', { source: siteLabel(h.source) }), icon: <ExternalLink />, onSelect: () => void api.app.openExternal(h.url) },
-      { label: t('menu.copyLink'), icon: <Link />, onSelect: () => void copy(h.url) }
+      { label: t('menu.copyLink'), icon: <Link />, onSelect: () => void copy(h.url) },
+      { label: t('chat.send.menu'), icon: <Send />, onSelect: () => void sendProject(h.id, h.title).catch((e) => toast(e.message, 'error')) }
     ]
   }
 
