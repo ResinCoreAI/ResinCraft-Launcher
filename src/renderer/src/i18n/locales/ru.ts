@@ -5426,7 +5426,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "Администраторы лаунчера",
   "servers.admin.mail.seg.verified": "Игроки с подтверждённой почтой",
   "servers.admin.mail.players": "Игроки",
-  "servers.admin.mail.playersHint": "Имена Minecraft или UUID через запятую или с новой строки (не больше {max})",
+  "servers.admin.mail.playersHint": "Ники Minecraft, UUID или адреса почты через запятую или с новой строки (до {max}). Адрес, который не принадлежит игроку, получит письмо только по почте.",
   "servers.admin.mail.delivery": "Доставка",
   "servers.admin.mail.deliveryInbox": "Входящие",
   "servers.admin.mail.deliveryEmail": "Почта",

@@ -5367,7 +5367,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "Admin launcher",
   "servers.admin.mail.seg.verified": "Pemain dengan email terkonfirmasi",
   "servers.admin.mail.players": "Pemain",
-  "servers.admin.mail.playersHint": "Nama Minecraft atau UUID, dipisahkan koma atau baris (maksimal {max})",
+  "servers.admin.mail.playersHint": "Nama Minecraft, UUID, atau alamat email, dipisah koma atau baris (hingga {max}). Alamat yang bukan milik pemain hanya menerimanya lewat email.",
   "servers.admin.mail.delivery": "Pengiriman",
   "servers.admin.mail.deliveryInbox": "Kotak Masuk",
   "servers.admin.mail.deliveryEmail": "Email",

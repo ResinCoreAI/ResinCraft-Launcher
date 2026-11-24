@@ -5354,7 +5354,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "啟動器管理員",
   "servers.admin.mail.seg.verified": "已確認電子郵件的玩家",
   "servers.admin.mail.players": "玩家",
-  "servers.admin.mail.playersHint": "Minecraft 名稱或 UUID，以逗號或換行分隔（最多 {max} 個）",
+  "servers.admin.mail.playersHint": "Minecraft 名稱、UUID 或電子郵件地址，用逗號或換行分隔（最多 {max} 個）。不屬於玩家的地址只會透過電子郵件收到。",
   "servers.admin.mail.delivery": "寄送方式",
   "servers.admin.mail.deliveryInbox": "收件匣",
   "servers.admin.mail.deliveryEmail": "電子郵件",

@@ -5364,7 +5364,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "ランチャー管理者",
   "servers.admin.mail.seg.verified": "メールを確認済みのプレイヤー",
   "servers.admin.mail.players": "プレイヤー",
-  "servers.admin.mail.playersHint": "Minecraft の名前または UUID を、カンマか改行で区切って入力（最大 {max}）",
+  "servers.admin.mail.playersHint": "Minecraft の名前、UUID、またはメールアドレスをカンマか改行で区切って入力（最大 {max}）。プレイヤーのものではないアドレスにはメールだけで届きます。",
   "servers.admin.mail.delivery": "配信先",
   "servers.admin.mail.deliveryInbox": "受信箱",
   "servers.admin.mail.deliveryEmail": "メール",

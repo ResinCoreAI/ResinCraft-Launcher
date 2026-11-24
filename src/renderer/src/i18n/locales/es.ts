@@ -5410,7 +5410,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "Administradores del launcher",
   "servers.admin.mail.seg.verified": "Jugadores con correo confirmado",
   "servers.admin.mail.players": "Jugadores",
-  "servers.admin.mail.playersHint": "Nombres de Minecraft o UUID, separados por comas o líneas (hasta {max})",
+  "servers.admin.mail.playersHint": "Nombres de Minecraft, UUID o direcciones de correo, separados por comas o líneas (hasta {max}). Una dirección que no es de un jugador lo recibe solo por correo.",
   "servers.admin.mail.delivery": "Entrega",
   "servers.admin.mail.deliveryInbox": "Buzón",
   "servers.admin.mail.deliveryEmail": "Correo",

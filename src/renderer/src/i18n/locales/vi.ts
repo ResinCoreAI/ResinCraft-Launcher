@@ -5364,7 +5364,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "Quản trị viên launcher",
   "servers.admin.mail.seg.verified": "Người chơi có email đã xác nhận",
   "servers.admin.mail.players": "Người chơi",
-  "servers.admin.mail.playersHint": "Tên Minecraft hoặc UUID, cách nhau bằng dấu phẩy hoặc xuống dòng (tối đa {max})",
+  "servers.admin.mail.playersHint": "Tên Minecraft, UUID hoặc địa chỉ email, cách nhau bằng dấu phẩy hoặc xuống dòng (tối đa {max}). Địa chỉ không phải của người chơi chỉ nhận qua email.",
   "servers.admin.mail.delivery": "Cách gửi",
   "servers.admin.mail.deliveryInbox": "Hộp thư",
   "servers.admin.mail.deliveryEmail": "Email",

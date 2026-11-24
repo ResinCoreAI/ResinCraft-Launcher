@@ -5356,7 +5356,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "แอดมินของลันเชอร์",
   "servers.admin.mail.seg.verified": "ผู้เล่นที่ยืนยันอีเมลแล้ว",
   "servers.admin.mail.players": "ผู้เล่น",
-  "servers.admin.mail.playersHint": "ชื่อ Minecraft หรือ UUID คั่นด้วยจุลภาคหรือขึ้นบรรทัดใหม่ (สูงสุด {max})",
+  "servers.admin.mail.playersHint": "ชื่อ Minecraft, UUID หรืออีเมล คั่นด้วยจุลภาคหรือขึ้นบรรทัดใหม่ (สูงสุด {max}) อีเมลที่ไม่ใช่ของผู้เล่นจะได้รับทางอีเมลเท่านั้น",
   "servers.admin.mail.delivery": "ช่องทางส่ง",
   "servers.admin.mail.deliveryInbox": "กล่องจดหมาย",
   "servers.admin.mail.deliveryEmail": "อีเมล",

@@ -5359,7 +5359,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "런처 관리자",
   "servers.admin.mail.seg.verified": "이메일을 확인한 플레이어",
   "servers.admin.mail.players": "플레이어",
-  "servers.admin.mail.playersHint": "Minecraft 이름 또는 UUID, 쉼표나 줄바꿈으로 구분 (최대 {max})",
+  "servers.admin.mail.playersHint": "Minecraft 이름, UUID 또는 이메일 주소를 쉼표나 줄로 구분해 입력하세요(최대 {max}). 플레이어 주소가 아니면 이메일로만 받아요.",
   "servers.admin.mail.delivery": "전달 방식",
   "servers.admin.mail.deliveryInbox": "받은편지함",
   "servers.admin.mail.deliveryEmail": "이메일",

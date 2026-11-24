@@ -5377,7 +5377,7 @@ const dict: Dict = {
   "servers.admin.mail.seg.admins": "Başlatıcı yöneticileri",
   "servers.admin.mail.seg.verified": "E-postası doğrulanmış oyuncular",
   "servers.admin.mail.players": "Oyuncular",
-  "servers.admin.mail.playersHint": "Minecraft adları ya da UUID'ler, virgülle ya da satırlarla ayrılmış (en fazla {max})",
+  "servers.admin.mail.playersHint": "Minecraft adları, UUID'ler veya e-posta adresleri, virgül ya da satırla ayrılmış (en fazla {max}). Bir oyuncuya ait olmayan adres yalnızca e-postayla alır.",
   "servers.admin.mail.delivery": "Teslimat",
   "servers.admin.mail.deliveryInbox": "Gelen kutusu",
   "servers.admin.mail.deliveryEmail": "E-posta",

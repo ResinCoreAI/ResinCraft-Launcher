@@ -990,7 +990,7 @@ export default {
   "servers.admin.mail.seg.admins": "Launcher admins",
   "servers.admin.mail.seg.verified": "Players with a confirmed email",
   "servers.admin.mail.players": "Players",
-  "servers.admin.mail.playersHint": "Minecraft names or UUIDs, separated by commas or lines (up to {max})",
+  "servers.admin.mail.playersHint": "Minecraft names, UUIDs or email addresses, separated by commas or lines (up to {max}). An address that isn't a player's gets it by email only.",
   "servers.admin.mail.delivery": "Delivery",
   "servers.admin.mail.deliveryInbox": "Inbox",
   "servers.admin.mail.deliveryEmail": "Email",
