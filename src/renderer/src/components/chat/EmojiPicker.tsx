@@ -5,7 +5,7 @@ import { Search, Settings2 } from 'lucide-react'
 import type { ChatGroup } from '@shared/types'
 import { t, type Key } from '../../i18n'
 import { FileImage } from './ChatMedia'
-import { myEmoji } from './chatEmoji'
+import { emojiText, myEmoji } from './chatEmoji'
 
 /** "emoji name name …" per line, by group. */
 const GROUPS: [Key, string][] = [
@@ -55,9 +55,10 @@ function recent(): string[] {
 
 /**
  * `groups`: every group's emoji shows (they work in every chat), the open chat's group (`here`) first. `onPick` gets a
- * group emoji as `:name:` with its file. `onManage`: the emoji manager.
+ * group emoji as it's written in this chat: `:name:` in its own group, `:groupid|name:` elsewhere. `onManage`: the
+ * emoji manager.
  */
-export default function EmojiPicker({ onPick, onClose, groups = [], here, onManage }: { onPick: (emoji: string, file?: string) => void; onClose: () => void; groups?: ChatGroup[]; here?: string; onManage?: () => void }) {
+export default function EmojiPicker({ onPick, onClose, groups = [], here, onManage }: { onPick: (emoji: string) => void; onClose: () => void; groups?: ChatGroup[]; here?: string; onManage?: () => void }) {
   const [query, setQuery] = useState('')
   const box = useRef<HTMLDivElement>(null)
   const recents = useMemo(recent, [])
@@ -90,7 +91,7 @@ export default function EmojiPicker({ onPick, onClose, groups = [], here, onMana
   const customGrid = (list: typeof custom) => (
     <div className="ep-grid">
       {list.map((e) => (
-        <button key={`${e.conv}:${e.name}`} type="button" className="ep-emoji" title={e.conv === here ? `:${e.name}:` : `:${e.name}: · ${e.group}`} onClick={() => onPick(`:${e.name}:`, e.file)}>
+        <button key={`${e.conv}:${e.name}`} type="button" className="ep-emoji" title={e.conv === here ? `:${e.name}:` : `:${e.name}: · ${e.group}`} onClick={() => onPick(emojiText(e, here))}>
           <FileImage id={e.file} alt={`:${e.name}:`} className="ct-emoji" />
         </button>
       ))}

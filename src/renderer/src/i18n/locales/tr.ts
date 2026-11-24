@@ -6205,7 +6205,7 @@ const dict: Dict = {
   "status.site.about.payments": "Satın almalar ve Stripe ödeme onayları.",
   "chat.emoji.manage": "Emojileri yönet",
   "chat.emoji.managerTitle": "Emoji",
-  "chat.emoji.managerLead": "Gruplarının emojileri her sohbette çalışır: arkadaşlarınla ve diğer gruplarında da. :ad: yaz ya da emoji düğmesinden seç.",
+  "chat.emoji.managerLead": "Gruplarının emojileri her sohbette çalışır. Kendi grubunda :ad:, başka her yerde :grupid|ad: yaz (Kopyala bunu verir) ya da emoji düğmesinden seç.",
   "chat.emoji.noGroups": "Henüz grup emojisi yok",
   "chat.emoji.noGroupsHint": "Bir grubun emojilerini sahibi ve yöneticileri ekler. Bir grup kur ya da birine katıl.",
   "chat.emoji.ofMax": "{count}/{max}",

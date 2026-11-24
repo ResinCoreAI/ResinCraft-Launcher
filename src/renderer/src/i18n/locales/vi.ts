@@ -6192,7 +6192,7 @@ const dict: Dict = {
   "status.site.about.payments": "Mua hàng và xác nhận thanh toán từ Stripe.",
   "chat.emoji.manage": "Quản lý emoji",
   "chat.emoji.managerTitle": "Emoji",
-  "chat.emoji.managerLead": "Emoji của các nhóm bạn dùng được ở mọi cuộc trò chuyện: với bạn bè và trong các nhóm khác. Gõ :tên: hoặc chọn từ nút emoji.",
+  "chat.emoji.managerLead": "Emoji của các nhóm bạn dùng được ở mọi cuộc trò chuyện. Trong chính nhóm đó gõ :tên:; ở nơi khác gõ :idnhóm|tên: (nút Sao chép cho bạn dạng này), hoặc chọn từ nút emoji.",
   "chat.emoji.noGroups": "Chưa có emoji nhóm",
   "chat.emoji.noGroupsHint": "Chủ nhóm và quản trị viên thêm emoji cho nhóm. Hãy tạo hoặc tham gia một nhóm.",
   "chat.emoji.ofMax": "{count}/{max}",

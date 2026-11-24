@@ -6238,7 +6238,7 @@ const dict: Dict = {
   "status.site.about.payments": "Compras y confirmaciones de pago de Stripe.",
   "chat.emoji.manage": "Gestionar emojis",
   "chat.emoji.managerTitle": "Emojis",
-  "chat.emoji.managerLead": "Los emojis de tus grupos funcionan en todos los chats: con amigos y en tus otros grupos. Escribe :nombre: o elige uno con el botón de emojis.",
+  "chat.emoji.managerLead": "Los emojis de tus grupos funcionan en todos los chats. En su propio grupo escribe :nombre:; en cualquier otro sitio :idgrupo|nombre: (Copiar te lo da), o elige uno con el botón de emojis.",
   "chat.emoji.noGroups": "Aún no hay emojis de grupo",
   "chat.emoji.noGroupsHint": "El dueño y los administradores de un grupo añaden sus emojis. Crea un grupo o únete a uno.",
   "chat.emoji.ofMax": "{count}/{max}",

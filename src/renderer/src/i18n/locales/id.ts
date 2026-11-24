@@ -6195,7 +6195,7 @@ const dict: Dict = {
   "status.site.about.payments": "Pembelian dan konfirmasi pembayaran dari Stripe.",
   "chat.emoji.manage": "Kelola emoji",
   "chat.emoji.managerTitle": "Emoji",
-  "chat.emoji.managerLead": "Emoji grup kamu bisa dipakai di semua chat: dengan teman dan di grup lain juga. Ketik :nama: atau pilih lewat tombol emoji.",
+  "chat.emoji.managerLead": "Emoji grup kamu bisa dipakai di semua chat. Di grupnya sendiri tulis :nama:; di tempat lain :idgrup|nama: (Salin memberikannya), atau pilih lewat tombol emoji.",
   "chat.emoji.noGroups": "Belum ada emoji grup",
   "chat.emoji.noGroupsHint": "Pemilik dan admin grup yang menambah emojinya. Buat grup atau gabung ke salah satunya.",
   "chat.emoji.ofMax": "{count}/{max}",

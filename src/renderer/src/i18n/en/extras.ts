@@ -1936,7 +1936,7 @@ export default {
   "status.site.about.payments": "Purchases and payment confirmations from Stripe.",
   "chat.emoji.manage": "Manage emoji",
   "chat.emoji.managerTitle": "Emoji",
-  "chat.emoji.managerLead": "Your groups' emoji work in every chat: with friends and in your other groups too. Type :name: or pick one with the emoji button.",
+  "chat.emoji.managerLead": "Your groups' emoji work in every chat. In its own group write :name:; anywhere else :groupid|name: (Copy gives you that), or pick one with the emoji button.",
   "chat.emoji.noGroups": "No group emoji yet",
   "chat.emoji.noGroupsHint": "A group's owner and admins add its emoji. Make a group or join one to have some.",
   "chat.emoji.ofMax": "{count}/{max}",

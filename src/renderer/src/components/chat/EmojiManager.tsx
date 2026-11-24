@@ -10,6 +10,7 @@ import { Empty, Modal } from '../ui'
 import { CropModal } from '../ImagePicker'
 import { FileImage } from './ChatMedia'
 import { GroupTile } from './ChatGroups'
+import { emojiText } from './chatEmoji'
 
 const MAX = 50
 const NAME = /^[a-z0-9_]{2,32}$/
@@ -144,7 +145,7 @@ function EmojiTile({ g, e, boss }: { g: ChatGroup; e: { name: string; file: stri
               className="btn ghost icon sm"
               title={t('chat.emoji.copyName')}
               aria-label={t('chat.emoji.copyName')}
-              onClick={() => void navigator.clipboard.writeText(`:${e.name}:`).then(() => toast(t('chat.emoji.copied', { name: `:${e.name}:` }), 'success'))}
+              onClick={() => void navigator.clipboard.writeText(emojiText({ name: e.name, conv: g.conv })).then(() => toast(t('chat.emoji.copied', { name: emojiText({ name: e.name, conv: g.conv }) }), 'success'))}
             >
               <Copy />
             </button>

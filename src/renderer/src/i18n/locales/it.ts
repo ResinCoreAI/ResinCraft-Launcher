@@ -6243,7 +6243,7 @@ const dict: Dict = {
   "status.site.about.payments": "Acquisti e conferme di pagamento da Stripe.",
   "chat.emoji.manage": "Gestisci emoji",
   "chat.emoji.managerTitle": "Emoji",
-  "chat.emoji.managerLead": "Le emoji dei tuoi gruppi funzionano in ogni chat: con gli amici e negli altri gruppi. Scrivi :nome: o scegline una con il pulsante emoji.",
+  "chat.emoji.managerLead": "Le emoji dei tuoi gruppi funzionano in ogni chat. Nel loro gruppo scrivi :nome:; altrove :idgruppo|nome: (Copia te lo dà), oppure scegline una con il pulsante emoji.",
   "chat.emoji.noGroups": "Ancora nessuna emoji di gruppo",
   "chat.emoji.noGroupsHint": "Il proprietario e gli admin di un gruppo aggiungono le sue emoji. Crea un gruppo o entrane in uno.",
   "chat.emoji.ofMax": "{count}/{max}",

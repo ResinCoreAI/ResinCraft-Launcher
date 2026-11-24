@@ -37,7 +37,8 @@ import { ConfirmModal, Empty, openContextMenu, type ContextEntry } from '../ui'
 import ChatText from './ChatText'
 import EmojiPicker from './EmojiPicker'
 import EmojiManager from './EmojiManager'
-import { forEditing, plainEmoji, withEmojiFiles } from './chatEmoji'
+import { plainEmoji, resolveEmoji, withEmojiFiles } from './chatEmoji'
+import { ChatComposer, type ComposerHandle } from './ChatComposer'
 import GiftModal from './GiftModal'
 import Embeds from './Embeds'
 import { GroupPanel, GroupTile, NewGroupModal, SystemNote } from './ChatGroups'
@@ -253,7 +254,7 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
       } catch {}
   }
   const list = useRef<HTMLDivElement>(null)
-  const box = useRef<HTMLTextAreaElement>(null)
+  const box = useRef<ComposerHandle>(null)
   const pinned = useRef(true)
 
   const open = v.open
@@ -330,8 +331,8 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
   const send = async () => {
     const typed = text.trim()
     if ((!typed && !ready.length) || !open || (!peer && !group) || sending || uploading) return
-    // Emoji of your other groups go as <:name:file>, so they show in this chat too.
-    const body = withEmojiFiles(typed, open, v.groups, picked.current)
+    // Emoji go as <:name:file>, so they show in any chat (chatEmoji.ts).
+    const body = withEmojiFiles(typed, open, v.groups)
     setSending(true)
     try {
       if (editing) await chat.edit(editing.id, body)
@@ -342,7 +343,6 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
       setText('')
       setReplyTo(null)
       setEditing(null)
-      picked.current.clear()
       pinned.current = true
     } catch (e) {
       fail(e)
@@ -352,7 +352,7 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
     }
   }
 
-  const onKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+  const onKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       void send()
@@ -366,7 +366,7 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
       if (mine) {
         e.preventDefault()
         setEditing(mine)
-        setText(forEditing(mine.body, picked.current))
+        setText(mine.body)
       }
     }
   }
@@ -430,23 +430,8 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
     }
   }
 
-  // Group emoji picked for this message: their files, so a name two groups share sends the one picked.
-  const picked = useRef(new Map<string, string>())
   const [emojiManager, setEmojiManager] = useState(false)
-  const pickEmoji = (s: string, file?: string) => {
-    if (file) picked.current.set(s.slice(1, -1), file)
-    insert(s)
-  }
-  const insert = (s: string) => {
-    const el = box.current
-    const a = el?.selectionStart ?? text.length
-    const b = el?.selectionEnd ?? a
-    setText(text.slice(0, a) + s + text.slice(b))
-    requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(a + s.length, a + s.length)
-    })
-  }
+  const insert = (s: string) => box.current?.insert(s)
 
   const friendMenu = (p: ChatPerson): ContextEntry[] => [
     { label: t('chat.profile.view'), icon: <Users size={14} />, onSelect: () => setProfileOf(p.uuid) },
@@ -472,7 +457,7 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
     return [
       !m.deleted && { label: t('chat.reply'), icon: <Reply size={14} />, onSelect: () => (setEditing(null), setReplyTo(m), box.current?.focus()) },
       !m.deleted && m.kind === 'text' && { label: t('chat.copyText'), icon: <Copy size={14} />, onSelect: () => void navigator.clipboard.writeText(plainEmoji(m.body)) },
-      mine && m.kind === 'text' && !m.deleted && { label: t('chat.edit'), icon: <Pencil size={14} />, onSelect: () => (setReplyTo(null), setEditing(m), setText(forEditing(m.body, picked.current)), box.current?.focus()) },
+      mine && m.kind === 'text' && !m.deleted && { label: t('chat.edit'), icon: <Pencil size={14} />, onSelect: () => (setReplyTo(null), setEditing(m), setText(m.body), box.current?.focus()) },
       mine &&
         m.kind === 'text' &&
         !m.deleted && {
@@ -959,23 +944,20 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
                       <Gift />
                     </button>
                   )}
-                  <textarea
+                  <ChatComposer
                     ref={box}
                     className="input chat-box"
-                    rows={1}
                     value={text}
                     maxLength={2000}
                     placeholder={t('chat.placeholder', { name: group ? group.name : displayName(open, peer) })}
-                    onChange={(e) => setText(e.target.value)}
+                    onChange={setText}
                     onKeyDown={onKey}
-                    onPaste={(e) => {
-                      const files = [...e.clipboardData.files]
-                      if (files.length && v.drive) {
-                        e.preventDefault()
-                        addBlobs(files)
-                      }
+                    resolve={(token) => resolveEmoji(token, v.groups, open ?? undefined)}
+                    onPasteFiles={(files) => {
+                      if (!v.drive) return false
+                      addBlobs(files)
+                      return true
                     }}
-                    style={{ height: `${Math.min(160, 22 * Math.max(1, text.split('\n').length) + 16)}px` }}
                   />
                   <button className="btn ghost icon chat-emoji-btn" aria-label={t('chat.emoji.title')} title={t('chat.emoji.title')} onClick={() => setEmoji(!emoji)}>
                     <Smile />
@@ -991,7 +973,7 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
                   )}
                   {emoji && (
                     <EmojiPicker
-                      onPick={pickEmoji}
+                      onPick={insert}
                       onClose={() => setEmoji(false)}
                       groups={v.groups}
                       here={open ?? undefined}

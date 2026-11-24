@@ -6192,7 +6192,7 @@ const dict: Dict = {
   "status.site.about.payments": "購入と Stripe からの支払い確認。",
   "chat.emoji.manage": "絵文字を管理",
   "chat.emoji.managerTitle": "絵文字",
-  "chat.emoji.managerLead": "グループの絵文字はどのチャットでも使えます。フレンドとのチャットや他のグループでも。:名前: と入力するか、絵文字ボタンから選んでください。",
+  "chat.emoji.managerLead": "グループの絵文字はどのチャットでも使えます。そのグループでは :名前:、他の場所では :グループID|名前:（コピーで取得できます）と書くか、絵文字ボタンから選んでください。",
   "chat.emoji.noGroups": "グループの絵文字はまだありません",
   "chat.emoji.noGroupsHint": "グループの絵文字はオーナーと管理者が追加します。グループを作るか参加してください。",
   "chat.emoji.ofMax": "{count}/{max}",

@@ -6182,7 +6182,7 @@ const dict: Dict = {
   "status.site.about.payments": "购买以及来自 Stripe 的付款确认。",
   "chat.emoji.manage": "管理表情",
   "chat.emoji.managerTitle": "表情",
-  "chat.emoji.managerLead": "你所在群组的表情可以在所有聊天中使用：与好友的聊天和其他群组都可以。输入 :名称: 或用表情按钮选择。",
+  "chat.emoji.managerLead": "你所在群组的表情可以在所有聊天中使用。在所属群组中写 :名称:，在其他地方写 :群组ID|名称:（复制会给出这个），或用表情按钮选择。",
   "chat.emoji.noGroups": "还没有群组表情",
   "chat.emoji.noGroupsHint": "群组的表情由群主和管理员添加。创建或加入一个群组即可拥有。",
   "chat.emoji.ofMax": "{count}/{max}",
