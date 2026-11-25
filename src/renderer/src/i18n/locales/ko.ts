@@ -6352,6 +6352,8 @@ const dict: Dict = {
   "engine.community.pickIcon": "그림 고르기",
   "engine.community.iconType": "아이콘은 PNG, JPEG, WebP, GIF 그림이어야 해요",
   "engine.community.iconTooBig": "아이콘은 최대 512 KB예요",
+  "engine.chat.downloadingFile": "{name} 내려받는 중",
+  "engine.chat.downloadedOf": "{done} / {total} MB",
 }
 
 export default dict

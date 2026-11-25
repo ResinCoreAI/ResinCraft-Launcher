@@ -6357,6 +6357,8 @@ const dict: Dict = {
   "engine.community.pickIcon": "画像を選ぶ",
   "engine.community.iconType": "アイコンはPNG、JPEG、WebP、GIFの画像です",
   "engine.community.iconTooBig": "アイコンは512 KBまでです",
+  "engine.chat.downloadingFile": "{name}をダウンロード中",
+  "engine.chat.downloadedOf": "{done} / {total} MB",
 }
 
 export default dict

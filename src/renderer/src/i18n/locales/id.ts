@@ -6360,6 +6360,8 @@ const dict: Dict = {
   "engine.community.pickIcon": "Pilih gambar",
   "engine.community.iconType": "Ikon harus gambar PNG, JPEG, WebP, atau GIF",
   "engine.community.iconTooBig": "Ikon maksimal 512 KB",
+  "engine.chat.downloadingFile": "Mengunduh {name}",
+  "engine.chat.downloadedOf": "{done} dari {total} MB",
 }
 
 export default dict

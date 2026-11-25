@@ -6347,6 +6347,8 @@ const dict: Dict = {
   "engine.community.pickIcon": "选择图片",
   "engine.community.iconType": "图标必须是 PNG、JPEG、WebP 或 GIF 图片",
   "engine.community.iconTooBig": "图标最大 512 KB",
+  "engine.chat.downloadingFile": "正在下载 {name}",
+  "engine.chat.downloadedOf": "{done} / {total} MB",
 }
 
 export default dict

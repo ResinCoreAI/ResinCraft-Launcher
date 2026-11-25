@@ -702,4 +702,6 @@ export default {
   "engine.community.pickIcon": "Choose a picture",
   "engine.community.iconType": "An icon is a PNG, JPEG, WebP or GIF picture",
   "engine.community.iconTooBig": "An icon is at most 512 KB",
+  "engine.chat.downloadingFile": "Downloading {name}",
+  "engine.chat.downloadedOf": "{done} of {total} MB",
 }

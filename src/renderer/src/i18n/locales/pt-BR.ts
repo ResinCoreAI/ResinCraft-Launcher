@@ -6401,6 +6401,8 @@ const dict: Dict = {
   "engine.community.pickIcon": "Escolha uma imagem",
   "engine.community.iconType": "Um ícone é uma imagem PNG, JPEG, WebP ou GIF",
   "engine.community.iconTooBig": "Um ícone tem no máximo 512 KB",
+  "engine.chat.downloadingFile": "Baixando {name}",
+  "engine.chat.downloadedOf": "{done} de {total} MB",
 }
 
 export default dict

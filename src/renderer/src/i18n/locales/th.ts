@@ -6497,6 +6497,8 @@ const dict: Dict = {
   "servers.admin.community.deleteTitle": "ลบ {name}?",
   "servers.admin.community.deleteBody": "โปรเจกต์และไฟล์จะถูกลบถาวร เจ้าของก็จะไม่มีโปรเจกต์นี้อีก",
   "servers.admin.community.deleted": "ลบแล้ว",
+  "engine.chat.downloadingFile": "กำลังดาวน์โหลด {name}",
+  "engine.chat.downloadedOf": "{done} จาก {total} MB",
 }
 
 export default dict

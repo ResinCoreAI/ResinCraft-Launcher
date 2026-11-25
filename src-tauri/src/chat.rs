@@ -344,30 +344,55 @@ async fn file_local(id: &str) -> Result<PathBuf> {
         return Ok(dest);
     }
     use tokio::io::AsyncWriteExt;
-    let mut res = relay_send(|http, base| http.get(format!("{base}/api/chat/file/{id}")).timeout(std::time::Duration::from_secs(4 * 3600))).await?;
+    let res = relay_send(|http, base| http.get(format!("{base}/api/chat/file/{id}")).timeout(std::time::Duration::from_secs(4 * 3600))).await?;
     if !res.status().is_success() {
         relay_json(res).await?;
         bail!("couldn't download the file");
     }
-    // Written as it comes (an instance can be a gigabyte), never held whole in memory.
+    // Written as it comes (an instance can be a gigabyte), never held whole in memory. A big file is a task with a
+    // progress bar (the tasks corner), so a modpack's Install shows how far its download is.
     tokio::fs::create_dir_all(cache_dir()).await?;
     let tmp = dest.with_extension("part");
-    let mut out = tokio::fs::File::create(&tmp).await?;
-    let copied: Result<()> = async {
+    let total = res.content_length().unwrap_or(0);
+    let name = download_name(&res).unwrap_or_else(|| id.to_string());
+    let copy = |mut res: reqwest::Response, tmp: PathBuf, task: Option<std::sync::Arc<crate::core::events::Task>>| async move {
+        let mut out = tokio::fs::File::create(&tmp).await?;
+        let mut got = 0u64;
+        let mut shown = std::time::Instant::now();
         while let Some(chunk) = res.chunk().await.context("the download stopped")? {
             out.write_all(&chunk).await?;
+            got += chunk.len() as u64;
+            if let Some(t) = task.as_ref().filter(|_| shown.elapsed().as_millis() >= 250) {
+                shown = std::time::Instant::now();
+                let detail = crate::tr!("chat.downloadedOf", "{done} of {total} MB", done = got / 1_000_000, total = total.max(1) / 1_000_000);
+                t.update(detail, (total > 0).then(|| (got as f64 / total as f64).min(1.0)));
+            }
         }
         out.flush().await?;
-        Ok(())
-    }
-    .await;
-    drop(out);
+        anyhow::Ok(())
+    };
+    let copied: Result<()> = if total > BIG_DOWNLOAD {
+        let tmp2 = tmp.clone();
+        crate::core::events::Task::run(crate::tr!("chat.downloadingFile", "Downloading {name}", name = name), None, move |task| copy(res, tmp2, Some(task))).await
+    } else {
+        copy(res, tmp.clone(), None).await
+    };
     if let Err(e) = copied {
         let _ = tokio::fs::remove_file(&tmp).await;
         return Err(e);
     }
     tokio::fs::rename(&tmp, &dest).await?;
     Ok(dest)
+}
+
+/// Downloads bigger than this show as a task with a progress bar.
+const BIG_DOWNLOAD: u64 = 5_000_000;
+
+/// The file's name from the relay's answer (Content-Disposition), for the task's title.
+fn download_name(res: &reqwest::Response) -> Option<String> {
+    let h = res.headers().get("content-disposition")?.to_str().ok()?;
+    let name = h.split("filename=").nth(1)?.trim().trim_matches('"').to_string();
+    (!name.is_empty()).then_some(name)
 }
 
 /// A picture or voice message for the page: its type and base64 bytes.

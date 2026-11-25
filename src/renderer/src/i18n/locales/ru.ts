@@ -6419,6 +6419,8 @@ const dict: Dict = {
   "engine.community.pickIcon": "Выберите картинку",
   "engine.community.iconType": "Значок: картинка PNG, JPEG, WebP или GIF",
   "engine.community.iconTooBig": "Значок не больше 512 КБ",
+  "engine.chat.downloadingFile": "Скачивание {name}",
+  "engine.chat.downloadedOf": "{done} из {total} МБ",
 }
 
 export default dict

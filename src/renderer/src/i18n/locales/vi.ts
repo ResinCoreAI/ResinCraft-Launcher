@@ -6357,6 +6357,8 @@ const dict: Dict = {
   "engine.community.pickIcon": "Chọn hình",
   "engine.community.iconType": "Biểu tượng phải là ảnh PNG, JPEG, WebP hoặc GIF",
   "engine.community.iconTooBig": "Biểu tượng tối đa 512 KB",
+  "engine.chat.downloadingFile": "Đang tải {name}",
+  "engine.chat.downloadedOf": "{done} / {total} MB",
 }
 
 export default dict
