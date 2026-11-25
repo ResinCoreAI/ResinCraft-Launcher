@@ -2238,6 +2238,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "Taşı ve orijinalleri kaldır",
   'migrate.remove.removed': "Orijinal Geri Dönüşüm Kutusu’na taşındı",
   'migrate.remove.kept': "Orijinal korundu. {reason}",
+  'migrate.drive': "{drive} sürücüsü",
+  'migrate.scanningDrives': "Tüm sürücülerde başka başlatıcılar aranıyor…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "{name} kopyalanıyor",

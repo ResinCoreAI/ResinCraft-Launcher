@@ -30,6 +30,8 @@ const PRISM = 'C:/Users/you/AppData/Roaming/PrismLauncher'
 const CF = 'C:/Users/you/curseforge/minecraft'
 const MR = 'C:/Users/you/AppData/Roaming/ModrinthApp'
 const MC = 'C:/Users/you/AppData/Roaming/.minecraft'
+/** A portable Prism on another drive (found by the per-drive look, migrate/drives.rs). */
+const PRISM_E = 'E:/Games/PrismLauncher'
 const SERVER_DIR = 'D:/Servers/Survival SMP'
 
 function sources(): MigrateSource[] {
@@ -38,6 +40,7 @@ function sources(): MigrateSource[] {
       launcher: 'prism',
       label: 'Prism Launcher',
       path: PRISM,
+      drive: 'C:',
       items: [
         item({
           launcher: 'prism',
@@ -68,6 +71,7 @@ function sources(): MigrateSource[] {
       launcher: 'curseforge',
       label: 'CurseForge',
       path: CF,
+      drive: 'C:',
       items: [
         item({
           launcher: 'curseforge',
@@ -87,6 +91,7 @@ function sources(): MigrateSource[] {
       launcher: 'modrinth',
       label: 'Modrinth App',
       path: MR,
+      drive: 'C:',
       items: [
         item({
           launcher: 'modrinth',
@@ -104,9 +109,19 @@ function sources(): MigrateSource[] {
       ]
     },
     {
+      launcher: 'prism',
+      label: 'Prism Launcher',
+      path: PRISM_E,
+      drive: 'E:',
+      items: [
+        item({ launcher: 'prism', root: PRISM_E, name: 'Skyblock', mcVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.11', size: 260e6, mods: 31, worlds: 2 })
+      ]
+    },
+    {
       launcher: 'official',
       label: 'Minecraft Launcher',
       path: MC,
+      drive: 'C:',
       items: [
         item({ launcher: 'official', root: MC, path: MC, profile: 'a1', name: 'Latest release', mcVersion: '1.21.4', size: 96e6, worlds: 5 }),
         item({
@@ -131,6 +146,7 @@ const SERVER: MigrateSource = {
   launcher: 'folder',
   label: 'Folder',
   path: SERVER_DIR,
+  drive: 'D:',
   items: [
     item({
       launcher: 'folder',

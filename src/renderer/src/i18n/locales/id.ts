@@ -2228,6 +2228,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "Pindahkan dan hapus yang asli",
   'migrate.remove.removed': "Yang asli dipindah ke Recycle Bin",
   'migrate.remove.kept': "Yang asli tetap disimpan. {reason}",
+  'migrate.drive': "Drive {drive}",
+  'migrate.scanningDrives': "Mencari launcher lain di semua drive…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "Menyalin {name}",

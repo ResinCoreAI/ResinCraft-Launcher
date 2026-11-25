@@ -2288,6 +2288,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "Importer et retirer les originaux",
   'migrate.remove.removed': "Original déplacé dans la Corbeille",
   'migrate.remove.kept': "Original conservé. {reason}",
+  'migrate.drive': "Lecteur {drive}",
+  'migrate.scanningDrives': "Recherche d’autres launchers sur tous les lecteurs…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "Copie de {name}",

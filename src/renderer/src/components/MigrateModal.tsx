@@ -104,6 +104,8 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
   }
 
   const all = useMemo(() => (sources ?? []).flatMap((s) => s.items), [sources])
+  /** Drives are named only when the list spans more than one (the same launcher can turn up on two). */
+  const manyDrives = useMemo(() => new Set((sources ?? []).map((s) => s.drive).filter(Boolean)).size > 1, [sources])
   const chosen = all.filter((i) => picked.has(keyOf(i)) && importable(i))
 
   const labelOf = useMemo(() => new Map((sources ?? []).flatMap((s) => s.items.map((i) => [keyOf(i), s.label] as const))), [sources])
@@ -303,7 +305,7 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
     >
       {!sources ? (
         <div className="mg-scanning">
-          <Loader2 className="spin" /> {t('migrate.scanning')}
+          <Loader2 className="spin" /> {t('migrate.scanningDrives')}
         </div>
       ) : sources.length === 0 ? (
         <Empty
@@ -341,6 +343,7 @@ export default function MigrateModal({ servers, onClose, onImported }: { servers
                     aria-label={t('migrate.selectAll', { name: s.label })}
                   />
                   <b>{s.launcher === 'folder' ? t('migrate.folder') : s.label}</b>
+                  {manyDrives && s.drive && <span className="chip">{t('migrate.drive', { drive: s.drive })}</span>}
                   <span className="mono hint ellipsis grow" title={s.path}>
                     {s.path}
                   </span>

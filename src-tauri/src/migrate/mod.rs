@@ -5,6 +5,7 @@
 //! arguments, name and icon. The other launcher's files are only read, never moved or changed.
 
 pub mod copy;
+pub mod drives;
 pub mod formats;
 pub mod remove;
 pub mod server_dir;
@@ -61,6 +62,9 @@ pub struct Source {
     pub launcher: Launcher,
     pub label: String,
     pub path: String,
+    /// The drive it's on ("E:"; a mount point on Linux and macOS), so the same launcher on two drives can be told apart.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drive: Option<String>,
     pub items: Vec<Item>,
 }
 
@@ -140,7 +144,8 @@ fn home() -> PathBuf {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from).unwrap_or_default()
 }
 
-/// Default data folders, per system. Portable installs are found with "Choose a folder…".
+/// Default data folders, per system. Portable installs and other drives are in drives.rs; anything else is
+/// found with "Choose a folder…".
 fn default_roots() -> Vec<(Launcher, PathBuf)> {
     use Launcher::*;
     let h = home();
@@ -367,7 +372,7 @@ fn to_item(f: &Found, root: &Path, imported: &BTreeMap<String, String>) -> Item 
 fn source(launcher: Launcher, root: &Path, found: Vec<Found>, imported: &BTreeMap<String, String>) -> Source {
     let mut items: Vec<Item> = par_map(&found, |f| to_item(f, root, imported));
     items.sort_by(|a, b| a.r.server.cmp(&b.r.server).then_with(|| crate::content::index::display_cmp(&a.name, &b.name)));
-    Source { launcher, label: launcher.label().to_string(), path: root.to_string_lossy().into_owned(), items }
+    Source { launcher, label: launcher.label().to_string(), path: root.to_string_lossy().into_owned(), drive: drives::drive_of(root), items }
 }
 
 /// Bytes an item would copy. Asked for separately (and per item) because walking big instances takes a while,
@@ -376,19 +381,25 @@ pub async fn size_of(r: ItemRef) -> Result<u64> {
     Ok(tokio::task::spawn_blocking(move || reread(&r).map(|f| copy::size(&f.game_dir, &f.skip)).unwrap_or(0)).await?)
 }
 
-/// Every launcher found in its default place.
+/// How long one drive may take to answer before it's left out (a sleeping disk spinning up, a stuck mount).
+const DRIVE_TIME: Duration = Duration::from_secs(6);
+
+/// Every launcher found in its default place or in the usual places on any drive.
 pub async fn scan() -> Result<Vec<Source>> {
     let imported = imported_ids().await;
     let mut tasks = Vec::new();
-    let mut seen = HashSet::new();
-    for (launcher, root) in default_roots() {
-        if !root.is_dir() || !seen.insert(std::fs::canonicalize(&root).unwrap_or_else(|_| root.clone())) {
-            continue;
-        }
+    for ((launcher, drive), root) in all_roots().await {
         let imported = imported.clone();
         tasks.push(tokio::task::spawn_blocking(move || {
-            let found = read_root(launcher, &root);
-            (!found.is_empty()).then(|| source(launcher, &root, found, &imported))
+            let found = match launcher {
+                Launcher::Folder => formats::loose_minecraft(&root).into_iter().collect(),
+                _ => read_root(launcher, &root),
+            };
+            (!found.is_empty()).then(|| {
+                let mut s = source(launcher, &root, found, &imported);
+                s.drive = drive.or(s.drive);
+                s
+            })
         }));
     }
     let mut out = Vec::new();
@@ -398,6 +409,37 @@ pub async fn scan() -> Result<Vec<Source>> {
         }
     }
     Ok(out)
+}
+
+type Root = ((Launcher, Option<String>), PathBuf);
+
+/// The launcher data folders to read: the default places, then the usual places on every drive (all drives at
+/// once, each with `DRIVE_TIME`), with each folder listed once however it was reached.
+async fn all_roots() -> Vec<Root> {
+    let defaults = tokio::task::spawn_blocking(|| default_roots().into_iter().filter(|(_, r)| r.is_dir()).collect::<Vec<_>>());
+    let list = tokio::time::timeout(DRIVE_TIME, tokio::task::spawn_blocking(drives::list));
+    let list = list.await.ok().and_then(Result::ok).unwrap_or_default();
+    // An old Windows install's user folders are looked in, but not this one's other accounts.
+    let home_drive = drives::drive_of(&home());
+    let probes: Vec<_> = list
+        .into_iter()
+        .map(|d| {
+            let with_users = !cfg!(windows) || drives::drive_of(&d) != home_drive;
+            let label = drives::label(&d);
+            tokio::spawn(async move {
+                let probe = tokio::task::spawn_blocking(move || drives::probe(&d, with_users, root_kind));
+                match tokio::time::timeout(DRIVE_TIME, probe).await {
+                    Ok(Ok(found)) => found.into_iter().map(|(l, p)| ((l, Some(label.clone())), p)).collect(),
+                    _ => Vec::new(), // too slow or unreadable: left out, the rest still shows
+                }
+            })
+        })
+        .collect();
+    let mut roots: Vec<Root> = defaults.await.unwrap_or_default().into_iter().map(|(l, p)| ((l, None), p)).collect();
+    for p in probes {
+        roots.extend(p.await.unwrap_or_default());
+    }
+    tokio::task::spawn_blocking(move || drives::dedupe(roots, &mut HashSet::new(), drives::identity)).await.unwrap_or_default()
 }
 
 /// What's in a folder the player picked: a launcher's data folder, one instance or server, a folder of them,
@@ -719,6 +761,20 @@ mod tests {
                 );
             }
             println!("   measured in {:?}", started.elapsed());
+        }
+    }
+
+    /// What the usual places on this PC's drives hold (read only): `cargo test --lib real_drives -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn real_drives_on_this_pc() {
+        for d in drives::list() {
+            let started = std::time::Instant::now();
+            let found = drives::probe(&d, true, root_kind);
+            println!("== {} ({} places) in {:?}", drives::label(&d), drives::candidates(&d, cfg!(windows)).len(), started.elapsed());
+            for (l, p) in found {
+                println!("   {} {}", l.label(), p.display());
+            }
         }
     }
 }

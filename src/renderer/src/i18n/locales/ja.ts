@@ -2223,6 +2223,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "移行して元のデータを削除",
   'migrate.remove.removed': "元のデータをごみ箱に移動しました",
   'migrate.remove.kept': "元のデータは残しました。{reason}",
+  'migrate.drive': "ドライブ {drive}",
+  'migrate.scanningDrives': "すべてのドライブで他のランチャーを探しています…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "{name} をコピー中",

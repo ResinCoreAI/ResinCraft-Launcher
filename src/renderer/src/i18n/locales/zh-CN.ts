@@ -2215,6 +2215,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "迁移并删除原实例",
   'migrate.remove.removed': "已将原实例移到回收站",
   'migrate.remove.kept': "已保留原实例。{reason}",
+  'migrate.drive': "驱动器 {drive}",
+  'migrate.scanningDrives': "正在所有驱动器上查找其他启动器…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "正在复制 {name}",

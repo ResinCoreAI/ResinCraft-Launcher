@@ -2217,6 +2217,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "ย้ายและลบต้นฉบับ",
   'migrate.remove.removed': "ย้ายต้นฉบับไปที่ถังรีไซเคิลแล้ว",
   'migrate.remove.kept': "เก็บต้นฉบับไว้ {reason}",
+  'migrate.drive': "ไดรฟ์ {drive}",
+  'migrate.scanningDrives': "กำลังค้นหาลันเชอร์อื่นในทุกไดรฟ์…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "กำลังคัดลอก {name}",

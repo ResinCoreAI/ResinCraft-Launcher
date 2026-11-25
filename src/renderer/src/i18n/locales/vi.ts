@@ -2225,6 +2225,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "Chuyển và xóa bản gốc",
   'migrate.remove.removed': "Đã chuyển bản gốc vào Thùng rác",
   'migrate.remove.kept': "Đã giữ bản gốc. {reason}",
+  'migrate.drive': "Ổ {drive}",
+  'migrate.scanningDrives': "Đang tìm launcher khác trên mọi ổ đĩa…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "Đang sao chép {name}",

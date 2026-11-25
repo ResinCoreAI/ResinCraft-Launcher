@@ -37,6 +37,8 @@ export interface MigrateSource {
   launcher: MigrateLauncher
   label: string
   path: string
+  /** The drive it's on ("E:"; a mount point on Linux and macOS). */
+  drive?: string
   items: MigrateItem[]
 }
 

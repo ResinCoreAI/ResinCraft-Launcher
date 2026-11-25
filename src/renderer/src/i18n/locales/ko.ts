@@ -2218,6 +2218,8 @@ const dict: Dict = {
   'migrate.remove.confirm': "옮기고 원본 삭제",
   'migrate.remove.removed': "원본을 휴지통으로 이동했습니다",
   'migrate.remove.kept': "원본을 남겨 두었습니다. {reason}",
+  'migrate.drive': "드라이브 {drive}",
+  'migrate.scanningDrives': "모든 드라이브에서 다른 런처를 찾는 중…",
 
   // Move from another launcher (engine messages)
   'engine.migrate.copying': "{name} 복사 중",

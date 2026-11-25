@@ -46,5 +46,7 @@ export default {
   'migrate.remove.confirmKept': 'These stay where they are:',
   'migrate.remove.confirm': 'Move and remove the originals',
   'migrate.remove.removed': 'Original moved to the Recycle Bin',
-  'migrate.remove.kept': 'Kept the original. {reason}'
+  'migrate.remove.kept': 'Kept the original. {reason}',
+  'migrate.drive': 'Drive {drive}',
+  'migrate.scanningDrives': 'Looking for other launchers on every drive…'
 }
