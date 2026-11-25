@@ -3074,6 +3074,8 @@ export interface ResinApi {
     uninstall(): Promise<'uninstaller' | 'settings'>
     /** A .rctheme file's text. */
     readThemeFile(path: string): Promise<string>
+    /** A theme file's bytes (base64; PRAR or plain JSON) as its JSON text. */
+    themeFromBytes(base64: string): Promise<string>
   }
   settings: {
     get(): Promise<Settings>
@@ -3106,6 +3108,12 @@ export interface ResinApi {
     inspect(path: string): Promise<BackupInfo>
     /** Adds the backup to this launcher (nothing here is replaced). */
     import(path: string, useSettings: boolean): Promise<BackupImport>
+    /** Packs an instance into `<name>.resinpack` (PRAR) in the launcher's cache, for sending in chat. */
+    shareInstance(id: string): Promise<{ path: string; bytes: number }>
+    /** Removes a file `shareInstance` made, once it's sent. */
+    dropShare(path: string): Promise<void>
+    /** Adds the instance in a `.resinpack` (only that instance; no launch commands or Java settings come with it). */
+    importShare(path: string): Promise<{ id: string; name: string }>
   }
   /** Horizon's own launcher (playhorizon.dev), kept in the data folder. */
   horizon: {

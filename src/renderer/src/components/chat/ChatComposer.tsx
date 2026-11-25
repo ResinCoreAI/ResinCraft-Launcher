@@ -26,13 +26,14 @@ interface Props {
 }
 
 /** The box's text: text as it is, an emoji picture as what it was written with, a line break as "\n". */
-function textOf(node: Node): string {
+function textOf(node: Node, inner = false): string {
   let out = ''
   node.childNodes.forEach((n, i) => {
     if (n.nodeType === Node.TEXT_NODE) out += (n.nodeValue ?? '').replace(/​/g, '')
     else if (n instanceof HTMLImageElement) out += n.dataset.t ?? ''
-    else if (n instanceof HTMLBRElement) out += n.dataset.end ? '' : '\n'
-    else if (n instanceof HTMLElement) out += (i > 0 && (n.tagName === 'DIV' || n.tagName === 'P') ? '\n' : '') + textOf(n)
+    // A <br> that ends a line the browser made (a new line typed is `<div><br></div>`) only holds that line open.
+    else if (n instanceof HTMLBRElement) out += n.dataset.end || (inner && n === node.lastChild) ? '' : '\n'
+    else if (n instanceof HTMLElement) out += (i > 0 && (n.tagName === 'DIV' || n.tagName === 'P') ? '\n' : '') + textOf(n, true)
   })
   return out
 }
@@ -139,6 +140,15 @@ export const ChatComposer = forwardRef<ComposerHandle, Props>(function ChatCompo
     if (!root || composing.current) return
     let text = textOf(root)
     let caret = caretOf(root)
+    // Everything deleted: the browser leaves a <br> (or a <div><br></div>) to hold the line, which isn't a new line.
+    if (!root.textContent && !root.querySelector('img')) {
+      text = ''
+      if (root.childNodes.length) {
+        draw('', 0)
+        onChange('')
+        return
+      }
+    }
     if (text.length > maxLength) {
       // Over the limit: back to what it was.
       text = shown.current ?? ''

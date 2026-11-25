@@ -11,6 +11,11 @@
 //! Importing adds to what's there: an instance or server whose id already exists comes in under a new id, the
 //! Quick join list and skin library are merged, and the backup's settings are used only when asked (keeping this
 //! PC's Java path and watch folders). A failed or cancelled import removes what it added.
+//!
+//! Sending an instance in chat uses the same file with one instance in it, named `<name>.resinpack`
+//! (`share_instance`): PRAR where this build has PuirkleRAR, else a zip. Its receiver adds it with `import_share`,
+//! which takes only that instance from the file (nothing else in it is placed) and drops what only means something on
+//! the sender's PC or could run commands here (Java path and arguments, launch commands, environment, play time).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{Read, Write};
@@ -370,7 +375,7 @@ fn read_manifest(path: &Path) -> Result<Manifest> {
 /// Asks for a backup file to import. None if cancelled.
 pub async fn pick() -> Result<Option<String>> {
     let title = tr!("backup.openTitle", "Choose a ResinCraft backup").to_string();
-    let exts: &[&str] = if backup_prar::available() { &["prar", "resincraft"] } else { &["resincraft"] };
+    let exts: &[&str] = if backup_prar::available() { &["prar", "resincraft", SHARE_EXT] } else { &["resincraft", SHARE_EXT] };
     Ok(shell::pick_file(&title, &[("ResinCraft backup", exts)]).await?.map(|p| p.to_string_lossy().to_string()))
 }
 
@@ -433,7 +438,8 @@ fn should_place(dest: &Path, games: &Path, staging: &Path, made: &std::sync::Mut
 
 /// Unpacks a PRAR backup into a work folder next to the instances (same drive), then moves each file to where
 /// `target` puts it. The work folder is always removed.
-fn extract_prar(path: &Path, games: &Path, map: &HashMap<(String, String), String>, staging: &Path, stop: &AtomicBool, done: &AtomicU64, made: &std::sync::Mutex<Vec<PathBuf>>) -> Result<()> {
+#[allow(clippy::too_many_arguments)]
+fn extract_prar(path: &Path, games: &Path, map: &HashMap<(String, String), String>, staging: &Path, only: Option<&str>, stop: &AtomicBool, done: &AtomicU64, made: &std::sync::Mutex<Vec<PathBuf>>) -> Result<()> {
     let work = games.join(format!(".backup-import-{}", super::fsutil::now_ms()));
     let result = (|| {
         backup_prar::unpack(path, &work, stop, done)?;
@@ -441,7 +447,7 @@ fn extract_prar(path: &Path, games: &Path, map: &HashMap<(String, String), Strin
             if stop.load(Ordering::Relaxed) {
                 bail!(super::events::cancelled_error());
             }
-            if name == MANIFEST {
+            if name == MANIFEST || !allowed(&name, only) {
                 continue;
             }
             let Some(dest) = target(&name, map, games, staging) else { continue };
@@ -460,6 +466,11 @@ fn extract_prar(path: &Path, games: &Path, map: &HashMap<(String, String), Strin
     result
 }
 
+/// Whether an entry may be placed: everything, or with `only`, just that instance's own files (a shared instance).
+fn allowed(name: &str, only: Option<&str>) -> bool {
+    only.is_none_or(|id| name.strip_prefix("games/instances/").and_then(|r| r.strip_prefix(id)).is_some_and(|r| r.starts_with('/')))
+}
+
 /// A rename, or a copy when `to` is on another drive (the staging folder can be).
 fn move_file(from: &Path, to: &Path) -> Result<()> {
     if std::fs::rename(from, to).is_ok() {
@@ -472,7 +483,7 @@ fn move_file(from: &Path, to: &Path) -> Result<()> {
 
 /// Extracts the backup (on a blocking thread). Game files that exist already are kept. Returns the instance and
 /// server folders it made, so a failure can remove them.
-fn extract(path: &Path, map: &HashMap<(String, String), String>, staging: &Path, stop: &AtomicBool, done: &AtomicU64, made: &std::sync::Mutex<Vec<PathBuf>>) -> Result<()> {
+fn extract(path: &Path, map: &HashMap<(String, String), String>, staging: &Path, only: Option<&str>, stop: &AtomicBool, done: &AtomicU64, made: &std::sync::Mutex<Vec<PathBuf>>) -> Result<()> {
     let games = paths::games();
     let mut zip = zip::ZipArchive::new(std::fs::File::open(path)?)?;
     let mut buf = vec![0u8; 1 << 20];
@@ -481,7 +492,7 @@ fn extract(path: &Path, map: &HashMap<(String, String), String>, staging: &Path,
             bail!(super::events::cancelled_error());
         }
         let mut entry = zip.by_index(i)?;
-        if entry.is_dir() || entry.name() == MANIFEST {
+        if entry.is_dir() || entry.name() == MANIFEST || !allowed(entry.name(), only) {
             continue;
         }
         let Some(dest) = target(entry.name(), map, &games, staging) else { continue };
@@ -520,10 +531,19 @@ fn remap_ids_in(file: &Path, ids: &[(String, String)]) {
 
 /// Imports a backup. `use_settings`: take the backup's settings (keeping this PC's Java path and watch folders).
 pub async fn import(path: String, use_settings: bool) -> Result<ImportResult> {
+    Ok(import_with(path, use_settings, false).await?.0)
+}
+
+/// Imports a backup, or with `share` a `.resinpack` (its one instance only). Also gives the ids things came in under.
+async fn import_with(path: String, use_settings: bool, share: bool) -> Result<(ImportResult, HashMap<(String, String), String>, Manifest)> {
     if let Some(why) = storage::blocker().await {
         bail!(why);
     }
     let info = inspect(&path).await?;
+    if share && (info.manifest.instances.len() != 1 || !info.manifest.servers.is_empty() || info.manifest.game_files) {
+        bail_tr!("backup.notShare", "That isn't a ResinCraft instance file.");
+    }
+    let only = share.then(|| info.manifest.instances[0].id.clone());
     let format = info.kind;
     if let Some(free) = info.free_bytes {
         if free < info.manifest.bytes + 200 * 1024 * 1024 {
@@ -552,14 +572,15 @@ pub async fn import(path: String, use_settings: bool) -> Result<ImportResult> {
     }
     let staging = paths::cache().join(format!("backup-import-{}", super::fsutil::now_ms()));
     let total = m.bytes;
-    Task::run(tr!("backup.importing", "Importing a backup"), None, move |task| async move {
+    let title = if share { tr!("backup.addingShare", "Adding {name}", name = m.instances[0].name.clone()) } else { tr!("backup.importing", "Importing a backup") };
+    Task::run(title, None, move |task| async move {
         let (p, map2, st) = (PathBuf::from(&path), map.clone(), staging.clone());
         // On its own thread, which runs to the end even after Cancel drops this task: so it cleans up there too.
         let work = move |stop: Arc<AtomicBool>, done: Arc<AtomicU64>| {
             let made = std::sync::Mutex::new(Vec::<PathBuf>::new());
             let r = match format {
-                Format::Zip => extract(&p, &map2, &st, &stop, &done, &made),
-                Format::Prar => extract_prar(&p, &paths::games(), &map2, &st, &stop, &done, &made),
+                Format::Zip => extract(&p, &map2, &st, only.as_deref(), &stop, &done, &made),
+                Format::Prar => extract_prar(&p, &paths::games(), &map2, &st, only.as_deref(), &stop, &done, &made),
             };
             if r.is_err() {
                 // Take back what this import added (game files that came in are only caches).
@@ -586,13 +607,176 @@ pub async fn import(path: String, use_settings: bool) -> Result<ImportResult> {
                 remap_ids_in(&dir.join(f), &instance_ids);
             }
         }
+        if share {
+            let _ = tokio::fs::remove_dir_all(&staging).await;
+            let id = map.get(&("instances".to_string(), m.instances[0].id.clone())).cloned().unwrap_or_else(|| m.instances[0].id.clone());
+            let meta = paths::instance_dir(&id).join("instance.json");
+            if !meta.is_file() {
+                let _ = tokio::fs::remove_dir_all(paths::instance_dir(&id)).await;
+                bail_tr!("backup.notShare", "That isn't a ResinCraft instance file.");
+            }
+            clean_shared_meta(&meta, true);
+            let result = ImportResult { instances: 1, servers: 0, renamed: map.len(), skins: 0, quick_join: 0, settings: false };
+            return Ok((result, map, m));
+        }
         let skins = merge_skins(&staging.join("skins")).await;
         let quick_join = merge_quick_join(&staging.join("quickjoin.json"), &instance_ids).await;
         let settings_used = use_settings && apply_settings(&staging.join("settings.json")).await;
         let _ = tokio::fs::remove_dir_all(&staging).await;
-        Ok(ImportResult { instances: m.instances.len(), servers: m.servers.len(), renamed: map.len(), skins, quick_join, settings: settings_used })
+        Ok((ImportResult { instances: m.instances.len(), servers: m.servers.len(), renamed: map.len(), skins, quick_join, settings: settings_used }, map, m))
     })
     .await
+}
+
+// ----- Sharing an instance in chat: `.resinpack` -----
+
+pub const SHARE_EXT: &str = "resinpack";
+/// What of an instance's game folder goes: its content and the folders a modpack export suggests (worlds,
+/// screenshots, logs and the player's own options stay on this PC).
+const SHARE_FOLDERS: &[&str] = &["mods", "resourcepacks", "shaderpacks", "config", "defaultconfigs", "kubejs", "scripts", "global_packs", "datapacks", "patchouli_books", "openloader"];
+/// Fields of instance.json that only mean something on the sender's PC, or could run commands on the receiver's.
+const SHARE_DROPPED: &[&str] = &["javaPath", "jvmArgs", "env", "commands", "playtime", "playtimeBy", "lastPlayed", "group", "syncSettings", "pendingDownloads"];
+/// Share files older than this are leftovers (a send that never finished): removed when the next one is made.
+const SHARE_KEEP_SECS: u64 = 6 * 3600;
+
+/// Where share files are made (the launcher's cache).
+pub fn share_dir() -> PathBuf {
+    paths::cache().join("chat-send")
+}
+
+/// Drops `SHARE_DROPPED` from an instance's meta (and with `fresh`, makes it new: created now, never played).
+fn clean_shared_meta(meta: &Path, fresh: bool) {
+    let Some(mut v) = std::fs::read(meta).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok()) else { return };
+    let Some(o) = v.as_object_mut() else { return };
+    for k in SHARE_DROPPED {
+        o.remove(*k);
+    }
+    o.insert("playtime".into(), Value::from(0));
+    if fresh {
+        o.insert("createdAt".into(), Value::from(super::fsutil::now_ms()));
+    }
+    if let Ok(b) = serde_json::to_vec_pretty(&v) {
+        let _ = std::fs::write(meta, b);
+    }
+}
+
+/// A file name from an instance's name: its own letters, minus what Windows doesn't allow.
+fn share_file_name(name: &str, id: &str) -> String {
+    let clean: String = name.chars().map(|c| if c.is_control() || r#"<>:"/\|?*"#.contains(c) { '_' } else { c }).take(80).collect();
+    let clean = clean.trim().trim_end_matches('.').trim().to_string();
+    format!("{}.{SHARE_EXT}", if clean.is_empty() { id } else { &clean })
+}
+
+/// Removes share files left from sends that never finished.
+fn clear_old_shares(dir: &Path) {
+    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    for e in rd.flatten() {
+        let old = e.metadata().ok().and_then(|m| m.modified().ok()).and_then(|t| t.elapsed().ok()).is_some_and(|age| age.as_secs() > SHARE_KEEP_SECS);
+        if old && e.file_type().is_ok_and(|t| t.is_file()) {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
+}
+
+/// The share file, and its size.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareFile {
+    pub path: String,
+    pub bytes: u64,
+}
+
+/// Packs instance `id` into `<name>.resinpack` in `share_dir()`, for sending in chat. Remove it with `drop_share`
+/// once it's sent.
+pub async fn share_instance(id: String) -> Result<ShareFile> {
+    if let Some(why) = storage::blocker().await {
+        bail!(why);
+    }
+    let dir = paths::instance_dir(&id);
+    let meta = dir.join("instance.json");
+    if id.is_empty() || id.contains(['/', '\\']) || id.contains("..") || !meta.is_file() {
+        bail!("There's no instance {id}.");
+    }
+    let name = name_of(&meta);
+    let folder = share_dir();
+    tokio::fs::create_dir_all(&folder).await?;
+    let format = formats()[0];
+    Task::run(tr!("backup.sharing", "Packing {name}", name = name.clone()), Some(id.clone()), move |task| async move {
+        let (folder2, id2, name2) = (folder.clone(), id.clone(), name.clone());
+        // The meta goes as a cleaned copy (no Java path, launch commands, play time…).
+        let (files, manifest, dest, meta_copy) = tokio::task::spawn_blocking(move || -> Result<_> {
+            clear_old_shares(&folder2);
+            let dest = crate::content::export::free_path(&folder2, &share_file_name(&name2, &id2));
+            let meta_copy = folder2.join(format!(".{}-instance.json", super::fsutil::now_ms()));
+            std::fs::copy(dir.join("instance.json"), &meta_copy)?;
+            clean_shared_meta(&meta_copy, false);
+            let prefix = format!("games/instances/{id2}");
+            let mut files: Vec<Entry> = vec![(meta_copy.clone(), format!("{prefix}/instance.json"), std::fs::metadata(&meta_copy)?.len())];
+            // The instance's own top-level files (its picture…), not its game folder, natives or meta.
+            for e in std::fs::read_dir(&dir)?.flatten() {
+                let n = e.file_name().to_string_lossy().to_string();
+                if e.file_type().is_ok_and(|t| t.is_file()) && n != "instance.json" {
+                    files.push((e.path(), format!("{prefix}/{n}"), e.metadata().map(|m| m.len()).unwrap_or(0)));
+                }
+            }
+            let game = dir.join("minecraft");
+            for f in SHARE_FOLDERS {
+                walk(&game.join(f), &format!("{prefix}/minecraft/{f}"), &[], &mut files);
+            }
+            let manifest = Manifest {
+                format: FORMAT.into(),
+                version: VERSION,
+                app_version: env!("CARGO_PKG_VERSION").into(),
+                created: super::fsutil::now_ms(),
+                instances: vec![Item { id: id2, name: name2 }],
+                servers: vec![],
+                game_files: false,
+                bytes: files.iter().map(|f| f.2).sum(),
+            };
+            Ok((files, manifest, dest, meta_copy))
+        })
+        .await??;
+        let (d2, m2) = (dest.clone(), manifest.clone());
+        let label = move || tr!("backup.sharing", "Packing {name}", name = name.clone());
+        let written = match format {
+            Format::Zip => run_blocking(&task, label, manifest.bytes, move |stop, done| write_zip(&d2, &files, &m2, &stop, &done)).await,
+            Format::Prar => run_blocking(&task, label, backup_prar::SCALE, move |stop, done| backup_prar::write(&d2, files, &m2, &stop, &done)).await,
+        };
+        let _ = tokio::fs::remove_file(&meta_copy).await;
+        written?;
+        let bytes = tokio::fs::metadata(&dest).await?.len();
+        Ok(ShareFile { path: dest.to_string_lossy().to_string(), bytes })
+    })
+    .await
+}
+
+/// Removes a share file once it's sent (only files in `share_dir()`).
+pub async fn drop_share(path: &str) -> Result<()> {
+    let p = PathBuf::from(path);
+    let inside = match (p.parent().map(std::fs::canonicalize), std::fs::canonicalize(share_dir())) {
+        (Some(Ok(parent)), Ok(dir)) => parent == dir,
+        _ => false,
+    };
+    if inside && p.is_file() {
+        tokio::fs::remove_file(&p).await?;
+    }
+    Ok(())
+}
+
+/// What `import_share` added.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedInstance {
+    pub id: String,
+    pub name: String,
+}
+
+/// Adds the instance in a `.resinpack` (sent in chat) to this launcher, under a new id when its own is taken.
+pub async fn import_share(path: String) -> Result<SharedInstance> {
+    let (_, map, m) = import_with(path, false, true).await?;
+    let item = &m.instances[0];
+    let id = map.get(&("instances".to_string(), item.id.clone())).cloned().unwrap_or_else(|| item.id.clone());
+    Ok(SharedInstance { id, name: item.name.clone() })
 }
 
 fn gb(bytes: u64) -> String {
@@ -672,6 +856,9 @@ pub async fn handle(channel: &str, args: super::Args) -> Result<Value> {
         "backup:pick" => json(pick().await?),
         "backup:inspect" => json(inspect(&args.get::<String>(0)?).await?),
         "backup:import" => json(import(args.get::<String>(0)?, args.get::<Option<bool>>(1)?.unwrap_or(true)).await?),
+        "backup:shareInstance" => json(share_instance(args.get::<String>(0)?).await?),
+        "backup:dropShare" => json(drop_share(&args.get::<String>(0)?).await?),
+        "backup:importShare" => json(import_share(args.get::<String>(0)?).await?),
         _ => bail!("Unknown request: {channel}"),
     }
 }
@@ -798,7 +985,7 @@ mod tests {
         map.insert(("instances".to_string(), "cozy".to_string()), "cozy-2".to_string());
         let made = std::sync::Mutex::new(Vec::new());
         let done = AtomicU64::new(0);
-        extract_prar(&arc, &games, &map, &dir.join("staging"), &AtomicBool::new(false), &done, &made).unwrap();
+        extract_prar(&arc, &games, &map, &dir.join("staging"), None, &AtomicBool::new(false), &done, &made).unwrap();
         assert_eq!(std::fs::read(games.join("instances/cozy-2/minecraft/mods/shared.jar")).unwrap(), mod_jar);
         assert_eq!(std::fs::read(games.join("instances/smp/minecraft/mods/shared.jar")).unwrap(), mod_jar);
         assert_eq!(std::fs::read(games.join("libraries/a.jar")).unwrap(), b"mine");
@@ -808,11 +995,48 @@ mod tests {
         assert!(std::fs::read_dir(&games).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().starts_with(".backup-import")));
         // Cancelled: stops before anything is placed, and leaves no work folder.
         let games2 = dir.join("games2");
-        let cancelled = extract_prar(&arc, &games2, &HashMap::new(), &dir.join("staging2"), &AtomicBool::new(true), &AtomicU64::new(0), &std::sync::Mutex::new(Vec::new()));
+        let cancelled = extract_prar(&arc, &games2, &HashMap::new(), &dir.join("staging2"), None, &AtomicBool::new(true), &AtomicU64::new(0), &std::sync::Mutex::new(Vec::new()));
         assert!(cancelled.is_err_and(|e| super::super::events::is_cancelled(&e)));
         assert!(!games2.join("instances").exists());
         assert!(std::fs::read_dir(&games2).map(|rd| rd.count() == 0).unwrap_or(true));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_shared_instance_places_only_its_own_files() {
+        assert!(allowed("games/instances/cozy/minecraft/mods/a.jar", None));
+        assert!(allowed("games/libraries/a.jar", None));
+        let only = Some("cozy");
+        assert!(allowed("games/instances/cozy/instance.json", only));
+        assert!(allowed("games/instances/cozy/minecraft/mods/a.jar", only));
+        for bad in ["games/instances/cozy2/instance.json", "games/instances/other/x", "games/libraries/a.jar", "launcher/settings.json", "games/servers/cozy/x", "games/instances/cozy"] {
+            assert!(!allowed(bad, only), "{bad}");
+        }
+    }
+
+    #[test]
+    fn shared_meta_drops_what_belongs_to_the_sender() {
+        let dir = std::env::temp_dir().join(format!("resin-share-meta-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("instance.json");
+        std::fs::write(&f, r#"{"id":"cozy","name":"Cozy","javaPath":"C:/jdk/java.exe","jvmArgs":"-XX:OnOutOfMemoryError=calc","commands":{"preLaunch":"calc"},"env":[{"name":"A","value":"b"}],"playtime":99,"lastPlayed":5,"memoryMb":4096}"#).unwrap();
+        clean_shared_meta(&f, true);
+        let v: Value = serde_json::from_slice(&std::fs::read(&f).unwrap()).unwrap();
+        for k in ["javaPath", "jvmArgs", "commands", "env", "lastPlayed"] {
+            assert!(v.get(k).is_none(), "{k}");
+        }
+        assert_eq!(v["playtime"], 0);
+        assert_eq!(v["memoryMb"], 4096);
+        assert_eq!(v["name"], "Cozy");
+        assert!(v["createdAt"].as_i64().unwrap() > 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn share_file_names_are_safe() {
+        assert_eq!(share_file_name("RTX Remix", "rtx"), "RTX Remix.resinpack");
+        assert_eq!(share_file_name("a/b:c?", "x"), "a_b_c_.resinpack");
+        assert_eq!(share_file_name("  ...  ", "fallback"), "fallback.resinpack");
     }
 
     #[test]

@@ -6268,7 +6268,6 @@ const dict: Dict = {
   "chat.send.to": "Кому",
   "chat.send.sending": "Отправка…",
   "chat.send.exporting": "Упаковка сборки…",
-  "chat.send.instanceHint": "Уходит файлом модпака (.mrpack) с модами, ресурспаками, шейдерами и конфигами этой сборки внутри, поэтому может быть большим. Миры и скриншоты остаются на этом ПК.",
   "chat.send.noChat": "Чат для этой учётной записи недоступен. Войдите с учётной записью Microsoft, чтобы общаться с друзьями.",
   "chat.send.noFiles": "Этот relay не принимает файлы в чате.",
   "chat.send.files": "Файлов: {count}",
@@ -6327,6 +6326,15 @@ const dict: Dict = {
   "inbox.team.from": "Команда ResinCraft",
   "inbox.team.none": "Пока нет переписки с командой",
   "inbox.team.off": "Писать команде на этом релее нельзя",
+  "chat.send.instanceHintPack": "Отправляется как файл сборки ResinCraft (.resinpack, сжат с помощью PRAR) с модами, ресурспаками, шейдерами и настройками этой сборки. Миры и скриншоты остаются на этом ПК, а файл удаляется с этого ПК после отправки.",
+  "chat.send.chosen": {"one": "{count} чат", "few": "{count} чата", "many": "{count} чатов", "other": "{count} чата"},
+  "chat.send.failedTo": "Не удалось отправить {item} для {name}: {why}",
+  "chat.file.addInstance": "Добавить сборку",
+  "chat.file.instanceAdded": "{name} теперь в вашей библиотеке.",
+  "chat.file.openInstance": "Открыть",
+  "engine.backup.sharing": "Упаковка {name}",
+  "engine.backup.addingShare": "Добавление {name}",
+  "engine.backup.notShare": "Это не файл сборки ResinCraft.",
 }
 
 export default dict

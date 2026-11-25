@@ -6219,7 +6219,6 @@ const dict: Dict = {
   "chat.send.to": "Alıcı",
   "chat.send.sending": "Gönderiliyor…",
   "chat.send.exporting": "Profil paketleniyor…",
-  "chat.send.instanceHint": "Bu kurulumun kendi modları, kaynak paketleri, gölgelendiricileri ve ayarları içinde bir modpack dosyası (.mrpack) olarak gider, bu yüzden büyük olabilir. Dünyalar ve ekran görüntüleri bu bilgisayarda kalır.",
   "chat.send.noChat": "Bu hesapta sohbet kapalı. Arkadaşlarınla sohbet etmek için Microsoft hesabıyla giriş yap.",
   "chat.send.noFiles": "Bu relay sohbette dosya kabul etmiyor.",
   "chat.send.files": "{count} dosya",
@@ -6278,6 +6277,15 @@ const dict: Dict = {
   "inbox.team.from": "ResinCraft ekibi",
   "inbox.team.none": "Ekiple henüz bir konuşma yok",
   "inbox.team.off": "Bu relay'de ekibe yazma kapalı",
+  "chat.send.instanceHintPack": "Bu kurulumun modları, kaynak paketleri, gölgelendiricileri ve ayarlarıyla bir ResinCraft kurulum dosyası (.resinpack, PRAR ile küçük paketlenmiş) olarak gider. Dünyalar ve ekran görüntüleri bu bilgisayarda kalır, dosya gönderildikten sonra bu bilgisayardan silinir.",
+  "chat.send.chosen": {"one": "{count} sohbet", "other": "{count} sohbet"},
+  "chat.send.failedTo": "{item}, {name} kişisine gönderilemedi: {why}",
+  "chat.file.addInstance": "Kurulumu ekle",
+  "chat.file.instanceAdded": "{name} kitaplığına eklendi.",
+  "chat.file.openInstance": "Aç",
+  "engine.backup.sharing": "{name} paketleniyor",
+  "engine.backup.addingShare": "{name} ekleniyor",
+  "engine.backup.notShare": "Bu bir ResinCraft kurulum dosyası değil.",
 }
 
 export default dict

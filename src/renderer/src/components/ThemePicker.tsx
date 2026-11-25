@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Download, Monitor, Pencil, Plus, Sparkles, Trash2, Upload } from 'lucide-react'
 import type { CustomTheme, Settings } from '@shared/types'
 import { api } from '../api'
+import { base64Of } from '../chatState'
 import { useStore } from '../store'
 import { cssVarIn, draftFromScreen, forgetPicture, importThemeText, notATheme, pictureFor, setCssVar, themeFile, themeFromScreen } from '../customTheme'
 import { CssGuide } from './CssGuide'
@@ -83,11 +84,17 @@ export function ThemePicker({ s, set }: { s: Settings; set: (patch: Partial<Sett
       toast((e as Error).message, 'error')
     }
   }
+  // A theme file is PRAR (read by the engine) or, from before, the JSON itself.
+  const themeFileText = async (file: File) => {
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
+    if (String.fromCharCode(...head) !== 'PRAR') return file.text()
+    return api.app.themeFromBytes(await base64Of(file))
+  }
   const importFile = async (file: File | undefined, input: HTMLInputElement) => {
     input.value = ''
     if (!file) return
     try {
-      const theme = await importThemeText(await file.text())
+      const theme = await importThemeText(await themeFileText(file))
       saveTheme(theme)
       toast(t('settings.themeMaker.imported', { name: theme.name }), 'success')
     } catch (e) {

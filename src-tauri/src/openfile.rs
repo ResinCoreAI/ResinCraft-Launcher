@@ -1,7 +1,7 @@
-//! Files Windows asks ResinCraft to open (double-click, "Open with"): themes (`.rctheme`), backups (`.resincraft`)
-//! and modpacks (`.mrpack`, CurseForge `.zip`). The first start keeps the file until the UI is up and asks
+//! Files Windows asks ResinCraft to open (double-click, "Open with"): themes (`.rctheme`), backups (`.resincraft`),
+//! instances sent in chat (`.resinpack`) and modpacks (`.mrpack`, CurseForge `.zip`). The first start keeps the file until the UI is up and asks
 //! (`app:pendingOpen`); opening one while ResinCraft runs comes through the single-instance plugin, and the UI hears
-//! `openFile`. tauri.conf.json registers `.rctheme` and `.resincraft` as ResinCraft's own.
+//! `openFile`. tauri.conf.json registers `.rctheme`, `.resincraft` and `.resinpack` as ResinCraft's own.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -12,10 +12,12 @@ use serde_json::json;
 use crate::core::events;
 
 /// The kinds of file ResinCraft opens.
-const KINDS: [&str; 4] = ["rctheme", "resincraft", "mrpack", "zip"];
+const KINDS: [&str; 5] = ["rctheme", "resincraft", "resinpack", "mrpack", "zip"];
 
 /// A theme file is JSON with its picture inside: 8 MB as base64 plus the rest.
 const MAX_THEME_BYTES: u64 = 16 * 1024 * 1024;
+/// The JSON's name inside a PRAR theme file.
+const THEME_ENTRY: &str = "theme.json";
 
 static PENDING: Mutex<Option<String>> = Mutex::new(None);
 static PENDING_LINK: Mutex<Option<String>> = Mutex::new(None);
@@ -118,12 +120,75 @@ pub async fn read_theme(path: &str) -> Result<String> {
     if tokio::fs::metadata(p).await?.len() > MAX_THEME_BYTES {
         bail!("That theme file is too big.");
     }
-    Ok(tokio::fs::read_to_string(p).await?)
+    theme_text(tokio::fs::read(p).await?).await
+}
+
+/// `app:themeFromBytes`: a theme file's bytes (base64) as its JSON text.
+pub async fn theme_from_base64(b64: &str) -> Result<String> {
+    use base64::Engine;
+    if b64.len() as u64 > MAX_THEME_BYTES * 4 / 3 + 4 {
+        bail!("That theme file is too big.");
+    }
+    theme_text(base64::engine::general_purpose::STANDARD.decode(b64.trim())?).await
+}
+
+/// A theme file's JSON: unpacked from PRAR, or (themes saved before, and by builds without PuirkleRAR) the file itself.
+async fn theme_text(bytes: Vec<u8>) -> Result<String> {
+    if !bytes.starts_with(b"PRAR") {
+        return Ok(String::from_utf8(bytes)?);
+    }
+    if !crate::core::backup_prar::available() {
+        bail!("This build of ResinCraft can't open PRAR theme files.");
+    }
+    tokio::task::spawn_blocking(move || {
+        let work = std::env::temp_dir().join(format!("resincraft-theme-{}-{}", std::process::id(), crate::core::fsutil::now_ms()));
+        let read = (|| {
+            std::fs::create_dir_all(&work)?;
+            let file = work.join("theme.rctheme");
+            std::fs::write(&file, &bytes)?;
+            crate::core::backup_prar::unpack_small(&file, &work.join("out"))?;
+            let json = work.join("out").join(THEME_ENTRY);
+            if std::fs::metadata(&json)?.len() > MAX_THEME_BYTES {
+                bail!("That theme file is too big.");
+            }
+            Ok(std::fs::read_to_string(json)?)
+        })();
+        let _ = std::fs::remove_dir_all(&work);
+        read
+    })
+    .await?
+}
+
+/// Writes a theme's JSON to `dest` as a PRAR file (on a blocking thread).
+pub fn pack_theme(dest: &Path, text: &str) -> Result<()> {
+    let tmp = std::env::temp_dir().join(format!("resincraft-theme-{}-{}.json", std::process::id(), crate::core::fsutil::now_ms()));
+    std::fs::write(&tmp, text)?;
+    let r = crate::core::backup_prar::pack_small(dest, &[(THEME_ENTRY.to_string(), tmp.clone())], None);
+    let _ = std::fs::remove_file(&tmp);
+    r
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn theme_files_are_prar_or_plain_json() {
+        assert_eq!(theme_text(br#"{"name":"Old"}"#.to_vec()).await.unwrap(), r#"{"name":"Old"}"#);
+        if !crate::core::backup_prar::available() {
+            return;
+        }
+        let dest = std::env::temp_dir().join(format!("rc-theme-prar-{}.rctheme", std::process::id()));
+        let json = format!(r#"{{"name":"New","image":"{}"}}"#, "A".repeat(100_000));
+        pack_theme(&dest, &json).unwrap();
+        let bytes = std::fs::read(&dest).unwrap();
+        assert!(bytes.starts_with(b"PRAR"));
+        assert!(bytes.len() < json.len() / 4, "{}", bytes.len());
+        assert_eq!(read_theme(&dest.to_string_lossy()).await.unwrap(), json);
+        use base64::Engine;
+        assert_eq!(theme_from_base64(&base64::engine::general_purpose::STANDARD.encode(&bytes)).await.unwrap(), json);
+        let _ = std::fs::remove_file(&dest);
+    }
 
     #[test]
     fn finds_the_file_among_the_arguments() {

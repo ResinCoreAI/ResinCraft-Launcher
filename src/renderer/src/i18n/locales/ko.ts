@@ -6201,7 +6201,6 @@ const dict: Dict = {
   "chat.send.to": "받는 곳",
   "chat.send.sending": "보내는 중…",
   "chat.send.exporting": "인스턴스를 묶는 중…",
-  "chat.send.instanceHint": "이 인스턴스의 모드, 리소스 팩, 셰이더, 설정 파일을 그대로 담은 모드팩 파일(.mrpack)로 보내서 용량이 클 수 있어요. 월드와 스크린샷은 이 PC에 남아요.",
   "chat.send.noChat": "이 계정은 채팅을 쓸 수 없어요. Microsoft 계정으로 로그인하면 친구와 채팅할 수 있어요.",
   "chat.send.noFiles": "이 릴레이는 채팅 파일을 받지 않아요.",
   "chat.send.files": "파일 {count}개",
@@ -6260,6 +6259,15 @@ const dict: Dict = {
   "inbox.team.from": "ResinCraft 팀",
   "inbox.team.none": "아직 팀과 나눈 대화가 없어요",
   "inbox.team.off": "이 릴레이에서는 팀에 문의하기가 꺼져 있어요",
+  "chat.send.instanceHintPack": "이 인스턴스의 모드, 리소스 팩, 셰이더, 설정이 담긴 ResinCraft 인스턴스 파일(.resinpack, PRAR로 작게 압축)로 보냅니다. 월드와 스크린샷은 이 PC에 남고, 파일은 보낸 뒤 이 PC에서 삭제됩니다.",
+  "chat.send.chosen": {"other": "채팅 {count}개"},
+  "chat.send.failedTo": "{item}을(를) {name}에게 보내지 못했어요: {why}",
+  "chat.file.addInstance": "인스턴스 추가",
+  "chat.file.instanceAdded": "{name}이(가) 라이브러리에 추가됐어요.",
+  "chat.file.openInstance": "열기",
+  "engine.backup.sharing": "{name} 압축 중",
+  "engine.backup.addingShare": "{name} 추가 중",
+  "engine.backup.notShare": "ResinCraft 인스턴스 파일이 아니에요.",
 }
 
 export default dict

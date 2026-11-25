@@ -51,6 +51,7 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       storageImport: fn('app:storageImport'),
       uninstall: fn('app:uninstall'),
       readThemeFile: fn('app:readThemeFile'),
+      themeFromBytes: fn('app:themeFromBytes'),
       showItem: fn('app:showItem'),
       pathForFile
     },
@@ -67,7 +68,10 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       formats: fn('backup:formats'),
       pick: fn('backup:pick'),
       inspect: fn('backup:inspect'),
-      import: fn('backup:import')
+      import: fn('backup:import'),
+      shareInstance: fn('backup:shareInstance'),
+      dropShare: fn('backup:dropShare'),
+      importShare: fn('backup:importShare')
     },
     horizon: {
       status: fn('horizon:status'),

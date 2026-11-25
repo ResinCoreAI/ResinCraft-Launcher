@@ -29,6 +29,13 @@ export default function OpenFiles() {
         } else if (ext === 'resincraft') {
           go({ page: 'settings' })
           requestBackupOpen(path)
+        } else if (ext === 'resinpack') {
+          toast(t('drop.importing', { name }), 'info')
+          const inst = await api.backup.importShare(path)
+          await refreshInstances()
+          toast(t('drop.imported', { name: inst.name }))
+          celebrate()
+          go({ page: 'instance', id: inst.id })
         } else if (ext === 'mrpack' || ext === 'zip') {
           toast(t('drop.importing', { name }), 'info')
           const inst = await api.content.importModpackFile(path)

@@ -332,6 +332,9 @@ export function mockApi(): ResinApi {
       readThemeFile: async () => {
         throw new Error('The browser preview has no files to open.')
       },
+      themeFromBytes: async () => {
+        throw new Error("The browser preview can't open PRAR theme files.")
+      },
       // The browser preview has no save dialog: a download stands in for it.
       // A placeholder square in the browser preview (the app draws the real code).
       qrSvg: async () =>
@@ -389,6 +392,20 @@ export function mockApi(): ResinApi {
       import: async () => {
         await mockEngine.download({ key: 'backup.importing', text: 'Importing a backup', params: {} })
         return { instances: instances.length, servers: 1, renamed: 2, skins: 3, quickJoin: 4, settings: true }
+      },
+      shareInstance: async (id) => {
+        const inst = instances.find((i) => i.id === id)
+        await mockEngine.download({ key: 'backup.sharing', text: `Packing ${inst?.name ?? id}`, params: { name: inst?.name ?? id } })
+        return { path: `C:\\Users\\you\\AppData\\Roaming\\ResinCraft Launcher\\cache\\chat-send\\${inst?.name ?? id}.resinpack`, bytes: 31.2e6 }
+      },
+      dropShare: async () => {},
+      importShare: async (path) => {
+        const name = (path.split(/[\\/]/).pop() ?? 'Shared').replace(/\.resinpack$/i, '')
+        await mockEngine.download({ key: 'backup.addingShare', text: `Adding ${name}`, params: { name } })
+        const base = instances[0]
+        const id = `${base.id}-shared-${instances.length}`
+        instances = [...instances, { ...base, id, name, createdAt: Date.now(), playtime: 0, lastPlayed: undefined }]
+        return { id, name }
       }
     },
     update: updates.update,

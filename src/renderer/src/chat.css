@@ -802,7 +802,8 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.chat-pick-row:hover {
+.chat-pick-row:hover,
+.chat-pick-row:has(input:checked) {
   background: var(--surface-2);
 }
 .chat-note {

@@ -291,6 +291,18 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
     const el = list.current
     if (el && pinned.current) el.scrollTop = el.scrollHeight
   }, [messages, open])
+  // And while the list changes size: the message box growing or shrinking, a reply bar, pictures loading.
+  useEffect(() => {
+    const el = list.current
+    if (!el) return
+    const keep = () => {
+      if (pinned.current) el.scrollTop = el.scrollHeight
+    }
+    const ro = new ResizeObserver(keep)
+    ro.observe(el)
+    for (const child of Array.from(el.children)) ro.observe(child)
+    return () => ro.disconnect()
+  }, [open, messages.length])
   useEffect(() => {
     pinned.current = true
     setReplyTo(null)

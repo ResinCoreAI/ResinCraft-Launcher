@@ -6209,7 +6209,6 @@ const dict: Dict = {
   "chat.send.to": "Kirim ke",
   "chat.send.sending": "Mengirim…",
   "chat.send.exporting": "Mengemas instance…",
-  "chat.send.instanceHint": "Dikirim sebagai file modpack (.mrpack) berisi mod, resource pack, shader, dan config instance ini, jadi ukurannya bisa besar. Dunia dan tangkapan layar tetap di PC ini.",
   "chat.send.noChat": "Chat tidak aktif untuk akun ini. Masuk dengan akun Microsoft untuk chat dengan teman.",
   "chat.send.noFiles": "Relay ini tidak menerima file di chat.",
   "chat.send.files": "{count} file",
@@ -6268,6 +6267,15 @@ const dict: Dict = {
   "inbox.team.from": "Tim ResinCraft",
   "inbox.team.none": "Belum ada percakapan dengan tim",
   "inbox.team.off": "Menulis ke tim dimatikan di relay ini",
+  "chat.send.instanceHintPack": "Dikirim sebagai file instance ResinCraft (.resinpack, dikemas kecil dengan PRAR) berisi mod, resource pack, shader, dan config instance ini. Dunia dan tangkapan layar tetap di PC ini, dan file dihapus dari PC ini setelah terkirim.",
+  "chat.send.chosen": {"other": "{count} obrolan"},
+  "chat.send.failedTo": "Gagal mengirim {item} ke {name}: {why}",
+  "chat.file.addInstance": "Tambah instance",
+  "chat.file.instanceAdded": "{name} sudah ada di Pustaka kamu.",
+  "chat.file.openInstance": "Buka",
+  "engine.backup.sharing": "Mengemas {name}",
+  "engine.backup.addingShare": "Menambahkan {name}",
+  "engine.backup.notShare": "Itu bukan file instance ResinCraft.",
 }
 
 export default dict

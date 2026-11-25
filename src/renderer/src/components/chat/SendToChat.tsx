@@ -1,19 +1,20 @@
-// "Send to chat" from anywhere in the launcher: pick a friend's chat or a group, add a note, send. What can go:
+// "Send to chat" from anywhere in the launcher: pick friends' chats and groups (one or several), add a note, send.
+// What can go:
 // - a mod, modpack, shader or resource pack: its share link (rscraft.resincore.tech/mod/…), which shows as a card with
 //   Open (Embeds.tsx ModCard); a file with no project behind it goes as the file;
-// - an instance: exported as a .mrpack with its own files inside (mods, resource packs, shaders, configs and the other
-//   suggested folders; nothing is looked up on Modrinth or CurseForge), which the receiver installs from the chat;
+// - an instance: packed with PRAR into `<name>.resinpack` (backup.rs share_instance: its own mods, resource packs,
+//   shaders, configs and the other suggested folders), which the receiver adds from the chat. The file is made once
+//   for every chat it goes to, and removed from this PC once it's sent (or failed);
 // - files: screenshots (as pictures) and config or other files from an instance's Files tab;
 // - a Store item: its card with the price.
 // One host (SendToChatHost, in App) shows the window; anything opens it with sendToChat(item).
 import { useEffect, useState } from 'react'
 import { Send } from 'lucide-react'
-import type { Instance } from '@shared/types'
+import type { ChatFile, Instance } from '@shared/types'
 import { api } from '../../api'
 import { chat, dmId, showChat, useChat } from '../../chatState'
 import { useStore } from '../../store'
 import { t } from '../../i18n'
-import { dataPath } from '../../util'
 import { Modal } from '../ui'
 import { GroupTile } from './ChatGroups'
 import PlayerHead from '../PlayerHead'
@@ -69,75 +70,79 @@ export async function pictureSize(dataUrl: string): Promise<{ w: number; h: numb
 
 export function SendToChatModal({ item, onClose }: { item: Sendable; onClose: () => void }) {
   const v = useChat()
-  const { toast, info, activeAccount, go } = useStore()
-  const [to, setTo] = useState('')
+  const { toast, go } = useStore()
+  const [to, setTo] = useState<string[]>([])
   const [note, setNote] = useState('')
   const chats = [
     ...v.groups.map((g) => ({ conv: g.conv, name: g.name, group: true, uuid: '' })),
     ...v.friends.friends.map((f) => ({ conv: f.conv ?? dmId(v.me, f.uuid), name: f.name, group: false, uuid: f.uuid }))
   ]
+  const toggle = (conv: string) => setTo((list) => (list.includes(conv) ? list.filter((c) => c !== conv) : [...list, conv]))
   const needsFiles = item.kind === 'files' || item.kind === 'instance'
   const limit = v.maxUploadMb * 1_000_000
   const tooBig = item.kind === 'files' && item.files.some((f) => (f.size ?? 0) > limit)
   // Why it can't go: no chat for this account, or this relay doesn't take files.
   const blocked = v.status !== 'ready' ? t('chat.send.noChat') : needsFiles && !v.drive ? t('chat.send.noFiles') : tooBig ? t('chat.files.tooBig', { size: v.maxUploadMb }) : ''
 
-  const upload = async (conv: string, path: string, image?: boolean, size?: { w: number; h: number }) =>
-    chat.uploadPath(conv, path, image ? 'image' : 'file', image && size ? { w: size.w, h: size.h } : undefined)
-
-  // Send closes the window at once: packing an instance takes a while, and it shows its progress where exports do
-  // (the instance page and the tasks corner). A toast says when it's in the chat, or why it isn't.
+  // Send closes the window at once: packing an instance takes a while, and it shows its progress where tasks do (the
+  // instance page and the tasks corner). A toast says which chats have it, or why some don't.
   const send = () => {
-    const target = chats.find((c) => c.conv === to)
-    if (!target) return
+    const targets = chats.filter((c) => to.includes(c.conv))
+    if (targets.length === 0) return
     const text = note.trim()
+    const names = targets.map((c) => c.name).join(', ')
     onClose()
-    if (item.kind === 'instance' || item.kind === 'files') toast(t('chat.send.inBackground', { item: item.title, name: target.name }), 'info')
+    if (item.kind === 'instance' || item.kind === 'files') toast(t('chat.send.inBackground', { item: item.title, name: names }), 'info')
     void (async () => {
-      if (item.kind === 'link') {
-        await chat.send(to, text ? `${text}
-${item.url}` : item.url)
-      } else if (item.kind === 'store') {
-        await chat.share(to, { type: 'store', product: item.product }, text)
-      } else if (item.kind === 'files') {
-        const sent = []
-        for (const f of item.files) {
-          let size: { w: number; h: number } | undefined
-          if (f.image && f.measure) size = await f.measure().catch(() => undefined)
-          sent.push(await upload(to, f.path, f.image, size))
+      // An instance is packed once, for every chat, and the file goes once it's sent everywhere it can.
+      let packed: string | null = null
+      try {
+        let files: SendFile[] = item.kind === 'files' ? item.files : []
+        if (item.kind === 'instance') {
+          const r = await api.backup.shareInstance(item.inst.id)
+          packed = r.path
+          if (r.bytes > limit) throw new Error(t('chat.send.packTooBig', { size: Math.ceil(r.bytes / 1_000_000), max: v.maxUploadMb }))
+          files = [{ path: r.path }]
         }
-        await chat.sendFiles(to, text, sent)
-      } else {
-        // An instance: as a .mrpack in the launcher's cache, then like any file.
-        if (!info) throw new Error(t('chat.send.noChat'))
-        const own = item.inst.ownPack
-        const include = (await api.content.exportPreview(item.inst.id)).filter((e) => e.suggested).map((e) => e.name)
-        const r = await api.content.exportModpackTo(
-          item.inst.id,
-          {
-            format: 'mrpack',
-            name: own?.name || item.inst.modpack?.name || item.inst.name,
-            version: own?.version || '1.0.0',
-            author: own?.author || activeAccount?.username || '',
-            summary: own?.summary ?? '',
-            include,
-            // The instance's own files, as they are: no lookups, and it's exactly what this PC plays.
-            bundleAll: true
-          },
-          dataPath(info.dataDir, 'cache', 'chat-send')
-        )
-        if (r.size > limit) throw new Error(t('chat.send.packTooBig', { size: Math.ceil(r.size / 1_000_000), max: v.maxUploadMb }))
-        await chat.sendFiles(to, text, [await upload(to, r.path)])
+        // A picture's size is read once, for every chat.
+        const sizes = new Map<string, { w: number; h: number } | undefined>()
+        for (const f of files) if (f.image && f.measure) sizes.set(f.path, await f.measure().catch(() => undefined))
+        const sendTo = async (conv: string) => {
+          if (item.kind === 'link') return chat.send(conv, text ? `${text}\n${item.url}` : item.url)
+          if (item.kind === 'store') return chat.share(conv, { type: 'store', product: item.product }, text)
+          const sent: ChatFile[] = []
+          for (const f of files) {
+            const size = sizes.get(f.path)
+            sent.push(await chat.uploadPath(conv, f.path, f.image ? 'image' : 'file', f.image && size ? { w: size.w, h: size.h } : undefined))
+          }
+          return chat.sendFiles(conv, text, sent)
+        }
+        const done: typeof targets = []
+        const failed: { name: string; why: string }[] = []
+        for (const c of targets) {
+          try {
+            await sendTo(c.conv)
+            done.push(c)
+          } catch (e) {
+            failed.push({ name: c.name, why: (e as Error).message })
+          }
+        }
+        return { done, failed }
+      } finally {
+        if (packed) await api.backup.dropShare(packed).catch(() => {})
       }
     })().then(
-      () =>
-        toast(t('chat.share.sent', { name: target.name }), 'success', {
-          label: t('chat.openChat'),
-          run: () => {
-            showChat(to)
-            go({ page: 'inbox' })
-          }
-        }),
+      ({ done, failed }) => {
+        if (done.length > 0)
+          toast(t('chat.share.sent', { name: done.map((c) => c.name).join(', ') }), 'success', {
+            label: t('chat.openChat'),
+            run: () => {
+              showChat(done[0].conv)
+              go({ page: 'inbox' })
+            }
+          })
+        for (const f of failed) toast(t('chat.send.failedTo', { item: item.title, name: f.name, why: f.why }), 'error')
+      },
       (e) => toast(t('chat.send.failed', { item: item.title, why: (e as Error).message }), 'error')
     )
   }
@@ -145,15 +150,16 @@ ${item.url}` : item.url)
   return (
     <Modal
       title={t('chat.send.title', { item: item.title })}
-      subtitle={item.kind === 'instance' ? t('chat.send.instanceHint') : undefined}
+      subtitle={item.kind === 'instance' ? t('chat.send.instanceHintPack') : undefined}
       onClose={onClose}
       footer={
         <>
+          {to.length > 1 && <span className="hint">{t('chat.send.chosen', { count: to.length })}</span>}
           <div className="spacer" />
           <button className="btn ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn primary" disabled={!to || !!blocked} onClick={send}>
+          <button className="btn primary" disabled={to.length === 0 || !!blocked} onClick={send}>
             <Send /> {t('chat.send.send')}
           </button>
         </>
@@ -165,10 +171,10 @@ ${item.url}` : item.url)
         ) : chats.length === 0 ? (
           <p className="hint">{t('chat.share.none')}</p>
         ) : (
-          <div className="chat-pick-list" role="radiogroup" aria-label={t('chat.send.to')}>
+          <div className="chat-pick-list" role="group" aria-label={t('chat.send.to')}>
             {chats.map((c) => (
               <label key={c.conv} className="chat-pick-row">
-                <input type="radio" name="send-to" checked={to === c.conv} onChange={() => setTo(c.conv)} />
+                <input type="checkbox" aria-label={c.name} checked={to.includes(c.conv)} onChange={() => toggle(c.conv)} />
                 {c.group ? <GroupTile name={c.name} size={24} /> : <PlayerHead who={c.uuid} name={c.name} size={24} className="chat-head" />}
                 <span className="ellipsis">{c.name}</span>
               </label>

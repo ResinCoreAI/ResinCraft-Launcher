@@ -689,4 +689,7 @@ export default {
   "engine.chat.uploadTooBig": "That file is too big for ResinCraft Relay right now.",
   'engine.settingsSync.closeFirst': 'Close {name} before you put its own settings back',
   'engine.settingsSync.noOwn': '{name} has no settings of its own kept',
+  "engine.backup.sharing": "Packing {name}",
+  "engine.backup.addingShare": "Adding {name}",
+  "engine.backup.notShare": "That isn't a ResinCraft instance file.",
 }

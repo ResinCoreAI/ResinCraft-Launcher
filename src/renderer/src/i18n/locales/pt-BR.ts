@@ -6250,7 +6250,6 @@ const dict: Dict = {
   "chat.send.to": "Enviar para",
   "chat.send.sending": "Enviando…",
   "chat.send.exporting": "Empacotando a instância…",
-  "chat.send.instanceHint": "Vai como arquivo de modpack (.mrpack) com os mods, pacotes de recursos, shaders e configs desta instância dentro, então pode ficar grande. Mundos e capturas ficam neste PC.",
   "chat.send.noChat": "O chat não está ativo nesta conta. Entre com uma conta Microsoft para conversar com amigos.",
   "chat.send.noFiles": "Este relay não aceita arquivos no chat.",
   "chat.send.files": "{count} arquivos",
@@ -6309,6 +6308,15 @@ const dict: Dict = {
   "inbox.team.from": "Equipe ResinCraft",
   "inbox.team.none": "Ainda não há conversas com a equipe",
   "inbox.team.off": "Escrever para a equipe está desativado neste relay",
+  "chat.send.instanceHintPack": "Vai como um arquivo de instância do ResinCraft (.resinpack, compactado com PRAR) com os mods, pacotes de recursos, shaders e configs desta instância. Mundos e capturas ficam neste PC, e o arquivo é removido deste PC depois de enviado.",
+  "chat.send.chosen": {"one": "{count} conversa", "other": "{count} conversas"},
+  "chat.send.failedTo": "Não foi possível enviar {item} para {name}: {why}",
+  "chat.file.addInstance": "Adicionar instância",
+  "chat.file.instanceAdded": "{name} está na sua Biblioteca.",
+  "chat.file.openInstance": "Abrir",
+  "engine.backup.sharing": "Empacotando {name}",
+  "engine.backup.addingShare": "Adicionando {name}",
+  "engine.backup.notShare": "Isso não é um arquivo de instância do ResinCraft.",
 }
 
 export default dict

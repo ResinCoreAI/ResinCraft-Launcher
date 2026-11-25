@@ -72,6 +72,8 @@ pub async fn handle(channel: &str, args: Args) -> Result<Value> {
         "app:mcpInfo" => json(crate::mcp::info().await?),
         "app:mcpResetToken" => json(crate::mcp::reset_token().await?),
         "app:readThemeFile" => json(crate::openfile::read_theme(&args.get::<String>(0)?).await?),
+        // A theme file the UI read itself (Settings → Appearance → Import), as base64: its JSON text.
+        "app:themeFromBytes" => json(crate::openfile::theme_from_base64(&args.get::<String>(0)?).await?),
         // Settings → Appearance → Export: [file name, the theme file's JSON text] → where it was saved, or null.
         "app:exportTheme" => json(export_theme(&args.get::<String>(0)?, &args.get::<String>(1)?).await?),
         // A QR code as SVG, made here (the 2FA setup key never leaves the PC).
@@ -310,14 +312,20 @@ fn read_game_texture(name: &str) -> Option<String> {
     }
     None
 }
-/// Saves a theme someone can import elsewhere (`<name>.rctheme`, JSON with the picture inside). None if cancelled.
+/// Saves a theme someone can import elsewhere (`<name>.rctheme`: its JSON, picture inside, packed with PRAR where this
+/// build has PuirkleRAR, else the JSON itself). None if cancelled.
 async fn export_theme(name: &str, contents: &str) -> Result<Option<String>> {
     let base: String = name.chars().filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_')).collect();
     let base = if base.trim().is_empty() { "theme".to_string() } else { base.trim().to_string() };
     let title = crate::tr!("app.exportThemeTitle", "Save the theme").text;
     let default = shell::downloads_dir().join(format!("{base}.rctheme"));
     let Some(path) = shell::save_file(&title, &default, &[("ResinCraft theme", &["rctheme"])]).await? else { return Ok(None) };
-    tokio::fs::write(&path, contents).await?;
+    if crate::core::backup_prar::available() {
+        let (dest, text) = (path.clone(), contents.to_string());
+        tokio::task::spawn_blocking(move || crate::openfile::pack_theme(&dest, &text)).await??;
+    } else {
+        tokio::fs::write(&path, contents).await?;
+    }
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 /// `text` as a black-on-white QR code (SVG, with a quiet zone), for an authenticator app to scan.

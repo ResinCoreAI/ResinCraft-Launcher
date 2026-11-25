@@ -99,11 +99,12 @@ function VoicePlayer({ f }: { f: ChatFile }) {
 }
 
 function FileCard({ f }: { f: ChatFile }) {
-  const { toast, instances } = useStore()
+  const { toast, instances, refreshInstances, go } = useStore()
   const [adding, setAdding] = useState<null | 'mods' | 'shaderpacks' | 'resourcepacks'>(null)
   const [installing, setInstalling] = useState(false)
   const mod = /\.jar$/i.test(f.name)
   const pack = /\.mrpack$/i.test(f.name)
+  const resinpack = /\.resinpack$/i.test(f.name)
   const zip = /\.zip$/i.test(f.name)
   // A modpack sent from an instance: installed as a new instance.
   const install = async () => {
@@ -112,6 +113,20 @@ function FileCard({ f }: { f: ChatFile }) {
       const path = await api.chat.fileLocal(f.id)
       await api.content.importModpackFile(path)
       toast(t('chat.file.installed', { name: f.name }), 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setInstalling(false)
+    }
+  }
+  // An instance sent from a launcher (.resinpack, PRAR): added to the Library as it is.
+  const addInstance = async () => {
+    setInstalling(true)
+    try {
+      const path = await api.chat.fileLocal(f.id)
+      const added = await api.backup.importShare(path)
+      await refreshInstances()
+      toast(t('chat.file.instanceAdded', { name: added.name }), 'success', { label: t('chat.file.openInstance'), run: () => go({ page: 'instance', id: added.id }) })
     } catch (e) {
       toast((e as Error).message, 'error')
     } finally {
@@ -140,7 +155,7 @@ function FileCard({ f }: { f: ChatFile }) {
   return (
     <div className="chat-embed chat-file">
       <span className="chat-embed-icon" aria-hidden>
-        {mod ? <Package /> : /\.(zip|mrpack|rar|7z)$/i.test(f.name) ? <FileArchive /> : <FileText />}
+        {mod || resinpack ? <Package /> : /\.(zip|mrpack|rar|7z|prar)$/i.test(f.name) ? <FileArchive /> : <FileText />}
       </span>
       <span className="chat-embed-text">
         <b className="ellipsis">{f.name}</b>
@@ -154,6 +169,11 @@ function FileCard({ f }: { f: ChatFile }) {
       {pack && (
         <button className="btn sm" disabled={installing} onClick={() => void install()}>
           {installing ? <Loader2 className="spin" /> : <Package />} {t('chat.file.installPack')}
+        </button>
+      )}
+      {resinpack && (
+        <button className="btn sm" disabled={installing} onClick={() => void addInstance()}>
+          {installing ? <Loader2 className="spin" /> : <Package />} {t('chat.file.addInstance')}
         </button>
       )}
       {zip && instances.length > 0 && (

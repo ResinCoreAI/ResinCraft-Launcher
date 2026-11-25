@@ -806,7 +806,7 @@ export function useInstanceMenu(inst: Instance) {
       },
       { label: t('library.card.duplicate'), hint: t('menu.hint.duplicate'), icon: <Copy />, onSelect: () => void duplicate() },
       { label: t('menu.instance.export'), hint: t('menu.hint.export'), icon: <PackageOpen />, onSelect: () => setDialog('export') },
-      { label: t('chat.send.menu'), hint: t('chat.send.instanceHint'), icon: <Send />, onSelect: () => sendToChat({ kind: 'instance', title: inst.name, inst }) },
+      { label: t('chat.send.menu'), hint: t('chat.send.instanceHintPack'), icon: <Send />, onSelect: () => sendToChat({ kind: 'instance', title: inst.name, inst }) },
       {
         label: t('reinstall.menu'),
         hint: t('menu.hint.reinstall'),

@@ -6206,7 +6206,6 @@ const dict: Dict = {
   "chat.send.to": "Gửi tới",
   "chat.send.sending": "Đang gửi…",
   "chat.send.exporting": "Đang đóng gói phiên bản…",
-  "chat.send.instanceHint": "Gửi dưới dạng tệp modpack (.mrpack) chứa sẵn mod, gói tài nguyên, shader và cấu hình của bản cài này, nên có thể khá nặng. Thế giới và ảnh chụp màn hình vẫn ở máy này.",
   "chat.send.noChat": "Trò chuyện chưa bật cho tài khoản này. Đăng nhập bằng tài khoản Microsoft để trò chuyện với bạn bè.",
   "chat.send.noFiles": "Relay này không nhận tệp trong trò chuyện.",
   "chat.send.files": "{count} tệp",
@@ -6265,6 +6264,15 @@ const dict: Dict = {
   "inbox.team.from": "Đội ngũ ResinCraft",
   "inbox.team.none": "Chưa có cuộc trò chuyện nào với đội ngũ",
   "inbox.team.off": "Relay này đã tắt việc viết cho đội ngũ",
+  "chat.send.instanceHintPack": "Gửi dưới dạng tệp phiên bản ResinCraft (.resinpack, nén nhỏ bằng PRAR) chứa mod, gói tài nguyên, shader và cấu hình của phiên bản này. Thế giới và ảnh chụp màn hình vẫn ở máy này, và tệp sẽ bị xóa khỏi máy này sau khi gửi.",
+  "chat.send.chosen": {"other": "{count} cuộc trò chuyện"},
+  "chat.send.failedTo": "Không gửi được {item} cho {name}: {why}",
+  "chat.file.addInstance": "Thêm phiên bản",
+  "chat.file.instanceAdded": "{name} đã có trong Thư viện của bạn.",
+  "chat.file.openInstance": "Mở",
+  "engine.backup.sharing": "Đang đóng gói {name}",
+  "engine.backup.addingShare": "Đang thêm {name}",
+  "engine.backup.notShare": "Đó không phải tệp phiên bản ResinCraft.",
 }
 
 export default dict

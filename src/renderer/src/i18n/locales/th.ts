@@ -6262,7 +6262,6 @@ const dict: Dict = {
   "chat.send.to": "ส่งถึง",
   "chat.send.sending": "กำลังส่ง…",
   "chat.send.exporting": "กำลังแพ็กอินสแตนซ์…",
-  "chat.send.instanceHint": "ส่งเป็นไฟล์ม็อดแพ็ก (.mrpack) ที่มีม็อด รีซอร์สแพ็ก เชเดอร์ และไฟล์คอนฟิกของอินสแตนซ์นี้อยู่ข้างใน ไฟล์จึงอาจใหญ่ ส่วนโลกและภาพหน้าจออยู่ในเครื่องนี้",
   "chat.send.noChat": "บัญชีนี้ใช้แชทไม่ได้ ลงชื่อเข้าใช้ด้วยบัญชี Microsoft เพื่อแชทกับเพื่อน",
   "chat.send.noFiles": "Relay นี้ไม่รับไฟล์ในแชท",
   "chat.send.files": "{count} ไฟล์",
@@ -6365,6 +6364,15 @@ const dict: Dict = {
   "servers.admin.mailbox.to": "ถึง",
   "servers.admin.mailbox.toPlaceholder": "ชื่อ Minecraft, UUID หรือที่อยู่อีเมล",
   "servers.admin.mailbox.composeHint": "ชื่อ Minecraft หรือ UUID จะส่งไปที่กล่องจดหมายในลันเชอร์ของผู้เล่น ที่อยู่อีเมลจะได้รับทางอีเมลจาก {address}",
+  "chat.send.instanceHintPack": "ส่งเป็นไฟล์อินสแตนซ์ ResinCraft (.resinpack บีบอัดให้เล็กด้วย PRAR) ที่มีม็อด รีซอร์สแพ็ก เชดเดอร์ และคอนฟิกของอินสแตนซ์นี้อยู่ข้างใน โลกและภาพหน้าจออยู่ในพีซีเครื่องนี้ และไฟล์จะถูกลบออกจากพีซีนี้เมื่อส่งเสร็จ",
+  "chat.send.chosen": {"other": "{count} แชท"},
+  "chat.send.failedTo": "ส่ง {item} ให้ {name} ไม่ได้: {why}",
+  "chat.file.addInstance": "เพิ่มอินสแตนซ์",
+  "chat.file.instanceAdded": "{name} อยู่ในคลังของคุณแล้ว",
+  "chat.file.openInstance": "เปิด",
+  "engine.backup.sharing": "กำลังแพ็ก {name}",
+  "engine.backup.addingShare": "กำลังเพิ่ม {name}",
+  "engine.backup.notShare": "นั่นไม่ใช่ไฟล์อินสแตนซ์ของ ResinCraft",
 }
 
 export default dict

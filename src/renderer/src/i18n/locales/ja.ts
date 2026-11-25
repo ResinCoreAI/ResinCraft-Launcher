@@ -6206,7 +6206,6 @@ const dict: Dict = {
   "chat.send.to": "送信先",
   "chat.send.sending": "送信中…",
   "chat.send.exporting": "インスタンスをまとめています…",
-  "chat.send.instanceHint": "このインスタンスの MOD、リソースパック、シェーダー、設定ファイルをそのまま入れたモッドパック（.mrpack）として送るので、大きくなることがあります。ワールドとスクリーンショットはこの PC に残ります。",
   "chat.send.noChat": "このアカウントではチャットが使えません。Microsoft アカウントでサインインするとフレンドとチャットできます。",
   "chat.send.noFiles": "この Relay はチャットでのファイルを受け付けていません。",
   "chat.send.files": "{count} 個のファイル",
@@ -6265,6 +6264,15 @@ const dict: Dict = {
   "inbox.team.from": "ResinCraft チーム",
   "inbox.team.none": "チームとの会話はまだありません",
   "inbox.team.off": "このリレーではチームへの連絡がオフです",
+  "chat.send.instanceHintPack": "このインスタンスのMod、リソースパック、シェーダー、設定を含むResinCraftインスタンスファイル（.resinpack、PRARで小さく圧縮）として送られます。ワールドとスクリーンショットはこのPCに残り、送信後にファイルはこのPCから削除されます。",
+  "chat.send.chosen": {"other": "{count}件のチャット"},
+  "chat.send.failedTo": "{item}を{name}に送れませんでした: {why}",
+  "chat.file.addInstance": "インスタンスを追加",
+  "chat.file.instanceAdded": "{name}がライブラリに追加されました。",
+  "chat.file.openInstance": "開く",
+  "engine.backup.sharing": "{name}をパック中",
+  "engine.backup.addingShare": "{name}を追加中",
+  "engine.backup.notShare": "ResinCraftのインスタンスファイルではありません。",
 }
 
 export default dict

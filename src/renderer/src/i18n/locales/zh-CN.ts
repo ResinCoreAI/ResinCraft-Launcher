@@ -6196,7 +6196,6 @@ const dict: Dict = {
   "chat.send.to": "发送给",
   "chat.send.sending": "正在发送…",
   "chat.send.exporting": "正在打包实例…",
-  "chat.send.instanceHint": "以整合包文件（.mrpack）发送，里面直接包含此实例的模组、资源包、光影和配置，所以可能比较大。世界和截图留在这台电脑上。",
   "chat.send.noChat": "这个账户无法使用聊天。用 Microsoft 账户登录后可以和好友聊天。",
   "chat.send.noFiles": "这个 Relay 不接受聊天中的文件。",
   "chat.send.files": "{count} 个文件",
@@ -6255,6 +6254,15 @@ const dict: Dict = {
   "inbox.team.from": "ResinCraft 团队",
   "inbox.team.none": "还没有和团队的对话",
   "inbox.team.off": "此中继已关闭联系团队",
+  "chat.send.instanceHintPack": "将作为 ResinCraft 实例文件（.resinpack，用 PRAR 压缩）发送，内含此实例的模组、资源包、光影和配置。世界和截图留在这台电脑上，发送完成后文件会从这台电脑删除。",
+  "chat.send.chosen": {"other": "{count} 个聊天"},
+  "chat.send.failedTo": "无法将 {item} 发送给 {name}：{why}",
+  "chat.file.addInstance": "添加实例",
+  "chat.file.instanceAdded": "{name} 已在你的库中。",
+  "chat.file.openInstance": "打开",
+  "engine.backup.sharing": "正在打包 {name}",
+  "engine.backup.addingShare": "正在添加 {name}",
+  "engine.backup.notShare": "这不是 ResinCraft 实例文件。",
 }
 
 export default dict

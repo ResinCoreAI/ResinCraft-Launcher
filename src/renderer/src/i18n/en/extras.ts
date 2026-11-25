@@ -1950,7 +1950,6 @@ export default {
   "chat.send.to": "Send to",
   "chat.send.sending": "Sending…",
   "chat.send.exporting": "Packing the instance…",
-  "chat.send.instanceHint": "It goes as a modpack file (.mrpack) with this instance's own mods, resource packs, shaders and configs inside, so it can be big. Worlds and screenshots stay on this PC.",
   "chat.send.noChat": "Chat isn't on for this account. Sign in with a Microsoft account to chat with friends.",
   "chat.send.noFiles": "This relay doesn't take files in chat.",
   "chat.send.files": "{count} files",
@@ -2019,4 +2018,10 @@ export default {
   "servers.admin.mailbox.to": "To",
   "servers.admin.mailbox.toPlaceholder": "A Minecraft name, UUID or email address",
   "servers.admin.mailbox.composeHint": "A Minecraft name or UUID goes to that player's launcher Inbox. An email address gets it by email from {address}.",
+  "chat.send.instanceHintPack": "It goes as a ResinCraft instance file (.resinpack, packed small with PRAR) with this instance's own mods, resource packs, shaders and configs inside. Worlds and screenshots stay on this PC, and the file is removed from this PC once it's sent.",
+  "chat.send.chosen": {"one": "{count} chat", "other": "{count} chats"},
+  "chat.send.failedTo": "Couldn't send {item} to {name}: {why}",
+  "chat.file.addInstance": "Add instance",
+  "chat.file.instanceAdded": "{name} is in your Library.",
+  "chat.file.openInstance": "Open",
 } as const

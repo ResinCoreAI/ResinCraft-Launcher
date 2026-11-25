@@ -6300,7 +6300,6 @@ const dict: Dict = {
   "chat.send.to": "Wyślij do",
   "chat.send.sending": "Wysyłanie…",
   "chat.send.exporting": "Pakowanie instancji…",
-  "chat.send.instanceHint": "Idzie jako plik modpacka (.mrpack) z modami, paczkami zasobów, shaderami i configami tej instancji w środku, więc może być duży. Światy i zrzuty ekranu zostają na tym PC.",
   "chat.send.noChat": "Czat jest wyłączony dla tego konta. Zaloguj się kontem Microsoft, by czatować ze znajomymi.",
   "chat.send.noFiles": "Ten relay nie przyjmuje plików na czacie.",
   "chat.send.files": "Plików: {count}",
@@ -6359,6 +6358,15 @@ const dict: Dict = {
   "inbox.team.from": "Zespół ResinCraft",
   "inbox.team.none": "Brak rozmów z zespołem",
   "inbox.team.off": "Pisanie do zespołu jest wyłączone na tym relayu",
+  "chat.send.instanceHintPack": "Zostanie wysłana jako plik instancji ResinCraft (.resinpack, spakowany przez PRAR) z modami, paczkami zasobów, shaderami i konfiguracją tej instancji. Światy i zrzuty ekranu zostają na tym PC, a plik zostanie usunięty z tego PC po wysłaniu.",
+  "chat.send.chosen": {"one": "{count} czat", "few": "{count} czaty", "many": "{count} czatów", "other": "{count} czatu"},
+  "chat.send.failedTo": "Nie udało się wysłać {item} do {name}: {why}",
+  "chat.file.addInstance": "Dodaj instancję",
+  "chat.file.instanceAdded": "{name} jest w twojej Bibliotece.",
+  "chat.file.openInstance": "Otwórz",
+  "engine.backup.sharing": "Pakowanie {name}",
+  "engine.backup.addingShare": "Dodawanie {name}",
+  "engine.backup.notShare": "To nie jest plik instancji ResinCraft.",
 }
 
 export default dict
