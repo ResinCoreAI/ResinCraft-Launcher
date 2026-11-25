@@ -966,7 +966,8 @@ a svg.inline {
   height: 24px;
   margin: 0;
 }
-.sv-results {
+/* Create a server's search results (its own name: .sv-results is the add-on browser's scrolling list). */
+.sv-kind-results {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;

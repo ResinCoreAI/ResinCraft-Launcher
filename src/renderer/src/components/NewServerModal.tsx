@@ -447,7 +447,7 @@ export default function NewServerModal({
                   <span className="hint">{t('servers.create.found', { count: found.length })}</span>
                 </div>
                 {found.length ? (
-                  <div className="sv-results">
+                  <div className="sv-kind-results">
                     {found.map(({ k, group }) => (
                       <button key={k} className={`sv-result ${k === kind ? 'on' : ''}`} aria-pressed={k === kind} onClick={() => choose(k)}>
                         <SoftwareLogo kind={k} icons={icons} />
