@@ -115,6 +115,8 @@ fn field(s: &str) -> String {
 
 /// Where friends get the launcher (the presence's "Get ResinCraft" button).
 pub const DOWNLOAD_URL: &str = "https://rscraft.resincore.tech";
+/// The ResinCraft Discord server (the presence's "Join our community" button).
+pub const COMMUNITY_URL: &str = "https://discord.gg/Xdfuj3WxDm";
 
 /// A modpack's page from its project id: bare for Modrinth, "cf:<id>" for CurseForge; other sites have none.
 fn pack_page(project_id: &str) -> Option<String> {
@@ -130,15 +132,14 @@ fn version_label() -> String {
     format!("{LAUNCHER} v{}", env!("CARGO_PKG_VERSION"))
 }
 
-/// Buttons under the presence (Discord shows them to others, up to two): the modpack's page when there is one,
-/// and the launcher with its version, which leads to where to get it.
+/// Buttons under the presence (Discord shows them to others, up to two): the launcher with its version, which leads
+/// to where to get it, and the modpack's page when there is one, else the ResinCraft Discord server.
 fn buttons(pack_url: Option<&str>) -> Value {
-    let mut out = Vec::new();
-    if let Some(url) = pack_url {
-        out.push(json!({ "label": "View modpack", "url": url }));
+    let get = json!({ "label": version_label(), "url": DOWNLOAD_URL });
+    match pack_url {
+        Some(url) => json!([{ "label": "View modpack", "url": url }, get]),
+        None => json!([get, { "label": "Join our community", "url": COMMUNITY_URL }]),
     }
-    out.push(json!({ "label": version_label(), "url": DOWNLOAD_URL }));
-    Value::Array(out)
 }
 
 /// What the player is doing in the launcher, as two lines for friends ("Browsing Modpacks" / "Looking for
@@ -526,20 +527,21 @@ mod tests {
     #[test]
     fn buttons_link_the_modpack_and_the_download() {
         let get = json!({ "label": version_label(), "url": DOWNLOAD_URL });
+        let join = json!({ "label": "Join our community", "url": COMMUNITY_URL });
         let a = activity(Some(&Playing::new("abc", &instance(), None, 0)), ON, 0, None).unwrap();
-        assert_eq!(a["buttons"], json!([get]));
+        assert_eq!(a["buttons"], json!([get, join]));
         let mut inst = instance();
         for (id, page) in [("1KVo5zza", Some("https://modrinth.com/modpack/1KVo5zza")), ("cf:285109", Some("https://www.curseforge.com/projects/285109")), ("ftb:23", None)] {
             inst.modpack = Some(ModpackRef { project_id: Some(id.into()), version_id: None, name: "Pack".into() });
             let a = activity(Some(&Playing::new("abc", &inst, None, 0)), ON, 0, None).unwrap();
             let want = match page {
                 Some(url) => json!([{ "label": "View modpack", "url": url }, get]),
-                None => json!([get]),
+                None => json!([get, join]),
             };
             assert_eq!(a["buttons"], want, "{id}");
         }
         let idle = activity(None, Options { in_launcher: true, ..ON }, 0, None).unwrap();
-        assert_eq!(idle["buttons"], json!([get]));
+        assert_eq!(idle["buttons"], json!([get, join]));
     }
 
     #[test]
@@ -663,7 +665,7 @@ mod tests {
         assert_eq!(a["details"], "Browsing Modpacks");
         assert_eq!(a["state"], "Looking for modpacks");
         assert_eq!(a["timestamps"]["start"], 5);
-        assert_eq!(a["buttons"], json!([{ "label": version_label(), "url": DOWNLOAD_URL }]));
+        assert_eq!(a["buttons"], json!([{ "label": version_label(), "url": DOWNLOAD_URL }, { "label": "Join our community", "url": COMMUNITY_URL }]));
         // Nothing about the relay's admin page; an empty second line is left out.
         let admin = page_lines("admin", None, None);
         assert_eq!(admin.0, "In the launcher");
