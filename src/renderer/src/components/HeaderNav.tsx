@@ -177,10 +177,12 @@ export default function HeaderNav({ items, current, onGo }: { items: NavEntry[];
       <button className="nav-step prev" onClick={() => step(-1)} title={t('nav.prev')} aria-label={t('nav.prev')} tabIndex={scroll.l ? 0 : -1}>
         <ChevronLeft />
       </button>
+      {/* Not a drag region (the box around it is): a click just above, below or between two tabs would start
+          dragging the window, which on Windows can leave it stuck to the mouse, and two quick clicks there maximize
+          it. Switching pages fast hit that. */}
       <nav
         ref={nav}
         className="nav"
-        data-tauri-drag-region
         onScroll={readScroll}
         // An ordinary wheel turn slides the tabs sideways.
         onWheel={(e) => {
