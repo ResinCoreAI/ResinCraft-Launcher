@@ -11,7 +11,7 @@ export type ContentKind = 'mod' | 'resourcepack' | 'shader' | 'modpack' | 'world
  * separate source argument.
  */
 /** `horizon` is Horizon's own registry, offered for Horizon instances only. */
-export type ContentSource = 'modrinth' | 'curseforge' | 'ftb' | 'atlauncher' | 'technic' | 'github' | 'horizon'
+export type ContentSource = 'modrinth' | 'curseforge' | 'ftb' | 'atlauncher' | 'technic' | 'github' | 'horizon' | 'resin'
 
 const PREFIXES: [string, ContentSource][] = [
   ['cf:', 'curseforge'],
@@ -652,6 +652,78 @@ export interface SearchQuery {
   sort?: SortMode
   offset?: number
   limit?: number
+  /** Categories it must have, by Modrinth id ("magic", "16x", "iris"); other sites match them as well as they can. */
+  categories?: string[]
+}
+
+/** What players post to ResinCraft Relay for Discover (its community.rs); admins approve each one first. */
+export type CommunityKind = 'modpack' | 'mod' | 'resourcepack' | 'shader'
+export type CommunityState = 'draft' | 'pending' | 'approved' | 'rejected' | 'removed'
+export interface CommunityVersion {
+  id: string
+  name: string
+  changelog: string
+  mc: string[]
+  loaders: string[]
+  fileName: string
+  size: number
+  sha1: string
+  sha256: string
+  /** Unix seconds. */
+  created: number
+  downloads: number
+  state: 'pending' | 'approved' | 'rejected'
+  /** Why an admin said no (the owner's and admins' view). */
+  reason?: string
+  reviewedAt?: number | null
+  reviewedBy?: string | null
+}
+export interface CommunityProject {
+  id: string
+  slug: string
+  kind: CommunityKind
+  title: string
+  summary: string
+  /** Markdown. */
+  body: string
+  categories: string[]
+  author: string
+  authorUuid: string
+  /** A full URL in My projects; a path on the relay in the admins' view. */
+  icon: string | null
+  downloads: number
+  created: number
+  updated: number
+  mc: string[]
+  loaders: string[]
+  versions: CommunityVersion[]
+  /** The owner's and admins' view only. */
+  state?: CommunityState
+  reason?: string
+  approvedAt?: number | null
+  /** Set by an admin: always review its new files (true), trust them (false), or the relay's default (null). */
+  reviewUpdates?: boolean | null
+  /** Whether its new files wait for review, all told. */
+  reviewsUpdates?: boolean
+}
+export interface CommunityMine {
+  projects: CommunityProject[]
+  /** The biggest file this relay takes, in bytes. */
+  maxFile: number
+  /** Whether the relay can take files at all (its storage is set up). */
+  on: boolean
+}
+export interface CommunityQueue {
+  projects: CommunityProject[]
+  updates: { project: { id: string; title: string; kind: CommunityKind; author: string; authorUuid: string | null }; version: CommunityVersion }[]
+  waiting: number
+  approved: number
+  rejected: number
+  removed: number
+  /** The relay's default: new files of approved projects wait for review. */
+  reviewUpdates: boolean
+  on: boolean
+  maxFile: number
 }
 
 export interface ProjectHit {
@@ -3344,6 +3416,26 @@ export interface ResinApi {
   java: {
     list(): Promise<JavaInstall[]>
     browse(): Promise<string | null>
+  }
+  /** Discover → My projects: posting to ResinCraft Relay for Discover's ResinCraft source. */
+  community: {
+    mine(): Promise<CommunityMine>
+    /** Makes a draft (no `id`) or changes one: kind (new only), title, summary, body (Markdown), categories. */
+    save(p: { id?: string; kind?: CommunityKind; title: string; summary: string; body: string; categories: string[] }): Promise<CommunityProject>
+    /** Sends a draft (or a rejected project, fixed) for review. */
+    submit(id: string): Promise<{ ok: boolean }>
+    delete(id: string): Promise<{ ok: boolean }>
+    deleteVersion(id: string): Promise<{ ok: boolean }>
+    /** A file from this PC as a new version: Minecraft versions and loaders as comma lists. */
+    upload(projectId: string, path: string, version: string, mc: string, loaders: string, changelog: string): Promise<{ version: CommunityVersion }>
+    /** One of the player's instances, packed as a .resinpack, as a modpack's new version. */
+    uploadInstance(projectId: string, instanceId: string, version: string, changelog: string): Promise<{ version: CommunityVersion }>
+    uploadIcon(projectId: string, path: string): Promise<{ icon: string }>
+    /** The open-file dialog for a kind's file; null if cancelled. */
+    pickFile(kind: CommunityKind): Promise<string | null>
+    pickIcon(): Promise<string | null>
+    /** The relay's address (https://…), for the admins' icons and file links. */
+    base(): Promise<string>
   }
   content: {
     search(q: SearchQuery): Promise<SearchResult>

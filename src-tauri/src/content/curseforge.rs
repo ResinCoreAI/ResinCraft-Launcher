@@ -265,6 +265,67 @@ fn fits(f: &CfFile, inst: &Instance, kind: ContentKind) -> bool {
 
 // ---------- Search ----------
 
+/// CurseForge's categories of a class (id, slug, name), asked once per class.
+static CATEGORIES: std::sync::Mutex<Option<HashMap<u32, Vec<(u64, String, String)>>>> = std::sync::Mutex::new(None);
+
+/// Where Modrinth's id and CurseForge's slug differ.
+fn category_aliases(id: &str) -> &'static [&'static str] {
+    match id {
+        "adventure" => &["adventure-rpg", "adventure-and-rpg", "exploration"],
+        "worldgen" => &["world-gen", "biomes", "structures", "dimensions"],
+        "library" => &["api-and-library", "library-api"],
+        "utility" => &["utility-qol", "utility"],
+        "decoration" => &["cosmetic", "decoration"],
+        "equipment" => &["armor-weapons-tools", "armor-tools-weapons"],
+        "transportation" => &["player-transport", "transportation"],
+        "optimization" => &["performance", "optimization"],
+        "technology" => &["technology", "tech"],
+        "combat" => &["combat-pvp", "combat"],
+        "lightweight" => &["small-light", "lightweight"],
+        "kitchen-sink" => &["extra-large", "kitchen-sink"],
+        "minigame" => &["mini-game", "minigame"],
+        "realistic" => &["photo-realistic", "realistic"],
+        "512x+" => &["512x-and-higher", "512x"],
+        "8x-" => &["8x-and-lower", "8x"],
+        _ => &[],
+    }
+}
+
+/// CurseForge's category ids for Discover's categories (those it has; the rest are left out).
+async fn category_ids(class: u32, wanted: &[String]) -> Vec<u64> {
+    let cached = CATEGORIES.lock().unwrap().as_ref().and_then(|m| m.get(&class).cloned());
+    let list = match cached {
+        Some(l) => l,
+        None => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Cat {
+                id: u64,
+                #[serde(default)]
+                slug: String,
+                #[serde(default)]
+                name: String,
+            }
+            let Ok(cats) = cf::<Vec<Cat>>(&format!("/categories?gameId={MINECRAFT}&classId={class}"), None).await else { return Vec::new() };
+            let l: Vec<(u64, String, String)> = cats.into_iter().map(|c| (c.id, c.slug.to_lowercase(), c.name.to_lowercase())).collect();
+            CATEGORIES.lock().unwrap().get_or_insert_with(HashMap::new).insert(class, l.clone());
+            l
+        }
+    };
+    let mut out = Vec::new();
+    for w in wanted {
+        let w = w.to_lowercase();
+        let names: Vec<String> = std::iter::once(w.clone()).chain(category_aliases(&w).iter().map(|a| a.to_string())).collect();
+        let hit = list.iter().find(|(_, slug, _)| names.contains(slug)).or_else(|| list.iter().find(|(_, _, name)| name.replace(' ', "-") == w || name == &w.replace('-', " ")));
+        if let Some((id, _, _)) = hit {
+            if !out.contains(id) {
+                out.push(*id);
+            }
+        }
+    }
+    out
+}
+
 pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
     let page_size = q.limit.unwrap_or(20).min(50);
     let mut params = vec![
@@ -299,8 +360,15 @@ pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
         Some(l) => loader_id(l),
         None => None,
     };
-    if let (ContentKind::Mod, Some(l), Some(_)) = (q.kind, loader, gv) {
+    if let (ContentKind::Mod | ContentKind::Modpack, Some(l), Some(_)) = (q.kind, loader, gv) {
         params.push(format!("modLoaderType={l}"));
+    }
+    // Discover's categories are Modrinth's ids: matched to CurseForge's own by slug or name.
+    if !q.categories.is_empty() {
+        let ids = category_ids(class_of(q.kind), &q.categories).await;
+        if !ids.is_empty() {
+            params.push(format!("categoryIds={}", urlencoding::encode(&serde_json::to_string(&ids)?)));
+        }
     }
 
     #[derive(Deserialize)]

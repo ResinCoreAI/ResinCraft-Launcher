@@ -144,6 +144,11 @@ fn non_empty(s: Option<String>) -> Option<String> {
 
 // ---------- Search ----------
 
+/// A category id as Modrinth writes them ("game-mechanics", "16x", "512x+"): nothing that could break the facets.
+pub(crate) fn is_category(c: &str) -> bool {
+    (1..=32).contains(&c.len()) && c.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '+')
+}
+
 pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
     let mut facets: Vec<Vec<String>> = vec![vec![format!("project_type:{}", q.kind.as_str())]];
     if let Some(v) = q.game_version.as_deref().filter(|v| !v.is_empty()) {
@@ -157,7 +162,14 @@ pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
         }
     }
     if q.kind == ContentKind::Modpack {
-        facets.push(["fabric", "quilt", "forge", "neoforge"].iter().map(|l| format!("categories:{l}")).collect());
+        match q.loader {
+            Some(l) if l != LoaderType::Vanilla => facets.push(vec![format!("categories:{}", l.as_str())]),
+            _ => facets.push(["fabric", "quilt", "forge", "neoforge"].iter().map(|l| format!("categories:{l}")).collect()),
+        }
+    }
+    // Each category is one more facet: a project needs all of them.
+    for c in q.categories.iter().filter(|c| is_category(c)) {
+        facets.push(vec![format!("categories:{c}")]);
     }
     let url = format!(
         "{API}/search?query={}&facets={}&index={}&offset={}&limit={}",

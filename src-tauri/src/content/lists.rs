@@ -77,6 +77,7 @@ fn source_name(id: &str) -> &'static str {
         ContentSource::Curseforge => "curseforge",
         ContentSource::Github => "github",
         ContentSource::Horizon => "horizon",
+        ContentSource::Resin => "resin",
         ContentSource::Ftb => "ftb",
         ContentSource::Atlauncher => "atlauncher",
         ContentSource::Technic => "technic",

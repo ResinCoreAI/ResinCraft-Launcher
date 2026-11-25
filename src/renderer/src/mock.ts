@@ -20,6 +20,7 @@ import { mockVersions } from './mock-versions'
 import { mockCheckServices, mockStatusNotices } from './mock-status'
 import { mockStatusSite } from './mock-statussite'
 import { mockMailCall } from './mock-mail'
+import { mockCommunity } from './mock-community'
 import { mockChat } from './mock-chat'
 
 export function mockApi(): ResinApi {
@@ -534,6 +535,7 @@ export function mockApi(): ResinApi {
       },
       remove: async (id) => void (instances = instances.map((i) => (i.id === id ? { ...i, optifine: undefined } : i)))
     },
+    community: mockCommunity(),
     content: {
       search: (q) => {
         const base =
@@ -547,6 +549,8 @@ export function mockApi(): ResinApi {
                   follows: 0,
                   horizon: { native: i === 2, signed: i === 0, games: ['26.3'] }
                 }))
+              : q.source === 'resin'
+              ? hits.slice(0, 5).map((h, i) => ({ ...h, id: `rc:${h.slug}`, source: 'resin' as const, author: ['Puirkle', 'Alex_Builds', 'SteveMines'][i % 3], follows: 0, downloads: Math.round(h.downloads / 900) }))
               : q.source === 'github'
               ? q.kind === 'mod'
                 ? hits

@@ -256,5 +256,11 @@ export default {
   'project.gallery.next': 'Next image',
   'project.gallery.counter': '{n} of {count}',
   // note for translators: replaces a video embedded in a description; opens it in the browser
-  'project.video': 'Watch the video'
+  'project.video': 'Watch the video',
+  "discover.filter.category": "Category",
+  "discover.filter.anyCategory": "Any category",
+  "discover.filter.resolution": "Resolution",
+  "discover.filter.anyResolution": "Any resolution",
+  "discover.filter.shaderLoader": "Shader loader",
+  "discover.filter.clear": "Clear filters",
 }

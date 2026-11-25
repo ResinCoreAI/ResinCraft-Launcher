@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react'
+import { Logo } from './ui'
 
 /**
  * Each content site's own icon, loaded from the site itself when it is shown (nothing of theirs ships with
@@ -19,6 +20,8 @@ const failed = new Set<string>()
 export function SourceMark({ source, color }: { source: string; color?: string }) {
   const url = SOURCE_ICONS[source]
   const [shown, setShown] = useState(() => !!url && !failed.has(url))
+  // ResinCraft's own projects wear its own mark.
+  if (source === 'resin') return <Logo className="source-logo resin" />
   if (!url || !shown) return <span className="source-dot" style={{ background: color ?? 'var(--text-faint)' }} />
   return (
     <img loading="lazy" decoding="async"

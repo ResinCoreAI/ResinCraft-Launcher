@@ -194,6 +194,19 @@ export function buildApi(call: Call, on: Subscribe, pathForFile: (file: File) =>
       fetchPng: fn('skins:fetchPng')
     },
     java: { list: fn('java:list'), browse: fn('java:browse') },
+    community: {
+      mine: fn('community:mine'),
+      save: fn('community:save'),
+      submit: fn('community:submit'),
+      delete: fn('community:delete'),
+      deleteVersion: fn('community:deleteVersion'),
+      upload: fn('community:upload'),
+      uploadInstance: fn('community:uploadInstance'),
+      uploadIcon: fn('community:uploadIcon'),
+      pickFile: fn('community:pickFile'),
+      pickIcon: fn('community:pickIcon'),
+      base: fn('community:base')
+    },
     content: {
       search: fn('content:search'),
       versions: fn('content:versions'),

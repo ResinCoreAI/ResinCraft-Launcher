@@ -24,6 +24,7 @@ import {
   Sparkles,
   SquareCheck,
   Star,
+  Upload,
   X
 } from 'lucide-react'
 import type {
@@ -63,6 +64,7 @@ import { ProjectPage } from '../components/ProjectPage'
 import { NativeInstallNotice } from '../components/HorizonNative'
 import { Send } from 'lucide-react'
 import { sendProject } from '../components/chat/SendToChat'
+import { CommunityProjects } from '../components/CommunityProjects'
 
 /** Which half of Discover was open last (this session). */
 
@@ -81,6 +83,23 @@ const SORTS: { value: SortMode; labelKey: Key }[] = [
   { value: 'newest', labelKey: 'discover.sort.newest' },
   { value: 'updated', labelKey: 'discover.sort.updated' }
 ]
+
+/** The Category filter's choices by kind (Modrinth ids; CurseForge and ResinCraft match them as well as they can). */
+const CATEGORY_FILTERS: Partial<Record<ContentKind, string[]>> = {
+  mod: ['adventure', 'decoration', 'economy', 'equipment', 'food', 'game-mechanics', 'library', 'magic', 'management', 'minigame', 'mobs', 'optimization', 'social', 'storage', 'technology', 'transportation', 'utility', 'worldgen'],
+  modpack: ['adventure', 'challenging', 'combat', 'kitchen-sink', 'lightweight', 'magic', 'multiplayer', 'optimization', 'quests', 'technology'],
+  resourcepack: ['audio', 'blocks', 'combat', 'core-shaders', 'decoration', 'entities', 'environment', 'equipment', 'fonts', 'gui', 'items', 'locale', 'modded', 'models', 'realistic', 'simplistic', 'themed', 'tweaks', 'utility', 'vanilla-like'],
+  shader: ['atmosphere', 'bloom', 'cartoon', 'colored-lighting', 'fantasy', 'foliage', 'path-tracing', 'realistic', 'reflections', 'semi-realistic', 'shadows', 'vanilla-like', 'potato', 'low', 'medium', 'high', 'screenshot']
+}
+/** Resource packs' resolutions and shaders' loaders: one more filter each, also categories on Modrinth. */
+const RESOLUTIONS = ['8x-', '16x', '32x', '48x', '64x', '128x', '256x', '512x+']
+const SHADER_LOADERS: [string, string][] = [
+  ['iris', 'Iris'],
+  ['optifine', 'OptiFine'],
+  ['canvas', 'Canvas']
+]
+/** The sites the Category filter works on (the rest have no categories to search by). */
+const CATEGORY_SITES: ContentSource[] = ['modrinth', 'curseforge', 'resin']
 
 /** Category tags we can translate, by Modrinth id. Anything else (loaders, resolutions, other sources' own tags) is shown as it comes. */
 const CATEGORY_KEYS: Record<string, Key> = {
@@ -156,6 +175,8 @@ export const SOURCES: { value: ContentSource; label: string; color: string; kind
   { value: 'atlauncher', label: 'ATLauncher', color: '#38bdf8', kinds: ['modpack'] },
   { value: 'technic', label: 'Technic', color: '#facc15', kinds: ['modpack'] },
   { value: 'github', label: 'GitHub', color: '#a8b3c2', kinds: ['mod'] },
+  // What players post on ResinCraft Relay, approved by its admins (Discover → My projects).
+  { value: 'resin', label: 'ResinCraft', color: '#8b46ff', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] },
   { value: 'horizon', label: 'Horizon', color: '#ff9b52', kinds: ['mod', 'modpack', 'resourcepack', 'shader'] }
 ]
 
@@ -290,6 +311,11 @@ export default function Discover({
   const [sort, setSort] = useState<SortMode>('relevance')
   const [gameVersion, setGameVersion] = useState(target?.mcVersion ?? '')
   const [loader, setLoader] = useState<LoaderType | ''>(target && target.loader !== 'vanilla' ? target.loader : '')
+  const [category, setCategory] = useState('')
+  /** A resource pack's resolution or a shader's loader. */
+  const [extra, setExtra] = useState('')
+  /** Discover → My projects (posting to ResinCraft). */
+  const [posting, setPosting] = useState(false)
   const [versions, setVersions] = useState<McVersion[]>([])
   const [hits, setHits] = useState<Hit[]>()
   /** "All": how far each site's results go, and the sites that didn't answer. */
@@ -369,10 +395,32 @@ export default function Discover({
     void loadInstalled()
   }, [loadInstalled])
 
+  // The kind's own filters start over with each kind.
+  useEffect(() => {
+    setCategory('')
+    setExtra('')
+  }, [kind])
+  const categorized = source === 'all' || CATEGORY_SITES.includes(source)
   const q = useMemo(
-    () => ({ query: debounced, kind, sort, gameVersion: gameVersion || undefined, loader: (kind === 'mod' && loader) || undefined }),
-    [debounced, kind, sort, gameVersion, loader]
+    () => ({
+      query: debounced,
+      kind,
+      sort,
+      gameVersion: gameVersion || undefined,
+      loader: ((kind === 'mod' || kind === 'modpack') && loader) || undefined,
+      categories: categorized ? [category, extra].filter(Boolean) : undefined
+    }),
+    [debounced, kind, sort, gameVersion, loader, category, extra, categorized]
   )
+  const filtered = !!category || !!extra || (!target && (!!gameVersion || !!loader))
+  const clearFilters = () => {
+    setCategory('')
+    setExtra('')
+    if (!target) {
+      setGameVersion('')
+      setLoader('')
+    }
+  }
   /** The sites "All" asks: those with this kind (not CurseForge without a key; no modpack-only ones for an instance). */
   const allSites = useMemo(
     () =>
@@ -792,6 +840,12 @@ export default function Discover({
               }))}
             />
             {canSelect && <span className="hint">{t('discover.selectHint')}</span>}
+            <span className="grow" />
+            {!target && (
+              <button className="btn sm ghost" onClick={() => setPosting(true)} title={t('community.mine.hint')}>
+                <Upload /> {t('community.mine.open')}
+              </button>
+            )}
           </div>
           <div className="toolbar">
             <div className="search">
@@ -819,7 +873,7 @@ export default function Discover({
                 </option>
               ))}
             </select>
-            {kind === 'mod' && !horizon && (
+            {(kind === 'mod' || kind === 'modpack') && !horizon && (
               <select
                 className="select"
                 value={loader}
@@ -834,6 +888,36 @@ export default function Discover({
                 <option value="neoforge">NeoForge</option>
               </select>
             )}
+            {categorized && CATEGORY_FILTERS[kind] && (
+              <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} aria-label={t('discover.filter.category')}>
+                <option value="">{t('discover.filter.anyCategory')}</option>
+                {CATEGORY_FILTERS[kind]!.map((c) => (
+                  <option key={c} value={c}>
+                    {categoryLabel(c)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {categorized && kind === 'resourcepack' && (
+              <select className="select" value={extra} onChange={(e) => setExtra(e.target.value)} aria-label={t('discover.filter.resolution')}>
+                <option value="">{t('discover.filter.anyResolution')}</option>
+                {RESOLUTIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            )}
+            {categorized && kind === 'shader' && (
+              <select className="select" value={extra} onChange={(e) => setExtra(e.target.value)} aria-label={t('discover.filter.shaderLoader')}>
+                <option value="">{t('discover.filter.anyLoader')}</option>
+                {SHADER_LOADERS.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            )}
             <select className="select" value={sort} onChange={(e) => setSort(e.target.value as SortMode)} aria-label={t('discover.sort.label')}>
               {SORTS.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -841,6 +925,11 @@ export default function Discover({
                 </option>
               ))}
             </select>
+            {filtered && (
+              <button className="btn ghost sm" onClick={clearFilters}>
+                <X /> {t('discover.filter.clear')}
+              </button>
+            )}
           </div>
 
           {horizon && source === 'modrinth' && <span className="hint">{t('discover.horizon.modrinthHint')}</span>}
@@ -1124,6 +1213,7 @@ export default function Discover({
 
       {nativeAsk && <NativeInstallNotice names={nativeAsk.names} onAnswer={nativeAsk.answer} />}
 
+      {posting && <CommunityProjects onClose={() => setPosting(false)} categoryOptions={CATEGORY_FILTERS} categoryLabel={categoryLabel} />}
       {worldWarn && (
         <Modal
           title={t('discover.world.otherVersion.title')}

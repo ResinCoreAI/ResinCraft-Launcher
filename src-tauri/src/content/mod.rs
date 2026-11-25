@@ -3,6 +3,7 @@
 //! Handles every `content:*` channel (argument order as in `ResinApi` in src/shared/types.ts).
 
 pub mod atlauncher;
+pub mod community;
 pub mod curseforge;
 pub mod details;
 pub mod dupes;

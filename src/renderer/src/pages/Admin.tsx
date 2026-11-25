@@ -16,6 +16,7 @@ import {
   Lock,
   Mail,
   MailOpen,
+  PackageCheck,
   MessageCircle,
   HardDrive,
   Pencil,
@@ -46,6 +47,7 @@ import { ServiceCard, LiveTunnels } from '../components/admin/Live'
 import { NamesAdmin } from '../components/admin/Names'
 import { BansAdmin } from '../components/admin/Bans'
 import { ReportsAdmin, ReportsCount } from '../components/admin/Reports'
+import { CommunityAdmin } from '../components/admin/Community'
 import { UsageAdmin } from '../components/admin/Usage'
 import { TwoFactorSetup, UsersAdmin } from '../components/admin/Users'
 import { RelaySettingsAdmin } from '../components/admin/RelaySettings'
@@ -122,11 +124,12 @@ type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
 /** The relay's screens, in the dashboard's order. */
-type Section = 'status' | 'mail' | 'mailbox' | 'chat' | 'drive' | 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
+type Section = 'status' | 'mail' | 'mailbox' | 'community' | 'chat' | 'drive' | 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
 const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
   { id: 'status', label: 'servers.admin.nav.status', icon: <Activity size={16} /> },
   { id: 'mail', label: 'servers.admin.nav.mail', icon: <Mail size={16} /> },
   { id: 'mailbox', label: 'servers.admin.nav.mailbox', icon: <MailOpen size={16} /> },
+  { id: 'community', label: 'servers.admin.nav.community', icon: <PackageCheck size={16} /> },
   { id: 'chat', label: 'servers.admin.nav.chat', icon: <MessageCircle size={16} /> },
   { id: 'drive', label: 'servers.admin.nav.drive', icon: <HardDrive size={16} /> },
   { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
@@ -364,6 +367,8 @@ export default function Admin() {
             <MailAdmin />
           ) : section === 'mailbox' ? (
             <MailboxAdmin />
+          ) : section === 'community' ? (
+            <CommunityAdmin />
           ) : section === 'chat' ? (
             <ChatAdmin />
           ) : section === 'drive' ? (

@@ -54,6 +54,8 @@ pub async fn dispatch(channel: &str, args: Args) -> Result<Value> {
         ("chat", _) => crate::chat::handle(channel, args).await,
         ("horizon", _) => crate::player::horizon::handle(channel, args).await,
         ("backup", _) => crate::core::backup::handle(channel, args).await,
+        // Discover → My projects: posting to ResinCraft Relay (content/community.rs).
+        ("community", _) => crate::content::community::handle(channel, args).await,
         _ => bail!("Unknown request: {channel}"),
     }
 }

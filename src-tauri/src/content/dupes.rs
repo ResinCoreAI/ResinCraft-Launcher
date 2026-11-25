@@ -903,6 +903,7 @@ pub async fn install_many(instance_id: &str, picks: Vec<ModPick>, replace: Vec<R
                     }
                     ContentSource::Github => super::github::install_into(&inst, &task, &mut idx, &p.id, kind, p.version_id.clone()).await,
                     ContentSource::Horizon => super::horizon::install_into(&inst, &task, &mut idx, &p.id, p.version_id.clone()).await,
+                    ContentSource::Resin => super::community::install(&inst.id, &p.id, kind, p.version_id.clone()).await,
                     _ => Err(err_tr!("dupes.notSingle", "{name} can't be installed into an instance", name = p.title)),
                 };
                 match r {

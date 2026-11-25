@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use super::dupes::Guard;
 use super::index::{has_entry, load_index, open_zip, save_index, ContentIndex};
-use super::{atlauncher, curseforge, ftb, github, horizon, modrinth, technic};
+use super::{atlauncher, community, curseforge, ftb, github, horizon, modrinth, technic};
 use crate::core::events::Task;
 use crate::core::instances;
 use crate::core::types::{source_of, ContentItem, ContentKind, ContentSource, Instance, LoaderType, ProjectVersion, SearchQuery, SearchResult};
@@ -22,6 +22,7 @@ pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
         Some(ContentSource::Technic) => technic::search(q).await,
         Some(ContentSource::Github) => github::search_hits(q).await,
         Some(ContentSource::Horizon) => horizon::search_hits(q).await,
+        Some(ContentSource::Resin) => community::search(q).await,
         _ => modrinth::search(q).await,
     }
 }
@@ -34,6 +35,7 @@ pub async fn versions(project_id: &str, instance_id: Option<&str>) -> Result<Vec
         ContentSource::Technic => technic::versions(project_id).await,
         ContentSource::Github => github::versions_for(project_id, instance_id).await,
         ContentSource::Horizon => horizon::versions_for(project_id).await,
+        ContentSource::Resin => community::versions(project_id, instance_id).await,
         ContentSource::Modrinth => modrinth::versions(project_id, instance_id).await,
     }
 }
@@ -49,6 +51,7 @@ pub async fn install(instance_id: &str, project_id: &str, kind: ContentKind, ver
         ContentSource::Technic => bail_tr!("content.modpacksOnly", "{source} only publishes modpacks", source = "Technic"),
         ContentSource::Github => github::install(instance_id, project_id, kind, version_id).await,
         ContentSource::Horizon => horizon::install(instance_id, project_id, version_id).await,
+        ContentSource::Resin => community::install(instance_id, project_id, kind, version_id).await,
         ContentSource::Modrinth => modrinth::install(instance_id, project_id, kind, version_id).await,
     }
 }
@@ -61,6 +64,7 @@ pub async fn install_modpack(project_id: &str, version_id: Option<String>) -> Re
         ContentSource::Technic => technic::install_modpack(project_id, version_id).await,
         ContentSource::Github => bail_tr!("github.modsOnly", "GitHub only offers mods here"),
         ContentSource::Horizon => bail_tr!("horizon.packIntoInstance", "A Horizon modpack goes into a Horizon instance: open Discover from one"),
+        ContentSource::Resin => community::install_modpack(project_id, version_id).await,
         ContentSource::Modrinth => modrinth::install_modpack(project_id, version_id).await,
     }
 }

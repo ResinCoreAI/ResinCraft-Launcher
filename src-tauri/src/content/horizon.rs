@@ -1128,7 +1128,7 @@ mod tests {
     }
 
     fn query(kind: ContentKind, text: &str) -> SearchQuery {
-        SearchQuery { query: text.into(), kind, source: None, game_version: Some("26.3".into()), loader: None, sort: None, offset: None, limit: None }
+        SearchQuery { query: text.into(), kind, source: None, game_version: Some("26.3".into()), loader: None, sort: None, offset: None, limit: None, categories: Vec::new() }
     }
 
     #[test]

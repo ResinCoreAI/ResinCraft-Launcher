@@ -88,6 +88,8 @@ pub enum ContentSource {
     Github,
     /// Horizon's own registry, for Horizon instances ("hz:<id>").
     Horizon,
+    /// What players post on ResinCraft Relay, approved by its admins ("rc:<id>").
+    Resin,
 }
 
 /// Project ids carry their source as a prefix ("cf:238222", "ftb:100", "atl:Foo", "technic:bar", "gh:owner/repo",
@@ -106,6 +108,8 @@ pub fn source_of(project_id: &str) -> ContentSource {
         ContentSource::Github
     } else if project_id.starts_with("hz:") {
         ContentSource::Horizon
+    } else if project_id.starts_with("rc:") {
+        ContentSource::Resin
     } else {
         ContentSource::Modrinth
     }
@@ -588,6 +592,9 @@ pub struct SearchQuery {
     /// "relevance" | "downloads" | "follows" | "newest" | "updated"
     #[serde(default)]
     pub sort: Option<String>,
+    /// Categories it must have, by Modrinth id ("magic", "16x", "iris"); other sites match them as well as they can.
+    #[serde(default)]
+    pub categories: Vec<String>,
     #[serde(default)]
     pub offset: Option<u32>,
     #[serde(default)]
