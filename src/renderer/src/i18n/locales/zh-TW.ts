@@ -6241,6 +6241,20 @@ const dict: Dict = {
   "gameSync.options.saved": "遊戲選項已儲存並共用",
   "engine.settingsSync.closeFirst": "請先關閉 {name}，再還原它自己的設定",
   "engine.settingsSync.noOwn": "{name} 沒有保存它自己的設定",
+  "inbox.rail.team": "團隊",
+  "inbox.team.write": "聯絡團隊",
+  "inbox.team.writeHint": "問題、故障或點子都可以：ResinCraft 團隊會在這裡的收件匣回覆你。",
+  "inbox.team.subject": "主旨",
+  "inbox.team.subjectPlaceholder": "關於什麼？",
+  "inbox.team.message": "內容",
+  "inbox.team.messagePlaceholder": "告訴我們發生了什麼，以及你原本預期的結果。如果是故障，附上啟動器版本和你的系統會更有幫助。",
+  "inbox.team.send": "傳送",
+  "inbox.team.sent": "已傳送給團隊，回覆會出現在這裡。",
+  "inbox.team.reply": "繼續寫…（Ctrl+Enter 傳送）",
+  "inbox.team.you": "你",
+  "inbox.team.from": "ResinCraft 團隊",
+  "inbox.team.none": "還沒有和團隊的對話",
+  "inbox.team.off": "此中繼已關閉聯絡團隊",
 }
 
 export default dict

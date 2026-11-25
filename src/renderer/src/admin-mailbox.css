@@ -1,0 +1,163 @@
+/* Admin → Mailbox (components/admin/Mailbox.tsx): folders, the thread list, a thread, a new mail. */
+.admin-mailbox .toolbar .ib-search {
+  max-width: none;
+}
+.mbx-layout {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 12px;
+}
+.mbx-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mbx-folders .btn.primary {
+  margin-bottom: 6px;
+}
+.mbx-folder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mbx-folder:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.mbx-folder.on {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+.mbx-main {
+  min-width: 0;
+}
+.mbx-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.mbx-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 200px) minmax(0, 1fr) auto 84px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mbx-row:last-child {
+  border-bottom: 0;
+}
+.mbx-row:hover {
+  background: var(--surface-2);
+}
+.mbx-row.unread {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.mbx-row.unread .mbx-who,
+.mbx-row.unread .mbx-subj b {
+  font-weight: 700;
+}
+.mbx-subj b {
+  font-weight: 500;
+}
+.mbx-when {
+  text-align: right;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.mbx-star {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  vertical-align: -2px;
+  color: var(--warning);
+  fill: currentColor;
+}
+.mbx-thread,
+.mbx-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mbx-thread .ib-mail-subject {
+  margin: 0;
+}
+.mbx-msg {
+  padding: 12px 16px;
+}
+.mbx-msg.out {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.mbx-msg header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.mbx-msg header svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+.mbx-msg header .mbx-when {
+  margin-left: auto;
+}
+.mbx-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mbx-reply,
+.mbx-compose {
+  padding: 12px;
+}
+.mbx-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mbx-reply textarea,
+.mbx-compose textarea {
+  resize: vertical;
+}
+@media (max-width: 900px) {
+  .mbx-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mbx-folders {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .mbx-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .mbx-row .mbx-subj {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .mbx-row .chip {
+    display: none;
+  }
+}

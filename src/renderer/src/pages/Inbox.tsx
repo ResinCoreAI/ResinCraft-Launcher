@@ -3,10 +3,11 @@
 // and the open mail or chat (with the friend's profile or the group's members beside it).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { plainEmoji } from '../components/chat/chatEmoji'
-import { ArrowLeft, BellRing, Copy, Download, Eye, EyeOff, Gift, Inbox as InboxIcon, Mail, MailOpen, MessageCircle, MoreHorizontal, Plus, RefreshCw, Search, Trash2, Upload, UserPlus, X } from 'lucide-react'
-import type { ChatGiftData, ChatGroup, ChatMessage, ChatPerson, InboxData, InboxMessage, InboxReward } from '@shared/types'
+import { ArrowLeft, BellRing, Copy, Download, Eye, EyeOff, Gift, Inbox as InboxIcon, LifeBuoy, Mail, MailOpen, MessageCircle, MoreHorizontal, PenLine, Plus, RefreshCw, Search, Trash2, Upload, UserPlus, X } from 'lucide-react'
+import type { ChatGiftData, ChatGroup, ChatMessage, ChatPerson, InboxData, InboxMessage, InboxReward, TeamMailData, TeamThread } from '@shared/types'
 import { api } from '../api'
-import { inbox, setInbox } from '../inboxState'
+import { inbox, setInbox, setTeamUnread } from '../inboxState'
+import { TeamCompose, TeamConversation } from '../components/TeamMail'
 import { money, setWalletBalance } from '../storeStatus'
 import creditIcon from '../assets/resin-credit.svg'
 import { useStore } from '../store'
@@ -132,12 +133,12 @@ function SenderMark({ name }: { name: string }) {
   )
 }
 
-type Filter = 'all' | 'mail' | 'friends' | 'groups' | 'requests'
+type Filter = 'all' | 'mail' | 'team' | 'friends' | 'groups' | 'requests'
 const FILTER_KEY = 'resin.inbox.filter'
 const savedFilter = (): Filter => {
   try {
     const f = localStorage.getItem(FILTER_KEY) as Filter | null
-    return f && ['all', 'mail', 'friends', 'groups', 'requests'].includes(f) ? f : 'all'
+    return f && ['all', 'mail', 'team', 'friends', 'groups', 'requests'].includes(f) ? f : 'all'
   } catch {
     return 'all'
   }
@@ -160,6 +161,7 @@ function chatLine(m: ChatMessage | undefined, me: string, conv: string, group: b
 
 type Row =
   | { kind: 'mail'; key: string; at: number; unread: boolean; m: InboxMessage }
+  | { kind: 'team'; key: string; at: number; unread: number; th: TeamThread }
   | { kind: 'dm'; key: string; at: number; unread: number; p: ChatPerson; conv: string; last?: ChatMessage }
   | { kind: 'group'; key: string; at: number; unread: number; g: ChatGroup; last?: ChatMessage }
 
@@ -192,6 +194,9 @@ export default function InboxPage() {
   const [busy, setBusy] = useState(false)
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState<string>()
+  const [team, setTeam] = useState<TeamMailData>()
+  const [teamOpen, setTeamOpen] = useState<number>()
+  const [teamWriting, setTeamWriting] = useState(false)
   const [deleting, setDeleting] = useState<InboxMessage>()
   const [emailOpen, setEmailOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
@@ -215,6 +220,12 @@ export default function InboxPage() {
       setData(d)
       setError('')
       setInbox({ unread: d.unread, available: true })
+      // Writing to the team: a relay from before it has no conversations to show.
+      if (d.team) {
+        const tm = await inbox.team().catch(() => undefined)
+        setTeam(tm)
+        setTeamUnread(tm?.unread ?? d.team.unread)
+      } else setTeam(undefined)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -224,6 +235,8 @@ export default function InboxPage() {
   useEffect(() => {
     setData(undefined)
     setOpenId(undefined)
+    setTeamOpen(undefined)
+    setTeamWriting(false)
     void load()
   }, [load, activeAccount?.id])
   // Leaving the Inbox: no chat is on screen any more (so its messages count as unread and pop up again). React runs
@@ -238,7 +251,11 @@ export default function InboxPage() {
   }, [])
   // A chat opened from elsewhere (a pop-up, a profile): it's what's on screen now.
   useEffect(() => {
-    if (v.open) setOpenId(undefined)
+    if (v.open) {
+      setOpenId(undefined)
+      setTeamOpen(undefined)
+      setTeamWriting(false)
+    }
   }, [v.open])
 
   /** Changes one mail here at once; the relay follows. */
@@ -250,8 +267,31 @@ export default function InboxPage() {
       setInbox({ unread })
       return { ...d, messages: next, unread, total: change ? d.total : d.total - (d.messages.length - next.length) }
     })
+  const closeTeam = () => {
+    setTeamOpen(undefined)
+    setTeamWriting(false)
+  }
+  /** What the relay says about the conversations with the team (after writing or reading). */
+  const teamGot = (d: TeamMailData) => {
+    setTeam(d)
+    setTeamUnread(d.unread)
+  }
+  const openTeam = (th: TeamThread) => {
+    chat.open(null)
+    setOpenId(undefined)
+    setTeamWriting(false)
+    setTeamOpen(th.id)
+    if (th.unread) inbox.readTeam(th.id).then(teamGot, fail)
+  }
+  const writeTeam = () => {
+    chat.open(null)
+    setOpenId(undefined)
+    setTeamOpen(undefined)
+    setTeamWriting(true)
+  }
   const openMail = (m: InboxMessage) => {
     chat.open(null)
+    closeTeam()
     setOpenId(m.id)
     if (!m.read) {
       patch([m.id], { read: true })
@@ -263,6 +303,7 @@ export default function InboxPage() {
   }
   const openChat = (conv: string) => {
     setOpenId(undefined)
+    closeTeam()
     chat.open(conv)
   }
   const mark = (m: InboxMessage, read: boolean) => {
@@ -333,6 +374,7 @@ export default function InboxPage() {
     const out: Row[] = []
     if (filter === 'all' || filter === 'mail')
       for (const m of data?.messages ?? []) out.push({ kind: 'mail', key: `m:${m.id}`, at: m.sentAt, unread: !m.read, m })
+    if (filter === 'all' || filter === 'team') for (const th of team?.threads ?? []) out.push({ kind: 'team', key: `t:${th.id}`, at: th.lastAt, unread: th.unread, th })
     if (chatOn && (filter === 'all' || filter === 'friends'))
       for (const p of v.friends.friends) {
         if (!p.conv) continue
@@ -347,11 +389,17 @@ export default function InboxPage() {
         out.push({ kind: 'group', key: g.conv, at: last?.at ?? g.created, unread: v.unread[g.conv] ?? 0, g, last })
       }
     const text = (r: Row) =>
-      r.kind === 'mail' ? `${r.m.from}\n${r.m.subject}\n${r.m.body}` : r.kind === 'dm' ? `${r.p.name}\n${displayName(r.conv, r.p.uuid)}` : r.g.name
+      r.kind === 'mail'
+        ? `${r.m.from}\n${r.m.subject}\n${r.m.body}`
+        : r.kind === 'team'
+          ? `${r.th.subject}\n${r.th.messages.map((m) => m.body).join('\n')}`
+          : r.kind === 'dm' ? `${r.p.name}\n${displayName(r.conv, r.p.uuid)}` : r.g.name
     return out.filter((r) => !q || text(r).toLowerCase().includes(q)).sort((a, b) => b.at - a.at)
-  }, [data, v.friends.friends, v.groups, v.convs, v.unread, filter, query, chatOn])
+  }, [data, team, v.friends.friends, v.groups, v.convs, v.unread, filter, query, chatOn])
 
   const mailUnread = data?.unread ?? 0
+  const teamOn = !!team && (team.on || team.threads.length > 0)
+  const teamUnread = team?.unread ?? 0
   const dmUnread = v.friends.friends.reduce((n, p) => n + (p.conv ? v.unread[p.conv] ?? 0 : 0), 0)
   const groupUnread = v.groups.reduce((n, g) => n + (v.unread[g.conv] ?? 0), 0)
   const requests = v.friends.incoming.length
@@ -404,6 +452,7 @@ export default function InboxPage() {
     { label: t('chat.giftCode.reset'), onSelect: () => void chat.giftCode(true).then((code) => toast(t('chat.giftCode.changed', { code }), 'success')).catch(fail) }
   ]
   const listMenu = (): ContextEntry[] => [
+    ...(team?.on ? ([{ label: t('inbox.team.write'), icon: <PenLine size={14} />, onSelect: writeTeam }, '-'] as ContextEntry[]) : []),
     { label: data?.email?.address ? t('inbox.email.button', { address: data.email.address }) : t('inbox.email.add'), icon: <Mail size={14} />, disabled: !data, onSelect: () => setEmailOpen(true) },
     { label: data?.status?.on ? t('inbox.status.on') : t('inbox.status.button'), icon: <BellRing size={14} />, disabled: !data, onSelect: () => setStatusOpen(true) },
     { label: t('inbox.markAllRead'), icon: <MailOpen size={14} />, disabled: !mailUnread, onSelect: markAll },
@@ -414,8 +463,10 @@ export default function InboxPage() {
   ]
 
   const open = openId ? data?.messages.find((m) => m.id === openId) : undefined
-  const showingChat = !open && !!v.open
-  const title = { all: t('inbox.title'), mail: t('inbox.rail.mail'), friends: t('inbox.rail.friends'), groups: t('chat.groups'), requests: t('inbox.rail.requests') }[filter]
+  const teamThread = teamOpen != null ? team?.threads.find((th) => th.id === teamOpen) : undefined
+  const showingTeam = !open && (teamWriting || !!teamThread)
+  const showingChat = !open && !showingTeam && !!v.open
+  const title = { all: t('inbox.title'), mail: t('inbox.rail.mail'), team: t('inbox.rail.team'), friends: t('inbox.rail.friends'), groups: t('chat.groups'), requests: t('inbox.rail.requests') }[filter]
   const RailButton = ({ f, icon, label, count }: { f: Filter; icon: ReactNode; label: string; count: number }) => (
     <button className={`ib2-rb ${filter === f ? 'on' : ''}`} title={label} aria-label={label} aria-pressed={filter === f} onClick={() => setFilter(f)}>
       {icon}
@@ -426,6 +477,28 @@ export default function InboxPage() {
   const timeOf = (secs: number) => (bucketOf(secs) === 'today' ? new Date(secs * 1000).toLocaleTimeString(currentLanguage(), { hour: '2-digit', minute: '2-digit' }) : shortTime(secs))
 
   const rowEl = (r: Row) => {
+    if (r.kind === 'team') {
+      const th = r.th
+      const last = th.messages[th.messages.length - 1]
+      return (
+        <button key={r.key} className={`ib2-row ${r.unread ? 'unread' : ''} ${teamOpen === th.id ? 'on' : ''}`} onClick={() => openTeam(th)}>
+          <span className="ib-mark ib-team-mark" aria-hidden>
+            <LifeBuoy />
+          </span>
+          <span className="ib2-row-text">
+            <span className="ib2-l1">
+              <b className="ellipsis">{th.subject}</b>
+              <span className="chip compact ib-cat ib-cat-support">{t('inbox.rail.team')}</span>
+            </span>
+            <span className="ib2-l2 ellipsis">{last ? `${last.fromTeam ? t('inbox.team.from') : t('inbox.team.you')}: ${last.body.replace(/\s+/g, ' ')}` : ''}</span>
+          </span>
+          <span className="ib2-r">
+            <span title={longTime(th.lastAt)}>{timeOf(th.lastAt)}</span>
+            {r.unread > 0 && <span className="ib-badge">{r.unread}</span>}
+          </span>
+        </button>
+      )
+    }
     if (r.kind === 'mail') {
       const m = r.m
       return (
@@ -485,10 +558,11 @@ export default function InboxPage() {
 
   return (
     <div className="page inbox-page ib2-page">
-      <div className={`card ib2-shell ${open || showingChat ? 'reading' : ''}`}>
+      <div className={`card ib2-shell ${open || showingChat || showingTeam ? 'reading' : ''}`}>
         <nav className="ib2-rail" aria-label={t('inbox.title')}>
-          <RailButton f="all" icon={<InboxIcon />} label={t('inbox.rail.all')} count={mailUnread + dmUnread + groupUnread + requests} />
+          <RailButton f="all" icon={<InboxIcon />} label={t('inbox.rail.all')} count={mailUnread + teamUnread + dmUnread + groupUnread + requests} />
           <RailButton f="mail" icon={<Mail />} label={t('inbox.rail.mail')} count={mailUnread} />
+          {teamOn && <RailButton f="team" icon={<LifeBuoy />} label={t('inbox.rail.team')} count={teamUnread} />}
           {chatOn && <RailButton f="friends" icon={<MessageCircle />} label={t('inbox.rail.friends')} count={dmUnread} />}
           {chatOn && <RailButton f="requests" icon={<UserPlus />} label={t('inbox.rail.requests')} count={requests} />}
           {chatOn && (
@@ -522,7 +596,12 @@ export default function InboxPage() {
           <div className="ib2-lh">
             <div className="row">
               <h2 className="grow">{title}</h2>
-              {!!data?.unclaimed && (
+              {filter === 'team' && team?.on && (
+                <button className="btn primary sm" onClick={writeTeam}>
+                  <PenLine /> {t('inbox.team.write')}
+                </button>
+              )}
+              {!!data?.unclaimed && filter !== 'team' && (
                 <button className="btn ghost sm" onClick={(e) => void claim('all', e.currentTarget)} disabled={claiming}>
                   <Gift /> {t('inbox.claimAll', { count: data.unclaimed })}
                 </button>
@@ -576,6 +655,12 @@ export default function InboxPage() {
               )
             ) : !data && !chatOn && !error ? (
               [0, 1, 2, 3].map((i) => <div key={i} className="ib-row ib-skeleton" aria-hidden />)
+            ) : rows.length === 0 && filter === 'team' && !query ? (
+              <div className="ib-none">
+                <LifeBuoy aria-hidden />
+                <b>{team?.on ? t('inbox.team.none') : t('inbox.team.off')}</b>
+                {team?.on && <span className="hint">{t('inbox.team.writeHint')}</span>}
+              </div>
             ) : rows.length === 0 ? (
               <div className="ib-none">
                 {query ? <Search aria-hidden /> : <InboxIcon aria-hidden />}
@@ -602,6 +687,17 @@ export default function InboxPage() {
         <div className="ib2-pane">
           {showingChat ? (
             <ChatPanel mode="pane" />
+          ) : showingTeam && teamWriting ? (
+            <TeamCompose
+              onCancel={closeTeam}
+              onSent={(d) => {
+                teamGot(d)
+                setTeamWriting(false)
+                if (d.thread != null) setTeamOpen(d.thread)
+              }}
+            />
+          ) : showingTeam && teamThread ? (
+            <TeamConversation thread={teamThread} onBack={closeTeam} onSent={teamGot} />
           ) : open ? (
             <article className="ib-mail" aria-label={open.subject}>
               <div className="ib-mail-bar">

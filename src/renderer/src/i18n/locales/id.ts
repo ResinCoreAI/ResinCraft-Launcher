@@ -6254,6 +6254,20 @@ const dict: Dict = {
   "gameSync.options.saved": "Opsi game disimpan dan dibagikan",
   "engine.settingsSync.closeFirst": "Tutup {name} sebelum mengembalikan pengaturannya sendiri",
   "engine.settingsSync.noOwn": "{name} tidak menyimpan pengaturannya sendiri",
+  "inbox.rail.team": "Tim",
+  "inbox.team.write": "Tulis ke tim",
+  "inbox.team.writeHint": "Pertanyaan, masalah, atau ide: tim ResinCraft menjawab di sini, di Kotak Masuk kamu.",
+  "inbox.team.subject": "Subjek",
+  "inbox.team.subjectPlaceholder": "Tentang apa?",
+  "inbox.team.message": "Pesan",
+  "inbox.team.messagePlaceholder": "Ceritakan apa yang terjadi dan apa yang kamu harapkan. Untuk masalah, versi launcher dan sistemmu juga membantu.",
+  "inbox.team.send": "Kirim",
+  "inbox.team.sent": "Terkirim ke tim. Jawabannya akan muncul di sini.",
+  "inbox.team.reply": "Tulis lagi… (Ctrl+Enter untuk mengirim)",
+  "inbox.team.you": "Kamu",
+  "inbox.team.from": "Tim ResinCraft",
+  "inbox.team.none": "Belum ada percakapan dengan tim",
+  "inbox.team.off": "Menulis ke tim dimatikan di relay ini",
 }
 
 export default dict

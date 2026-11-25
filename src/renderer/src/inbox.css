@@ -1001,3 +1001,82 @@
     display: inline-flex;
   }
 }
+
+/* ---------- Writing to the team (components/TeamMail.tsx) ---------- */
+.ib-mark.ib-team-mark {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ib-mark.ib-team-mark svg {
+  width: 18px;
+  height: 18px;
+}
+.ib-team {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ib-team .ib-mail-subject {
+  margin: 4px 0 0;
+}
+.ib-team-body {
+  resize: vertical;
+  min-height: 160px;
+}
+.ib-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ib-team-msg {
+  max-width: 86%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.ib-team-msg.mine {
+  align-self: flex-end;
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+.ib-team-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.ib-team-who svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+.ib-team-who .hint {
+  margin-left: auto;
+  font-size: 12px;
+}
+.ib-team-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ib-team-reply {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px 0 0;
+  background: var(--surface);
+}
+.ib-team-reply textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 64px;
+}
+.ib-team textarea,
+.mbx-reply textarea,
+.mbx-compose textarea {
+  font: inherit;
+}

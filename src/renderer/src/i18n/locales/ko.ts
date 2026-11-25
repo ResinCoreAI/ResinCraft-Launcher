@@ -6246,6 +6246,20 @@ const dict: Dict = {
   "gameSync.options.saved": "게임 옵션을 저장하고 공유했습니다",
   "engine.settingsSync.closeFirst": "원래 설정을 되돌리기 전에 {name}을(를) 닫으세요",
   "engine.settingsSync.noOwn": "{name}에 보관된 원래 설정이 없습니다",
+  "inbox.rail.team": "팀",
+  "inbox.team.write": "팀에 문의하기",
+  "inbox.team.writeHint": "질문, 문제, 아이디어 무엇이든: ResinCraft 팀이 이 받은편지함에서 답변해요.",
+  "inbox.team.subject": "제목",
+  "inbox.team.subjectPlaceholder": "무엇에 관한 건가요?",
+  "inbox.team.message": "메시지",
+  "inbox.team.messagePlaceholder": "무슨 일이 있었고 어떻게 되길 기대했는지 알려 주세요. 문제라면 런처 버전과 사용 중인 시스템도 도움이 돼요.",
+  "inbox.team.send": "보내기",
+  "inbox.team.sent": "팀에 보냈어요. 답변은 여기로 와요.",
+  "inbox.team.reply": "더 쓰기… (Ctrl+Enter로 보내기)",
+  "inbox.team.you": "나",
+  "inbox.team.from": "ResinCraft 팀",
+  "inbox.team.none": "아직 팀과 나눈 대화가 없어요",
+  "inbox.team.off": "이 릴레이에서는 팀에 문의하기가 꺼져 있어요",
 }
 
 export default dict

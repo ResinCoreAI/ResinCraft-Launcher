@@ -1,7 +1,7 @@
 // The Inbox's unread count for the header badge, and the calls the Inbox page and the email section make
 // (src-tauri mail.rs → the relay's /api/inbox…). Kept apart from pages/Inbox.tsx so the header doesn't load the page.
 import { useEffect, useSyncExternalStore } from 'react'
-import type { InboxData, InboxEmail, InboxMessage, InboxReward, InboxStatusSub } from '@shared/types'
+import type { InboxData, InboxEmail, InboxMessage, InboxReward, InboxStatusSub, TeamMailData } from '@shared/types'
 import { api } from './api'
 import './inbox-badge.css'
 
@@ -20,7 +20,11 @@ export const inbox = {
   claim: (id: string | 'all') =>
     call<{ claimed: string[]; given: InboxReward[]; credit: number; unread: number; unclaimed: number; error?: string | null }>('POST', '/api/inbox/claim', id === 'all' ? { all: true } : { id }),
   status: () => call<InboxStatusSub>('GET', '/api/inbox/status'),
-  setStatus: (on: boolean, email: boolean) => call<InboxStatusSub>('POST', '/api/inbox/status', { on, email })
+  setStatus: (on: boolean, email: boolean) => call<InboxStatusSub>('POST', '/api/inbox/status', { on, email }),
+  /** Conversations with the team: write a new one (`subject`) or more in one (`thread`); the team's answers. */
+  team: () => call<TeamMailData>('GET', '/api/inbox/team'),
+  writeTeam: (to: { subject: string } | { thread: number }, body: string) => call<TeamMailData>('POST', '/api/inbox/team', { ...to, body }),
+  readTeam: (thread?: number) => call<TeamMailData>('POST', '/api/inbox/team/read', thread == null ? {} : { thread })
 }
 
 /** `available`: the relay answered for this account (a Microsoft account, a relay with mail). */
@@ -43,11 +47,19 @@ export function setInbox(next: Partial<State>): void {
   listeners.forEach((cb) => cb())
 }
 
+/** The team's answers the player hasn't read, counted on the same badge. */
+let teamUnread = 0
+export function setTeamUnread(n: number): void {
+  if (n === teamUnread) return
+  teamUnread = n
+  listeners.forEach((cb) => cb())
+}
+
 /** Chat's unread messages and friend requests (chatState.ts), counted on the same badge. */
 let chatBadge = { count: 0, on: false }
 let badge: State = state
 const badgeOf = (): State => {
-  const unread = state.unread + chatBadge.count
+  const unread = state.unread + teamUnread + chatBadge.count
   const available = state.available || chatBadge.on
   if (badge.unread !== unread || badge.available !== available) badge = { unread, available }
   return badge
@@ -112,15 +124,18 @@ export function useInboxWatch(accountId: string | undefined, onNew: (count: numb
     let asked = 0
     let first = true
     setInbox({ unread: 0, available: false })
+    setTeamUnread(0)
     const ask = () => {
       asked = Date.now()
-      call<{ unread: number; celebrate?: Celebration[] }>('GET', '/api/inbox/unread').then(
+      call<{ unread: number; team?: number; celebrate?: Celebration[] }>('GET', '/api/inbox/unread').then(
         (r) => {
           if (!live) return
-          const before = state.unread
+          const before = state.unread + teamUnread
           setInbox({ unread: r.unread, available: true })
+          setTeamUnread(r.team ?? 0)
           if (r.celebrate?.length) addCelebrations(r.celebrate)
-          if (!first && r.unread > before) onNew(r.unread - before)
+          const after = r.unread + (r.team ?? 0)
+          if (!first && after > before) onNew(after - before)
           first = false
         },
         () => live && setInbox({ available: false })

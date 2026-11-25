@@ -15,6 +15,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  MailOpen,
   MessageCircle,
   HardDrive,
   Pencil,
@@ -53,6 +54,7 @@ import { PaymentsAdmin } from '../components/admin/Payments'
 import { DevAdmin } from '../components/admin/Dev'
 import { StatusAdmin } from '../components/admin/Status'
 import { MailAdmin } from '../components/admin/Mail'
+import { MailboxAdmin } from '../components/admin/Mailbox'
 import { ChatAdmin } from '../components/admin/Chat'
 import { DriveAdmin } from '../components/admin/Drive'
 import '../serverlist.css'
@@ -120,10 +122,11 @@ type Tab = 'pending' | 'listings' | 'reports' | 'bans' | 'settings' | 'add'
 const when = (secs?: number | null) => (secs ? new Date(secs * 1000).toLocaleString() : '')
 
 /** The relay's screens, in the dashboard's order. */
-type Section = 'status' | 'mail' | 'chat' | 'drive' | 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
+type Section = 'status' | 'mail' | 'mailbox' | 'chat' | 'drive' | 'live' | 'names' | 'bans' | 'usage' | 'list' | 'reports' | 'payments' | 'users' | 'dev' | 'settings' | 'events'
 const SECTIONS: { id: Section; label: Key; icon: ReactNode }[] = [
   { id: 'status', label: 'servers.admin.nav.status', icon: <Activity size={16} /> },
   { id: 'mail', label: 'servers.admin.nav.mail', icon: <Mail size={16} /> },
+  { id: 'mailbox', label: 'servers.admin.nav.mailbox', icon: <MailOpen size={16} /> },
   { id: 'chat', label: 'servers.admin.nav.chat', icon: <MessageCircle size={16} /> },
   { id: 'drive', label: 'servers.admin.nav.drive', icon: <HardDrive size={16} /> },
   { id: 'live', label: 'servers.admin.nav.live', icon: <Radio size={16} /> },
@@ -359,6 +362,8 @@ export default function Admin() {
             <StatusAdmin />
           ) : section === 'mail' ? (
             <MailAdmin />
+          ) : section === 'mailbox' ? (
+            <MailboxAdmin />
           ) : section === 'chat' ? (
             <ChatAdmin />
           ) : section === 'drive' ? (

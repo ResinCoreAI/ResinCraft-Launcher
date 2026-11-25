@@ -6251,6 +6251,20 @@ const dict: Dict = {
   "gameSync.options.saved": "Đã lưu và chia sẻ tùy chọn game",
   "engine.settingsSync.closeFirst": "Hãy đóng {name} trước khi khôi phục cài đặt riêng của nó",
   "engine.settingsSync.noOwn": "{name} không có cài đặt riêng nào được giữ lại",
+  "inbox.rail.team": "Đội ngũ",
+  "inbox.team.write": "Viết cho đội ngũ",
+  "inbox.team.writeHint": "Câu hỏi, sự cố hay ý tưởng: đội ngũ ResinCraft sẽ trả lời ngay tại Hộp thư của bạn.",
+  "inbox.team.subject": "Tiêu đề",
+  "inbox.team.subjectPlaceholder": "Về chuyện gì?",
+  "inbox.team.message": "Tin nhắn",
+  "inbox.team.messagePlaceholder": "Hãy kể điều gì đã xảy ra và bạn mong đợi điều gì. Nếu là sự cố, phiên bản launcher và hệ điều hành của bạn cũng giúp ích.",
+  "inbox.team.send": "Gửi",
+  "inbox.team.sent": "Đã gửi cho đội ngũ. Câu trả lời sẽ đến ở đây.",
+  "inbox.team.reply": "Viết thêm… (Ctrl+Enter để gửi)",
+  "inbox.team.you": "Bạn",
+  "inbox.team.from": "Đội ngũ ResinCraft",
+  "inbox.team.none": "Chưa có cuộc trò chuyện nào với đội ngũ",
+  "inbox.team.off": "Relay này đã tắt việc viết cho đội ngũ",
 }
 
 export default dict

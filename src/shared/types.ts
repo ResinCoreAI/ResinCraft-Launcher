@@ -2272,6 +2272,32 @@ export interface InboxData {
   credit?: number
   currency?: string
   status?: InboxStatusSub
+  /** Writing to the team (relay teammail.rs): on, and the team's answers not read yet. */
+  team?: { on: boolean; unread: number }
+}
+
+/** One message in a conversation with the team: the player's, or the team's answer. */
+export interface TeamMessage {
+  id: number
+  at: number
+  fromTeam: boolean
+  body: string
+}
+/** A conversation a player started with the team (or the team with them), from the Inbox. */
+export interface TeamThread {
+  id: number
+  subject: string
+  createdAt: number
+  lastAt: number
+  unread: number
+  messages: TeamMessage[]
+}
+export interface TeamMailData {
+  on: boolean
+  threads: TeamThread[]
+  unread: number
+  /** After writing: the conversation it went in. */
+  thread?: number
 }
 
 /** A part's day on ResinCraft Status: [uptime %, outage minutes, average ms, slow checks, posted level?, posted titles?]. */

@@ -6313,6 +6313,20 @@ const dict: Dict = {
   "gameSync.options.saved": "Настройки игры сохранены и переданы",
   "engine.settingsSync.closeFirst": "Закройте {name}, прежде чем возвращать её собственные настройки",
   "engine.settingsSync.noOwn": "У {name} нет сохранённых собственных настроек",
+  "inbox.rail.team": "Команда",
+  "inbox.team.write": "Написать команде",
+  "inbox.team.writeHint": "Вопросы, проблемы или идеи: команда ResinCraft ответит здесь, во «Входящих».",
+  "inbox.team.subject": "Тема",
+  "inbox.team.subjectPlaceholder": "О чём речь?",
+  "inbox.team.message": "Сообщение",
+  "inbox.team.messagePlaceholder": "Расскажите, что произошло и чего вы ожидали. Если это проблема, помогут версия лаунчера и ваша система.",
+  "inbox.team.send": "Отправить",
+  "inbox.team.sent": "Отправлено команде. Ответ придёт сюда.",
+  "inbox.team.reply": "Написать ещё… (Ctrl+Enter — отправить)",
+  "inbox.team.you": "Вы",
+  "inbox.team.from": "Команда ResinCraft",
+  "inbox.team.none": "Пока нет переписки с командой",
+  "inbox.team.off": "Писать команде на этом релее нельзя",
 }
 
 export default dict

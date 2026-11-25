@@ -2,6 +2,7 @@
 // Mail screen (`/api/mail…` over adminCall). `?inbox=empty` starts with no mail, `?inbox=off` as a relay without
 // email, `?inbox=none` as a build with no relay (the page says so). The confirmation code is always 123456.
 import type { InboxMessage, InboxReward } from '@shared/types'
+import { mockTeamAdmin, mockTeamPlayer, teamUnread } from './mock-teammail'
 
 const now = () => Math.floor(Date.now() / 1000)
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms))
@@ -278,13 +279,14 @@ export async function mockMailCall(method: string, path: string, body?: unknown)
   const b = (body ?? {}) as { id?: string; ids?: string[]; read?: boolean; address?: string; code?: string }
   const ids = b.ids ?? (b.id ? [b.id] : [])
   const route = `${method} ${path}`
+  if (path === '/api/inbox/team' || path.startsWith('/api/inbox/team/')) return mockTeamPlayer(method, path, body)
   switch (route) {
     case 'GET /api/inbox':
-      return { messages: mine().map(asMessage), unread: unread(), total: mine().length, email: emailState(), unclaimed: unclaimed().length, credit, currency: 'thb', status: statusSub }
+      return { messages: mine().map(asMessage), unread: unread(), total: mine().length, email: emailState(), unclaimed: unclaimed().length, credit, currency: 'thb', status: statusSub, team: { on: true, unread: teamUnread() } }
     case 'GET /api/inbox/unread': {
       // ?celebrate=tester (or developer): the relay has an invitation's pop-up waiting, until it's shown.
       const kind = new URLSearchParams(location.search).get('celebrate')
-      return { unread: unread(), celebrate: kind && !celebratedHere.has(kind) ? [{ kind, by: 'Developer Notch', at: Math.floor(Date.now() / 1000) }] : [] }
+      return { unread: unread(), team: teamUnread(), celebrate: kind && !celebratedHere.has(kind) ? [{ kind, by: 'Developer Notch', at: Math.floor(Date.now() / 1000) }] : [] }
     }
     case 'POST /api/inbox/celebrated':
       celebratedHere.add(String((body as { kind?: string })?.kind ?? ''))
@@ -779,6 +781,7 @@ function mockSchedules(method: string, path: string, b: Record<string, unknown>)
 /** The admins' `/api/mail…` routes in the preview (relayMock in mock-serverlist.ts). */
 export function mockMailAdmin(method: string, path: string, b: Record<string, unknown>): unknown {
   if (path === '/api/mail/schedules' || path.startsWith('/api/mail/schedules/')) return mockSchedules(method, path, b)
+  if (path === '/api/mail/box' || path.startsWith('/api/mail/box/')) return mockTeamAdmin(method, path, b)
   if (method === 'GET' && path === '/api/mail') return adminData()
   if (method === 'POST' && path === '/api/mail/send') return { ...adminData(), mail: sendMail(b, 'admin puirkle (Puirkle_Gamer) via launcher') }
   if (method === 'POST' && path === '/api/mail/remove') {

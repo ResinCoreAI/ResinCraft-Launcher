@@ -6264,6 +6264,20 @@ const dict: Dict = {
   "gameSync.options.saved": "Oyun seçenekleri kaydedildi ve paylaşıldı",
   "engine.settingsSync.closeFirst": "Kendi ayarlarını geri yüklemeden önce {name} kurulumunu kapatın",
   "engine.settingsSync.noOwn": "{name} için saklanmış kendi ayarları yok",
+  "inbox.rail.team": "Ekip",
+  "inbox.team.write": "Ekibe yaz",
+  "inbox.team.writeHint": "Sorular, sorunlar ya da fikirler: ResinCraft ekibi burada, Gelen Kutunda yanıtlar.",
+  "inbox.team.subject": "Konu",
+  "inbox.team.subjectPlaceholder": "Ne hakkında?",
+  "inbox.team.message": "Mesaj",
+  "inbox.team.messagePlaceholder": "Ne olduğunu ve ne beklediğini anlat. Bir sorunsa başlatıcı sürümü ve sistemin de yardımcı olur.",
+  "inbox.team.send": "Gönder",
+  "inbox.team.sent": "Ekibe gönderildi. Yanıt buraya gelecek.",
+  "inbox.team.reply": "Devam et… (Ctrl+Enter gönderir)",
+  "inbox.team.you": "Sen",
+  "inbox.team.from": "ResinCraft ekibi",
+  "inbox.team.none": "Ekiple henüz bir konuşma yok",
+  "inbox.team.off": "Bu relay'de ekibe yazma kapalı",
 }
 
 export default dict

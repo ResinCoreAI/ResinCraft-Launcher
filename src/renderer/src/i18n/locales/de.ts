@@ -6283,6 +6283,20 @@ const dict: Dict = {
   "gameSync.options.saved": "Spieloptionen gespeichert und geteilt",
   "engine.settingsSync.closeFirst": "Schließe {name}, bevor du ihre eigenen Einstellungen zurückholst",
   "engine.settingsSync.noOwn": "{name} hat keine eigenen Einstellungen aufbewahrt",
+  "inbox.rail.team": "Team",
+  "inbox.team.write": "Dem Team schreiben",
+  "inbox.team.writeHint": "Fragen, Probleme oder Ideen: Das ResinCraft-Team antwortet hier in deinem Posteingang.",
+  "inbox.team.subject": "Betreff",
+  "inbox.team.subjectPlaceholder": "Worum geht es?",
+  "inbox.team.message": "Nachricht",
+  "inbox.team.messagePlaceholder": "Erzähl uns, was passiert ist und was du erwartet hast. Bei einem Problem helfen auch die Launcher-Version und dein System.",
+  "inbox.team.send": "Senden",
+  "inbox.team.sent": "An das Team gesendet. Die Antwort kommt hierher.",
+  "inbox.team.reply": "Mehr schreiben … (Strg+Enter sendet)",
+  "inbox.team.you": "Du",
+  "inbox.team.from": "ResinCraft-Team",
+  "inbox.team.none": "Noch keine Unterhaltungen mit dem Team",
+  "inbox.team.off": "Dem Team schreiben ist auf diesem Relay aus",
 }
 
 export default dict

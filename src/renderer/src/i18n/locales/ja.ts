@@ -6251,6 +6251,20 @@ const dict: Dict = {
   "gameSync.options.saved": "ゲームオプションを保存して共有しました",
   "engine.settingsSync.closeFirst": "元の設定を戻す前に {name} を閉じてください",
   "engine.settingsSync.noOwn": "{name} には保存された元の設定がありません",
+  "inbox.rail.team": "チーム",
+  "inbox.team.write": "チームに連絡",
+  "inbox.team.writeHint": "質問・問題・アイデアをどうぞ。ResinCraft チームがこの受信箱で返信します。",
+  "inbox.team.subject": "件名",
+  "inbox.team.subjectPlaceholder": "どんな内容ですか？",
+  "inbox.team.message": "メッセージ",
+  "inbox.team.messagePlaceholder": "何が起きたか、どうなるはずだったかを教えてください。問題の場合はランチャーのバージョンとお使いのシステムも役立ちます。",
+  "inbox.team.send": "送信",
+  "inbox.team.sent": "チームに送信しました。返信はここに届きます。",
+  "inbox.team.reply": "続きを書く…（Ctrl+Enter で送信）",
+  "inbox.team.you": "あなた",
+  "inbox.team.from": "ResinCraft チーム",
+  "inbox.team.none": "チームとの会話はまだありません",
+  "inbox.team.off": "このリレーではチームへの連絡がオフです",
 }
 
 export default dict
