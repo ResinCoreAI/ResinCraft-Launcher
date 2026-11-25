@@ -8,6 +8,7 @@ import { inbox } from '../inboxState'
 import { useStore } from '../store'
 import { currentLanguage, t } from '../i18n'
 import MailText from './MailText'
+import PlayerHead from './PlayerHead'
 import { ConfirmModal } from './ui'
 
 const longTime = (secs: number) => new Date(secs * 1000).toLocaleString(currentLanguage(), { dateStyle: 'medium', timeStyle: 'short' })
@@ -163,8 +164,10 @@ export function TeamConversation({ thread, onSent, onBack, onCloseTicket }: { th
           ) : (
             <div key={m.id} className={`ib-team-msg ${m.fromTeam ? 'team' : 'mine'}`}>
               <div className="ib-team-who">
-                {m.fromTeam && <LifeBuoy aria-hidden />}
-                <b>{m.fromTeam ? t('inbox.team.from') : t('inbox.team.you')}</b>
+                {m.fromTeam && (m.by ? <PlayerHead who={m.by} name={m.by} size={18} /> : <LifeBuoy aria-hidden />)}
+                {/* Which admin answered, with the team's tag (relay: their Minecraft name, else their dashboard name). */}
+                <b>{m.fromTeam ? m.by || t('inbox.team.from') : t('inbox.team.you')}</b>
+                {m.fromTeam && m.by && <span className="ib-staff-tag">{t('inbox.team.from')}</span>}
                 <span className="hint" title={longTime(m.at)}>
                   {longTime(m.at)}
                 </span>

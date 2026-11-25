@@ -503,7 +503,7 @@ export default function InboxPage() {
             </span>
             <span className="ib2-l2 ellipsis">
               {th.topic ? `${t(TOPIC_KEYS[th.topic])} · ` : ''}
-              {last ? (last.system ? t(last.system === 'closed' ? 'inbox.ticket.closedBy' : 'inbox.ticket.reopenedBy', { name: last.by ?? '' }) : `${last.fromTeam ? t('inbox.team.from') : t('inbox.team.you')}: ${last.body.replace(/\s+/g, ' ')}`) : ''}
+              {last ? (last.system ? t(last.system === 'closed' ? 'inbox.ticket.closedBy' : 'inbox.ticket.reopenedBy', { name: last.by ?? '' }) : `${last.fromTeam ? last.by || t('inbox.team.from') : t('inbox.team.you')}: ${last.body.replace(/\s+/g, ' ')}`) : ''}
             </span>
           </span>
           <span className="ib2-r">

@@ -118,7 +118,9 @@ function playerData() {
         topic: t.topic ?? 'launcher',
         closed: t.closed ?? null,
         closedBy: t.closedBy ?? null,
-        messages: t.messages.map((m) => (m.dir === 'sys' ? { id: m.id, at: m.at, fromTeam: false, body: '', system: m.body, by: m.by } : { id: m.id, at: m.at, fromTeam: m.dir === 'out', body: m.body }))
+        messages: t.messages.map((m) =>
+          m.dir === 'sys' ? { id: m.id, at: m.at, fromTeam: false, body: '', system: m.body, by: m.by } : { id: m.id, at: m.at, fromTeam: m.dir === 'out', body: m.body, ...(m.dir === 'out' ? { by: m.by || 'Puirkle_Gamer' } : {}) }
+        )
       })),
     topics: ['launcher', 'store', 'account', 'report', 'other']
   }

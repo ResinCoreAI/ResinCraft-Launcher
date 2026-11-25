@@ -2361,6 +2361,7 @@ export interface TeamMessage {
   body: string
   /** A ticket's line: "closed" or "reopened", by `by`. */
   system?: 'closed' | 'reopened'
+  /** Who: the admin who answered (their Minecraft name, else their dashboard name), or who closed / reopened it. */
   by?: string
 }
 /** What a ticket is about (relay teammail.rs TOPICS). */
