@@ -6548,6 +6548,10 @@ const dict: Dict = {
   "servers.admin.mailbox.reopenTicket": "เปิดทิกเก็ตใหม่",
   "servers.admin.mailbox.ticketClosed": "ปิดทิกเก็ตแล้ว",
   "servers.admin.mailbox.ticketReopened": "เปิดทิกเก็ตใหม่แล้ว",
+  "servers.admin.mailbox.tickets": "ทิกเก็ต",
+  "servers.admin.mailbox.closedTickets": "ทิกเก็ตที่ปิดแล้ว",
+  "servers.admin.mailbox.emptyEmail": "ไม่มีอีเมลรอ อีเมลที่ส่งถึงกล่องจดหมายสถานะจะมาที่นี่ ส่วนทิกเก็ตของผู้เล่นอยู่ในทิกเก็ต",
+  "servers.admin.mailbox.emptyTickets": "ไม่มีทิกเก็ตที่เปิดอยู่ สิ่งที่ผู้เล่นเขียนจากลันเชอร์ (ฝ่ายช่วยเหลือ ResinCraft) จะมาที่นี่",
 }
 
 export default dict

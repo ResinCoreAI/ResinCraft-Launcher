@@ -2179,4 +2179,8 @@ export default {
   "servers.admin.mailbox.reopenTicket": "Reopen ticket",
   "servers.admin.mailbox.ticketClosed": "Ticket closed",
   "servers.admin.mailbox.ticketReopened": "Ticket reopened",
+  "servers.admin.mailbox.tickets": "Tickets",
+  "servers.admin.mailbox.closedTickets": "Closed tickets",
+  "servers.admin.mailbox.emptyEmail": "No email waiting. Email to the status mailbox comes here; players’ tickets are under Tickets.",
+  "servers.admin.mailbox.emptyTickets": "No open tickets. What players write from the launcher (ResinCraft Support) comes here.",
 } as const

@@ -217,8 +217,12 @@ function list(folder: string, q: string) {
         return !t.trashed && t.starred
       case 'all':
         return !t.trashed
+      case 'tickets':
+        return !t.trashed && t.kind === 'player' && !t.closed
+      case 'closed':
+        return !t.trashed && t.kind === 'player' && !!t.closed
       default:
-        return !t.trashed && !t.done && t.messages.some((m) => m.dir === 'in')
+        return !t.trashed && t.kind === 'email' && !t.done && t.messages.some((m) => m.dir === 'in')
     }
   }
   const hit = (t: Thread) => !query || [t.subject, t.name, t.who, ...t.messages.map((m) => m.body)].some((s) => s.toLowerCase().includes(query))
@@ -226,7 +230,11 @@ function list(folder: string, q: string) {
     folder,
     threads: sorted().filter((t) => inFolder(t) && hit(t)).map(summary),
     unread: threads.filter((t) => !t.trashed && !t.done && t.unread).length,
-    counts: { inbox: threads.filter((t) => !t.trashed && !t.done && t.unread).length, trash: threads.filter((t) => t.trashed).length },
+    counts: {
+      inbox: threads.filter((t) => !t.trashed && t.kind === 'email' && !t.done && t.unread).length,
+      tickets: threads.filter((t) => !t.trashed && t.kind === 'player' && !t.closed && t.unread).length,
+      trash: threads.filter((t) => t.trashed).length
+    },
     emailIn: true,
     emailOut: true,
     players: true,

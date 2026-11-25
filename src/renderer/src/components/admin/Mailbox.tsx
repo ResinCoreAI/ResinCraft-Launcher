@@ -14,9 +14,12 @@ import { ago, Loading, post, size, when } from './common'
 import '../../inbox.css'
 import '../../admin-mailbox.css'
 
-type Folder = 'inbox' | 'starred' | 'sent' | 'done' | 'all' | 'trash'
+type Folder = 'inbox' | 'tickets' | 'closed' | 'starred' | 'sent' | 'done' | 'all' | 'trash'
+// Players' tickets have folders of their own (open, and closed); the Inbox is email.
 const FOLDERS: [Folder, Key][] = [
   ['inbox', 'servers.admin.mailbox.inbox'],
+  ['tickets', 'servers.admin.mailbox.tickets'],
+  ['closed', 'servers.admin.mailbox.closedTickets'],
   ['starred', 'servers.admin.mailbox.starred'],
   ['sent', 'servers.admin.mailbox.sent'],
   ['done', 'servers.admin.mailbox.done'],
@@ -63,7 +66,7 @@ interface BoxData {
   folder: Folder
   threads: Summary[]
   unread: number
-  counts: { inbox: number; trash: number }
+  counts: { inbox: number; tickets?: number; trash: number }
   emailIn: boolean
   emailOut: boolean
   players: boolean
@@ -176,6 +179,7 @@ export function MailboxAdmin() {
             <button key={id} className={`mbx-folder ${folder === id ? 'on' : ''}`} aria-pressed={folder === id} onClick={() => (setFolder(id), setOpen(undefined), setWriting(false))}>
               {t(label)}
               {id === 'inbox' && data.counts.inbox > 0 && <span className="ib-badge">{data.counts.inbox}</span>}
+              {id === 'tickets' && (data.counts.tickets ?? 0) > 0 && <span className="ib-badge">{data.counts.tickets}</span>}
             </button>
           ))}
         </nav>
@@ -215,7 +219,7 @@ export function MailboxAdmin() {
           ) : (
             <div className="ib-none">
               <Inbox aria-hidden />
-              <b>{query ? t('inbox.noMatch') : folder === 'inbox' ? t('servers.admin.mailbox.empty') : t('servers.admin.mailbox.nothing')}</b>
+              <b>{query ? t('inbox.noMatch') : folder === 'inbox' ? t('servers.admin.mailbox.emptyEmail') : folder === 'tickets' ? t('servers.admin.mailbox.emptyTickets') : t('servers.admin.mailbox.nothing')}</b>
             </div>
           )}
         </div>
@@ -258,9 +262,10 @@ export function splitQuoted(body: string): [string, string] {
 
 /** "admin Puirkle (Puirkle_Gamer)" (who answered, as the relay writes it) as a name to show. */
 const adminName = (by: string) => {
-  const m = /^admin\s+(.+?)\s+\((.+)\)$/.exec(by.trim())
-  if (m) return m[1] === m[2] ? m[1] : `${m[1]} (${m[2]})`
-  return by.replace(/^admin\s+/, '').trim()
+  const b = by.trim().replace(/\s+via launcher$/i, '')
+  const m = /^admin\s+(.+?)\s+\((.+)\)$/i.exec(b)
+  if (m) return m[2]
+  return b.replace(/^admin\s+/i, '').trim()
 }
 
 /** A steady colour for an address's initial. */
