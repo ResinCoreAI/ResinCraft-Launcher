@@ -6499,6 +6499,12 @@ const dict: Dict = {
   "servers.admin.community.deleted": "ลบแล้ว",
   "engine.chat.downloadingFile": "กำลังดาวน์โหลด {name}",
   "engine.chat.downloadedOf": "{done} จาก {total} MB",
+  "servers.admin.mailbox.teamName": "ทีม ResinCraft",
+  "servers.admin.mailbox.toTeam": "ทีม ResinCraft",
+  "servers.admin.mailbox.toWho": "ถึง {who}",
+  "servers.admin.mailbox.showQuoted": "แสดงข้อความที่อ้างถึง",
+  "servers.admin.mailbox.hideQuoted": "ซ่อนข้อความที่อ้างถึง",
+  "servers.admin.mailbox.replyPlaceholder": "เขียนคำตอบ… (Ctrl+Enter เพื่อส่ง)",
 }
 
 export default dict

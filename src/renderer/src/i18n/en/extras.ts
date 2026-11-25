@@ -2130,4 +2130,10 @@ export default {
   "servers.admin.community.deleteTitle": "Delete {name}?",
   "servers.admin.community.deleteBody": "The project and its files are deleted for good. The owner loses it too.",
   "servers.admin.community.deleted": "Deleted",
+  "servers.admin.mailbox.teamName": "ResinCraft team",
+  "servers.admin.mailbox.toTeam": "the ResinCraft team",
+  "servers.admin.mailbox.toWho": "to {who}",
+  "servers.admin.mailbox.showQuoted": "Show the quoted text",
+  "servers.admin.mailbox.hideQuoted": "Hide the quoted text",
+  "servers.admin.mailbox.replyPlaceholder": "Write your answer… (Ctrl+Enter sends)",
 } as const

@@ -3,11 +3,12 @@
 // through the status checker) or write a new mail to a player or any address (relay-server teammail.rs,
 // `/api/mail/box…`; the relay dashboard's Mailbox page has the same).
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, Check, Inbox, LifeBuoy, Mail, MailPlus, Paperclip, RefreshCw, Search, Send, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Inbox, LifeBuoy, Mail, MailPlus, MoreHorizontal, Paperclip, RefreshCw, Search, Send, Star, Trash2, Undo2 } from 'lucide-react'
 import { useStore } from '../../store'
 import { t, type Key } from '../../i18n'
 import { ConfirmModal } from '../ui'
 import MailText from '../MailText'
+import PlayerHead from '../PlayerHead'
 import { ago, Loading, post, size, when } from './common'
 import '../../inbox.css'
 import '../../admin-mailbox.css'
@@ -228,6 +229,94 @@ export function MailboxAdmin() {
   )
 }
 
+/** An email's own words, and the history its mail program quoted under them ("On … wrote:" and the "> " lines),
+ * which the thread shows folded like Gmail does. */
+export function splitQuoted(body: string): [string, string] {
+  const lines = body.replace(/\r\n/g, '\n').split('\n')
+  const wrote = (i: number) => {
+    const l = lines[i].trim()
+    if (!/^On\s/i.test(l)) return false
+    return /wrote:\s*$/i.test(l) || /^wrote:\s*$/i.test(lines[i + 1]?.trim() ?? '') || /wrote:\s*$/i.test(lines[i + 1]?.trim() ?? '')
+  }
+  const quotedFrom = (i: number) => lines.slice(i).every((l) => !l.trim() || l.trimStart().startsWith('>'))
+  for (let i = 1; i < lines.length; i++) {
+    if (wrote(i) || (lines[i].trimStart().startsWith('>') && quotedFrom(i))) {
+      const own = lines.slice(0, i).join('\n').trimEnd()
+      if (own) return [own, lines.slice(i).join('\n').trim()]
+    }
+  }
+  return [body.trimEnd(), '']
+}
+
+/** "admin Puirkle (Puirkle_Gamer)" (who answered, as the relay writes it) as a name to show. */
+const adminName = (by: string) => {
+  const m = /^admin\s+(.+?)\s+\((.+)\)$/.exec(by.trim())
+  if (m) return m[1] === m[2] ? m[1] : `${m[1]} (${m[2]})`
+  return by.replace(/^admin\s+/, '').trim()
+}
+
+/** A steady colour for an address's initial. */
+const tint = (s: string) => {
+  let h = 0
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360
+  return `hsl(${h} 45% 42%)`
+}
+
+function MessageCard({ m, th }: { m: Message; th: Thread }) {
+  const [quoted, setQuoted] = useState(false)
+  const out = m.dir === 'out'
+  const player = th.kind === 'player'
+  const [own, rest] = out ? [m.body, ''] : splitQuoted(m.body)
+  const name = out ? adminName(m.by || '') || t('inbox.team.from') : player ? th.name : m.by || m.from
+  const detail = out ? t('servers.admin.mailbox.teamName') : player ? '' : m.by ? m.from : ''
+  const to = out ? (player ? t('servers.admin.mailbox.toLauncher', { name: th.name }) : m.to) : player ? t('servers.admin.mailbox.toTeam') : m.to
+  return (
+    <section className={`mbx-msg ${out ? 'out' : ''}`}>
+      <div className="mbx-avatar" aria-hidden style={!out && !player ? { background: tint(m.from) } : undefined}>
+        {out ? <LifeBuoy /> : player ? <PlayerHead who={th.who} name={th.name} size={36} /> : (name.trim()[0] ?? '?').toUpperCase()}
+      </div>
+      <div className="mbx-msg-main">
+        <header>
+          <b className="ellipsis">{name}</b>
+          {detail && <span className="hint ellipsis">{detail}</span>}
+          <span className="mbx-when hint" title={when(m.at)}>
+            {when(m.at)} <span className="mbx-ago">· {ago(m.at)}</span>
+          </span>
+        </header>
+        <div className="mbx-to hint">
+          {t('servers.admin.mailbox.toWho', { who: to })}
+          {m.status === 'failed' && (
+            <span className="chip compact danger" title={m.error ?? ''}>
+              {t('servers.admin.mailbox.notSent')}
+            </span>
+          )}
+          {out && m.via === 'email' && m.status === 'sent' && <span className="chip compact success">{t('servers.admin.mailbox.sentEmail')}</span>}
+          {out && m.via === 'launcher' && <span className="chip compact accent">{t('servers.admin.mailbox.sentPlayer')}</span>}
+        </div>
+        {m.status === 'failed' && m.error && <p className="hint bad">{m.error}</p>}
+        <div className="mbx-body">{out ? <MailText text={own} /> : <p className="mbx-text">{own}</p>}</div>
+        {rest && (
+          <>
+            <button type="button" className="mbx-quote-toggle" aria-expanded={quoted} title={t(quoted ? 'servers.admin.mailbox.hideQuoted' : 'servers.admin.mailbox.showQuoted')} onClick={() => setQuoted((q) => !q)}>
+              <MoreHorizontal />
+            </button>
+            {quoted && <p className="mbx-text mbx-quoted">{rest}</p>}
+          </>
+        )}
+        {m.files.length > 0 && (
+          <div className="chips" title={t('servers.admin.mailbox.files')}>
+            {m.files.map((f, i) => (
+              <span key={i} className="chip compact">
+                <Paperclip size={12} /> {f.name} ({size(f.size)})
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function ThreadView({
   th,
   onBack,
@@ -301,53 +390,37 @@ function ThreadView({
       <p className="hint">
         <span className={`chip compact ${player ? 'accent' : ''}`}>{player ? t('servers.admin.mailbox.launcher') : t('servers.admin.mailbox.email')}</span> {player ? `${th.name} · ${th.who}` : whoOf(th)}
       </p>
-      {th.messages.map((m) => {
-        const out = m.dir === 'out'
-        const from = out ? `${m.by || t('inbox.team.from')} → ${player ? t('servers.admin.mailbox.toLauncher', { name: th.name }) : m.to}` : player ? th.name : m.by ? `${m.by} <${m.from}>` : m.from
-        return (
-          <section key={m.id} className={`card mbx-msg ${out ? 'out' : ''}`}>
-            <header>
-              {out ? <LifeBuoy aria-hidden /> : null}
-              <b>{from}</b>
-              {m.status === 'failed' && (
-                <span className="chip compact danger" title={m.error ?? ''}>
-                  {t('servers.admin.mailbox.notSent')}
-                </span>
-              )}
-              {out && m.via === 'email' && m.status === 'sent' && <span className="chip compact success">{t('servers.admin.mailbox.sentEmail')}</span>}
-              <span className="hint mbx-when" title={when(m.at)}>
-                {when(m.at)} · {ago(m.at)}
-              </span>
-            </header>
-            {m.status === 'failed' && m.error && <p className="hint bad">{m.error}</p>}
-            {out ? <MailText text={m.body} /> : <p className="mbx-text">{m.body}</p>}
-            {m.files.length > 0 && (
-              <div className="chips" title={t('servers.admin.mailbox.files')}>
-                {m.files.map((f, i) => (
-                  <span key={i} className="chip compact">
-                    <Paperclip size={12} /> {f.name} ({size(f.size)})
-                  </span>
-                ))}
-              </div>
-            )}
-          </section>
-        )
-      })}
+      <div className="mbx-msgs">
+        {th.messages.map((m) => (
+          <MessageCard key={m.id} m={m} th={th} />
+        ))}
+      </div>
       <form
-        className="card mbx-reply"
+        className="mbx-reply"
         onSubmit={(e) => {
           e.preventDefault()
           void send()
         }}
       >
+        <div className="mbx-reply-to hint">
+          {player ? <PlayerHead who={th.who} name={th.name} size={18} /> : <Mail />}
+          {player ? t('servers.admin.mailbox.replyPlayer', { name: th.name }) : t('servers.admin.mailbox.replyEmail', { address: th.who })}
+        </div>
         <textarea
-          className="input"
+          className="mbx-reply-input"
           id="mailbox-reply"
-          rows={6}
+          rows={5}
           maxLength={5000}
           value={body}
-          placeholder={player ? t('servers.admin.mailbox.replyPlayer', { name: th.name }) : t('servers.admin.mailbox.replyEmail', { address: th.who })}
+          aria-label={player ? t('servers.admin.mailbox.replyPlayer', { name: th.name }) : t('servers.admin.mailbox.replyEmail', { address: th.who })}
+          placeholder={t('servers.admin.mailbox.replyPlaceholder')}
           onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && body.trim() && !busy) {
+              e.preventDefault()
+              void send()
+            }
+          }}
         />
         <div className="row">
           <span className="hint grow">{t('servers.admin.mailbox.formatHint')}</span>
