@@ -7,12 +7,12 @@ import { ArrowLeft, BellRing, Copy, Download, Eye, EyeOff, Gift, Inbox as InboxI
 import type { ChatGiftData, ChatGroup, ChatMessage, ChatPerson, InboxData, InboxMessage, InboxReward, TeamMailData, TeamThread } from '@shared/types'
 import { api } from '../api'
 import { inbox, setInbox, setTeamUnread } from '../inboxState'
-import { TeamCompose, TeamConversation } from '../components/TeamMail'
+import { TeamCompose, TeamConversation, TOPIC_KEYS } from '../components/TeamMail'
 import { money, setWalletBalance } from '../storeStatus'
 import creditIcon from '../assets/resin-credit.svg'
 import { useStore } from '../store'
 import { currentLanguage, t, type Key } from '../i18n'
-import { ConfirmModal, Modal, Switch, celebrate, openContextMenu, type ContextEntry } from '../components/ui'
+import { ConfirmModal, Logo, Modal, Switch, celebrate, openContextMenu, type ContextEntry } from '../components/ui'
 import MailText from '../components/MailText'
 import EmailAddress from '../components/EmailAddress'
 import ChatPanel, { Requests } from '../components/chat/ChatPanel'
@@ -464,9 +464,19 @@ export default function InboxPage() {
 
   const open = openId ? data?.messages.find((m) => m.id === openId) : undefined
   const teamThread = teamOpen != null ? team?.threads.find((th) => th.id === teamOpen) : undefined
+  // An open ticket stays live: the team's answers (and a close) show while it's on screen.
+  useEffect(() => {
+    if (teamOpen == null) return
+    const h = setInterval(() => void inbox.team().then((d) => {
+      teamGot(d)
+      if (d.threads.find((th) => th.id === teamOpen)?.unread) void inbox.readTeam(teamOpen).then(teamGot, () => {})
+    }, () => {}), 8000)
+    return () => clearInterval(h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamOpen])
   const showingTeam = !open && (teamWriting || !!teamThread)
   const showingChat = !open && !showingTeam && !!v.open
-  const title = { all: t('inbox.title'), mail: t('inbox.rail.mail'), team: t('inbox.rail.team'), friends: t('inbox.rail.friends'), groups: t('chat.groups'), requests: t('inbox.rail.requests') }[filter]
+  const title = { all: t('inbox.title'), mail: t('inbox.rail.mail'), team: t('inbox.support.title'), friends: t('inbox.rail.friends'), groups: t('chat.groups'), requests: t('inbox.rail.requests') }[filter]
   const RailButton = ({ f, icon, label, count }: { f: Filter; icon: ReactNode; label: string; count: number }) => (
     <button className={`ib2-rb ${filter === f ? 'on' : ''}`} title={label} aria-label={label} aria-pressed={filter === f} onClick={() => setFilter(f)}>
       {icon}
@@ -483,14 +493,18 @@ export default function InboxPage() {
       return (
         <button key={r.key} className={`ib2-row ${r.unread ? 'unread' : ''} ${teamOpen === th.id ? 'on' : ''}`} onClick={() => openTeam(th)}>
           <span className="ib-mark ib-team-mark" aria-hidden>
-            <LifeBuoy />
+            <Logo />
           </span>
           <span className="ib2-row-text">
             <span className="ib2-l1">
+              <span className="ib-ticket-no">#{th.id}</span>
               <b className="ellipsis">{th.subject}</b>
-              <span className="chip compact ib-cat ib-cat-support">{t('inbox.rail.team')}</span>
+              <span className={`chip compact ${th.closed ? '' : 'success'}`}>{t(th.closed ? 'inbox.ticket.closed' : 'inbox.ticket.open')}</span>
             </span>
-            <span className="ib2-l2 ellipsis">{last ? `${last.fromTeam ? t('inbox.team.from') : t('inbox.team.you')}: ${last.body.replace(/\s+/g, ' ')}` : ''}</span>
+            <span className="ib2-l2 ellipsis">
+              {th.topic ? `${t(TOPIC_KEYS[th.topic])} · ` : ''}
+              {last ? (last.system ? t(last.system === 'closed' ? 'inbox.ticket.closedBy' : 'inbox.ticket.reopenedBy', { name: last.by ?? '' }) : `${last.fromTeam ? t('inbox.team.from') : t('inbox.team.you')}: ${last.body.replace(/\s+/g, ' ')}`) : ''}
+            </span>
           </span>
           <span className="ib2-r">
             <span title={longTime(th.lastAt)}>{timeOf(th.lastAt)}</span>
@@ -562,7 +576,6 @@ export default function InboxPage() {
         <nav className="ib2-rail" aria-label={t('inbox.title')}>
           <RailButton f="all" icon={<InboxIcon />} label={t('inbox.rail.all')} count={mailUnread + teamUnread + dmUnread + groupUnread + requests} />
           <RailButton f="mail" icon={<Mail />} label={t('inbox.rail.mail')} count={mailUnread} />
-          {teamOn && <RailButton f="team" icon={<LifeBuoy />} label={t('inbox.rail.team')} count={teamUnread} />}
           {chatOn && <RailButton f="friends" icon={<MessageCircle />} label={t('inbox.rail.friends')} count={dmUnread} />}
           {chatOn && <RailButton f="requests" icon={<UserPlus />} label={t('inbox.rail.requests')} count={requests} />}
           {chatOn && (
@@ -571,7 +584,14 @@ export default function InboxPage() {
               <span className="ib2-rl">{t('chat.gifts.rail')}</span>
             </button>
           )}
-          {chatOn && <hr />}
+          {(chatOn || teamOn) && <hr />}
+          {/* ResinCraft's own space, apart from friends and groups (like a server): its support tickets. */}
+          {teamOn && (
+            <button className={`ib2-group ib2-resin ${filter === 'team' ? 'on' : ''}`} title={t('inbox.support.title')} aria-label={t('inbox.support.title')} aria-pressed={filter === 'team'} onClick={() => setFilter('team')}>
+              {teamUnread > 0 && <span className="ib2-n">{teamUnread > 99 ? '99+' : teamUnread}</span>}
+              <Logo />
+            </button>
+          )}
           {chatOn &&
             v.groups.map((g) => (
               <button key={g.conv} className={`ib2-group ${showingChat && v.open === g.conv ? 'on' : ''}`} title={g.name} aria-label={g.name} onClick={() => openChat(g.conv)}>
@@ -598,7 +618,7 @@ export default function InboxPage() {
               <h2 className="grow">{title}</h2>
               {filter === 'team' && team?.on && (
                 <button className="btn primary sm" onClick={writeTeam}>
-                  <PenLine /> {t('inbox.team.write')}
+                  <PenLine /> {t('inbox.ticket.new')}
                 </button>
               )}
               {!!data?.unclaimed && filter !== 'team' && (
@@ -657,7 +677,7 @@ export default function InboxPage() {
               [0, 1, 2, 3].map((i) => <div key={i} className="ib-row ib-skeleton" aria-hidden />)
             ) : rows.length === 0 && filter === 'team' && !query ? (
               <div className="ib-none">
-                <LifeBuoy aria-hidden />
+                <Logo />
                 <b>{team?.on ? t('inbox.team.none') : t('inbox.team.off')}</b>
                 {team?.on && <span className="hint">{t('inbox.team.writeHint')}</span>}
               </div>
@@ -697,7 +717,7 @@ export default function InboxPage() {
               }}
             />
           ) : showingTeam && teamThread ? (
-            <TeamConversation thread={teamThread} onBack={closeTeam} onSent={teamGot} />
+            <TeamConversation thread={teamThread} onBack={closeTeam} onSent={teamGot} onCloseTicket={() => void inbox.closeTicket(teamThread.id).then(teamGot, fail)} />
           ) : open ? (
             <article className="ib-mail" aria-label={open.subject}>
               <div className="ib-mail-bar">

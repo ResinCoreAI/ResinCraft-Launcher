@@ -10,7 +10,7 @@ const ADDRESS = 'resincraft@resincore.tech'
 interface Msg {
   id: number
   at: number
-  dir: 'in' | 'out'
+  dir: 'in' | 'out' | 'sys'
   via: 'launcher' | 'email'
   by: string
   from: string
@@ -33,6 +33,10 @@ interface Thread {
   starred: boolean
   trashed: boolean
   messages: Msg[]
+  /** Tickets (players' threads): what it's about, and when it was closed (by whom). */
+  topic?: string
+  closed?: number | null
+  closedBy?: string | null
 }
 
 let nextId = 100
@@ -105,8 +109,30 @@ function playerData() {
     unread: playerUnread(),
     threads: sorted()
       .filter((t) => t.kind === 'player' && t.who === ME)
-      .map((t) => ({ id: t.id, subject: t.subject, createdAt: t.createdAt, lastAt: lastAt(t), unread: t.playerUnread, messages: t.messages.map((m) => ({ id: m.id, at: m.at, fromTeam: m.dir === 'out', body: m.body })) }))
+      .map((t) => ({
+        id: t.id,
+        subject: t.subject,
+        createdAt: t.createdAt,
+        lastAt: lastAt(t),
+        unread: t.playerUnread,
+        topic: t.topic ?? 'launcher',
+        closed: t.closed ?? null,
+        closedBy: t.closedBy ?? null,
+        messages: t.messages.map((m) => (m.dir === 'sys' ? { id: m.id, at: m.at, fromTeam: false, body: '', system: m.body, by: m.by } : { id: m.id, at: m.at, fromTeam: m.dir === 'out', body: m.body }))
+      })),
+    topics: ['launcher', 'store', 'account', 'report', 'other']
   }
+}
+
+/** Closes or reopens a ticket, with its line. */
+function ticket(t: Thread, close: boolean, by: string) {
+  if (t.kind !== 'player' || !!t.closed === close) return false
+  t.closed = close ? now() : null
+  t.closedBy = close ? by : null
+  if (close) Object.assign(t, { done: true, unread: false, playerUnread: t.playerUnread + 1 })
+  else t.done = false
+  t.messages.push(msg(0, 'sys', 'launcher', close ? 'closed' : 'reopened', { by }))
+  return true
 }
 
 /** The team's unread answers, for `/api/inbox` and `/api/inbox/unread`. */
@@ -114,7 +140,7 @@ export const teamUnread = playerUnread
 
 /** `/api/inbox/team…` in the preview. */
 export function mockTeamPlayer(method: string, path: string, body?: unknown): unknown {
-  const b = (body ?? {}) as { subject?: string; body?: string; thread?: number }
+  const b = (body ?? {}) as { subject?: string; body?: string; thread?: number; topic?: string }
   if (method === 'GET' && path === '/api/inbox/team') return playerData()
   if (method === 'POST' && path === '/api/inbox/team') {
     const text = String(b.body ?? '')
@@ -122,12 +148,13 @@ export function mockTeamPlayer(method: string, path: string, body?: unknown): un
       checkText(null, text)
       const t = threads.find((x) => x.id === b.thread && x.kind === 'player' && x.who === ME)
       if (!t) throw new Error('ResinCraft Relay: there’s no such conversation')
+      if (t.closed) ticket(t, false, ME_NAME)
       t.messages.push(msg(0, 'in', 'launcher', text.trim()))
       Object.assign(t, { unread: true, done: false, trashed: false })
       return { ...playerData(), thread: t.id }
     }
     checkText(String(b.subject ?? ''), text)
-    const t = thread(nextId++, String(b.subject).trim(), 'player', ME, ME_NAME, [msg(0, 'in', 'launcher', text.trim())])
+    const t = thread(nextId++, String(b.subject).trim(), 'player', ME, ME_NAME, [msg(0, 'in', 'launcher', text.trim())], { topic: b.topic || 'other' })
     threads.push(t)
     // The team answers a little later in the preview, so the player can see one come in.
     setTimeout(() => {
@@ -135,6 +162,13 @@ export function mockTeamPlayer(method: string, path: string, body?: unknown): un
       t.playerUnread += 1
     }, 8000)
     return { ...playerData(), thread: t.id }
+  }
+  if (method === 'POST' && path === '/api/inbox/team/close') {
+    const t = threads.find((x) => x.id === b.thread && x.kind === 'player' && x.who === ME)
+    if (!t) throw new Error('ResinCraft Relay: there’s no such ticket')
+    ticket(t, true, ME_NAME)
+    t.playerUnread = 0
+    return playerData()
   }
   if (method === 'POST' && path === '/api/inbox/team/read') {
     for (const t of threads) if (t.kind === 'player' && t.who === ME && (b.thread == null || t.id === b.thread)) t.playerUnread = 0
@@ -158,8 +192,11 @@ function summary(t: Thread) {
     done: t.done,
     starred: t.starred,
     trashed: t.trashed,
-    count: t.messages.length,
-    snippet: last.body.replace(/\s+/g, ' ').slice(0, 140)
+    count: t.messages.filter((m) => m.dir !== 'sys').length,
+    snippet: (t.messages.filter((m) => m.dir !== 'sys').pop() ?? last).body.replace(/\s+/g, ' ').slice(0, 140),
+    topic: t.kind === 'player' ? t.topic ?? 'launcher' : '',
+    closed: t.closed ?? null,
+    closedBy: t.closedBy ?? null
   }
 }
 const full = (t: Thread) => ({ ...summary(t), messages: t.messages })
@@ -257,6 +294,9 @@ export function mockTeamAdmin(method: string, path: string, b: Record<string, un
         else if (what === 'unstar') t.starred = false
         else if (what === 'trash') t.trashed = true
         else if (what === 'restore') t.trashed = false
+        else if (what === 'close' || what === 'reopen') {
+          if (!ticket(t, what === 'close', 'the team')) changed--
+        }
       }
       return { changed }
     }

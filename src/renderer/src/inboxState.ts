@@ -23,7 +23,9 @@ export const inbox = {
   setStatus: (on: boolean, email: boolean) => call<InboxStatusSub>('POST', '/api/inbox/status', { on, email }),
   /** Conversations with the team: write a new one (`subject`) or more in one (`thread`); the team's answers. */
   team: () => call<TeamMailData>('GET', '/api/inbox/team'),
-  writeTeam: (to: { subject: string } | { thread: number }, body: string) => call<TeamMailData>('POST', '/api/inbox/team', { ...to, body }),
+  writeTeam: (to: { subject: string; topic?: string } | { thread: number }, body: string) => call<TeamMailData>('POST', '/api/inbox/team', { ...to, body }),
+  /** Closes one of the player's tickets (writing in it opens it again). */
+  closeTicket: (thread: number) => call<TeamMailData>('POST', '/api/inbox/team/close', { thread }),
   readTeam: (thread?: number) => call<TeamMailData>('POST', '/api/inbox/team/read', thread == null ? {} : { thread })
 }
 

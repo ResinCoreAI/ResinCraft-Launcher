@@ -1385,3 +1385,92 @@
   margin-top: 8px;
   max-width: 420px;
 }
+
+/* Pinned messages: a quiet mark on the message, and the chat's list of them (ChatPanel PinsModal). */
+.chat-pinned-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: var(--accent);
+  font-size: 11.5px;
+}
+.chat-pinned-mark svg {
+  width: 12px;
+  height: 12px;
+}
+.chat-msg.is-pinned {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.chat-msg.flash {
+  animation: chat-flash 1.6s var(--ease, ease);
+}
+@keyframes chat-flash {
+  0%,
+  40% {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+.chat-pins {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.chat-pin {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.chat-pin-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-pin-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.chat-pin-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-pin .btn {
+  margin: 6px 6px 0 0;
+}
+.chat-pins-none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 0;
+  text-align: center;
+}
+.chat-pins-none svg {
+  width: 26px;
+  height: 26px;
+  color: var(--text-faint);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg.flash {
+    animation: none;
+  }
+}

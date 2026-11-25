@@ -407,6 +407,8 @@ export function SystemNote({ m }: { m: ChatMessage }) {
                   ? t('chat.note.untimeout', { by, who })
                 : d.event === 'banned'
                   ? t('chat.note.banned', { by, who })
+                : d.event === 'pinned'
+                  ? t('chat.note.pinned', { by })
                 : d.role === 'admin'
                   ? t('chat.note.madeAdmin', { by, who })
                   : t('chat.note.madeMember', { by, who })

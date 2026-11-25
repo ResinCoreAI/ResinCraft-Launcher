@@ -17,6 +17,8 @@ import {
   MoreHorizontal,
   PanelRight,
   Pencil,
+  Pin,
+  PinOff,
   Reply,
   Send,
   Smile,
@@ -33,7 +35,7 @@ import { chat, displayName, isGroup, nameOf, peerOf, popupsOn, setPopups, setSou
 import { money, setWalletBalance } from '../../storeStatus'
 import { useStore } from '../../store'
 import { currentLanguage, t, type Key } from '../../i18n'
-import { ConfirmModal, Empty, openContextMenu, type ContextEntry } from '../ui'
+import { ConfirmModal, Empty, Modal, openContextMenu, type ContextEntry } from '../ui'
 import ChatText from './ChatText'
 import EmojiPicker from './EmojiPicker'
 import EmojiManager from './EmojiManager'
@@ -255,6 +257,8 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
   }
   const list = useRef<HTMLDivElement>(null)
   const box = useRef<ComposerHandle>(null)
+  /** The chat's pinned messages, open. */
+  const [pinsOpen, setPinsOpen] = useState(false)
   const pinned = useRef(true)
 
   const open = v.open
@@ -464,10 +468,18 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
     }
   ]
 
+  // Who may pin here: either friend in a one-on-one chat, a group's owner and admins.
+  const canPin = !group || group.role === 'owner' || group.role === 'admin'
+  const togglePin = (m: ChatMessage) =>
+    void chat.pin(m.id, !m.pinned).then(
+      () => toast(t(m.pinned ? 'chat.pin.unpinned' : 'chat.pin.pinnedToast'), 'success'),
+      (e) => fail(e)
+    )
   const messageMenu = (m: ChatMessage): ContextEntry[] => {
     const mine = m.sender === v.me
     return [
       !m.deleted && { label: t('chat.reply'), icon: <Reply size={14} />, onSelect: () => (setEditing(null), setReplyTo(m), box.current?.focus()) },
+      !m.deleted && m.kind !== 'system' && canPin && { label: t(m.pinned ? 'chat.pin.unpin' : 'chat.pin.pin'), icon: m.pinned ? <PinOff size={14} /> : <Pin size={14} />, onSelect: () => togglePin(m) },
       !m.deleted && m.kind === 'text' && { label: t('chat.copyText'), icon: <Copy size={14} />, onSelect: () => void navigator.clipboard.writeText(plainEmoji(m.body)) },
       mine && m.kind === 'text' && !m.deleted && { label: t('chat.edit'), icon: <Pencil size={14} />, onSelect: () => (setReplyTo(null), setEditing(m), setText(m.body), box.current?.focus()) },
       mine &&
@@ -744,6 +756,9 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
                   >
                     <Gift /> {t('chat.sendGift')}
                   </button>
+                  <button className="btn ghost icon sm" aria-label={t('chat.pin.list')} title={t('chat.pin.list')} onClick={() => setPinsOpen(true)}>
+                    <Pin />
+                  </button>
                   <button className={`btn sm ${members ? 'primary' : ''}`} onClick={() => setMembers(!members)}>
                     <Users /> {t('chat.group.membersButton')}
                   </button>
@@ -760,6 +775,11 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
               {friend && (
                 <button className="btn sm" onClick={() => setGift(true)} disabled={!v.enabled || !!v.muted}>
                   <Gift /> {t('chat.sendGift')}
+                </button>
+              )}
+              {friend && (
+                <button className="btn ghost icon sm" aria-label={t('chat.pin.list')} title={t('chat.pin.list')} onClick={() => setPinsOpen(true)}>
+                  <Pin />
                 </button>
               )}
               {friend && pane && (
@@ -828,7 +848,8 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
                       </div>
                     )}
                     <div
-                      className={`chat-msg ${mine ? 'mine' : ''} ${grouped ? 'grouped' : ''} ${m.deleted ? 'deleted' : ''} ${editing?.id === m.id ? 'editing' : ''}`}
+                      data-mid={m.id}
+                      className={`chat-msg ${mine ? 'mine' : ''} ${grouped ? 'grouped' : ''} ${m.deleted ? 'deleted' : ''} ${editing?.id === m.id ? 'editing' : ''} ${m.pinned && !m.deleted ? 'is-pinned' : ''}`}
                       onContextMenu={(e) => openContextMenu(e, messageMenu(m))}
                     >
                       {!grouped && (
@@ -874,6 +895,11 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
                           </>
                         )}
                         {m.edited && !m.deleted && <span className="chat-edited">{t('chat.edited')}</span>}
+                        {m.pinned && !m.deleted && (
+                          <span className="chat-pinned-mark" title={m.pinnedBy ? t('chat.pin.by', { name: m.pinnedBy === v.me ? t('chat.you') : displayName(open, m.pinnedBy) }) : undefined}>
+                            <Pin aria-hidden /> {t('chat.pin.pinned')}
+                          </span>
+                        )}
                         {mine && m.id === lastMine?.id && !group && peerRead >= m.id && <span className="chat-seen">{t('chat.seen')}</span>}
                         {mine && m.id === lastMine?.id && group && seenBy(m.id) > 0 && <span className="chat-seen">{t('chat.seenBy', { count: seenBy(m.id) })}</span>}
                       </div>
@@ -1000,6 +1026,23 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
             )}
           </>
         )}
+        {pinsOpen && open && (
+          <PinsModal
+            conv={open}
+            name={(uuid) => (uuid === v.me ? t('chat.you') : displayName(open, uuid))}
+            canPin={canPin}
+            onUnpin={togglePin}
+            onJump={(id) => {
+              setPinsOpen(false)
+              const el = list.current?.querySelector<HTMLElement>(`[data-mid="${id}"]`)
+              if (!el) return toast(t('chat.pin.notLoaded'), 'info')
+              el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+              el.classList.add('flash')
+              setTimeout(() => el.classList.remove('flash'), 1600)
+            }}
+            onClose={() => setPinsOpen(false)}
+          />
+        )}
         {group && members && (
           <GroupPanel g={group} onClose={() => setMembers(false)} onProfile={setProfileOf} onNick={setNickFor} onGift={(uuid) => setGiftTo({ uuid, conv: group.conv })} />
         )}
@@ -1057,5 +1100,54 @@ export default function ChatPanel({ mode = 'full' }: { mode?: 'full' | 'pane' } 
         />
       )}
     </div>
+  )
+}
+
+/** A chat's pinned messages (newest pin first): each jumps to its place in the chat, and can be unpinned by whoever may. */
+function PinsModal({ conv, name, canPin, onUnpin, onJump, onClose }: { conv: string; name: (uuid: string) => string; canPin: boolean; onUnpin: (m: ChatMessage) => void; onJump: (id: number) => void; onClose: () => void }) {
+  const [pins, setPins] = useState<ChatMessage[]>()
+  const [error, setError] = useState<string>()
+  const load = () => void chat.pins(conv).then(setPins, (e) => setError((e as Error).message))
+  useEffect(load, [conv])
+  return (
+    <Modal title={t('chat.pin.list')} onClose={onClose}>
+      {error && <p className="hint bad">{error}</p>}
+      {!pins && !error && <div className="skeleton" style={{ height: 60 }} />}
+      {pins && pins.length === 0 && (
+        <div className="chat-pins-none">
+          <Pin aria-hidden />
+          <b>{t('chat.pin.none')}</b>
+          <span className="hint">{t('chat.pin.noneHint')}</span>
+        </div>
+      )}
+      {pins && pins.length > 0 && (
+        <div className="chat-pins">
+          {pins.map((m) => (
+            <div key={m.id} className="chat-pin">
+              <button className="chat-pin-main" onClick={() => onJump(m.id)}>
+                <span className="chat-pin-head">
+                  <b>{name(m.sender)}</b>
+                  <span className="hint">{new Date(m.at * 1000).toLocaleString(currentLanguage(), { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                </span>
+                <span className="chat-pin-text">{m.body ? plainEmoji(m.body) : t('chat.pin.attachment')}</span>
+              </button>
+              {canPin && (
+                <button
+                  className="btn ghost icon sm"
+                  aria-label={t('chat.pin.unpin')}
+                  title={t('chat.pin.unpin')}
+                  onClick={() => {
+                    onUnpin(m)
+                    setPins((l) => l?.filter((x) => x.id !== m.id))
+                  }}
+                >
+                  <PinOff />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   )
 }

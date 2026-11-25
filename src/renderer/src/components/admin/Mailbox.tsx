@@ -3,12 +3,13 @@
 // through the status checker) or write a new mail to a player or any address (relay-server teammail.rs,
 // `/api/mail/box…`; the relay dashboard's Mailbox page has the same).
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, Check, Inbox, LifeBuoy, Mail, MailPlus, MoreHorizontal, Paperclip, RefreshCw, Search, Send, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, CircleCheck, Inbox, LifeBuoy, Lock, Mail, MailPlus, MoreHorizontal, Paperclip, RefreshCw, Search, Send, Star, Trash2, Undo2 } from 'lucide-react'
 import { useStore } from '../../store'
 import { t, type Key } from '../../i18n'
 import { ConfirmModal } from '../ui'
 import MailText from '../MailText'
 import PlayerHead from '../PlayerHead'
+import { TOPIC_KEYS } from '../TeamMail'
 import { ago, Loading, post, size, when } from './common'
 import '../../inbox.css'
 import '../../admin-mailbox.css'
@@ -38,11 +39,16 @@ interface Summary {
   trashed: boolean
   count: number
   snippet: string
+  /** A player's conversation is a ticket: what it's about, and when it was closed (by whom). */
+  topic?: string
+  closed?: number | null
+  closedBy?: string | null
 }
 interface Message {
   id: number
   at: number
-  dir: 'in' | 'out'
+  /** sys: a ticket's "closed" / "reopened" line (body), by `by`. */
+  dir: 'in' | 'out' | 'sys'
   via: 'launcher' | 'email'
   by: string
   from: string
@@ -197,7 +203,9 @@ export function MailboxAdmin() {
                     <b>{s.subject}</b>
                     <span className="hint"> — {s.snippet}</span>
                   </span>
-                  <span className={`chip compact ${s.kind === 'player' ? 'accent' : ''}`}>{s.kind === 'player' ? t('servers.admin.mailbox.launcher') : t('servers.admin.mailbox.email')}</span>
+                  <span className={`chip compact ${s.kind === 'player' ? (s.closed ? '' : 'accent') : ''}`} title={s.closed ? t('inbox.ticket.closed') : undefined}>
+                    {s.kind === 'player' ? t('servers.admin.mailbox.ticketNo', { id: s.id }) : t('servers.admin.mailbox.email')}
+                  </span>
                   <span className="hint mbx-when" title={when(s.lastAt)}>
                     {ago(s.lastAt)}
                   </span>
@@ -264,6 +272,14 @@ const tint = (s: string) => {
 
 function MessageCard({ m, th }: { m: Message; th: Thread }) {
   const [quoted, setQuoted] = useState(false)
+  if (m.dir === 'sys') {
+    return (
+      <div className="mbx-sys hint" title={when(m.at)}>
+        {m.body === 'closed' ? <Lock aria-hidden /> : <CircleCheck aria-hidden />}
+        {t(m.body === 'closed' ? 'inbox.ticket.closedBy' : 'inbox.ticket.reopenedBy', { name: m.by })} · {ago(m.at)}
+      </div>
+    )
+  }
   const out = m.dir === 'out'
   const player = th.kind === 'player'
   const [own, rest] = out ? [m.body, ''] : splitQuoted(m.body)
@@ -363,6 +379,16 @@ function ThreadView({
         <button className="btn ghost sm" onClick={() => onMark(th, 'unread', undefined, true)}>
           <Mail /> {t('inbox.markUnread')}
         </button>
+        {player &&
+          (th.closed ? (
+            <button className="btn ghost sm" onClick={() => onMark(th, 'reopen', 'servers.admin.mailbox.ticketReopened')}>
+              <CircleCheck /> {t('servers.admin.mailbox.reopenTicket')}
+            </button>
+          ) : (
+            <button className="btn ghost sm" title={t('servers.admin.mailbox.closeTicketHint')} onClick={() => onMark(th, 'close', 'servers.admin.mailbox.ticketClosed')}>
+              <Lock /> {t('servers.admin.mailbox.closeTicket')}
+            </button>
+          ))}
         {th.trashed ? (
           <button className="btn ghost sm" onClick={() => onMark(th, 'restore', 'servers.admin.mailbox.restored')}>
             <Undo2 /> {t('servers.admin.mailbox.restore')}
@@ -388,7 +414,16 @@ function ThreadView({
       </div>
       <h2 className="ib-mail-subject">{th.subject}</h2>
       <p className="hint">
-        <span className={`chip compact ${player ? 'accent' : ''}`}>{player ? t('servers.admin.mailbox.launcher') : t('servers.admin.mailbox.email')}</span> {player ? `${th.name} · ${th.who}` : whoOf(th)}
+        {player ? (
+          <>
+            <span className="chip compact accent">{t('servers.admin.mailbox.ticketNo', { id: th.id })}</span>
+            {th.topic && th.topic in TOPIC_KEYS && <span className="chip compact">{t(TOPIC_KEYS[th.topic as keyof typeof TOPIC_KEYS])}</span>}
+            <span className={`chip compact ${th.closed ? '' : 'success'}`}>{t(th.closed ? 'inbox.ticket.closed' : 'inbox.ticket.open')}</span>
+          </>
+        ) : (
+          <span className="chip compact">{t('servers.admin.mailbox.email')}</span>
+        )}{' '}
+        {player ? `${th.name} · ${th.who}` : whoOf(th)}
       </p>
       <div className="mbx-msgs">
         {th.messages.map((m) => (

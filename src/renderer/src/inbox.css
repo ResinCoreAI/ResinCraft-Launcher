@@ -1080,3 +1080,122 @@
 .mbx-compose textarea {
   font: inherit;
 }
+
+/* ResinCraft's own space in the rail (its support tickets): a tile with the logo, like a server's. */
+.ib2-resin {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: var(--surface-2);
+  border-radius: 14px;
+  transition: border-radius 0.2s var(--ease, ease), background 0.15s var(--ease, ease);
+  cursor: pointer;
+}
+.ib2-resin svg {
+  width: 26px;
+  height: 26px;
+}
+.ib2-resin:hover,
+.ib2-resin.on {
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+.ib2-resin.on {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ib2-resin .ib2-n {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+
+/* Tickets */
+.ib-ticket-no {
+  flex: none;
+  color: var(--text-faint);
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ib-ticket-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.ib-ticket-head .ib-ticket-no {
+  font-size: 15px;
+}
+.ib-ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ib-topics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+.ib-topic {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease, ease), background 0.15s var(--ease, ease);
+}
+.ib-topic:hover {
+  border-color: var(--border-strong);
+}
+.ib-topic.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.ib-topic-icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent);
+}
+.ib-topic-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.ib-topic .hint {
+  font-size: 12px;
+  line-height: 1.35;
+}
+/* A ticket's "closed" / "reopened" line, centred between the messages. */
+.ib-team-sys {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 4px 0;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.ib-team-sys svg {
+  width: 14px;
+  height: 14px;
+}
+.ib-ticket-closed {
+  text-align: center;
+  margin: 0;
+}

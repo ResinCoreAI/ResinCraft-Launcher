@@ -2178,8 +2178,10 @@ export interface ChatGiftData {
 }
 /** A note in a group's chat: it was made, someone joined, left, was added or removed, it was renamed, a role changed. */
 export interface ChatSystemData {
-  event: 'created' | 'joined' | 'left' | 'added' | 'removed' | 'renamed' | 'role' | 'nickname' | 'timeout' | 'untimeout' | 'banned'
+  event: 'created' | 'joined' | 'left' | 'added' | 'removed' | 'renamed' | 'role' | 'nickname' | 'timeout' | 'untimeout' | 'banned' | 'pinned'
   by: string
+  /** What was pinned (event pinned). */
+  message?: number
   who?: string[]
   name?: string
   role?: string
@@ -2269,6 +2271,9 @@ export interface ChatMessage {
   reply: number | null
   edited: number | null
   deleted: number | null
+  /** Pinned for everyone in the chat: when, and by whom. */
+  pinned?: number | null
+  pinnedBy?: string | null
 }
 /** `GET /api/chat/sync`. */
 export interface ChatSync {
@@ -2354,7 +2359,12 @@ export interface TeamMessage {
   at: number
   fromTeam: boolean
   body: string
+  /** A ticket's line: "closed" or "reopened", by `by`. */
+  system?: 'closed' | 'reopened'
+  by?: string
 }
+/** What a ticket is about (relay teammail.rs TOPICS). */
+export type TicketTopic = 'launcher' | 'store' | 'account' | 'report' | 'other'
 /** A conversation a player started with the team (or the team with them), from the Inbox. */
 export interface TeamThread {
   id: number
@@ -2363,6 +2373,11 @@ export interface TeamThread {
   lastAt: number
   unread: number
   messages: TeamMessage[]
+  /** A ticket's topic ('' for conversations from before tickets). */
+  topic?: TicketTopic | ''
+  /** When it was closed (unix seconds), and by whom; null while open. */
+  closed?: number | null
+  closedBy?: string | null
 }
 export interface TeamMailData {
   on: boolean
@@ -2370,6 +2385,7 @@ export interface TeamMailData {
   unread: number
   /** After writing: the conversation it went in. */
   thread?: number
+  topics?: TicketTopic[]
 }
 
 /** A part's day on ResinCraft Status: [uptime %, outage minutes, average ms, slow checks, posted level?, posted titles?]. */

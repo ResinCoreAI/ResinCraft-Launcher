@@ -295,3 +295,20 @@
     display: none;
   }
 }
+/* A ticket's "closed" / "reopened" line between the messages. */
+.mbx-sys {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+  font-size: 12.5px;
+}
+.mbx-sys + .mbx-msg,
+.mbx-msg + .mbx-sys {
+  border-top: 1px solid var(--border);
+}
+.mbx-sys svg {
+  width: 14px;
+  height: 14px;
+}

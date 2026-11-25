@@ -460,6 +460,12 @@ export const chat = {
     return took((await call<{ message: ChatMessage }>('POST', '/api/chat/delete', { id })).message)
   },
   report: (id: number, reason: string) => call<{ report: number }>('POST', '/api/chat/report', { id, reason }),
+  /** Pins (or unpins) a message for everyone in its chat: either friend, or a group's owner and admins. */
+  async pin(id: number, pinned: boolean) {
+    return took((await call<{ message: ChatMessage }>('POST', '/api/chat/pin', { id, pinned })).message)
+  },
+  /** A chat's pinned messages, newest pin first. */
+  pins: async (conv: string) => (await call<{ pins: ChatMessage[] }>('GET', `/api/chat/pins?conv=${encodeURIComponent(conv)}`)).pins,
   async addFriend(name: string) {
     const r = await call<{ state: 'requested' | 'friends'; uuid: string; name: string; friends: ChatFriends }>('POST', '/api/chat/friends/add', { name })
     set({ friends: r.friends, names: namesFrom(r.friends, view.names) })

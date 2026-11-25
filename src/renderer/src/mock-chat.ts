@@ -383,6 +383,18 @@ async function call(method: string, path: string, body?: unknown): Promise<unkno
       changed()
       return { message: m }
     }
+    case 'POST /api/chat/pin': {
+      const m = messages.find((x) => x.id === b.id)
+      if (!m || m.deleted) return err("there's no such message")
+      const on = b.pinned !== false
+      m.pinned = on ? now() : null
+      m.pinnedBy = on ? ME : null
+      m.seq = ++seq
+      changed()
+      return { message: m }
+    }
+    case 'GET /api/chat/pins':
+      return { pins: messages.filter((m) => m.conv === q.get('conv') && m.pinned && !m.deleted).sort((a, c) => (c.pinned ?? 0) - (a.pinned ?? 0)) }
     case 'POST /api/chat/read': {
       const conv = String(b.conv)
       reads[conv] = { ...reads[conv], [ME]: Math.max(reads[conv]?.[ME] ?? 0, Number(b.id)) }
