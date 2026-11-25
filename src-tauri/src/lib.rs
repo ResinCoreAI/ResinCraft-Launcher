@@ -106,6 +106,8 @@ pub fn run() {
                 }
             }
             tauri::async_runtime::spawn(discord::init());
+            // Play starts with a valid Minecraft token instead of signing in first.
+            player::accounts::keep_token_fresh();
             webview::started();
             tauri::async_runtime::spawn(server::discordbot::init());
             tauri::async_runtime::spawn(remote::init());

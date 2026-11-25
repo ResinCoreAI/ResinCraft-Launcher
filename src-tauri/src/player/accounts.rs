@@ -414,12 +414,17 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
         Err(e) => return Err(e),
     };
 
-    let profile: Profile = match send_json(http().get("https://api.minecraftservices.com/minecraft/profile").bearer_auth(&mc.access_token)).await {
+    // The profile and the Bedrock entitlement need only the Minecraft token, so they're asked for together: one
+    // round trip less on every sign-in, and a Play whose token ran out waits that much less.
+    let (profile, owns_bedrock) = tokio::join!(
+        send_json::<Profile>(http().get("https://api.minecraftservices.com/minecraft/profile").bearer_auth(&mc.access_token)),
+        bedrock_entitlement(&mc.access_token)
+    );
+    let profile: Profile = match profile {
         Ok(p) => p,
         // No Java Edition: a Bedrock profile, named after the Xbox gamertag.
         Err(e) if status_of(&e) == Some(404) => {
             let (gamertag, xuid) = xbox_identity(&xbl.token).await?;
-            let owns_bedrock = bedrock_entitlement(&mc.access_token).await;
             return Ok(McLoginResult {
                 java: false,
                 username: gamertag,
@@ -439,7 +444,6 @@ async fn minecraft_login(ms_access_token: &str) -> Result<McLoginResult> {
         Some(x) => Some(x),
         None => xbox_identity(&xbl.token).await.ok().map(|(_, xuid)| xuid),
     };
-    let owns_bedrock = bedrock_entitlement(&mc.access_token).await;
 
     Ok(McLoginResult {
         java: true,
@@ -836,16 +840,60 @@ pub async fn launch_auth_for(id: Option<&str>) -> Result<LaunchAuth> {
 }
 
 /// Opens a Microsoft account's Minecraft token, refreshing it first when it's about to expire (or when `force`d).
-async fn fresh_token(mut acc: StoredAccount, force: bool) -> Result<(StoredAccount, String)> {
+async fn fresh_token(acc: StoredAccount, force: bool) -> Result<(StoredAccount, String)> {
+    renewed(acc, force, 5 * 60_000).await
+}
+
+/// Like `fresh_token`, renewing a token with less than `within_ms` left.
+async fn renewed(mut acc: StoredAccount, force: bool, within_ms: i64) -> Result<(StoredAccount, String)> {
     // Tokens sealed by launcher 0.1 can't be opened here: the account is effectively signed out.
     if is_unreadable(acc.mc_token.as_deref()) || is_unreadable(acc.refresh_token.as_deref()) {
         return Err(sign_in_again(&acc));
     }
-    if force || acc.mc_token_expires.map_or(true, |exp| exp - now_ms() < 5 * 60_000) {
-        acc = refresh(&acc).await?;
+    if force || expires_within(&acc, within_ms) {
+        // One renewal per account at a time: Play and the background renewal (`keep_token_fresh`) don't both sign in,
+        // and the second finds the token the first saved.
+        let turn = REFRESHING.lock().unwrap().entry(acc.id.clone()).or_default().clone();
+        let _turn = turn.lock().await;
+        if let Some(saved) = load().await.into_iter().find(|a| a.id == acc.id) {
+            acc = saved;
+        }
+        if force || expires_within(&acc, within_ms) {
+            acc = refresh(&acc).await?;
+        }
     }
     let token = unseal(acc.mc_token.as_deref()).map_err(|_| sign_in_again(&acc))?;
     Ok((acc, token))
+}
+
+static REFRESHING: std::sync::LazyLock<Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>> =
+    std::sync::LazyLock::new(Default::default);
+
+fn expires_within(acc: &StoredAccount, ms: i64) -> bool {
+    acc.mc_token_expires.map_or(true, |exp| exp - now_ms() < ms)
+}
+
+/// How long before its token runs out the active account signs in again by itself (a Minecraft token lasts a day).
+const RENEW_BEFORE_MS: i64 = 3 * 60 * 60_000;
+
+/// Keeps the active Microsoft account's Minecraft token fresh in the background: soon after the launcher starts and
+/// then every half hour, a token with less than three hours left is renewed. Play then starts with a valid token
+/// instead of first signing in to Microsoft, Xbox Live (twice) and Minecraft, five to seven requests one after another,
+/// which the first Play of each day used to wait for. Quiet: a renewal that fails (offline, a revoked sign-in) is left
+/// to Play, which says what's wrong.
+pub fn keep_token_fresh() {
+    tauri::async_runtime::spawn(async {
+        tokio::time::sleep(Duration::from_secs(20)).await;
+        loop {
+            let list = load().await;
+            if let Some(acc) = list.iter().find(|a| a.active).or_else(|| list.first()) {
+                if acc.kind == "msa" && expires_within(acc, RENEW_BEFORE_MS) {
+                    let _ = renewed(acc.clone(), false, RENEW_BEFORE_MS).await;
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(30 * 60)).await;
+        }
+    });
 }
 
 // ---------- ResinCraft Relay (see `server::relay`) ----------
