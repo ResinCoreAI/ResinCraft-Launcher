@@ -595,6 +595,12 @@ pub struct SearchQuery {
     /// Categories it must have, by Modrinth id ("magic", "16x", "iris"); other sites match them as well as they can.
     #[serde(default)]
     pub categories: Vec<String>,
+    /// Modrinth only: "client" or "server", projects that run there.
+    #[serde(default)]
+    pub environment: Option<String>,
+    /// Modrinth only: open-source projects only.
+    #[serde(default)]
+    pub open_source: bool,
     #[serde(default)]
     pub offset: Option<u32>,
     #[serde(default)]

@@ -1710,6 +1710,100 @@ button.stat b {
   background: var(--border);
 }
 
+/* Discover's More filters: the button (with how many are on) and the panel under the toolbar. */
+.more-filters-btn .count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.more-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin: -6px 0 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.more-filters-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+label.more-filters-row {
+  cursor: pointer;
+}
+.more-filters-row.wide {
+  flex-basis: 100%;
+  align-items: flex-start;
+}
+.more-filters-label {
+  flex: none;
+  min-width: 92px;
+  padding-top: 4px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.more-filters-row:not(.wide) .more-filters-label {
+  padding-top: 0;
+  min-width: 0;
+}
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.filter-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.filter-chip.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.filter-chip svg {
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
+}
+.filter-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.more-filters-note {
+  flex-basis: 100%;
+}
+
 /* ---------- Menu ---------- */
 
 .menu-wrap {

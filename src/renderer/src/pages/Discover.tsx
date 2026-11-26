@@ -21,6 +21,7 @@ import {
   Repeat,
   Search,
   Server,
+  SlidersHorizontal,
   Sparkles,
   SquareCheck,
   Star,
@@ -42,7 +43,7 @@ import type {
 } from '@shared/types'
 import { api } from '../api'
 import { AutoLoadMore } from '../components/AutoLoadMore'
-import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, useCopy, type ContextEntry } from '../components/ui'
+import { celebrate, Empty, InstanceTile, Modal, openContextMenu, Segmented, Switch, useCopy, type ContextEntry } from '../components/ui'
 import { SourceBadge, SourceMark } from '../components/SourceMark'
 import VersionPicker from '../components/VersionPicker'
 import {
@@ -311,9 +312,16 @@ export default function Discover({
   const [sort, setSort] = useState<SortMode>('relevance')
   const [gameVersion, setGameVersion] = useState(target?.mcVersion ?? '')
   const [loader, setLoader] = useState<LoaderType | ''>(target && target.loader !== 'vanilla' ? target.loader : '')
-  const [category, setCategory] = useState('')
+  /** Categories a project must have (the Category list picks one; More filters picks several). */
+  const [categories, setCategories] = useState<string[]>([])
   /** A resource pack's resolution or a shader's loader. */
   const [extra, setExtra] = useState('')
+  /** More filters, as Modrinth and CurseForge have them. */
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [environment, setEnvironment] = useState<'' | 'client' | 'server'>('')
+  const [openSource, setOpenSource] = useState(false)
+  const [snapshots, setSnapshots] = useState(false)
+  const [hideInstalled, setHideInstalled] = useState(false)
   /** Discover → My projects (posting to ResinCraft). */
   const [posting, setPosting] = useState(false)
   const [versions, setVersions] = useState<McVersion[]>([])
@@ -359,7 +367,7 @@ export default function Discover({
   const blockedLabel = (h: ProjectHit): string => (h.horizon?.revoked ? t('discover.horizon.revokedChip') : t('discover.horizon.otherGameChip'))
 
   useEffect(() => {
-    void api.versions.list().then((v) => setVersions(v.filter((x) => x.type === 'release')))
+    void api.versions.list().then((v) => setVersions(v.filter((x) => x.type === 'release' || x.type === 'snapshot')))
   }, [])
 
   useEffect(() => {
@@ -397,10 +405,15 @@ export default function Discover({
 
   // The kind's own filters start over with each kind.
   useEffect(() => {
-    setCategory('')
+    setCategories([])
     setExtra('')
   }, [kind])
   const categorized = source === 'all' || CATEGORY_SITES.includes(source)
+  /** Environment and open source: only Modrinth says, so "All" asks only Modrinth while one is on. */
+  const modrinthFilters = source === 'all' || source === 'modrinth'
+  const sideKinds = kind === 'mod' || kind === 'modpack'
+  const env = (modrinthFilters && sideKinds && environment) || undefined
+  const onlyOpen = modrinthFilters && openSource
   const q = useMemo(
     () => ({
       query: debounced,
@@ -408,14 +421,22 @@ export default function Discover({
       sort,
       gameVersion: gameVersion || undefined,
       loader: ((kind === 'mod' || kind === 'modpack') && loader) || undefined,
-      categories: categorized ? [category, extra].filter(Boolean) : undefined
+      categories: categorized ? [...categories, extra].filter(Boolean) : undefined,
+      environment: env,
+      openSource: onlyOpen || undefined
     }),
-    [debounced, kind, sort, gameVersion, loader, category, extra, categorized]
+    [debounced, kind, sort, gameVersion, loader, categories, extra, categorized, env, onlyOpen]
   )
-  const filtered = !!category || !!extra || (!target && (!!gameVersion || !!loader))
+  /** How many of More filters' own choices are on (shown on its button). */
+  const moreCount = categories.length + (env ? 1 : 0) + (onlyOpen ? 1 : 0) + (snapshots && !target ? 1 : 0) + (hideInstalled && target ? 1 : 0)
+  const filtered = categories.length > 0 || !!extra || !!env || onlyOpen || (!!target && hideInstalled) || (!target && (!!gameVersion || !!loader))
+  const toggleCategory = (c: string) => setCategories((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]))
   const clearFilters = () => {
-    setCategory('')
+    setCategories([])
     setExtra('')
+    setEnvironment('')
+    setOpenSource(false)
+    setHideInstalled(false)
     if (!target) {
       setGameVersion('')
       setLoader('')
@@ -425,9 +446,14 @@ export default function Discover({
   const allSites = useMemo(
     () =>
       SOURCES.filter(
-        (s) => s.value !== 'horizon' && s.kinds.includes(kind) && !(s.value === 'curseforge' && noCurseForge) && !(target && modpackOnly(s.value))
+        (s) =>
+          s.value !== 'horizon' &&
+          s.kinds.includes(kind) &&
+          !(s.value === 'curseforge' && noCurseForge) &&
+          !(target && modpackOnly(s.value)) &&
+          (s.value === 'modrinth' || !(env || onlyOpen))
       ).map((s) => s.value),
-    [kind, noCurseForge, target]
+    [kind, noCurseForge, target, env, onlyOpen]
   )
 
   /** One page from every site in "All", interleaved; `fresh` starts over. */
@@ -483,6 +509,8 @@ export default function Discover({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, source, needsKey, allSites])
 
+  /** The results to show: without what this instance already has, when More filters says so. */
+  const shown = target && hideInstalled ? hits?.filter((h) => !installed.has(h.id)) : hits
   const hasMore = source === 'all' ? Object.values(cursor.current).some((c) => c && c.next < c.total) : !!hits && hits.length < total
 
   const more = async () => {
@@ -867,11 +895,13 @@ export default function Discover({
             >
               <option value="">{t('discover.filter.allVersions')}</option>
               {target && !versions.some((v) => v.id === target.mcVersion) && <option value={target.mcVersion}>{target.mcVersion}</option>}
-              {versions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.id}
-                </option>
-              ))}
+              {versions
+                .filter((v) => v.type === 'release' || (snapshots && !target) || v.id === gameVersion)
+                .map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.id}
+                  </option>
+                ))}
             </select>
             {(kind === 'mod' || kind === 'modpack') && !horizon && (
               <select
@@ -889,8 +919,18 @@ export default function Discover({
               </select>
             )}
             {categorized && CATEGORY_FILTERS[kind] && (
-              <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} aria-label={t('discover.filter.category')}>
+              <select
+                className="select"
+                value={categories.length > 1 ? '*' : (categories[0] ?? '')}
+                onChange={(e) => setCategories(e.target.value ? [e.target.value] : [])}
+                aria-label={t('discover.filter.category')}
+              >
                 <option value="">{t('discover.filter.anyCategory')}</option>
+                {categories.length > 1 && (
+                  <option value="*" disabled>
+                    {t('discover.filter.nCategories', { count: categories.length })}
+                  </option>
+                )}
                 {CATEGORY_FILTERS[kind]!.map((c) => (
                   <option key={c} value={c}>
                     {categoryLabel(c)}
@@ -925,12 +965,71 @@ export default function Discover({
                 </option>
               ))}
             </select>
+            <button
+              className={`btn sm ${moreOpen ? '' : 'ghost'} more-filters-btn`}
+              onClick={() => setMoreOpen((o) => !o)}
+              aria-expanded={moreOpen}
+              aria-controls="discover-more-filters"
+            >
+              <SlidersHorizontal /> {t('discover.filter.more')}
+              {moreCount > 0 && <span className="count">{moreCount}</span>}
+            </button>
             {filtered && (
               <button className="btn ghost sm" onClick={clearFilters}>
                 <X /> {t('discover.filter.clear')}
               </button>
             )}
           </div>
+          {moreOpen && (
+            <div className="more-filters" id="discover-more-filters">
+              {categorized && CATEGORY_FILTERS[kind] && (
+                <div className="more-filters-row wide">
+                  <span className="more-filters-label">{t('discover.filter.categories')}</span>
+                  <div className="filter-chips" role="group" aria-label={t('discover.filter.categories')}>
+                    {CATEGORY_FILTERS[kind]!.map((c) => (
+                      <button key={c} type="button" className={`filter-chip ${categories.includes(c) ? 'on' : ''}`} aria-pressed={categories.includes(c)} onClick={() => toggleCategory(c)}>
+                        {categories.includes(c) && <Check />}
+                        {categoryLabel(c)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {modrinthFilters && sideKinds && (
+                <div className="more-filters-row">
+                  <span className="more-filters-label">{t('discover.filter.environment')}</span>
+                  <Segmented
+                    value={environment}
+                    onChange={setEnvironment}
+                    options={[
+                      { value: '', label: t('discover.filter.envAny') },
+                      { value: 'client', label: t('discover.filter.envClient') },
+                      { value: 'server', label: t('discover.filter.envServer') }
+                    ]}
+                  />
+                </div>
+              )}
+              {modrinthFilters && (
+                <label className="more-filters-row">
+                  <Switch on={openSource} onChange={setOpenSource} label={t('discover.filter.openSource')} />
+                  <span>{t('discover.filter.openSource')}</span>
+                </label>
+              )}
+              {!target && (
+                <label className="more-filters-row">
+                  <Switch on={snapshots} onChange={setSnapshots} label={t('discover.filter.snapshots')} />
+                  <span>{t('discover.filter.snapshots')}</span>
+                </label>
+              )}
+              {target && (
+                <label className="more-filters-row">
+                  <Switch on={hideInstalled} onChange={setHideInstalled} label={t('discover.filter.hideInstalled')} />
+                  <span>{t('discover.filter.hideInstalled')}</span>
+                </label>
+              )}
+              {source === 'all' && (env || onlyOpen) && <span className="hint more-filters-note">{t('discover.filter.modrinthOnly')}</span>}
+            </div>
+          )}
 
           {horizon && source === 'modrinth' && <span className="hint">{t('discover.horizon.modrinthHint')}</span>}
           {source === 'all' && failed.length > 0 && hits && hits.length > 0 && (
@@ -988,13 +1087,13 @@ export default function Discover({
                 <div key={i} className="skeleton" />
               ))}
             </div>
-          ) : hits.length === 0 ? (
+          ) : !shown?.length && !hasMore ? (
             <Empty icon={<Search />} title={t('discover.empty.title')}>
               {t('discover.empty.body')}
             </Empty>
           ) : (
             <div className="results">
-              {hits.map((h) => {
+              {shown!.map((h) => {
                 const have = installed.get(h.id)
                 const isSelected = selected.has(h.id)
                 const state = installing[h.id]

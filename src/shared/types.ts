@@ -654,6 +654,10 @@ export interface SearchQuery {
   limit?: number
   /** Categories it must have, by Modrinth id ("magic", "16x", "iris"); other sites match them as well as they can. */
   categories?: string[]
+  /** Modrinth only: projects that run on the client or the server. */
+  environment?: 'client' | 'server'
+  /** Modrinth only: open-source projects only. */
+  openSource?: boolean
 }
 
 /** What players post to ResinCraft Relay for Discover (its community.rs); admins approve each one first. */

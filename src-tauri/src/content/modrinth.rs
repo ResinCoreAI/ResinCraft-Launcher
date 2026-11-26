@@ -149,7 +149,8 @@ pub(crate) fn is_category(c: &str) -> bool {
     (1..=32).contains(&c.len()) && c.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '+')
 }
 
-pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
+/// The search's facets: each inner list is "any of", the lists together "all of".
+fn facets(q: &SearchQuery) -> Vec<Vec<String>> {
     let mut facets: Vec<Vec<String>> = vec![vec![format!("project_type:{}", q.kind.as_str())]];
     if let Some(v) = q.game_version.as_deref().filter(|v| !v.is_empty()) {
         facets.push(vec![format!("versions:{v}")]);
@@ -171,6 +172,19 @@ pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
     for c in q.categories.iter().filter(|c| is_category(c)) {
         facets.push(vec![format!("categories:{c}")]);
     }
+    // Where it runs, as Modrinth's own Environment filter: needed or optional there.
+    match q.environment.as_deref() {
+        Some(side @ ("client" | "server")) => facets.push(vec![format!("{side}_side:required"), format!("{side}_side:optional")]),
+        _ => {}
+    }
+    if q.open_source {
+        facets.push(vec!["open_source:true".into()]);
+    }
+    facets
+}
+
+pub async fn search(q: &SearchQuery) -> Result<SearchResult> {
+    let facets = facets(q);
     let url = format!(
         "{API}/search?query={}&facets={}&index={}&offset={}&limit={}",
         enc(&q.query),
@@ -1124,4 +1138,30 @@ pub async fn pack_mods(version_id: &str) -> Result<Vec<crate::core::types::PackM
             }
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn query(kind: ContentKind) -> SearchQuery {
+        SearchQuery { query: String::new(), kind, source: None, game_version: None, loader: None, sort: None, offset: None, limit: None, categories: Vec::new(), environment: None, open_source: false }
+    }
+
+    #[test]
+    fn environment_and_open_source_facets() {
+        let mut q = query(ContentKind::Mod);
+        q.categories = vec!["magic".into(), "storage".into()];
+        q.environment = Some("server".into());
+        q.open_source = true;
+        let f = facets(&q);
+        assert_eq!(f[0], vec!["project_type:mod"]);
+        assert!(f.contains(&vec!["categories:magic".to_string()]) && f.contains(&vec!["categories:storage".to_string()]));
+        assert!(f.contains(&vec!["server_side:required".to_string(), "server_side:optional".to_string()]));
+        assert!(f.contains(&vec!["open_source:true".to_string()]));
+        // Anything else as the environment is no filter at all.
+        q.environment = Some("both\"]".into());
+        q.open_source = false;
+        assert_eq!(facets(&q).len(), 3);
+    }
 }
